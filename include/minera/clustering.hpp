@@ -49,6 +49,17 @@ struct TraceAttributeClusteringResult {
   TraceAttributeClusteringDiagnostics diagnostics;
 };
 
+// Source trace positions, independent of possibly repeated case identifiers.
+// Shares the discovery algorithm's exact selector/alias and first-seen order.
+struct TraceAttributeClusteringGroup {
+  std::string name;
+  std::vector<std::size_t> trace_indices;
+};
+
+[[nodiscard]] std::vector<TraceAttributeClusteringGroup>
+trace_attribute_clustering_groups(const EventLog& log,
+                                 const std::string& trace_attribute);
+
 [[nodiscard]] TraceAttributeClusteringResult discover_trace_attribute_clustering(
     const EventLog& log,
     const TraceAttributeClusteringOptions& options = {});

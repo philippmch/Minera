@@ -249,6 +249,29 @@ double pair_distance(const Profile& a, const Profile& b,
 struct Cluster { std::vector<std::size_t> members; std::string name; TraceAttributeClusteringNode node; };
 }
 
+std::vector<TraceAttributeClusteringGroup> trace_attribute_clustering_groups(
+    const EventLog& log, const std::string& trace_attribute) {
+  if (trace_attribute.empty()) throw std::invalid_argument("clustering: trace_attribute must not be empty");
+  std::map<std::string, std::size_t> indices;
+  std::vector<TraceAttributeClusteringGroup> groups;
+  const auto key = trace_attribute.rfind("case:", 0) == 0
+      ? trace_attribute.substr(5) : trace_attribute;
+  const bool case_id_selector = key == "concept:name" || key == "id" ||
+                                key == "case:id" || key == "case_id";
+  for (std::size_t i = 0; i < log.traces.size(); ++i) {
+    const auto& trace = log.traces[i];
+    const auto* value = case_id_selector ? &trace.case_id : trace.attribute(trace_attribute);
+    if (!value) value = trace.attribute(key);
+    if (!value && trace_attribute.rfind("case:", 0) != 0)
+      value = trace.attribute("case:" + trace_attribute);
+    if (!value) continue;
+    const auto [it, inserted] = indices.emplace(*value, groups.size());
+    if (inserted) groups.push_back({*value, {}});
+    groups[it->second].trace_indices.push_back(i);
+  }
+  return groups;
+}
+
 TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLog& log, const TraceAttributeClusteringOptions& o) {
   if (o.trace_attribute.empty()) throw std::invalid_argument("clustering: trace_attribute must not be empty");
   if (!std::isfinite(o.alpha) || o.alpha < 0 || o.alpha > 1) throw std::invalid_argument("clustering: alpha must be in [0,1]");
@@ -257,24 +280,15 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
   TraceAttributeClusteringResult r; r.diagnostics.trace_count = log.traces.size();
   // Attribute values are discovered in input order.  Keep a separate lookup
   // map so grouping remains linear without imposing lexical output order.
-  std::map<std::string, std::size_t> group_indices;
   struct TraceGroup {
     std::string name;
     std::vector<const Trace*> traces;
   };
   std::vector<TraceGroup> groups;
-  for (const auto& t : log.traces) {
-    const std::string key = o.trace_attribute.rfind("case:", 0) == 0 ? o.trace_attribute.substr(5) : o.trace_attribute;
-    const bool case_id_selector = key == "concept:name" || key == "id" ||
-                                  key == "case:id" || key == "case_id";
-    const auto* v = case_id_selector ? &t.case_id : t.attribute(o.trace_attribute);
-    if (!v) v = t.attribute(key);
-    if (!v && o.trace_attribute.rfind("case:", 0) != 0) v = t.attribute("case:" + o.trace_attribute);
-    if (!v) continue;
-    const std::string name = *v;
-    const auto [it, inserted] = group_indices.emplace(name, groups.size());
-    if (inserted) groups.push_back({name, {}});
-    groups[it->second].traces.push_back(&t);
+  for (const auto& membership : trace_attribute_clustering_groups(log, o.trace_attribute)) {
+    groups.push_back({membership.name, {}});
+    for (const auto index : membership.trace_indices)
+      groups.back().traces.push_back(&log.traces[index]);
   }
   if (groups.size() > o.max_groups) throw std::invalid_argument("clustering: group bound exceeded");
   r.diagnostics.group_count = groups.size();
@@ -294,8 +308,9 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
   }
   if (groups.empty()) {
     r.tree = {"root", {}, 0.0, 0, true};
+    r.diagnostics.node_count = 1;
     r.diagnostics.computed = true;
-    r.diagnostics.message = "empty event log";
+    r.diagnostics.message = log.traces.empty() ? "empty event log" : "no matching trace attribute groups";
     return r;
   }
   std::vector<Cluster> cs; cs.reserve(groups.size());
@@ -393,12 +408,15 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
 std::string trace_attribute_clustering_json(const TraceAttributeClusteringResult& r) {
   std::set<std::string> leaves;
   std::size_t node_count = 0;
+  const bool empty_root = r.diagnostics.group_count == 0 && r.leaf_names.empty() &&
+      r.tree.leaf && r.tree.size == 0 && r.tree.children.empty();
   std::function<void(const TraceAttributeClusteringNode&)> validate = [&](const auto& node) {
     ++node_count;
-    if (node.name.empty() || !std::isfinite(node.distance) || node.distance < 0.0)
+    if (!std::isfinite(node.distance) || node.distance < 0.0)
       throw std::invalid_argument("clustering: malformed result node");
     if (node.leaf) {
-      if (!node.children.empty() || node.size == 0 || !leaves.insert(node.name).second)
+      if (!node.children.empty() || (node.size == 0 && !empty_root) ||
+          (!empty_root && !leaves.insert(node.name).second))
         throw std::invalid_argument("clustering: malformed result leaf");
     } else if (node.children.empty()) {
       throw std::invalid_argument("clustering: internal result node has no children");

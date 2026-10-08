@@ -44,6 +44,16 @@
 .native-discovery,.discovery-inspection { min-width: 0; padding-bottom: 24px; }
 .native-discovery pre,.discovery-inspection pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .discovery-inspection h3,.discovery-inspection p,.discovery-inspection details { margin-inline: 24px; }
+.clustering-workspace,.clustering-inspection,.clustering-dendrogram { min-width:0; padding-bottom:24px; }
+.clustering-inspection > .query-actions,.clustering-inspection > p,.clustering-inspection > h3,.clustering-inspection > details { margin:16px 24px; }
+.clustering-workspace pre,.clustering-inspection pre { white-space:pre-wrap;overflow-wrap:anywhere; }
+.profile-selector-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px; }
+.clustering-dendrogram-wrap { max-height:560px;overflow:auto;margin:16px 24px; }
+.clustering-dendrogram svg { min-width:700px;width:100%;height:auto; }
+.cluster-axis,.cluster-branch { fill:none;stroke:var(--line);stroke-width:1.4; }
+.cluster-node { cursor:pointer; }.cluster-node circle { fill:var(--paper);stroke:var(--ink);stroke-width:1.5; }.cluster-node.selected circle { fill:var(--accent); }
+.clustering-dendrogram text { fill:var(--ink);font:12px var(--font-mono); }
+@media(max-width:600px){.clustering-inspection > .query-actions,.clustering-inspection > p,.clustering-inspection > h3,.clustering-inspection > details,.clustering-dendrogram-wrap{margin-inline:12px;}.profile-selector-grid{grid-template-columns:minmax(0,1fr);}}
 @media (max-width:600px) { .query-fields, .query-filter { padding-inline:12px; }.query-intro, .query-results, .query-setup { margin-inline:12px; }.query-options > label { flex:1 1 140px;min-width:0; }.query-options input, .query-options select { width:100%; } }
 
 .ask-model-panel { min-width: 0; padding-bottom: 24px; }

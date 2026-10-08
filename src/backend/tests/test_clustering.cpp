@@ -15,6 +15,10 @@ EventLog sample() {
 
 int main() {
   auto l = sample(); TraceAttributeClusteringOptions o; o.trace_attribute="segment";
+  const auto memberships = trace_attribute_clustering_groups(l, "segment");
+  assert(memberships.size() == 2 && memberships[0].name == "z" && memberships[1].name == "y");
+  assert(memberships[0].trace_indices == std::vector<std::size_t>({0, 2}));
+  assert(memberships[1].trace_indices == std::vector<std::size_t>({1}));
   for (auto v : {TraceAttributeClusteringVariant::kDmmLeven, TraceAttributeClusteringVariant::kAvgLeven,
                  TraceAttributeClusteringVariant::kDmmVec, TraceAttributeClusteringVariant::kAvgVec,
                  TraceAttributeClusteringVariant::kDfg}) {
@@ -22,6 +26,19 @@ int main() {
     const auto j=trace_attribute_clustering_json(r); assert(j.find("TRACE_ATTRIBUTE_CLUSTERING")!=std::string::npos); assert(j.find("leaf_names")!=std::string::npos);
   }
   EventLog empty; auto e=discover_trace_attribute_clustering(empty,o); assert(e.diagnostics.computed && e.diagnostics.group_count==0);
+  assert(trace_attribute_clustering_json(e).find("empty event log") != std::string::npos);
+  auto no_groups = o; no_groups.trace_attribute = "missing";
+  const auto unmatched = discover_trace_attribute_clustering(l, no_groups);
+  assert(unmatched.diagnostics.trace_count == 3 && unmatched.tree.size == 0);
+  assert(trace_attribute_clustering_json(unmatched).find("no matching trace attribute groups") != std::string::npos);
+  auto blank_label = l;
+  blank_label.traces[0].attributes[0].value.clear();
+  const auto blank_result = discover_trace_attribute_clustering(blank_label, o);
+  assert(trace_attribute_clustering_json(blank_result).find("\"name\":\"\"") != std::string::npos);
+  auto repeated_ids = l;
+  repeated_ids.traces[2].case_id = repeated_ids.traces[0].case_id;
+  const auto repeated_groups = trace_attribute_clustering_groups(repeated_ids, "case:concept:name");
+  assert(repeated_groups.size() == 2 && repeated_groups[0].trace_indices == std::vector<std::size_t>({0, 2}));
   bool threw=false; try { auto bad=o; bad.alpha=2; (void)discover_trace_attribute_clustering(l,bad); } catch(const std::invalid_argument&) {threw=true;} assert(threw);
   threw=false; try { auto bad=o; bad.percent=0; (void)discover_trace_attribute_clustering(l,bad); } catch(const std::invalid_argument&) {threw=true;} assert(threw);
   threw=false; try { auto bad=o; bad.max_output_nodes=2; (void)discover_trace_attribute_clustering(l,bad); } catch(const std::invalid_argument&) {threw=true;} assert(threw);

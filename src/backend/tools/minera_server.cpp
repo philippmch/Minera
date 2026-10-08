@@ -414,6 +414,16 @@ const minera::PetriNet& select_cached_or_process_tree_net(
 
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
+
+struct ClusteringAnalysis {
+  std::string id;
+  std::shared_ptr<const MinedSession> source;
+  std::optional<minera::TraceAttributeClusteringResult> hierarchy;
+  std::optional<minera::ProfileClusteringResult> profiles;
+  std::vector<minera::TraceAttributeClusteringGroup> groups;
+};
+std::atomic<std::uint64_t> g_clustering_sequence{0};
+std::shared_ptr<const ClusteringAnalysis> g_clustering_analysis;
 bool g_embedding_runtime_enabled = false;
 std::string g_llm_runtime_url;
 std::string g_query_runtime_url;
@@ -1123,6 +1133,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     {
       std::lock_guard<std::mutex> lock(g_session_mutex);
       g_session = std::move(session);
+      g_clustering_analysis.reset();
     }
 
     response.set_content(body, "application/json");
@@ -3660,17 +3671,170 @@ void handle_local_diagnostics(const httplib::Request& request, httplib::Response
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
+bool clustering_cases_requested(const httplib::Request& request,
+                                const MinedSession& session) {
+  if (request.has_param("source_id") && request.get_param_value("source_id") !=
+      std::to_string(session.query_source_id))
+    throw std::invalid_argument("the source log changed; refresh the clustering source");
+  if (!request.has_param("include_cases")) return false;
+  const auto value = request.get_param_value("include_cases");
+  if (value != "true" && value != "false")
+    throw std::invalid_argument("include_cases must be true or false");
+  if (value == "false") return false;
+  if (!request.has_param("source_id"))
+    throw std::invalid_argument("source_id is required for clustering case analysis");
+  return true;
+}
+
+std::string clustering_analysis_json(std::shared_ptr<ClusteringAnalysis> analysis,
+                                     std::string result_json) {
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  if (analysis->profiles) {
+    // The optional workflow includes native centroids; legacy JSON stays stable.
+    std::ostringstream centroids;
+    centroids.precision(std::numeric_limits<double>::max_digits10);
+    centroids << '[';
+    const auto& rows = analysis->profiles->centroids;
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+      if (i) centroids << ',';
+      centroids << '[';
+      for (std::size_t j = 0; j < rows[i].size(); ++j) {
+        if (j) centroids << ',';
+        centroids << rows[i][j];
+      }
+      centroids << ']';
+    }
+    centroids << ']';
+    result_json.pop_back();
+    result_json += ",\"centroids\":" + centroids.str() + '}';
+  }
+  analysis->id = std::to_string(++g_clustering_sequence);
+  std::string body = "{\"family\":\"CLUSTER_ANALYSIS\",\"analysis_id\":" + quote(analysis->id) +
+      ",\"source_id\":" + quote(std::to_string(analysis->source->query_source_id)) +
+      ",\"result\":" + result_json + ",\"cases\":[";
+  for (std::size_t i = 0; i < analysis->source->log.traces.size(); ++i) {
+    if (i) body += ',';
+    const auto& trace = analysis->source->log.traces[i];
+    body += "{\"index\":" + std::to_string(i) + ",\"case_id\":" + quote(trace.case_id) +
+        ",\"event_count\":" + std::to_string(trace.events.size()) + '}';
+  }
+  body += "],\"groups\":[";
+  for (std::size_t i = 0; i < analysis->groups.size(); ++i) {
+    if (i) body += ',';
+    const auto& group = analysis->groups[i];
+    body += "{\"name\":" + quote(group.name) + ",\"trace_indices\":[";
+    for (std::size_t j = 0; j < group.trace_indices.size(); ++j) {
+      if (j) body += ',';
+      body += std::to_string(group.trace_indices[j]);
+    }
+    body += "]}";
+  }
+  body += "]}";
+  std::lock_guard<std::mutex> lock(g_session_mutex);
+  if (!g_session || g_session->query_source_id != analysis->source->query_source_id)
+    throw std::invalid_argument("the source log changed during clustering; run again");
+  g_clustering_analysis = std::move(analysis);
+  return body;
+}
+
+std::size_t clustering_index(std::string_view text) {
+  std::size_t value = 0;
+  const auto parsed = std::from_chars(text.data(), text.data() + text.size(), value);
+  if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size())
+    throw std::invalid_argument("invalid clustering selection index");
+  return value;
+}
+
+void handle_clustering_export(const httplib::Request& request,
+                              httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {"source_id", "analysis_id", "selection", "format"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key)) throw std::invalid_argument("unknown clustering export parameter: " + key);
+    }
+    for (const auto key : {"source_id", "analysis_id", "selection"})
+      if (!request.has_param(key)) throw std::invalid_argument(std::string(key) + " is required for clustering export");
+    std::shared_ptr<const ClusteringAnalysis> analysis;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      analysis = g_clustering_analysis;
+      if (!analysis || analysis->id != request.get_param_value("analysis_id"))
+        throw std::invalid_argument("the clustering analysis was replaced; run clustering again");
+      if (!g_session || request.get_param_value("source_id") != std::to_string(g_session->query_source_id) ||
+          g_session->query_source_id != analysis->source->query_source_id)
+        throw std::invalid_argument("the source log changed; run clustering again");
+    }
+    const auto selection = request.get_param_value("selection");
+    std::vector<std::size_t> indices;
+    if (analysis->hierarchy) {
+      if (selection.empty() || selection[0] != 'r') throw std::invalid_argument("invalid hierarchy selection");
+      const auto* node = &analysis->hierarchy->tree;
+      std::size_t position = 1;
+      while (position < selection.size()) {
+        if (selection[position++] != '/') throw std::invalid_argument("invalid hierarchy path");
+        const auto end = selection.find('/', position);
+        const auto index = clustering_index(std::string_view(selection).substr(position, end == std::string::npos ? end : end - position));
+        if (index >= node->children.size()) throw std::invalid_argument("hierarchy selection is out of range");
+        node = &node->children[index];
+        position = end == std::string::npos ? selection.size() : end;
+      }
+      std::set<std::string> leaves;
+      std::vector<const minera::TraceAttributeClusteringNode*> pending{node};
+      while (!pending.empty()) {
+        const auto* current = pending.back(); pending.pop_back();
+        if (current->leaf && current->size) leaves.insert(current->name);
+        for (const auto& child : current->children) pending.push_back(&child);
+      }
+      for (const auto& group : analysis->groups) if (leaves.contains(group.name))
+        indices.insert(indices.end(), group.trace_indices.begin(), group.trace_indices.end());
+    } else {
+      if (selection.rfind("c/", 0) != 0) throw std::invalid_argument("invalid profile cluster selection");
+      const auto index = clustering_index(std::string_view(selection).substr(2));
+      if (!analysis->profiles || index >= analysis->profiles->clusters.size())
+        throw std::invalid_argument("profile cluster selection is out of range");
+      indices = analysis->profiles->clusters[index];
+    }
+    std::sort(indices.begin(), indices.end());
+    indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+    auto selected = analysis->source->log;
+    selected.traces.clear();
+    for (const auto index : indices) selected.traces.push_back(analysis->source->log.traces.at(index));
+    const auto format = request.has_param("format") ? request.get_param_value("format") : "xes";
+    response.set_header("X-Minera-Case-Count", std::to_string(selected.trace_count()));
+    response.set_header("X-Minera-Event-Count", std::to_string(selected.event_count()));
+    if (format == "xes") {
+      minera::XesExportOptions options; options.preserve_nulls = true;
+      response.set_content(minera::serialize_xes(selected, options), "application/xml");
+    } else if (format == "json") {
+      minera::LogConversionOptions options; options.variant = minera::LogConversionVariant::kToDataFrame;
+      response.set_content(minera::log_conversion_json(minera::convert_event_log(selected, options)), "application/json");
+    } else throw std::invalid_argument("clustering export format must be xes or json");
+  } catch (const std::exception& error) {
+    response.status = 400; response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_clustering(const httplib::Request& request, httplib::Response& response) {
   try {
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status=409; response.set_content(error_json("no cached log; run /api/mine first"),"application/json"); return; }
-    static const std::set<std::string> allowed={"clustering_trace_attribute","clustering_activity_attribute","clustering_variant","clustering_alpha","clustering_percent","clustering_max_groups","clustering_max_output_nodes"};
+    static const std::set<std::string> allowed={"clustering_trace_attribute","clustering_activity_attribute","clustering_variant","clustering_alpha","clustering_percent","clustering_max_groups","clustering_max_output_nodes","source_id","include_cases"};
     for (const auto& [k,v] : request.params) { (void)v; if(!allowed.contains(k)) throw std::invalid_argument("unknown clustering parameter: "+k); }
     const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};};
     const auto present=[&](std::string_view n){return request.has_param(std::string(n));};
+    const bool include_cases = clustering_cases_requested(request, *session);
     const auto o=minera::parse_clustering_params(lookup,present);
-    response.set_content(minera::trace_attribute_clustering_json(minera::discover_trace_attribute_clustering(session->log,o)),"application/json");
+    const auto result = minera::discover_trace_attribute_clustering(session->log,o);
+    auto body = minera::trace_attribute_clustering_json(result);
+    if (include_cases) {
+      auto analysis = std::make_shared<ClusteringAnalysis>();
+      analysis->source = session; analysis->hierarchy = result;
+      analysis->groups = minera::trace_attribute_clustering_groups(session->log, o.trace_attribute);
+      body = clustering_analysis_json(std::move(analysis), std::move(body));
+    }
+    response.set_content(body,"application/json");
   } catch (const std::exception& e) { response.status=400; response.set_content(error_json(e.what()),"application/json"); }
 }
 
@@ -3692,7 +3856,7 @@ void handle_profile_clustering(const httplib::Request& request,
         "profile_include_activity", "profile_include_succession",
         "profile_trace_string_attributes", "profile_event_string_attributes",
         "profile_trace_numeric_attributes", "profile_event_numeric_attributes",
-        "profile_feature_names"};
+        "profile_feature_names", "source_id", "include_cases"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -3706,6 +3870,7 @@ void handle_profile_clustering(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool include_cases = clustering_cases_requested(request, *session);
     const auto options = minera::parse_profile_clustering_params(lookup, present);
     if (options.cluster_count > kServerProfileMaxClusters ||
         options.max_iterations > kServerProfileMaxIterations ||
@@ -3713,10 +3878,14 @@ void handle_profile_clustering(const httplib::Request& request,
         options.max_features > kServerProfileMaxFeatures) {
       throw std::invalid_argument("profile clustering safety bound exceeded");
     }
-    response.set_content(
-        minera::profile_clustering_json(
-            minera::discover_profile_clustering(session->log, options)),
-        "application/json");
+    const auto result = minera::discover_profile_clustering(session->log, options);
+    auto body = minera::profile_clustering_json(result);
+    if (include_cases) {
+      auto analysis = std::make_shared<ClusteringAnalysis>();
+      analysis->source = session; analysis->profiles = result;
+      body = clustering_analysis_json(std::move(analysis), std::move(body));
+    }
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -8131,6 +8300,7 @@ int main(int argc, char** argv) {
   server.Options("/api/local-diagnostics", preflight);
   server.Options("/api/clustering", preflight);
   server.Options("/api/profile-clustering", preflight);
+  server.Options("/api/clustering/export", preflight);
   server.Options("/api/chaotic-activities", preflight);
   server.Options("/api/passed-time", preflight);
   server.Options("/api/service-time", preflight);
@@ -8239,6 +8409,7 @@ int main(int argc, char** argv) {
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
   server.Post("/api/profile-clustering", handle_profile_clustering);
+  server.Post("/api/clustering/export", handle_clustering_export);
   server.Post("/api/chaotic-activities", handle_chaotic_activities);
   server.Post("/api/passed-time", handle_passed_time);
   server.Post("/api/service-time", handle_service_time);
