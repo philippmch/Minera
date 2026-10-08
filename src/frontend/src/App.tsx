@@ -51,6 +51,7 @@ import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
 import { AnonymizationWorkspace } from "./components/AnonymizationWorkspace";
+import { ClusteringWorkspace } from "./components/ClusteringWorkspace";
 import { VisualizationExplain } from "./components/VisualizationExplain";
 import { type VisualizationDraft } from "./visualization-explanation";
 import {
@@ -672,6 +673,7 @@ export default function App() {
         <button className={tab === "llm" ? "tab active" : "tab"} onClick={() => setTab("llm")}>Ask a model</button>
         <button className={tab === "query" ? "tab active" : "tab"} onClick={() => setTab("query")}>Query &amp; filter</button>
         <button className={tab === "anonymization" ? "tab active" : "tab"} onClick={() => setTab("anonymization")}>Anonymize</button>
+        <button className={tab === "clustering" ? "tab active" : "tab"} onClick={() => setTab("clustering")}>Clustering</button>
       </nav>
       <Kpis data={data} />
       {tab!=="llm"&&tab!=="query"&&tab!=="embeddings"&&tab!=="anonymization"&&<VisualizationExplain key={cacheGeneration.current+":"+tab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");}} />}
@@ -752,6 +754,7 @@ export default function App() {
       {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} data={data} mining={mining} available={source!==null} onOpenFiltered={loadFile} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></main>}
       {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
       {tab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenReleased={loadFile} /></main>}
+      {tab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenCluster={loadFile} /></main>}
       {tab === "dfg" && (
         <main className="layout">
           <ProcessMap

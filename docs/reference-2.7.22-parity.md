@@ -11593,3 +11593,67 @@ closed and the viewport restored. Exact optimizer, search, fitness, conversion,
 parameter/type/error behavior and all remaining catalogue requirements stay
 open. Counts remain 46/86 complete packages, 199/387 complete modules and 228
 incomplete units, without promotion or a full-parity claim.
+
+
+## Feature delivery first: native clustering workflows (2026-10-08)
+
+The new Clustering workspace exposes both catalogue families: all five
+trace-attribute hierarchy distances (DMM_LEVEN, AVG_LEVEN, DMM_VEC, AVG_VEC, DFG)
+and sklearn_profiles case clustering. Controls cover trace/activity attributes,
+distance alpha/coverage/group/node bounds and profile count/iterations/seed/
+tolerance/trace/feature bounds, activity/succession presence representations,
+exact string/numeric attributes and explicit feature names. Blank profile lists
+retain native automatic selection. DFG uses complete group profiles while the
+other hierarchy distances apply variant coverage.
+
+The dendrogram uses actual merge distance, with graph and table selection,
+subtree focus and path-based node identity. Its display is capped at 120 leaves
+per subtree; paginated node/case/centroid tables, reports and exports retain
+complete data. Native source trace positions identify cases independently of
+repeated case IDs. Shared grouping retains first-seen order and existing aliases,
+skips missing grouping attributes and accepts empty category values. Hierarchy
+serialization now supports valid empty/no-match results and empty-string leaves.
+Profile cluster selectors expose the actual native features, centroids and
+memberships. Legacy JSON shapes remain unchanged; include_cases/source_id
+envelopes add positional metadata and native centroid arrays to profile results.
+
+Selected XES exports copy complete cached traces, their typed attributes and
+log metadata, including empty traces. Typed event tables retain selected event
+rows and trace columns, but cannot represent empty traces. Exports consume the
+same cached analysis and reject replaced analyses or changed sources. Ordinary
+mining reopens the selected XES. Saved analysis JSON cannot operate on another
+cached source; source changes reset the workspace. Validation/native failures
+remain explicit and preserve the preceding usable result.
+
+docs/feature-first-clustering-validation.json binds 721 frontend tests, the
+production build, 589 native source bindings, 140 frontend/runtime bindings,
+one fresh assertion-enabled native clustering suite, 82 checks over 66 actual
+HTTP calls and six CLI executions, 22 browser workflow checks and six final-build
+checks. Controlled exports cover all five hierarchy roots, each leaf and an
+internal merge, both profile clusters, typed attributes, repeated case IDs,
+empty traces and empty selections. Browser proof covers all five distances,
+graph/row selection, subtree focus, exact report/XES/table downloads, centroids,
+both reopen paths, errors, source resets, saved-analysis guards and phone views.
+Final labels describe native binary presence rather than counts; the original
+component snapshot and built assets remain bound alongside the final proof.
+
+Verification corrected initial assumptions from recorded owned outputs:
+attribute order is non-semantic, ordinary XES import truncates timestamps to
+microseconds, an explicit numeric event selector rejects an empty trace, and the
+legacy profile serializer omits its already-computed native centroids. The
+optional workflow exposes those centroids without altering legacy output.
+Earlier attempts, including one helper indentation error, remain retained.
+Selected XES retains cached timestamp precision; no original seventh-digit
+timestamp identity is asserted. Full precision and selector conventions remain
+gates. Cancellation controls/signals exist without a claimed browser/native
+computation cancellation outcome.
+
+The clustering source is freshly compiled; 166 unchanged core objects are
+verified and reused. The public grouping helper is additive and existing result
+layouts remain unchanged. Distance/linkage and profile optimization algorithms
+are unchanged; other catalogue algorithm proofs are inherited. Owned server
+processes and tabs are closed, the viewport restored, and the test port released.
+Exact distance/tie order, feature extraction, optimizer initialization, parameter,
+type, error and scalability parity remain open. All 86 packages and 387 modules
+remain in scope: 46 complete packages, 199 complete modules and 228 incomplete
+units. Neither clustering family is promoted from partial parity.

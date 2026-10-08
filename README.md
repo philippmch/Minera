@@ -1011,6 +1011,50 @@ not restore original attribute values. Algorithm distribution, parameter and
 privacy guarantees remain independent parity gates in the catalogue; this
 workspace adds usable entry points without marking those packages complete.
 
+### Native clustering
+
+Open **Clustering** with an active CSV/XES source. **Trace-attribute hierarchy**
+groups cases by a trace attribute and exposes all five native distance methods:
+`DMM_LEVEN`, `AVG_LEVEN`, `DMM_VEC`, `AVG_VEC` and `DFG`. Merge distance scales
+the dendrogram horizontally. Select a graph node or a row, focus its subtree,
+and inspect the exact source case positions. Case positions distinguish repeated
+case IDs and path IDs distinguish groups whose names collide with merge labels.
+The diagram shows up to 120 leaves per subtree; paginated tables and exports
+retain complete results. Missing grouping attributes yield an empty hierarchy.
+
+**Case profiles** exposes `sklearn_profiles`, cluster count, iterations, seed,
+tolerance, trace/feature bounds, activity/succession presence representations,
+and exact trace/event string and numeric selectors. Blank selector lists retain
+native automatic selection. Numeric event selectors require a value in every
+trace, so an empty trace produces an explicit error when such a field is selected.
+Inspect each cluster's feature names and native centroid values.
+
+Download the parameter-bound report, the selected XES or a typed event table, or
+open the selected XES for ordinary mining. Selections copy complete cached
+traces, including trace attributes and empty traces. Event tables contain event
+rows and therefore do not represent empty traces. The ordinary XES import path
+currently caches timestamps at microsecond precision; selection export retains
+that cached precision. Empty selections export successfully but cannot be opened
+for mining. Saved analysis JSON cannot cluster a different cached source.
+
+The existing `POST /api/clustering` and `POST /api/profile-clustering` routes
+retain their legacy JSON shapes. Add `source_id` and `include_cases=true` to
+receive `CLUSTER_ANALYSIS` with source/analysis revisions, positional case
+metadata and native memberships. The optional profile result also includes
+native centroids. `POST /api/clustering/export` accepts these two revisions,
+`selection=r/0/1` for a hierarchy path or `selection=c/0` for a profile cluster,
+and `format=xes|json`. Exports use the cached analysis. A new source or analysis
+rejects old selections. Standalone native execution remains available:
+
+```sh
+minera_export source.xes --clustering --clustering-trace-attribute segment --clustering-variant AVG_LEVEN
+minera_export source.xes --profile-clustering --profile-clustering-cluster-count 2 --profile-clustering-seed 17
+```
+
+Both clustering packages retain their partial parity status. Exact distance,
+feature extraction, optimization, selector, ordering and scalability behavior
+remain separate catalogue gates.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

@@ -50,7 +50,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "clustering_workflow_available",
       "package": "algo.clustering.profiles",
       "parity_status": "partial",
       "selectors": [
@@ -58,7 +58,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "clustering_workflow_available",
       "package": "algo.clustering.trace_attribute_driven",
       "parity_status": "partial",
       "selectors": [
@@ -1071,6 +1071,37 @@
       "id": "ilp_and_genetic_discovery_workflows",
       "state": "native_app_and_cli_available",
       "validation": "docs/feature-first-discovery-miners-validation.json"
+    },
+    {
+      "added": [
+        "A Clustering workspace with all five trace-attribute hierarchy methods and native sklearn_profiles case clustering",
+        "Controls for grouping/activity selectors, all distance/profile fields, exact attribute/feature lists, seeds and native bounds",
+        "Merge-distance dendrograms, graph/row selection, subtree focus, paginated node/case/centroid inspection and complete reports",
+        "Native source-position memberships preserve repeated case IDs, empty grouping values and valid empty/no-match hierarchies",
+        "Single-analysis complete cached-trace XES and typed event-table exports, with selected XES reopening through ordinary mining",
+        "Source/analysis revision guards, explicit failures, previous-result retention, saved-analysis guards and phone layouts"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/ClusteringWorkspace.tsx",
+        "src/frontend/src/clustering-workspace.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_export.cpp"
+      ],
+      "families": [
+        "algo.clustering.trace_attribute_driven",
+        "algo.clustering.profiles"
+      ],
+      "id": "native_clustering_workflows",
+      "methods": [
+        "DMM_LEVEN",
+        "AVG_LEVEN",
+        "DMM_VEC",
+        "AVG_VEC",
+        "DFG",
+        "sklearn_profiles"
+      ],
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-clustering-validation.json"
     }
   ],
   "execution_priority": [
@@ -1088,11 +1119,12 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue reviewing remaining catalogue capabilities and entry points, including clustering, transformations, OCEL analysis and conversion/export variants. ILP and Genetic now join the eight existing model families with configurable discovery, rendered nets, exports and conformance; their exact optimizer/selector behavior remains a parity gate."
+      "next_action": "Continue reviewing remaining catalogue capabilities and entry points, including transformations, OCEL analysis and conversion/export variants. Both clustering families now have configurable native workflows, hierarchy/centroid inspection and case exports; their exact distance/feature/optimization behavior remains a parity gate."
     }
   ],
   "feature_status_meaning": {
     "anonymization_workflow_available": "Native LAPLACE/SACOFA/PRIPEL execution has app controls, previews, source guards, matching single-run XES/report downloads and reopening. Exact reference behavior and privacy guarantees remain independent gates.",
+    "clustering_workflow_available": "Both native clustering families have configurable app entry points, hierarchy/centroid inspection, source-position memberships, complete reports and selected XES/table exports that reopen for mining. Exact distance, feature, optimizer, ordering, parameter and scalability parity remain separate gates.",
     "configured_discovery_workflow_available": "A selectable native miner with exposed controls, actual rendered net/diagnostics/markings, exact PNML/report exports and conformance handoff. Reference algorithm, optimizer, conversion and parameter/selector parity remain separate gates.",
     "explorer_available": "A selectable discovery model with a rendered result in the application. This does not mark its reference package or modules complete.",
     "feature_review_pending": "The partial parity status alone does not prove a feature is missing. Inspect implementation and usable entry points before choosing work.",

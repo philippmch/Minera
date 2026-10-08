@@ -5,7 +5,7 @@ import {
   FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
 } from "./types";
 
-export type Tab = "log" | "dotted" | "dfg" | "model" | "conformance" | "resources" | "embeddings" | "llm" | "query" | "anonymization";
+export type Tab = "log" | "dotted" | "dfg" | "model" | "conformance" | "resources" | "embeddings" | "llm" | "query" | "anonymization" | "clustering";
 
 /**
  * Opening tab for a freshly loaded analysis: inspect the raw event log first
