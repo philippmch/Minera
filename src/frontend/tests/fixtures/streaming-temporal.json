@@ -1,0 +1,1 @@
+{"family":"STREAMING_TEMPORAL","total_events_processed":7,"total_deviations":1,"cases":{"1":{"events":3,"deviations":0},"10":{"events":3,"deviations":1},"2":{"events":1,"deviations":0}},"deviations":{"10":[{"source":"B","target":"C","elapsed_seconds":13,"standard_deviation_distance":8}]},"input":{"event_order":"input","parsed_events":7}}

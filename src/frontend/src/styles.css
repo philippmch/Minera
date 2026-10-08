@@ -2332,3 +2332,10 @@ input[type="range"]::-moz-range-thumb {
 .ocel-io-workspace fieldset{border:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:16px}.ocel-io-workspace .filters-field,.ocel-io-inspection .filters-field{display:flex;flex-direction:column;gap:6px;min-width:0}.ocel-io-workspace input,.ocel-io-workspace select,.ocel-io-inspection select{width:100%;min-width:0}.ocel-io-workspace .query-options>.filters-field{flex:1 1 230px}.ocel-io-inspection td{max-width:480px;overflow-wrap:anywhere;white-space:pre-wrap}.ocel-io-inspection pre,.ocel-io-inspection p{overflow-wrap:anywhere;white-space:pre-wrap}
 @media (max-width:600px){.topbar{flex-wrap:wrap}.topbar>.dataset{min-width:0;flex:1 1 150px}}
 .related-logs-workspace fieldset{border:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:16px}.related-logs-workspace .filters-field{display:flex;flex-direction:column;gap:6px;min-width:0}.related-logs-workspace input:not([type=checkbox]),.related-logs-workspace select{width:100%;min-width:0}.related-logs-workspace .query-options>.filters-field{flex:1 1 230px}.related-logs-inspection td{max-width:480px;overflow-wrap:anywhere;white-space:pre-wrap}.related-logs-inspection pre{overflow-wrap:anywhere;white-space:pre-wrap}
+.streaming-workspace fieldset { border: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.streaming-workspace .filters-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.streaming-workspace input:not([type=checkbox]), .streaming-workspace select, .streaming-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.streaming-workspace .query-options > .filters-field { flex: 1 1 230px; }
+.streaming-workspace textarea { resize: vertical; border: 1px solid var(--line); border-radius: 4px; padding: 9px 10px; background: transparent; color: inherit; font: inherit; }
+.streaming-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.streaming-inspection pre { overflow: auto; max-height: 460px; }

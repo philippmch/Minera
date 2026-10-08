@@ -1501,6 +1501,59 @@ record all four CSV/XES combinations, eight link-switch combinations, native
 CLI comparisons, source guards, handoffs, paging and complete exports. These
 workflow annotations preserve every existing catalogue parity status.
 
+### Replay event streams
+
+Choose **Replay event streams** on the landing page, **Event streams** in an
+open workspace, or **Replay event streams** under **Transform**. Upload a CSV
+event sequence and select streaming DFG discovery, footprint prefix checks,
+temporal prefix checks, or forward/backwards token replay with a PNML model.
+**Use current original CSV for streaming** selects the original upload.
+
+The workflow defaults to **CSV input order**, preserving parsed arrival order
+across cases. **Case-grouped importer order** groups cases and sorts their events
+by timestamps when available, matching the existing HTTP/CLI convention. Every
+run creates a fresh monitor over the selected file. These runs are independent
+of current workspace filters and the preceding streaming result.
+
+Footprint controls accept JSON activity lists and sequence/parallel pairs.
+Empty start/end constraint text omits that check. Temporal profiles accept
+`[source, target, mean seconds, standard deviation seconds]` tuples with zeta
+and start/completion column selectors. Compare parsed and processed counts:
+the native temporal monitor can skip invalid or missing timestamps.
+
+Token replay exposes its two variants, stop-unfit option and invisible-search
+limit, including exact unsigned 64-bit decimal values. **Finalize all cases
+after replay** performs native end/final-marking checks for footprints and
+token replay. Prefix cases remain separately inspectable alongside termination
+fit, missing/remaining and marking results. Finalized cases leave `open_cases`.
+
+Inspect the DFG diagram and native tables, then download complete native JSON,
+a source-bound report or the selected category as CSV. CSV exports include
+every row beyond the 25-row page and retain empty table schemas. Raw JSON keeps
+the complete native response bytes; object-map tables use JavaScript key order.
+
+The four multipart streaming routes accept `streaming_event_order=input|imported`
+and opt-in `streaming_include_diagnostics=true` for parsed/order metadata and
+prefix/termination diagnostics. Token replay additionally accepts
+`streaming_tbr_terminate_all=true`. Ordinary responses retain their current
+shapes. Existing commands use importer order:
+
+```sh
+minera_streaming_dfg events.csv
+minera_streaming_footprints events.csv --model-activities A,B,C --model-start A --model-end C --model-sequence "A->B,B->C" --terminate-all
+minera_streaming_temporal events.csv --profile "A->B:5:1" --zeta 2 --start-timestamp-column start
+minera_streaming_tbr model.pnml events.csv --variant backwards --max-invisible 10
+```
+
+The current adapters require comma-separated CSV with a header and valid case/
+activity identifiers, delimiter-compatible model activities, and a PNML workflow
+net with single source/sink markings. Silent search remains bounded. Persistent
+stream state, live readers/observers, general PNML documents, unbounded response
+counters, cancellation of native computation and performance remain separate
+work. [Validation and checkpoint boundaries](docs/feature-first-streaming-validation.json)
+record the four workflows, both replay orders, complete exports and phone controls.
+Full reference parity remains active.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

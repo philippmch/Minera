@@ -1408,6 +1408,46 @@
         "PANDAS_CASE_RELATIONS",
         "FORMAT_DATAFRAME"
       ]
+    },
+    {
+      "added": [
+        "Streaming workspace from the landing page, classic and OCEL top bars, and the classic transformation hub",
+        "Source-free original CSV uploads with literal case/activity/timestamp/start selectors, source file hashes and an explicit current-original-CSV handoff",
+        "CSV input arrival order and historical case-grouped timestamp importer order exposed independently, with opt-in native parsed-event/order diagnostics",
+        "Streaming DFG graph, activity/start/end counts, open cases, native edge identities, paging and complete exports",
+        "Footprint activity/start/end/sequence/parallel constraints, prefix diagnostics and final end checks with retained prefix cases and native termination fit results",
+        "Temporal profile tuples, zero standard deviation, zeta and start/completion timestamps with complete per-case deviation data and parsed-versus-processed counts",
+        "PNML forward/backwards streaming token replay, exact unsigned 64-bit invisible search bounds, stop-unfit behavior and optional native case finalization",
+        "Native token markings and separate termination missing/remaining/fit records; numeric case IDs do not depend on JavaScript object enumeration order",
+        "Complete native JSON, source-bound reports and every CSV category, including empty schemas and rows beyond a 25-row page",
+        "Return navigation, source-free/required-file guards, native errors, cancellation signals, accessible controls and four 390px phone forms"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/StreamingWorkspace.tsx",
+        "src/frontend/src/streaming-workspace.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_streaming_dfg.cpp",
+        "src/backend/tools/minera_streaming_footprints.cpp",
+        "src/backend/tools/minera_streaming_temporal.cpp",
+        "src/backend/tools/minera_streaming_tbr.cpp"
+      ],
+      "families": [],
+      "id": "native_streaming_workflows",
+      "native_components": [
+        "include/minera/streaming_dfg.hpp",
+        "include/minera/streaming_footprints.hpp",
+        "include/minera/streaming_temporal.hpp",
+        "include/minera/streaming_tbr.hpp"
+      ],
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-streaming-validation.json",
+      "variants": [
+        "STREAMING_DFG",
+        "STREAMING_FOOTPRINTS",
+        "STREAMING_TEMPORAL",
+        "STREAMING_TBR_FORWARD",
+        "STREAMING_TBR_BACKWARDS"
+      ]
     }
   ],
   "execution_priority": [
@@ -1425,7 +1465,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue model/export and remaining catalogue workflows. Related-log links/interleavings/merging and native formatting now have usable entry points alongside existing OCEL analysis/preparation/execution/I/O and classic transformations. Exact XES timestamp precision, CSV header/dtype/selector/index/null conventions, native boundaries, search exhaustiveness and performance gates stay independent."
+      "next_action": "Review model import/export, persistent streaming state/live readers and remaining catalogue workflows. Streaming DFG/footprints/temporal/token replay now expose both CSV arrival and historical importer orders, prefix/final diagnostics and complete outputs. Existing related-log, OCEL and classic workflows remain available; exactness, schemas, numerical counters, native boundaries, exhaustive search and performance gates stay independent."
     }
   ],
   "feature_status_meaning": {
