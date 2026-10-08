@@ -12211,3 +12211,49 @@ packages/199 complete modules and 228 incomplete units. Owned server/tab are
 closed, viewport restored and port 8497 released. Historical journal bytes and
 110 unrelated files remain preserved. Continue feature delivery and the complete
 exactness contract; full parity remains active.
+
+
+## Feature delivery first: independent model exchange (2026-10-08)
+
+Inspect and convert model files adds source-free PNML/BPMN/PTML/DFG workflows
+from landing, both top bars and Transform. All native PNML import options,
+two process-tree net constructions and two DFG constructions are exposed.
+Inspection, converted net and requested export remain separate; failed
+conversions retain native data and full PNML. Validated original BPMN bytes
+remain distinct from requested native semantic re-export.
+
+Full marking vectors/keys, XML identities, arc occurrences/types/directions/
+signed weights, stochastic metadata and ordered nested tree nodes remain
+inspectable. Exact 501-digit integers survive JSON/report/CSV/PNML transport.
+New process_tree_json delegates the existing node writer with local activity
+IDs; it does not run a discovery, simulation or reduction algorithm.
+
+Complete exports retain every row and column beyond 25-row/eight-column pages,
+including 32 places, 31 transitions, 62 arcs, 32 tree nodes and 31 DFG edges.
+Both actual conformance handoffs preserve omitted zero markings with current
+source revisions and pnml_infer_legacy_boundaries=false. The historical default
+remains unchanged; general/large/weighted solver gates stay independent.
+
+docs/feature-first-model-exchange-validation.json binds 838 frontend tests and
+production assets, 589 native and 189 frontend/runtime sources, one fresh JSON
+object/166 reused objects, four assertion-enabled native suites, 90 checks over
+81 HTTP cases/five CLI runs, 109 browser checks and 100 independent artifact
+checks over 46 CSVs, 11 reports and 17 documents. All four formats, normal export
+paths, both net constructions, errors, special arcs/stochastic data, source
+handoff, paging and 390px controls are exercised.
+
+Artificial DFG identifiers are internal collision keys and their boundaries
+are silent; native PNML does not expose them as visible labels. Native reverse
+tree conversion preserves nested sequence structure. Retained probes and new
+immutable helpers correct visible-label, CLI-spelling, tree-flattening and CSV
+null assumptions. The same live browser tab/server resumed after an observation
+timeout, with completed evidence verified and no inferred restart.
+
+Full BPMN/PNML/PTML/DFG dialect/schema/ID/diagram/numeric/error conventions,
+unsupported markings/arcs in topology-only conversions, bounded searches,
+source/concurrency/cancellation races and performance remain gates. No reference
+implementation was read. All catalogue statuses stay unchanged: 86 packages/
+387 modules, 46 complete packages/199 complete modules and 228 incomplete units.
+Owned tab/server are closed, viewport restored and port 8498 released.
+Historical journal bytes and 110 unrelated files remain preserved. Continue the
+complete feature/exactness objective; full parity remains active.

@@ -325,6 +325,8 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string petri_net_reduction_json(
     const PetriNetReductionResult& result);
 [[nodiscard]] std::string pnml_document_json(const PnmlDocument& document);
+// Standalone tree transport with its own activity registry and local leaf IDs.
+[[nodiscard]] std::string process_tree_json(const ProcessTree& tree);
 [[nodiscard]] std::string serialize_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_stochastic_playout_visited_json(

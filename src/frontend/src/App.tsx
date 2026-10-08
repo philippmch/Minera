@@ -50,6 +50,7 @@ import { OcelWorkspaceHub } from "./components/OcelWorkspaceHub";
 import { OcelIoWorkspace } from "./components/OcelIoWorkspace";
 import { RelatedLogsWorkspace } from "./components/RelatedLogsWorkspace";
 import { StreamingWorkspace } from "./components/StreamingWorkspace";
+import { ModelExchangeWorkspace } from "./components/ModelExchangeWorkspace";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
@@ -108,6 +109,7 @@ export default function App() {
   const [showOcelIo, setShowOcelIo] = useState(false);
   const [showRelatedLogs, setShowRelatedLogs] = useState(false);
   const [showStreaming, setShowStreaming] = useState(false);
+  const [showModelExchange, setShowModelExchange] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -119,7 +121,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("log");
   const [mining, setMining] = useState(false);
   const [visualizationDraft,setVisualizationDraft]=useState<{generation:number;draft:VisualizationDraft}|null>(null);
-  const [discoveryModelDraft,setDiscoveryModelDraft]=useState<{generation:number;file:File;sourceId:string;activityKey?:string}|null>(null);
+  const [discoveryModelDraft,setDiscoveryModelDraft]=useState<{generation:number;file:File;sourceId:string;activityKey?:string;inferLegacyBoundaries?:boolean}|null>(null);
   const ocelQuestions=useRef<HTMLDetailsElement|null>(null);
   // The CSV upload behind the current view, kept so filters can re-mine it.
   // null when the data came from a pre-mined JSON export (not re-minable).
@@ -280,9 +282,9 @@ export default function App() {
   // Checks an uploaded PNML or BPMN model against the mined log. A new upload
   // replaces the server's cached "imported" net, so its stale alignments and
   // decisions are dropped.
-  const requestModelCheck = useCallback(async (file: File, sourceId?: string, activityKey?: string) => {
+  const requestModelCheck = useCallback(async (file: File, sourceId?: string, activityKey?: string, inferLegacyBoundaries?: boolean) => {
     const generation = cacheGeneration.current;
-    const result = await checkModel(file, {sourceId,activityKey});
+    const result = await checkModel(file, {sourceId,activityKey,pnmlInferLegacyBoundaries:inferLegacyBoundaries});
     if (generation !== cacheGeneration.current)
       throw new Error("The active analysis changed during model checking; choose the model again.");
     cacheGeneration.current += 1;
@@ -350,6 +352,7 @@ export default function App() {
     setShowOcelIo(false);
     setShowRelatedLogs(false);
     setShowStreaming(false);
+    setShowModelExchange(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -558,6 +561,7 @@ export default function App() {
 
   if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
 
+  if (showModelExchange) return <><TopBar dataset={data?.dataset??ocelDataset??'Model files'} datasetKind="model exchange" onOpenFile={loadFile} onHome={()=>setShowModelExchange(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowModelExchange(false)}>Return to current workspace</button><ModelExchangeWorkspace available={source!==null} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setShowModelExchange(false);setTab("conformance");}}/></main></>;
   if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} busy={mining}/></main></>;
   if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} available={source!==null} mining={mining} dataset={data?.dataset} onOpen={loadFile}/></main></>;
 
@@ -571,6 +575,7 @@ export default function App() {
           onImportOcel={()=>setShowOcelIo(true)}
           onRelateLogs={()=>setShowRelatedLogs(true)}
           onStreaming={()=>setShowStreaming(true)}
+          onModelExchange={()=>setShowModelExchange(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -616,6 +621,7 @@ export default function App() {
           onLoadResourceSample={loadResourceSample}
           onRelateLogs={()=>setShowRelatedLogs(true)}
           onStreaming={()=>setShowStreaming(true)}
+          onModelExchange={()=>setShowModelExchange(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -638,6 +644,7 @@ export default function App() {
         onImportOcel={()=>setShowOcelIo(true)}
         onRelateLogs={()=>setShowRelatedLogs(true)}
         onStreaming={()=>setShowStreaming(true)}
+        onModelExchange={()=>setShowModelExchange(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);
@@ -785,7 +792,7 @@ export default function App() {
       {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
       {tab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenReleased={loadFile} /></main>}
       {tab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenCluster={loadFile} /></main>}
-      {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={source!==null} file={source?.file??null} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey});setTab("conformance");}} /></main>}
+      {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={source!==null} file={source?.file??null} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey,inferLegacyBoundaries)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries});setTab("conformance");}} /></main>}
       {tab === "dfg" && (
         <main className="layout">
           <ProcessMap

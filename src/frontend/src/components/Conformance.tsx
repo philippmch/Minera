@@ -95,8 +95,8 @@ export function Conformance({
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
   onRequestDecisions?: (minerId: string, options?: DecisionMiningOptions) => Promise<DecisionsResult>;
-  onCheckModel?: (file: File, sourceId?: string, activityKey?: string) => Promise<ImportedModelCheck>;
-  initialModel?: {file:File;sourceId:string;activityKey?:string}|null;
+  onCheckModel?: (file: File, sourceId?: string, activityKey?: string, inferLegacyBoundaries?: boolean) => Promise<ImportedModelCheck>;
+  initialModel?: {file:File;sourceId:string;activityKey?:string;inferLegacyBoundaries?:boolean}|null;
   onInitialModelConsumed?: (file:File) => void;
   onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
   onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
@@ -158,14 +158,14 @@ export function Conformance({
     setStep("result");
   };
 
-  const uploadModel = async (file: File, sourceId?: string, activityKey?: string) => {
+  const uploadModel = async (file: File, sourceId?: string, activityKey?: string, inferLegacyBoundaries?: boolean) => {
     if (!onCheckModel) return;
     const sequence = ++uploadSequence.current;
     const requestedAnalysis = analysisId;
     setImporting(true);
     setImportError(null);
     try {
-      const result = await onCheckModel(file, sourceId, activityKey);
+      const result = await onCheckModel(file, sourceId, activityKey, inferLegacyBoundaries);
       if (sequence !== uploadSequence.current || requestedAnalysis !== analysisIdentity.current.id) return;
       setImported(result);
       setImportedAnalysisId(requestedAnalysis);
@@ -182,9 +182,9 @@ export function Conformance({
 
   useEffect(() => {
     if (!initialModel || initialModelAttempt.current === initialModel.file || !onCheckModel) return;
-    const {file,sourceId,activityKey} = initialModel;
+    const {file,sourceId,activityKey,inferLegacyBoundaries} = initialModel;
     initialModelAttempt.current = file;
-    void uploadModel(file,sourceId,activityKey).finally(()=>onInitialModelConsumed?.(file));
+    void uploadModel(file,sourceId,activityKey,inferLegacyBoundaries).finally(()=>onInitialModelConsumed?.(file));
   },[initialModel,data]);
 
   // The backend checks every discovered model both ways, keyed by miner id, so

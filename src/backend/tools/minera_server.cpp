@@ -4775,7 +4775,13 @@ void handle_check_model(const httplib::Request& request,
         minera::looks_like_bpmn(model_xml) ? minera::parse_bpmn(model_xml)
         : minera::looks_like_ptml(model_xml)
             ? minera::to_petri_net(minera::parse_ptml(model_xml))
-            : (document = minera::tools::parse_pnml_model(model_xml, public_markings),
+            : (document = request.has_param("pnml_infer_legacy_boundaries")
+                  ? minera::tools::resolve_pnml_model(
+                      minera::parse_pnml_document(model_xml,
+                          minera::tools::pnml_model_import_options(public_markings)),
+                      ocel_query_bool(request, "pnml_infer_legacy_boundaries", true) &&
+                          !public_markings)
+                  : minera::tools::parse_pnml_model(model_xml, public_markings),
                document->net);
 
     auto next_session = std::make_shared<MinedSession>(*session);
@@ -7939,6 +7945,165 @@ void handle_dfg_dataframe(const httplib::Request& request,
   }
 }
 
+void handle_model_exchange(const httplib::Request& request,
+                           httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "format", "output", "tree_variant", "dfg_variant",
+        "artificial_start_activity", "artificial_end_activity",
+        "pnml_infer_initial_marking", "pnml_infer_final_marking",
+        "pnml_import_stochastic_map", "pnml_require_workflow_boundaries",
+        "pnml_public_marking_semantics"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown model exchange parameter: " + key);
+    }
+    const auto format = request.get_param_value("format");
+    if (format != "pnml" && format != "bpmn" && format != "ptml" && format != "dfg")
+      throw std::invalid_argument("format must be pnml, bpmn, ptml or dfg");
+    const auto output = request.has_param("output")
+        ? request.get_param_value("output") : std::string("inspect");
+    if (output != "inspect" && output != "pnml" && output != "bpmn" &&
+        output != "ptml" && output != "dfg")
+      throw std::invalid_argument("output must be inspect, pnml, bpmn, ptml or dfg");
+    const auto body = ocel_request_body(request, "model");
+    if (body.empty()) throw std::invalid_argument("missing model document");
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    std::optional<minera::PnmlDocument> document;
+    std::optional<minera::ProcessTree> tree;
+    std::optional<minera::DfgCleanAnalysis> dfg;
+    std::string primary, tree_data = "null", arcs = "[]", pnml, canonical;
+    std::string conversion_error;
+    const auto tree_variant = minera::parse_process_tree_petri_net_variant(
+        request.has_param("tree_variant") ? request.get_param_value("tree_variant") : "standard");
+    minera::DfgPetriConversionOptions dfg_options;
+    if (request.has_param("dfg_variant"))
+      dfg_options.variant = minera::parse_dfg_petri_conversion_variant(
+          request.get_param_value("dfg_variant"));
+    if (request.has_param("artificial_start_activity"))
+      dfg_options.artificial_start_activity = request.get_param_value("artificial_start_activity");
+    if (request.has_param("artificial_end_activity"))
+      dfg_options.artificial_end_activity = request.get_param_value("artificial_end_activity");
+    if (format == "pnml") {
+      minera::PnmlImportOptions options;
+      options.infer_initial_marking = ocel_query_bool(request, "pnml_infer_initial_marking", true);
+      options.infer_final_marking = ocel_query_bool(request, "pnml_infer_final_marking", true);
+      options.import_stochastic_map = ocel_query_bool(request, "pnml_import_stochastic_map", false);
+      options.require_workflow_boundaries = ocel_query_bool(request, "pnml_require_workflow_boundaries", true);
+      options.public_marking_semantics = ocel_query_bool(request, "pnml_public_marking_semantics", false);
+      document = minera::parse_pnml_document(body, options);
+      pnml = canonical = minera::to_pnml(*document);
+      primary = minera::pnml_document_json(*document);
+    } else if (format == "ptml") {
+      tree = minera::parse_ptml(body);
+      primary = tree_data = minera::process_tree_json(*tree);
+      canonical = minera::to_ptml(*tree);
+      pnml = minera::to_pnml(minera::to_petri_net(*tree, tree_variant));
+    } else if (format == "bpmn") {
+      const auto net = minera::parse_bpmn(body);
+      pnml = minera::to_pnml(net);
+      // The native reader exposes a net projection, not a BPMN DOM. Keep the
+      // validated original separately from a requested semantic re-export.
+      canonical = body;
+    } else {
+      dfg = minera::parse_dfg(body);
+      canonical = minera::to_dfg(*dfg);
+      std::ostringstream data;
+      data << "{\"family\":\"DFG_DOCUMENT\",\"graph\":[";
+      bool first = true;
+      for (const auto& [pair, count] : dfg->graph) {
+        if (!first) data << ',';
+        first = false;
+        data << "{\"source\":" << quote(pair.first) << ",\"target\":"
+             << quote(pair.second) << ",\"count\":" << count << '}';
+      }
+      const auto boundaries = [&](const char* name, const auto& values) {
+        data << "],\"" << name << "\":[";
+        bool start = true;
+        for (const auto& [activity, count] : values) {
+          if (!start) data << ',';
+          start = false;
+          data << "{\"activity\":" << quote(activity) << ",\"count\":" << count << '}';
+        }
+      };
+      boundaries("start_activities", dfg->start_activities);
+      boundaries("end_activities", dfg->end_activities);
+      data << "]}";
+      primary = data.str();
+      if (output != "inspect" && output != "dfg") {
+        try { pnml = minera::to_pnml(minera::convert_dfg_to_petri_net(*dfg, dfg_options)); }
+        catch (const std::exception& error) { conversion_error = error.what(); }
+      }
+    }
+    if (!document && !pnml.empty()) document = minera::parse_pnml_document(pnml);
+    if (format == "bpmn") primary = minera::pnml_document_json(*document);
+    if (document && document->arc_occurrences) {
+      std::ostringstream data; data << '[';
+      for (std::size_t i = 0; i < document->arc_occurrences->size(); ++i) {
+        if (i) data << ',';
+        const auto& arc = document->arc_occurrences->at(i);
+        data << "{\"id\":" << quote(arc.id) << ",\"place\":" << arc.place
+             << ",\"transition\":" << arc.transition
+             << ",\"input\":" << (arc.input ? "true" : "false")
+             << ",\"type\":\""
+             << (arc.type == minera::PetriArcType::kNormal ? "normal" :
+                 arc.type == minera::PetriArcType::kReset ? "reset" : "inhibitor")
+             << "\",\"weight\":" << (arc.negative_weight && arc.weight ? "-" : "") << arc.weight << '}';
+      }
+      data << ']'; arcs = data.str();
+    }
+    std::string exported;
+    if (output != "inspect" && conversion_error.empty()) {
+      try {
+        if (output == format && format != "bpmn") exported = canonical;
+        else if (output == "pnml") exported = pnml;
+        else if (output == "dfg") throw std::invalid_argument("DFG export requires a DFG input");
+        else {
+          // These converters consume workflow topology, not arbitrary document markings.
+          if (!tree) {
+            if (!document) throw std::invalid_argument("no converted workflow net");
+            const auto single = [&](const auto& marking, std::size_t boundary) {
+              return boundary < marking.size() && marking[boundary] == 1 &&
+                  std::all_of(marking.begin(), marking.end(), [&](const auto& count) {
+                    return &count == &marking[boundary] || count == 0;
+                  });
+            };
+            if (!single(document->initial_marking, document->net.source()) ||
+                !single(document->final_marking, document->net.sink()))
+              throw std::invalid_argument("BPMN/PTML conversion requires single source/sink token markings; the full PNML remains available");
+            if (document->net.has_extended_arcs() ||
+                std::any_of(document->arc_occurrences->begin(), document->arc_occurrences->end(),
+                    [](const auto& arc) { return arc.weight != 1 || arc.negative_weight; }))
+              throw std::invalid_argument("BPMN/PTML conversion cannot preserve this document's extended or weighted arcs; the full PNML remains available");
+          }
+          if (output == "bpmn")
+            exported = tree ? minera::to_bpmn(*tree) : minera::to_bpmn(document->net);
+          else {
+            if (!tree) tree = minera::to_process_tree(document->net);
+            tree_data = minera::process_tree_json(*tree);
+            exported = minera::to_ptml(*tree);
+          }
+        }
+        if (exported.empty()) throw std::invalid_argument("native conversion returned no document");
+      } catch (const std::exception& error) { conversion_error = error.what(); exported.clear(); }
+    }
+    response.set_content(
+        "{\"family\":\"MODEL_EXCHANGE\",\"format\":" + quote(format) +
+        ",\"output_format\":" + quote(output) + ",\"data\":" + primary +
+        ",\"net\":" + (document ? minera::pnml_document_json(*document) : "null") +
+        ",\"tree\":" + tree_data + ",\"arcs\":" + arcs +
+        ",\"canonical\":" + quote(canonical) +
+        ",\"pnml\":" + (pnml.empty() ? "null" : quote(pnml)) +
+        ",\"exported\":" + (exported.empty() ? "null" : quote(exported)) +
+        ",\"conversion_error\":" + (conversion_error.empty() ? "null" : quote(conversion_error)) + "}",
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_dfg_import(const httplib::Request& request,
                        httplib::Response& response) {
   try {
@@ -8843,6 +9008,7 @@ int main(int argc, char** argv) {
   server.Get("/api/dfg-dataframe", handle_dfg_dataframe);
   server.Post("/api/dfg-dataframe", handle_dfg_dataframe);
   server.Post("/api/dfg", handle_dfg_import);
+  server.Post("/api/model-exchange", handle_model_exchange);
   server.Post("/api/dfg-precision", handle_dfg_precision);
   server.Post("/api/dfg-to-petri", handle_dfg_conversion);
   server.Post("/api/process-cube", handle_process_cube);

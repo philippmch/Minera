@@ -1448,6 +1448,47 @@
         "STREAMING_TBR_FORWARD",
         "STREAMING_TBR_BACKWARDS"
       ]
+    },
+    {
+      "added": [
+        "Independent PNML/BPMN/PTML/DFG model workspace from landing, classic/OCEL top bars and the transformation hub",
+        "Native PNML import flags for initial/final inference, stochastic annotations, general workflow boundaries and public marking conventions",
+        "Full marking vectors, explicit keys, node identities, arc occurrences/types/directions/signed weights and native stochastic metadata",
+        "Exact 501-digit integer inspection, raw JSON/report retention and CSV/PNML downloads without JavaScript numeric rewriting",
+        "Standalone process-tree serializer preserves local activity registry, node operators, nested hierarchy and ordered child positions",
+        "Standard and transition-bordered tree nets; both DFG net constructions and applicable artificial-boundary identifiers",
+        "Independent source inspection and requested PNML/BPMN/PTML/DFG export with explicit failed-conversion data and retained PNML",
+        "Native topology diagrams, row/column paging and complete table exports, including 32-place/31-transition/62-arc and 31-edge models",
+        "Original uploads, source hashes, validated BPMN source copy, normalized native sources, 17 actual exported documents and complete reports",
+        "Current-log revision handoff to conformance preserves omitted zero markings through opt-in legacy boundary inference control, from both global workspace and hub"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/ModelExchangeWorkspace.tsx",
+        "src/frontend/src/model-exchange.ts",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_export.cpp"
+      ],
+      "families": [],
+      "id": "native_independent_model_exchange",
+      "native_components": [
+        "include/minera/pnml.hpp",
+        "include/minera/bpmn.hpp",
+        "include/minera/ptml.hpp",
+        "include/minera/dfg_io.hpp",
+        "include/minera/dfg_conversion.hpp"
+      ],
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-model-exchange-validation.json",
+      "variants": [
+        "PNML_DOCUMENT",
+        "BPMN_PETRI_PROJECTION",
+        "PTML_PROCESS_TREE",
+        "DFG_DOCUMENT",
+        "STANDARD",
+        "TRANSITION_BORDERED",
+        "ACTIVITY_DEFINES_PLACE",
+        "INVISIBLES_NO_DUPLICATES"
+      ]
     }
   ],
   "execution_priority": [
@@ -1465,7 +1506,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Review model import/export, persistent streaming state/live readers and remaining catalogue workflows. Streaming DFG/footprints/temporal/token replay now expose both CSV arrival and historical importer orders, prefix/final diagnostics and complete outputs. Existing related-log, OCEL and classic workflows remain available; exactness, schemas, numerical counters, native boundaries, exhaustive search and performance gates stay independent."
+      "next_action": "Review persistent streaming state/live readers, process-cube and remaining catalogue/analysis/export workflows. Independent model exchange now delivers PNML/BPMN/PTML/DFG inspection/conversions and marking-preserving conformance handoff alongside existing streaming, related-log, OCEL and classic workflows. Full schema, numeric, dialect, ordering, search, concurrency and performance gates remain."
     }
   ],
   "feature_status_meaning": {
