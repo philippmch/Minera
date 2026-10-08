@@ -330,6 +330,7 @@ struct MinedSession {
   minera::DeclareModel declare;  // classic Declare, for on-demand playout
   std::string dataset;       // uploaded file name, echoed into XES exports
   std::optional<minera::PnmlDocument> imported_document;
+  std::string imported_activity_attribute = "concept:name";
   minera::TokenReplayOptions token_replay;
   minera::InductiveMinerOptions inductive_options;
   std::string alpha_activity_attribute = "concept:name";
@@ -3081,7 +3082,35 @@ void handle_ocel_conformance(const httplib::Request& request,
 // the cached session under the id "imported", so POST /api/align?miner=imported
 // can align against it on demand like any discovered model; the session's
 // registry is extended with the net's activities so ids stay resolvable.
-// Hidden cached-session adapter for the bounded classic ILP miner. The log is
+bool discovery_model_requested(const httplib::Request& request,
+                               const MinedSession& session) {
+  if (request.has_param("source_id") && request.get_param_value("source_id") !=
+      std::to_string(session.query_source_id))
+    throw std::invalid_argument("the source log changed; refresh the discovery source");
+  if (!request.has_param("include_pnml")) return false;
+  const auto value = request.get_param_value("include_pnml");
+  if (value != "true" && value != "false")
+    throw std::invalid_argument("include_pnml must be true or false");
+  if (value == "false") return false;
+  if (!request.has_param("source_id"))
+    throw std::invalid_argument("source_id is required for a discovery model");
+  return true;
+}
+
+std::string discovery_model_json(std::string result_json,
+                                 const minera::PetriNet& net,
+                                 const minera::WorkflowMarkings& markings,
+                                 const MinedSession& session,
+                                 bool computed) {
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  return "{\"family\":\"DISCOVERY_MODEL\",\"source_id\":" +
+         quote(std::to_string(session.query_source_id)) + ",\"result\":" +
+         result_json + ",\"pnml\":" + (computed
+             ? quote(minera::to_pnml(net, markings.initial, markings.final, "discovered"))
+             : std::string("null")) + '}';
+}
+
+// Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
 // not accept uploads or perform any implicit re-importing.
 void handle_ilp_mine(const httplib::Request& request,
@@ -3101,7 +3130,7 @@ void handle_ilp_mine(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "ilp_activity_key", "ilp_artificial_start_activity",
         "ilp_artificial_end_activity", "ilp_alpha", "ilp_causal_relation",
-        "ilp_noise_threshold", "ilp_max_nodes"};
+        "ilp_noise_threshold", "ilp_max_nodes", "source_id", "include_pnml"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key)) {
@@ -3116,19 +3145,23 @@ void handle_ilp_mine(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool include_model = discovery_model_requested(request, *session);
     const auto options = minera::parse_ilp_miner_params(lookup, present);
     if (options.max_nodes > kServerIlpMaxNodes) {
       throw std::invalid_argument("ilp_max_nodes exceeds the server safety cap");
     }
     const auto result = minera::mine_ilp(session->log, options);
-    response.set_content(minera::ilp_miner_json(result), "application/json");
+    auto body = minera::ilp_miner_json(result);
+    if (include_model) body = discovery_model_json(std::move(body), result.net,
+        result.markings, *session, result.diagnostics.computed);
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
   }
 }
 
-// Hidden cached-session adapter for bounded classic genetic discovery. The
+// Cached-session adapter for bounded classic genetic discovery. The
 // source log is the latest /api/mine session and all evolutionary limits are
 // checked again at the server boundary.
 void handle_genetic_request(const httplib::Request& request,
@@ -3152,7 +3185,7 @@ void handle_genetic_request(const httplib::Request& request,
         "genetic_generations", "genetic_elitism_rate",
         "genetic_crossover_rate", "genetic_mutation_rate",
         "genetic_elitism_min_sample", "genetic_max_activities",
-        "genetic_max_states", "genetic_conversion_variant"};
+        "genetic_max_states", "genetic_conversion_variant", "source_id", "include_pnml"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -3169,6 +3202,7 @@ void handle_genetic_request(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool include_model = discovery_model_requested(request, *session);
     const auto options = minera::parse_genetic_miner_params(lookup, present);
     if (options.population_size > kServerGeneticMaxPopulation ||
         options.generations > kServerGeneticMaxGenerations ||
@@ -3181,13 +3215,16 @@ void handle_genetic_request(const httplib::Request& request,
           ? minera::parse_genetic_matrix_conversion_variant(
                 request.get_param_value("genetic_conversion_variant"))
           : minera::GeneticMatrixConversionVariant::kToPetriNet;
-      response.set_content(minera::genetic_matrix_conversion_json(
-                               minera::convert_genetic_matrix(result.matrix,
-                                                              variant)),
-                           "application/json");
+      const auto converted = minera::convert_genetic_matrix(result.matrix, variant);
+      auto body = minera::genetic_matrix_conversion_json(converted);
+      if (include_model) body = discovery_model_json(std::move(body), converted.net,
+          converted.markings, *session, result.diagnostics.computed);
+      response.set_content(body, "application/json");
     } else {
-      response.set_content(minera::genetic_miner_json(result),
-                           "application/json");
+      auto body = minera::genetic_miner_json(result);
+      if (include_model) body = discovery_model_json(std::move(body), result.net,
+          result.markings, *session, result.diagnostics.computed);
+      response.set_content(body, "application/json");
     }
   } catch (const std::exception& error) {
     response.status = 400;
@@ -4397,6 +4434,9 @@ void handle_check_model(const httplib::Request& request,
   }
 
   try {
+    if (request.has_param("source_id") && request.get_param_value("source_id") !=
+        std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; rediscover the model before checking it");
     const std::string model_xml = request.has_file("model")
                                       ? request.get_file_value("model").content
                                       : request.body;
@@ -4429,9 +4469,26 @@ void handle_check_model(const httplib::Request& request,
     }
     next_session->nets.insert_or_assign("imported", imported);
     next_session->imported_document = document;
-    const auto replay_options = document
+    auto replay_options = document
         ? minera::tools::pnml_replay_options(*document, session->token_replay)
         : session->token_replay;
+    if (request.has_param("activity_attribute")) {
+      const auto selector = request.get_param_value("activity_attribute");
+      if (selector.empty()) throw std::invalid_argument("activity_attribute must not be empty");
+      replay_options.activity_attribute = selector;
+    }
+    next_session->imported_activity_attribute = replay_options.activity_attribute;
+    std::optional<minera::EventLog> footprint_input;
+    if (replay_options.activity_attribute != "activity" &&
+        replay_options.activity_attribute != "concept:name") {
+      footprint_input = session->log;
+      for (auto& trace : footprint_input->traces) for (auto& event : trace.events) {
+        const auto* activity = minera::dfg_event_field_value(event, replay_options.activity_attribute);
+        if (!activity) throw std::invalid_argument("missing model activity field: " + replay_options.activity_attribute);
+        event.activity = *activity;
+      }
+    }
+    const auto& footprint_log = footprint_input ? *footprint_input : session->log;
     const auto gated = minera::tools::pnml_conformance_gate(
         imported, document ? &*document : nullptr);
     const minera::ModelConformance conformance = gated ? *gated : minera::ModelConformance{
@@ -4440,9 +4497,9 @@ void handle_check_model(const httplib::Request& request,
                   replay_options.initial_marking, replay_options.final_marking)
             : minera::final_marking_reachable(imported),
         minera::check_conformance(session->log, imported, replay_options),
-        document ? minera::check_footprints(session->log, imported,
+        document ? minera::check_footprints(footprint_log, imported,
                                              replay_options.initial_marking)
-                 : minera::check_footprints(session->log, imported),
+                 : minera::check_footprints(footprint_log, imported),
         std::nullopt};
     const auto body =
         minera::imported_model_json(conformance, next_session->graph);
@@ -4451,6 +4508,12 @@ void handle_check_model(const httplib::Request& request,
       std::lock_guard<std::mutex> lock(g_session_mutex);
       // Only publish if no re-mine replaced the session in the meantime.
       if (g_session == session) g_session = std::move(next_session);
+      else if (request.has_param("source_id")) {
+        response.status = 409;
+        response.set_content(error_json("the active session changed during model checking; retry the handoff"),
+                             "application/json");
+        return;
+      }
     }
     response.set_content(body, "application/json");
   } catch (const std::exception& error) {
@@ -4488,6 +4551,8 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
       return request.has_param(std::string(name));
     };
     auto options = minera::parse_alignment_params(lookup, present);
+    if (miner == "imported" && !request.has_param("alignment_activity_attribute"))
+      options.activity_attribute = session->imported_activity_attribute;
     if (miner == "imported" && session->imported_document)
       options = minera::tools::pnml_alignment_options(
           *session->imported_document, options);
@@ -5660,6 +5725,7 @@ void handle_evaluate(const httplib::Request& request,
         : miner == "alpha" ? std::string_view(session->alpha_activity_attribute)
         : miner == "heuristic" ? std::string_view(session->heuristic_activity_attribute)
         : miner == "powl" ? std::string_view(session->powl_activity_key)
+        : miner == "imported" ? std::string_view(session->imported_activity_attribute)
         : std::string_view("concept:name");
     params = minera::tools::default_evaluation_input_params(
         *evaluation_log, std::move(params),

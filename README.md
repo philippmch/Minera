@@ -937,6 +937,46 @@ field. The cached-log HTTP route is `POST /api/log-cluster`, with a literal
 UTF-8 regex body and `source_id`, optional `name`/`activity_attribute`, and
 `format=summary|xes|json`. Source revisions reject stale cluster requests.
 
+### ILP and genetic discovery
+
+In **Mine a Process Model**, select **ILP Miner** or **Genetic Miner**, then
+**Classic**. Both run the native miner on the active CSV/XES source and render
+its actual Petri net with local activity labels and initial/final markings.
+ILP exposes activity/boundary labels, alpha, noise filtering, causal relations
+and its search bound. Genetic discovery exposes activity/timestamp/case fields,
+population, generations, seed, evolutionary rates, tournament size and
+activity/state bounds. Zero generations retains the initialized population's
+result. Diagnostics show the actual work and returned fitness; bounded search
+does not guarantee a perfectly fitting model.
+
+Inspect genetic causal-matrix input/output groups alongside its workflow net.
+Members within a group are alternatives; separate groups require independent
+tokens. Download the complete discovery report or the exact PNML returned with
+the model. Reports retain reviewed parameters and original native JSON text.
+**Check this model** opens the existing conformance workflow with that PNML,
+the source revision and selected activity field. Valid custom fields follow
+through token replay, footprints, default alignments and model quality.
+
+`POST /api/ilp-mine`, `POST /api/genetic-mine` and the existing
+`POST /api/genetic-matrix-convert` accept `include_pnml=true` with `source_id`.
+The `DISCOVERY_MODEL` envelope includes the ordinary `result` and its `pnml`
+(null when discovery did not produce a model). Calls without the option retain
+their previous result shape. `POST /api/check-model` accepts `source_id` and
+`activity_attribute` for the handoff; stale revisions are rejected. Native CLI
+entry points remain available:
+
+```sh
+minera_export source.csv --ilp-mine --ilp-alpha 1 --ilp-max-nodes 100000
+minera_export source.csv --genetic-mine --genetic-seed 17 --genetic-population-size 32 --genetic-generations 20
+minera_export source.csv --genetic-matrix-convert --genetic-conversion-variant to_petri_net
+```
+
+These views add usable entry points while both packages retain their partial
+parity status. Complete reference optimizer/search/parameter behavior and input
+fallback conventions remain independent gates. In particular, a missing named
+activity can fall back during native discovery, while a handoff's selected field
+must exist; inspect the resulting labels and use a valid field for conformance.
+
 ### Anonymization
 
 Open a CSV or XES log and choose **Anonymize**. Release activity variants with

@@ -11535,3 +11535,61 @@ corpora and privacy guarantees remain open. This adds usable entry points withou
 promoting either package or any module. The full catalogue remains 86 packages /
 387 modules, with 46 complete packages, 199 complete modules and 228 incomplete
 units. Full parity has not been reached.
+
+
+## Feature delivery first: ILP and genetic discovery workflows (2026-10-08)
+
+The existing model wizard now exposes classic ILP and Genetic discovery,
+increasing selectable families from eight to ten. Native controls cover activity
+and ILP boundary labels, alpha/noise/causal/search parameters, genetic timestamp
+and case fields, population, generations, seed, evolutionary rates, tournament
+sample and activity/state bounds. Zero generations is supported. The rendered
+Petri net uses the result's own activity registry, preserving custom labels,
+arcs and source/sink markings. Genetic causal groups are inspectable alongside
+the converted net; complete reports retain requested parameters and original
+native JSON, while PNML downloads match the same generated net exactly.
+
+Optional source_id/include_pnml envelopes preserve legacy route result shapes.
+The existing matrix-conversion route produces the matching exercised PNML and
+markings; empty extended-arc arrays differ between its JSON and the ordinary
+genetic serializer, and schema/type parity remains an independent gate.
+
+Check this model hands the exact PNML and source revision to the imported
+conformance workflow. Valid custom activity fields now follow through token
+replay, footprints, default alignments and quality evaluation. Before this
+addition the import consumer used the original activity field instead of the
+selected discovery field. The server retains a per-imported-model selector;
+footprint projection affects only its input copy. Source/session changes reject
+stale handoffs; application generation guards prevent stale imported results.
+Saved analysis JSON cannot mine a different cached source, and a new source
+resets the model wizard/results. Failed runs retain the previous valid model.
+
+docs/feature-first-discovery-miners-validation.json binds 710 frontend tests,
+the production build, exact source/binaries and three fresh assertion-enabled
+native discovery/conversion suites. Forty-six checks cover 28 actual HTTP calls
+and three actual CLI executions, including ordinary/custom-field discovery,
+legacy agreement, exact PNML structure/labels/markings, matrix conversion,
+zero generations, source retention/staleness, valid custom conformance defaults
+and explicit failures. Twenty-one browser checks verify the ten-family picker,
+both actual rendered nets, causal inspection, parameter-bound downloads, custom
+labels, both exact-model handoffs, ILP replay/alignment on phase, explicit source
+selectors, zero generations, validation/native failures, phone layout and source
+reset/saved-analysis guards. The genetic sample retains its actual two fitting
+cases out of three; no perfect-fit assertion replaces the native result.
+
+Initial verification assumptions about PNML final-marking place references,
+imported-result field names, empty extended-arc arrays, perfect-replay collapsed
+variant lists and missing activity selectors were corrected from recorded owned
+outputs in fresh helper namespaces. Missing activity fields can fall back during
+discovery; a selected handoff field must exist. Complete missing/partial-field
+fallback and selector-normalization behavior remain gates. The browser instead
+verifies a strict timestamp-selector error. Earlier records remain retained.
+
+The server/CLI/tests are freshly compiled with all 167 verified unchanged core
+objects reused; no core algorithm changed, and other catalogue proofs are
+inherited. Cancellation signals/controls exist without an asserted browser or
+native-computation cancellation outcome. Owned servers and browser tab are
+closed and the viewport restored. Exact optimizer, search, fitness, conversion,
+parameter/type/error behavior and all remaining catalogue requirements stay
+open. Counts remain 46/86 complete packages, 199/387 complete modules and 228
+incomplete units, without promotion or a full-parity claim.

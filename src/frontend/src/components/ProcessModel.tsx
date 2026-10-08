@@ -12,6 +12,7 @@ import { LogSkeletonModel } from "./LogSkeletonModel";
 import { DeclareModel } from "./DeclareModel";
 import { FootprintsModel } from "./FootprintsModel";
 import { TransitionSystemModel } from "./TransitionSystemModel";
+import { NativeDiscovery } from "./NativeDiscovery";
 
 type Step = "miner" | "variant" | "result";
 
@@ -29,6 +30,8 @@ interface ProcessModelProps {
   powlPetriLayout: PetriLayout | null;
   /** Whether the backend can export PNML (a log was mined this session). */
   canExportPnml: boolean;
+  mining?: boolean;
+  onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
 }
 
 // A small wizard: pick a miner family, then a variant, then the mined model is
@@ -41,6 +44,8 @@ export function ProcessModel({
   heuristicPetriLayout,
   powlPetriLayout,
   canExportPnml,
+  mining = false,
+  onUseModel,
 }: ProcessModelProps) {
   const [step, setStep] = useState<Step>("miner");
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -143,6 +148,8 @@ export function ProcessModel({
           heuristicPetriLayout={heuristicPetriLayout}
           powlPetriLayout={powlPetriLayout}
           canExportPnml={canExportPnml}
+          mining={mining}
+          onUseModel={onUseModel}
         />
       )}
     </div>
@@ -160,6 +167,8 @@ interface ModelResultProps {
   heuristicPetriLayout: PetriLayout | null;
   powlPetriLayout: PetriLayout | null;
   canExportPnml: boolean;
+  mining: boolean;
+  onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
 }
 
 // Renders the mined model for the chosen variant by its artifact type. A null
@@ -179,8 +188,13 @@ function ModelResult({
   heuristicPetriLayout,
   powlPetriLayout,
   canExportPnml,
+  mining,
+  onUseModel,
 }: ModelResultProps) {
   const [asNet, setAsNet] = useState(false);
+
+  if (minerId === "ilp" || minerId === "genetic")
+    return <NativeDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} />;
 
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
   // inductive tree or from the net's token semantics (converted server-side),

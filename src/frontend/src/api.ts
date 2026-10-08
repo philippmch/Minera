@@ -3198,13 +3198,16 @@ export interface ImportedModelCheck {
  * keeps the net under the miner id "imported", so alignments can be
  * requested for it afterwards like for any discovered model.
  */
-export async function checkModel(file: File, options: { pnmlPublicMarkings?: boolean } = {}): Promise<ImportedModelCheck> {
+export async function checkModel(file: File, options: { pnmlPublicMarkings?: boolean; sourceId?: string; activityKey?: string } = {}): Promise<ImportedModelCheck> {
   const form = new FormData();
   form.append("model", file, file.name);
   let response: Response;
   try {
-    const query = options.pnmlPublicMarkings === undefined ? ""
-      : `?pnml_public_markings=${options.pnmlPublicMarkings}`;
+    const parameters = new URLSearchParams();
+    if (options.pnmlPublicMarkings !== undefined) parameters.set("pnml_public_markings", String(options.pnmlPublicMarkings));
+    if (options.sourceId !== undefined) parameters.set("source_id", options.sourceId);
+    if (options.activityKey !== undefined) parameters.set("activity_attribute", options.activityKey);
+    const query = parameters.size ? `?${parameters}` : "";
     response = await fetch(`/api/check-model${query}`, { method: "POST", body: form });
   } catch {
     throw new Error(

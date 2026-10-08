@@ -41,6 +41,9 @@
 .anonymization-workspace input[type="file"] { width: 100%; max-width: 400px; }
 .anonymization-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .anonymization-case { margin-top: 16px; }
+.native-discovery,.discovery-inspection { min-width: 0; padding-bottom: 24px; }
+.native-discovery pre,.discovery-inspection pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.discovery-inspection h3,.discovery-inspection p,.discovery-inspection details { margin-inline: 24px; }
 @media (max-width:600px) { .query-fields, .query-filter { padding-inline:12px; }.query-intro, .query-results, .query-setup { margin-inline:12px; }.query-options > label { flex:1 1 140px;min-width:0; }.query-options input, .query-options select { width:100%; } }
 
 .ask-model-panel { min-width: 0; padding-bottom: 24px; }

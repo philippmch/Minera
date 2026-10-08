@@ -159,5 +159,10 @@ MINER_GROUPS.push({
   variants:[{id:"configured",name:"Configured discovery",description:"Render the sequence, set or multiset view discovered with the direction and window selected in Miner settings.",artifact:"transition-system"}],
 });
 
+MINER_GROUPS.push(
+  {id:"ilp",name:"ILP Miner",tagline:"Discover a workflow net with configurable integer region search.",variants:[{id:"classic",name:"Classic",description:"Configure activity and boundary labels, causal relations, filtering and search limits, then inspect and export the discovered net.",artifact:"petri-net"}]},
+  {id:"genetic",name:"Genetic Miner",tagline:"Evolve a causal matrix and inspect its converted workflow net.",variants:[{id:"classic",name:"Classic",description:"Configure population, generations, seed, evolutionary rates and input fields, then inspect the causal matrix and export its Petri net.",artifact:"petri-net"}]},
+);
+
 export const DEFAULT_GROUP = MINER_GROUPS.find((group) => group.id === "inductive")!;
 export const DEFAULT_VARIANT = DEFAULT_GROUP.variants[0];
