@@ -1,0 +1,1 @@
+{"family":"PROCESS_CUBE","x_dimension":"x","y_dimension":"y","aggregation":"mean","x_bins":[{"label":"[0,1]","lower":0,"upper":1,"numeric":true}],"y_bins":[{"label":"[0,1]","lower":0,"upper":1,"numeric":true}],"x_edges":[0,1],"y_edges":[0,1],"cells":[[null]],"case_ids":[[[]]]}

@@ -1601,6 +1601,54 @@ minera_export --pnml-to-ptml model.pnml -o converted.ptml
 ```
 
 [Validation and checkpoint boundaries](docs/feature-first-model-exchange-validation.json)
+
+## Process cubes
+
+Choose **Explore process cubes** on the landing page, **Process cubes** in a
+classic or OCEL workspace's top bar, or **Process cubes** under **Transform**.
+Upload a JSON table with `case_ids` and `columns`; optional
+`categorical_columns` contains additional string columns. Each column has one
+finite numeric or string value per input row:
+
+```json
+{"case_ids":["case-1","case-2"],"columns":{"cost":[10,20],"duration":[2,4],"region":["North","South"]}}
+```
+
+Select numeric or categorical axes, a positive one-hot prefix group, or a
+composite JSON list of exact dimension names. All eight native aggregations
+are available: mean, sum, min, max, count, median, first and last. Division
+limits and explicit numeric bin edges use the native controls. The native
+engine normalizes edge order; rows outside explicit edges do not enter cells.
+First and last follow input row order.
+
+The heatmap uses X columns and Y rows, with ten displayed bins per axis.
+Selecting a cell shows its native case-ID set. Repeated case IDs can contribute
+multiple input rows but appear once in each cell's membership. Empty numeric
+results remain `null`, distinct from zero. Complete cell/membership/bin/edge
+and source-row CSV exports retain all data beyond the display pages. Original
+uploads, raw native JSON and reports retain source hashes and numeric tokens.
+
+After extracting **One row per case** features in **Transform**, choose
+**Explore case features as a process cube**. This transposes the same native
+matrix, preserving case order and numeric tokens. The optional case identifier
+column remains metadata. Empty/duplicate feature names and non-numeric values
+produce an explicit diagnostic instead of dropping or overwriting dimensions.
+Generated source metadata records the extraction revision; independent table
+membership is not an active-log filtering operation.
+
+`POST /api/process-cube` and `minera_process_cube` share the native engine:
+
+```text
+minera_process_cube table.json --x-col cost --y-col region --agg-col duration --aggregation median --max-divisions-x 4
+```
+
+The checkpoint verifies 852 frontend tests, one assertion-enabled native suite,
+26 controlled HTTP cases, 12 CLI runs, 56 browser checks, 20 complete CSVs and
+16 cube reports. The browser handles Unicode and escaped composite names.
+Windows narrow command-line argument encoding still mangles Unicode names;
+native numeric/default/bin/category/order/performance and complete reference
+parity remain separate gates.
+[Validation and checkpoint boundaries](docs/feature-first-process-cube-validation.json)
 record all four formats, normal export paths, both net constructions, extended
 arcs, stochastic data, 501-digit integers, actual conformance handoff and complete
 exports. Full format/dialect/schema/diagram preservation, solver/search,

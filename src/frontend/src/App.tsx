@@ -51,6 +51,7 @@ import { OcelIoWorkspace } from "./components/OcelIoWorkspace";
 import { RelatedLogsWorkspace } from "./components/RelatedLogsWorkspace";
 import { StreamingWorkspace } from "./components/StreamingWorkspace";
 import { ModelExchangeWorkspace } from "./components/ModelExchangeWorkspace";
+import { ProcessCubeWorkspace } from "./components/ProcessCubeWorkspace";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
@@ -110,6 +111,7 @@ export default function App() {
   const [showRelatedLogs, setShowRelatedLogs] = useState(false);
   const [showStreaming, setShowStreaming] = useState(false);
   const [showModelExchange, setShowModelExchange] = useState(false);
+  const [showProcessCube, setShowProcessCube] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -353,6 +355,7 @@ export default function App() {
     setShowRelatedLogs(false);
     setShowStreaming(false);
     setShowModelExchange(false);
+    setShowProcessCube(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -562,6 +565,7 @@ export default function App() {
   if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
 
   if (showModelExchange) return <><TopBar dataset={data?.dataset??ocelDataset??'Model files'} datasetKind="model exchange" onOpenFile={loadFile} onHome={()=>setShowModelExchange(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowModelExchange(false)}>Return to current workspace</button><ModelExchangeWorkspace available={source!==null} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setShowModelExchange(false);setTab("conformance");}}/></main></>;
+  if (showProcessCube) return <><TopBar dataset={data?.dataset??ocelDataset??'Process cubes'} datasetKind="process cube" onOpenFile={loadFile} onHome={()=>setShowProcessCube(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowProcessCube(false)}>Return to current workspace</button><ProcessCubeWorkspace busy={mining}/></main></>;
   if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} busy={mining}/></main></>;
   if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} available={source!==null} mining={mining} dataset={data?.dataset} onOpen={loadFile}/></main></>;
 
@@ -576,6 +580,7 @@ export default function App() {
           onRelateLogs={()=>setShowRelatedLogs(true)}
           onStreaming={()=>setShowStreaming(true)}
           onModelExchange={()=>setShowModelExchange(true)}
+          onProcessCube={()=>setShowProcessCube(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -622,6 +627,7 @@ export default function App() {
           onRelateLogs={()=>setShowRelatedLogs(true)}
           onStreaming={()=>setShowStreaming(true)}
           onModelExchange={()=>setShowModelExchange(true)}
+          onProcessCube={()=>setShowProcessCube(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -645,6 +651,7 @@ export default function App() {
         onRelateLogs={()=>setShowRelatedLogs(true)}
         onStreaming={()=>setShowStreaming(true)}
         onModelExchange={()=>setShowModelExchange(true)}
+          onProcessCube={()=>setShowProcessCube(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);

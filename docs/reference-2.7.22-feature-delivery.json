@@ -1489,6 +1489,44 @@
         "ACTIVITY_DEFINES_PLACE",
         "INVISIBLES_NO_DUPLICATES"
       ]
+    },
+    {
+      "added": [
+        "Independent process-cube workspace from landing, classic/OCEL top bars and the transformation hub",
+        "All eight native aggregations with numeric/categorical axes, positive one-hot prefix groups and composite exact-name lists",
+        "Native division limits and explicit numeric edges, escaped comma/backslash names, Unicode HTTP dimensions and input-row first/last ordering",
+        "X-column/Y-row heatmap with null/zero distinction, exact native values and complete retained data beyond ten-bin display pages",
+        "Native distinct case-ID memberships, selected-cell inspection/paging and full selected/all-cell membership CSV exports",
+        "Complete cells/bins/edges/input-schema/input-row tables with row/column paging, original uploads, raw JSON and source-bound reports",
+        "Original numeric token preservation in uploads, input inspection, feature-matrix transposition, native data/reports and complete CSV exports",
+        "Same-result case-feature handoff preserves source positions/IDs, omits identifier metadata from numeric dimensions and rejects ambiguous/non-finite schemas",
+        "Actual four-case/26-dimension native feature-to-cube browser workflow independently reproduced through HTTP and CLI",
+        "31 by 12 categorical grid, 399 input/membership rows, 28-member selected cell, empty results, retained native errors and 390px controls"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/ProcessCubeWorkspace.tsx",
+        "src/frontend/src/process-cube-workspace.ts",
+        "src/frontend/src/components/TransformationWorkspace.tsx",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tools/minera_process_cube.cpp"
+      ],
+      "families": [],
+      "id": "native_process_cube_workspace",
+      "native_components": [
+        "include/minera/process_cube.hpp"
+      ],
+      "state": "native_app_and_cli_available",
+      "validation": "docs/feature-first-process-cube-validation.json",
+      "variants": [
+        "mean",
+        "sum",
+        "min",
+        "max",
+        "count",
+        "median",
+        "first",
+        "last"
+      ]
     }
   ],
   "execution_priority": [
@@ -1506,7 +1544,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Review persistent streaming state/live readers, process-cube and remaining catalogue/analysis/export workflows. Independent model exchange now delivers PNML/BPMN/PTML/DFG inspection/conversions and marking-preserving conformance handoff alongside existing streaming, related-log, OCEL and classic workflows. Full schema, numeric, dialect, ordering, search, concurrency and performance gates remain."
+      "next_action": "Review persistent streaming state/live readers and remaining catalogue/analysis/export workflows. Native process cubes now expose all eight aggregations, dimensions, full membership/export inspection and case-feature handoff alongside independent model exchange, streaming, related-log, OCEL and classic workflows. Full numeric/schema/dialect/default/order/search/concurrency/performance and Windows CLI Unicode gates remain."
     }
   ],
   "feature_status_meaning": {
