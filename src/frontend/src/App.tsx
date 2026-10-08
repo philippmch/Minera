@@ -50,6 +50,8 @@ import { OcelExplorer } from "./components/OcelExplorer";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
+import { VisualizationExplain } from "./components/VisualizationExplain";
+import { type VisualizationDraft } from "./visualization-explanation";
 import {
   alignModel,
   alignDfg,
@@ -107,6 +109,8 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState<Tab>("log");
   const [mining, setMining] = useState(false);
+  const [visualizationDraft,setVisualizationDraft]=useState<{generation:number;draft:VisualizationDraft}|null>(null);
+  const ocelQuestions=useRef<HTMLDetailsElement|null>(null);
   // The CSV upload behind the current view, kept so filters can re-mine it.
   // null when the data came from a pre-mined JSON export (not re-minable).
   const [source, setSource] = useState<{
@@ -554,13 +558,14 @@ export default function App() {
           }}
         />
         {error && <div className="error-banner">{error}</div>}
+        <VisualizationExplain key={cacheGeneration.current+":"+ocelResult.variant} dataset={ocelDataset??"object-centric log"} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});if(ocelQuestions.current)ocelQuestions.current.open=true;}} />
         <main className="layout-log">
           <OcelExplorer
             result={ocelResult}
             busy={mining}
             onDiscover={changeOcelModel}
           />
-          <details className="ocel-model-question"><summary>Ask a model about this object-centric log</summary><PromptChat key={cacheGeneration.current} mining={mining} available={ocelFile!==null} ocelFile={ocelFile} dataset={ocelDataset??undefined} /></details>
+          <details ref={ocelQuestions} className="ocel-model-question"><summary>Ask a model about this object-centric log</summary><PromptChat key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} mining={mining} available={ocelFile!==null} ocelFile={ocelFile} dataset={ocelDataset??undefined} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></details>
         </main>
         <footer className="footer reveal">
           <span>{ocelDataset ?? "object-centric log"} · object-centric model</span>
@@ -663,6 +668,7 @@ export default function App() {
         <button className={tab === "query" ? "tab active" : "tab"} onClick={() => setTab("query")}>Query &amp; filter</button>
       </nav>
       <Kpis data={data} />
+      {tab!=="llm"&&tab!=="query"&&tab!=="embeddings"&&<VisualizationExplain key={cacheGeneration.current+":"+tab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");}} />}
       {source && (
         <Filters
           key={source.file.name}
@@ -732,7 +738,7 @@ export default function App() {
           <EmbeddingSearch key={cacheGeneration.current} data={data} available={source !== null} mining={mining} />
         </main>
       )}
-      {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current} data={data} mining={mining} available={source!==null} onOpenFiltered={loadFile} /></main>}
+      {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} data={data} mining={mining} available={source!==null} onOpenFiltered={loadFile} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></main>}
       {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
       {tab === "dfg" && (
         <main className="layout">

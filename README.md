@@ -762,6 +762,51 @@ This is usable image transport and payload control. Exact pinned-reference
 defaults, field omission, media-type conventions, saver adapters, response/error
 behavior and per-call endpoint conventions remain independent parity gates.
 
+### Automatic visualization explanations
+
+Open a diagram, chart or table and select it in **Visualization to explain**.
+**Prepare visualization explanation** renders that selected panel into a PNG
+and opens it with an editable prompt in **Ask a model**. OCEL views open their
+own question section. The image reflects the displayed filters, annotations,
+pan/zoom and scroll state; review it before sending.
+
+The renderer waits for fonts and finite entrance animations, retains SVG styles
+and legends, and rejects blank output. It fits the complete selected panel
+within a 1600-pixel dimension and a 4-million-pixel area, with an image bound of
+1.5 MiB. Content already clipped by the selected view remains clipped. Rendering
+uses `html2canvas` 1.4.1; exact browser pixels and reference saver layouts remain
+separate parity gates. See its [rendering limitations](https://html2canvas.hertzen.com/documentation).
+
+Standalone Python workflows accept a real saver callback. The saver receives
+its positional arguments followed by the image path. Additional options are
+forwarded, and the generated image is read before the owned temporary directory
+is cleaned:
+
+```python
+from scripts.llm_visualization import explain_visualization
+
+explanation = explain_visualization(
+    save_my_model, model, connector=my_connector,
+    description="A process model with activity frequencies.",
+    annotated=True,
+)
+```
+
+The connector receives the prepared prompt, `image_path` and the same options.
+`prepare_visualization` returns a prompt and byte-preserving image attachment
+without calling a provider. The command-line entry point accepts JSON arguments
+and options and supports prompt-only or provider execution:
+
+```sh
+python scripts/llm_visualization.py --saver my_plots:save_model --args-file arguments.json --options-file controls.json --prompt-only
+python scripts/llm_visualization.py --saver my_plots:save_model --args-file arguments.json --description "Process model" --provider openai --model MODEL --runtime-url http://127.0.0.1:8189
+```
+
+Response reports retain the exact submitted image and request. Provider/model
+availability, large-view detail, automatic dispatch of every reference saver,
+prompt defaults, temporary-file/error conventions and exact rendering fidelity
+remain open independently of these usable entry points.
+
 ### Native log, model and OCEL contexts
 
 In **Ask a model**, expand **Build log or model context** to build text from the

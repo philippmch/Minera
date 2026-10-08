@@ -1003,6 +1003,24 @@
       "id": "llm_responses_images_and_extra_payloads",
       "state": "available_with_configured_provider",
       "validation": "docs/feature-first-llm-images-validation.json"
+    },
+    {
+      "added": [
+        "Generic current-view selection for visible diagrams, charts and tables",
+        "PNG rendering with original SVG styles, fonts, legends, selected controls and displayed viewport",
+        "Automatic handoff into reviewed prompt and original-image provider workflow in traditional and OCEL views",
+        "Finite entrance-animation waiting, cancellation control and blank-canvas rejection",
+        "Standalone saver-callback preparation and execution, argument/option forwarding, provider workflows and temporary-file cleanup"
+      ],
+      "entry_points": [
+        "src/frontend/src/components/VisualizationExplain.tsx",
+        "src/frontend/src/visualization-explanation.ts",
+        "src/frontend/src/components/AskModel.tsx",
+        "scripts/llm_visualization.py"
+      ],
+      "id": "automatic_visualization_explanations",
+      "state": "rendering_and_prompt_preparation_available_provider_execution_optional",
+      "validation": "docs/feature-first-visualization-explanations-validation.json"
     }
   ],
   "execution_priority": [
@@ -1012,7 +1030,7 @@
   "feature_backlog": [
     {
       "area": "LLM and query integrations",
-      "next_action": "Complete visualization-saver adapters and review remaining provider/modal capabilities. Responses, image attachments and overriding extra payloads now join all 13 native contexts, SQL queries/filters, clusters and hypotheses; defaults, omission, MIME, per-call URLs and failure/response details remain parity gates."
+      "next_action": "Review remaining provider/modal and visualization/export capabilities across the catalogue. Current-view automatic explanations and standalone saver callbacks join all 13 contexts, image/Responses execution, queries/filters, clusters and hypotheses; exact saver dispatch/rendering/default/temporary/error conventions remain parity gates."
     },
     {
       "area": "Optional connector drivers",

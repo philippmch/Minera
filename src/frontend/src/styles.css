@@ -2281,3 +2281,8 @@ input[type="range"]::-moz-range-thumb {
 .llm-attachments figure { margin: 0; padding: 12px; border: 1px solid var(--line); min-width: 0; }
 .llm-attachments img { display: block; max-width: 100%; height: 180px; object-fit: contain; margin: 0 auto 10px; }
 .llm-attachments figcaption { overflow-wrap: anywhere; margin-bottom: 10px; font-size: 12px; }
+.visualization-explain { margin: 20px var(--gutter,48px); border-block: 1px solid var(--line); padding: 16px 0; }
+.visualization-explain-controls { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.visualization-explain-controls .filters-field { min-width: 220px; max-width: 100%; }
+.visualization-explain p { margin: 8px 0 0; font-size: 13px; }
+@media (max-width:600px) { .visualization-explain { margin-inline: 16px; } .visualization-explain-controls .filters-field { min-width: 0; width: 100%; } }
