@@ -48,7 +48,7 @@ import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
 import { OcelExplorer } from "./components/OcelExplorer";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
-import { AskModel } from "./components/AskModel";
+import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
 import {
   alignModel,
@@ -560,6 +560,7 @@ export default function App() {
             busy={mining}
             onDiscover={changeOcelModel}
           />
+          <details className="ocel-model-question"><summary>Ask a model about this object-centric log</summary><PromptChat key={cacheGeneration.current} mining={mining} available={ocelFile!==null} ocelFile={ocelFile} dataset={ocelDataset??undefined} /></details>
         </main>
         <footer className="footer reveal">
           <span>{ocelDataset ?? "object-centric log"} · object-centric model</span>

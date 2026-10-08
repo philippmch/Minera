@@ -1,5 +1,13 @@
 /* Minera — paper & graphite with a copper seam */
 
+.native-context-builder { margin:16px 24px; padding:12px 0; border-block:1px solid var(--line-soft); min-width:0; }
+.native-context-builder summary,.ocel-model-question > summary { cursor:pointer; }
+.native-context-builder fieldset { border:0; min-width:0; padding:12px 0; margin:0; }
+.context-switches { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; }
+.native-context-text { max-height:360px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px var(--font-mono); }
+.ocel-model-question { margin:24px 0; min-width:0; border-top:1px solid var(--line-soft); padding-top:16px; }
+@media(max-width:600px){ .native-context-builder { margin-inline:12px; }.native-context-builder .ask-model-options > label { flex:1 1 140px;min-width:0; }.native-context-builder input:not([type="checkbox"]),.native-context-builder select { width:100%; } }
+
 .model-task { margin: 12px 24px; }
 .llm-studies { min-width: 0; padding-bottom: 24px; }
 .study-results { margin: 24px; display: grid; gap: 20px; min-width: 0; }

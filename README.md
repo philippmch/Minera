@@ -711,9 +711,54 @@ The adapters follow the documented text protocols for
 [Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create), and
 [Google generateContent](https://ai.google.dev/api/generate-content).
 Automated checks use local HTTP protocol fixtures; external account access and
-live model inference are not established by those checks. Remaining abstraction
-variants, provider parameters/interfaces and exact reference behavior retain
-their feature and parity gates.
+live model inference are not established by those checks. Provider parameters,
+multimodal interfaces and exact reference behavior retain their feature and
+parity gates.
+
+### Native log, model and OCEL contexts
+
+In **Ask a model**, expand **Build log or model context** to build text from the
+loaded native data. CSV/XES logs provide one case, directly-follows graphs,
+variants, event streams, attribute statistics, case features, DECLARE, log
+skeletons, temporal profiles and Petri nets. Original OCEL files provide events
+and objects, object features and object-centric directly-follows graphs through
+**Ask a model about this object-centric log**.
+
+Inspect the result, select **Use built context**, enter a question and preview
+the prompt. Both the native context and the reviewed prompt/response can be
+downloaded. Using new context cancels an outstanding model request and clears
+its old prompt/response. Native context construction requires no provider or
+Python runtime.
+
+Controls include headers, timestamps, case/event attributes, performance,
+relative case frequency, two duration aggregations, case index, exact source
+attribute names, model selection and object lifecycle paths. Object features
+require an exact object type, such as `Order`. The character budget preserves
+complete lines; a first line or header may exceed it. The result records the
+actual character count and whether content was omitted, with a separate 2 MiB
+output limit.
+
+```sh
+minera_context my_event_log.xes --variant dfg --relative-frequency true --primary-aggregation median
+minera_context my_event_log.csv --variant case --case-index 0 --include-timestamps false
+minera_context model.pnml --variant petri_net
+minera_context orders.json --variant ocel_features --object-type Order
+```
+
+The CLI supports `case`, `dfg`, `variants`, `event_stream`, `log_attributes`,
+`log_features`, `declare`, `log_skeleton`, `temporal_profile`, `petri_net`,
+`ocel`, `ocel_features` and `ocel_ocdfg`. Petri contexts can use `inductive`,
+`alpha`, `heuristic` or `powl` discovery, or an imported PNML document.
+`POST /api/llm-context` accepts the same options with underscores in their
+names. Traditional log requests require the current cached `source_id` from
+`GET /api/log-query/schema`; OCEL requests upload the original JSON in the
+multipart `ocel` field. Stale sources and invalid controls return explicit
+errors. Saved model-export JSON alone does not contain the original log needed
+for native context construction.
+
+All 13 builders have usable native and browser paths. Exact reference wording,
+ordering, types and parameter combinations remain parity gates; the current
+public-reference byte comparisons cover default DFG and variant text only.
 
 ### SQL queries and filtered logs
 

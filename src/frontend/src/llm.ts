@@ -53,7 +53,8 @@ export async function requestLlmStatus(signal?:AbortSignal):Promise<LlmRuntimeSt
 export async function requestKnowledgePreview(options:KnowledgeInjectionOptions,signal?:AbortSignal):Promise<KnowledgeInjectionResult> {
   const form=new FormData();
   for(const [key,value] of new URLSearchParams(knowledgeInjectionQuery(options)))form.append(key,value);
-  return checkedJson(await fetch("/api/knowledge-injection",{method:"POST",body:form,...(signal?{signal}:{})}),isKnowledgeInjectionResult,"knowledge prompt");
+  const result=await checkedJson(await fetch("/api/knowledge-injection",{method:"POST",body:form,...(signal?{signal}:{})}),isKnowledgeInjectionResult,"knowledge prompt");
+  return {...result,prompt:result.prompt.replace(/\r\n?/g,"\n")};
 }
 export async function requestLlmCompletion(input:LlmCompletionRequest,signal?:AbortSignal):Promise<LlmCompletion> {
   const body=JSON.stringify(input);

@@ -11349,3 +11349,49 @@ additional parameters, ordering, dtype details, failure protocols, multimodal
 interfaces and large-log behavior remain open, along with every other incomplete
 catalogue unit. Counts stay 46/86 packages, 199/387 modules and 228 incomplete
 units; this checkpoint makes no package/module promotion or full-parity claim.
+
+
+## Feature delivery first: native log, model and OCEL contexts (2026-10-08)
+
+All 13 text context builders now have native CLI and HTTP entry points and
+an editable browser workflow: one case, directly-follows graph, variants, event
+stream, log attributes, case features, DECLARE, log skeleton, temporal profile,
+Petri net, OCEL events/objects, object features and object-centric flow graph.
+They consume real imported data and native discoveries. The context builder
+exposes headers, timestamps, attributes, performance, relative case support,
+two duration aggregations, exact source selectors, miners, object type and
+lifecycle paths. Native construction requires neither Python nor a provider.
+Original OCEL files have their own Ask a model section and remain object-centric.
+Contexts can be inspected, downloaded and copied into an editable prompt.
+Using a new context cancels outstanding provider execution and clears its old
+prompt/response. Cached source revisions reject stale traditional requests.
+
+docs/feature-first-llm-context-validation.json binds 589 native source files,
+165 reused core objects, two freshly compiled core sources, four consumers,
+two passing native suites, six study tests, eight query-runtime tests, 682
+frontend tests and the production build. All 89 CLI/HTTP checks pass, including
+all 13 modes and three provider transports, controls, four Petri miners and
+invalid/stale source paths. Twenty CLI/HTTP results agree apart from source IDs.
+Default DFG and variant context texts byte-match public pinned-reference
+outputs. Thirty-one browser checks cover all modes, native context use,
+provider execution, exact prompt downloads, cancellation, source/mode guards,
+Unicode soft budgets and desktop/phone layouts. OCEL checks measure real
+Order/Item lifetimes and event/object flow counts from the original sample.
+Provider replies are owned HTTP fixtures; no external account inference is
+claimed. The browser found CRLF state versus LF editor text; normalization now
+keeps displayed, sent and downloaded prompts equal. The failed browser capture
+and three POWL header integration builds remain retained in separate namespaces.
+The final build and front-end checks use fresh frozen helpers. Owned server and
+provider fixture processes are stopped, and their ports are released.
+
+Reference access remains public signatures/enums/black-box behavior and opaque
+pin hashes. Exact wording, output ordering, event scalar/metadata conventions,
+dtype handling, other parameter combinations, provider/multimodal interfaces
+and large-log behavior remain open. Event streams currently use native typed
+table JSON, and attribute summaries include source integer/string columns that
+the observed pandas 3 reference context skipped. The line budget preserves a
+complete first line/header and marks omitted content; a separate 2 MiB output
+limit applies. The preceding 152 algorithm suites remain inherited rather than
+a fresh whole-algorithm audit. Every catalogue family and parity gate remains
+in scope: counts stay 46/86 packages, 199/387 modules and 228 incomplete units.
+This is feature availability, without package/module promotion or full parity.
