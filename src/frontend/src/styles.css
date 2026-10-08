@@ -2345,3 +2345,20 @@ input[type="range"]::-moz-range-thumb {
 .model-exchange-workspace .query-options > .filters-field { flex: 1 1 230px; }
 .model-exchange-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .model-exchange-inspection pre { overflow: auto; max-height: 460px; }
+.process-cube-workspace fieldset { border: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.process-cube-workspace .filters-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.process-cube-workspace input, .process-cube-workspace select, .process-cube-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.process-cube-workspace .query-options > .filters-field { flex: 1 1 210px; }
+.process-cube-inspection { min-width: 0; }
+.process-cube-inspection > p, .process-cube-inspection > details, .process-cube-inspection > .query-actions, .cube-members { margin: 16px 24px; }
+.process-cube-inspection pre, .process-cube-workspace pre { overflow: auto; max-height: 460px; }
+.process-cube-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.cube-heatmap th { max-width: 230px; overflow-wrap: anywhere; }
+.cube-heatmap caption { padding: 16px; text-align: left; }
+.cube-cell { width: 100%; min-width: 100px; border: 1px solid transparent; border-radius: 6px; padding: 12px; color: var(--ink); cursor: pointer; }
+.cube-cell[aria-pressed=true], .cube-cell:focus-visible { border-color: var(--accent); outline: 2px solid var(--accent); }
+.cube-cell strong, .cube-cell small { display: block; overflow-wrap: anywhere; }
+.cube-cell small { margin-top: 6px; }
+.cube-members li { overflow-wrap: anywhere; white-space: pre-wrap; }
+.cube-export { margin: 0 24px 16px; }
+@media (max-width: 1200px) { .topbar { flex-wrap: wrap; } .topbar > .dataset { min-width: 0; flex: 1 1 180px; } }

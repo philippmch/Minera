@@ -12257,3 +12257,50 @@ implementation was read. All catalogue statuses stay unchanged: 86 packages/
 Owned tab/server are closed, viewport restored and port 8498 released.
 Historical journal bytes and 110 unrelated files remain preserved. Continue the
 complete feature/exactness objective; full parity remains active.
+
+
+## Feature delivery first: process-cube workspace (2026-10-08)
+
+Explore process cubes adds independent native table analysis from landing,
+classic/OCEL top bars and Transform. Eight aggregations, numeric/categorical
+axes, positive one-hot prefix groups, composite names, divisions and explicit
+numeric edges are exposed. Native edges are sorted; outside rows are omitted.
+First/last follow original input order. X columns/Y rows display the native
+matrix with null distinct from zero, not browser-recomputed aggregates.
+
+Cell membership retains native distinct case-ID sets while repeated input rows
+continue contributing numerically. Ten-bin heatmap pages, 25-row membership and
+table pages and eight-column pages leave every native value available through
+complete cells/memberships/bins/edges/input schema/input rows CSV, JSON/report
+and original-upload downloads. Integer and decimal source/result tokens survive
+inspection and transport without claiming arbitrary-precision arithmetic.
+
+One-row-per-case feature extraction hands the same native result into a cube,
+preserving original case IDs/order, numeric tokens and extraction revision.
+The identifier column remains metadata; duplicate/empty names and unsupported
+values are explicit diagnostics. Actual four-case/26-dimension browser handoff
+matches independent HTTP and CLI execution. Independent upload memberships are
+not active-log filters or a proof of current-source identity.
+
+docs/feature-first-process-cube-validation.json binds 852 frontend tests and
+production assets, 589 native sources, 167 reused core objects, fresh executables,
+one assertion-enabled native suite, 37 application checks, 26 HTTP cases/12 CLI
+runs, 56 browser checks/89 artifacts and 63 independent export checks over 20
+CSVs, 16 cube reports and two local served assets. The 31 by 12 grid preserves
+399 source/membership rows, a 28-member cell, all 15 source columns and all empty
+schemas. Unicode/comma/backslash HTTP names, all aggregations, prefix membership,
+both-axis paging, retained errors, classic/OCEL navigation and 390px controls pass.
+
+Retained immutable attempts document Windows narrow-argv Unicode mangling,
+native descending-bin normalization, a default-feature cell-distribution
+assumption, and Python verifier API/lexical-number mismatches. New helper/output
+namespaces correct validation assumptions while preserving the same native
+implementation and completed evidence. Owned server PID 33744/port 8499 and
+browser tab 29 were cleaned up after identity checks; viewport override reset.
+
+Numeric/default/bin/category/composite/order/error/performance parity, CLI
+Unicode/path/locale support, cancellation/concurrency races, persistent live
+streaming/readers, optional connectors and remaining catalogue workflows stay
+open. No reference bodies or bytecode were inspected, and no reference unit is
+promoted: all 86 packages/387 modules, 46 complete packages/199 complete modules
+and 228 incomplete coverage units remain the full objective.

@@ -2123,7 +2123,7 @@ export function isProcessCubeTable(value: unknown): value is ProcessCubeTable {
   if (!Object.values(columns).every(isColumn)) return false;
   if (value.categorical_columns !== undefined) {
     if (!isOcelRecord(value.categorical_columns) ||
-        Object.keys(value.categorical_columns).some((name) => name in columns) ||
+        Object.keys(value.categorical_columns).some((name) => Object.prototype.hasOwnProperty.call(columns, name)) ||
         !Object.values(value.categorical_columns).every((column) =>
           Array.isArray(column) && column.length === rows &&
           column.every((entry) => typeof entry === "string"))) return false;

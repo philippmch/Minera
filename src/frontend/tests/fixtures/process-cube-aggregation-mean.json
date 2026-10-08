@@ -1,0 +1,1 @@
+{"family":"PROCESS_CUBE","x_dimension":"x","y_dimension":"y","aggregation":"mean","x_bins":[{"label":"[0,1)","lower":0,"upper":1,"numeric":true},{"label":"[1,2]","lower":1,"upper":2,"numeric":true}],"y_bins":[{"label":"North 東京","lower":0,"upper":0,"numeric":false}],"x_edges":[0,1,2],"y_edges":[],"cells":[[15],[null]],"case_ids":[[["a","b","same"]],[[]]]}
