@@ -937,6 +937,40 @@ field. The cached-log HTTP route is `POST /api/log-cluster`, with a literal
 UTF-8 regex body and `source_id`, optional `name`/`activity_attribute`, and
 `format=summary|xes|json`. Source revisions reject stale cluster requests.
 
+### Anonymization
+
+Open a CSV or XES log and choose **Anonymize**. Release activity variants with
+**LAPLACE** or **SACOFA**, inspect the released sequences/cases, and optionally
+run **PRIPEL** on that release to add anonymized event attributes. PRIPEL also
+accepts a separately released CSV or XES query log. Its attribute blocklist uses
+one exact name per line, including names containing commas or backslashes.
+
+Both stages expose epsilon, output limits and OS-entropy sampling or a seeded
+preview. Variant queries also expose prefix length, pruning and candidate
+limits; PRIPEL exposes matching distance. Empty/capped results are explicit.
+Cases, variants and long event lists have paginated inspection. Download the
+complete release report or its XES, or open the XES through ordinary mining.
+These actions retain the output of the same run, including its sampled values.
+Report downloads retain the original JSON text and exact large integer seeds.
+
+The native routes remain `POST /api/trace-variant-query` and `POST /api/pripel`.
+Adding `include_xes=true` and the active `source_id` returns an
+`ANONYMIZATION_RELEASE` envelope containing the ordinary `result` and
+`released_xes`. Stale source revisions are rejected. PRIPEL accepts a multipart
+`trace_variant_query` file. Calls without the release option keep their previous
+result shape. Standalone JSON execution remains available:
+
+```sh
+minera_export source.xes --trace-variant-query --tvq-variant sacofa --tvq-epsilon 1 --tvq-k 4 --tvq-secure-random true
+minera_export source.xes --pripel released-query.xes --pripel-epsilon 1 --pripel-blocklist customer,resource --pripel-secure-random true
+```
+
+PRIPEL replaces imported typed scalars when their sampled values change and
+represents fractional values from integer inputs as floats, so XES export does
+not restore original attribute values. Algorithm distribution, parameter and
+privacy guarantees remain independent parity gates in the catalogue; this
+workspace adds usable entry points without marking those packages complete.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the

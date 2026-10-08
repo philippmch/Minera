@@ -1,7 +1,12 @@
 #include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
+#include "minera/xes_export.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 #include <cassert>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
 #include <stdexcept>
 
 using minera::AttributeKind;
@@ -70,6 +75,43 @@ void matching_is_one_to_one() {
   assert(result.log.traces[0].events[2].resource == "r2");
   assert(result.log.traces[1].events[0].resource == "r1");
 }
+
+void noisy_integer_values_survive_xes() {
+  auto input = source();
+  input.traces[1].events[1].attributes.push_back({"amount", "20", AttributeKind::kInt});
+  input.traces[0].events[1].attributes.push_back({"approved", "true", AttributeKind::kBoolean});
+  input.traces[1].events[1].attributes.push_back({"approved", "false", AttributeKind::kBoolean});
+  // Exercise imported native scalars, not just manually constructed lexical
+  // values: the exporter gives these scalars precedence over the text field.
+  std::istringstream source_xml(minera::serialize_xes(input));
+  input = minera::import_xes_event_log(source_xml);
+  bool saw_fractional_value = false;
+  for (std::uint64_t seed = 0; seed < 32; ++seed) {
+    minera::PripelOptions options;
+    options.seed = seed;
+    const auto released = minera::anonymize_pripel(input, input, options);
+    std::istringstream xml(minera::serialize_xes(released.log));
+    const auto reopened = minera::import_xes_event_log(xml);
+    for (std::size_t ti = 0; ti < released.log.traces.size(); ++ti) {
+      const auto& before_attrs = released.log.traces[ti].events[1].attributes;
+      const auto& after_attrs = reopened.traces[ti].events[1].attributes;
+      const auto amount = [](const auto& attr) { return attr.key == "amount"; };
+      const auto before = std::find_if(before_attrs.begin(), before_attrs.end(), amount);
+      const auto after = std::find_if(after_attrs.begin(), after_attrs.end(), amount);
+      assert(before != before_attrs.end() && after != after_attrs.end());
+      const auto value = std::stod(before->value);
+      assert(std::stod(after->value) == value);
+      if (std::trunc(value) != value) {
+        saw_fractional_value = true;
+        assert(before->kind == AttributeKind::kFloat);
+        assert(after->kind == AttributeKind::kFloat);
+      }
+      assert(*released.log.traces[ti].events[1].attribute("approved") ==
+             *reopened.traces[ti].events[1].attribute("approved"));
+    }
+  }
+  assert(saw_fractional_value);
+}
 }
 
 int main() {
@@ -108,5 +150,6 @@ int main() {
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   matching_is_one_to_one();
+  noisy_integer_values_survive_xes();
   return 0;
 }

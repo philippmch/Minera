@@ -11486,3 +11486,52 @@ catalogue gate. No native source changed: the preceding binaries and 165 core
 objects are verified and reused, and the 152 algorithm suites remain inherited.
 All 86 families remain in scope; counts stay 46/86 packages, 199/387 modules and
 228 incomplete units. There is no package/module promotion or full-parity claim.
+
+
+## Feature delivery first: anonymization release workflows (2026-10-08)
+
+The Anonymize workspace makes LAPLACE and SACOFA trace-variant queries and
+PRIPEL attribute anonymization selectable for active CSV/XES sources. Controls
+cover epsilon, prefix/pruning/candidate limits, output limits, matching distance,
+exact-name attribute blocklists, OS entropy and seeded previews. PRIPEL can use
+the generated released query or an uploaded CSV/XES query. Variants, cases and
+long event lists have paginated inspection; empty and capped outputs are explicit.
+Complete report/XES downloads and Open released log preserve the output of one
+native run. Source revisions reject stale requests; source changes reset results.
+Saved analysis JSON cannot anonymize a different cached source. Raw report text
+preserves exact integer seeds beyond JavaScript's integer range.
+
+The existing native routes accept optional source_id/include_xes=true and return
+the ordinary result alongside native XES from the same generated log. Legacy
+calls retain their result shape, and the standalone CLI remains usable. No
+optional language-model or query runtime is required for anonymization.
+
+Export/reimport verification found PRIPEL changing lexical attribute values
+while leaving imported typed scalars intact, allowing XES to restore original
+values. Changed attributes now clear that stale scalar; fractional noisy integer
+values receive float kinds. A test starts with imported typed XES, exercises 32
+seeds, and checks numeric and boolean samples after native export/reimport.
+
+docs/feature-first-anonymization-validation.json binds the exact source/binaries,
+two fresh assertion-enabled native suites, 700 frontend tests and the production
+build. Thirty-two checks cover 22 HTTP calls and two actual CLI executions,
+including both methods, legacy results, source retention/staleness, OS entropy,
+caps/empty outputs, errors, uploaded query formats and numeric/boolean fidelity.
+Twenty-four browser feature checks use the unchanged final frontend and the
+preceding native build. Eight additional checks on the corrected final binary
+prove sampled preview/XES equality, fractional float kinds and real reopening
+followed by native SQL confirmation of every numeric and boolean value. Phone
+controls fit without document overflow; table content scrolls inside its panel.
+Owned server processes and the browser tab are closed; viewport overrides reset.
+
+Prior test compile/cast errors and a DOM assertion escaping mistake remain
+recorded, with corrected fresh helper namespaces. Cancellation controls/signals
+exist, but no browser completion or native-computation cancellation result is
+asserted. The build reuses 164 verified unchanged core objects and recompiles
+PRIPEL plus existing query/context sources; other algorithm proofs are inherited.
+
+Exact stochastic distributions, reference assignments, full parameter/error/type
+corpora and privacy guarantees remain open. This adds usable entry points without
+promoting either package or any module. The full catalogue remains 86 packages /
+387 modules, with 46 complete packages, 199 complete modules and 228 incomplete
+units. Full parity has not been reached.
