@@ -48,6 +48,7 @@ import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
 import { OcelWorkspaceHub } from "./components/OcelWorkspaceHub";
 import { OcelIoWorkspace } from "./components/OcelIoWorkspace";
+import { RelatedLogsWorkspace } from "./components/RelatedLogsWorkspace";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
@@ -104,6 +105,7 @@ export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
   const [ocelResult, setOcelResult] = useState<OcelDiscoveryResult | null>(null);
   const [showOcelIo, setShowOcelIo] = useState(false);
+  const [showRelatedLogs, setShowRelatedLogs] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -344,6 +346,7 @@ export default function App() {
 
   const loadFile = (file: File, xesActivityAttribute?: string) => {
     setShowOcelIo(false);
+    setShowRelatedLogs(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -552,6 +555,8 @@ export default function App() {
 
   if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
 
+  if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} available={source!==null} mining={mining} dataset={data?.dataset} onOpen={loadFile}/></main></>;
+
   if (!data && ocelResult) {
     return (
       <>
@@ -560,6 +565,7 @@ export default function App() {
           datasetKind="object-centric"
           onOpenFile={loadFile}
           onImportOcel={()=>setShowOcelIo(true)}
+          onRelateLogs={()=>setShowRelatedLogs(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -603,6 +609,7 @@ export default function App() {
           onLoadSample={loadSample}
           onLoadOcelSample={loadOcelSample}
           onLoadResourceSample={loadResourceSample}
+          onRelateLogs={()=>setShowRelatedLogs(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -623,6 +630,7 @@ export default function App() {
         generator={data.generator}
         onOpenFile={loadFile}
         onImportOcel={()=>setShowOcelIo(true)}
+        onRelateLogs={()=>setShowRelatedLogs(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);
@@ -770,7 +778,7 @@ export default function App() {
       {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
       {tab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenReleased={loadFile} /></main>}
       {tab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenCluster={loadFile} /></main>}
-      {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey});setTab("conformance");}} /></main>}
+      {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={source!==null} file={source?.file??null} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey});setTab("conformance");}} /></main>}
       {tab === "dfg" && (
         <main className="layout">
           <ProcessMap

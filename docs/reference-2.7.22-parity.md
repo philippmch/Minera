@@ -12101,3 +12101,59 @@ remain in scope: 46 complete packages, 199 complete modules and 228 incomplete
 units. Owned server/tab are closed, viewport restored and port 8497 released;
 110 unrelated files and historical journal bytes remain preserved. Continue
 model/export and acquisition workflows and full exactness/performance gates.
+
+
+## Feature delivery first: related logs and native tables (2026-10-08)
+
+Relate logs and events adds the three missing catalogue workflows: classic
+event-link analysis, two-log timestamp interleavings and pandas case-relation
+merging. Native event-table formatting joins them. Landing/top-bar access supports
+independent source uploads; the classic transformation hub exposes the same views.
+Link analysis uses a guarded active mined source. Reports bind all original files,
+source revision/counts and actual formatting payload hashes.
+
+All four CSV/XES input combinations retain complete native merge/interleaving
+outputs. Duplicate relations expand incoming rows; a missing left relation creates
+the native incoming case. Thirteen rows project to three cases/thirteen events,
+including duplicated X/Y/Z activities. Optional include_open_log=true returns
+typed XES through the same existing native projection. A failed projection keeps
+the full table. include_format_table=true supplements the legacy inspection schema
+with native canonical serialization for formatting without deleting metadata.
+
+Selectors/suffixes, explicit empty unused suffixes, link direction/occurrence/
+propagation/index fields, timestamp fields and exact uint64 limits drive native
+options. Formatting exposes its selectors, nullable start choice and exact uploaded
+request bytes/options. Formatted and input_after tables remain separate; native
+failed formatting state is downloadable while preceding results remain usable.
+Typed cell/schema/index/category/metadata inspection distinguishes absent/null/
+lexical values, and full CSV retains every row/column beyond the page.
+
+The browser proves merge-to-format and merged-XES opening, all link switch modes,
+source-change rejection, safety-bound error recovery and native graph endpoint
+identities. Larger outputs retain forty merged rows, sixty interleavings and
+twenty-nine links. All four form sets fit a 390px phone viewport. Cancellation
+signals have unit coverage without a native-computation/race-cancellation claim.
+
+Native interleavings include artificial boundaries with their own indices and
+large time differences. The UI preserves them without recomputing timing. Plain
+XES import normalizes/truncates the controlled nanosecond time to microseconds,
+so actual timestamp differences vary by input format. Native CSV relation headers
+trim outer whitespace; the padded selector capture failed, while comma/Unicode/
+internal-space names work. These precision/dialect/type/selector/index/null/
+ordering/error/performance behaviors remain independent exactness gates.
+
+docs/feature-first-related-logs-validation.json binds 814 frontend tests and
+production assets, 589 native and 173 frontend/runtime sources, one fresh JSON
+export object plus 166 reused objects, and six fresh assertion-enabled suites.
+The fresh public delegate exposes existing projection logic; algorithms are
+unchanged. It records 73 primary checks over 51 HTTP cases/18 CLI runs, 49 browser
+checks and 22 export/report/asset checks over eleven CSV/four native output files.
+Failed probes retain metadata-schema, XML-namespace, timestamp, header and
+observer assumptions; fresh immutable helpers corrected them.
+
+Only three existing family delivery annotations change. All catalogue parity
+statuses remain unchanged: 86 packages/387 modules, 46 complete packages, 199
+complete modules and 228 incomplete units. Owned servers/tabs are closed,
+viewport restored and port 8496 released. Historical journal bytes and 110
+unrelated files remain preserved. Continue missing catalogue/model/export
+workflows and full exactness/performance; no full parity claim is made.

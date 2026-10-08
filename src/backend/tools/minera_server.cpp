@@ -67,6 +67,7 @@
 #include "minera/dfg_alignment.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/json_export.hpp"
+#include "minera/event_table_json.hpp"
 #include "minera/knowledge_injection.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/dfg_variants.hpp"
@@ -3559,7 +3560,7 @@ void handle_link_analysis(const httplib::Request& request,
         "link_analysis_sorting_column", "link_analysis_index_column",
         "link_analysis_look_forward",
         "link_analysis_keep_first_occurrence", "link_analysis_propagate",
-        "link_analysis_max_links"};
+        "link_analysis_max_links", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -3573,11 +3574,19 @@ void handle_link_analysis(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
+    const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_link_analysis_params(lookup, present);
-    response.set_content(
-        minera::link_analysis_json(
-            minera::discover_link_analysis(session->log, options)),
-        "application/json");
+    auto payload = minera::link_analysis_json(
+        minera::discover_link_analysis(session->log, options));
+    if (include_source) {
+      payload.pop_back();
+      payload += ",\"source_id\":" + minera::embedding_runtime::detail::escape_json(
+          std::to_string(session->query_source_id)) + '}';
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      if (!g_session || g_session->query_source_id != session->query_source_id)
+        throw std::invalid_argument("the source log changed during link analysis; run again");
+    }
+    response.set_content(payload, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -5702,7 +5711,7 @@ void handle_case_relations(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "merge_variant", "merge_timestamp_key", "merge_case_id_key",
         "merge_left_suffix", "merge_right_suffix", "merge_left_column",
-        "merge_right_column"};
+        "merge_right_column", "include_open_log", "include_format_table"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -5730,6 +5739,37 @@ void handle_case_relations(const httplib::Request& request,
     };
     auto options =
         minera::parse_case_relations_params(lookup, present);
+    const bool include_open_log = ocel_query_bool(request, "include_open_log", false);
+    const bool include_format_table = ocel_query_bool(request, "include_format_table", false);
+    const auto publish_merge = [&](const minera::EventTable& table) {
+      auto payload = minera::case_relations_json(table, options);
+      if (include_open_log || include_format_table) {
+        const auto quote = minera::embedding_runtime::detail::escape_json;
+        payload.pop_back();
+        if (include_format_table)
+          payload += ",\"format_table\":" + minera::serialize_event_table_json(table);
+        if (include_open_log) try {
+          const auto log = minera::case_relations_projected_log(table, options);
+          std::string activity = "concept:name";
+          bool complete = true, first = true;
+          for (const auto& trace : log.traces) for (const auto& event : trace.events) {
+            const auto key = event.activity_source_key.empty() ? "concept:name" : event.activity_source_key;
+            if (first) { activity = key; first = false; }
+            complete = complete && !event.activity.empty() && key == activity;
+          }
+          minera::XesExportOptions export_options; export_options.preserve_nulls = true;
+          payload += ",\"open_log\":{\"xes\":" + quote(minera::serialize_xes(log, export_options)) +
+              ",\"case_count\":" + std::to_string(log.trace_count()) +
+              ",\"event_count\":" + std::to_string(log.event_count()) +
+              ",\"activity_attribute\":" + quote(activity) +
+              ",\"complete_activity_field\":" + std::string(complete ? "true" : "false") + '}';
+        } catch (const std::exception& error) {
+          payload += ",\"open_log\":null,\"open_log_error\":" + quote(error.what());
+        }
+        payload += '}';
+      }
+      response.set_content(payload, "application/json");
+    };
     const auto left_column = value(
         "merge_left_column", options.case_id_key + options.left_suffix);
     const auto right_column = value(
@@ -5750,10 +5790,8 @@ void handle_case_relations(const httplib::Request& request,
         adapt_case_relations_table_timestamp(options, base_data.table,
                                               incoming_data.table);
       }
-      response.set_content(
-          minera::case_relations_json(minera::merge_case_relations(
-              base_data.table, incoming_data.table, relation_table, options), options),
-          "application/json");
+      publish_merge(minera::merge_case_relations(
+          base_data.table, incoming_data.table, relation_table, options));
     } else {
       std::optional<decltype(minera::import_csv_event_data(base_input))> base_csv;
       std::optional<decltype(minera::import_csv_event_data(incoming_input))> incoming_csv;
@@ -5782,8 +5820,8 @@ void handle_case_relations(const httplib::Request& request,
       options.relation_left_column = left_column;
       options.relation_right_column = right_column;
       const auto relation_table = minera::parse_case_relations_table_csv(relation_input);
-      response.set_content(minera::case_relations_json(minera::merge_case_relations(
-          base_table, incoming_table, relation_table, options), options), "application/json");
+      publish_merge(minera::merge_case_relations(
+          base_table, incoming_table, relation_table, options));
     }
   } catch (const std::exception& error) {
     response.status = 400;

@@ -6643,6 +6643,11 @@ std::string case_relations_json(const EventTable& result,
   return out.str();
 }
 
+EventLog case_relations_projected_log(const EventTable& result,
+                                     const CaseRelationsOptions& options) {
+  return case_relations_compatibility_log(result, options);
+}
+
 namespace {
 void write_random_tree_node_json(std::ostream& out,
                                  const ProcessTreeNode& node,

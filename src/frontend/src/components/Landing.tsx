@@ -6,9 +6,10 @@ interface LandingProps {
   error: string | null;
   mining: boolean;
   onImportOcel?: () => void;
+  onRelateLogs?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -53,6 +54,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
           Mine a sample with resource relationships
         </button>
         {onImportOcel && <button className="landing-sample reveal" disabled={mining} onClick={onImportOcel}>Import OCEL JSON, XML, CSV or SQLite</button>}
+        {onRelateLogs && <button className="landing-sample reveal" disabled={mining} onClick={onRelateLogs}>Relate logs and events</button>}
 
         <div className="landing-steps reveal">
           <div className="landing-step">
