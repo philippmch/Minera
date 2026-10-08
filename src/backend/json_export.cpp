@@ -6585,6 +6585,7 @@ std::string interval_tree_json(const std::vector<OpenPathInterval>& result) {
 
 std::string interval_tree_json(const IntervalTreeQueryResult& result) {
   std::ostringstream out;
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
   out << "{\"family\":\"LOG_TO_INTERVAL_TREE\",\"interval_count\":"
       << result.interval_count << ",\"intervals\":[";
   write_interval_tree_intervals(out, result.intervals);

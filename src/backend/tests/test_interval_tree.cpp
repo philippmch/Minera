@@ -143,6 +143,27 @@ void query_diagnostics_are_inclusive_and_indexed() {
   assert(threw);
 }
 
+void json_round_trips_subsecond_epoch_boundaries_and_queries() {
+  const double epoch = *parse_timestamp("2026-10-01T09:00:00.123456Z");
+  const std::vector<OpenPathInterval> intervals = {
+      {epoch - 0.00001, epoch + 1.00001, "same", "A", "B", 0, 0, 1}};
+  IntervalTreeQueryOptions options;
+  options.point = epoch + 0.5;
+  options.range = std::pair{epoch + 0.25, epoch + 0.75};
+  const auto json = interval_tree_json(query_open_path_intervals(intervals, options));
+  const auto number_after = [&](const std::string& field) {
+    const auto position = json.find(field);
+    assert(position != std::string::npos);
+    return std::stod(json.substr(position + field.size()));
+  };
+  assert(number_after(R"("start":)") == intervals[0].start);
+  assert(number_after(R"("end":)") == intervals[0].end);
+  assert(number_after(R"("point_query":)") == *options.point);
+  assert(number_after(R"("range_query":[)") == options.range->first);
+  const auto range = json.find(R"("range_query":[)");
+  assert(std::stod(json.substr(json.find(',', range) + 1)) == options.range->second);
+}
+
 }  // namespace
 
 int main() {
@@ -151,4 +172,5 @@ int main() {
   invalid_and_empty();
   json_shape_is_stable();
   query_diagnostics_are_inclusive_and_indexed();
+  json_round_trips_subsecond_epoch_boundaries_and_queries();
 }

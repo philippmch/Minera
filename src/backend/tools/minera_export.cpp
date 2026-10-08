@@ -7041,9 +7041,9 @@ int run_export(int argc, char** argv) {
       const auto trie = minera::discover_trie(log, params);
       if (trie_to_petri_requested) {
         const auto net = minera::convert_trie_to_petri_net(trie);
-        std::cout << minera::serialize_trie_petri_net_json(net) << '\n';
+        write_cli_json(output, minera::serialize_trie_petri_net_json(net));
       } else {
-        std::cout << minera::trie_json(trie) << '\n';
+        write_cli_json(output, minera::trie_json(trie));
       }
       return 0;
     }
@@ -7060,7 +7060,7 @@ int run_export(int argc, char** argv) {
           minera::discover_open_path_intervals(log, params);
       const auto query = minera::query_open_path_intervals(
           intervals, minera::interval_tree_query_options(params));
-      std::cout << minera::interval_tree_json(query) << '\n';
+      write_cli_json(output, minera::interval_tree_json(query));
       return 0;
     }
     if (!compare_petri_model.empty()) {
