@@ -2015,6 +2015,48 @@
         "Source-generation request validation and frontend cancellation/invalidation; malformed options keep the last successful result; legacy plain Monte Carlo JSON and XES contracts remain available"
       ],
       "validation": "docs/feature-first-simulation-workspace-validation.json"
+    },
+    {
+      "id": "native_variant_specific_workflow_discovery",
+      "state": "actual_variant_discovery_controls_outputs_and_model_exports_available",
+      "families": [
+        "algo.discovery.alpha",
+        "algo.discovery.heuristics"
+      ],
+      "variants": [
+        "ALPHA_VERSION_CLASSIC",
+        "ALPHA_VERSION_PLUS",
+        "CLASSIC",
+        "PLUSPLUS",
+        "GROUPED_LOG_OPTIONS",
+        "LIVE_DETACHED_MARKINGS",
+        "HEURISTIC_MATRICES_BUNDLES",
+        "PERFORMANCE_BUSINESS_HOURS",
+        "CONNECT_ALL",
+        "PNML",
+        "BPMN",
+        "PTML",
+        "BOUNDED_SEEDED_PLAYOUT",
+        "COMPLETE_REPORTS_CSV"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/workflow-discovery.ts",
+        "src/frontend/src/components/WorkflowDiscovery.tsx",
+        "src/frontend/src/components/ProcessModel.tsx"
+      ],
+      "added": [
+        "Explicit Classic/Alpha+ and Classic/Heuristics++ workflows replace variant labels that merely displayed a cached model; selecting and running a variant invokes that actual native algorithm",
+        "Source-bound grouped-log discovery exposes existing activity, timing, threshold, count, loop, path, performance, business-hour, lifecycle and native decoration controls plus connect-all",
+        "Complete native analysis and Alpha+ live/detached marking records or heuristic statistics/matrices/bundles/metadata are retained without mutating the active cached model",
+        "The exact discovered workflow and heuristic dependency model render using native activity/transition identities; Unicode alternate activity selectors are retained",
+        "Full native JSON, analysis JSON, request reports and every-table CSV preserve complete records and original numeric tokens beyond visible row/column paging",
+        "PNML and BPMN plus representable PTML exports derive from the newly discovered model; conversion failures retain their native error instead of exporting the cached or an approximate model",
+        "Optional bounded seeded XES playout uses the selected discovered model and its live Alpha+ markings and reopens for ordinary mining",
+        "Discovered PNML hands off with source ID and activity selector for imported conformance; malformed native options retain the previous result and client requests invalidate across source changes",
+        "Loaded analysis models remain visible offline with recorded heuristic variants and an honest Alpha variant-not-recorded caption rather than a false selected-variant claim"
+      ],
+      "validation": "docs/feature-first-workflow-discovery-validation.json"
     }
   ],
   "execution_priority": [
@@ -2032,7 +2074,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across discovery, evaluation, conformance, simulation and I/O. Monte Carlo now has complete typed resource/duration/stochastic controls, native interval/case/event inspection and matching single-run XES/PNML handoffs; eight alignment/distance/reduction result groups and decision/guarded model workbenches are also available. Complete native algorithm/parameter/selector/default/error/type/numeric/order/Unicode/concurrency/performance behavior remains independent."
+      "next_action": "Continue feature-first review across evaluation, conformance, remaining discovery/simulation and I/O. Native Classic/Alpha+ and Classic/Heuristics++ workbenches now invoke the chosen algorithm and expose full marking/statistic/matrix/bundle data, exact discovered-model formats and seeded playout handoffs. Monte Carlo, complete alignment/distance/reduction inspection and decision/guarded model workflows are available. The full catalogue and exact algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates remain intact."
     }
   ],
   "feature_status_meaning": {

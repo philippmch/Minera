@@ -2322,6 +2322,11 @@ input[type="range"]::-moz-range-thumb {
 .simulation-inspection td { max-width: 480px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .simulation-inspection pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 500px; overflow: auto; }
 .simulation-inspection svg { display: block; width: 100%; height: auto; max-height: 680px; color: var(--accent); font-size: 12px; }
+.workflow-discovery fieldset { border: 0; min-width: 0; padding: 0; }
+.workflow-discovery label, .workflow-inspection > label { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.workflow-discovery input:not([type=checkbox]), .workflow-discovery textarea, .workflow-discovery select, .workflow-inspection select { width: 100%; min-width: 0; }
+.workflow-inspection td { max-width: 480px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.workflow-inspection pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 500px; overflow: auto; }
 .other-align-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
 .other-align-card { border: 1px solid var(--line, #ddd); border-radius: 10px; padding: 1rem; background: var(--surface, #fff); }
 .other-align-card h3 { margin-top: 0; }

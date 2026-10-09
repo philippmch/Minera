@@ -56,6 +56,11 @@ export const MINER_GROUPS: MinerGroup[] = [
       "The classic algorithm: derives a Petri net from directly-follows relations.",
     variants: [
       {
+        id: "classic", name: "Classic",
+        description: "Run the native Classic Alpha algorithm over the active source and inspect its exact discovered workflow and exports.",
+        artifact: "petri-net",
+      },
+      {
         id: "plus",
         name: "Alpha+",
         description:
@@ -76,6 +81,11 @@ export const MINER_GROUPS: MinerGroup[] = [
     tagline:
       "Noise-tolerant: keeps only the dependencies frequent and reliable enough to trust.",
     variants: [
+      {
+        id: "plusplus", name: "Heuristics++",
+        description: "Run interval-aware discovery with native timing, concurrency, performance and resource/lifecycle selectors, then inspect the dependency and converted workflow models.",
+        artifact: "dependency-graph",
+      },
       {
         id: "classic",
         name: "Classic",

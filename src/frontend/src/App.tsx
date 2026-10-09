@@ -752,6 +752,7 @@ export default function App() {
       {tab === "model" && (
         <main className="layout-log">
           <ProcessModel
+            onOpenPlayout={loadFile}
             key={cacheGeneration.current}
             data={data}
             treeLayout={treeLayout}
