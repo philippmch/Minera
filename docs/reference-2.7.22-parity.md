@@ -12634,3 +12634,28 @@ incomplete catalogue units remain open. No parity status is promoted.
 
 Evidence: docs/feature-first-outlook-source-validation.json and
 docs/outlook-driver-reference-behavior.json.
+
+
+### Feature delivery first: native Outlook acquisition in the application
+
+Added Outlook desktop acquisition controls for mailbox and default/shared
+calendars, item/event bounds, reminder selection and a fixed calendar clock.
+The app validates the complete native item/formatted tables, exposes all native
+and skipped rows with row/column paging, downloads complete JSON/reports/table
+CSV/XES/gzip, reconnects immutable captures, and retains both tables after release.
+Mailbox and shared-calendar XES logs reopen for native analysis and export again.
+Switching away from Outlook resets its input mode; switching from Camunda Access
+to SAP resets the incompatible dialect. Live Outlook mode hides CSV-only help.
+
+Validation: 11 native suites, 956 frontend tests and production build, four
+controlled public reference comparisons, 10 native HTTP acquisition checks,
+20 browser checks, 37 downloads and 45 independent artifact checks. All thirteen
+CSV files, six full reports and five XES files preserve their tested native
+values. Browser acquisition uses production handlers and the native COM extractor
+with owned IDispatch objects in a separate loopback fixture server. Real Outlook
+profiles/private mailbox data were not accessed; activation, complete driver/
+time-zone/type/default/error/performance behavior and all 228 incomplete catalogue
+units remain open. No package/module parity status is promoted.
+
+Evidence: docs/feature-first-outlook-workspace-validation.json and
+docs/feature-first-outlook-workspace-preview.jpg.

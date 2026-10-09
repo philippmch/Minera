@@ -1398,6 +1398,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_outlook_source_tests PRIVATE cxx_std_20)
   target_compile_options(minera_outlook_source_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_outlook_source_tests COMMAND minera_outlook_source_tests)
+  if(WIN32)
+    add_executable(minera_outlook_workspace_fixture src/backend/tests/outlook_workspace_fixture.cpp)
+    target_link_libraries(minera_outlook_workspace_fixture PRIVATE minera::core $<TARGET_PROPERTY:minera_server,LINK_LIBRARIES>)
+    target_include_directories(minera_outlook_workspace_fixture PRIVATE $<TARGET_PROPERTY:minera_server,INCLUDE_DIRECTORIES>)
+    target_compile_definitions(minera_outlook_workspace_fixture PRIVATE $<TARGET_PROPERTY:minera_server,COMPILE_DEFINITIONS>)
+    target_compile_features(minera_outlook_workspace_fixture PRIVATE cxx_std_20)
+    target_compile_options(minera_outlook_workspace_fixture PRIVATE ${MINERA_TEST_OPTIONS} $<TARGET_PROPERTY:minera_server,COMPILE_OPTIONS> $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
+  endif()
 
   add_executable(minera_workflow_history_tests
     src/backend/tests/test_workflow_history.cpp

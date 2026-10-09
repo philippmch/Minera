@@ -16,7 +16,8 @@ std::string acquired_payload(const AcquiredSourceRecord& record) {
   out<<json<<",\"source_id\":"<<quote(record.id)<<",\"configuration\":{";bool first=true;for(const auto& [key,value]:record.configuration){if(!first)out<<',';first=false;out<<quote(key)<<':'<<quote(value);}
   out<<"},\"source\":{\"name\":"<<quote(record.name)<<",\"mode\":"<<quote(record.mode)<<",\"path\":"<<quote(record.path)<<",\"has_original\":"<<(record.acquired.original_bytes?"true":"false")<<",\"size\":"<<(record.acquired.original_bytes?std::to_string(record.acquired.original_bytes->size()):"null")<<",\"provided_sha256\":"<<quote(record.provided_sha256)<<",\"authenticated\":"<<(record.authenticated?"true":"false")<<"}}";return out.str();
 }
-void handle_acquire_source(const httplib::Request& request,httplib::Response& response) {
+void handle_acquire_source_using(const httplib::Request& request,httplib::Response& response,
+    minera::SourceAcquisitionResult (*acquire)(const minera::SourceAcquisitionInput&)) {
   live_response(response,[&]{
     const auto connector=live_required(request,"connector"),mode=live_required(request,"mode"),id=live_required(request,"source_id");live_id(id);
     std::set<std::string> allowed={"source_id","connector","mode","source_name","source_path","source_sha256"};std::set<std::string> native_parameters;
@@ -36,19 +37,22 @@ void handle_acquire_source(const httplib::Request& request,httplib::Response& re
     else if(mode=="windows_service"){if(connector!="windows_events"||request.has_param("source_path")||!request.body.empty())throw std::invalid_argument("Windows service mode requires a Windows connector and no upload/path");if(input.parameters.contains("windows_events_source")&&input.parameters.at("windows_events_source")!="service")throw std::invalid_argument("Windows service mode requires service source");input.parameters["windows_events_source"]="service";}
     else if(mode=="outlook_com"){if((connector!="outlook_calendar"&&connector!="outlook_mail_extractor")||request.has_param("source_path")||!request.body.empty())throw std::invalid_argument("Outlook COM mode requires an Outlook connector and no upload/path");if(input.parameters.contains("outlook_source")&&input.parameters.at("outlook_source")!="com")throw std::invalid_argument("Outlook COM mode requires com source");input.parameters["outlook_source"]="com";}
     else if(mode=="database"){if((connector!="camunda_workflow"&&connector!="sap_o2c"&&connector!="sap_accounting")||!input.parameters.contains("database_driver")||input.parameters.at("database_driver")!="odbc"||request.has_param("source_path")||!request.body.empty())throw std::invalid_argument("Database connection mode requires an ODBC connector and no file/path");}
-    else throw std::invalid_argument("acquisition mode requires upload, path, repository_api or windows_service");
+    else throw std::invalid_argument("acquisition mode requires upload, path, repository_api, windows_service, database or outlook_com");
     const auto authorization=request.get_header_value("Authorization");
     if(!authorization.empty()){if(connector!="github_repo"||authorization.rfind("Bearer ",0)!=0||authorization.size()==7)throw std::invalid_argument("repository authentication requires a non-empty bearer header");input.auth_token=authorization.substr(7);}
     const auto connection=request.get_header_value("X-Minera-Database-Connection");if(!connection.empty()){if(mode!="database")throw std::invalid_argument("Database credentials require database connection mode");input.database_connection=connection;}
     if(mode!="database"&&input.parameters.contains("database_driver")&&input.parameters.at("database_driver")=="odbc")throw std::invalid_argument("ODBC source requires database connection mode");
     if(mode!="outlook_com"&&(input.parameters.contains("outlook_source")||input.parameters.contains("outlook_email_user")||input.parameters.contains("outlook_calendar_id")))throw std::invalid_argument("Outlook driver options require Outlook COM mode");
     input.repository_transport=minera::tools::repository_history_http_transport();
-    auto record=std::make_shared<AcquiredSourceRecord>();record->id=id;record->configuration=request.params;record->name=request.has_param("source_name")?request.get_param_value("source_name"):connector;record->mode=mode;record->path=input.server_path;record->provided_sha256=request.has_param("source_sha256")?request.get_param_value("source_sha256"):"";record->authenticated=!input.auth_token.empty()||!input.database_connection.empty();record->acquired=minera::acquire_source(input);
+    auto record=std::make_shared<AcquiredSourceRecord>();record->id=id;record->configuration=request.params;record->name=request.has_param("source_name")?request.get_param_value("source_name"):connector;record->mode=mode;record->path=input.server_path;record->provided_sha256=request.has_param("source_sha256")?request.get_param_value("source_sha256"):"";record->authenticated=!input.auth_token.empty()||!input.database_connection.empty();record->acquired=acquire(input);
     std::shared_ptr<AcquiredSourceRecord> existing;
     {std::lock_guard lock(g_acquired_mutex);auto [it,inserted]=g_acquired_sources.emplace(id,record);if(!inserted)existing=it->second;}
     if(existing){std::lock_guard source_lock(existing->mutex);if(existing->configuration!=record->configuration||existing->acquired.original_bytes!=record->acquired.original_bytes||existing->acquired.database_capture.has_value()!=record->acquired.database_capture.has_value()||(existing->acquired.database_capture&&(existing->acquired.database_capture->raw_table_json!=record->acquired.database_capture->raw_table_json||existing->acquired.database_capture->formatted_table_json!=record->acquired.database_capture->formatted_table_json))||existing->acquired.windows_capture.has_value()!=record->acquired.windows_capture.has_value()||(existing->acquired.windows_capture&&existing->acquired.windows_capture->xml!=record->acquired.windows_capture->xml)||minera::source_acquisition_json(existing->acquired)!=minera::source_acquisition_json(record->acquired))throw minera::StreamingSessionConflict("acquisition source ID already has different inputs or results");record=existing;}
     std::lock_guard lock(record->mutex);response.set_content(acquired_payload(*record),"application/json");
   });
+}
+void handle_acquire_source(const httplib::Request& request,httplib::Response& response) {
+  handle_acquire_source_using(request,response,minera::acquire_source);
 }
 void handle_acquired_snapshot(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{live_params(request,{"source_id"});auto s=acquired_find(request);std::lock_guard lock(s->mutex);response.set_content(acquired_payload(*s),"application/json");});
