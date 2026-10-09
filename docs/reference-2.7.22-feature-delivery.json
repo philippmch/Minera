@@ -1831,6 +1831,51 @@
         "Four controlled public reference comparisons matching every formatted column, row and index"
       ],
       "validation": "docs/feature-first-outlook-source-validation.json"
+    },
+    {
+      "id": "native_outlook_acquisition_workbench",
+      "state": "native_outlook_driver_api_cli_and_app_available",
+      "families": [
+        "algo.connectors"
+      ],
+      "variants": [
+        "OUTLOOK_MAILBOX_COM",
+        "OUTLOOK_CALENDAR_COM",
+        "DEFAULT_CALENDAR",
+        "SHARED_CALENDAR",
+        "REMINDER_SELECTION",
+        "FIXED_CLOCK",
+        "BOUNDED_ITEMS",
+        "SKIPPED_ITEM_RECORDS",
+        "COMPLETE_TABLES",
+        "XES_HANDOFF",
+        "RECONNECT",
+        "RELEASE"
+      ],
+      "native_components": [
+        "include/minera/outlook_source.hpp",
+        "src/backend/outlook_source.cpp",
+        "include/minera/source_acquisition.hpp",
+        "src/backend/source_acquisition.cpp"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_acquire_source.cpp",
+        "src/backend/tools/source_acquisition_routes.hpp",
+        "src/frontend/src/source-acquisition-workspace.ts",
+        "src/frontend/src/components/SourceAcquisitionWorkspace.tsx"
+      ],
+      "added": [
+        "Outlook desktop profile mode for both mailbox and calendar connectors in the source acquisition workbench",
+        "Default/shared calendar account and folder controls, fixed calendar clock, reminder toggles and native item/event bounds",
+        "Strict complete native Outlook response/table/descriptor validation, including formatted row alignment with the native event log",
+        "Complete normalized item/formatted/skipped/metadata/case/event/attribute inspection with row and column paging",
+        "Complete native JSON, saved reports, item/formatted JSON downloads and every-table CSV exports, including released tables",
+        "Line-by-line and etree/gzip XES exports that reopen for native analysis and export again with all acquired cases/events and ordinary fixture scalar/date/case attributes",
+        "Saved source ID reconnect, acquired-source listing, duplicate recovery, release and clear invalid-limit feedback",
+        "Outlook mode resets on foreign connector selection; Camunda Access dialect resets on SAP selection; live modes hide CSV-only explanatory text",
+        "Reusable owned IDispatch fixtures and a separate loopback-only validation server exercising the production acquisition/cache/export/analysis handlers without accessing user Outlook profiles"
+      ],
+      "validation": "docs/feature-first-outlook-workspace-validation.json"
     }
   ],
   "execution_priority": [
@@ -1844,7 +1889,7 @@
     },
     {
       "area": "Optional connector drivers",
-      "next_action": "Finish live Outlook mailbox/calendar controls, complete table inspection and browser handoff on top of the native Windows COM driver. Native Outlook CLI/HTTP foundation now joins GitHub HTTPS, Windows channel/EVTX and Camunda/SAP SQLite/ODBC acquisition. Real Outlook profiles, broader vendor deployments, typed/binary/dialect fidelity, subscriptions/bookmarks/remote hosts and full reference behavior remain open."
+      "next_action": "All nine existing connector families now have native acquisition workbenches. Outlook mailbox/default/shared-calendar desktop controls and complete capture tables join GitHub HTTPS, Windows channel/EVTX and Camunda/SAP SQLite/ODBC acquisition. Real Outlook profiles, broader vendor deployments, typed/binary/dialect fidelity, COM cancellation/recurrence, subscriptions/bookmarks/remote hosts and complete reference behavior remain open. Continue feature review across the rest of the catalogue before completing strict driver parity."
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",

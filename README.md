@@ -1947,10 +1947,19 @@ native log. The `/capture` and `/table?formatted=true` routes download those
 tables, and `/export` produces native log JSON or XES/gzip. Reconnection and
 release retain the acquired result without rerunning COM extraction.
 
-This checkpoint provides the native driver, CLI and HTTP foundation. The browser
-workbench currently uses Outlook CSV inputs; live Outlook controls are next.
-Controlled COM graphs validate the same extraction code and four public
-reference outputs; real user profiles were not read during validation. Outlook
-COM activation/profile behavior, hard call deadlines, recurrence expansion,
-full date/type/default/error/performance parity and arbitrary-character XES
-fidelity remain open. See `docs/feature-first-outlook-source-validation.json`.
+The Acquire source data workbench supports both Outlook CSV records and the
+Outlook desktop profile. Choose mailbox history or calendar history, then the
+desktop profile input. Calendar controls select the current/shared account and
+folder, reminders and a fixed clock; native limits bound items and events. The
+inspector retains all item/formatted/skipped rows, native JSON and full reports,
+complete table CSV, and both XES/gzip writers. Reconnect restores the saved native
+snapshot, release retains both tables for local inspection, and acquired XES logs
+open for analysis with their complete case/event data.
+
+Controlled COM graphs validate the same native extraction and production HTTP
+handlers through the application, alongside four public reference outputs.
+Real user profiles were not read during validation. Outlook COM activation/profile
+behavior, hard call deadlines, recurrence expansion, full date/type/default/error/
+performance parity and arbitrary-character XES fidelity remain open. See
+`docs/feature-first-outlook-source-validation.json` and
+`docs/feature-first-outlook-workspace-validation.json`.
