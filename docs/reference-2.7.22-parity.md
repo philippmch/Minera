@@ -12659,3 +12659,31 @@ units remain open. No package/module parity status is promoted.
 
 Evidence: docs/feature-first-outlook-workspace-validation.json and
 docs/feature-first-outlook-workspace-preview.jpg.
+
+
+### Feature delivery first: encoded decision tables and guarded model workbench
+
+Added a Conformance workbench for complete native encoded tables and guarded
+data-Petri-net results. It exposes activity/context/case/lookback and all existing
+tree/candidate/gain/diagnostic controls, supports available discovered/imported
+models and actual inductive process-tree conversions, and keeps a source-bound
+native result and underlying workflow PNML from the same run. Complete rows,
+classes, diagnostics, guards, variables and recursive rules export as original
+JSON/full reports/every-table CSV with paging. The guarded workflow is rendered
+with exact native expressions and variable tooltips; underlying PNML opens for
+structural conformance without claiming evaluation of data guards. Embedded
+tables in loaded analysis exports remain inspectable offline.
+
+Validation: three native suites, 971 frontend tests and production build,
+18 native HTTP checks, standalone CLI/API table agreement, 16 browser checks,
+26 downloads and 25 independent artifact checks over eleven complete CSV files,
+seven reports and same-run PNML. Public reference interfaces/raw rows/encoded
+matrix outputs were captured without inspecting implementation bodies. The
+reference classifier target-type failure and unannotated guarded creation under
+the recorded modern dependencies remain open behavior/dependency gates. Exact
+reference defaults/encoding/classifier/guard/type/numeric/error/performance parity
+and all 228 incomplete catalogue units remain open; no parity status is promoted.
+
+Evidence: docs/feature-first-decision-workspace-validation.json,
+docs/decision-mining-reference-behavior.json and
+docs/feature-first-decision-workspace-preview.jpg.

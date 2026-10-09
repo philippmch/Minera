@@ -1963,3 +1963,30 @@ behavior, hard call deadlines, recurrence expansion, full date/type/default/erro
 performance parity and arbitrary-character XES fidelity remain open. See
 `docs/feature-first-outlook-source-validation.json` and
 `docs/feature-first-outlook-workspace-validation.json`.
+
+
+### Decision tables and guarded workflow models
+
+After opening a raw event log, use Conformance → Decision tables and guarded
+models. Select a cached discovered/imported workflow and either encoded tables
+or a guarded data Petri net. Context controls select the activity field,
+attributes, case scope and bounded lookback. Guarded output also exposes native
+tree depth/split/leaf/candidate/gain controls and optional diagnostics. Inductive
+models can use the standard or transition-bordered process-tree conversion.
+
+The inspector retains every encoded row/target/class and all diagnostics,
+guard transitions, variables and recursive decision rules. JSON/report and
+complete-table CSV downloads preserve the full native result beyond visible
+paging. The guarded model is rendered with native expressions and variables.
+The same-run underlying PNML retains workflow structure/markings and can reopen
+for structural conformance; data guards remain in the complete decision JSON
+and are not enforced by structural replay. Native encoded tables embedded in
+a loaded analysis export remain available for offline inspection and downloads.
+
+`POST /api/decision-tables` and `/api/data-petri-net` keep their original native
+response shapes. Request `include_workspace=true` with the current query-schema
+`source_id` to obtain the result, source/model identity and same-run underlying
+PNML in a `DECISION_WORKSPACE` envelope. Guarded requests additionally accept
+`include_decision_diagnostics`; mismatched source generations are rejected.
+This feature checkpoint does not certify full reference classifier/encoding/
+guard behavior. See `docs/feature-first-decision-workspace-validation.json`.

@@ -23,6 +23,7 @@ interface PetriNetProps {
   decoration?: PetriDecoration | null;
   annotations?: {
     variableTransitions?: ReadonlySet<number>;
+    variableTransitionDescription?: string;
     transitionLabels?: ReadonlyMap<number, string>;
     transitionTooltips?: ReadonlyMap<number, string>;
     placeTooltips?: ReadonlyMap<number, string>;
@@ -192,7 +193,7 @@ export function PetriNet({ layout, title, actions, decoration, annotations,
                 d={arc.path}
                 markerEnd={`url(#${arrowId})`}
               >
-                {annotations?.variableTransitions?.has(arc.transition) && <title>Variable object count</title>}
+                {annotations?.variableTransitions?.has(arc.transition) && <title>{annotations.variableTransitionDescription??'Variable object count'}</title>}
               </path>
             ))}
           </g>
