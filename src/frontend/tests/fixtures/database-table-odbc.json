@@ -1,0 +1,1 @@
+{"family":"DATABASE_HISTORY_CAPTURE","columns":["processID","case:concept:name","concept:name","time:timestamp","org:resource"],"column_types":["ODBC:-9","ODBC:-9","ODBC:-9","ODBC:93","ODBC:-9"],"rows":[["p,東京","case-odbc","A","2024-01-01 10:00:00",null],["p,東京","case-odbc","B","2024-01-02 10:00:00","owner"]],"row_count":2,"limited":false}

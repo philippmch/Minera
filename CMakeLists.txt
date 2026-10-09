@@ -36,6 +36,7 @@ add_library(minera_core
   src/backend/browser_history.cpp
   src/backend/source_acquisition.cpp
   src/backend/windows_event_source.cpp
+  src/backend/database_history_source.cpp
   src/backend/batches.cpp
   src/backend/batches/discovery_registry.cpp
   src/backend/case_relations.cpp
@@ -360,6 +361,7 @@ target_include_directories(minera_acquire_source PRIVATE third_party src/backend
 target_compile_features(minera_acquire_source PRIVATE cxx_std_20)
 if(WIN32)
   target_link_libraries(minera_core PUBLIC wevtapi)
+  target_link_libraries(minera_core PUBLIC odbc32)
   target_link_libraries(minera_server PRIVATE winhttp)
   target_link_libraries(minera_acquire_source PRIVATE winhttp)
 else()
@@ -1384,6 +1386,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_windows_event_source_tests PRIVATE cxx_std_20)
   target_compile_options(minera_windows_event_source_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_windows_event_source_tests COMMAND minera_windows_event_source_tests)
+  add_executable(minera_database_history_source_tests src/backend/tests/test_database_history_source.cpp)
+  target_link_libraries(minera_database_history_source_tests PRIVATE minera::core)
+  target_compile_features(minera_database_history_source_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_database_history_source_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_database_history_source_tests COMMAND minera_database_history_source_tests)
 
   add_executable(minera_workflow_history_tests
     src/backend/tests/test_workflow_history.cpp

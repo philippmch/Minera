@@ -8923,7 +8923,8 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-declare", preflight);
   for(const auto* route:{"create","snapshot","append","action","list","source","release"})server.Options(std::string("/api/live-stream/")+route,preflight);
   for(const auto* route:{"create","snapshot","read","action","list","source","export","release"})server.Options(std::string("/api/stream-reader/")+route,preflight);
-  for(const auto* route:{"acquire","snapshot","original","capture","export","list","release"})server.Options(std::string("/api/source-acquisition/")+route,preflight);
+  auto source_preflight=[&](const httplib::Request& request,httplib::Response& response){preflight(request,response);response.set_header("Access-Control-Allow-Methods","GET, POST, OPTIONS");response.set_header("Access-Control-Allow-Headers","Content-Type, Authorization, X-Minera-Database-Connection");};
+  for(const auto* route:{"acquire","snapshot","original","capture","table","export","list","release"})server.Options(std::string("/api/source-acquisition/")+route,source_preflight);
   server.Options("/api/knowledge-injection", preflight);
 
   server.Post("/api/mine", handle_mine);
@@ -9049,6 +9050,7 @@ int main(int argc, char** argv) {
   server.Get("/api/source-acquisition/snapshot",handle_acquired_snapshot);
   server.Get("/api/source-acquisition/original",handle_acquired_original);
   server.Get("/api/source-acquisition/capture",handle_acquired_capture);
+  server.Get("/api/source-acquisition/table",handle_acquired_database_table);
   server.Get("/api/source-acquisition/export",handle_acquired_export);
   server.Get("/api/source-acquisition/list",handle_acquired_list);
   server.Post("/api/source-acquisition/release",handle_acquired_release);

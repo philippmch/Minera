@@ -1800,7 +1800,7 @@ analysis** uses the native exported log. Reconnect/list/release operate on
 immutable snapshots in the current server process. GitHub API and profile
 directory acquisitions have no single original file body. Workflow/SAP/Outlook
 CSV and Windows XML import exported records. Native Windows channel/EVTX modes
-are described below; live Outlook/workflow/SAP/database drivers, restart
+are described below; live Outlook and broader database/driver fidelity, restart
 durability and complete reference/performance parity remain open.
 
 `minera_acquire_source CONNECTOR [PATH] --param key=value` prints the complete
@@ -1859,6 +1859,55 @@ own reader; nine complete CSVs, four reports, original/capture downloads,
 three XES reimports and final production assets are independently verified.
 [Validation and checkpoint boundaries](docs/feature-first-windows-source-validation.json)
 retain public dataset provenance, source bindings and the corrected test attempt.
+
+### Native workflow and SAP database history
+
+In **Acquire source data**, select workflow activity, SAP accounting or SAP
+order-to-cash history. **Database history source** selects exported CSV,
+an uploaded/explicit SQLite history database, or an ODBC connection.
+The native driver reads the actual history schemas: Camunda process/activity
+joins, SAP document creation/customer/vendor clearing, or sales/delivery/change/
+billing records. SAP schema prefixes, row bounds and database timeouts are exposed.
+
+The default ODBC dialect retains the caller-observed reference queries. Portable
+SQLite syntax and Microsoft Access Camunda syntax are explicit options. ODBC
+requires Windows and a configured compatible installed driver. Its connection
+string is sent as a request header, cleared after success and excluded from
+reports; the CLI reads it from a named environment variable. Native connections
+have no interactive prompts. Unsupported ODBC query timeout is reported clearly;
+the row bound remains active. SQLite opens read-only; ODBC requests the driver's
+read-only hint and issues only the fixed history SELECT queries.
+
+Inspect/download complete original query tables, formatted UTC timestamps,
+NULL resources, ordering/indexes and rich native logs. Full JSON/report/CSV,
+original SQLite bytes and both XES/gzip writers remain usable beyond table paging.
+Reconnect uses the immutable captured result. Release includes the full tables
+so local inspection and CSV/report exports remain available. **Open acquired log
+for analysis** uses the canonical XES trace case key. Choosing the same database
+again after changing connectors resets the file input correctly.
+
+```text
+minera_acquire_source sap_accounting history.sqlite --param database_driver=sqlite --param database_prefix=main. --output-table query.json --output-formatted formatted.json
+minera_acquire_source camunda_workflow --param database_driver=odbc --database-connection-env MINERA_DB_CONNECTION --output-xes history.xes
+```
+
+Additional parameters are `database_dialect`, `database_max_rows` (default 1000)
+and `database_timeout_seconds` (default 30). HTTP `mode=database` uses ODBC;
+SQLite uses upload/path mode with `database_driver=sqlite`. Credentials use
+`X-Minera-Database-Connection`. GET `/api/source-acquisition/table` takes
+`source_id` and optional `formatted=true`. Query values are text/NULL with
+reported SQL types; binary/general dtype behavior, live vendor deployments,
+whole-database WAL/backup consistency and full reference/performance fidelity
+remain gates. Original explicit-file bytes are the main file, not an online backup.
+
+Ten native suites, 941 frontend tests/production build, 53 HTTP cases, four
+native CLI comparisons, three controlled reference formatting comparisons,
+17 browser checks and 65 artifact checks pass. All three SQLite schemas and
+a real installed ODBC Camunda driver are exercised. Twelve complete CSVs,
+six reports, original/query/formatted downloads, three XES reimports and final
+production assets are verified. [Reference query/result evidence](docs/database-driver-reference-behavior.json)
+and [validation boundaries](docs/feature-first-database-source-validation.json)
+retain the public-interface pins and corrected attempts. No parity unit is promoted.
 
 ### Sample dataset
 

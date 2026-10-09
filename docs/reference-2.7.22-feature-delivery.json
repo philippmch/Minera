@@ -1746,6 +1746,53 @@
         "XPATH_QUERY",
         "BOUNDED_CAPTURE"
       ]
+    },
+    {
+      "added": [
+        "Native acquisition from Camunda process/activity and SAP accounting/order-to-cash database history schemas",
+        "Exact caller-observed reference history query templates, SAP table prefixes and an explicit SQLite-compatible order-to-cash dialect",
+        "Original SQLite database uploads and explicit read-only server database paths, including Unicode paths",
+        "Windows ODBC connections without interactive prompts, fixed history SELECT queries and credentials supplied only for the acquisition request",
+        "Original query tables plus formatted columns/UTC timestamps/NULL resources/ordering/indexes and complete rich native event logs",
+        "Bounded row acquisition, explicit more-rows-available flag, database timeouts and reported unsupported ODBC query timeout",
+        "Reference/portable SQLite/Microsoft Access Camunda query dialect selection, with the original reference query retained alongside the executed query",
+        "Raw/formatted JSON and complete paged query/formatted/metadata/case/event/attribute/source tables, original SQLite bytes and full JSON/report/CSV/XES/gzip",
+        "Credential-free immutable reconnect, full query table retention in release responses and XES reopening for native analysis",
+        "CLI database connection environment input plus --output-table/--output-formatted/--output-xes and source-family credential-header CORS",
+        "File chooser identity reset makes reusing one database across all three connectors work; connector labels now cover CSV and database history"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_acquire_source.cpp",
+        "src/backend/tools/source_acquisition_routes.hpp",
+        "src/frontend/src/source-acquisition-workspace.ts",
+        "src/frontend/src/components/SourceAcquisitionWorkspace.tsx"
+      ],
+      "families": [
+        "algo.connectors"
+      ],
+      "id": "native_workflow_and_enterprise_database_acquisition",
+      "native_components": [
+        "include/minera/database_history_source.hpp",
+        "src/backend/database_history_source.cpp",
+        "src/backend/database_history_queries.hpp",
+        "include/minera/source_acquisition.hpp",
+        "src/backend/source_acquisition.cpp"
+      ],
+      "state": "native_database_driver_cli_api_and_app_available",
+      "validation": "docs/feature-first-database-source-validation.json",
+      "variants": [
+        "CAMUNDA_WORKFLOW",
+        "SAP_ACCOUNTING",
+        "SAP_O2C",
+        "SQLITE",
+        "ODBC",
+        "REFERENCE_QUERIES",
+        "SQLITE_DIALECT",
+        "ACCESS_CAMUNDA_DIALECT",
+        "BOUNDED_ROWS",
+        "NULLS",
+        "FORMATTED_TABLES"
+      ]
     }
   ],
   "execution_priority": [
@@ -1759,7 +1806,7 @@
     },
     {
       "area": "Optional connector drivers",
-      "next_action": "Continue live Outlook and workflow/SAP/database drivers beyond normalized CSV import. Nine existing connector workbenches, GitHub HTTPS and native bounded Windows event-channel/EVTX acquisition are available; subscriptions/bookmarks/remote event hosts and complete driver/reference fidelity remain open."
+      "next_action": "Continue live Outlook mailbox/calendar extraction and broader driver fidelity. Nine connector workbenches, GitHub HTTPS, native Windows channel/EVTX acquisition and Camunda/SAP SQLite/ODBC history acquisition are available. Native ODBC currently requires Windows; live vendor deployments, typed/binary/driver dialects, subscriptions/bookmarks/remote hosts and full reference behavior remain open."
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
