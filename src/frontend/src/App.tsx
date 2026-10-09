@@ -775,6 +775,7 @@ export default function App() {
       {tab === "conformance" && (
         <main className="layout-log">
           <Conformance
+            onOpenSimulation={loadFile}
             data={data}
             onRequestAlignment={requestAlignment}
             onRequestDecisions={source ? requestDecisions : undefined}

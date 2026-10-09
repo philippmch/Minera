@@ -12717,3 +12717,33 @@ type/order/error/numeric/concurrency/performance gates remain open.
 
 Evidence: docs/feature-first-alignment-inspection-validation.json and
 docs/feature-first-alignment-inspection-preview.jpg.
+
+
+### Feature delivery first: single-run Monte Carlo simulation workbench
+
+Replaced the paired summary/XES simulations and three-field summary with one
+source-bound native simulation workspace. Complete generated logs, diagnostics,
+case-duration vectors, every place/transition interval tree and interval, model
+indices, same-run XES and underlying PNML with run markings are now inspectable.
+The workbench exposes all existing typed controls, including transition weights,
+eight duration families, default/per-place resources, sparse stochastic maps,
+model conversion and native compatibility settings. Visible and scheduler times
+remain distinct; inert compatibility controls and native resource-accounting
+interval semantics are described. Complete JSON/request reports/every-table CSV
+preserve all rows and native numeric tokens beyond visible paging. Generated
+XES reopens for mining, and underlying PNML opens for conformance.
+
+Validation: four native suites, 1,011 frontend tests and production build,
+15 native HTTP checks over 20 calls and six actual fixtures, 14 browser checks
+and 48 downloads, and 62 independent artifact checks over thirty complete CSV
+tables, five full report/XES pairs and three same-run PNML files. The server was
+freshly compiled while 174 unchanged core objects were hash-verified and reused.
+Legacy plain JSON and XES formats remain unchanged under the captured seeded
+controls. Failed assumptions and helper attempts remain in separate outputs.
+
+This is feature progress. Exact reference fitting, distributions, scheduler,
+resource/replay/default/error/type/numeric/order/concurrency/performance parity
+and the full 228 incomplete catalogue units remain open; no status is promoted.
+
+Evidence: docs/feature-first-simulation-workspace-validation.json and
+docs/feature-first-simulation-workspace-preview.jpg.

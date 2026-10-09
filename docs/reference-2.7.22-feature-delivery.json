@@ -1972,6 +1972,49 @@
         "Existing embedded results have explicit embedded provenance without fabricated HTTP requests or backend source identities"
       ],
       "validation": "docs/feature-first-alignment-inspection-validation.json"
+    },
+    {
+      "id": "native_single_run_monte_carlo_workspace",
+      "state": "full_native_simulation_controls_outputs_and_same_run_handoffs_available",
+      "families": [
+        "algo.simulation.montecarlo"
+      ],
+      "variants": [
+        "PETRI_SEMAPH_FIFO",
+        "ALPHA",
+        "INDUCTIVE",
+        "HEURISTIC",
+        "POWL",
+        "IMPORTED",
+        "STANDARD",
+        "TRANSITION_BORDERED",
+        "DURATION_FAMILIES",
+        "SPARSE_STOCHASTIC_MAP",
+        "PLACE_RESOURCES",
+        "COMPLETE_INTERVALS",
+        "SAME_RUN_XES",
+        "FULL_REPORTS",
+        "COMPLETE_CSV",
+        "MODEL_PNML"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/simulation-workspace.ts",
+        "src/frontend/src/components/SimulationWorkspace.tsx",
+        "src/frontend/src/components/Conformance.tsx"
+      ],
+      "added": [
+        "Single-run Monte Carlo workbench replaces separate JSON/XES simulations and exposes the complete native result, generated log, matching XES, selected model indices and underlying PNML with run markings",
+        "Native simulation count/firings/seed/arrival/start, activity/time selectors, markings, replay strategy, duration fitting, diagnostics and stopping controls for Alpha, Inductive, Heuristic, POWL and imported workflows",
+        "Existing typed transition weights, eight duration families, default/per-place resource capacities and sparse stochastic-map distributions/weights/priorities are exposed with explicit precedence and native validation",
+        "Actual standard/transition-bordered process-tree conversion controls and compatibility settings whose current timing/deadline limitations are stated",
+        "Complete diagnostics, visible/scheduler case durations, metadata/traces/events/attributes, model/transition inventory, interval-tree presence, interval records and actual request configuration tables",
+        "Every-table CSV, raw full JSON and request-report exports retain original native numeric tokens beyond visible row/column paging",
+        "Interactive native place/transition interval previews, with paging rather than discarded intervals, and the selected workflow rendered with native index order",
+        "Matching XES download and reopening for ordinary mining plus same-run PNML download and imported conformance handoff",
+        "Source-generation request validation and frontend cancellation/invalidation; malformed options keep the last successful result; legacy plain Monte Carlo JSON and XES contracts remain available"
+      ],
+      "validation": "docs/feature-first-simulation-workspace-validation.json"
     }
   ],
   "execution_priority": [
@@ -1989,7 +2032,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining discovery/evaluation/simulation/conformance and I/O capabilities. Eight native alignment/distance/reduction result groups now expose full entries, moves, diagnostics, projected tables and exact HTTP JSON/request reports/every-table CSV; decision tables and guarded models are also available. Complete native selector/parameter/algorithm/default/error/type/numeric/order/Unicode/concurrency/performance parity remains independent."
+      "next_action": "Continue feature-first review across discovery, evaluation, conformance, simulation and I/O. Monte Carlo now has complete typed resource/duration/stochastic controls, native interval/case/event inspection and matching single-run XES/PNML handoffs; eight alignment/distance/reduction result groups and decision/guarded model workbenches are also available. Complete native algorithm/parameter/selector/default/error/type/numeric/order/Unicode/concurrency/performance behavior remains independent."
     }
   ],
   "feature_status_meaning": {

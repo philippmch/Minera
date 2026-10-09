@@ -2008,3 +2008,24 @@ attributes remain complete JSON cells. Native errors keep the last successful
 result; opening another log clears prior inspections. Earlier summary previews
 remain available above the complete inspector. This feature checkpoint does not
 promote native algorithm or reference parity status.
+
+
+### Single-run Monte Carlo simulation
+
+Open a raw CSV/XES log and use Conformance → Monte Carlo Petri-net simulation.
+Select a discovered/imported workflow, configure arrivals, markings, replay,
+duration fitting and stopping, or expand the indexed overrides for transition
+weights, duration-family records, per-place resources and sparse stochastic maps.
+Native compatibility controls state their current virtual-time limitations.
+
+Run native simulation once, then inspect every generated case/event, visible and
+scheduler duration, diagnostic, model index and resource interval. Row/column
+paging and the interval preview retain complete JSON/report/CSV downloads.
+Matching simulation XES comes from that same result and can reopen for mining;
+the workflow PNML retains structure and run markings and opens for conformance.
+
+`POST /api/monte-carlo` keeps its original JSON shape. Add
+`include_workspace=true` and the current query-schema `source_id` to receive a
+`SIMULATION_WORKSPACE` with the complete native result/log, matching XES and
+model/PNML from one run. The existing playout XES endpoint remains available.
+This feature checkpoint does not promote native/reference behavioral parity.
