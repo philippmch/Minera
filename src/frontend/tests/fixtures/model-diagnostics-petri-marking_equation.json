@@ -1,0 +1,1 @@
+{"family":"marking_equation","variant":"classic","computed":true,"feasible":true,"exhausted":false,"solver_nodes":1,"objective":-0,"lower_bound":-0,"transition_counts":[1,1,1,0],"residual":[0,0,0,0],"activated_transitions":[0,1,2],"firing_sequence":[0,1,2],"recovery_attempted":true,"reaches_final":true,"error":""}

@@ -1,0 +1,1 @@
+{"family":"extended_marking_equation","variant":"classic","computed":true,"feasible":true,"exhausted":false,"solver_nodes":1,"objective":-0,"lower_bound":-0,"retained_splits":[1,2],"segment_count":3,"transition_counts":[1,0,1,1],"firing_sequence":[0,3,2],"reaches_final":true,"error":""}

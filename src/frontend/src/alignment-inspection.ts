@@ -1,36 +1,23 @@
 import type { DfgAlignmentResult, EditDistanceResult, ProcessTreeAlignmentResult,
   DecomposedAlignmentResult, PetriAntiAlignmentResult, PetriMultiAlignmentResult,
   ProcessTreeReductionResult, EmdResult } from "./types";
-import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
+import { nativeCell, nativeJson } from "./native-json";
+import { readNativeResponse, nativeResponseJson, nativeResponseRequest, hasNativeResponse, type NativeRequest } from "./native-response";
 
 export type AlignmentKind = "dfg" | "edit" | "process-tree" | "decomposed" | "anti" | "multi" | "reduction" | "emd";
 export type InspectableAlignment = DfgAlignmentResult | EditDistanceResult | ProcessTreeAlignmentResult |
   DecomposedAlignmentResult | PetriAntiAlignmentResult | PetriMultiAlignmentResult | ProcessTreeReductionResult | EmdResult;
 export interface AlignmentEntry { kind: AlignmentKind; label: string; result: InspectableAlignment; }
-export interface AlignmentRequest {
-  path: string;
-  fields?: Array<[string, string]>;
-  reference?: { name: string; size: number; last_modified: number };
-}
-interface Capture { raw: string; request: AlignmentRequest; }
-const captures = new WeakMap<object, Capture>();
+export type AlignmentRequest = NativeRequest;
 
 /** Retain the actual response and submitted settings, including native numeric tokens. */
-export async function readAlignmentResponse(response: Response, request: AlignmentRequest): Promise<unknown> {
-  const raw = await response.text().catch(() => "");
-  try {
-    const value = parseNativeJson(raw);
-    if (value && typeof value === "object") captures.set(value, { raw, request: structuredClone(request) });
-    return value;
-  } catch { return null; }
-}
-export function alignmentRequest(result: InspectableAlignment): AlignmentRequest | undefined { return captures.get(result)?.request; }
-export function alignmentJson(result: InspectableAlignment): string { return captures.get(result)?.raw ?? nativeJson(result, 2); }
+export const readAlignmentResponse = readNativeResponse;
+export function alignmentRequest(result: InspectableAlignment): AlignmentRequest | undefined { return nativeResponseRequest(result); }
+export function alignmentJson(result: InspectableAlignment): string { return nativeResponseJson(result); }
 export function alignmentReport(entry: AlignmentEntry, dataset: string): string {
-  const capture = captures.get(entry.result);
   return nativeJson({ family: "ALIGNMENT_INSPECTION", kind: entry.kind, dataset,
-    origin: capture ? "native_http_response" : "embedded_result",
-    request: capture?.request ?? null, native_result: entry.result }, 2);
+    origin: hasNativeResponse(entry.result) ? "native_http_response" : "embedded_result",
+    request: nativeResponseRequest(entry.result) ?? null, native_result: entry.result }, 2);
 }
 export function alignmentCell(value: unknown): string {
   if (value === undefined) return "";
@@ -64,7 +51,7 @@ export function alignmentTables(entry: AlignmentEntry): AlignmentTable[] {
   const root = entry.result as unknown as Record<string, unknown>;
   const tables: AlignmentTable[] = [properties("summary", "Native summary", root,
     ["alignments", "traces", "diagnostics", "projected_log", "projected_dfg", "process_tree", "activities", "transitions"])];
-  const request = captures.get(entry.result)?.request;
+  const request = nativeResponseRequest(entry.result);
   if (request) {
     const params = [...new URLSearchParams(request.path.split("?")[1] ?? ""), ...(request.fields ?? [])];
     tables.push({ id: "request", title: "Submitted request", columns: ["field", "value"], rows: [

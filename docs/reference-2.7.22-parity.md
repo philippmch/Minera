@@ -12778,3 +12778,35 @@ type/order/error/numeric/concurrency/performance parity remain open with all
 
 Evidence: docs/feature-first-workflow-discovery-validation.json and
 docs/feature-first-workflow-discovery-preview.jpg.
+
+
+### Feature delivery first: complete quality and Petri diagnostics
+
+Added complete model diagnostics to Conformance. Each quality/Petri run can be
+saved and inspected across every native property/table, replay row, transition,
+witness and invariant. Ordered public values retain original int tokens and
+exact float hex where supplied. Complete native JSON, request/report JSON,
+every-table CSV and saved comparison JSON/CSV preserve returned values beyond
+visible row/column paging. Missing public values remain absent. Comparisons
+retain all actual scalar fields, uncomputed outcomes and errors.
+
+Fixed valid Petri results rejected solely because their root included error.
+Composite weights now accept native signed/NaN/infinite/zero-total inputs; zero
+totals retain an uncomputed error. Both workbenches expose Inductive conversion.
+Petri control/model changes hide previous results and stale request completions
+are ignored. New analysis sources hide and clear saved diagnostic history.
+
+Validation: 1,069 frontend tests (38 added) and production build; twenty-three
+controlled native HTTP checks/calls and twenty-one actual result fixtures;
+sixteen browser checks, twenty-four actual runs and 355 downloaded artifacts;
+412 independent artifact checks across 306 complete CSV files, twenty-four
+reports/native results and a twenty-six-entry/153-scalar-column comparison.
+Each downloaded native result matches an independently repeated native call.
+The exact unchanged prior native build retains five passing suites with all
+619 source bindings, 174 objects and six binaries reverified.
+
+This is feature delivery. Complete reference defaults/selectors/input shapes,
+algorithm/type/order/error/numeric/Unicode/concurrency/performance behavior
+remains open with all 228 incomplete units. No catalogue parity is promoted.
+Evidence: docs/feature-first-model-diagnostics-validation.json and
+docs/feature-first-model-diagnostics-preview.jpg.

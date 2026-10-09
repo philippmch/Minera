@@ -1,0 +1,1 @@
+{"miner": "inductive", "simplicity": {"variant": "extended_cyclomatic", "computed": true, "exhausted": false, "error": null, "simplicity": 4, "complexity": 4, "value": 4, "vertices": 4, "edges": 4, "strongly_connected_components": 4}}

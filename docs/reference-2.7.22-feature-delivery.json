@@ -2057,6 +2057,49 @@
         "Loaded analysis models remain visible offline with recorded heuristic variants and an honest Alpha variant-not-recorded caption rather than a false selected-variant claim"
       ],
       "validation": "docs/feature-first-workflow-discovery-validation.json"
+    },
+    {
+      "id": "complete_model_diagnostics_inspection",
+      "state": "complete_native_diagnostics_tables_comparisons_and_exports_available",
+      "families": [
+        "algo.evaluation.replay_fitness",
+        "algo.evaluation.precision",
+        "algo.evaluation.generalization",
+        "algo.evaluation.simplicity",
+        "algo.evaluation",
+        "algo.analysis.marking_equation",
+        "algo.analysis.extended_marking_equation",
+        "algo.analysis.workflow_net",
+        "algo.analysis.woflan"
+      ],
+      "variants": [
+        "FIVE_QUALITY_FAMILIES",
+        "FIVE_PETRI_ANALYSIS_FAMILIES",
+        "ORDERED_TYPED_PUBLIC_VALUE",
+        "SIGNED_NONFINITE_COMPOSITE_WEIGHTS",
+        "INDUCTIVE_CONVERSION",
+        "NATIVE_ERROR_EXHAUSTION",
+        "COMPLETE_REPORTS_CSV",
+        "SAVED_COMPARISONS"
+      ],
+      "entry_points": [
+        "src/frontend/src/native-response.ts",
+        "src/frontend/src/model-diagnostics.ts",
+        "src/frontend/src/components/ModelDiagnosticsInspection.tsx",
+        "src/frontend/src/components/Conformance.tsx",
+        "src/frontend/src/components/PetriAnalysis.tsx"
+      ],
+      "added": [
+        "Complete quality and Petri diagnostics inspection retains every native field, full nested rows, witness/invariant/transition/replay data and empty tables with row and column paging",
+        "Saved comparisons retain actual scalar metrics and statuses across models, families, variants and conversions; full reports preserve each native result and submitted request",
+        "Optional typed public values retain ordered dictionary entries, int tokens and exact float hex including NaN; variants without public_result retain that absence",
+        "Original HTTP response JSON and original numeric tokens survive native/report/table/comparison exports, including wide integers and signed zero transport",
+        "All five quality families and five Petri analysis families can save complete diagnostics; successful typed Petri results no longer fail merely because their envelope contains error",
+        "Composite weight controls accept signed, nonfinite and zero-total native inputs; uncomputed native errors and exhausted analyses remain inspectable",
+        "Both quality and Petri workbenches expose native/default Standard/Transition bordered Inductive conversion; control changes hide previous results and request tracking rejects stale completions",
+        "Opening a new source immediately hides and clears comparison history; imported model generations remain explicit in saved reports"
+      ],
+      "validation": "docs/feature-first-model-diagnostics-validation.json"
     }
   ],
   "execution_priority": [
@@ -2074,7 +2117,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across evaluation, conformance, remaining discovery/simulation and I/O. Native Classic/Alpha+ and Classic/Heuristics++ workbenches now invoke the chosen algorithm and expose full marking/statistic/matrix/bundle data, exact discovered-model formats and seeded playout handoffs. Monte Carlo, complete alignment/distance/reduction inspection and decision/guarded model workflows are available. The full catalogue and exact algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates remain intact."
+      "next_action": "Continue feature-first review across remaining discovery, conformance, simulation, transformations, conversions and I/O. Complete evaluation/Petri diagnostic inspection, ordered public values, comparisons, exports, nonfinite weights and conversion join actual Alpha/Heuristic discovery, Monte Carlo, alignment inspection and guarded decision workflows. Preserve the full catalogue and exact algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates."
     }
   ],
   "feature_status_meaning": {
