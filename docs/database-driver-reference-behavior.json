@@ -1,0 +1,520 @@
+{
+  "controlled_result_observations": {
+    "complete": true,
+    "helper_sha256": "314afbe72191f70a2adec5b9c896184175a01067d7cc71b389dc3449d15505e2",
+    "records": [
+      {
+        "calls": [
+          {
+            "operation": "execute",
+            "sql": "\n    SELECT\n    pi.PROC_DEF_KEY_ AS \"processID\",\n    ai.EXECUTION_ID_ AS \"case:concept:name\",\n    ai.ACT_NAME_ AS \"concept:name\",\n    ai.START_TIME_ AS \"time:timestamp\",\n    ai.ASSIGNEE_ AS \"org:resource\"\n    FROM\n        act_hi_procinst pi\n    JOIN\n        act_hi_actinst ai ON pi.PROC_INST_ID_ = ai.PROC_INST_ID_\n    ORDER BY\n        pi.PROC_INST_ID_,\n        ai.EXECUTION_ID_,\n        ai.START_TIME_;\n    "
+          },
+          {
+            "operation": "fetchall"
+          },
+          {
+            "operation": "cursor_close"
+          },
+          {
+            "operation": "connection_close"
+          }
+        ],
+        "columns": [
+          "processID",
+          "case:concept:name",
+          "concept:name",
+          "time:timestamp",
+          "org:resource"
+        ],
+        "input_rows": [
+          [
+            "p,\u6771\u4eac",
+            "case1",
+            "A",
+            "2024-01-01T10:00:00",
+            null
+          ],
+          [
+            "p,\u6771\u4eac",
+            "case1",
+            "B",
+            "2024-01-02T10:00:00",
+            "owner"
+          ]
+        ],
+        "module": "pm4py.algo.connectors.variants.camunda_workflow",
+        "result": {
+          "columns": [
+            "processID",
+            "case:concept:name",
+            "concept:name",
+            "time:timestamp",
+            "org:resource",
+            "@@index",
+            "@@case_index"
+          ],
+          "dtypes": [
+            "str",
+            "string",
+            "string",
+            "datetime64[us, UTC]",
+            "str",
+            "int64",
+            "int64"
+          ],
+          "split": {
+            "columns": [
+              "processID",
+              "case:concept:name",
+              "concept:name",
+              "time:timestamp",
+              "org:resource",
+              "@@index",
+              "@@case_index"
+            ],
+            "data": [
+              [
+                "p,\u6771\u4eac",
+                "case1",
+                "A",
+                "2024-01-01T10:00:00.000000000Z",
+                null,
+                0,
+                0
+              ],
+              [
+                "p,\u6771\u4eac",
+                "case1",
+                "B",
+                "2024-01-02T10:00:00.000000000Z",
+                "owner",
+                1,
+                0
+              ]
+            ],
+            "index": [
+              0,
+              1
+            ]
+          }
+        }
+      },
+      {
+        "calls": [
+          {
+            "operation": "execute",
+            "sql": "\n    SELECT * FROM\n    (SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || BELNR AS \"case:concept:name\", 'Create Financial Document - ' || BLART AS \"concept:name\", CPUDT || ' ' || CPUTM AS \"time:timestamp\", USNAM AS \"org:resource\", BLART FROM BKPF\n    UNION\n    SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || AUGBL AS \"case:concept:name\", 'Clear Customer Document' AS \"concept:name\", AUGDT || ' 235958' AS \"time:timestamp\", NULL AS \"org:resource\", NULL AS BLART FROM BSAD\n    UNION\n    SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || AUGBL AS \"case:concept:name\", 'Clear Vendor Document' AS \"concept:name\", AUGDT || ' 235959' AS \"time:timestamp\", NULL AS \"org:resource\", NULL AS BLART FROM BSAK)\n    ORDER BY \"case:concept:name\", \"time:timestamp\";\n    "
+          },
+          {
+            "operation": "fetchall"
+          },
+          {
+            "operation": "cursor_close"
+          },
+          {
+            "operation": "connection_close"
+          }
+        ],
+        "columns": [
+          "case:concept:name",
+          "concept:name",
+          "time:timestamp",
+          "org:resource",
+          "BLART"
+        ],
+        "input_rows": [
+          [
+            "100-C-2024-7",
+            "Create Financial Document - X",
+            "20240101 100000",
+            "owner",
+            "X"
+          ],
+          [
+            "100-C-2024-7",
+            "Clear Customer Document",
+            "20240102 235958",
+            null,
+            null
+          ]
+        ],
+        "module": "pm4py.algo.connectors.variants.sap_accounting",
+        "result": {
+          "columns": [
+            "case:concept:name",
+            "concept:name",
+            "time:timestamp",
+            "org:resource",
+            "BLART",
+            "@@index",
+            "@@case_index"
+          ],
+          "dtypes": [
+            "string",
+            "string",
+            "datetime64[us, UTC]",
+            "str",
+            "str",
+            "int64",
+            "int64"
+          ],
+          "split": {
+            "columns": [
+              "case:concept:name",
+              "concept:name",
+              "time:timestamp",
+              "org:resource",
+              "BLART",
+              "@@index",
+              "@@case_index"
+            ],
+            "data": [
+              [
+                "100-C-2024-7",
+                "Create Financial Document - X",
+                "2024-01-01T10:00:00.000000000Z",
+                "owner",
+                "X",
+                0,
+                0
+              ],
+              [
+                "100-C-2024-7",
+                "Clear Customer Document",
+                "2024-01-02T23:59:58.000000000Z",
+                null,
+                null,
+                1,
+                0
+              ]
+            ],
+            "index": [
+              0,
+              1
+            ]
+          }
+        }
+      },
+      {
+        "calls": [
+          {
+            "operation": "execute",
+            "sql": "\nSELECT * FROM\n(SELECT\n    T1.VBELN AS \"case:concept:name\",\n    DECODE(T1.TYPE, 'C', 'Create Sales Document', 'D', 'Create Delivery') AS \"concept:name\",\n    T1.TIMESTAMP AS \"time:timestamp\",\n    T1.USERNAME AS \"org:resource\"\nFROM\n    (\n        SELECT\n            'C' AS TYPE,\n            VBAK.VBELN,\n            VBAK.ERDAT || ' ' || VBAK.ERZET AS TIMESTAMP,\n            VBAK.ERNAM AS USERNAME\n        FROM\n            VBAK\n        UNION ALL\n        SELECT\n            'D' AS TYPE,\n            VBFA.VBELV AS VBELN,\n            LIKP.ERDAT || ' ' || LIKP.ERZET AS TIMESTAMP,\n            LIKP.ERNAM AS USERNAME\n        FROM\n            LIKP\n        JOIN VBFA ON LIKP.VBELN = VBFA.VBELN\n        WHERE\n            VBFA.VBTYP_N = 'J'\n    ) T1 )\n    UNION\n    (\n    SELECT\n    VBFA.VBELN AS \"case:concept:name\",\n    TSTCT.TTEXT AS \"concept:name\",\n    CDHDR.UDATE || ' ' || CDHDR.UTIME AS \"time:timestamp\",\n    CDHDR.USERNAME AS \"org:resource\"\nFROM\n    VBFA VBFA\n    JOIN VBAK VBAK ON VBFA.VBELN = VBAK.VBELN\n    JOIN VBAP VBAP ON VBAK.VBELN = VBAP.VBELN\n    JOIN CDHDR CDHDR ON VBFA.VBELN = CDHDR.OBJECTID\n    JOIN TSTCT TSTCT ON CDHDR.TCODE = TSTCT.TCODE\nWHERE\n    VBFA.VBTYP_N = 'C'\n    AND TSTCT.SPRSL = 'E'\n    )\n    UNION\n    (\n        SELECT\n        C.VBELN AS \"case:concept:name\",\n        'Create Billing' AS \"concept:name\",\n        C.FKDAT AS \"time:timestamp\",\n        C.ERNAM AS \"org:resource\"\n    FROM\n        VBRK C\n    JOIN\n        VBAK A ON A.VBELN = C.VBELN\n    )\n    "
+          },
+          {
+            "operation": "fetchall"
+          },
+          {
+            "operation": "cursor_close"
+          },
+          {
+            "operation": "connection_close"
+          }
+        ],
+        "columns": [
+          "case:concept:name",
+          "concept:name",
+          "time:timestamp",
+          "org:resource"
+        ],
+        "input_rows": [
+          [
+            "7",
+            "Create Sales Document",
+            "20240101 100000",
+            "owner"
+          ],
+          [
+            "7",
+            "Create Billing",
+            "20240102",
+            "owner"
+          ]
+        ],
+        "module": "pm4py.algo.connectors.variants.sap_o2c",
+        "result": {
+          "columns": [
+            "case:concept:name",
+            "concept:name",
+            "time:timestamp",
+            "org:resource",
+            "@@index",
+            "@@case_index"
+          ],
+          "dtypes": [
+            "string",
+            "string",
+            "datetime64[us, UTC]",
+            "str",
+            "int64",
+            "int64"
+          ],
+          "split": {
+            "columns": [
+              "case:concept:name",
+              "concept:name",
+              "time:timestamp",
+              "org:resource",
+              "@@index",
+              "@@case_index"
+            ],
+            "data": [
+              [
+                "7",
+                "Create Sales Document",
+                "2024-01-01T10:00:00.000000000Z",
+                "owner",
+                0,
+                0
+              ],
+              [
+                "7",
+                "Create Billing",
+                "2024-01-02T00:00:00.000000000Z",
+                "owner",
+                1,
+                0
+              ]
+            ],
+            "index": [
+              0,
+              1
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "public_interfaces": {
+    "complete": true,
+    "created_utc": "2026-10-09T14:35:23.011895+00:00",
+    "helper_sha256": "cafb0e4b5ca12b85f55606b92147ce5f742f2d8646125981ba92eaf8706f1823",
+    "interfaces": [
+      {
+        "enums": {
+          "Enum": [],
+          "Parameters": [
+            {
+              "name": "CONNECTION_STRING",
+              "value": "connection_string"
+            }
+          ]
+        },
+        "functions": {
+          "apply": "(conn, parameters: Optional[Dict[Any, Any]] = None) -> pandas.DataFrame"
+        },
+        "module": "pm4py.algo.connectors.variants.camunda_workflow",
+        "opaque_sha256": "974f6c698e648c54b3efca06bdfa0ad70509930d29a3913787bbbd0169bc3f66",
+        "pinned_blob_equal": true
+      },
+      {
+        "enums": {
+          "Enum": [],
+          "Parameters": [
+            {
+              "name": "CONNECTION_STRING",
+              "value": "connection_string"
+            },
+            {
+              "name": "PREFIX",
+              "value": "prefix"
+            }
+          ]
+        },
+        "functions": {
+          "apply": "(conn, parameters: Optional[Dict[Any, Any]] = None) -> pandas.DataFrame"
+        },
+        "module": "pm4py.algo.connectors.variants.sap_accounting",
+        "opaque_sha256": "32329e37896e5d171cd5bb44a774ceb7b6fcf0ccae51e3283f1183c821dbd9ce",
+        "pinned_blob_equal": true
+      },
+      {
+        "enums": {
+          "Enum": [],
+          "Parameters": [
+            {
+              "name": "CONNECTION_STRING",
+              "value": "connection_string"
+            },
+            {
+              "name": "PREFIX",
+              "value": "prefix"
+            }
+          ]
+        },
+        "functions": {
+          "apply": "(conn, parameters: Optional[Dict[Any, Any]] = None) -> pandas.DataFrame"
+        },
+        "module": "pm4py.algo.connectors.variants.sap_o2c",
+        "opaque_sha256": "d22a58c495e80634c31cd1c4e72778ae2e1d7002cc3c540c4dbcbfb3514b6c84",
+        "pinned_blob_equal": true
+      },
+      {
+        "enums": {
+          "Enum": [],
+          "Parameters": [
+            {
+              "name": "EMAIL_USER",
+              "value": "email_user"
+            },
+            {
+              "name": "CALENDAR_ID",
+              "value": "calendar_id"
+            },
+            {
+              "name": "INCLUDE_REMINDERS",
+              "value": "include_reminders"
+            }
+          ]
+        },
+        "functions": {
+          "apply": "(parameters: Optional[Dict[str, Any]] = None) -> pandas.DataFrame"
+        },
+        "module": "pm4py.algo.connectors.variants.outlook_calendar",
+        "opaque_sha256": "932a53884901b3a481efa51a141c7a240deb4ef8ed0756c7ee7f2801b8bf2b53",
+        "pinned_blob_equal": true
+      },
+      {
+        "enums": {},
+        "functions": {
+          "apply": "(parameters: Optional[Dict[str, Any]] = None) -> pandas.DataFrame",
+          "get_events": "(box, prefix, progress) -> List[Dict[str, Any]]"
+        },
+        "module": "pm4py.algo.connectors.variants.outlook_mail_extractor",
+        "opaque_sha256": "2061c45a01ac10a387e15dda4b9c2396032bc2ddf0106c51a560931d05d2f6d2",
+        "pinned_blob_equal": true
+      }
+    ],
+    "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899"
+  },
+  "query_observations": {
+    "complete": true,
+    "helper_sha256": "8ac65978235f4dbb56fffbc7e891963a3119160200c8267308b939df45a1fdd5",
+    "public_surface_sha256": "09835ee6869fbfa42704cb1cd72edf4764d5c2796c76f8ebcec5afe5b6f55d96",
+    "records": [
+      {
+        "calls": [
+          {
+            "operation": "cursor"
+          },
+          {
+            "operation": "execute",
+            "parameters": [],
+            "sql": "\n    SELECT\n    pi.PROC_DEF_KEY_ AS \"processID\",\n    ai.EXECUTION_ID_ AS \"case:concept:name\",\n    ai.ACT_NAME_ AS \"concept:name\",\n    ai.START_TIME_ AS \"time:timestamp\",\n    ai.ASSIGNEE_ AS \"org:resource\"\n    FROM\n        act_hi_procinst pi\n    JOIN\n        act_hi_actinst ai ON pi.PROC_INST_ID_ = ai.PROC_INST_ID_\n    ORDER BY\n        pi.PROC_INST_ID_,\n        ai.EXECUTION_ID_,\n        ai.START_TIME_;\n    "
+          }
+        ],
+        "case": "default",
+        "exception": {
+          "message": "Owned SQL capture boundary reached",
+          "type": "CaptureBoundary"
+        },
+        "module": "pm4py.algo.connectors.variants.camunda_workflow",
+        "parameters": {}
+      },
+      {
+        "calls": [
+          {
+            "operation": "cursor"
+          },
+          {
+            "operation": "execute",
+            "parameters": [],
+            "sql": "\n    SELECT\n    pi.PROC_DEF_KEY_ AS \"processID\",\n    ai.EXECUTION_ID_ AS \"case:concept:name\",\n    ai.ACT_NAME_ AS \"concept:name\",\n    ai.START_TIME_ AS \"time:timestamp\",\n    ai.ASSIGNEE_ AS \"org:resource\"\n    FROM\n        act_hi_procinst pi\n    JOIN\n        act_hi_actinst ai ON pi.PROC_INST_ID_ = ai.PROC_INST_ID_\n    ORDER BY\n        pi.PROC_INST_ID_,\n        ai.EXECUTION_ID_,\n        ai.START_TIME_;\n    "
+          }
+        ],
+        "case": "prefix",
+        "exception": {
+          "message": "Owned SQL capture boundary reached",
+          "type": "CaptureBoundary"
+        },
+        "module": "pm4py.algo.connectors.variants.camunda_workflow",
+        "parameters": {
+          "prefix": "OWNED."
+        }
+      },
+      {
+        "calls": [
+          {
+            "operation": "cursor"
+          },
+          {
+            "operation": "execute",
+            "parameters": [],
+            "sql": "\n    SELECT * FROM\n    (SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || BELNR AS \"case:concept:name\", 'Create Financial Document - ' || BLART AS \"concept:name\", CPUDT || ' ' || CPUTM AS \"time:timestamp\", USNAM AS \"org:resource\", BLART FROM BKPF\n    UNION\n    SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || AUGBL AS \"case:concept:name\", 'Clear Customer Document' AS \"concept:name\", AUGDT || ' 235958' AS \"time:timestamp\", NULL AS \"org:resource\", NULL AS BLART FROM BSAD\n    UNION\n    SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || AUGBL AS \"case:concept:name\", 'Clear Vendor Document' AS \"concept:name\", AUGDT || ' 235959' AS \"time:timestamp\", NULL AS \"org:resource\", NULL AS BLART FROM BSAK)\n    ORDER BY \"case:concept:name\", \"time:timestamp\";\n    "
+          }
+        ],
+        "case": "default",
+        "exception": {
+          "message": "Owned SQL capture boundary reached",
+          "type": "CaptureBoundary"
+        },
+        "module": "pm4py.algo.connectors.variants.sap_accounting",
+        "parameters": {}
+      },
+      {
+        "calls": [
+          {
+            "operation": "cursor"
+          },
+          {
+            "operation": "execute",
+            "parameters": [],
+            "sql": "\n    SELECT * FROM\n    (SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || BELNR AS \"case:concept:name\", 'Create Financial Document - ' || BLART AS \"concept:name\", CPUDT || ' ' || CPUTM AS \"time:timestamp\", USNAM AS \"org:resource\", BLART FROM OWNED.BKPF\n    UNION\n    SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || AUGBL AS \"case:concept:name\", 'Clear Customer Document' AS \"concept:name\", AUGDT || ' 235958' AS \"time:timestamp\", NULL AS \"org:resource\", NULL AS BLART FROM OWNED.BSAD\n    UNION\n    SELECT MANDT || '-' || BUKRS || '-' || GJAHR || '-' || AUGBL AS \"case:concept:name\", 'Clear Vendor Document' AS \"concept:name\", AUGDT || ' 235959' AS \"time:timestamp\", NULL AS \"org:resource\", NULL AS BLART FROM OWNED.BSAK)\n    ORDER BY \"case:concept:name\", \"time:timestamp\";\n    "
+          }
+        ],
+        "case": "prefix",
+        "exception": {
+          "message": "Owned SQL capture boundary reached",
+          "type": "CaptureBoundary"
+        },
+        "module": "pm4py.algo.connectors.variants.sap_accounting",
+        "parameters": {
+          "prefix": "OWNED."
+        }
+      },
+      {
+        "calls": [
+          {
+            "operation": "cursor"
+          },
+          {
+            "operation": "execute",
+            "parameters": [],
+            "sql": "\nSELECT * FROM\n(SELECT\n    T1.VBELN AS \"case:concept:name\",\n    DECODE(T1.TYPE, 'C', 'Create Sales Document', 'D', 'Create Delivery') AS \"concept:name\",\n    T1.TIMESTAMP AS \"time:timestamp\",\n    T1.USERNAME AS \"org:resource\"\nFROM\n    (\n        SELECT\n            'C' AS TYPE,\n            VBAK.VBELN,\n            VBAK.ERDAT || ' ' || VBAK.ERZET AS TIMESTAMP,\n            VBAK.ERNAM AS USERNAME\n        FROM\n            VBAK\n        UNION ALL\n        SELECT\n            'D' AS TYPE,\n            VBFA.VBELV AS VBELN,\n            LIKP.ERDAT || ' ' || LIKP.ERZET AS TIMESTAMP,\n            LIKP.ERNAM AS USERNAME\n        FROM\n            LIKP\n        JOIN VBFA ON LIKP.VBELN = VBFA.VBELN\n        WHERE\n            VBFA.VBTYP_N = 'J'\n    ) T1 )\n    UNION\n    (\n    SELECT\n    VBFA.VBELN AS \"case:concept:name\",\n    TSTCT.TTEXT AS \"concept:name\",\n    CDHDR.UDATE || ' ' || CDHDR.UTIME AS \"time:timestamp\",\n    CDHDR.USERNAME AS \"org:resource\"\nFROM\n    VBFA VBFA\n    JOIN VBAK VBAK ON VBFA.VBELN = VBAK.VBELN\n    JOIN VBAP VBAP ON VBAK.VBELN = VBAP.VBELN\n    JOIN CDHDR CDHDR ON VBFA.VBELN = CDHDR.OBJECTID\n    JOIN TSTCT TSTCT ON CDHDR.TCODE = TSTCT.TCODE\nWHERE\n    VBFA.VBTYP_N = 'C'\n    AND TSTCT.SPRSL = 'E'\n    )\n    UNION\n    (\n        SELECT\n        C.VBELN AS \"case:concept:name\",\n        'Create Billing' AS \"concept:name\",\n        C.FKDAT AS \"time:timestamp\",\n        C.ERNAM AS \"org:resource\"\n    FROM\n        VBRK C\n    JOIN\n        VBAK A ON A.VBELN = C.VBELN\n    )\n    "
+          }
+        ],
+        "case": "default",
+        "exception": {
+          "message": "Owned SQL capture boundary reached",
+          "type": "CaptureBoundary"
+        },
+        "module": "pm4py.algo.connectors.variants.sap_o2c",
+        "parameters": {}
+      },
+      {
+        "calls": [
+          {
+            "operation": "cursor"
+          },
+          {
+            "operation": "execute",
+            "parameters": [],
+            "sql": "\nSELECT * FROM\n(SELECT\n    T1.VBELN AS \"case:concept:name\",\n    DECODE(T1.TYPE, 'C', 'Create Sales Document', 'D', 'Create Delivery') AS \"concept:name\",\n    T1.TIMESTAMP AS \"time:timestamp\",\n    T1.USERNAME AS \"org:resource\"\nFROM\n    (\n        SELECT\n            'C' AS TYPE,\n            VBAK.VBELN,\n            VBAK.ERDAT || ' ' || VBAK.ERZET AS TIMESTAMP,\n            VBAK.ERNAM AS USERNAME\n        FROM\n            OWNED.VBAK\n        UNION ALL\n        SELECT\n            'D' AS TYPE,\n            VBFA.VBELV AS VBELN,\n            LIKP.ERDAT || ' ' || LIKP.ERZET AS TIMESTAMP,\n            LIKP.ERNAM AS USERNAME\n        FROM\n            OWNED.LIKP\n        JOIN OWNED.VBFA ON LIKP.VBELN = VBFA.VBELN\n        WHERE\n            VBFA.VBTYP_N = 'J'\n    ) T1 )\n    UNION\n    (\n    SELECT\n    VBFA.VBELN AS \"case:concept:name\",\n    TSTCT.TTEXT AS \"concept:name\",\n    CDHDR.UDATE || ' ' || CDHDR.UTIME AS \"time:timestamp\",\n    CDHDR.USERNAME AS \"org:resource\"\nFROM\n    OWNED.VBFA VBFA\n    JOIN OWNED.VBAK VBAK ON VBFA.VBELN = VBAK.VBELN\n    JOIN OWNED.VBAP VBAP ON VBAK.VBELN = VBAP.VBELN\n    JOIN OWNED.CDHDR CDHDR ON VBFA.VBELN = CDHDR.OBJECTID\n    JOIN OWNED.TSTCT TSTCT ON CDHDR.TCODE = TSTCT.TCODE\nWHERE\n    VBFA.VBTYP_N = 'C'\n    AND TSTCT.SPRSL = 'E'\n    )\n    UNION\n    (\n        SELECT\n        C.VBELN AS \"case:concept:name\",\n        'Create Billing' AS \"concept:name\",\n        C.FKDAT AS \"time:timestamp\",\n        C.ERNAM AS \"org:resource\"\n    FROM\n        OWNED.VBRK C\n    JOIN\n        OWNED.VBAK A ON A.VBELN = C.VBELN\n    )\n    "
+          }
+        ],
+        "case": "prefix",
+        "exception": {
+          "message": "Owned SQL capture boundary reached",
+          "type": "CaptureBoundary"
+        },
+        "module": "pm4py.algo.connectors.variants.sap_o2c",
+        "parameters": {
+          "prefix": "OWNED."
+        }
+      }
+    ]
+  },
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "reference_version": "2.7.22",
+  "scope": "Public signatures/enums and controlled caller-visible SQL/results only; no reference implementation bodies or bytecode inspected."
+}

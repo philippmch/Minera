@@ -3,14 +3,14 @@ import evtxRaw from './fixtures/windows-source-evtx.json?raw';
 import serviceRaw from './fixtures/windows-source-service.json?raw';
 import filteredRaw from './fixtures/windows-source-filtered.json?raw';
 import {parseNativeJson,nativeJson} from '../src/native-json';
-import {acquireSource,acquiredCapture,acquiredTables,acquisitionQuery,formFromAcquired,validAcquiredSource,type AcquiredSource} from '../src/source-acquisition-workspace';
+import {acquireSource,acquiredCapture,acquiredTables,acquisitionQuery,formFromAcquired,validAcquiredSource,type AcquiredSource,type WindowsAcquisitionMetadata} from '../src/source-acquisition-workspace';
 import {ocelPreparedCsv} from '../src/ocel-preparation';
-const parse=(raw=evtxRaw)=>parseNativeJson(raw) as AcquiredSource;
+const parse=(raw=evtxRaw)=>parseNativeJson(raw) as AcquiredSource & {native_acquisition:WindowsAcquisitionMetadata};
 afterEach(()=>vi.unstubAllGlobals());
 describe('native Windows event source workflows',()=>{
  it.each([evtxRaw,serviceRaw,filteredRaw])('accepts actual native Windows capture metadata with complete logs',raw=>expect(validAcquiredSource(parse(raw))).toBe(true));
  it('rejects missing, foreign or inconsistent native capture descriptors',()=>{
-  let s=parse(serviceRaw);delete s.native_acquisition;expect(validAcquiredSource(s)).toBe(false);
+  let s=parse(serviceRaw);delete (s as AcquiredSource).native_acquisition;expect(validAcquiredSource(s)).toBe(false);
   s=parse();s.native_acquisition!.captured_events++;expect(validAcquiredSource(s)).toBe(false);
   s=parse();s.native_acquisition!.driver='windows_event_service';expect(validAcquiredSource(s)).toBe(false);
   s=parse();s.native_acquisition!.xml_bytes=0;expect(validAcquiredSource(s)).toBe(false);

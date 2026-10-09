@@ -12560,3 +12560,52 @@ argv, subscriptions/bookmarks, remote hosts, restart durability and live
 Outlook/workflow/SAP/database drivers remain open. All 86 packages/387 modules,
 46 complete packages/199 complete modules and 228 incomplete units remain the
 objective. This feature delivery promotes no catalogue parity unit.
+
+
+## Feature delivery first: native workflow and enterprise database acquisition (2026-10-09)
+
+Camunda process/activity and SAP accounting/order-to-cash histories now have
+native SQLite and Windows ODBC acquisition. Controlled pinned public calls
+revealed the exact history SQL, table-prefix behavior, closure and dataframe
+formatting; only public interfaces/outputs and opaque hashes were used. The
+original reference query is retained alongside explicit SQLite/Access syntax
+adapters. All three SQLite history schemas and a real Microsoft Access ODBC
+Camunda fixture are exercised. Connection credentials remain request-only,
+clear after success and are absent from stored records/reports/diagnostics.
+
+Original/Unicode server SQLite files, row bounds/truncation, timeouts, complete
+raw and formatted query tables, UTC timestamps, NULL resources, sorting/indexes
+and rich native logs are available through CLI/API/app. XES uses the canonical
+trace case key for analysis reopening. Full JSON/report/twelve-category CSV,
+original bytes, query/formatted JSON and both XES/gzip writers are exposed.
+Immutable reconnect and release retain every captured table locally. Reusing
+one file across connector selections now resets the native file input identity.
+
+docs/feature-first-database-source-validation.json binds 614 native and 252
+frontend/runtime sources, two fresh core objects and 171 reused objects. Ten
+assertion-enabled native suites, 941 frontend tests/production build, 37 native
+application checks over 42 HTTP cases/four CLIs, three exact controlled reference
+column/row comparisons, 17 browser checks and 65 artifact checks pass. Independent
+evidence covers twelve complete CSVs, six reports, original SQLite, all query/
+formatted downloads, NULL/kind/value/date semantics, three XES reimports across
+nine API cases and two served assets. All 60 cases/120 events survive analysis.
+
+Retained attempts expose an unsupported ODBC query-timeout attribute and Access
+syntax incompatibility, corrected through reported capability and an explicit
+dialect. Browser verification caught unchanged file inputs after selecting the
+same source for another connector. An attribute-list-only XES assertion was
+corrected to include canonical projection wrappers and exact kind/value/NULL/
+timestamp semantics. Integer native payloads and date resolution/timezone
+metadata normalize through XES; original native JSON/query tables remain exact.
+Owned PIDs 628/31512/29152 and ports 8508/8509/8510 were identity-checked and
+closed after validation. Temporary tab/390px viewport overrides were cleaned.
+
+Live SAP/HANA/Oracle/PostgreSQL deployments, non-Windows ODBC, complete scalar/
+dtype/binary/default/error/order/Unicode/concurrency/performance fidelity and
+live Outlook extraction remain open. ODBC read-only is a provider hint and
+timeouts depend on the driver; unsupported timeout is visible. Server SQLite
+queries can read WAL state while original bytes represent only the main file;
+consistent whole-database backup/durability remains a gate. No reference bodies
+or bytecode were inspected and no catalogue parity unit is promoted. All
+86 packages/387 modules, 46 complete packages/199 complete modules and 228
+incomplete units remain the objective.

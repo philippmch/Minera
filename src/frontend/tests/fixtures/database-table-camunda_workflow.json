@@ -1,0 +1,1 @@
+{"family":"DATABASE_HISTORY_CAPTURE","columns":["processID","case:concept:name","concept:name","time:timestamp","org:resource"],"column_types":["TEXT","TEXT","TEXT","TEXT","TEXT"],"rows":[["p,東京","case-b","A","2024-01-01T10:00:00Z","owner"],["p,東京","case-b","B","2024-01-02T10:00:00Z",null],["q","case-a","X","2024-01-03T10:00:00Z","other"]],"row_count":3,"limited":false}

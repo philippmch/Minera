@@ -53,7 +53,16 @@ SourceAcquisitionResult acquire_source(const SourceAcquisitionInput& input) {
   if(!input.server_path.empty()&&std::filesystem::is_regular_file(path))result.original_bytes=read_file(path);
   if(result.original_bytes&&result.original_bytes->size()>maximum_bytes)throw std::length_error("source acquisition: source exceeds 512 MiB");
   std::unique_ptr<UploadedFile> uploaded;
-  if(input.connector=="chrome_history"||input.connector=="firefox_history") {
+  if(present("database_driver")) {
+    DatabaseHistoryOptions options;options.connector=input.connector;options.driver=field("database_driver");options.prefix=field("database_prefix");options.dialect=field("database_dialect");options.connection_string=input.database_connection;
+    if(options.driver=="sqlite"){if(input.server_path.empty()&&result.original_bytes){uploaded=std::make_unique<UploadedFile>(*result.original_bytes);path=uploaded->path();}options.path=path;}
+    else if(result.original_bytes||!input.server_path.empty())throw std::invalid_argument("ODBC acquisition does not accept an upload or server file path");
+    const auto number=[&](std::string_view key,std::size_t limit,std::size_t fallback){if(!present(key))return fallback;const auto value=field(key);std::size_t n=0;const auto parsed=std::from_chars(value.data(),value.data()+value.size(),n);if(value.empty()||parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size()||!n||n>limit)throw std::invalid_argument(std::string(key)+" is outside its native limit");return n;};
+    options.max_rows=number("database_max_rows",10000000,1000);const auto event_key=input.connector=="camunda_workflow"?"workflow_max_events":"enterprise_max_events";options.max_rows=std::min(options.max_rows,number(event_key,10000000,10000000));options.timeout_seconds=static_cast<unsigned>(number("database_timeout_seconds",300,30));
+    result.database_capture=capture_database_history(options,input.database_reader);result.log=result.database_capture->log;
+    if(input.connector=="camunda_workflow")result.native_result_json=workflow_history_json(result.log);
+    else result.native_result_json=enterprise_history_json(result.log,input.connector=="sap_o2c"?EnterpriseHistoryVariant::kOrderToCash:EnterpriseHistoryVariant::kAccounting);
+  }else if(input.connector=="chrome_history"||input.connector=="firefox_history") {
     if(result.original_bytes){uploaded=std::make_unique<UploadedFile>(*result.original_bytes);path=uploaded->path();}
     if(path.empty())throw std::invalid_argument("source acquisition: browser history requires a database upload or explicit profile path");
     auto params=input.parameters;params["browser_history_variant"]=input.connector;params["browser_history_path"]="explicit-source";
@@ -94,6 +103,7 @@ std::string source_acquisition_json(const SourceAcquisitionResult& result) {
   LogConversionResult full;full.log=result.log;std::ostringstream out;
   out<<"{\"family\":\"SOURCE_ACQUISITION\",\"connector\":\""<<result.connector<<"\",\"trace_count\":"<<result.log.trace_count()<<",\"event_count\":"<<result.log.event_count()<<",\"native_result\":"<<result.native_result_json<<",\"native_log\":"<<log_conversion_json(full);
   if(result.windows_capture)out<<",\"native_acquisition\":"<<windows_event_capture_json(*result.windows_capture);
+  if(result.database_capture)out<<",\"native_acquisition\":"<<database_history_capture_json(*result.database_capture);
   out<<'}';return out.str();
 }
 }  // namespace minera
