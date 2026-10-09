@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MineraExport, PetriAnalysisFamily, PetriAnalysisOptions, PetriAnalysisResult } from "../types";
 import { evaluationModelIds } from "../app-logic";
+import { nativeResponseJson } from "../native-response";
 
 interface Props {
   data: MineraExport;
   importedAvailable?: boolean;
   onRequest?: (options: PetriAnalysisOptions) => Promise<PetriAnalysisResult>;
+  onInspect?: (result: PetriAnalysisResult, model: string) => void;
 }
 
 const list = (value: string, integer: boolean): number[] | undefined => {
@@ -19,7 +21,7 @@ const list = (value: string, integer: boolean): number[] | undefined => {
   });
 };
 
-export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Props) {
+export function PetriAnalysis({ data, importedAvailable = false, onRequest, onInspect }: Props) {
   const models = useMemo(() => evaluationModelIds(data, importedAvailable), [data, importedAvailable]);
   const [family, setFamily] = useState<PetriAnalysisFamily>("soundness");
   const [miner, setMiner] = useState(models[0] ?? "");
@@ -36,9 +38,20 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
   const [fullBootstrap, setFullBootstrap] = useState(true);
   const [diagnostics, setDiagnostics] = useState(true);
   const [returnAsapWhenUnsound, setReturnAsapWhenUnsound] = useState(false);
-  const [result, setResult] = useState<PetriAnalysisResult | null>(null);
+  const [conversion, setConversion] = useState<PetriAnalysisOptions["process_tree_variant"]>();
+  const [storedResult, setResult] = useState<{key:string;value:PetriAnalysisResult}|null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const dataIdentity = useRef({data,id:0});
+  if(dataIdentity.current.data!==data)dataIdentity.current={data,id:dataIdentity.current.id+1};
+  const selectionKey = JSON.stringify([dataIdentity.current.id,models,miner,family,traceIndex,initial,final,transitionCosts,
+    modelCosts,syncCosts,logCosts,splits,maxK,maxStates,fullBootstrap,diagnostics,returnAsapWhenUnsound,conversion]);
+  const selectionRef = useRef(selectionKey); selectionRef.current=selectionKey;
+  const sequence = useRef(0);
+  useEffect(()=>{ sequence.current+=1;setLoading(false);setError(null); },[selectionKey]);
+  useEffect(()=>()=>{sequence.current+=1;},[]);
+  useEffect(()=>{if(!models.includes(miner))setMiner(models[0]??"");},[models,miner]);
+  const result = storedResult?.key===selectionKey?storedResult.value:null;
   const structuralPairs = (result?.family === "soundness" || result?.family === "woflan")
     ? (result.not_well_handled_pairs ?? result.handled_pairs)
     : undefined;
@@ -46,12 +59,15 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
 
   const run = async () => {
     if (!onRequest || !miner) return;
+    const currentSequence=++sequence.current, requestedSelection=selectionKey;
     setLoading(true);
+    setResult(null);
     setError(null);
     try {
       const options: PetriAnalysisOptions = {
         family,
         miner,
+        process_tree_variant: miner==="inductive"?conversion:undefined,
         trace_index: Number(traceIndex || 0),
         initial_marking: list(initial, true),
         final_marking: list(final, true),
@@ -66,11 +82,12 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
         diagnostics,
         return_asap_when_unsound: returnAsapWhenUnsound,
       };
-      setResult(await onRequest(options));
+      const next=await onRequest(options);
+      if(currentSequence===sequence.current&&requestedSelection===selectionRef.current)setResult({key:requestedSelection,value:next});
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if(currentSequence===sequence.current&&requestedSelection===selectionRef.current)setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setLoading(false);
+      if(currentSequence===sequence.current)setLoading(false);
     }
   };
 
@@ -78,6 +95,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
     <div className="panel-head"><h2>Petri analysis</h2><span className="panel-meta">State equation · workflow structure · soundness</span></div>
     <div className="align-settings-grid">
       <label>Model<select value={miner} onChange={(event) => setMiner(event.target.value)} disabled={models.length === 0}>{models.map((id) => <option value={id} key={id}>{id}</option>)}</select></label>
+      {miner==="inductive"&&<label>Process-tree conversion<select value={conversion??""} onChange={event=>setConversion((event.target.value||undefined) as PetriAnalysisOptions["process_tree_variant"])}><option value="">Native default</option><option value="standard">Standard</option><option value="transition_bordered">Transition bordered</option></select></label>}
       <label>Family<select value={family} onChange={(event) => { setFamily(event.target.value as PetriAnalysisFamily); setResult(null); }}>{<><option value="soundness">Soundness</option><option value="woflan">Woflan</option><option value="workflow_net">Workflow net</option><option value="marking_equation">Marking equation</option><option value="extended_marking_equation">Extended marking equation</option></>}</select></label>
       {family === "extended_marking_equation" && <label>Trace index<input type="number" min={0} value={traceIndex} onChange={(event) => setTraceIndex(event.target.value)} /></label>}
       {(family === "marking_equation" || family === "extended_marking_equation" || family === "soundness" || family === "woflan") && <>
@@ -124,6 +142,6 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
       {result.completion_witness && <div>Completion path length: {result.completion_witness.length}</div>}
       {lockingScenarios && <div>Locking scenarios: {lockingScenarios.length}</div>}
     </div>}
-    {result && <pre className="analysis-json">{JSON.stringify(result, null, 2)}</pre>}
+    {result && <><details><summary>Native Petri diagnostics JSON</summary><pre className="analysis-json">{nativeResponseJson(result)}</pre></details>{onInspect&&<button type="button" className="btn-ghost" onClick={()=>onInspect(result,miner)}>Inspect and save Petri diagnostics</button>}</>}
   </section>;
 }

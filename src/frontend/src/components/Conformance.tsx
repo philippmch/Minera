@@ -58,6 +58,8 @@ import { DecisionWorkspace } from "./DecisionWorkspace";
 import { SimulationWorkspace } from "./SimulationWorkspace";
 import { AlignmentInspection } from "./AlignmentInspection";
 import { type AlignmentEntry, type AlignmentKind } from "../alignment-inspection";
+import { ModelDiagnosticsInspection } from "./ModelDiagnosticsInspection";
+import { parseDiagnosticWeight, type DiagnosticEntry } from "../model-diagnostics";
 
 type Step = "miner" | "method" | "result";
 
@@ -120,6 +122,8 @@ export function Conformance({
     analysisIdentity.current = { data, id: analysisIdentity.current.id + 1 };
   }
   const analysisId = analysisIdentity.current.id;
+  const [diagnosticHistory, setDiagnosticHistory] = useState<{analysisId:number;entries:DiagnosticEntry[]}>({analysisId,entries:[]});
+  const diagnosticCounter = useRef(0);
   const [step, setStep] = useState<Step>("miner");
   const [minerId, setMinerId] = useState<string | null>(null);
   const [methodId, setMethodId] = useState<string | null>(null);
@@ -132,6 +136,12 @@ export function Conformance({
   const [importError, setImportError] = useState<string | null>(null);
   const uploadSequence = useRef(0);
   const initialModelAttempt = useRef<File|null>(null);
+  const saveDiagnostic = (kind: DiagnosticEntry["kind"], result: ModelEvaluation | PetriAnalysisResult, model: string) => {
+    const family = "family" in result ? result.family : Object.keys(result).find(key => key !== "miner" && key !== "public_result") ?? "evaluation";
+    const entry: DiagnosticEntry = {id:++diagnosticCounter.current,kind,label:String(family),dataset:data.dataset,
+      model,model_generation:importedGeneration,result};
+    setDiagnosticHistory(current => ({analysisId,entries:[...(current.analysisId===analysisId?current.entries:[]),entry]}));
+  };
 
   // A re-mine invalidates the uploaded model's results (and the server drops
   // its cached net), so fall back to the start of the wizard.
@@ -140,6 +150,7 @@ export function Conformance({
     setImported(null);
     setImportedAnalysisId(null);
     setImportedGeneration(0);
+    setDiagnosticHistory({analysisId,entries:[]});
     setImporting(false);
     setImportError(null);
     setMinerId(null);
@@ -370,9 +381,10 @@ export function Conformance({
             </div>
           </section>
         ))}
-      <ModelEvaluationPanel key={`evaluation-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestEvaluation={onRequestEvaluation} />
+      <ModelEvaluationPanel key={`evaluation-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestEvaluation={onRequestEvaluation} onInspect={result=>saveDiagnostic("evaluation",result,result.miner)} />
       <DecisionWorkspace key={`decision-workspace-${analysisId}-${importedGeneration}`} models={evaluationModelIds(data,Boolean(currentImported || data.conformance?.imported))} live={!!onRequestDecisions} embedded={data.decision_tables} dataset={data.dataset} caseCount={data.trace_count} eventCount={data.event_count} onOpenUnderlying={onCheckModel?(file,sourceId)=>void uploadModel(file,sourceId):undefined}/>
-      <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} />
+      <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} onInspect={(result,model)=>saveDiagnostic("petri",result,model)} />
+      <ModelDiagnosticsInspection key={`model-diagnostics-${analysisId}`} entries={diagnosticHistory.analysisId===analysisId?diagnosticHistory.entries:[]} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
       <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
       <PetriPlayoutPanel key={`petri-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
@@ -738,10 +750,11 @@ const EVALUATION_ALIGNMENT_VARIANTS: Array<{
   { value: "recompos_maximal", label: "Decomposed recomposition" },
 ];
 
-function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: {
+function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation, onInspect }: {
   data: MineraExport;
   importedAvailable: boolean;
   onRequestEvaluation?: (miner: string, options?: EvaluationOptions) => Promise<ModelEvaluation>;
+  onInspect: (result: ModelEvaluation) => void;
 }) {
   const modelIds = evaluationModelIds(data, importedAvailable);
   const modelKey = modelIds.join("|");
@@ -760,6 +773,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
   });
   const [evaluationMarkings, setEvaluationMarkings] = useState({ initial: "", final: "" });
   const [simplicityMarkings, setSimplicityMarkings] = useState({ initial: "", final: "" });
+  const [weights, setWeights] = useState({fitness_weight:"0.25",precision_weight:"0.25",generalization_weight:"0.25",simplicity_weight:"0.25"});
   const [result, setResult] = useState<ModelEvaluation | null>(null);
   const [resultSelectionKey, setResultSelectionKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -768,7 +782,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
   if (dataIdentity.current.data !== data) dataIdentity.current = { data, id: dataIdentity.current.id + 1 };
   const selectionKeyFor = (selectedMiner: string, selectedOptions: EvaluationOptions) =>
     JSON.stringify([dataIdentity.current.id, selectedMiner, selectedOptions,
-      evaluationMarkings, simplicityMarkings]);
+      evaluationMarkings, simplicityMarkings, weights]);
   const selectionKey = selectionKeyFor(miner, options);
   const selectionKeyRef = useRef(selectionKey);
   const requestSequence = useRef(0);
@@ -813,9 +827,15 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     const sequence = ++requestSequence.current;
     const requestedSelection = selectionKeyRef.current;
     setLoading(true);
+    setResult(null);
+    setResultSelectionKey(null);
     setError(null);
     try {
       const request: EvaluationOptions = { ...options };
+      request.process_tree_variant = miner === "inductive" ? options.process_tree_variant : undefined;
+      for(const key of ["fitness_weight","precision_weight","generalization_weight","simplicity_weight"] as const) {
+        request[key] = family === "composite" ? parseDiagnosticWeight(weights[key]) : undefined;
+      }
       if (family === "simplicity") {
         request.simplicity_initial_marking = parseMarkingInput(simplicityMarkings.initial);
         request.simplicity_final_marking = parseMarkingInput(simplicityMarkings.final);
@@ -909,6 +929,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     <div className="align-settings-grid">
       <label>Model<select value={miner} onChange={(event) => { const next = event.target.value; setMiner(next); const embedded = embeddedEvaluation(data, next, options.evaluation_family ?? "composite"); setResult(embedded); setResultSelectionKey(embedded ? selectionKeyFor(next, options) : null); setError(null); }} disabled={modelIds.length === 0}>{modelIds.map((id) => <option value={id} key={id}>{id}</option>)}</select></label>
       <label>Family<select value={family} onChange={(event) => updateFamily(event.target.value as EvaluationFamily)}><option value="replay_fitness">Replay fitness</option><option value="precision">Precision</option><option value="generalization">Generalization</option><option value="simplicity">Simplicity</option><option value="composite">Composite</option></select></label>
+      {miner === "inductive" && <label>Process-tree conversion<select value={options.process_tree_variant ?? ""} onChange={event => setOptions({...options,process_tree_variant:(event.target.value || undefined) as EvaluationOptions["process_tree_variant"]})}><option value="">Native default</option><option value="standard">Standard</option><option value="transition_bordered">Transition bordered</option></select></label>}
       {family === "replay_fitness" && <label>Variant<select value={options.fitness_variant ?? "auto"} onChange={(event) => setOptions({ ...options, fitness_variant: event.target.value as EvaluationOptions["fitness_variant"] })}><option value="auto">Automatic</option><option value="token_based">Token based</option><option value="alignment_based">Alignment based</option></select></label>}
       {family === "precision" && <>
         <label>Variant<select value={options.precision_variant ?? "auto"} onChange={(event) => { const next = event.target.value as NonNullable<EvaluationOptions["precision_variant"]>; setOptions({ ...options, precision_variant: next, precision_use_task_ids: next === "automaton_after_align" ? options.precision_use_task_ids : false }); }}><option value="auto">Automatic</option><option value="etconformance_token">Token escaping edges</option><option value="align_etconformance">Alignment escaping edges</option><option value="automaton_after_align">Automaton after alignment</option></select></label>
@@ -954,10 +975,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
         <label>Final marking<input value={simplicityMarkings.final} placeholder="2,3" onChange={(event) => setSimplicityMarkings({ ...simplicityMarkings, final: event.target.value })} /></label>
       </>}
       {family === "composite" && <>
-        <label>Fitness weight<input type="number" min={0} step={0.05} value={options.fitness_weight ?? ""} onChange={(event) => numberOption("fitness_weight", event.target.value)} /></label>
-        <label>Precision weight<input type="number" min={0} step={0.05} value={options.precision_weight ?? ""} onChange={(event) => numberOption("precision_weight", event.target.value)} /></label>
-        <label>Generalization weight<input type="number" min={0} step={0.05} value={options.generalization_weight ?? ""} onChange={(event) => numberOption("generalization_weight", event.target.value)} /></label>
-        <label>Simplicity weight<input type="number" min={0} step={0.05} value={options.simplicity_weight ?? ""} onChange={(event) => numberOption("simplicity_weight", event.target.value)} /></label>
+        {([["fitness_weight","Fitness weight"],["precision_weight","Precision weight"],["generalization_weight","Generalization weight"],["simplicity_weight","Simplicity weight"]] as const).map(([key,label])=><label key={key}>{label}<input value={weights[key]} placeholder="native default" onChange={event=>setWeights({...weights,[key]:event.target.value})} /></label>)}
       </>}
     </div>
     {usesAlignment && <div className="align-costs">
@@ -967,9 +985,10 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
       ))}
     </div>}
     {modelIds.length === 0 && <p className="conf-inline-note">No evaluable Petri model is available in this analysis.</p>}
+    {family === "composite" && <p className="conf-inline-note">Weights accept signed numbers, NaN, inf and -inf. An all-zero total returns an uncomputed native result.</p>}
     <div className="align-settings-actions"><button type="button" className="button" disabled={!onRequestEvaluation || !miner || loading} onClick={() => void run()}>{loading ? "Evaluating…" : "Evaluate model"}</button></div>
     {error?.key === selectionKey && <div className="conf-notice"><span className="conf-notice-mark">⚠</span><p>{error.message}</p></div>}
-    {result && resultSelectionKey === selectionKey && <ModelEvaluationResultView result={result} />}
+    {result && resultSelectionKey === selectionKey && <><ModelEvaluationResultView result={result} /><button type="button" className="btn-ghost" onClick={()=>onInspect(result)}>Inspect and save evaluation</button></>}
   </section>;
 }
 

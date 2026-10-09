@@ -1,0 +1,1 @@
+{"miner": "inductive", "simplicity": {"variant": "arc_degree", "computed": true, "exhausted": false, "error": null, "simplicity": 1, "complexity": 0, "value": 1, "vertices": 8, "edges": 0, "strongly_connected_components": 0}, "public_result": {"type":"float","hex":"0x1.0000000000000p+0"}}

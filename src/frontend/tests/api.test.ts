@@ -615,7 +615,7 @@ describe("POWL export and deferred API routes", () => {
     vi.stubGlobal("fetch", vi.fn(async (path: string) => {
       paths.push(path);
       if (path.startsWith("/api/evaluate"))
-        return { ok: true, json: async () => evaluationPayload };
+        return new Response(JSON.stringify(evaluationPayload));
       return { ok: true, json: async () => ({ computed: true }) };
     }));
     await expect(evaluateModel("powl", {

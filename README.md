@@ -2051,3 +2051,22 @@ It returns `WORKFLOW_DISCOVERY` with the actual variant, complete native
 analysis/Alpha+ result and same-model formats. Optional `discovery_playout_*`
 controls select trace count, firing cap and seed. Discovery leaves the active
 cached model unchanged. Full reference behavioral parity remains open.
+
+
+### Complete quality and Petri diagnostics
+
+In Conformance, run Model quality evaluation or Petri analysis, then choose
+Inspect and save. Complete model diagnostics keeps saved results for the current
+workspace and offers every native table, full selected-row JSON and ordered
+typed public values where the native result supplies them. Original native
+response JSON, request/report JSON and complete CSV retain every returned field
+and numeric token. Saved comparisons expose all actual scalar fields across
+runs; comparison JSON also retains each complete result and submitted request.
+
+Both workbenches expose Standard/Transition bordered Inductive conversion.
+Composite weights accept signed numbers, NaN, inf and -inf; zero-total weights
+produce the native uncomputed outcome. Errors, exhausted searches, null values,
+empty tables and absent typed public values remain visible. Changing controls
+hides the previous current result; saved entries retain their original request.
+Opening a new log clears the comparison history. Export comparisons before
+navigating away or reloading. Full reference behavioral parity remains open.

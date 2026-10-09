@@ -1,0 +1,1 @@
+{"family":"workflow_net","result":{"variant":"petri_net","valid":true,"source_candidates":[0],"sink_candidates":[1],"offending_places":[],"offending_transitions":[],"unreachable_places":[],"unreachable_transitions":[],"reason":""}}

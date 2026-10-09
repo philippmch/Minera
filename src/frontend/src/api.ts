@@ -253,6 +253,7 @@ import {
 } from "./types";
 import { nativeJson } from "./native-json";
 import { readAlignmentResponse } from "./alignment-inspection";
+import { readNativeResponse } from "./native-response";
 
 export interface CsvOptions {
   caseColumn?: string;
@@ -2086,17 +2087,8 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
     ["simplicity_weight", options.simplicity_weight],
     ["generalization_weight", options.generalization_weight],
   ] as const;
-  let suppliedWeight = false;
-  let weightTotal = 0;
   for (const [name, value] of weights) {
-    if (value !== undefined) {
-      suppliedWeight = true;
-      if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be a finite non-negative number`);
-    }
-    weightTotal += value ?? 0.25;
-  }
-  if (suppliedWeight && (!Number.isFinite(weightTotal) || weightTotal <= 0)) {
-    throw new Error("composite weights must have a positive total");
+    if (value !== undefined && typeof value !== "number") throw new Error(`${name} must be a number`);
   }
   for (const [name, value] of [
     ["evaluation_initial_marking", options.evaluation_initial_marking],
@@ -2112,7 +2104,7 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   const query = new URLSearchParams();
   setProcessTreePetriNetVariant(query, options.process_tree_variant);
   query.set("evaluation_family", family);
-  const add = (name: string, value: unknown) => { if (value !== undefined) query.set(name, Array.isArray(value) ? value.join(",") : String(value)); };
+  const add = (name: string, value: unknown) => { if (value !== undefined) query.set(name, Array.isArray(value) ? value.join(",") : name.endsWith("_weight") && Object.is(value,-0) ? "-0" : String(value)); };
   add("fitness_variant", options.fitness_variant);
   if (options.evaluation_activity_attribute !== undefined) {
     add("evaluation_activity_attribute",
@@ -2165,7 +2157,7 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
 export async function evaluateModel(miner: string, options: EvaluationOptions = {}): Promise<ModelEvaluation> {
   const query = new URLSearchParams(evaluationQuery(options));
   query.set("miner", miner);
-  return postChecked(`/api/evaluate?${query.toString()}`, isModelEvaluation, "model evaluation");
+  return postNativeChecked(`/api/evaluate?${query.toString()}`, isModelEvaluation, "model evaluation");
 }
 
 /** Stable query serialization for the native Petri-analysis families. */
@@ -2222,7 +2214,7 @@ export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
 /** Runs one selected Petri-analysis family against a cached model. */
 export async function analyzePetriModel(options: PetriAnalysisOptions = {}): Promise<PetriAnalysisResult> {
   const query = petriAnalysisQuery(options);
-  return postChecked(`/api/petri-analysis?${query}`, isPetriAnalysisResult, "Petri analysis");
+  return postNativeChecked(`/api/petri-analysis?${query}`, isPetriAnalysisResult, "Petri analysis");
 }
 
 /** Stable query serialization for stochastic-language distance controls. */
@@ -3058,6 +3050,18 @@ async function postChecked<T>(path: string, guard: (value: unknown) => value is 
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!guard(parsed)) throw new Error(`the Minera backend returned an invalid ${label}`);
+  return parsed;
+}
+async function postNativeChecked<T>(path:string,guard:(value:unknown)=>value is T,label:string):Promise<T> {
+  let response:Response;
+  try{response=await fetch(path,{method:"POST"});}catch{throw new Error("could not reach the Minera backend — is minera_server running?");}
+  const parsed=await readNativeResponse(response,{path});
+  // Diagnostic results carry their own error field, including an empty string.
+  // Preserve valid uncomputed/exhausted results for inspection and export.
+  if(response.ok&&guard(parsed))return parsed;
+  if(parsed&&typeof parsed==="object"&&"error"in parsed)throw new Error(String((parsed as {error:unknown}).error));
+  if(!response.ok)throw new Error(`the Minera backend answered with status ${response.status}`);
+  if(!guard(parsed))throw new Error(`the Minera backend returned an invalid ${label}`);
   return parsed;
 }
 export function alignDecomposed(miner: string, options: DecomposedAlignmentOptions = {}): Promise<DecomposedAlignmentResult> {

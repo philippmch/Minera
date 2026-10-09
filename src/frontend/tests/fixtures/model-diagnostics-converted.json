@@ -1,0 +1,1 @@
+{"miner": "inductive", "generalization": {"variant": "generalization_token", "computed": true, "error": null, "score": 0.857532, "executed_transitions": 8, "transition_count": 8, "transition_frequencies": [60, 30, 30, 60, 60, 60, 60, 60]}, "public_result": {"type":"float","hex":"0x1.b70e6ad0e06aep-1"}}
