@@ -21,7 +21,7 @@ void handle_acquire_source(const httplib::Request& request,httplib::Response& re
     const auto connector=live_required(request,"connector"),mode=live_required(request,"mode"),id=live_required(request,"source_id");live_id(id);
     std::set<std::string> allowed={"source_id","connector","mode","source_name","source_path","source_sha256"};std::set<std::string> native_parameters;
     if(connector=="chrome_history"||connector=="firefox_history")native_parameters={"browser_history_max_events"};
-    else if(connector=="windows_events")native_parameters={"windows_events_max_events"};
+    else if(connector=="windows_events")native_parameters={"windows_events_max_events","windows_events_source","windows_events_channel","windows_events_query","windows_events_reverse","windows_events_timeout_ms"};
     else if(connector=="github_repo")native_parameters={"repository_owner","repository_name","repository_api_base_url","repository_max_pages","repository_max_issues","repository_max_events"};
     else if(connector=="camunda_workflow")native_parameters={"workflow_max_events"};
     else if(connector=="sap_o2c"||connector=="sap_accounting")native_parameters={"enterprise_max_events"};
@@ -29,17 +29,19 @@ void handle_acquire_source(const httplib::Request& request,httplib::Response& re
     else throw std::invalid_argument("unknown acquisition connector");
     allowed.insert(native_parameters.begin(),native_parameters.end());live_params(request,allowed);
     minera::SourceAcquisitionInput input;input.connector=connector;for(const auto& [key,value]:request.params)if(native_parameters.contains(key))input.parameters.emplace(key,value);
+    if((mode=="upload"||mode=="path")&&connector=="windows_events"&&request.has_param("windows_events_source")&&request.get_param_value("windows_events_source")=="service")throw std::invalid_argument("Windows service source requires windows_service mode");
     if(mode=="upload"){if(connector=="github_repo")throw std::invalid_argument("repository acquisition requires API mode");if(request.has_param("source_path"))throw std::invalid_argument("upload acquisition does not accept a server path");input.source_bytes=ocel_request_body(request,"source");}
     else if(mode=="path"){if(connector=="github_repo")throw std::invalid_argument("repository acquisition requires API mode");input.server_path=live_required(request,"source_path");if(!request.body.empty())throw std::invalid_argument("server path acquisition does not accept an upload body");}
     else if(mode=="repository_api"){if(connector!="github_repo"||request.has_param("source_path")||!request.body.empty())throw std::invalid_argument("API acquisition requires a repository and no file/path");}
-    else throw std::invalid_argument("acquisition mode requires upload, path or repository_api");
+    else if(mode=="windows_service"){if(connector!="windows_events"||request.has_param("source_path")||!request.body.empty())throw std::invalid_argument("Windows service mode requires a Windows connector and no upload/path");if(input.parameters.contains("windows_events_source")&&input.parameters.at("windows_events_source")!="service")throw std::invalid_argument("Windows service mode requires service source");input.parameters["windows_events_source"]="service";}
+    else throw std::invalid_argument("acquisition mode requires upload, path, repository_api or windows_service");
     const auto authorization=request.get_header_value("Authorization");
     if(!authorization.empty()){if(connector!="github_repo"||authorization.rfind("Bearer ",0)!=0||authorization.size()==7)throw std::invalid_argument("repository authentication requires a non-empty bearer header");input.auth_token=authorization.substr(7);}
     input.repository_transport=minera::tools::repository_history_http_transport();
     auto record=std::make_shared<AcquiredSourceRecord>();record->id=id;record->configuration=request.params;record->name=request.has_param("source_name")?request.get_param_value("source_name"):connector;record->mode=mode;record->path=input.server_path;record->provided_sha256=request.has_param("source_sha256")?request.get_param_value("source_sha256"):"";record->authenticated=!input.auth_token.empty();record->acquired=minera::acquire_source(input);
     std::shared_ptr<AcquiredSourceRecord> existing;
     {std::lock_guard lock(g_acquired_mutex);auto [it,inserted]=g_acquired_sources.emplace(id,record);if(!inserted)existing=it->second;}
-    if(existing){std::lock_guard source_lock(existing->mutex);if(existing->configuration!=record->configuration||existing->acquired.original_bytes!=record->acquired.original_bytes||minera::source_acquisition_json(existing->acquired)!=minera::source_acquisition_json(record->acquired))throw minera::StreamingSessionConflict("acquisition source ID already has different inputs or results");record=existing;}
+    if(existing){std::lock_guard source_lock(existing->mutex);if(existing->configuration!=record->configuration||existing->acquired.original_bytes!=record->acquired.original_bytes||existing->acquired.windows_capture.has_value()!=record->acquired.windows_capture.has_value()||(existing->acquired.windows_capture&&existing->acquired.windows_capture->xml!=record->acquired.windows_capture->xml)||minera::source_acquisition_json(existing->acquired)!=minera::source_acquisition_json(record->acquired))throw minera::StreamingSessionConflict("acquisition source ID already has different inputs or results");record=existing;}
     std::lock_guard lock(record->mutex);response.set_content(acquired_payload(*record),"application/json");
   });
 }
@@ -55,6 +57,9 @@ void handle_acquired_export(const httplib::Request& request,httplib::Response& r
     else if(format=="xes"){minera::XesExportOptions options;if(request.has_param("variant"))options.variant=minera::parse_xes_export_variant(request.get_param_value("variant"));options.compress=ocel_query_bool(request,"gzip",false);options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",true);options.infer_metadata=ocel_query_bool(request,"infer_metadata",false);response.set_content(minera::serialize_xes(s->acquired.log,options),*options.compress?"application/gzip":"application/xml");}
     else throw std::invalid_argument("acquired source export format requires json or xes");
   });
+}
+void handle_acquired_capture(const httplib::Request& request,httplib::Response& response) {
+  live_response(response,[&]{live_params(request,{"source_id"});auto s=acquired_find(request);std::lock_guard lock(s->mutex);if(!s->acquired.windows_capture)throw std::out_of_range("this acquired source has no native event XML capture");response.set_content(s->acquired.windows_capture->xml,"application/xml");});
 }
 void handle_acquired_list(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{live_params(request,{});std::vector<std::shared_ptr<AcquiredSourceRecord>> sources;{std::lock_guard lock(g_acquired_mutex);for(const auto& [id,s]:g_acquired_sources){(void)id;sources.push_back(s);}}std::ostringstream out;out<<"{\"sources\":[";bool first=true;for(const auto& s:sources){std::lock_guard lock(s->mutex);if(!first)out<<',';first=false;out<<acquired_payload(*s);}out<<"]}";response.set_content(out.str(),"application/json");});

@@ -1799,8 +1799,9 @@ file bytes, native logs or either XES writer with gzip. **Open acquired log for
 analysis** uses the native exported log. Reconnect/list/release operate on
 immutable snapshots in the current server process. GitHub API and profile
 directory acquisitions have no single original file body. Workflow/SAP/Outlook
-CSV and Windows XML import exported records; live application/database/service
-drivers, restart durability and complete reference/performance parity remain open.
+CSV and Windows XML import exported records. Native Windows channel/EVTX modes
+are described below; live Outlook/workflow/SAP/database drivers, restart
+durability and complete reference/performance parity remain open.
 
 `minera_acquire_source CONNECTOR [PATH] --param key=value` prints the complete
 native connector and rich log. Optional `--token-env NAME` reads a repository
@@ -1818,6 +1819,46 @@ reports, original downloads, both XES writers/gzip, three native reimports and
 the final served production assets. Live public GitHub HTTPS also completed.
 [Validation and checkpoint boundaries](docs/feature-first-acquisition-validation.json)
 retain source bindings and failed verification attempts. No parity unit is promoted.
+
+### Native Windows event acquisition
+
+In **Acquire source data**, choose **Windows event logs**. Read an explicit
+**Local Windows event channel**, upload an archived **EVTX binary log**, or
+provide its server file path. Exported XML import remains available. Native
+channel/EVTX reads use the Windows event APIs with the current account access.
+Set a query filter, newest-first selection, event bound or per-read timeout.
+The default bound is 1000; a visible flag reports when more records were
+available. The native importer orders selected events by timestamp within cases.
+
+Download the exact original EVTX and the complete captured event XML separately,
+inspect the capture descriptor alongside all native log fields, or export full
+JSON/report/nine-table CSV and XES/gzip. Reconnect returns the retained snapshot;
+release removes it from the current server process. **Open acquired log for
+analysis** retains the complete selected log. Live channel reads have no original
+file body; their event XML capture remains available.
+
+CLI examples:
+
+```text
+minera_acquire_source windows_events --param windows_events_source=service --param windows_events_channel=Application --param windows_events_max_events=100 --output-capture events.xml
+minera_acquire_source windows_events archive.evtx --param windows_events_source=evtx --param windows_events_reverse=true --output-xes events.xes
+```
+
+Additional parameters are `windows_events_query` and
+`windows_events_timeout_ms` (1 through 30000). HTTP acquisition uses
+`mode=windows_service` for channels, or `mode=upload|path` with
+`windows_events_source=evtx` for archived files. GET
+`/api/source-acquisition/capture?source_id=...` returns retained UTF-8 event XML.
+Native capture requires Windows; continuous subscriptions/bookmarks, remote
+hosts, restart durability and full reference/performance fidelity remain open.
+
+Nine native suites, 926 frontend tests/production build, 44 HTTP cases,
+three native CLI and three Windows-reader comparisons, 16 browser checks and
+44 artifact checks pass. Forward/reverse/query EVTX captures match Windows'
+own reader; nine complete CSVs, four reports, original/capture downloads,
+three XES reimports and final production assets are independently verified.
+[Validation and checkpoint boundaries](docs/feature-first-windows-source-validation.json)
+retain public dataset provenance, source bindings and the corrected test attempt.
 
 ### Sample dataset
 

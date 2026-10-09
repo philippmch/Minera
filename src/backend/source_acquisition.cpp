@@ -8,6 +8,7 @@
 #include "minera/workflow_history.hpp"
 #include <atomic>
 #include <chrono>
+#include <charconv>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -59,7 +60,19 @@ SourceAcquisitionResult acquire_source(const SourceAcquisitionInput& input) {
     const auto lookup=[&](std::string_view key){const auto it=params.find(std::string(key));return it==params.end()?std::string{}:it->second;};
     const auto supplied=[&](std::string_view key){return params.contains(std::string(key));};auto options=parse_browser_history_params(lookup,supplied);options.history_path=path;result.log=import_browser_history(options);result.native_result_json=browser_history_json(result.log,options.variant);
   }else if(input.connector=="windows_events") {
-    if(result.original_bytes){uploaded=std::make_unique<UploadedFile>(*result.original_bytes);path=uploaded->path();}
+    const auto source=present("windows_events_source")?field("windows_events_source"):"xml";
+    if(source!="xml"&&source!="evtx"&&source!="service")throw std::invalid_argument("Windows acquisition source requires xml, evtx or service");
+    if(source=="xml"&&(present("windows_events_channel")||present("windows_events_query")||present("windows_events_reverse")||present("windows_events_timeout_ms")))throw std::invalid_argument("Windows native query options require service or EVTX acquisition");
+    if(source!="xml") {
+      WindowsEventSourceOptions capture;capture.kind=source=="service"?WindowsEventSourceKind::kChannel:WindowsEventSourceKind::kEvtx;
+      if(source=="service"){if(result.original_bytes||!input.server_path.empty())throw std::invalid_argument("Windows service acquisition does not accept a file or path");capture.channel=field("windows_events_channel");}
+      else {if(present("windows_events_channel"))throw std::invalid_argument("EVTX acquisition does not accept a channel");if(result.original_bytes){uploaded=std::make_unique<UploadedFile>(*result.original_bytes);path=uploaded->path();}capture.path=path;}
+      if(present("windows_events_query"))capture.query=field("windows_events_query");
+      if(present("windows_events_reverse")){const auto v=field("windows_events_reverse");if(v!="true"&&v!="false")throw std::invalid_argument("windows_events_reverse requires true or false");capture.reverse=v=="true";}
+      const auto number=[&](std::string_view key,std::size_t maximum,std::size_t fallback){if(!present(key))return fallback;const auto value=field(key);std::size_t n=0;const auto p=std::from_chars(value.data(),value.data()+value.size(),n);if(value.empty()||p.ec!=std::errc{}||p.ptr!=value.data()+value.size()||n==0||n>maximum)throw std::invalid_argument(std::string(key)+" is outside its native limit");return n;};
+      capture.max_events=number("windows_events_max_events",10'000'000,1000);capture.timeout_ms=static_cast<unsigned>(number("windows_events_timeout_ms",30000,1000));
+      result.windows_capture=capture_windows_events(capture,input.windows_event_reader);uploaded=std::make_unique<UploadedFile>(result.windows_capture->xml);path=uploaded->path();
+    }else if(result.original_bytes){uploaded=std::make_unique<UploadedFile>(*result.original_bytes);path=uploaded->path();}
     if(path.empty())throw std::invalid_argument("source acquisition: Windows events require an exported XML upload or explicit file path");
     auto params=input.parameters;params["windows_events_path"]="explicit-source";const auto lookup=[&](std::string_view key){const auto it=params.find(std::string(key));return it==params.end()?std::string{}:it->second;};const auto supplied=[&](std::string_view key){return params.contains(std::string(key));};auto options=parse_windows_event_log_params(lookup,supplied);options.path=path;result.log=import_windows_event_log(options);result.native_result_json=windows_event_log_json(result.log);
   }else if(input.connector=="github_repo") {
@@ -79,6 +92,8 @@ SourceAcquisitionResult acquire_source(const SourceAcquisitionInput& input) {
 std::string source_acquisition_json(const SourceAcquisitionResult& result) {
   // Connector names are selected from the fixed native registry above.
   LogConversionResult full;full.log=result.log;std::ostringstream out;
-  out<<"{\"family\":\"SOURCE_ACQUISITION\",\"connector\":\""<<result.connector<<"\",\"trace_count\":"<<result.log.trace_count()<<",\"event_count\":"<<result.log.event_count()<<",\"native_result\":"<<result.native_result_json<<",\"native_log\":"<<log_conversion_json(full)<<'}';return out.str();
+  out<<"{\"family\":\"SOURCE_ACQUISITION\",\"connector\":\""<<result.connector<<"\",\"trace_count\":"<<result.log.trace_count()<<",\"event_count\":"<<result.log.event_count()<<",\"native_result\":"<<result.native_result_json<<",\"native_log\":"<<log_conversion_json(full);
+  if(result.windows_capture)out<<",\"native_acquisition\":"<<windows_event_capture_json(*result.windows_capture);
+  out<<'}';return out.str();
 }
 }  // namespace minera

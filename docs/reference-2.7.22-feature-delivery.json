@@ -1707,6 +1707,45 @@
         "OUTLOOK_MAILBOX_CSV",
         "OUTLOOK_CALENDAR_CSV"
       ]
+    },
+    {
+      "added": [
+        "Native Windows event service reads from an explicit local channel using EvtQuery/EvtNext/EvtRender and the current account permissions",
+        "Archived binary EVTX acquisition through original uploads or explicit server files, including Unicode server paths",
+        "Native query filters, forward/newest-first selection, bounded event count and per-read timeout controls",
+        "Retained complete UTF-8 event XML captures with event counts, exact query/direction, XML size and an explicit more-records-available flag",
+        "Existing Windows native connector normalization plus complete rich log, original EVTX bytes and a separate XML capture download",
+        "Windows service and EVTX modes in the source acquisition workspace, saved configuration restoration and an additional complete acquisition table",
+        "Native JSON/report/nine-table CSV, XES/gzip, reconnect/release and reopening the acquired Windows log for analysis",
+        "minera_acquire_source exposes the native driver and optional --output-capture for complete event XML alongside --output-xes"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_acquire_source.cpp",
+        "src/backend/tools/source_acquisition_routes.hpp",
+        "src/frontend/src/source-acquisition-workspace.ts",
+        "src/frontend/src/components/SourceAcquisitionWorkspace.tsx"
+      ],
+      "families": [
+        "algo.connectors"
+      ],
+      "id": "native_windows_event_service_and_evtx_acquisition",
+      "native_components": [
+        "include/minera/windows_event_source.hpp",
+        "src/backend/windows_event_source.cpp",
+        "include/minera/source_acquisition.hpp",
+        "src/backend/source_acquisition.cpp"
+      ],
+      "state": "native_windows_driver_cli_api_and_app_available",
+      "validation": "docs/feature-first-windows-source-validation.json",
+      "variants": [
+        "WINDOWS_SERVICE",
+        "EVTX",
+        "EXPORTED_XML",
+        "FORWARD",
+        "NEWEST_FIRST",
+        "XPATH_QUERY",
+        "BOUNDED_CAPTURE"
+      ]
     }
   ],
   "execution_priority": [
@@ -1720,7 +1759,7 @@
     },
     {
       "area": "Optional connector drivers",
-      "next_action": "Nine existing native connector families now have original-upload/explicit-file acquisition and complete inspect/export-to-analysis workflows; GitHub HTTPS is exercised. Live Outlook, Camunda/database, SAP and Windows service drivers remain open beyond normalized CSV/exported XML import."
+      "next_action": "Continue live Outlook and workflow/SAP/database drivers beyond normalized CSV import. Nine existing connector workbenches, GitHub HTTPS and native bounded Windows event-channel/EVTX acquisition are available; subscriptions/bookmarks/remote event hosts and complete driver/reference fidelity remain open."
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",

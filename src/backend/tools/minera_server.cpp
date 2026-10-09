@@ -8923,7 +8923,7 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-declare", preflight);
   for(const auto* route:{"create","snapshot","append","action","list","source","release"})server.Options(std::string("/api/live-stream/")+route,preflight);
   for(const auto* route:{"create","snapshot","read","action","list","source","export","release"})server.Options(std::string("/api/stream-reader/")+route,preflight);
-  for(const auto* route:{"acquire","snapshot","original","export","list","release"})server.Options(std::string("/api/source-acquisition/")+route,preflight);
+  for(const auto* route:{"acquire","snapshot","original","capture","export","list","release"})server.Options(std::string("/api/source-acquisition/")+route,preflight);
   server.Options("/api/knowledge-injection", preflight);
 
   server.Post("/api/mine", handle_mine);
@@ -9048,6 +9048,7 @@ int main(int argc, char** argv) {
   server.Post("/api/source-acquisition/acquire",handle_acquire_source);
   server.Get("/api/source-acquisition/snapshot",handle_acquired_snapshot);
   server.Get("/api/source-acquisition/original",handle_acquired_original);
+  server.Get("/api/source-acquisition/capture",handle_acquired_capture);
   server.Get("/api/source-acquisition/export",handle_acquired_export);
   server.Get("/api/source-acquisition/list",handle_acquired_list);
   server.Post("/api/source-acquisition/release",handle_acquired_release);
