@@ -2309,6 +2309,12 @@ input[type="range"]::-moz-range-thumb {
 .batch-evidence { list-style: none; margin: .45rem 0 0; padding: 0; display: grid; gap: .25rem; color: var(--ink-muted, #667085); font-size: .78rem; }
 .batch-evidence li { display: flex; justify-content: space-between; gap: .6rem; }
 .other-alignments { margin-top: 2rem; }
+.alignment-inspection { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 16px; min-width: 0; }
+.alignment-inspection > .panel-head { padding-inline: 0; }
+.alignment-inspection .filters-field { display: flex; flex-direction: column; gap: 6px; margin: 16px 0; max-width: 520px; }
+.alignment-inspection select, .alignment-inspection input { width: 100%; min-width: 0; }
+.alignment-inspection td { max-width: 420px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.alignment-inspection pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 500px; overflow: auto; }
 .other-align-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
 .other-align-card { border: 1px solid var(--line, #ddd); border-radius: 10px; padding: 1rem; background: var(--surface, #fff); }
 .other-align-card h3 { margin-top: 0; }

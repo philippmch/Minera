@@ -1990,3 +1990,21 @@ PNML in a `DECISION_WORKSPACE` envelope. Guarded requests additionally accept
 `include_decision_diagnostics`; mismatched source generations are rejected.
 This feature checkpoint does not certify full reference classifier/encoding/
 guard behavior. See `docs/feature-first-decision-workspace-validation.json`.
+
+
+### Complete alignment result inspection
+
+In Conformance → Other alignments, run a DFG, edit-distance, process-tree,
+decomposed, Petri anti/multi-alignment, process-tree reduction or stochastic
+language comparison. The Complete alignment results inspector below the controls
+retains every returned entry, move, native count, diagnostic and projected
+DFG/log record. Select a result and table, page through every row and column, or
+inspect one entry directly by its zero-based index.
+
+Download complete native JSON to retain the original HTTP response, an alignment
+report to retain the submitted settings/reference file metadata, or complete
+table CSV for every row and column beyond the visible page. Nested event
+attributes remain complete JSON cells. Native errors keep the last successful
+result; opening another log clears prior inspections. Earlier summary previews
+remain available above the complete inspector. This feature checkpoint does not
+promote native algorithm or reference parity status.

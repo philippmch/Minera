@@ -1,0 +1,1 @@
+{"algorithm":"process_tree_reduction","variant":"tree_tr_based","trace_index":45,"process_tree":{"operator": "sequence", "children": [{"operator": "activity", "activity": 0}, {"operator": "exclusive", "children": [{"operator": "activity", "activity": 3}, {"operator": "activity", "activity": 1}]}, {"operator": "activity", "activity": 2}]}}

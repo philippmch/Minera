@@ -12687,3 +12687,33 @@ and all 228 incomplete catalogue units remain open; no parity status is promoted
 Evidence: docs/feature-first-decision-workspace-validation.json,
 docs/decision-mining-reference-behavior.json and
 docs/feature-first-decision-workspace-preview.jpg.
+
+
+### Feature delivery first: complete alignment result inspection and exports
+
+Conformance now retains complete DFG, edit-distance, process-tree and decomposed
+alignment outputs beyond the earlier first-thirty/first-entry previews. Petri
+anti/multi-alignment, reduced process trees and stochastic-language distance use
+the same inspector. All entries and native counts, moves, search diagnostics,
+projected DFG metrics, projected log metadata/events/attributes and reduced-tree
+nodes are available through row/column paging and direct entry selection.
+Original HTTP JSON, full request reports and every-table CSV exports preserve
+complete native values and numeric tokens. Editing controls does not rewrite a
+completed request; native errors retain the previous result and replacing the
+source clears prior inspections.
+
+Validation: 996 frontend tests and production build; 17 native HTTP checks over
+13 actual response fixtures; 15 browser checks and 63 downloads; 63 independent
+artifact checks over 45 complete CSV files, nine reports and nine native JSON
+files. The unchanged native server, 619 native source bindings and 174 core
+objects were reverified against the prior three-suite build. The actual edit
+result has 210 moves for 180 source events, and the observed decomposed run
+returns sixty separate entries with native count one; neither is normalized to
+an assumed shape. Earlier failed assumptions remain in separate build outputs.
+
+This delivers inspection/export features and makes no algorithm or catalogue
+parity promotion. All 228 incomplete units and strict native selector/default/
+type/order/error/numeric/concurrency/performance gates remain open.
+
+Evidence: docs/feature-first-alignment-inspection-validation.json and
+docs/feature-first-alignment-inspection-preview.jpg.

@@ -1924,6 +1924,54 @@
         "Legacy plain decision-table and data-Petri-net response shapes remain unchanged; source mismatch and malformed native options are rejected"
       ],
       "validation": "docs/feature-first-decision-workspace-validation.json"
+    },
+    {
+      "id": "native_complete_alignment_result_inspection",
+      "state": "complete_native_alignment_outputs_inspectable_and_exportable",
+      "families": [
+        "algo.conformance.alignments.dfg",
+        "algo.conformance.alignments.edit_distance",
+        "algo.conformance.alignments.process_tree",
+        "algo.conformance.alignments.decomposed",
+        "algo.conformance.antialignments",
+        "algo.conformance.multialignments",
+        "algo.evaluation.earth_mover_distance"
+      ],
+      "variants": [
+        "CLASSIC",
+        "EDIT_DISTANCE",
+        "SEARCH_GRAPH_PT",
+        "DYNAMIC_PROGRAMMING",
+        "MILP",
+        "APPROXIMATED_ORIGINAL",
+        "RECOMPOS_MAXIMAL",
+        "VERSION_DISCOUNTED_A_STAR",
+        "TREE_TR_BASED",
+        "EXACT",
+        "PYEMD",
+        "COMPLETE_JSON",
+        "COMPLETE_REPORTS",
+        "COMPLETE_CSV",
+        "PROJECTED_LOG",
+        "PROJECTED_DFG",
+        "ALL_ENTRIES"
+      ],
+      "entry_points": [
+        "src/frontend/src/api.ts",
+        "src/frontend/src/alignment-inspection.ts",
+        "src/frontend/src/components/AlignmentInspection.tsx",
+        "src/frontend/src/components/Conformance.tsx"
+      ],
+      "added": [
+        "Complete native-output inspector for DFG classic, edit distance, all four existing process-tree variants, decomposed recomposition, Petri anti/multi-alignment, process-tree reduction and stochastic-language distance",
+        "Every returned trace/entry, native count, alignment move, diagnostic, projected DFG edge/activity, projected trace/event attribute and reduced-tree node is available beyond the existing summary previews",
+        "Complete row and column paging plus direct zero-based entry inspection, including empty/uncomputed entries and legacy decomposed alignment fields",
+        "Exact original HTTP JSON download and full reports retain native numeric tokens and the actual submitted query/form fields and reference file metadata",
+        "Complete CSV downloads retain all native table rows, fields and nested JSON attributes regardless of the visible page",
+        "Native errors preserve the previous result; source/model generations clear results and stale client completions are ignored",
+        "Existing embedded results have explicit embedded provenance without fabricated HTTP requests or backend source identities"
+      ],
+      "validation": "docs/feature-first-alignment-inspection-validation.json"
     }
   ],
   "execution_priority": [
@@ -1941,7 +1989,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining conformance/discovery/evaluation/simulation and I/O capabilities. Encoded decision tables and guarded model workflows now join native context/tree/diagnostics controls, complete reports/CSV, same-run structural PNML, model rendering and imported conformance handoff. Exact classifier/encoding/guard/default/error/type/numeric/order/Unicode/concurrency/performance behavior remains a separate gate."
+      "next_action": "Continue feature-first review across remaining discovery/evaluation/simulation/conformance and I/O capabilities. Eight native alignment/distance/reduction result groups now expose full entries, moves, diagnostics, projected tables and exact HTTP JSON/request reports/every-table CSV; decision tables and guarded models are also available. Complete native selector/parameter/algorithm/default/error/type/numeric/order/Unicode/concurrency/performance parity remains independent."
     }
   ],
   "feature_status_meaning": {
