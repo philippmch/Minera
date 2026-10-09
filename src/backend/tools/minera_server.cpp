@@ -6627,7 +6627,8 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
 }
 
 minera::DecisionMiningOptions decision_mining_options(
-    const httplib::Request& request, bool allow_table_lookback = false) {
+    const httplib::Request& request, bool allow_table_lookback = false,
+    bool allow_workspace = false) {
   static const std::set<std::string> allowed = {
       "miner", "decision_max_depth", "decision_min_split",
       "decision_min_leaf", "decision_max_categories",
@@ -6638,7 +6639,9 @@ minera::DecisionMiningOptions decision_mining_options(
   for (const auto& [key, value] : request.params) {
     (void)value;
     if (!allowed.contains(key) &&
-        !(allow_table_lookback && key == "decision_lookback"))
+        !(allow_table_lookback && key == "decision_lookback") &&
+        !(allow_workspace && (key == "source_id" || key == "include_workspace" ||
+                              key == "include_decision_diagnostics")))
       throw std::invalid_argument("unknown decision parameter: " + key);
   }
   minera::DecisionMiningOptions options;
@@ -6942,6 +6945,23 @@ void handle_monte_carlo_json(const httplib::Request& request,
 }
 
 // Returns the deterministic encoded decision tables for one cached model.
+bool decision_workspace_requested(const httplib::Request& request,
+                                  const MinedSession& session) {
+  if(request.has_param("source_id")&&request.get_param_value("source_id")!=std::to_string(session.query_source_id))
+    throw std::invalid_argument("the source log changed; refresh the decision source");
+  const bool included=ocel_query_bool(request,"include_workspace",false);
+  if(included&&!request.has_param("source_id"))throw std::invalid_argument("source_id is required for a decision workspace");
+  return included;
+}
+std::string decision_workspace_json(const std::string& result,const minera::PetriNet& net,
+                                    const MinedSession& session,const std::string& miner,
+                                    const std::string& mode) {
+  const auto quote=minera::embedding_runtime::detail::escape_json;
+  std::string pnml;
+  if(miner=="imported"&&session.imported_document){auto document=*session.imported_document;document.net=net;pnml=minera::to_pnml(document,"decision underlying model");}
+  else {const auto markings=minera::default_workflow_markings(net);pnml=minera::to_pnml(net,markings.initial,markings.final,"decision underlying model");}
+  return "{\"family\":\"DECISION_WORKSPACE\",\"source_id\":"+quote(std::to_string(session.query_source_id))+",\"dataset\":"+quote(session.dataset)+",\"miner\":"+quote(miner)+",\"mode\":"+quote(mode)+",\"source\":{\"case_count\":"+std::to_string(session.log.trace_count())+",\"event_count\":"+std::to_string(session.log.event_count())+"},\"result\":"+result+",\"underlying_pnml\":"+quote(pnml)+"}";
+}
 void handle_decision_tables(const httplib::Request& request,
                             httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -6963,7 +6983,9 @@ void handle_decision_tables(const httplib::Request& request,
     std::optional<minera::PetriNet> converted;
     const auto& selected = select_cached_or_process_tree_net(
         request, *session, miner, converted);
-    auto mining = decision_mining_options(request, true);
+    const bool workspace=decision_workspace_requested(request,*session);
+    if(request.has_param("include_decision_diagnostics"))throw std::invalid_argument("include_decision_diagnostics requires a guarded model");
+    auto mining = decision_mining_options(request, true, true);
     const bool use_default_powl_decision_selector =
         miner == "powl" && !request.has_param("decision_activity_attribute");
     if (use_default_powl_decision_selector)
@@ -6984,7 +7006,8 @@ void handle_decision_tables(const httplib::Request& request,
     }
     const auto result =
         minera::mine_decision_tables(*decision_log, selected, options);
-    response.set_content(minera::serialize_decision_tables_json(result),
+    const auto json=minera::serialize_decision_tables_json(result);
+    response.set_content(workspace?decision_workspace_json(json,selected,*session,miner,"tables"):json,
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -7016,7 +7039,9 @@ void handle_data_petri_net(const httplib::Request& request,
     const auto& selected = select_cached_or_process_tree_net(
         request, *session, miner, converted);
     minera::DataPetriNetOptions options;
-    options.decision_options = decision_mining_options(request, true);
+    const bool workspace=decision_workspace_requested(request,*session);
+    options.decision_options = decision_mining_options(request, true, true);
+    if(request.has_param("include_decision_diagnostics"))options.include_decision_diagnostics=ocel_query_bool(request,"include_decision_diagnostics",true);
     const bool use_default_powl_decision_selector =
         miner == "powl" && !request.has_param("decision_activity_attribute");
     if (use_default_powl_decision_selector)
@@ -7033,7 +7058,8 @@ void handle_data_petri_net(const httplib::Request& request,
     }
     const auto result =
         minera::mine_data_petri_net(*decision_log, selected, options);
-    response.set_content(minera::serialize_data_petri_net_json(result, miner),
+    const auto json=minera::serialize_data_petri_net_json(result,miner);
+    response.set_content(workspace?decision_workspace_json(json,result.net,*session,miner,"guarded"):json,
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

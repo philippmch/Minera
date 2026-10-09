@@ -1876,6 +1876,54 @@
         "Reusable owned IDispatch fixtures and a separate loopback-only validation server exercising the production acquisition/cache/export/analysis handlers without accessing user Outlook profiles"
       ],
       "validation": "docs/feature-first-outlook-workspace-validation.json"
+    },
+    {
+      "id": "native_decision_tables_and_guarded_model_workbench",
+      "state": "native_decision_tables_guards_api_cli_and_app_available",
+      "families": [
+        "algo.decision_mining"
+      ],
+      "variants": [
+        "ENCODED_TABLES",
+        "GUARDED_DATA_PETRI_NET",
+        "ALPHA",
+        "INDUCTIVE",
+        "HEURISTIC",
+        "POWL",
+        "IMPORTED",
+        "STANDARD",
+        "TRANSITION_BORDERED",
+        "NATIVE_CONTEXT_OPTIONS",
+        "NATIVE_TREE_OPTIONS",
+        "DIAGNOSTICS",
+        "OFFLINE_TABLES",
+        "STRUCTURAL_PNML_HANDOFF"
+      ],
+      "native_components": [
+        "include/minera/decision_table.hpp",
+        "src/backend/decision_table.cpp",
+        "include/minera/data_petri_net.hpp",
+        "src/backend/data_petri_net.cpp"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_decision_table.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/decision-workspace.ts",
+        "src/frontend/src/components/DecisionWorkspace.tsx"
+      ],
+      "added": [
+        "Decision tables and guarded models workbench in Conformance for the available Alpha, Inductive, Heuristic, POWL and imported workflow models",
+        "Actual standard/transition-bordered inductive process-tree conversion selectors rather than an unsupported process_tree miner alias",
+        "Native context/activity/attribute/case scope and lookback controls plus tree depth/split/leaf/category/threshold/gain and diagnostics options",
+        "Optional source-bound decision workspace envelopes retaining the complete existing native result and underlying PNML from the same native run",
+        "Complete encoded training rows, classes, source/configuration, replay/alignment/failure diagnostics, guard transitions/variables and recursive decision rules",
+        "Full native JSON, saved reports and every-table CSV exports with row/column paging and original native numeric-token preservation",
+        "Rendered guarded workflow with the exact native guard/read/write-variable tooltips and a correct data-variable highlight description",
+        "Underlying workflow PNML download and imported structural conformance handoff with an explicit statement that structural replay does not evaluate data guards",
+        "Loaded analysis exports retain their embedded native decision tables for offline inspection/JSON/report/CSV while backend actions remain disabled",
+        "Legacy plain decision-table and data-Petri-net response shapes remain unchanged; source mismatch and malformed native options are rejected"
+      ],
+      "validation": "docs/feature-first-decision-workspace-validation.json"
     }
   ],
   "execution_priority": [
@@ -1893,7 +1941,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first work across the remaining catalogue and analysis/export gaps. Native event monitors, CSV/XES readers and existing connector acquisition workbenches are available. Lazy/unbounded/live drivers, restart durability and complete native/reference default/error/type/numeric/order/Unicode/concurrency/performance gates remain."
+      "next_action": "Continue feature-first review across remaining conformance/discovery/evaluation/simulation and I/O capabilities. Encoded decision tables and guarded model workflows now join native context/tree/diagnostics controls, complete reports/CSV, same-run structural PNML, model rendering and imported conformance handoff. Exact classifier/encoding/guard/default/error/type/numeric/order/Unicode/concurrency/performance behavior remains a separate gate."
     }
   ],
   "feature_status_meaning": {

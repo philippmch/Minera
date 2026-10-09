@@ -55,6 +55,7 @@ import {
 import { MINER_GROUPS } from "../miners";
 import { evaluationModelIds } from "../app-logic";
 import { PetriAnalysis } from "./PetriAnalysis";
+import { DecisionWorkspace } from "./DecisionWorkspace";
 
 type Step = "miner" | "method" | "result";
 
@@ -366,6 +367,7 @@ export function Conformance({
           </section>
         ))}
       <ModelEvaluationPanel key={`evaluation-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestEvaluation={onRequestEvaluation} />
+      <DecisionWorkspace key={`decision-workspace-${analysisId}-${importedGeneration}`} models={evaluationModelIds(data,Boolean(currentImported || data.conformance?.imported))} live={!!onRequestDecisions} embedded={data.decision_tables} dataset={data.dataset} caseCount={data.trace_count} eventCount={data.event_count} onOpenUnderlying={onCheckModel?(file,sourceId)=>void uploadModel(file,sourceId):undefined}/>
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
       <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />

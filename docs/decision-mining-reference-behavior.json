@@ -1,0 +1,310 @@
+{
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "reference_version": "2.7.22",
+  "public_interface": {
+    "complete": true,
+    "module": "pm4py.algo.decision_mining.algorithm",
+    "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "opaque_sha256": "78244db40e048f9d4518c649c55dc4d54b9f24504cf1d69ab8fe67a04453e48a",
+    "pinned_blob_equal": true,
+    "functions": {
+      "create_data_petri_nets_with_decisions": "(log: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking) -> Tuple[pm4py.objects.petri_net.obj.PetriNet, pm4py.objects.petri_net.obj.Marking, pm4py.objects.petri_net.obj.Marking]",
+      "get_decision_tree": "(log: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, decision_point=None, attributes=None, parameters: Optional[Dict[Union[str, pm4py.algo.decision_mining.algorithm.Parameters], Any]] = None) -> Any",
+      "apply": "(log: Union[pm4py.objects.log.obj.EventLog, pandas.DataFrame], net: pm4py.objects.petri_net.obj.PetriNet, initial_marking: pm4py.objects.petri_net.obj.Marking, final_marking: pm4py.objects.petri_net.obj.Marking, decision_point=None, attributes=None, parameters: Optional[Dict[Union[str, pm4py.algo.decision_mining.algorithm.Parameters], Any]] = None) -> Any",
+      "get_decisions_table": "(log0, net, initial_marking, final_marking, attributes=None, use_trace_attributes=False, k=1, pre_decision_points=None, trace_attributes=None, parameters=None)",
+      "prepare_event_log": "(log)",
+      "prepare_attributes": "(attributes)",
+      "get_decision_points": "(net, labels=False, pre_decision_points=None, parameters=None)",
+      "get_attributes": "(log, decision_points, attributes, use_trace_attributes, trace_attributes, k, net, initial_marking, final_marking, decision_points_names, parameters=None)",
+      "encode_target": "(df, target_column)"
+    },
+    "enums": {
+      "Enum": [],
+      "Parameters": [
+        {
+          "name": "ACTIVITY_KEY",
+          "value": "pm4py:param:activity_key"
+        },
+        {
+          "name": "LABELS",
+          "value": "labels"
+        }
+      ]
+    },
+    "helper_sha256": "a77824119a16333850ddac53349cbc5c5561dc0d9da222bce2024dbde4ecfb05"
+  },
+  "controlled_observations": {
+    "complete": false,
+    "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "module_sha256": "78244db40e048f9d4518c649c55dc4d54b9f24504cf1d69ab8fe67a04453e48a",
+    "records": [
+      {
+        "scenario": "points_default",
+        "result": {
+          "p1": [
+            "tC",
+            "tB"
+          ]
+        }
+      },
+      {
+        "scenario": "points_labels",
+        "result": {
+          "p1": [
+            "C",
+            "B"
+          ]
+        }
+      },
+      {
+        "scenario": "tables_default",
+        "result": [
+          {
+            "p1": [
+              [
+                {
+                  "amount": 10.0,
+                  "region": "north"
+                },
+                "B"
+              ],
+              [
+                {
+                  "amount": 20.0,
+                  "region": "north"
+                },
+                "B"
+              ],
+              [
+                {
+                  "amount": 90.0,
+                  "region": "south"
+                },
+                "C"
+              ],
+              [
+                {
+                  "amount": 100.0,
+                  "region": "south"
+                },
+                "C"
+              ]
+            ]
+          },
+          {
+            "p1": [
+              "tC",
+              "tB"
+            ]
+          }
+        ]
+      },
+      {
+        "scenario": "tables_labels",
+        "result": [
+          {
+            "p1": [
+              [
+                {
+                  "amount": 10.0,
+                  "region": "north"
+                },
+                "B"
+              ],
+              [
+                {
+                  "amount": 20.0,
+                  "region": "north"
+                },
+                "B"
+              ],
+              [
+                {
+                  "amount": 90.0,
+                  "region": "south"
+                },
+                "C"
+              ],
+              [
+                {
+                  "amount": 100.0,
+                  "region": "south"
+                },
+                "C"
+              ]
+            ]
+          },
+          {
+            "p1": [
+              "tC",
+              "tB"
+            ]
+          }
+        ]
+      },
+      {
+        "scenario": "tables_history",
+        "result": [
+          {
+            "p1": [
+              [
+                {
+                  "amount": 10.0,
+                  "region": "north"
+                },
+                "B"
+              ],
+              [
+                {
+                  "amount": 20.0,
+                  "region": "north"
+                },
+                "B"
+              ],
+              [
+                {
+                  "amount": 90.0,
+                  "region": "south"
+                },
+                "C"
+              ],
+              [
+                {
+                  "amount": 100.0,
+                  "region": "south"
+                },
+                "C"
+              ]
+            ]
+          },
+          {
+            "p1": [
+              "tC",
+              "tB"
+            ]
+          }
+        ]
+      },
+      {
+        "scenario": "encoded",
+        "result": [
+          {
+            "dataframe": true,
+            "columns": [
+              "region_north",
+              "region_south",
+              "amount"
+            ],
+            "dtypes": [
+              "bool",
+              "bool",
+              "float64"
+            ],
+            "split": {
+              "columns": [
+                "region_north",
+                "region_south",
+                "amount"
+              ],
+              "index": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "data": [
+                [
+                  true,
+                  false,
+                  10.0
+                ],
+                [
+                  true,
+                  false,
+                  20.0
+                ],
+                [
+                  false,
+                  true,
+                  90.0
+                ],
+                [
+                  false,
+                  true,
+                  100.0
+                ]
+              ]
+            }
+          },
+          [
+            0,
+            0,
+            1,
+            1
+          ],
+          [
+            "B",
+            "C"
+          ]
+        ]
+      },
+      {
+        "scenario": "classifier",
+        "exception": {
+          "type": "ValueError",
+          "message": "Unknown label type: unknown. Maybe you are trying to fit a classifier, which expects discrete classes on a regression target with continuous values."
+        }
+      },
+      {
+        "scenario": "guarded",
+        "result": {
+          "transitions": [
+            {
+              "name": "tA",
+              "label": "A",
+              "properties": {}
+            },
+            {
+              "name": "tB",
+              "label": "B",
+              "properties": {}
+            },
+            {
+              "name": "tC",
+              "label": "C",
+              "properties": {}
+            },
+            {
+              "name": "tD",
+              "label": "D",
+              "properties": {}
+            }
+          ]
+        }
+      }
+    ],
+    "helper_sha256": "75e7f9974f2c9542925c3cb82d7c20bc58864f9e598505022bc88d57ce5c4120"
+  },
+  "reference_dependencies": {
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "pandas": "3.0.6",
+    "scikit-learn": "1.7.2",
+    "joblib": "1.5.2",
+    "threadpoolctl": "3.6.0"
+  },
+  "optional_dependency_manifest": {
+    "path": "build/decision-reference-optional-deps/validation.json",
+    "sha256": "6f8d8c46f9e9fc227252a4bb06606f4c6c3c1c8ef24283a0b7841e89bf68e936"
+  },
+  "clean_room": "Only opaque pinned module hashes, public signatures/enums and controlled public calls were used; no reference implementation bodies or bytecode were inspected.",
+  "limitations": [
+    "The public raw decision rows and encoded matrix were observed. Exact native feature naming/order/dtypes, tree training and guards are not certified by this checkpoint.",
+    "get_decision_tree raises a classifier target-type ValueError with the captured modern dependency set; guarded creation returned unannotated transitions in this controlled call. These outcomes are retained as open reference/dependency/behavior gates.",
+    "The first observer mistook apply output for a classifier. That attempt is retained and replaced by public get_decision_tree and encoded apply observations."
+  ],
+  "helpers": {
+    "capture-decision-public-surface-2.py": "a77824119a16333850ddac53349cbc5c5561dc0d9da222bce2024dbde4ecfb05",
+    "capture-decision-public-behavior-2.py": "75e7f9974f2c9542925c3cb82d7c20bc58864f9e598505022bc88d57ce5c4120"
+  }
+}
