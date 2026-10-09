@@ -10,9 +10,10 @@ interface LandingProps {
   onStreaming?: () => void;
   onModelExchange?: () => void;
   onProcessCube?: () => void;
+  onAcquisition?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onAcquisition }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -61,6 +62,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onStreaming && <button className="landing-sample reveal" disabled={mining} onClick={onStreaming}>Replay event streams</button>}
         {onModelExchange && <button className="landing-sample reveal" disabled={mining} onClick={onModelExchange}>Inspect and convert model files</button>}
         {onProcessCube && <button className="landing-sample reveal" disabled={mining} onClick={onProcessCube}>Explore process cubes</button>}
+        {onAcquisition && <button className="landing-sample reveal" disabled={mining} onClick={onAcquisition}>Acquire source data</button>}
 
         <div className="landing-steps reveal">
           <div className="landing-step">

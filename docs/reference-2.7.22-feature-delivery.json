@@ -1666,6 +1666,47 @@
         "DISPATCH",
         "RECONNECT"
       ]
+    },
+    {
+      "added": [
+        "A source acquisition workbench for all nine existing native connector families from landing, classic/OCEL navigation and the transformation hub",
+        "Original Chrome/Firefox SQLite database uploads, explicit server files and native profile-directory discovery",
+        "Windows exported event XML, workflow activity CSV, SAP order-to-cash/accounting CSV and Outlook mailbox/calendar CSV",
+        "Native GitHub issue/timeline acquisition with configurable API origin, pagination/issue/event limits and optional bearer header",
+        "Windows WinHTTP transport with native HTTPS, system certificate validation, disabled redirects and bounded reads; optional OpenSSL linkage on other platforms",
+        "Immutable process-local acquired snapshots with reconnect/list/release, duplicate-input recovery and conflicting-ID rejection",
+        "Complete existing native connector result plus rich typed event log, explicit source/configuration metadata and original file bytes",
+        "Calendar fixed-clock/reminder/item/event controls and exact per-family native limits",
+        "Complete paged case/event/attribute/property/metadata/configuration/source/summary inspection, native JSON/report/CSV, original bytes and both XES/gzip writers",
+        "Acquired logs reopen for native analysis, and the standalone minera_acquire_source CLI exposes the same native result/log and optional XES output"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_acquire_source.cpp",
+        "src/backend/tools/source_acquisition_routes.hpp",
+        "src/frontend/src/source-acquisition-workspace.ts",
+        "src/frontend/src/components/SourceAcquisitionWorkspace.tsx"
+      ],
+      "families": [
+        "algo.connectors"
+      ],
+      "id": "native_source_acquisition_workbench",
+      "native_components": [
+        "include/minera/source_acquisition.hpp",
+        "src/backend/source_acquisition.cpp"
+      ],
+      "state": "existing_connector_native_api_cli_and_app_available",
+      "validation": "docs/feature-first-acquisition-validation.json",
+      "variants": [
+        "CHROME_HISTORY",
+        "FIREFOX_HISTORY",
+        "GITHUB_REPO",
+        "WINDOWS_EVENTS_XML",
+        "CAMUNDA_WORKFLOW_CSV",
+        "SAP_O2C_CSV",
+        "SAP_ACCOUNTING_CSV",
+        "OUTLOOK_MAILBOX_CSV",
+        "OUTLOOK_CALENDAR_CSV"
+      ]
     }
   ],
   "execution_priority": [
@@ -1679,11 +1720,11 @@
     },
     {
       "area": "Optional connector drivers",
-      "next_action": "Review live mail/calendar and enterprise/database acquisition beyond existing import normalization."
+      "next_action": "Nine existing native connector families now have original-upload/explicit-file acquisition and complete inspect/export-to-analysis workflows; GitHub HTTPS is exercised. Live Outlook, Camunda/database, SAP and Windows service drivers remain open beyond normalized CSV/exported XML import."
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Review remaining live acquisition/connectors and catalogue/analysis/export gaps. All five event monitors and native CSV/XES event/whole-trace reader cursors, dispatch, rewind/reconnect, selection and complete export-to-analysis workflows are available. Lazy/unbounded/network sources, restart durability and complete native/reference default/error/type/numeric/order/Unicode/concurrency/performance gates remain."
+      "next_action": "Continue feature-first work across the remaining catalogue and analysis/export gaps. Native event monitors, CSV/XES readers and existing connector acquisition workbenches are available. Lazy/unbounded/live drivers, restart durability and complete native/reference default/error/type/numeric/order/Unicode/concurrency/performance gates remain."
     }
   ],
   "feature_status_meaning": {

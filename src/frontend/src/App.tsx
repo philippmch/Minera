@@ -49,6 +49,7 @@ import { Filters } from "./components/Filters";
 import { OcelWorkspaceHub } from "./components/OcelWorkspaceHub";
 import { OcelIoWorkspace } from "./components/OcelIoWorkspace";
 import { RelatedLogsWorkspace } from "./components/RelatedLogsWorkspace";
+import { SourceAcquisitionWorkspace } from "./components/SourceAcquisitionWorkspace";
 import { StreamingWorkspace } from "./components/StreamingWorkspace";
 import { ModelExchangeWorkspace } from "./components/ModelExchangeWorkspace";
 import { ProcessCubeWorkspace } from "./components/ProcessCubeWorkspace";
@@ -113,6 +114,7 @@ export default function App() {
   const [showStreaming, setShowStreaming] = useState(false);
   const [showModelExchange, setShowModelExchange] = useState(false);
   const [showProcessCube, setShowProcessCube] = useState(false);
+  const [showAcquisition, setShowAcquisition] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -358,6 +360,7 @@ export default function App() {
     setShowStreaming(false);
     setShowModelExchange(false);
     setShowProcessCube(false);
+    setShowAcquisition(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -566,6 +569,7 @@ export default function App() {
   );
 
   if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
+  if (showAcquisition) return <><TopBar dataset={data?.dataset??ocelDataset??'Activity sources'} datasetKind="source acquisition" onOpenFile={loadFile} onHome={()=>setShowAcquisition(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowAcquisition(false)}>Return to current workspace</button><SourceAcquisitionWorkspace busy={mining} onOpen={loadFile}/></main></>;
 
   if (showModelExchange) return <><TopBar dataset={data?.dataset??ocelDataset??'Model files'} datasetKind="model exchange" onOpenFile={loadFile} onHome={()=>setShowModelExchange(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowModelExchange(false)}>Return to current workspace</button><ModelExchangeWorkspace available={source!==null} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setShowModelExchange(false);setTab("conformance");}}/></main></>;
   if (showProcessCube) return <><TopBar dataset={data?.dataset??ocelDataset??'Process cubes'} datasetKind="process cube" onOpenFile={loadFile} onHome={()=>setShowProcessCube(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowProcessCube(false)}>Return to current workspace</button><ProcessCubeWorkspace busy={mining}/></main></>;
@@ -584,6 +588,7 @@ export default function App() {
           onStreaming={()=>setShowStreaming(true)}
           onModelExchange={()=>setShowModelExchange(true)}
           onProcessCube={()=>setShowProcessCube(true)}
+          onAcquisition={()=>setShowAcquisition(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -631,6 +636,7 @@ export default function App() {
           onStreaming={()=>setShowStreaming(true)}
           onModelExchange={()=>setShowModelExchange(true)}
           onProcessCube={()=>setShowProcessCube(true)}
+          onAcquisition={()=>setShowAcquisition(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -655,6 +661,7 @@ export default function App() {
         onStreaming={()=>setShowStreaming(true)}
         onModelExchange={()=>setShowModelExchange(true)}
           onProcessCube={()=>setShowProcessCube(true)}
+          onAcquisition={()=>setShowAcquisition(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);

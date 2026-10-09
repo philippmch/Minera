@@ -34,6 +34,7 @@ add_library(minera_core
   src/backend/chaotic_activities.cpp
   src/backend/bpmn.cpp
   src/backend/browser_history.cpp
+  src/backend/source_acquisition.cpp
   src/backend/batches.cpp
   src/backend/batches/discovery_registry.cpp
   src/backend/case_relations.cpp
@@ -352,6 +353,22 @@ add_executable(minera_server
 target_link_libraries(minera_server PRIVATE minera::core Threads::Threads)
 target_include_directories(minera_server PRIVATE third_party)
 target_compile_features(minera_server PRIVATE cxx_std_20)
+add_executable(minera_acquire_source src/backend/tools/minera_acquire_source.cpp)
+target_link_libraries(minera_acquire_source PRIVATE minera::core Threads::Threads)
+target_include_directories(minera_acquire_source PRIVATE third_party src/backend/tools)
+target_compile_features(minera_acquire_source PRIVATE cxx_std_20)
+if(WIN32)
+  target_link_libraries(minera_server PRIVATE winhttp)
+  target_link_libraries(minera_acquire_source PRIVATE winhttp)
+else()
+  find_package(OpenSSL QUIET)
+  if(OpenSSL_FOUND)
+    target_compile_definitions(minera_server PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT)
+    target_link_libraries(minera_server PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    target_compile_definitions(minera_acquire_source PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT)
+    target_link_libraries(minera_acquire_source PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  endif()
+endif()
 
 if(MINERA_BUILD_TESTS)
   enable_testing()
@@ -1355,6 +1372,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_repository_history_tests PRIVATE cxx_std_20)
   target_compile_options(minera_repository_history_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_repository_history_tests COMMAND minera_repository_history_tests)
+  add_executable(minera_source_acquisition_tests src/backend/tests/test_source_acquisition.cpp)
+  target_link_libraries(minera_source_acquisition_tests PRIVATE minera::core)
+  target_compile_features(minera_source_acquisition_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_source_acquisition_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_source_acquisition_tests COMMAND minera_source_acquisition_tests)
 
   add_executable(minera_workflow_history_tests
     src/backend/tests/test_workflow_history.cpp
