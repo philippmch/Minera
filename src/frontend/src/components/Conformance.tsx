@@ -56,6 +56,8 @@ import { MINER_GROUPS } from "../miners";
 import { evaluationModelIds } from "../app-logic";
 import { PetriAnalysis } from "./PetriAnalysis";
 import { DecisionWorkspace } from "./DecisionWorkspace";
+import { AlignmentInspection } from "./AlignmentInspection";
+import { type AlignmentEntry, type AlignmentKind } from "../alignment-inspection";
 
 type Step = "miner" | "method" | "result";
 
@@ -1139,6 +1141,10 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
   const [traceIndex, setTraceIndex] = useState(0);
   const [reductionOptions, setReductionOptions] = useState<ProcessTreeReductionOptions>({ variant: "tree_tr_based" });
   const [busy, setBusy] = useState<"dfg" | "edit" | "emd" | "process-tree" | "decomposed" | "anti" | "multi" | "reduction" | null>(null);
+  const [inspectionKind, setInspectionKind] = useState<AlignmentKind>("dfg");
+  const otherRequestSequence = useRef(0);
+  const otherData = useRef(data); otherData.current = data;
+  useEffect(() => () => { otherRequestSequence.current += 1; }, [data]);
   const [error, setError] = useState<string | null>(null);
   const [costText, setCostText] = useState<Record<string, string>>({ sync_cost: "", model_move_cost: "", log_move_cost: "", internal_log_move_cost: "" });
   const emdDataIdentity = useRef({ data, id: 0 });
@@ -1154,8 +1160,16 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
   };
   useEffect(() => { emdRequestSequence.current += 1; setDfg(null); setEdit(null); setEmd(data.earth_movers_distance ?? null); setEmdResultSelectionKey(data.earth_movers_distance ? "embedded" : null); setEmdError(null); setProcessTree(null); setDecomposed(null); setAnti(null); setMulti(null); setReduced(null); setReference(null); setEmdReference(null); setBusy(null); setError(null); setTraceIndex(0); }, [data]);
   useEffect(() => { setPetriMiner((current) => petriMiners.includes(current) ? current : (petriMiners[0] ?? "")); }, [petriMinerKey]);
-  const runDfg = async () => { if (!onRequestDfg) return; setBusy("dfg"); setError(null); try { const maps = Object.fromEntries(Object.entries(costText).map(([key, text]) => [key, parseDfgCostMapInput(text)])); setDfg(await onRequestDfg({ ...dfgOptions, ...maps })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
-  const runEdit = async () => { if (!onRequestEditDistance || !reference) return; setBusy("edit"); setError(null); try { setEdit(await onRequestEditDistance(reference, editOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runOther = async <T,>(kind: Exclude<AlignmentKind, "emd">, task: () => Promise<T>, receive: (value: T) => void) => {
+    const sequence = ++otherRequestSequence.current; const requestedData = data;
+    const current = () => sequence === otherRequestSequence.current && requestedData === otherData.current;
+    setBusy(kind); setError(null);
+    try { const next = await task(); if (current()) { receive(next); setInspectionKind(kind); } }
+    catch (cause) { if (current()) setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { if (current()) setBusy(null); }
+  };
+  const runDfg = async () => { if (!onRequestDfg) return; await runOther("dfg", () => { const maps = Object.fromEntries(Object.entries(costText).map(([key, text]) => [key, parseDfgCostMapInput(text)])); return onRequestDfg({ ...dfgOptions, ...maps }); }, setDfg); };
+  const runEdit = async () => { if (!onRequestEditDistance || !reference) return; await runOther("edit", () => onRequestEditDistance(reference, editOptions), setEdit); };
   const runEmd = async () => {
     if (!onRequestEmd || !emdReference) return;
     const sequence = ++emdRequestSequence.current;
@@ -1167,6 +1181,7 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
       if (sequence === emdRequestSequence.current && requestedSelection === emdSelectionKeyRef.current) {
         setEmd(next);
         setEmdResultSelectionKey(requestedSelection);
+        setInspectionKind("emd");
       }
     } catch (cause) {
       if (sequence === emdRequestSequence.current && requestedSelection === emdSelectionKeyRef.current) setEmdError(cause instanceof Error ? cause.message : String(cause));
@@ -1174,12 +1189,21 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
       if (sequence === emdRequestSequence.current && requestedSelection === emdSelectionKeyRef.current) setBusy(null);
     }
   };
-  const runProcessTree = async () => { if (!onRequestProcessTree || !data.process_tree) return; setBusy("process-tree"); setError(null); try { setProcessTree(await onRequestProcessTree(processTreeOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runProcessTree = async () => { if (!onRequestProcessTree || !data.process_tree) return; await runOther("process-tree", () => onRequestProcessTree(processTreeOptions), setProcessTree); };
   const parseCostMap = (value: string) => value.trim() ? parseDfgCostMapInput(value) : undefined;
-  const runDecomposed = async () => { if (!onRequestDecomposed) return; setBusy("decomposed"); setError(null); try { setDecomposed(await onRequestDecomposed(petriMiner, { ...decomposedOptions, initial_marking: parseMarkingInput(decomposedText.initial_marking), final_marking: parseMarkingInput(decomposedText.final_marking), activity_log_costs: parseCostMap(decomposedText.activity_log_costs), activity_model_costs: parseCostMap(decomposedText.activity_model_costs), activity_sync_costs: parseCostMap(decomposedText.activity_sync_costs) })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
-  const runAnti = async () => { if (!onRequestPetriAnti) return; setBusy("anti"); setError(null); try { setAnti(await onRequestPetriAnti(petriMiner, { ...advancedOptions, initial_marking: parseMarkingInput(petriText.antiInitial), final_marking: parseMarkingInput(petriText.antiFinal) })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
-  const runMulti = async () => { if (!onRequestPetriMulti) return; setBusy("multi"); setError(null); try { setMulti(await onRequestPetriMulti(petriMiner, { ...multiOptions, initial_marking: parseMarkingInput(petriText.multiInitial), final_marking: parseMarkingInput(petriText.multiFinal) })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
-  const runReduction = async () => { if (!onRequestReduction || !data.process_tree || !data.traces?.length) return; setBusy("reduction"); setError(null); try { setReduced(await onRequestReduction(traceIndex, reductionOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runDecomposed = async () => { if (!onRequestDecomposed) return; await runOther("decomposed", () => onRequestDecomposed(petriMiner, { ...decomposedOptions, initial_marking: parseMarkingInput(decomposedText.initial_marking), final_marking: parseMarkingInput(decomposedText.final_marking), activity_log_costs: parseCostMap(decomposedText.activity_log_costs), activity_model_costs: parseCostMap(decomposedText.activity_model_costs), activity_sync_costs: parseCostMap(decomposedText.activity_sync_costs) }), setDecomposed); };
+  const runAnti = async () => { if (!onRequestPetriAnti) return; await runOther("anti", () => onRequestPetriAnti(petriMiner, { ...advancedOptions, initial_marking: parseMarkingInput(petriText.antiInitial), final_marking: parseMarkingInput(petriText.antiFinal) }), setAnti); };
+  const runMulti = async () => { if (!onRequestPetriMulti) return; await runOther("multi", () => onRequestPetriMulti(petriMiner, { ...multiOptions, initial_marking: parseMarkingInput(petriText.multiInitial), final_marking: parseMarkingInput(petriText.multiFinal) }), setMulti); };
+  const runReduction = async () => { if (!onRequestReduction || !data.process_tree || !data.traces?.length) return; await runOther("reduction", () => onRequestReduction(traceIndex, reductionOptions), setReduced); };
+  const inspectionEntries: AlignmentEntry[] = [];
+  if (dfg) inspectionEntries.push({ kind: "dfg", label: "DFG classic", result: dfg });
+  if (edit) inspectionEntries.push({ kind: "edit", label: "Edit distance", result: edit });
+  if (processTree) inspectionEntries.push({ kind: "process-tree", label: "Process-tree alignment", result: processTree });
+  if (decomposed) inspectionEntries.push({ kind: "decomposed", label: "Decomposed alignment", result: decomposed });
+  if (anti) inspectionEntries.push({ kind: "anti", label: "Petri anti-alignment", result: anti });
+  if (multi) inspectionEntries.push({ kind: "multi", label: "Petri multi-alignment", result: multi });
+  if (reduced) inspectionEntries.push({ kind: "reduction", label: "Process-tree reduction", result: reduced });
+  if (emd && (emdResultSelectionKey === emdSelectionKey || (emdResultSelectionKey === "embedded" && !emdReference))) inspectionEntries.push({ kind: "emd", label: "Stochastic-language distance", result: emd });
   return <section className="panel conf-panel other-alignments">
     <div className="panel-head"><h2>Other alignments</h2><span className="panel-meta">Native decomposed · Petri anti/multi · process-tree reduction</span></div>
      <div className="other-align-grid">
@@ -1237,13 +1261,15 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
         <div className="align-settings-grid"><label>Distance variant<select value={emdOptions.emd_variant ?? "pyemd"} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, emd_variant: e.target.value as EmdOptions["emd_variant"] }); }}><option value="pyemd">PYEMD-compatible</option><option value="exact">Exact native (explicit)</option></select></label><label>Normalize masses<select value={String(emdOptions.normalize_masses ?? true)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, normalize_masses: e.target.value === "true" }); }}><option value="true">On</option><option value="false">Off</option></select></label><label>Equal mass required<select value={String(emdOptions.strict_equal_mass ?? false)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, strict_equal_mass: e.target.value === "true" }); }}><option value="false">No</option><option value="true">Yes</option></select></label><label>Fast EMD backend<select value={String(emdOptions.use_fast_emd ?? true)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, use_fast_emd: e.target.value === "true" }); }}><option value="true">On</option><option value="false">Off</option></select></label></div>
         <button className="button" disabled={!onRequestEmd || !emdReference || busy !== null} onClick={() => void runEmd()}>{busy === "emd" ? "Comparing…" : "Compare stochastic languages"}</button>{emdError && <p className="conf-inline-note">{emdError}</p>}{emd && (emdResultSelectionKey === emdSelectionKey || (emdResultSelectionKey === "embedded" && !emdReference)) && <EmdResultView result={emd} />}
       </div>
-    </div>{error && <div className="conf-notice"><span className="conf-notice-mark">⚠</span><p>{error}</p></div>}
+    </div>{error && <div className="conf-notice" role="alert"><span className="conf-notice-mark">⚠</span><p>{error}</p></div>}
+    <AlignmentInspection entries={inspectionEntries} selected={inspectionKind} onSelect={setInspectionKind} dataset={data.dataset} />
   </section>;
 }
 
 function DfgResult({ result }: { result: DfgAlignmentResult }) {
   return <div className="other-result">
     <p><strong>{numberFormat.format(result.alignments.length)}</strong> traces · {numberFormat.format(result.unique_variants)} unique variants searched</p>
+    {result.alignments.length > 30 && <small>Preview of the first 30 entries. Inspect every entry and download full results below.</small>}
     <ol className="variant-list">{result.alignments.slice(0, 30).map((a, i) =>
       !a.computed ? <li className="variant" key={i}>
         <strong>No alignment</strong><p>The DFG has no accepting path for this trace.</p>
@@ -1264,6 +1290,7 @@ function ProcessTreeResultView({ result }: { result: ProcessTreeAlignmentResult 
     <p><strong>{numberFormat.format(result.traces.length)}</strong> traces · {percent(result.fitness)} fitness · total cost {numberFormat.format(result.total_cost)}</p>
     <p className="variant-count">Variant {result.variant.replaceAll("_", " ")} · {result.computed ? "computed" : "not computed"} · {result.completed ? "completed" : "incomplete"}{result.timed_out ? " · timed out" : ""}{result.exhausted ? " · search exhausted" : ""}</p>
     <small>Visited {numberFormat.format(result.diagnostics.visited_states)} states · queued {numberFormat.format(result.diagnostics.queued_states)} · aligned {numberFormat.format(result.diagnostics.traces_aligned)} traces</small>
+    {result.traces.length > 30 && <small>Preview of the first 30 entries. Inspect every entry and download full results below.</small>}
     {result.diagnostics.message && <p className="variant-count">{result.diagnostics.message}</p>}
     <ol className="variant-list">{result.traces.slice(0, 30).map((trace, index) => <li className="variant" key={index}>
       <div className="variant-top"><span className={`conf-pill ${grade(trace.fitness)}`}>{percent(trace.fitness)}</span><span className="variant-count">cost {numberFormat.format(trace.cost)} · {trace.completed ? "complete" : "incomplete"}{trace.timed_out ? " · timed out" : ""}</span></div>

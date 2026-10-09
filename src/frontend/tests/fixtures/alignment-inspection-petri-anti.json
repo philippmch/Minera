@@ -1,0 +1,1 @@
+{"algorithm":"petri_anti_alignment","variant":"version_discounted_a_star","activities":["A","B","D"],"transitions":[0,2,3],"cost":-0,"objective":-0,"precision":1,"diagnostics":{"visited_states":4,"queued_states":5,"traversed_arcs":5,"exhausted":false}}

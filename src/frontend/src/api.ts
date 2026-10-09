@@ -252,6 +252,7 @@ import {
   isVariantStatisticsResult,
 } from "./types";
 import { nativeJson } from "./native-json";
+import { readAlignmentResponse } from "./alignment-inspection";
 
 export interface CsvOptions {
   caseColumn?: string;
@@ -1898,10 +1899,12 @@ export function dfgAlignmentQuery(options: DfgAlignmentOptions = {}): string {
 }
 
 export async function alignDfg(options: DfgAlignmentOptions = {}): Promise<DfgAlignmentResult> {
+  const query = dfgAlignmentQuery(options);
+  const path = `/api/align-dfg${query ? `?${query}` : ""}`;
   let response: Response;
-  try { response = await fetch(`/api/align-dfg${dfgAlignmentQuery(options) ? `?${dfgAlignmentQuery(options)}` : ""}`, { method: "POST" }); }
+  try { response = await fetch(path, { method: "POST" }); }
   catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
-  const parsed: unknown = await response.json().catch(() => null);
+  const parsed = await readAlignmentResponse(response, { path });
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isDfgAlignmentResult(parsed)) throw new Error("the Minera backend returned an invalid DFG alignment");
@@ -1930,11 +1933,13 @@ export function editDistanceFormEntries(options: EditDistanceOptions = {}): Arra
 export async function alignEditDistance(reference: File, options: EditDistanceOptions = {}): Promise<EditDistanceResult> {
   const form = new FormData();
   form.append("reference_log", reference, reference.name);
-  for (const [name, value] of editDistanceFormEntries(options)) form.append(name, value);
+  const fields = editDistanceFormEntries(options);
+  for (const [name, value] of fields) form.append(name, value);
   let response: Response;
   try { response = await fetch("/api/align-edit-distance", { method: "POST", body: form }); }
   catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
-  const parsed: unknown = await response.json().catch(() => null);
+  const parsed = await readAlignmentResponse(response, { path: "/api/align-edit-distance", fields,
+    reference: { name: reference.name, size: reference.size, last_modified: reference.lastModified } });
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isEditDistanceResult(parsed)) throw new Error("the Minera backend returned an invalid edit-distance alignment");
@@ -2243,13 +2248,15 @@ export async function evaluateEmd(reference: File, options: EmdOptions = {}): Pr
   const form = new FormData();
   form.append("reference_log", reference, reference.name);
   const query = emdQuery(options);
+  const path = `/api/evaluate-emd${query ? `?${query}` : ""}`;
   let response: Response;
   try {
-    response = await fetch(`/api/evaluate-emd${query ? `?${query}` : ""}`, { method: "POST", body: form });
+    response = await fetch(path, { method: "POST", body: form });
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
-  const parsed: unknown = await response.json().catch(() => null);
+  const parsed = await readAlignmentResponse(response, { path,
+    reference: { name: reference.name, size: reference.size, last_modified: reference.lastModified } });
   if (!response.ok) {
     if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
     throw new Error(`the Minera backend answered with status ${response.status}`);
@@ -2330,15 +2337,16 @@ export function processTreeAlignmentQuery(options: ProcessTreeAlignmentOptions =
 }
 
 export async function alignProcessTree(options: ProcessTreeAlignmentOptions = {}): Promise<ProcessTreeAlignmentResult> {
+  const query = processTreeAlignmentQuery(options);
+  const path = `/api/align-process-tree${query ? `?${query}` : ""}`;
   let response: Response;
   try {
-    const query = processTreeAlignmentQuery(options);
-    response = await fetch(`/api/align-process-tree${query ? `?${query}` : ""}`, { method: "POST" });
+    response = await fetch(path, { method: "POST" });
   } catch (cause) {
     if (cause instanceof Error && cause.message.startsWith("pt_alignment_")) throw cause;
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
-  const parsed: unknown = await response.json().catch(() => null);
+  const parsed = await readAlignmentResponse(response, { path });
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isProcessTreeAlignmentResult(parsed)) throw new Error("the Minera backend returned an invalid process-tree alignment");
@@ -3054,20 +3062,31 @@ async function postChecked<T>(path: string, guard: (value: unknown) => value is 
 }
 export function alignDecomposed(miner: string, options: DecomposedAlignmentOptions = {}): Promise<DecomposedAlignmentResult> {
   const query = new URLSearchParams(decomposedAlignmentQuery(options)); query.set("miner", miner);
-  return postChecked(`/api/align-decomposed?${query.toString()}`, isDecomposedAlignmentResult, "decomposed alignment");
+  return postAlignmentChecked(`/api/align-decomposed?${query.toString()}`, isDecomposedAlignmentResult, "decomposed alignment");
 }
 export function alignPetriAnti(miner: string, options: PetriAntiAlignmentOptions = {}): Promise<PetriAntiAlignmentResult> {
   const query = new URLSearchParams(petriAntiAlignmentQuery(options)); query.set("miner", miner);
-  return postChecked(`/api/align-petri-anti?${query.toString()}`, isPetriAntiAlignmentResult, "Petri anti-alignment");
+  return postAlignmentChecked(`/api/align-petri-anti?${query.toString()}`, isPetriAntiAlignmentResult, "Petri anti-alignment");
 }
 export function alignPetriMulti(miner: string, options: PetriMultiAlignmentOptions = {}): Promise<PetriMultiAlignmentResult> {
   const query = new URLSearchParams(petriMultiAlignmentQuery(options)); query.set("miner", miner);
-  return postChecked(`/api/align-petri-multi?${query.toString()}`, isPetriMultiAlignmentResult, "Petri multi-alignment");
+  return postAlignmentChecked(`/api/align-petri-multi?${query.toString()}`, isPetriMultiAlignmentResult, "Petri multi-alignment");
 }
 export function reduceProcessTree(traceIndex: number, options: ProcessTreeReductionOptions = {}): Promise<ProcessTreeReductionResult> {
   if (!Number.isInteger(traceIndex) || traceIndex < 0) return Promise.reject(new Error("trace_index must be a non-negative integer"));
   const query = new URLSearchParams(processTreeReductionQuery(options)); query.set("trace_index", String(traceIndex));
-  return postChecked(`/api/reduce-process-tree?${query.toString()}`, isProcessTreeReductionResult, "process-tree reduction");
+  return postAlignmentChecked(`/api/reduce-process-tree?${query.toString()}`, isProcessTreeReductionResult, "process-tree reduction");
+}
+
+async function postAlignmentChecked<T>(path: string, guard: (value: unknown) => value is T, label: string): Promise<T> {
+  let response: Response;
+  try { response = await fetch(path, { method: "POST" }); }
+  catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
+  const parsed = await readAlignmentResponse(response, { path });
+  if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!guard(parsed)) throw new Error(`the Minera backend returned an invalid ${label}`);
+  return parsed;
 }
 
 export interface DecisionMiningOptions {
