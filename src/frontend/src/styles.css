@@ -2315,6 +2315,13 @@ input[type="range"]::-moz-range-thumb {
 .alignment-inspection select, .alignment-inspection input { width: 100%; min-width: 0; }
 .alignment-inspection td { max-width: 420px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .alignment-inspection pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 500px; overflow: auto; }
+.simulation-workspace fieldset { border: 0; min-width: 0; padding: 0; }
+.simulation-workspace label { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.simulation-workspace input:not([type=checkbox]), .simulation-workspace textarea, .simulation-workspace select { width: 100%; min-width: 0; }
+.simulation-inspection { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 16px; }
+.simulation-inspection td { max-width: 480px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.simulation-inspection pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 500px; overflow: auto; }
+.simulation-inspection svg { display: block; width: 100%; height: auto; max-height: 680px; color: var(--accent); font-size: 12px; }
 .other-align-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
 .other-align-card { border: 1px solid var(--line, #ddd); border-radius: 10px; padding: 1rem; background: var(--surface, #fff); }
 .other-align-card h3 { margin-top: 0; }

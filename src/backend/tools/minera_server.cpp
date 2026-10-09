@@ -520,7 +520,8 @@ void validate_monte_carlo_server_limits(
   }
 }
 
-void reject_unknown_monte_carlo_params(const httplib::Request& request) {
+void reject_unknown_monte_carlo_params(const httplib::Request& request,
+                                      bool allow_workspace = false) {
   static const std::set<std::string> allowed = {
       "miner", "mode", "monte_carlo_simulations",
       "monte_carlo_activity_key", "monte_carlo_timestamp_key",
@@ -542,7 +543,8 @@ void reject_unknown_monte_carlo_params(const httplib::Request& request) {
       "process_tree_variant"};
   for (const auto& [key, value] : request.params) {
     (void)value;
-    if (!allowed.contains(key))
+    if (!allowed.contains(key) &&
+        !(allow_workspace && (key == "source_id" || key == "include_workspace")))
       throw std::invalid_argument("unknown Monte Carlo parameter: " + key);
   }
 }
@@ -6882,6 +6884,77 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
   }
 }
 
+std::string simulation_workspace_json(const minera::MonteCarloResult& result,
+    const minera::PetriNet& net, const minera::MonteCarloOptions& options,
+    const MinedSession& session, const std::string& miner) {
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  minera::LogConversionResult simulated;
+  simulated.log = result.log;
+  minera::PnmlDocument document;
+  if (miner == "imported" && session.imported_document)
+    document = *session.imported_document;
+  document.net = net;
+  if (options.initial_marking.empty() && options.final_marking.empty() &&
+      miner != "imported") {
+    const auto markings = minera::default_workflow_markings(net);
+    document.initial_marking = markings.initial;
+    document.final_marking = markings.final;
+  } else {
+    document.initial_marking.clear();
+    document.final_marking.clear();
+    for (const auto value : options.initial_marking)
+      document.initial_marking.push_back(value);
+    for (const auto value : options.final_marking)
+      document.final_marking.push_back(value);
+    if (options.initial_marking.empty()) {
+      document.initial_marking.assign(net.place_count(), 0);
+      document.initial_marking.at(net.source()) = 1;
+    }
+    if (options.final_marking.empty()) {
+      document.final_marking.assign(net.place_count(), 0);
+      document.final_marking.at(net.sink()) = 1;
+    }
+  }
+  document.initial_marking_keys = options.initial_marking_keys;
+  document.final_marking_keys = options.final_marking_keys;
+  std::string model = "{\"place_count\":" + std::to_string(net.place_count()) +
+      ",\"source\":" + std::to_string(net.source()) +
+      ",\"sink\":" + std::to_string(net.sink()) + ",\"activities\":[";
+  for (std::size_t i = 0; i < net.activities().size(); ++i) {
+    if (i) model += ',';
+    model += quote(net.activities()[i]);
+  }
+  model += "],\"transitions\":[";
+  const auto indices = [](const std::vector<std::size_t>& values) {
+    std::string json = "[";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i) json += ',';
+      json += std::to_string(values[i]);
+    }
+    return json + ']';
+  };
+  for (std::size_t i = 0; i < net.transitions().size(); ++i) {
+    if (i) model += ',';
+    const auto& t = net.transitions()[i];
+    model += "{\"index\":" + std::to_string(i) + ",\"activity\":" +
+        (t.activity ? std::to_string(*t.activity) : "null") +
+        ",\"inputs\":" + indices(t.inputs) + ",\"outputs\":" + indices(t.outputs) +
+        ",\"reset_inputs\":" + indices(t.reset_inputs) +
+        ",\"inhibitor_inputs\":" + indices(t.inhibitor_inputs) + '}';
+  }
+  model += "]}";
+  return "{\"family\":\"SIMULATION_WORKSPACE\",\"source_id\":" +
+      quote(std::to_string(session.query_source_id)) + ",\"dataset\":" +
+      quote(session.dataset) + ",\"miner\":" + quote(miner) +
+      ",\"source\":{\"case_count\":" + std::to_string(session.log.trace_count()) +
+      ",\"event_count\":" + std::to_string(session.log.event_count()) +
+      "},\"result\":" + minera::monte_carlo_json(result) +
+      ",\"simulated_log\":" + minera::log_conversion_json(simulated) +
+      ",\"xes\":" + quote(minera::to_xes(result.log, miner + " Monte Carlo playout")) +
+      ",\"model\":" + model + ",\"underlying_pnml\":" +
+      quote(minera::to_pnml(document, "simulation underlying model")) + '}';
+}
+
 void handle_monte_carlo_json(const httplib::Request& request,
                              httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -6906,7 +6979,13 @@ void handle_monte_carlo_json(const httplib::Request& request,
     response.set_content(error_json(message), "application/json");
   };
   try {
-    reject_unknown_monte_carlo_params(request);
+    reject_unknown_monte_carlo_params(request, true);
+    if (request.has_param("source_id") && request.get_param_value("source_id") !=
+        std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; refresh the simulation source");
+    const bool workspace = ocel_query_bool(request, "include_workspace", false);
+    if (workspace && !request.has_param("source_id"))
+      throw std::invalid_argument("source_id is required for a simulation workspace");
     const auto lookup = [&](std::string_view name) {
       const std::string key(name);
       return request.has_param(key) ? request.get_param_value(key)
@@ -6938,7 +7017,9 @@ void handle_monte_carlo_json(const httplib::Request& request,
       simulation_log = &*projected_powl_log;
     }
     const auto result = minera::monte_carlo(*simulation_log, selected, options);
-    response.set_content(minera::monte_carlo_json(result), "application/json");
+    response.set_content(workspace ? simulation_workspace_json(
+        result, selected, options, *session, selected_miner) :
+        minera::monte_carlo_json(result), "application/json");
   } catch (const std::exception& error) {
     reject(error.what());
   }

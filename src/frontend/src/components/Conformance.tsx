@@ -40,13 +40,12 @@ import {
   type BasicPlayoutVisitedResult,
   type ExtensivePlayoutVisitedResult,
   type StochasticPlayoutOptions,
-  type MonteCarloOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   type ConceptDriftResult,
   numberFormat,
 } from "../types";
-import { fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchExtensivePlayoutVisited, fetchMonteCarloPlayout, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
+import { fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchExtensivePlayoutVisited, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -56,6 +55,7 @@ import { MINER_GROUPS } from "../miners";
 import { evaluationModelIds } from "../app-logic";
 import { PetriAnalysis } from "./PetriAnalysis";
 import { DecisionWorkspace } from "./DecisionWorkspace";
+import { SimulationWorkspace } from "./SimulationWorkspace";
 import { AlignmentInspection } from "./AlignmentInspection";
 import { type AlignmentEntry, type AlignmentKind } from "../alignment-inspection";
 
@@ -94,6 +94,7 @@ export function Conformance({
   onRequestPetriAnalysis,
   onRequestEmd,
   onRequestConceptDrift,
+  onOpenSimulation,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
@@ -112,6 +113,7 @@ export function Conformance({
   onRequestPetriAnalysis?: (options?: PetriAnalysisOptions) => Promise<PetriAnalysisResult>;
   onRequestEmd?: (reference: File, options?: EmdOptions) => Promise<EmdResult>;
   onRequestConceptDrift?: (options?: ConceptDriftOptions) => Promise<ConceptDriftResult>;
+  onOpenSimulation?: (file: File) => void;
 }) {
   const analysisIdentity = useRef({ data, id: 0 });
   if (analysisIdentity.current.data !== data) {
@@ -375,7 +377,7 @@ export function Conformance({
       <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
       <PetriPlayoutPanel key={`petri-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
       <StochasticPetriPlayoutPanel key={`stochastic-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
-      <MonteCarloPlayoutPanel key={`monte-carlo-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
+      <SimulationWorkspace key={`simulation-workspace-${analysisId}-${importedGeneration}`} dataset={data.dataset} models={evaluationModelIds(data,Boolean(currentImported || data.conformance?.imported))} live={!!onRequestDecisions} onOpenLog={onOpenSimulation} onOpenUnderlying={onCheckModel?(file,sourceId)=>void uploadModel(file,sourceId):undefined} />
       <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
       <PetriUsageComparisonPanel />
       <ConceptDriftPanel key={`concept-drift-${analysisId}`} onRequest={onRequestConceptDrift} />
@@ -648,81 +650,6 @@ function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; min
         <label><input type="checkbox" checked={Boolean(options.stop_at_final)} onChange={e => setOptions({ ...options, stop_at_final: e.target.checked })} /> Stop at final marking</label>
       </div>
       <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download stochastic playout"}</button>
-      {error && <p className="conf-inline-note">{error}</p>}
-    </>}
-  </section>;
-}
-
-function MonteCarloPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array<{ id: string; label: string }> }) {
-  const [options, setOptions] = useState<MonteCarloOptions>({ simulations: 100, max_steps: 1000, stop_at_final: true });
-  const [initialMarking, setInitialMarking] = useState("");
-  const [finalMarking, setFinalMarking] = useState("");
-  const [miner, setMiner] = useState(miners[0]?.id ?? "inductive");
-  const [result, setResult] = useState<{ completed_cases: number; deadlocked_cases: number; median_case_execution_seconds: number } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const parseMarking = (value: string, label: string): number[] | undefined => {
-    if (!value.trim()) return undefined;
-    const tokens = value.split(",").map((token) => token.trim());
-    if (tokens.some((token) => !/^\d+$/.test(token))) {
-      throw new Error(`${label} must contain comma-separated token counts`);
-    }
-    const marking = tokens.map(Number);
-    if (marking.some((count) => !Number.isSafeInteger(count) || count > 0xffffffff)) {
-      throw new Error(`${label} token counts must fit uint32`);
-    }
-    return marking;
-  };
-  const run = async () => {
-    setBusy(true); setError(null); setResult(null);
-    try {
-      const selectedMiner = miners.some((candidate) => candidate.id === miner) ? miner : (miners[0]?.id ?? "inductive");
-      const runOptions: MonteCarloOptions = {
-        ...options,
-        initial_marking: parseMarking(initialMarking, "Initial marking"),
-        final_marking: parseMarking(finalMarking, "Final marking"),
-      };
-      const [summary, xes] = await Promise.all([
-        fetchMonteCarloResult(selectedMiner, runOptions),
-        fetchMonteCarloPlayout(selectedMiner, runOptions),
-      ]);
-      setResult({
-        completed_cases: summary.diagnostics.completed_cases,
-        deadlocked_cases: summary.diagnostics.deadlocked_cases,
-        median_case_execution_seconds: summary.diagnostics.median_case_execution_seconds,
-      });
-      const blob = new Blob([xes], { type: "application/xml" });
-      const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
-      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-monte-carlo.xes`; anchor.click();
-      URL.revokeObjectURL(anchor.href);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setBusy(false); }
-  };
-  const number = (name: keyof MonteCarloOptions, value: string) =>
-    setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
-  return <section className="panel conf-panel other-alignments">
-    <div className="panel-head"><h2>Monte Carlo Petri-net simulation</h2><span className="panel-meta">Bounded virtual-time XES with resource pools and diagnostics</span></div>
-    {miners.length === 0 ? <p className="conf-inline-note">No Petri net is present in this analysis.</p> : <>
-      <div className="align-settings-grid">
-        <label>Miner<select value={miner} onChange={e => setMiner(e.target.value)}>{miners.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>
-        <label>Simulations<input type="number" min={1} value={options.simulations ?? ""} onChange={e => number("simulations", e.target.value)} /></label>
-        <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
-        <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
-        <label>Arrival override (s)<input type="number" min={0} step={0.1} placeholder="infer from log" value={options.case_arrival_ratio ?? ""} onChange={e => number("case_arrival_ratio", e.target.value)} /></label>
-        <label>Default duration (s)<input type="number" min={0} step={0.1} value={options.default_duration_seconds ?? ""} onChange={e => number("default_duration_seconds", e.target.value)} /></label>
-        <label>Activity key<input value={options.activity_key ?? ""} placeholder="concept:name" onChange={e => setOptions({ ...options, activity_key: e.target.value || undefined })} /></label>
-        <label>Timestamp key<input value={options.timestamp_key ?? ""} placeholder="time:timestamp" onChange={e => setOptions({ ...options, timestamp_key: e.target.value || undefined })} /></label>
-        <label>Initial marking<input value={initialMarking} placeholder="default source token" onChange={e => setInitialMarking(e.target.value)} /></label>
-        <label>Final marking<input value={finalMarking} placeholder="default sink token" onChange={e => setFinalMarking(e.target.value)} /></label>
-        <label>Replay strategy<select value={options.token_replay_variant ?? "forward"} onChange={e => setOptions({ ...options, token_replay_variant: e.target.value as "forward" | "backwards" })}><option value="forward">forward</option><option value="backwards">backwards</option></select></label>
-        <label>Diagnostic interval<input type="number" min={1} value={options.diagnostic_interval ?? ""} placeholder="32" onChange={e => number("diagnostic_interval", e.target.value)} /></label>
-        <label>Scale factor<input type="number" min={0} step={1} value={options.small_scale_factor ?? ""} placeholder="864000" onChange={e => number("small_scale_factor", e.target.value)} /></label>
-        <label>Execution limit (s)<input type="number" min={0} step={0.1} value={options.max_thread_execution_time ?? ""} placeholder="60" onChange={e => number("max_thread_execution_time", e.target.value)} /></label>
-        <label><input type="checkbox" checked={Boolean(options.stop_at_final)} onChange={e => setOptions({ ...options, stop_at_final: e.target.checked })} /> Stop at final marking</label>
-        <label><input type="checkbox" checked={options.enable_diagnostics !== false} onChange={e => setOptions({ ...options, enable_diagnostics: e.target.checked })} /> Collect diagnostics</label>
-      </div>
-      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Simulatingâ€¦" : "Download Monte Carlo playout"}</button>
-      {result && <p className="conf-inline-note">Completed {numberFormat.format(result.completed_cases)} Â· deadlocked {numberFormat.format(result.deadlocked_cases)} Â· median execution {result.median_case_execution_seconds.toFixed(2)} s</p>}
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;
