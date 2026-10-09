@@ -122,6 +122,7 @@ add_library(minera_core
   src/backend/streaming_store.cpp
   src/backend/streaming_footprints.cpp
   src/backend/streaming_import.cpp
+  src/backend/reader_stream_session.cpp
   src/backend/streaming_temporal.cpp
   src/backend/streaming_tbr.cpp
   src/backend/ltl_filter.cpp
@@ -280,6 +281,9 @@ target_compile_features(minera_streaming_dfg PRIVATE cxx_std_20)
 add_executable(minera_streaming_declare src/backend/tools/minera_streaming_declare.cpp)
 target_link_libraries(minera_streaming_declare PRIVATE minera::core)
 target_compile_features(minera_streaming_declare PRIVATE cxx_std_20)
+add_executable(minera_reader_stream src/backend/tools/minera_reader_stream.cpp)
+target_link_libraries(minera_reader_stream PRIVATE minera::core)
+target_compile_features(minera_reader_stream PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_store
   src/backend/tools/minera_streaming_store.cpp
@@ -887,6 +891,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_streaming_import_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_import_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_import_tests COMMAND minera_streaming_import_tests)
+  add_executable(minera_reader_stream_session_tests src/backend/tests/test_reader_stream_session.cpp)
+  target_link_libraries(minera_reader_stream_session_tests PRIVATE minera::core)
+  target_compile_features(minera_reader_stream_session_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_reader_stream_session_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_reader_stream_session_tests COMMAND minera_reader_stream_session_tests)
 
   add_executable(minera_data_petri_net_tests src/backend/tests/test_data_petri_net.cpp)
   target_link_libraries(minera_data_petri_net_tests PRIVATE minera::core)

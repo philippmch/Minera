@@ -12413,3 +12413,57 @@ reference behavior/performance remain open. No reference implementation bodies
 or bytecode were inspected and no catalogue unit is promoted. All 86 packages /
 387 modules, 46 complete packages / 199 complete modules and 228 incomplete
 units remain the full objective.
+
+
+## Feature delivery first: native event and trace reader workflows (2026-10-09)
+
+Native CSV event, XES event and XES whole-trace readers now have a usable CLI,
+HTTP and browser workflow. Original upload bytes, bounded cursor reads,
+exhaustion, read generations/rewind, queue/start/drain/finish, observer detach/
+reattach, complete item/delivery histories and reconnect/list/release are
+available. Mutations use revisions and unique read receipts. All six XES
+parsers, gzip, CSV dialect/literal columns and XES attribute/sort/trace limits
+are exposed. Native prefix transforms precede exact acceptance; whole-trace
+selection retains complete duplicate/empty trace occurrences and typed/nested
+attributes. Current readers materialize the source rather than acquire it lazily.
+
+Complete JSON/report/CSV, original bytes and selected native JSON/XES/gzip
+exports preserve data beyond paged inspection. Selected results reopen for
+analysis with all five source selectors retained through re-mining. Grouping
+event results now copies the native events directly, fixing flat conversion
+that inferred date metadata and rejected plain timestamp strings. A reconnect
+also displays the server-held source name instead of a stale local selection.
+
+docs/feature-first-reader-stream-validation.json binds 602 native sources,
+222 frontend/runtime sources, two fresh core objects/168 reused objects, six
+assertion-enabled native suites and 893 frontend tests/production assets.
+72 native application checks over 127 HTTP cases/17 CLIs, 29 browser checks,
+and 103 independent artifact checks pass. The latter verify 29 complete CSVs,
+17 reports, seven native log exports, two original uploads, six XES reimports,
+18 further HTTP cases, one further CLI and served production assets. All
+parser/event/trace combinations use their own native output; large results
+retain 120 items, complete columns and responsive inspection. Default and
+custom-selector export-to-analysis, re-mining, empty/repeated traces, nested/
+typed/control labels, lifecycle/reset/reconnect and explicit errors are covered.
+
+Earlier failed attempts remain unchanged: namespace header inclusion and event
+export type inference were fixed in new builds; parser equality, timestamp
+spelling and analysis log-name assumptions were corrected from actual output.
+Raw JSON/CSV preserve number tokens and native values. XES reimport normalizes
+recognized timestamps to the same instants and assigns document-order positions;
+analysis downloads explicitly add the displayed dataset name as concept:name.
+Four older snapshot fixtures remain bound and are independently matched to
+the final native item/observer payloads. The main 27-check browser proof uses
+frontend-3; final source labeling, unchanged snapshot/preview and final assets
+use frontend-4. The earlier server remained live during correction. Owned
+PIDs 27700/4836, ports 8503/8504 and temporary tabs were closed after validation,
+and viewport overrides reset. Client source hashes were checked against actual
+bytes and are not asserted as server-computed authorities.
+
+Restart durability, lazy/unbounded/network acquisition, broader callbacks,
+multithreaded scheduling/concurrency/cancellation/failure fidelity, remaining
+workflows/connectors and full default/error/type/numeric/order/schema/dialect/
+Unicode-path/reference exactness/performance remain open. No reference bodies
+or bytecode were inspected and no catalogue parity unit is promoted. All
+86 packages/387 modules, 46 complete packages/199 complete modules and 228
+incomplete units remain the full objective.

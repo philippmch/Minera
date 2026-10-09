@@ -1,6 +1,8 @@
 #include "minera/streaming_import.hpp"
 
 #include <utility>
+#include <iterator>
+#include <sstream>
 
 namespace minera {
 namespace {
@@ -30,10 +32,17 @@ CsvEventStreamReader::CsvEventStreamReader(
   reset();
 }
 
+CsvEventStreamReader::CsvEventStreamReader(std::istream& input, CsvImportOptions import_options,
+                                         StreamingEventReaderOptions options)
+    : import_options_(std::move(import_options)), options_(std::move(options)),
+      source_body_(std::string(std::istreambuf_iterator<char>(input), {})) { reset(); }
 void CsvEventStreamReader::reset() {
   events_.clear();
   cursor_ = 0;
-  const auto log = import_csv_event_log(path_, import_options_);
+  std::istringstream input(source_body_.value_or(""));
+  const auto log = source_body_ ? import_csv_event_log(input, import_options_)
+                                : import_csv_event_log(path_, import_options_);
+  copy_event_log_context(log, context_);
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
       auto selected = apply_event_options(event, options_);
@@ -68,10 +77,17 @@ XesEventStreamReader::XesEventStreamReader(
   reset();
 }
 
+XesEventStreamReader::XesEventStreamReader(std::istream& input, XesImportOptions import_options,
+                                         StreamingEventReaderOptions options)
+    : import_options_(std::move(import_options)), options_(std::move(options)),
+      source_body_(std::string(std::istreambuf_iterator<char>(input), {})) { reset(); }
 void XesEventStreamReader::reset() {
   events_.clear();
   cursor_ = 0;
-  const auto log = import_xes_event_log(path_, import_options_);
+  std::istringstream input(source_body_.value_or(""));
+  const auto log = source_body_ ? import_xes_event_log(input, import_options_)
+                                : import_xes_event_log(path_, import_options_);
+  copy_event_log_context(log, context_);
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
       auto selected = apply_event_options(event, options_);
@@ -106,10 +122,17 @@ XesTraceStreamReader::XesTraceStreamReader(
   reset();
 }
 
+XesTraceStreamReader::XesTraceStreamReader(std::istream& input, XesImportOptions import_options,
+                                         StreamingTraceReaderOptions options)
+    : import_options_(std::move(import_options)), options_(std::move(options)),
+      source_body_(std::string(std::istreambuf_iterator<char>(input), {})) { reset(); }
 void XesTraceStreamReader::reset() {
   traces_.clear();
   cursor_ = 0;
-  const auto log = import_xes_event_log(path_, import_options_);
+  std::istringstream input(source_body_.value_or(""));
+  const auto log = source_body_ ? import_xes_event_log(input, import_options_)
+                                : import_xes_event_log(path_, import_options_);
+  copy_event_log_context(log, context_);
   for (const auto& trace : log.traces) {
     auto selected = apply_trace_options(trace, options_);
     if (selected) traces_.push_back(std::move(*selected));

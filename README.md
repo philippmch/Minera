@@ -1742,6 +1742,46 @@ complete reference behavior and performance remain open.
 [Validation and checkpoint boundaries](docs/feature-first-declare-stream-validation.json)
 retain source bindings and the corrected validation attempts.
 
+### Native event and trace readers
+
+In **Event streams**, choose **Native event and trace readers** to open the
+CSV event, XES event or XES whole-trace reader. Upload the original source,
+read a bounded number of items, then start the native dispatcher. Queue,
+drain, finish, observer detach/reattach, cursor rewind and session reconnect
+retain complete read and delivery histories. Whole traces preserve repeated
+case IDs and empty occurrences. All six native XES parsers and gzip are usable;
+CSV dialect/column and XES attribute/sort/trace-limit settings are exposed.
+Native activity-prefix transforms run before exact case/activity acceptance;
+whole-trace filters retain the entire accepted trace.
+
+Download complete JSON/report/CSV, original bytes or selected native log/XES
+exports. **Open selected reader log for analysis** retains case, activity,
+timestamp, resource and lifecycle selectors through reopening and re-mining.
+Native event grouping copies original events, preserving plain timestamp strings
+instead of inferring date metadata. Row/column paging leaves exports complete.
+Current readers import the source in memory; bounded reads advance a cursor.
+Sessions last for the current server process. Lazy/unbounded/live acquisition,
+restart durability and complete reference behavior/performance remain open.
+
+`minera_reader_stream INPUT --kind csv_events|xes_events|xes_traces` prints
+complete native item and selected-log data. It accepts `--batch-size`,
+`--activity-prefix`, `--accept-case`, `--accept-activity`, trace event bounds,
+CSV case/activity/timestamp/delimiter selectors, XES parser/case/activity/time
+selectors and `--output-xes`. The HTTP family is `/api/stream-reader/`:
+POST `create`, `read`, `action`, `release`; GET `snapshot`, `list`, `source`,
+`export`. Reads/actions use `expected_revision`; reads also use `batch_id`
+and `maximum_items` from 1 through 10000. Export takes `scope=read|delivered`
+and `format=json|xes`, with XES `variant`, `gzip` and null/metadata flags.
+
+Six native suites, 893 frontend tests/production build, 145 HTTP cases,
+18 standalone native comparisons, 29 browser checks and 103 independent artifact
+checks cover 29 complete CSVs, 17 reports, seven native logs, original downloads,
+six XES reimports and final served assets. XES reimport normalizes recognized
+timestamp spelling and assigns document order; analysis downloads add the
+visible dataset name. Exact raw native values remain in JSON and CSV.
+[Validation and checkpoint boundaries](docs/feature-first-reader-stream-validation.json)
+retain the source bindings and corrected attempts.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the
