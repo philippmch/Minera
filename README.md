@@ -2029,3 +2029,25 @@ the workflow PNML retains structure and run markings and opens for conformance.
 `SIMULATION_WORKSPACE` with the complete native result/log, matching XES and
 model/PNML from one run. The existing playout XES endpoint remains available.
 This feature checkpoint does not promote native/reference behavioral parity.
+
+
+### Variant-specific Alpha and Heuristic discovery
+
+In Mine a Process Model, select Alpha → Classic/Alpha+ or Heuristic → Classic/
+Heuristics++. Configure the native grouped-log controls and run discovery.
+The rendered models, complete marking/statistic/matrix/bundle tables, JSON/
+analysis/request reports and every-table CSV retain that actual selected result.
+Selecting a wizard label no longer presents the cached Classic model as Alpha+.
+
+PNML/BPMN and representable PTML export the newly discovered model. Native
+conversion errors remain visible. Optional bounded seeded playout produces XES
+from that model and reopens for mining. Check this discovered workflow imports
+its PNML for conformance with the source ID and selected activity field. Loaded
+analysis JSON retains saved models with an explicit unrecorded Alpha variant.
+
+`POST /api/discover-workflow` accepts `family=alpha|heuristic`, the current
+query-schema `source_id` and the existing family-specific mining parameters.
+It returns `WORKFLOW_DISCOVERY` with the actual variant, complete native
+analysis/Alpha+ result and same-model formats. Optional `discovery_playout_*`
+controls select trace count, firing cap and seed. Discovery leaves the active
+cached model unchanged. Full reference behavioral parity remains open.

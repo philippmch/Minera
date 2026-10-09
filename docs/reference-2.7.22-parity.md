@@ -12747,3 +12747,34 @@ and the full 228 incomplete catalogue units remain open; no status is promoted.
 
 Evidence: docs/feature-first-simulation-workspace-validation.json and
 docs/feature-first-simulation-workspace-preview.jpg.
+
+
+### Feature delivery first: actual Alpha and Heuristic discovery variants
+
+Replaced the Alpha+ label over a cached Classic model with explicit Classic/
+Alpha+ and Classic/Heuristics++ discovery workbenches. Each request runs the
+selected native algorithm over the current source and retains complete marking
+or heuristic statistic/matrix/bundle data. Existing grouped-log activity/timing/
+threshold/count/loop/path/performance/business-hour/lifecycle/native-decoration
+controls and connect-all are exposed. Graphs, complete JSON/analysis/request
+reports/every-table CSV and PNML/BPMN/representable PTML all use the exact new
+model. Native conversion errors remain visible. Optional seeded XES playout
+uses that model and reopens for mining; discovered PNML hands off with its
+source/activity selector for conformance. Saved models retain honest identity.
+
+Validation: five native suites, 1,031 frontend tests and production build,
+27 native HTTP checks over 23 calls and eight actual fixtures, 17 browser
+checks and 99 downloads, and 109 independent artifact checks over seventy-one
+complete tables, six reports, twelve model files and three playout files.
+Classic/Alpha+ topology differs on the controlled short-loop source; the full
+Alpha+ result matches its existing native endpoint. Cached models remain
+unchanged. A structured fixture verifies successful PTML while short-loop
+conversion errors retain the exact native conditions.
+
+This delivers variant execution/inspection/export features. Detached marking
+PNML, remaining input shapes/selectors and complete reference algorithm/default/
+type/order/error/numeric/concurrency/performance parity remain open with all
+228 incomplete catalogue units. No parity status is promoted.
+
+Evidence: docs/feature-first-workflow-discovery-validation.json and
+docs/feature-first-workflow-discovery-preview.jpg.

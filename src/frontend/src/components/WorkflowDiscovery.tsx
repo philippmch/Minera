@@ -1,0 +1,80 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { defaultWorkflowForm, runWorkflowDiscovery, workflowModelFile, workflowNet, type WorkflowFamily, type WorkflowVariant, type WorkflowForm, type WorkflowRun } from "../workflow-discovery";
+import type { MineraExport } from "../types";
+import { requestLogQuerySchema, downloadQueryBlob, type LogQuerySchema } from "../log-query";
+import { ocelPreparedCsv } from "../ocel-preparation";
+import { nativeJson } from "../native-json";
+import { cellText } from "../transformation-workspace";
+import { computePetriLayout } from "../petri-layout";
+import { PetriNet } from "./PetriNet";
+import { DependencyGraph } from "./DependencyGraph";
+
+export function WorkflowDiscovery({ family, variant, data, available, mining, onUseModel, onOpenPlayout }: {
+ family:WorkflowFamily;variant:WorkflowVariant;data:MineraExport;available:boolean;mining:boolean;
+ onUseModel?:(file:File,sourceId:string,activityKey?:string)=>void;onOpenPlayout?:(file:File)=>void;
+}) {
+ const [form,setForm]=useState(()=>defaultWorkflowForm(variant));const [schema,setSchema]=useState<LogQuerySchema|null>(null);const [run,setRun]=useState<WorkflowRun|null>(null);const [pending,setPending]=useState(false);const [error,setError]=useState<string|null>(null);
+ const request=useRef<AbortController|null>(null),source=useRef<AbortController|null>(null),sequence=useRef(0);
+ const refresh=async()=>{request.current?.abort();source.current?.abort();setPending(false);setSchema(null);setRun(null);setError(null);if(!available||mining)return;const controller=new AbortController();source.current=controller;try{const next=await requestLogQuerySchema(controller.signal);if(source.current===controller&&!controller.signal.aborted)setSchema(next);}catch(cause){if(source.current===controller&&!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}};
+ useEffect(()=>{void refresh();return()=>{request.current?.abort();source.current?.abort();};},[available,mining]);
+ const change=<K extends keyof WorkflowForm>(key:K,value:WorkflowForm[K])=>setForm(old=>({...old,[key]:value}));
+ const start=async()=>{if(!schema||pending||mining)return;const controller=new AbortController();request.current=controller;setPending(true);setError(null);try{const next=await runWorkflowDiscovery(family,form,schema,controller.signal);if(request.current===controller&&!controller.signal.aborted){sequence.current++;setRun(next);}}catch(cause){if(request.current===controller&&!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}finally{if(request.current===controller){request.current=null;setPending(false);}}};
+ return <>
+  <section className="panel workflow-discovery" aria-label="Configured workflow discovery"><div className="panel-head"><h2>{family==='alpha'?'Alpha':'Heuristic'} discovery</h2><span className="panel-meta">{data.dataset}</span></div>
+   <p>Select the native variant and mine the current source. The resulting graph and downloads come from that discovery run.</p>
+   {!available&&<p>Open a CSV or XES source to discover another variant. The saved model below retains its recorded identity.</p>}
+   <button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Refresh workflow discovery source</button>{schema&&<p>Source {schema.source_id} · {schema.case_count} cases · {schema.event_count} events</p>}
+   <fieldset disabled={!schema||mining||pending}><div className="align-settings-grid">
+    <label>Workflow discovery variant<select value={form.variant} onChange={event=>change('variant',event.target.value as WorkflowVariant)}><option value="classic">Classic</option>{family==='alpha'?<option value="plus">Alpha+</option>:<option value="plusplus">Heuristics++</option>}</select></label>
+    <label>Discovery activity field<input value={form.activity} placeholder="native selector" onChange={event=>change('activity',event.target.value)}/></label>
+    {family==='alpha'?<><label>Alpha input row cap<input type="number" min={0} value={form.maximumRows} onChange={event=>change('maximumRows',event.target.value)}/></label><label><input type="checkbox" checked={form.remove} onChange={event=>change('remove',event.target.checked)}/> Remove unconnected Alpha+ transitions</label></>:<>
+     <label>Discovery timestamp field<input value={form.timestamp} placeholder="time:timestamp" onChange={event=>change('timestamp',event.target.value)}/></label>
+     {([['dependency','Dependency threshold'],['and','AND threshold'],['frequency','Minimum edge frequency'],['minimumActivity','Minimum activity count']]as const).map(([key,label])=><label key={key}>{label}<input type="number" min={0} step="any" value={form[key]} onChange={event=>change(key,event.target.value)}/></label>)}
+     <label>Heuristic decoration<select value={form.decoration} onChange={event=>change('decoration',event.target.value as WorkflowForm['decoration'])}><option value="frequency">Frequency</option><option value="performance">Performance</option></select></label>
+     <label>Performance aggregation<select value={form.aggregation} onChange={event=>change('aggregation',event.target.value as WorkflowForm['aggregation'])}>{['mean','median','min','max','stdev','sum','raw_values','all'].map(value=><option key={value}>{value}</option>)}</select></label>
+     <label>Connect strongest dependencies<select value={form.connect} onChange={event=>change('connect',event.target.value as WorkflowForm['connect'])}><option value="native">Native default</option><option value="true">Connect all</option><option value="false">Threshold only</option></select></label>
+    </>}
+   </div>
+   {family==='heuristic'&&<details><summary>Heuristic timing, loops and native decoration controls</summary><div className="align-settings-grid">
+    <label>Discovery start-time field<input value={form.start} placeholder="variant-specific native default" onChange={event=>change('start',event.target.value)}/></label><label>Discovery lifecycle instance field<input value={form.lifecycle} placeholder="concept:instance" onChange={event=>change('lifecycle',event.target.value)}/></label>
+    <label>Pre-cleaning noise threshold<input type="number" min={0} step="any" value={form.noise} onChange={event=>change('noise',event.target.value)}/></label><label>Length-two-loop threshold<input type="number" min={0} step="any" value={form.loop} onChange={event=>change('loop',event.target.value)}/></label>
+    <label><input type="checkbox" checked={form.once} onChange={event=>change('once',event.target.checked)}/> Count each path once per case</label><label>Most common paths<input value={form.paths} placeholder="A -> B, B -> D" onChange={event=>change('paths',event.target.value)}/></label>
+    <label><input type="checkbox" checked={form.businessHours} onChange={event=>change('businessHours',event.target.checked)}/> Use business hours</label><label>Discovery weekly business-hour slots<input value={form.slots} placeholder="none or 25200-61200,..." onChange={event=>change('slots',event.target.value)}/></label>
+    <label>Heuristics++ native decoration selector<input value={form.decorationSelector} onChange={event=>change('decorationSelector',event.target.value)}/></label><label>Heuristics++ native decoration value (JSON)<textarea rows={3} value={form.decorationValue} onChange={event=>change('decorationValue',event.target.value)}/></label>
+   </div></details>}
+   <details><summary>Playout from this discovered model</summary><p>Optional seeded XES uses this model's native markings. A zero or blank trace count skips playout. Partial paths and conversion failures retain their native behavior.</p><div className="align-settings-grid">{([['playoutTraces','Discovered-model playout traces'],['playoutSteps','Discovered-model firing cap'],['playoutSeed','Discovered-model playout seed']]as const).map(([key,label])=><label key={key}>{label}<input type="number" min={0} value={form[key]} onChange={event=>change(key,event.target.value)}/></label>)}</div></details>
+   <button className="btn-open" onClick={()=>void start()}>Discover selected workflow</button></fieldset>
+   {pending&&<p role="status">Discovering… <button className="btn-ghost" onClick={()=>{request.current?.abort();request.current=null;setPending(false);}}>Cancel discovery request</button></p>}{error&&<div className="error-banner" role="alert">{error}</div>}
+  </section>
+  {run&&<WorkflowInspection key={sequence.current} run={run} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout}/>}
+  {!available&&<SavedWorkflow family={family} data={data}/>}
+ </>;
+}
+function SavedWorkflow({family,data}:{family:WorkflowFamily;data:MineraExport}) {
+ const net=family==='alpha'?data.petri_net:data.heuristic_petri_net;const layout=useMemo(()=>net?computePetriLayout(net,data):null,[net,data]);
+ return <>{family==='heuristic'&&data.heuristics_net&&<DependencyGraph data={data} title={`Saved heuristic model · ${data.heuristics_net.variant??'variant not recorded'}`}/>}{layout&&<PetriNet layout={layout} heading="Saved workflow model" title={family==='alpha'?'Alpha variant not recorded':data.heuristics_net?.variant??'variant not recorded'} disconnectedDescription="transitions with no incident arcs"/>}</>;
+}
+function WorkflowInspection({run,onUseModel,onOpenPlayout}:{run:WorkflowRun;onUseModel?:(file:File,sourceId:string,activityKey?:string)=>void;onOpenPlayout?:(file:File)=>void}) {
+ const [selected,setSelected]=useState(run.value.method==='alpha'&&run.tables.alpha_places?'alpha_places':'transitions'),[page,setPage]=useState(0),[columnPage,setColumnPage]=useState(0);
+ const model=workflowNet(run.value),layout=useMemo(()=>computePetriLayout(model,run.value.result),[model,run.value.result]),current=run.tables[selected]??run.tables.transitions;
+ const download=(raw:string,name:string,type='application/json')=>downloadQueryBlob(new Blob([raw],{type}),name),playout=()=>new File([run.value.playout_xes!],`minera-${run.value.method}-${run.value.variant}-playout.xes`,{type:'application/xml'});
+ const columns=current.columns.slice(columnPage*8,(columnPage+1)*8);
+ return <>
+  {run.value.method==='heuristic'&&<DependencyGraph data={run.value.result} title={`Native ${run.value.variant}`}/>}
+  <PetriNet layout={layout} heading="Discovered workflow" title={`${run.value.method} · ${run.value.variant}`} disconnectedDescription="transitions with no incident arcs"/>
+  <section className="panel workflow-inspection" aria-label="Complete workflow discovery inspection"><div className="panel-head"><h3>Complete discovery results</h3><span className="panel-meta">{run.value.method} · {run.value.variant} · source {run.value.source_id}</span></div>
+   <p>The model, marking/heuristic tables and export files come from this exact native discovery. Existing cached analysis models remain unchanged. Alpha+ retains live and detached markings in its full discovery JSON.</p>
+   <div className="query-actions"><button className="btn-ghost" onClick={()=>download(run.raw,'minera-workflow-discovery.json')}>Download complete discovery JSON</button><button className="btn-ghost" onClick={()=>download(run.report,'minera-workflow-discovery-report.json')}>Download workflow discovery report</button><button className="btn-ghost" onClick={()=>download(nativeJson(run.value.result),'minera-discovered-analysis.json')}>Download discovered analysis JSON</button>
+    {(['pnml','bpmn','ptml']as const).map(format=><button key={format} className="btn-ghost" disabled={!run.value[format]} onClick={()=>downloadQueryBlob(workflowModelFile(run,format),workflowModelFile(run,format).name)}>Download discovered {format.toUpperCase()}</button>)}
+    {onUseModel&&<button className="btn-ghost" disabled={!run.value.pnml} onClick={()=>onUseModel(workflowModelFile(run,'pnml'),run.value.source_id,run.value.activity_key)}>Check this discovered workflow</button>}
+    <button className="btn-ghost" disabled={!run.value.playout_xes} onClick={()=>downloadQueryBlob(playout(),playout().name)}>Download discovered-model playout</button>{onOpenPlayout&&<button className="btn-ghost" disabled={!run.value.playout_xes} onClick={()=>onOpenPlayout(playout())}>Mine discovered-model playout</button>}
+   </div>
+   {(['pnml_error','bpmn_error','ptml_error','playout_error']as const).map(key=>run.value[key]?<p role="status" key={key}>{key.replaceAll('_',' ')}: {run.value[key]}</p>:null)}
+   <label>Discovery result table<select value={selected} onChange={event=>{setSelected(event.target.value);setPage(0);setColumnPage(0);}}>{Object.entries(run.tables).map(([id,table])=><option key={id} value={id}>{id.replaceAll('_',' ')} · {table.count} rows</option>)}</select></label><p>{current.count} rows · {current.columns.length} columns. CSV downloads retain every row and column, including nested native structures.</p>
+   <button className="btn-ghost" onClick={()=>downloadQueryBlob(ocelPreparedCsv(current),`minera-discovery-${selected}.csv`)}>Download complete discovery table CSV</button>
+   <div className="query-table-wrap"><table className="activity-table"><thead><tr>{columns.map(column=><th scope="col" key={column}>{column}</th>)}</tr></thead><tbody>{Array.from({length:Math.min(25,Math.max(0,current.count-page*25))},(_,i)=>{const row=current.rowAt(page*25+i);return <tr key={page*25+i}>{columns.map((column,j)=><td key={column}>{cellText(row[columnPage*8+j])}</td>)}</tr>;})}</tbody></table>{!current.count&&<p>No native rows in this table.</p>}</div>
+   <div className="query-actions"><button className="btn-ghost" disabled={!page} onClick={()=>setPage(value=>value-1)}>Previous discovery rows</button><span>Page {page+1} of {Math.max(1,Math.ceil(current.count/25))}</span><button className="btn-ghost" disabled={(page+1)*25>=current.count} onClick={()=>setPage(value=>value+1)}>Next discovery rows</button>{current.columns.length>8&&<><button className="btn-ghost" disabled={!columnPage} onClick={()=>setColumnPage(value=>value-1)}>Previous discovery columns</button><span>Columns {columnPage*8+1}–{Math.min((columnPage+1)*8,current.columns.length)} of {current.columns.length}</span><button className="btn-ghost" disabled={(columnPage+1)*8>=current.columns.length} onClick={()=>setColumnPage(value=>value+1)}>Next discovery columns</button></>}</div>
+   <details><summary>Complete native discovery response</summary><pre>{run.raw}</pre></details>
+  </section>
+ </>;
+}

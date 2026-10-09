@@ -3215,6 +3215,130 @@ std::string discovery_model_json(std::string result_json,
              : std::string("null")) + '}';
 }
 
+// Variant-specific discovery runs without replacing the active analysis.
+void handle_workflow_discovery(const httplib::Request& request,
+                               httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no mined log; mine a log first"), "application/json");
+      return;
+    }
+    if (!request.has_param("source_id"))
+      throw std::invalid_argument("source_id is required for workflow discovery");
+    if (request.get_param_value("source_id") != std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; refresh the discovery source");
+    const auto family = request.get_param_value("family");
+    if (family != "alpha" && family != "heuristic")
+      throw std::invalid_argument("workflow discovery family must be alpha or heuristic");
+    static const std::set<std::string> alpha_fields = {
+      "alpha_variant", "alpha_activity_attribute", "alpha_remove_unconnected",
+      "alpha_max_rows_to_materialize"};
+    static const std::set<std::string> heuristic_fields = {
+      "heuristic_variant", "heuristic_activity_attribute", "heuristic_timestamp_attribute",
+      "dependency_threshold", "and_threshold", "min_edge_frequency",
+      "heuristic_min_activity_count", "heuristic_decoration",
+      "heuristic_performance_aggregation", "heuristic_business_hours",
+      "heuristic_business_hour_slots", "heuristic_start_timestamp_attribute",
+      "heuristic_lifecycle_instance_attribute", "heuristic_dfg_pre_cleaning_noise_threshold",
+      "heuristic_loop_length_two_threshold", "heuristic_keep_once_per_case",
+      "heuristic_most_common_paths", "heuristic_plusplus_decoration_selector",
+      "heuristic_plusplus_decoration_value", "heuristic_connect_all"};
+    const auto& allowed = family == "alpha" ? alpha_fields : heuristic_fields;
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "family" && key != "source_id" &&
+          key != "discovery_playout_traces" && key != "discovery_playout_max_steps" &&
+          key != "discovery_playout_seed" && !allowed.contains(key))
+        throw std::invalid_argument("unknown workflow discovery parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{};
+    };
+    const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    auto params = minera::parse_mine_params(lookup, present);
+    if (family == "heuristic")
+      params.heuristic.connect_all = ocel_query_bool(request, "heuristic_connect_all", params.heuristic.connect_all);
+    std::optional<minera::HeuristicsNet> heuristic;
+    std::optional<minera::AlphaPlusDiscoveryResult> alpha_plus;
+    minera::PetriNet net;
+    const auto variant = family == "alpha" ? (params.alpha.short_loops ? "plus" : "classic") :
+      (params.heuristic.variant == minera::HeuristicMinerVariant::kPlusPlus ? "plusplus" : "classic");
+    if (family == "alpha") {
+      if (params.alpha.short_loops) {
+        alpha_plus = minera::discover_alpha_plus_result(session->log, params.alpha);
+        net = alpha_plus->net;
+      } else net = minera::discover_alpha_classic(session->log, params.alpha);
+    } else {
+      heuristic = minera::discover_heuristics_net(session->log, params.heuristic);
+      net = minera::to_petri_net(*heuristic);
+    }
+    auto graph = minera::discover_directly_follows_graph(session->log);
+    for (const auto& activity : net.activities()) graph.ensure_activity(activity);
+    if (heuristic) for (const auto& activity : heuristic->activities) graph.ensure_activity(activity);
+    const auto result = minera::analysis_json(session->dataset, session->log, graph,
+      nullptr, family == "alpha" ? &net : nullptr, heuristic ? &*heuristic : nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, family == "heuristic" ? &net : nullptr);
+    std::string pnml, pnml_error;
+    try {
+      if (alpha_plus) {
+        if (!alpha_plus->detached_initial_marking.empty() || !alpha_plus->detached_final_marking.empty())
+          throw std::invalid_argument("Detached Alpha+ markings cannot be represented by the current PNML workflow exporter; the complete discovery JSON retains them.");
+        minera::PnmlDocument document; document.net = net;
+        for (const auto tokens : alpha_plus->initial_marking) document.initial_marking.push_back(tokens);
+        for (const auto tokens : alpha_plus->final_marking) document.final_marking.push_back(tokens);
+        pnml = minera::to_pnml(document, "Alpha+ discovery");
+      } else pnml = minera::to_pnml(net, family + " " + variant + " discovery");
+    } catch (const std::exception& error) { pnml_error = error.what(); }
+    std::string bpmn, bpmn_error, ptml, ptml_error, playout, playout_error;
+    try { bpmn = minera::to_bpmn(net, family + " " + variant + " discovery"); }
+    catch (const std::exception& error) { bpmn_error = error.what(); }
+    try { ptml = minera::to_ptml(minera::to_process_tree(net), family + " " + variant + " discovery"); }
+    catch (const std::exception& error) { ptml_error = error.what(); }
+    const auto playout_traces = ocel_query_size(request, "discovery_playout_traces", 0);
+    const auto playout_steps = ocel_query_size(request, "discovery_playout_max_steps", 1000);
+    const auto playout_seed = ocel_query_size(request, "discovery_playout_seed", 1);
+    if (playout_traces > 10000 || playout_steps > 10000 ||
+        (playout_steps && playout_traces > 1000000 / playout_steps))
+      throw std::invalid_argument("discovery playout exceeds the server firing budget");
+    if (playout_traces) {
+      try {
+        if (pnml.empty()) throw std::invalid_argument("Discovery playout requires representable workflow markings; inspect the native discovery result.");
+        minera::PlayoutOptions options; options.traces = playout_traces;
+        options.max_steps = playout_steps; options.seed = playout_seed;
+        if (alpha_plus) {
+          for (const auto tokens : alpha_plus->initial_marking) options.initial_marking.push_back(static_cast<std::uint32_t>(tokens));
+          for (const auto tokens : alpha_plus->final_marking) options.final_marking.push_back(static_cast<std::uint32_t>(tokens));
+        }
+        playout = minera::to_xes(minera::playout(net, options), family + " " + variant + " discovery playout");
+      } catch (const std::exception& error) { playout_error = error.what(); }
+    }
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    const auto activity = family == "alpha" ? params.alpha.activity_attribute : params.heuristic.activity_attribute;
+    response.set_content("{\"family\":\"WORKFLOW_DISCOVERY\",\"method\":" + quote(family) +
+      ",\"variant\":" + quote(variant) + ",\"activity_key\":" + quote(activity) +
+      ",\"source_id\":" + quote(std::to_string(session->query_source_id)) +
+      ",\"dataset\":" + quote(session->dataset) + ",\"source\":{\"case_count\":" +
+      std::to_string(session->log.trace_count()) + ",\"event_count\":" +
+      std::to_string(session->log.event_count()) + "},\"result\":" + result +
+      ",\"alpha_discovery\":" + (alpha_plus ? minera::alpha_plus_result_json(*alpha_plus) : "null") +
+      ",\"pnml\":" + (pnml.empty() ? "null" : quote(pnml)) +
+      ",\"pnml_error\":" + (pnml_error.empty() ? "null" : quote(pnml_error)) +
+      ",\"bpmn\":" + (bpmn.empty() ? "null" : quote(bpmn)) +
+      ",\"bpmn_error\":" + (bpmn_error.empty() ? "null" : quote(bpmn_error)) +
+      ",\"ptml\":" + (ptml.empty() ? "null" : quote(ptml)) +
+      ",\"ptml_error\":" + (ptml_error.empty() ? "null" : quote(ptml_error)) +
+      ",\"playout_xes\":" + (playout.empty() ? "null" : quote(playout)) +
+      ",\"playout_error\":" + (playout_error.empty() ? "null" : quote(playout_error)) + '}', "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
 // not accept uploads or perform any implicit re-importing.
@@ -9125,6 +9249,7 @@ int main(int argc, char** argv) {
   server.Post("/api/reduce-petri-net", handle_reduce_petri_net);
   server.Post("/api/align-dfg", handle_align_dfg);
   server.Post("/api/discover-alpha-plus", handle_alpha_plus_result);
+  server.Post("/api/discover-workflow", handle_workflow_discovery);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);

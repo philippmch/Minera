@@ -13,6 +13,7 @@ import { DeclareModel } from "./DeclareModel";
 import { FootprintsModel } from "./FootprintsModel";
 import { TransitionSystemModel } from "./TransitionSystemModel";
 import { NativeDiscovery } from "./NativeDiscovery";
+import { WorkflowDiscovery } from "./WorkflowDiscovery";
 
 type Step = "miner" | "variant" | "result";
 
@@ -32,6 +33,7 @@ interface ProcessModelProps {
   canExportPnml: boolean;
   mining?: boolean;
   onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
+  onOpenPlayout?: (file: File) => void;
 }
 
 // A small wizard: pick a miner family, then a variant, then the mined model is
@@ -46,6 +48,7 @@ export function ProcessModel({
   canExportPnml,
   mining = false,
   onUseModel,
+  onOpenPlayout,
 }: ProcessModelProps) {
   const [step, setStep] = useState<Step>("miner");
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -150,6 +153,7 @@ export function ProcessModel({
           canExportPnml={canExportPnml}
           mining={mining}
           onUseModel={onUseModel}
+          onOpenPlayout={onOpenPlayout}
         />
       )}
     </div>
@@ -169,6 +173,7 @@ interface ModelResultProps {
   canExportPnml: boolean;
   mining: boolean;
   onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
+  onOpenPlayout?: (file: File) => void;
 }
 
 // Renders the mined model for the chosen variant by its artifact type. A null
@@ -190,11 +195,14 @@ function ModelResult({
   canExportPnml,
   mining,
   onUseModel,
+  onOpenPlayout,
 }: ModelResultProps) {
   const [asNet, setAsNet] = useState(false);
 
   if (minerId === "ilp" || minerId === "genetic")
     return <NativeDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} />;
+  if (minerId === "alpha" || minerId === "heuristic")
+    return <WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} />;
 
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
   // inductive tree or from the net's token semantics (converted server-side),
