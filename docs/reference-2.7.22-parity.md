@@ -12514,3 +12514,49 @@ acquisition, restart durability, non-Windows transport execution and complete
 schema/default/error/type/numeric/order/Unicode/concurrency/performance fidelity
 remain open. All 86 packages/387 modules, 46 complete packages/199 complete
 modules and 228 incomplete units remain the objective; no parity unit is promoted.
+
+
+## Feature delivery first: native Windows service and EVTX acquisition (2026-10-09)
+
+The Windows connector now reads explicit local event channels and binary EVTX
+uploads/server files through native EvtQuery/EvtNext/EvtRender. Query filters,
+forward/newest-first selection, event bounds and per-read timeouts are exposed.
+The default limit selects 1000 events; an extra-record probe distinguishes
+exhaustion from truncation. Native capture order is retained in complete UTF-8
+XML; the existing importer groups by computer and sorts each case by timestamp.
+Original EVTX bytes, rich event logs and a separate capture descriptor/XML
+download coexist. Source mode/configuration restoration, complete acquisition
+inspection and reconnect/release, all JSON/report/CSV/XES/gzip exports and
+reopening for native analysis are available. The CLI adds --output-capture.
+
+docs/feature-first-windows-source-validation.json binds 610 native and 239
+frontend/runtime sources, two fresh core objects and 170 reused objects. Nine
+assertion-enabled native suites and 926 frontend tests/production build pass.
+24 application checks over 33 HTTP cases, three native CLIs and three independent
+Windows-reader comparisons cover actual forward/reverse/XPath EVTX acquisition,
+Unicode server paths, exact binary/source capture, live empty Application query,
+controls/errors and lifecycle. Public EVTX captures match wevtutil-rendered
+records in exact order. The source dataset URL, bytes and SHA256 are retained.
+16 browser checks and 44 independent artifact checks verify nine complete CSVs,
+four reports, original EVTX, four event XML downloads, complete native payloads,
+three XES reimports across nine further API cases and two served assets. All
+120 events and original attributes survive analysis handoff. Decimal timestamp
+comparisons retain exact instants; XES adds standard projection keys, normalizes
+spelling/document order and names the analysis dataset explicitly.
+
+The first frontend verifier assumed one case; the actual capture has 88 and
+32 events in two cases, and the assertion now follows all cases. Failed output
+is retained. Initial server PID 28652 and its listener were verified missing
+after interruption before starting PID 26824 from the unchanged binary. A later
+browser observation timed out while mining; the same request completed without
+a restart. The final server, port 8507 and temporary tab were closed and the
+390px viewport reset. No private user event payloads or reference implementation
+bodies/bytecode were inspected or published. Unrelated files and the historical
+journal prefix remain preserved.
+
+Complete localized provider-message/projection/default/error/numeric/schema/
+order/Unicode/concurrency/performance/reference fidelity, Windows CLI Unicode
+argv, subscriptions/bookmarks, remote hosts, restart durability and live
+Outlook/workflow/SAP/database drivers remain open. All 86 packages/387 modules,
+46 complete packages/199 complete modules and 228 incomplete units remain the
+objective. This feature delivery promotes no catalogue parity unit.
