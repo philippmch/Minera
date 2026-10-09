@@ -1,0 +1,66 @@
+import { isBrowserHistoryResult,isWindowsEventsResult,isRepositoryHistoryResult,isWorkflowHistoryResult,isEnterpriseHistoryResult,isCommunicationHistoryResult,isLogConversionResult,type LogConversionLog,type LogConversionResult } from "./types";
+import { nativeCell,nativeJson,parseNativeJson } from "./native-json";
+import { type OcelPreparedTable } from "./ocel-preparation";
+export const SOURCE_CONNECTORS=[['chrome_history','Chrome history database'],['firefox_history','Firefox history database'],['github_repo','GitHub repository issues'],['windows_events','Windows event XML'],['camunda_workflow','Workflow activity CSV'],['sap_o2c','SAP order-to-cash CSV'],['sap_accounting','SAP accounting CSV'],['outlook_mail_extractor','Outlook mailbox CSV'],['outlook_calendar','Outlook calendar CSV']] as const;
+export type SourceConnector=typeof SOURCE_CONNECTORS[number][0];
+export interface AcquisitionForm {connector:SourceConnector;mode:'upload'|'path';path:string;maximumEvents:string;owner:string;repository:string;apiBase:string;maximumPages:string;maximumIssues:string;maximumItems:string;currentTime:string;reminders:boolean;}
+export function defaultAcquisitionForm():AcquisitionForm{return {connector:'chrome_history',mode:'upload',path:'',maximumEvents:'',owner:'',repository:'',apiBase:'',maximumPages:'',maximumIssues:'',maximumItems:'',currentTime:'',reminders:true};}
+type NativeLog=Extract<LogConversionResult,{log:LogConversionLog}>;
+export interface AcquiredSource {
+ family:'SOURCE_ACQUISITION';connector:SourceConnector;source_id:string;trace_count:number;event_count:number;
+ native_result:Record<string,unknown>;native_log:NativeLog;configuration:Record<string,string>;
+ source:{name:string;mode:'upload'|'path'|'repository_api';path:string;has_original:boolean;size:number|null;provided_sha256:string;authenticated:boolean};released?:boolean;
+}
+const record=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
+const count=(v:unknown):v is number=>Number.isSafeInteger(v)&&(v as number)>=0;
+export function validAcquiredSource(v:unknown):v is AcquiredSource {
+ if(!record(v)||v.family!=='SOURCE_ACQUISITION'||!SOURCE_CONNECTORS.some(([id])=>id===v.connector)||typeof v.source_id!=='string'||!v.source_id||![v.trace_count,v.event_count].every(count)||!record(v.configuration)||!Object.values(v.configuration).every(x=>typeof x==='string')||v.configuration.source_id!==v.source_id||v.configuration.connector!==v.connector)return false;
+ if(!isLogConversionResult(v.native_log)||v.native_log.variant!=='TO_EVENT_LOG'||!('log'in v.native_log)||v.native_log.log.traces.length!==v.trace_count||v.native_log.log.traces.reduce((n,t)=>n+t.events.length,0)!==v.event_count)return false;
+ const r=v.native_result;let valid=false;
+ if(v.connector==='chrome_history'||v.connector==='firefox_history')valid=isBrowserHistoryResult(r)&&r.variant===v.connector;
+ else if(v.connector==='windows_events')valid=isWindowsEventsResult(r);
+ else if(v.connector==='github_repo')valid=isRepositoryHistoryResult(r)&&r.owner===v.configuration.repository_owner&&r.repository===v.configuration.repository_name;
+ else if(v.connector==='camunda_workflow')valid=isWorkflowHistoryResult(r);
+ else if(v.connector==='sap_o2c'||v.connector==='sap_accounting')valid=isEnterpriseHistoryResult(r)&&r.variant===(v.connector==='sap_o2c'?'order_to_cash':'accounting');
+ else valid=isCommunicationHistoryResult(r)&&r.variant===(v.connector==='outlook_calendar'?'calendar':'mailbox');
+ if(!valid||!record(r)||r.trace_count!==v.trace_count||r.event_count!==v.event_count)return false;
+ const source=v.source;if(!record(source)||typeof source.name!=='string'||typeof source.path!=='string'||!['upload','path','repository_api'].includes(String(source.mode))||source.mode!==v.configuration.mode||typeof source.has_original!=='boolean'||typeof source.authenticated!=='boolean'||typeof source.provided_sha256!=='string'||!(source.size===null||count(source.size))||source.has_original!==(source.size!==null)||v.released!==undefined&&typeof v.released!=='boolean')return false;
+ const legacy=r.traces as {case_id:string;events:{activity:string;timestamp:string;resource?:string}[]}[];
+ const fullLog=v.native_log.log;
+ return legacy.every((t,i)=>{const full=fullLog.traces[i];return t.case_id===full.case_id&&t.events.length===full.events.length&&t.events.every((e,j)=>e.activity===full.events[j].activity&&e.timestamp===full.events[j].timestamp&&(e.resource===undefined||e.resource===full.events[j].resource));});
+}
+function size(value:string,label:string,maximum:number):string {if(!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value))||Number(value)<=0||Number(value)>maximum)throw new Error(`${label} must be an integer from 1 through ${maximum}.`);return value;}
+export function acquisitionQuery(form:AcquisitionForm,id:string):URLSearchParams {
+ const mode=form.connector==='github_repo'?'repository_api':form.mode,q=new URLSearchParams({source_id:id,connector:form.connector,mode});if(!id)throw new Error('Acquisition source ID is empty.');
+ if(mode==='path'){if(!form.path)throw new Error('Enter an explicit server file or profile directory path.');q.set('source_path',form.path);}
+ const key=form.connector==='chrome_history'||form.connector==='firefox_history'?'browser_history_max_events':form.connector==='windows_events'?'windows_events_max_events':form.connector==='github_repo'?'repository_max_events':form.connector==='camunda_workflow'?'workflow_max_events':form.connector.startsWith('sap_')?'enterprise_max_events':'communication_max_events';
+ if(form.maximumEvents)q.set(key,size(form.maximumEvents,'Maximum native events',10000000));
+ if(form.connector==='github_repo'){
+  if(!form.owner||!form.repository)throw new Error('Repository owner and name are required.');q.set('repository_owner',form.owner);q.set('repository_name',form.repository);
+  if(form.apiBase){let url:URL;try{url=new URL(form.apiBase);}catch{throw new Error('Repository API base must be an HTTP(S) URL.');}if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.hash||url.search)throw new Error('Use an HTTP(S) API base without credentials, query or fragment.');q.set('repository_api_base_url',form.apiBase);}
+  if(form.maximumPages)q.set('repository_max_pages',size(form.maximumPages,'Maximum repository pages',10000));if(form.maximumIssues)q.set('repository_max_issues',size(form.maximumIssues,'Maximum repository issues',1000000));
+ }
+ if(form.connector.startsWith('outlook_')){if(form.maximumItems)q.set('communication_max_items',size(form.maximumItems,'Maximum communication items',1000000));if(form.currentTime)q.set('communication_current_time',form.currentTime);q.set('communication_include_reminders',String(form.reminders));}
+ return q;
+}
+export function formFromAcquired(source:AcquiredSource):AcquisitionForm {
+ const f=defaultAcquisitionForm(),p=source.configuration;f.connector=source.connector;f.mode=source.source.mode==='path'?'path':'upload';f.path=source.source.path;f.owner=p.repository_owner??'';f.repository=p.repository_name??'';f.apiBase=p.repository_api_base_url??'';f.maximumPages=p.repository_max_pages??'';f.maximumIssues=p.repository_max_issues??'';f.maximumItems=p.communication_max_items??'';f.currentTime=p.communication_current_time??'';f.reminders=p.communication_include_reminders!=='false';
+ f.maximumEvents=p.browser_history_max_events??p.windows_events_max_events??p.repository_max_events??p.workflow_max_events??p.enterprise_max_events??p.communication_max_events??'';return f;
+}
+export function acquiredTables(s:AcquiredSource):Record<string,OcelPreparedTable> {
+ const log=s.native_log.log,tables:Record<string,OcelPreparedTable>={},table=(columns:string[],rows:unknown[][]):OcelPreparedTable=>({columns,count:rows.length,rowAt:i=>rows[i]});
+ tables.cases=table(['case_position','case_id','events','attributes_json','properties_json','native_trace_json'],log.traces.map((t,i)=>[i,t.case_id,t.events.length,nativeJson(t.attributes),nativeJson(t.properties??[]),nativeJson(t)]));
+ tables.events=table(['case_position','event_position','case_id','activity','timestamp','resource','lifecycle','input_order','native_event_json'],log.traces.flatMap((t,i)=>t.events.map((e,j)=>[i,j,e.case_id,e.activity,e.timestamp,e.resource,e.lifecycle,nativeCell(e,'input_order'),nativeJson(e)])));
+ const rows:unknown[][]=[];for(const [i,t] of log.traces.entries()){const groups=[{scope:'case',event:null,values:t.attributes},{scope:'case_properties',event:null,values:t.properties??[]},...t.events.map((e,j)=>({scope:'event',event:j,values:e.attributes}))];for(const g of groups)g.values.forEach((a,j)=>rows.push([i,t.case_id,g.scope,g.event,j,a.key,a.kind,nativeCell(a,'value'),a.null??false,nativeJson(a)]));}
+ tables.attributes=table(['case_position','case_id','scope','event_position','attribute_position','key','kind','value','null','native_attribute_json'],rows);tables.log_attributes=table(['attribute_position','key','kind','value','native_attribute_json'],log.attributes.map((a,i)=>[i,a.key,a.kind,nativeCell(a,'value'),nativeJson(a)]));tables.metadata=table(['native_metadata_json'],[[nativeJson(log.metadata??{})]]);
+ tables.configuration=table(['parameter','value'],Object.entries(s.configuration));const source=['name','mode','path','has_original','size','provided_sha256','authenticated'];tables.source=table(source,[source.map(k=>nativeCell(s.source,k))]);tables.summary=table(['source_id','connector','trace_count','event_count','released'],[[s.source_id,s.connector,nativeCell(s,'trace_count'),nativeCell(s,'event_count'),s.released??false]]);return tables;
+}
+export interface AcquisitionRun {result:AcquiredSource;raw:string;report_json:string;tables:Record<string,OcelPreparedTable>;}
+async function failure(response:Response):Promise<never>{const raw=await response.text();let v:unknown;try{v=parseNativeJson(raw);}catch{throw new Error(`Acquisition returned ${response.status}.`);}if(record(v)&&'error'in v)throw new Error(String(v.error));throw new Error(`Acquisition returned ${response.status}.`);}
+async function request(route:string,q:URLSearchParams,method:'GET'|'POST',body?:FormData,token='',signal?:AbortSignal):Promise<AcquisitionRun>{const response=await fetch(`/api/source-acquisition/${route}?${q}`,{method,...(body?{body}:{}),...(token?{headers:{Authorization:'Bearer '+token}}:{}),...(signal?{signal}:{})});if(!response.ok)return failure(response);const raw=await response.text();let value:unknown;try{value=parseNativeJson(raw);}catch{throw new Error('The backend returned invalid acquisition JSON.');}if(!validAcquiredSource(value))throw new Error('The backend returned an invalid native acquired source.');if(value.source_id!==q.get('source_id'))throw new Error('The backend returned a different acquired source.');return {result:value,raw,report_json:`{"family":"SOURCE_ACQUISITION_REPORT","request":${JSON.stringify({route,method,parameters:Object.fromEntries(q),authentication_provided:!!token})},"response":${raw}}`,tables:acquiredTables(value)};}
+export async function acquireSource(form:AcquisitionForm,id:string,file:File|null,token='',signal?:AbortSignal):Promise<AcquisitionRun>{const q=acquisitionQuery(form,id);let body:FormData|undefined;if(q.get('mode')==='upload'){if(!file)throw new Error('Choose an original source upload.');const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());if(signal?.aborted)throw new DOMException('Aborted','AbortError');q.set('source_name',file.name);q.set('source_sha256',Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join(''));body=new FormData();body.append('source',file);}else q.set('source_name',form.connector==='github_repo'?form.owner+'/'+form.repository:form.path);const result=await request('acquire',q,'POST',body,form.connector==='github_repo'?token:'',signal);if(result.result.connector!==form.connector)throw new Error('The backend returned a different connector.');return result;}
+export function getAcquiredSource(id:string,signal?:AbortSignal):Promise<AcquisitionRun>{return request('snapshot',new URLSearchParams({source_id:id}),'GET',undefined,'',signal);}
+export function releaseAcquiredSource(id:string,signal?:AbortSignal):Promise<AcquisitionRun>{return request('release',new URLSearchParams({source_id:id}),'POST',undefined,'',signal);}
+export async function listAcquiredSources(signal?:AbortSignal):Promise<AcquiredSource[]>{const r=await fetch('/api/source-acquisition/list',{...(signal?{signal}:{})});if(!r.ok)return failure(r);const v:unknown=parseNativeJson(await r.text());if(!record(v)||!Array.isArray(v.sources)||!v.sources.every(validAcquiredSource))throw new Error('The backend returned an invalid acquired source list.');return v.sources;}
+export async function acquiredOriginal(id:string):Promise<Blob>{const r=await fetch(`/api/source-acquisition/original?${new URLSearchParams({source_id:id})}`);if(!r.ok)return failure(r);return r.blob();}
+export async function acquiredExport(id:string,format:'json'|'xes',variant='line_by_line',gzip=false):Promise<Blob>{const r=await fetch(`/api/source-acquisition/export?${new URLSearchParams({source_id:id,format,variant,gzip:String(gzip),preserve_nulls:'true'})}`);if(!r.ok)return failure(r);return r.blob();}

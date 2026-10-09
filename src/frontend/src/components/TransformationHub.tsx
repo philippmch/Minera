@@ -8,6 +8,7 @@ import { StreamingWorkspace } from "./StreamingWorkspace";
 import { ModelExchangeWorkspace } from "./ModelExchangeWorkspace";
 import { ProcessCubeWorkspace } from "./ProcessCubeWorkspace";
 import { type CsvOptions } from "../api";
+import { SourceAcquisitionWorkspace } from "./SourceAcquisitionWorkspace";
 const GROUPS = [
   ["transformation", "Features, targets & labels"],
   ["preparation", "Prepare logs & event data"],
@@ -16,6 +17,7 @@ const GROUPS = [
   ["streaming", "Replay event streams"],
   ["models", "Inspect & convert model files"],
   ["cube", "Process cubes"],
+  ["acquisition", "Acquire source data"],
 ] as const;
 export function TransformationHub({data,available,mining,file=null,onOpenTransformed,onUseModel}:{data:MineraExport;available:boolean;mining:boolean;file?:File|null;onOpenTransformed:(file:File,activityAttribute:string,importOptions?:CsvOptions)=>void;onUseModel?:(file:File,sourceId:string,activityKey?:string,inferLegacyBoundaries?:boolean)=>void}) {
   const [group,setGroup]=useState<typeof GROUPS[number][0]>("transformation");
@@ -29,6 +31,7 @@ export function TransformationHub({data,available,mining,file=null,onOpenTransfo
     :group==="related"?<RelatedLogsWorkspace file={file} available={available} mining={mining} dataset={data.dataset} onOpen={onOpenTransformed}/>
     :group==="streaming"?<StreamingWorkspace file={file} busy={mining} data={data} onOpen={onOpenTransformed}/>
     :group==="cube"?<ProcessCubeWorkspace initialFile={cubeFile} busy={mining}/>
+    :group==="acquisition"?<SourceAcquisitionWorkspace busy={mining} onOpen={file=>onOpenTransformed(file,"concept:name")}/>
     :<ModelExchangeWorkspace available={available} busy={mining} onUseModel={onUseModel}/>}
   </>;
 }

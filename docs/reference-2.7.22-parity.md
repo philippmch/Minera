@@ -12467,3 +12467,50 @@ Unicode-path/reference exactness/performance remain open. No reference bodies
 or bytecode were inspected and no catalogue parity unit is promoted. All
 86 packages/387 modules, 46 complete packages/199 complete modules and 228
 incomplete units remain the full objective.
+
+
+## Feature delivery first: native source acquisition workbench (2026-10-09)
+
+All nine existing native connector families now have an acquisition workspace
+from the landing page, classic/OCEL navigation and the transformation hub.
+Chrome/Firefox copied SQLite databases, explicit server file/profile paths,
+Windows exported event XML, workflow/SAP/Outlook normalized CSV and GitHub
+issue/timeline API acquisition retain the existing native connector response
+alongside a complete rich event log. Original file bytes, source/configuration
+metadata, immutable snapshots, reconnect/list/release and conflicting-ID errors
+are exposed. API and profile-directory sources have no single original file.
+Windows native WinHTTP HTTPS completed against public octocat/test-repo1 data;
+controlled pagination/timeline fixtures verify native order and bearer headers.
+Tokens are cleared from the form after success and absent from saved reports.
+
+Calendar clock/reminder/item/event controls and per-family native limits are
+available. Complete paged inspection and full native JSON/report/CSV, original
+downloads, both XES writers/gzip and reopening for native analysis are usable.
+The minera_acquire_source CLI exposes the same complete native output and
+optional XES; credentials come from a named environment variable.
+
+docs/feature-first-acquisition-validation.json binds 607 native and 235
+frontend/runtime sources, one fresh core object and 170 reused objects.
+Eight assertion-enabled native suites, 916 frontend tests/production build,
+110 application checks across 108 HTTP cases/11 native CLIs, 28 browser checks
+and 69 artifact checks pass. Independent evidence verifies all eight complete
+large-result CSVs, ten reports, exact original bytes, native snapshots/logs,
+three XES reimports across nine further HTTP cases and final served assets.
+All 60 cases/120 events survive paging and native analysis. The 390px layout
+fits its viewport. XES adds standard projection keys and normalizes timestamp
+spelling/document order; analysis exports add the visible dataset name.
+
+Failed native/capture/browser/artifact attempts remain retained. The native test
+was corrected to inspect SAP accounting document_type rather than dereference
+an unsupported arbitrary column. Verification corrected a nonexistent public
+repository, POST route assumptions, a DOM input value-property lookup, evidence
+closure routing and XES namespaces. No reference bodies or bytecode were read.
+Owned PIDs 34124/31684, ports 8505/8506 and the temporary tab were closed and
+the viewport reset. Unrelated files and the historical journal prefix remain
+unchanged. Client source hashes are independently matched to original bytes.
+
+Live workflow/database/SAP/Outlook/Windows service drivers, lazy/unbounded
+acquisition, restart durability, non-Windows transport execution and complete
+schema/default/error/type/numeric/order/Unicode/concurrency/performance fidelity
+remain open. All 86 packages/387 modules, 46 complete packages/199 complete
+modules and 228 incomplete units remain the objective; no parity unit is promoted.

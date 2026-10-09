@@ -142,6 +142,7 @@
 #include "minera/streaming_tbr.hpp"
 #include "minera/streaming_session.hpp"
 #include "minera/reader_stream_session.hpp"
+#include "minera/source_acquisition.hpp"
 #include "minera/path_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
@@ -8673,6 +8674,7 @@ void handle_streaming_tbr(const httplib::Request& request,
 
 #include "live_stream_routes.hpp"
 #include "reader_stream_routes.hpp"
+#include "source_acquisition_routes.hpp"
 
 void handle_streaming_declare(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{
@@ -8921,6 +8923,7 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-declare", preflight);
   for(const auto* route:{"create","snapshot","append","action","list","source","release"})server.Options(std::string("/api/live-stream/")+route,preflight);
   for(const auto* route:{"create","snapshot","read","action","list","source","export","release"})server.Options(std::string("/api/stream-reader/")+route,preflight);
+  for(const auto* route:{"acquire","snapshot","original","export","list","release"})server.Options(std::string("/api/source-acquisition/")+route,preflight);
   server.Options("/api/knowledge-injection", preflight);
 
   server.Post("/api/mine", handle_mine);
@@ -9042,6 +9045,12 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-declare", handle_streaming_declare);
   server.Post("/api/live-stream/create",handle_live_create);
   server.Post("/api/stream-reader/create",handle_reader_create);
+  server.Post("/api/source-acquisition/acquire",handle_acquire_source);
+  server.Get("/api/source-acquisition/snapshot",handle_acquired_snapshot);
+  server.Get("/api/source-acquisition/original",handle_acquired_original);
+  server.Get("/api/source-acquisition/export",handle_acquired_export);
+  server.Get("/api/source-acquisition/list",handle_acquired_list);
+  server.Post("/api/source-acquisition/release",handle_acquired_release);
   server.Get("/api/stream-reader/snapshot",handle_reader_snapshot);
   server.Post("/api/stream-reader/read",handle_reader_read);
   server.Post("/api/stream-reader/action",handle_reader_action);

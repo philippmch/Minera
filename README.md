@@ -1782,6 +1782,43 @@ visible dataset name. Exact raw native values remain in JSON and CSV.
 [Validation and checkpoint boundaries](docs/feature-first-reader-stream-validation.json)
 retain the source bindings and corrected attempts.
 
+### Source acquisition
+
+Open **Acquire source data** from the landing page, classic or object-centric
+navigation, or the transformation hub. All nine existing native connectors are
+available: Chrome/Firefox history databases, GitHub issues/timelines, Windows
+event XML, workflow activity CSV, SAP order-to-cash/accounting CSV, and Outlook
+mailbox/calendar CSV. Upload copied source files or specify a server file path;
+browser profile directories are discovered only at an explicit path. GitHub
+reads the selected API using native HTTPS on Windows. Its optional bearer token
+is sent as a header, cleared after success and excluded from saved reports.
+
+Inspect complete native connector and rich event-log results, page through all
+cases/events/attributes/metadata, and download full JSON/report/CSV, original
+file bytes, native logs or either XES writer with gzip. **Open acquired log for
+analysis** uses the native exported log. Reconnect/list/release operate on
+immutable snapshots in the current server process. GitHub API and profile
+directory acquisitions have no single original file body. Workflow/SAP/Outlook
+CSV and Windows XML import exported records; live application/database/service
+drivers, restart durability and complete reference/performance parity remain open.
+
+`minera_acquire_source CONNECTOR [PATH] --param key=value` prints the complete
+native connector and rich log. Optional `--token-env NAME` reads a repository
+credential without printing it; `--output-xes PATH` exports the native log.
+HTTP endpoints are POST `/api/source-acquisition/acquire` and `release`, plus
+GET `snapshot`, `list`, `original`, and `export`. Acquisition takes `source_id`,
+`connector`, `mode=upload|path|repository_api`, native family parameters and
+explicit `source_path` for path mode; uploads use multipart field `source`.
+Export takes `format=json|xes`, XES `variant=line_by_line|etree` and `gzip`.
+
+Eight native suites, 916 frontend tests/production build, 117 HTTP cases,
+11 standalone CLI comparisons, 28 browser checks and 69 artifact checks pass.
+Browser evidence includes all nine connectors, complete eight-table CSVs, ten
+reports, original downloads, both XES writers/gzip, three native reimports and
+the final served production assets. Live public GitHub HTTPS also completed.
+[Validation and checkpoint boundaries](docs/feature-first-acquisition-validation.json)
+retain source bindings and failed verification attempts. No parity unit is promoted.
+
 ### Sample dataset
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the
