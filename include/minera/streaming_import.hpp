@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <istream>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -30,6 +31,9 @@ class CsvEventStreamReader {
   explicit CsvEventStreamReader(
       std::filesystem::path path, CsvImportOptions import_options = {},
       StreamingEventReaderOptions options = {});
+  explicit CsvEventStreamReader(std::istream& input, CsvImportOptions import_options = {},
+                                StreamingEventReaderOptions options = {});
+  [[nodiscard]] const EventLog& source_context() const noexcept { return context_; }
 
   void reset();
   [[nodiscard]] std::optional<Event> read_event();
@@ -42,6 +46,8 @@ class CsvEventStreamReader {
   StreamingEventReaderOptions options_;
   std::vector<Event> events_;
   std::size_t cursor_ = 0;
+  std::optional<std::string> source_body_;
+  EventLog context_;
 };
 
 // A restartable event reader over XES. The importer preserves generic scalar
@@ -51,6 +57,9 @@ class XesEventStreamReader {
   explicit XesEventStreamReader(
       std::filesystem::path path, XesImportOptions import_options = {},
       StreamingEventReaderOptions options = {});
+  explicit XesEventStreamReader(std::istream& input, XesImportOptions import_options = {},
+                                StreamingEventReaderOptions options = {});
+  [[nodiscard]] const EventLog& source_context() const noexcept { return context_; }
 
   void reset();
   [[nodiscard]] std::optional<Event> read_event();
@@ -63,6 +72,8 @@ class XesEventStreamReader {
   StreamingEventReaderOptions options_;
   std::vector<Event> events_;
   std::size_t cursor_ = 0;
+  std::optional<std::string> source_body_;
+  EventLog context_;
 };
 
 // A restartable trace reader over XES. A trace is accepted or transformed as
@@ -72,6 +83,9 @@ class XesTraceStreamReader {
   explicit XesTraceStreamReader(
       std::filesystem::path path, XesImportOptions import_options = {},
       StreamingTraceReaderOptions options = {});
+  explicit XesTraceStreamReader(std::istream& input, XesImportOptions import_options = {},
+                                StreamingTraceReaderOptions options = {});
+  [[nodiscard]] const EventLog& source_context() const noexcept { return context_; }
 
   void reset();
   [[nodiscard]] std::optional<Trace> read_trace();
@@ -84,6 +98,8 @@ class XesTraceStreamReader {
   StreamingTraceReaderOptions options_;
   std::vector<Trace> traces_;
   std::size_t cursor_ = 0;
+  std::optional<std::string> source_body_;
+  EventLog context_;
 };
 
 }  // namespace minera

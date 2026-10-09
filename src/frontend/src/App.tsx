@@ -89,6 +89,7 @@ import {
   mineCsv,
   requestOcelDiscovery,
   type FilterOptions,
+  type CsvOptions,
   type MinerOptions,
   type OcelDiscoveryOptions,
 } from "./api";
@@ -131,6 +132,7 @@ export default function App() {
     file: File;
     delimiter?: string;
     xesActivityAttribute?: string;
+    xesOptions?: CsvOptions;
     activities: string[];
     resources: string[];
     lifecycles: string[];
@@ -350,7 +352,7 @@ export default function App() {
       .finally(() => { if (ocelRequest.current === controller) setMining(false); });
   }, [ocelFile]);
 
-  const loadFile = (file: File, xesActivityAttribute?: string) => {
+  const loadFile = (file: File, xesActivityAttribute?: string, xesOptions?: CsvOptions) => {
     setShowOcelIo(false);
     setShowRelatedLogs(false);
     setShowStreaming(false);
@@ -383,11 +385,12 @@ export default function App() {
         }
       } else {
         const delimiter = delimiterForFile(file.name);
-        const result = await mineCsv(file, { delimiter, xesActivityAttribute });
+        const result = await mineCsv(file, { ...xesOptions, delimiter, xesActivityAttribute });
         setSource({
           file,
           delimiter,
           xesActivityAttribute,
+          xesOptions,
           activities: result.activities.map((a) => a.name),
           resources: result.resources?.resources.map((r) => r.name) ?? [],
           lifecycles: logLifecycles(result),
@@ -437,7 +440,7 @@ export default function App() {
     if (!source) return;
     setFiltersActive(hasActiveFilters(filters) || hasActiveMinerOptions(filters));
     setMining(true);
-    mineCsv(source.file, { delimiter: source.delimiter, ...filters,
+    mineCsv(source.file, { ...source.xesOptions, delimiter: source.delimiter, ...filters,
       xesActivityAttribute: source.xesActivityAttribute })
       .then((result) => {
         cacheGeneration.current += 1;
@@ -566,7 +569,7 @@ export default function App() {
 
   if (showModelExchange) return <><TopBar dataset={data?.dataset??ocelDataset??'Model files'} datasetKind="model exchange" onOpenFile={loadFile} onHome={()=>setShowModelExchange(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowModelExchange(false)}>Return to current workspace</button><ModelExchangeWorkspace available={source!==null} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setShowModelExchange(false);setTab("conformance");}}/></main></>;
   if (showProcessCube) return <><TopBar dataset={data?.dataset??ocelDataset??'Process cubes'} datasetKind="process cube" onOpenFile={loadFile} onHome={()=>setShowProcessCube(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowProcessCube(false)}>Return to current workspace</button><ProcessCubeWorkspace busy={mining}/></main></>;
-  if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} busy={mining} data={data??undefined}/></main></>;
+  if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} busy={mining} data={data??undefined} onOpen={loadFile}/></main></>;
   if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} available={source!==null} mining={mining} dataset={data?.dataset} onOpen={loadFile}/></main></>;
 
   if (!data && ocelResult) {

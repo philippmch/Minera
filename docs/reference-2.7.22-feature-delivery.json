@@ -1617,6 +1617,55 @@
         "FRESH_REPLAY",
         "PERSISTENT_SESSION"
       ]
+    },
+    {
+      "added": [
+        "Restartable CSV event, XES event and XES whole-trace readers with server-held original upload bytes",
+        "Bounded cursor reads, exhaustion, reader generations, rewind and retained complete native item histories",
+        "Ordered native event/trace dispatch with queue/start/drain/finish, observer detach/reattach and separate actual delivery histories",
+        "Revision-checked reads/actions, unique batch receipts, reconnectable creation and session listing/release",
+        "All six native XES parsers, gzip, CSV dialect/literal selectors, XES attribute/sort/trace-limit options",
+        "Native activity-prefix transforms before exact case/activity acceptance and whole-trace event-count filters",
+        "Whole-trace occurrences retain duplicate case IDs, empty traces, typed/nested attributes and source log context",
+        "Native JSON/report/CSV, original source and selected JSON/XES/gzip exports with paged complete inspection",
+        "Selected reader results reopen for native analysis with all five original field selectors, retained through re-mining",
+        "Standalone minera_reader_stream exposes complete native item/selected-log outputs and optional XES output",
+        "Event grouping preserves original native projections instead of inferring new date/type metadata"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_reader_stream.cpp",
+        "src/backend/tools/reader_stream_routes.hpp",
+        "src/frontend/src/reader-stream-workspace.ts",
+        "src/frontend/src/components/ReaderStreamWorkspace.tsx"
+      ],
+      "families": [],
+      "id": "native_event_and_trace_reader_workflows",
+      "native_components": [
+        "include/minera/streaming_import.hpp",
+        "include/minera/reader_stream_session.hpp",
+        "include/minera/live_stream.hpp",
+        "src/backend/streaming_import.cpp",
+        "src/backend/reader_stream_session.cpp"
+      ],
+      "state": "native_reader_dispatch_api_and_app_available",
+      "validation": "docs/feature-first-reader-stream-validation.json",
+      "variants": [
+        "CSV_EVENTS",
+        "XES_EVENTS",
+        "XES_TRACES",
+        "ITERPARSE",
+        "LINE_BY_LINE",
+        "ITERPARSE_MEM_COMPRESSED",
+        "ITERPARSE_20",
+        "CHUNK_REGEX",
+        "RUSTXES",
+        "GZIP",
+        "READ",
+        "RESET",
+        "QUEUE",
+        "DISPATCH",
+        "RECONNECT"
+      ]
     }
   ],
   "execution_priority": [
@@ -1634,7 +1683,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Review remaining acquisition/readers, trace-stream workflows and catalogue/analysis/export gaps. Declare now joins the four previous native event monitors, with model authoring/displayed-model handoff and complete rule/state/event/time exports. Durability, lazy acquisition, dialect/default/numeric/order/search/concurrency/performance, Windows CLI Unicode paths and full reference behavior remain."
+      "next_action": "Review remaining live acquisition/connectors and catalogue/analysis/export gaps. All five event monitors and native CSV/XES event/whole-trace reader cursors, dispatch, rewind/reconnect, selection and complete export-to-analysis workflows are available. Lazy/unbounded/network sources, restart durability and complete native/reference default/error/type/numeric/order/Unicode/concurrency/performance gates remain."
     }
   ],
   "feature_status_meaning": {

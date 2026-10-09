@@ -12,11 +12,13 @@ import { type MineraExport } from "../types";
 import { DeclareStreamModelFields } from "./DeclareStreamModelFields";
 import { DeclareStreamChart } from "./DeclareStreamChart";
 import { LiveStreamingInspection } from "./LiveStreamingInspection";
+import { ReaderStreamWorkspace } from "./ReaderStreamWorkspace";
+import { type CsvOptions } from "../api";
 import { LIVE_XES_VARIANTS, defaultLiveImport, createLiveSession, getLiveSession, appendLiveSession, actLiveSession, listLiveSessions, formFromLive, importsFromLive, type LiveRun, type LiveSnapshot, type LiveAction, type LiveImportForm } from "../live-stream-workspace";
 
-export function StreamingWorkspace({ file = null, busy = false, data }: { file?: File | null; busy?: boolean; data?:MineraExport }) {
+export function StreamingWorkspace({ file = null, busy = false, data, onOpen }: { file?: File | null; busy?: boolean; data?:MineraExport;onOpen?:(file:File,activityAttribute:string,importOptions?:CsvOptions)=>void }) {
   const [form, setForm] = useState(defaultStreaming);
-  const [mode,setMode]=useState<"fresh"|"live">("fresh");
+  const [mode,setMode]=useState<"fresh"|"live"|"reader">("fresh");
   const [imports,setImports]=useState(defaultLiveImport);
   const [liveRun,setLiveRun]=useState<LiveRun|null>(null);
   const [sessions,setSessions]=useState<LiveSnapshot[]>([]);
@@ -79,11 +81,12 @@ export function StreamingWorkspace({ file = null, busy = false, data }: { file?:
   const jsonField = (key: "activities" | "starts" | "ends" | "sequence" | "parallel" | "profile", label: string, help: string) =>
     <label className="filters-field" key={key}><span>{label}</span>
       <textarea rows={3} value={form[key]} onChange={event => change(key, event.target.value)} /><small>{help}</small></label>;
+  if(mode==="reader")return <><section className="panel"><label className="filters-field"><span>Streaming execution</span><select disabled={busy} value={mode} onChange={event=>setMode(event.target.value as typeof mode)}><option value="fresh">Fresh file replay</option><option value="live">Persistent server session</option><option value="reader">Native event and trace readers</option></select></label></section><ReaderStreamWorkspace file={file} busy={busy} onOpen={onOpen}/></>;
   return <>
     <section className="panel streaming-workspace">
       <div className="panel-head"><h2>Replay event streams</h2><span className="panel-meta">{mode==="live"?"Server monitor sessions":"Independent event uploads"}</span></div>
       <p>{mode==="fresh"?"Replay an uploaded event sequence through a fresh native streaming monitor. Inspect open-case prefixes, or finalize footprint and token-replay cases at the end of the file.":"Keep a native monitor in the server, queue uploads, then start and append more batches. Inspect state, detach or reattach the observer, reset cases and finalize conformance."}</p>
-      <label className="filters-field streaming-mode"><span>Streaming execution</span><select disabled={busy||pending} value={mode} onChange={event=>{cancel();setMode(event.target.value as typeof mode);setError(null);if(event.target.value==="live"&&liveRun){setForm(formFromLive(liveRun.result));setImports(importsFromLive(liveRun.result));}}}><option value="fresh">Fresh file replay</option><option value="live">Persistent server session</option></select></label>
+      <label className="filters-field streaming-mode"><span>Streaming execution</span><select disabled={busy||pending} value={mode} onChange={event=>{cancel();setMode(event.target.value as typeof mode);setError(null);if(event.target.value==="live"&&liveRun){setForm(formFromLive(liveRun.result));setImports(importsFromLive(liveRun.result));}}}><option value="fresh">Fresh file replay</option><option value="live">Persistent server session</option><option value="reader">Native event and trace readers</option></select></label>
       {mode==="live"&&<div className="query-options live-connections"><label className="filters-field"><span>Server stream session ID</span><input disabled={busy||pending} value={connectionId} onChange={event=>setConnectionId(event.target.value)}/></label><button className="btn-ghost" disabled={busy||pending||!connectionId} onClick={()=>connect(connectionId)}>Connect or refresh session</button><button className="btn-ghost" disabled={busy||pending} onClick={()=>void list()}>List server stream sessions</button>{sessions.map(s=><button className="btn-ghost" disabled={busy||pending} key={s.session_id} onClick={()=>connect(s.session_id)}>Connect {s.method} · {s.session_id} · {s.state}</button>)}</div>}
       <fieldset className="query-fields" disabled={busy || pending || mode==="live"&&!!liveRun&&!liveRun.result.released}>
         <div className="query-options">

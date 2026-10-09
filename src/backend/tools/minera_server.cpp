@@ -141,6 +141,7 @@
 #include "minera/streaming_temporal.hpp"
 #include "minera/streaming_tbr.hpp"
 #include "minera/streaming_session.hpp"
+#include "minera/reader_stream_session.hpp"
 #include "minera/path_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
@@ -8671,6 +8672,7 @@ void handle_streaming_tbr(const httplib::Request& request,
 }
 
 #include "live_stream_routes.hpp"
+#include "reader_stream_routes.hpp"
 
 void handle_streaming_declare(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{
@@ -8918,6 +8920,7 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-tbr", preflight);
   server.Options("/api/streaming-declare", preflight);
   for(const auto* route:{"create","snapshot","append","action","list","source","release"})server.Options(std::string("/api/live-stream/")+route,preflight);
+  for(const auto* route:{"create","snapshot","read","action","list","source","export","release"})server.Options(std::string("/api/stream-reader/")+route,preflight);
   server.Options("/api/knowledge-injection", preflight);
 
   server.Post("/api/mine", handle_mine);
@@ -9038,6 +9041,14 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-tbr", handle_streaming_tbr);
   server.Post("/api/streaming-declare", handle_streaming_declare);
   server.Post("/api/live-stream/create",handle_live_create);
+  server.Post("/api/stream-reader/create",handle_reader_create);
+  server.Get("/api/stream-reader/snapshot",handle_reader_snapshot);
+  server.Post("/api/stream-reader/read",handle_reader_read);
+  server.Post("/api/stream-reader/action",handle_reader_action);
+  server.Get("/api/stream-reader/list",handle_reader_list);
+  server.Get("/api/stream-reader/source",handle_reader_source);
+  server.Get("/api/stream-reader/export",handle_reader_export);
+  server.Post("/api/stream-reader/release",handle_reader_release);
   server.Get("/api/live-stream/snapshot",handle_live_snapshot);
   server.Post("/api/live-stream/append",handle_live_append);
   server.Post("/api/live-stream/action",handle_live_action);
