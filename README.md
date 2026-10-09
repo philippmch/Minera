@@ -1919,3 +1919,38 @@ The bundled sample (`data/sample_event_log.csv`) is produced by the
 ./build/minera_generate_sample data/sample_event_log.csv
 ./build/minera_export data/sample_event_log.csv -o src/frontend/public/sample-data.json
 ```
+
+
+### Native Outlook acquisition on Windows
+
+The native source API and `minera_acquire_source` can read the current Windows
+account's `Outlook.Application` COM profile. Mail extraction reads Sent Mail and
+Inbox; calendar extraction supports the default calendar or an explicitly
+resolved shared account and folder ID. Live item acquisition defaults to 1000
+examined items and records total/examined/captured/skipped counts plus an explicit
+limit flag. COM property failures and unsupported mail classes appear in the
+retained item table. These counts describe a bounded acquisition rather than a
+transactional Outlook snapshot.
+
+```powershell
+minera_acquire_source outlook_mail_extractor --param outlook_source=com --param communication_max_items=1000 --output-capture mailbox-items.json --output-formatted mailbox-events.json --output-xes mailbox.xes
+minera_acquire_source outlook_calendar --param outlook_source=com --param outlook_email_user=owner@example.invalid --param outlook_calendar_id=9 --param communication_include_reminders=false --output-table calendar-items.json --output-formatted calendar-events.json
+```
+
+HTTP acquisition uses `POST /api/source-acquisition/acquire` with
+`connector=outlook_calendar` or `outlook_mail_extractor`, `mode=outlook_com` and a
+new `source_id`. It accepts no upload body or server file path. Use the existing
+communication item/event/reminder/current-time parameters and optional
+`outlook_email_user`/`outlook_calendar_id` for shared calendars. Source responses
+retain `outlook_tables.items` and `outlook_tables.formatted` alongside the full
+native log. The `/capture` and `/table?formatted=true` routes download those
+tables, and `/export` produces native log JSON or XES/gzip. Reconnection and
+release retain the acquired result without rerunning COM extraction.
+
+This checkpoint provides the native driver, CLI and HTTP foundation. The browser
+workbench currently uses Outlook CSV inputs; live Outlook controls are next.
+Controlled COM graphs validate the same extraction code and four public
+reference outputs; real user profiles were not read during validation. Outlook
+COM activation/profile behavior, hard call deadlines, recurrence expansion,
+full date/type/default/error/performance parity and arbitrary-character XES
+fidelity remain open. See `docs/feature-first-outlook-source-validation.json`.

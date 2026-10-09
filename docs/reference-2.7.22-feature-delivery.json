@@ -1793,6 +1793,44 @@
         "NULLS",
         "FORMATTED_TABLES"
       ]
+    },
+    {
+      "id": "native_outlook_com_acquisition",
+      "state": "native_driver_cli_and_http_foundation_available",
+      "families": [
+        "algo.connectors"
+      ],
+      "variants": [
+        "OUTLOOK_MAIL_EXTRACTOR",
+        "OUTLOOK_CALENDAR",
+        "WINDOWS_COM",
+        "DEFAULT_CALENDAR",
+        "SHARED_CALENDAR",
+        "BOUNDED_ITEMS",
+        "SKIPPED_ITEMS",
+        "ITEM_AND_FORMATTED_TABLES"
+      ],
+      "native_components": [
+        "include/minera/outlook_source.hpp",
+        "src/backend/outlook_source.cpp",
+        "include/minera/source_acquisition.hpp",
+        "src/backend/source_acquisition.cpp"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_acquire_source.cpp",
+        "src/backend/tools/source_acquisition_routes.hpp"
+      ],
+      "added": [
+        "Native Windows Outlook.Application COM acquisition for mailbox sent/inbox folders and default/shared calendars",
+        "IDispatch property/method extraction without mail mutation, with COM apartment and object lifetime cleanup",
+        "Recipient display names, Outlook class labels, conversation/topic/subject fields and scheduled calendar completion/reminder events",
+        "Explicit shared calendar account and folder selectors, bounded item capture, exact counts and explicit skipped item reasons",
+        "Full normalized item capture and formatted event tables, retained inline in native source responses and separate capture/table endpoints",
+        "CLI complete item/formatted JSON and native log/XES outputs through the same native driver",
+        "Unicode COM strings and valid connector JSON for subject control characters",
+        "Four controlled public reference comparisons matching every formatted column, row and index"
+      ],
+      "validation": "docs/feature-first-outlook-source-validation.json"
     }
   ],
   "execution_priority": [
@@ -1806,7 +1844,7 @@
     },
     {
       "area": "Optional connector drivers",
-      "next_action": "Continue live Outlook mailbox/calendar extraction and broader driver fidelity. Nine connector workbenches, GitHub HTTPS, native Windows channel/EVTX acquisition and Camunda/SAP SQLite/ODBC history acquisition are available. Native ODBC currently requires Windows; live vendor deployments, typed/binary/driver dialects, subscriptions/bookmarks/remote hosts and full reference behavior remain open."
+      "next_action": "Finish live Outlook mailbox/calendar controls, complete table inspection and browser handoff on top of the native Windows COM driver. Native Outlook CLI/HTTP foundation now joins GitHub HTTPS, Windows channel/EVTX and Camunda/SAP SQLite/ODBC acquisition. Real Outlook profiles, broader vendor deployments, typed/binary/dialect fidelity, subscriptions/bookmarks/remote hosts and full reference behavior remain open."
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",

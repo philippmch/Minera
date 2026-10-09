@@ -29,7 +29,7 @@ std::vector<std::vector<std::string>> table(std::string_view input) {
   if (quoted) throw std::invalid_argument("Communication history: unterminated CSV quote");
   return rows;
 }
-std::string escape_json(std::string_view value) { std::string out; for (const char c : value) { if (c == '"') out += "\\\""; else if (c == '\\') out += "\\\\"; else if (c == '\n') out += "\\n"; else if (c == '\r') out += "\\r"; else if (c == '\t') out += "\\t"; else out += c; } return out; }
+std::string escape_json(std::string_view value) { constexpr char hex[]="0123456789abcdef"; std::string out; for (const unsigned char c : value) { if (c == '"') out += "\\\""; else if (c == '\\') out += "\\\\"; else if (c == '\n') out += "\\n"; else if (c == '\r') out += "\\r"; else if (c == '\t') out += "\\t"; else if(c<32){out+="\\u00";out+=hex[c>>4];out+=hex[c&15];} else out += static_cast<char>(c); } return out; }
 std::string_view variant_name(CommunicationHistoryVariant variant) { return variant == CommunicationHistoryVariant::kMailbox ? "mailbox" : "calendar"; }
 const std::map<std::string, std::string, std::less<>> kClasses = {
     {"26","Appointment"},{"40","Contact"},{"41","Document"},{"42","Journal"},{"43","Mail"},{"44","Note"},{"45","Post"},{"46","Delivery Report"},{"47","Remote"},{"48","Task"},{"49","Task Request"},{"50","Task Request Update"},{"51","Task Request Acceptance"},{"52","Task Request Declination"},{"53","Meeting Request"},{"54","Meeting Cancellation"},{"55","Meeting Declination"},{"56","Meeting Acceptance"},{"57","Meeting Tentatively Accepted"},{"69","Distribution List"},{"104","Sharing"},{"113","Storage"},{"181","Meeting Forward Notification"}};
