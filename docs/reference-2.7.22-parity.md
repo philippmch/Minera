@@ -12609,3 +12609,28 @@ consistent whole-database backup/durability remains a gate. No reference bodies
 or bytecode were inspected and no catalogue parity unit is promoted. All
 86 packages/387 modules, 46 complete packages/199 complete modules and 228
 incomplete units remain the objective.
+
+
+### Feature delivery first: native Outlook COM acquisition foundation
+
+Added Windows Outlook.Application COM acquisition for sent/inbox mailbox items
+and default/shared calendars through the native source API and CLI. The driver
+reads recipient display names and caller-observed class/subject/topic/date fields,
+computes calendar completion/reminder events, retains complete normalized item
+and formatted tables, and exposes bounded counts and explicit skipped item
+records. Native source JSON includes both tables; capture/table endpoints and
+CLI item/formatted/XES outputs retain them. Connector JSON now escapes all ASCII
+control characters in subjects.
+
+Validation: 11 assertion-enabled native suites, four exact controlled public
+reference table comparisons, 21 controlled COM/artifact checks and 27 HTTP/CLI
+checks (26 HTTP requests, three CLI guard invocations). Controlled IDispatch
+graphs exercise the real extraction code without accessing private profiles.
+The reference was used only through public calls, signatures and opaque hashes.
+The tested frontend remains unchanged: live Outlook app controls and browser
+proof are the next step. Actual Outlook profile activation, complete driver/type/
+default/error/time-zone/recurrence/concurrency/performance behavior and all 228
+incomplete catalogue units remain open. No parity status is promoted.
+
+Evidence: docs/feature-first-outlook-source-validation.json and
+docs/outlook-driver-reference-behavior.json.

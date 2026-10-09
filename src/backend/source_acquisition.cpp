@@ -53,7 +53,16 @@ SourceAcquisitionResult acquire_source(const SourceAcquisitionInput& input) {
   if(!input.server_path.empty()&&std::filesystem::is_regular_file(path))result.original_bytes=read_file(path);
   if(result.original_bytes&&result.original_bytes->size()>maximum_bytes)throw std::length_error("source acquisition: source exceeds 512 MiB");
   std::unique_ptr<UploadedFile> uploaded;
-  if(present("database_driver")) {
+  if(present("outlook_source")) {
+    if((input.connector!="outlook_mail_extractor"&&input.connector!="outlook_calendar")||field("outlook_source")!="com")throw std::invalid_argument("Outlook acquisition requires an Outlook connector and com source");
+    if(result.original_bytes||!input.server_path.empty())throw std::invalid_argument("Outlook COM acquisition does not accept an upload or server path");
+    OutlookSourceOptions options;options.history=parse_communication_history_params(field,present);if(!present("communication_max_items"))options.history.max_items=1000;options.email_user=field("outlook_email_user");
+    if(present("outlook_calendar_id")){const auto value=field("outlook_calendar_id");const auto parsed=std::from_chars(value.data(),value.data()+value.size(),options.calendar_id);if(value.empty()||parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size())throw std::invalid_argument("outlook_calendar_id requires a positive folder number");}
+#ifdef _WIN32
+    if(input.outlook_application)result.outlook_capture=capture_outlook_source_with_dispatch(options,input.outlook_application);else
+#endif
+    result.outlook_capture=capture_outlook_source(options);result.log=result.outlook_capture->log;result.native_result_json=communication_history_json(result.log,options.history.variant);
+  }else if(present("database_driver")) {
     DatabaseHistoryOptions options;options.connector=input.connector;options.driver=field("database_driver");options.prefix=field("database_prefix");options.dialect=field("database_dialect");options.connection_string=input.database_connection;
     if(options.driver=="sqlite"){if(input.server_path.empty()&&result.original_bytes){uploaded=std::make_unique<UploadedFile>(*result.original_bytes);path=uploaded->path();}options.path=path;}
     else if(result.original_bytes||!input.server_path.empty())throw std::invalid_argument("ODBC acquisition does not accept an upload or server file path");
@@ -104,6 +113,7 @@ std::string source_acquisition_json(const SourceAcquisitionResult& result) {
   out<<"{\"family\":\"SOURCE_ACQUISITION\",\"connector\":\""<<result.connector<<"\",\"trace_count\":"<<result.log.trace_count()<<",\"event_count\":"<<result.log.event_count()<<",\"native_result\":"<<result.native_result_json<<",\"native_log\":"<<log_conversion_json(full);
   if(result.windows_capture)out<<",\"native_acquisition\":"<<windows_event_capture_json(*result.windows_capture);
   if(result.database_capture)out<<",\"native_acquisition\":"<<database_history_capture_json(*result.database_capture);
+  if(result.outlook_capture)out<<",\"native_acquisition\":"<<outlook_source_capture_json(*result.outlook_capture)<<",\"outlook_tables\":{\"items\":"<<result.outlook_capture->item_table_json<<",\"formatted\":"<<result.outlook_capture->formatted_table_json<<'}';
   out<<'}';return out.str();
 }
 }  // namespace minera

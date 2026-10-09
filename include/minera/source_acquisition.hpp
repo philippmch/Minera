@@ -6,6 +6,7 @@
 #include "minera/repository_history.hpp"
 #include "minera/windows_event_source.hpp"
 #include "minera/database_history_source.hpp"
+#include "minera/outlook_source.hpp"
 
 namespace minera {
 // Uploads and explicit server paths feed the existing native connector importers.
@@ -20,6 +21,9 @@ struct SourceAcquisitionInput {
   WindowsEventNext windows_event_reader;
   std::string database_connection;
   DatabaseHistoryReader database_reader;
+#ifdef _WIN32
+  ::IDispatch* outlook_application = nullptr;
+#endif
 };
 struct SourceAcquisitionResult {
   std::string connector;
@@ -28,6 +32,7 @@ struct SourceAcquisitionResult {
   std::optional<std::string> original_bytes;
   std::optional<WindowsEventCapture> windows_capture;
   std::optional<DatabaseHistoryCapture> database_capture;
+  std::optional<OutlookSourceCapture> outlook_capture;
 };
 [[nodiscard]] SourceAcquisitionResult acquire_source(const SourceAcquisitionInput& input);
 [[nodiscard]] std::string source_acquisition_json(const SourceAcquisitionResult& result);
