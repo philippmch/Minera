@@ -1,0 +1,576 @@
+{
+  "4-source-free-forward": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-forward-log": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-forward-stream": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "stream",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-forward-dataframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "dataframe",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-forward-lazyframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-backwards-log": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "log"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-backwards-stream": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "stream"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-backwards-dataframe": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "dataframe"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-backwards-lazyframe": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "lazyframe"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-regrouped-log": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_case_id_attribute": "bucket",
+      "token_replay_activity_attribute": "phase"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-regrouped-stream": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "stream",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_case_id_attribute": "bucket",
+      "token_replay_activity_attribute": "phase"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-regrouped-dataframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "dataframe",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_case_id_attribute": "bucket",
+      "token_replay_activity_attribute": "phase"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-regrouped-lazyframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_case_id_attribute": "bucket",
+      "token_replay_activity_attribute": "phase"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-variants-native": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-variants-disabled": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_disable_variants": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-variants-grouped": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_disable_variants": "false"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-returned-names": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_return_names": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-no-pltr": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "false"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-empty-hidden-cache": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_places_shortest_path_by_hidden": "{}"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-null-hidden-cache": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_places_shortest_path_by_hidden": "null"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-supplied-hidden-cache": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_places_shortest_path_by_hidden": "{\"p-source\":{\"p-before-A\":[\"t-hidden\"]}}"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "4-wide-log": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-wide.pnml"
+  },
+  "4-wide-stream": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "stream",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-wide.pnml"
+  },
+  "4-wide-dataframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "dataframe",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-wide.pnml"
+  },
+  "4-wide-lazyframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.csv",
+    "model": "owned-wide.pnml"
+  },
+  "4-xes-log": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "4-xes-stream": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "stream",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "4-xes-dataframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "dataframe",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "4-xes-lazyframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "4-xes-importer-iterparse": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "xes_variant": "iterparse",
+      "xes_timestamp_sort": "true",
+      "xes_reverse_sort": "false",
+      "xes_require_timestamp": "true",
+      "xes_attributes_to_read": "amount,approved",
+      "xes_max_traces": "2"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "5-xes-importer-iterparse": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "xes_variant": "iterparse",
+      "xes_timestamp_sort": "true",
+      "xes_reverse_sort": "false",
+      "xes_require_timestamp": "true",
+      "xes_attributes_to_read": "amount,approved",
+      "xes_max_traces": "2"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "5-xes-importer-line_by_line": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "xes_variant": "line_by_line",
+      "xes_timestamp_sort": "true",
+      "xes_reverse_sort": "false",
+      "xes_require_timestamp": "true",
+      "xes_attributes_to_read": "amount,approved",
+      "xes_max_traces": "2"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "5-xes-importer-iterparse_20": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "xes_variant": "iterparse_20",
+      "xes_timestamp_sort": "true",
+      "xes_reverse_sort": "false",
+      "xes_require_timestamp": "true",
+      "xes_attributes_to_read": "amount,approved",
+      "xes_max_traces": "2"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "5-xes-importer-iterparse_mem_compressed": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "xes_variant": "iterparse_mem_compressed",
+      "xes_timestamp_sort": "true",
+      "xes_reverse_sort": "false",
+      "xes_require_timestamp": "true",
+      "xes_attributes_to_read": "amount,approved",
+      "xes_max_traces": "2"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "5-xes-importer-rustxes": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "xes_variant": "rustxes",
+      "xes_timestamp_sort": "true",
+      "xes_reverse_sort": "false",
+      "xes_require_timestamp": "true",
+      "xes_attributes_to_read": "amount,approved",
+      "xes_max_traces": "2"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "5-xes-importer-chunk_regex": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "xes_variant": "chunk_regex",
+      "xes_timestamp_sort": "true",
+      "xes_reverse_sort": "false",
+      "xes_require_timestamp": "true",
+      "xes_attributes_to_read": "amount,approved",
+      "xes_max_traces": "2"
+    },
+    "log": "owned-replay.xes",
+    "model": "owned-replay.pnml"
+  },
+  "5-gzip-lazyframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-replay.xes.gz",
+    "model": "owned-replay.pnml"
+  },
+  "5-custom-tsv-log": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "case_column": "job",
+      "activity_column": "step",
+      "timestamp_column": "clock",
+      "delimiter": "\t"
+    },
+    "log": "owned-replay.tsv",
+    "model": "owned-replay.pnml"
+  },
+  "5-custom-tsv-stream": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "stream",
+      "token_replay_enable_pltr_fitness": "true",
+      "case_column": "job",
+      "activity_column": "step",
+      "timestamp_column": "clock",
+      "delimiter": "\t"
+    },
+    "log": "owned-replay.tsv",
+    "model": "owned-replay.pnml"
+  },
+  "5-custom-tsv-dataframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "dataframe",
+      "token_replay_enable_pltr_fitness": "true",
+      "case_column": "job",
+      "activity_column": "step",
+      "timestamp_column": "clock",
+      "delimiter": "\t"
+    },
+    "log": "owned-replay.tsv",
+    "model": "owned-replay.pnml"
+  },
+  "5-custom-tsv-lazyframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_enable_pltr_fitness": "true",
+      "case_column": "job",
+      "activity_column": "step",
+      "timestamp_column": "clock",
+      "delimiter": "\t"
+    },
+    "log": "owned-replay.tsv",
+    "model": "owned-replay.pnml"
+  },
+  "5-deviant-native": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "owned-deviant.csv",
+    "model": "owned-replay.pnml"
+  },
+  "5-deviant-unknown-policy": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_consider_activities_not_in_model_in_fitness": "true"
+    },
+    "log": "owned-deviant.csv",
+    "model": "owned-replay.pnml"
+  },
+  "5-deviant-stop": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_enable_pltr_fitness": "true",
+      "token_replay_stop_immediately_unfit": "true"
+    },
+    "log": "owned-deviant.csv",
+    "model": "owned-replay.pnml"
+  },
+  "5-deviant-backwards": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "log"
+    },
+    "log": "owned-deviant.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-forward-log": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "log",
+      "token_replay_max_rows_to_materialize": "0",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "empty-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-forward-stream": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "stream",
+      "token_replay_max_rows_to_materialize": "0",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "empty-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-forward-dataframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "dataframe",
+      "token_replay_max_rows_to_materialize": "0",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "empty-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-forward-lazyframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_max_rows_to_materialize": "0",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "empty-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-backwards-log": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "log",
+      "token_replay_max_rows_to_materialize": "0"
+    },
+    "log": "empty-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-backwards-stream": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "stream",
+      "token_replay_max_rows_to_materialize": "0"
+    },
+    "log": "empty-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-backwards-dataframe": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "dataframe",
+      "token_replay_max_rows_to_materialize": "0"
+    },
+    "log": "empty-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-backwards-lazyframe": {
+    "fields": {
+      "token_replay_variant": "backwards",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_max_rows_to_materialize": "0"
+    },
+    "log": "empty-replay.csv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-custom-dataframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "dataframe",
+      "case_column": "job",
+      "activity_column": "step",
+      "timestamp_column": "clock",
+      "delimiter": "\t",
+      "token_replay_max_rows_to_materialize": "0",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "empty-custom.tsv",
+    "model": "owned-replay.pnml"
+  },
+  "6-empty-alias-lazyframe": {
+    "fields": {
+      "token_replay_variant": "forward",
+      "token_replay_input_adapter": "lazyframe",
+      "token_replay_max_rows_to_materialize": "0",
+      "token_replay_enable_pltr_fitness": "true"
+    },
+    "log": "empty-alias.csv",
+    "model": "owned-replay.pnml"
+  }
+}

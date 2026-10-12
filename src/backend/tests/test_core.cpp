@@ -746,6 +746,29 @@ void imports_csv_and_discovers_directly_follows_graph() {
   assert(graph.variants().size() == 2);
 }
 
+void preserves_multiline_csv_fields_and_original_table_order() {
+  std::istringstream input("case_id,activity,timestamp,payload,case:note\r\n"
+      "z,B,2024-01-01T00:00:10Z,\"line 1\r\nline \"\"2\"\", tail\",\"case\r\nnote\"\r\n"
+      "a,A,2024-01-01T00:00:00Z,\"first\nsecond\",other\n"
+      "z,A,2024-01-01T00:00:00Z,last,same");
+  const auto imported = minera::import_csv_event_data(input);
+  assert(imported.table.rows.size() == 3 && imported.log.event_count() == 3);
+  assert(imported.table.rows[0][3]->value == "line 1\r\nline \"2\", tail");
+  assert(imported.table.rows[1][3]->value == "first\nsecond");
+  assert(imported.log.traces[0].events[0].activity == "A");
+  assert(imported.log.traces[0].events[0].input_order == 2);
+  assert(*imported.log.traces[0].events[1].attribute("payload") == "line 1\r\nline \"2\", tail");
+  assert(*imported.log.traces[0].attribute("note") == "case\r\nnote");
+  std::istringstream untrimmed("case_id,activity,payload\r\nz,A,\"  first\nlast  \"\r\n");
+  minera::CsvImportOptions options;options.trim_fields = false;
+  assert(minera::import_csv_event_data(untrimmed,options).table.rows[0][2]->value == "  first\nlast  ");
+  std::istringstream broken("case_id,activity,payload\nz,A,\"unterminated\nfield");
+  bool rejected = false;
+  try { (void)minera::import_csv_event_log(broken); }
+  catch (const std::runtime_error& error) { rejected = std::string(error.what()) == "CSV row contains an unterminated quoted field"; }
+  assert(rejected);
+}
+
 void handles_quoted_csv_fields_and_timestamp_sorting() {
   const auto path = write_temp_log(
       "case_id,activity,timestamp\n"
@@ -7050,6 +7073,7 @@ int main() {
   imported_first_class_selectors_reach_temporal_behavioral_adapters();
   imports_csv_and_discovers_directly_follows_graph();
   handles_quoted_csv_fields_and_timestamp_sorting();
+  preserves_multiline_csv_fields_and_original_table_order();
   aggregates_repeated_trace_variants();
   inductive_miner_discovers_sequence();
   inductive_miner_discovers_exclusive_choice();

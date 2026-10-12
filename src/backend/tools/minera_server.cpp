@@ -5376,6 +5376,127 @@ void handle_token_replay(const httplib::Request& request,
   }
 }
 
+// Independent replay keeps the original uploads and never changes the cached
+// mining session. CSV flat inputs use the parser's original rectangular rows.
+void handle_token_replay_workbench(const httplib::Request& request,
+                                   httplib::Response& response) {
+  try {
+    if (!request.is_multipart_form_data() || !request.has_file("log") ||
+        !request.has_file("model"))
+      throw std::invalid_argument("token replay requires multipart fields log and model");
+    const auto lookup = [&](std::string_view name) {
+      const std::string key(name);
+      return request.has_file(key) ? form_field(request, key)
+             : request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      const std::string key(name);
+      return request.has_file(key) || request.has_param(key);
+    };
+    const auto params = minera::parse_mine_params(lookup, present);
+    const auto adapter = minera::parse_token_replay_input_adapter(lookup, present);
+    const auto& file = request.get_file_value("log");
+    const auto& model_file = request.get_file_value("model");
+    const bool is_xes = looks_like_xes(file.filename, file.content);
+    std::istringstream input(file.content);
+    minera::EventLog source_log;
+    std::optional<minera::EventTable> source_table;
+    if (is_xes) source_log = minera::import_xes_event_log(input, params.xes);
+    else {
+      auto imported = minera::import_csv_event_data(input, params.csv);
+      source_log = std::move(imported.log);
+      source_table = std::move(imported.table);
+    }
+    auto import_options = minera::tools::pnml_model_import_options();
+    import_options.import_stochastic_map = false;
+    const auto document = minera::parse_pnml_document(model_file.content, import_options);
+    auto options = minera::tools::default_replay_input_options(
+        source_log, minera::tools::pnml_replay_options(document, params.token_replay),
+        params.token_replay_activity_attribute_supplied);
+    // Header-only CSV inputs still declare their imported activity field.
+    // With no events, the ordinary default helper has no source cell to inspect.
+    if (source_table && source_log.event_count() == 0 &&
+        !params.token_replay_activity_attribute_supplied) {
+      auto selected = std::find(source_table->columns.begin(), source_table->columns.end(),
+                                params.csv.activity_column);
+      if (selected == source_table->columns.end()) {
+        const auto alias = params.csv.activity_column == "activity" ? "concept:name"
+            : params.csv.activity_column == "concept:name" ? "activity" : "";
+        selected = std::find(source_table->columns.begin(), source_table->columns.end(), alias);
+      }
+      if (selected != source_table->columns.end()) options.activity_attribute = *selected;
+    }
+    if (!is_xes && !present("token_replay_case_id_attribute"))
+      options.case_id_attribute = params.csv.case_id_column;
+    const bool forward = options.variant == minera::TokenReplayVariant::kForward;
+    if (!forward && (options.enable_pltr_fitness || options.return_names ||
+                    present("token_replay_disable_variants")))
+      throw std::invalid_argument(
+          "place/transition fitness, return-names and variant grouping require forward replay");
+    std::optional<minera::EventStream> stream;
+    std::optional<minera::EventTable> table;
+    std::optional<minera::LazyEventTable> lazy;
+    minera::EventLog replay_log;
+    if (adapter == "log") replay_log = source_log;
+    else {
+      if (adapter == "stream") {
+        stream = source_table ? minera::event_table_to_event_stream(*source_table)
+                              : minera::event_log_to_event_stream(source_log);
+        replay_log = minera::normalize_token_replay_event_log(minera::EventDataView(*stream), options);
+      } else if (adapter == "dataframe") {
+        table = source_table ? *source_table : minera::event_log_to_table(source_log);
+        replay_log = minera::normalize_token_replay_event_log(minera::EventDataView(*table), options);
+      } else {
+        lazy = source_table ? minera::LazyEventTable::from_table(*source_table)
+                            : minera::event_log_to_lazy_table(source_log);
+        replay_log = minera::normalize_token_replay_event_log(minera::EventDataView(*lazy), options);
+      }
+    }
+    std::vector<minera::TokenReplayTraceDiagnostics> rows;
+    std::string full_result = "null";
+    if (forward) {
+      const auto result = minera::replay_token_result(replay_log, document.net, options);
+      full_result = minera::token_replay_result_json(result);
+      rows = result.traces;
+    } else rows = minera::replay_token_traces(replay_log, document.net, options);
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    std::string body = "{\"family\":\"TOKEN_REPLAY_WORKFLOW\",\"variant\":" +
+        quote(forward ? "forward" : "backwards") + ",\"input_context\":{\"adapter\":" + quote(adapter) +
+        ",\"origin\":" + quote(source_table && adapter != "log" ? "uploaded_csv_rows" : "uploaded_grouped_log") +
+        ",\"dataset\":" + quote(file.filename) + ",\"model\":" + quote(model_file.filename) +
+        ",\"log_bytes\":" + std::to_string(file.content.size()) +
+        ",\"model_bytes\":" + std::to_string(model_file.content.size()) +
+        ",\"source_case_count\":" + std::to_string(source_log.trace_count()) +
+        ",\"source_event_count\":" + std::to_string(source_log.event_count()) +
+        ",\"evaluated_case_count\":" + std::to_string(replay_log.trace_count()) +
+        ",\"evaluated_event_count\":" + std::to_string(replay_log.event_count()) +
+        ",\"activity_attribute\":" + quote(options.activity_attribute) +
+        ",\"case_id_attribute\":" + quote(options.case_id_attribute) +
+        "},\"model_context\":{\"places\":[";
+    for (std::size_t p = 0; p < document.net.place_count(); ++p) {
+      if (p) body += ',';
+      body += "{\"index\":" + std::to_string(p) + ",\"id\":" + quote(document.place_ids.at(p)) +
+          ",\"initial_tokens\":" + minera::TokenInteger(document.initial_marking.at(p)).decimal() +
+          ",\"final_tokens\":" + minera::TokenInteger(document.final_marking.at(p)).decimal() +
+          ",\"initial_key\":" + (document.initial_marking_keys.at(p) ? "true" : "false") +
+          ",\"final_key\":" + (document.final_marking_keys.at(p) ? "true" : "false") + '}';
+    }
+    body += "],\"transitions\":[";
+    for (std::size_t t = 0; t < document.net.transitions().size(); ++t) {
+      if (t) body += ',';
+      const auto& transition = document.net.transitions()[t];
+      body += "{\"index\":" + std::to_string(t) + ",\"id\":" + quote(document.transition_ids.at(t)) +
+          ",\"label\":" + (transition.activity ? quote(document.net.activities().at(*transition.activity)) : "null") + '}';
+    }
+    body += "]},\"full_result\":" + full_result + ",\"diagnostics\":" +
+        minera::token_replay_traces_json(rows, options.variant) + '}';
+    response.set_content(body, "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_replay_fitness(const httplib::Request& request,
                            httplib::Response& response) {
   try {
@@ -9851,6 +9972,7 @@ int main(int argc, char** argv) {
   server.Options("/api/data-petri-net", preflight);
   server.Options("/api/check-model", preflight);
   server.Options("/api/token-replay", preflight);
+  server.Options("/api/replay-token-workbench", preflight);
   server.Options("/api/replay-fitness", preflight);
   server.Options("/api/process-tree-petri", preflight);
   server.Options("/api/playout", preflight);
@@ -9977,6 +10099,7 @@ int main(int argc, char** argv) {
   server.Post("/api/data-petri-net", handle_data_petri_net);
   server.Post("/api/check-model", handle_check_model);
   server.Post("/api/token-replay", handle_token_replay);
+  server.Post("/api/replay-token-workbench", handle_token_replay_workbench);
   server.Post("/api/replay-fitness", handle_replay_fitness);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/process-tree-petri", handle_process_tree_petri);

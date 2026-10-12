@@ -56,6 +56,30 @@ std::vector<std::string> parse_csv_row(
   return fields;
 }
 
+// A quoted field can span physical lines. Keep its exact CR/LF bytes; only an
+// unquoted record terminator is consumed. Escaped quotes retain their spelling
+// for the existing field parser to decode.
+bool read_csv_record(std::istream& input, std::string& record) {
+  record.clear();
+  bool in_quotes = false;
+  bool read_any = false;
+  char ch;
+  while (input.get(ch)) {
+    read_any = true;
+    if (ch == '"') {
+      record.push_back(ch);
+      if (in_quotes && input.peek() == '"') {
+        input.get(ch);
+        record.push_back(ch);
+      } else in_quotes = !in_quotes;
+    } else if (!in_quotes && (ch == '\r' || ch == '\n')) {
+      if (ch == '\r' && input.peek() == '\n') input.get(ch);
+      return true;
+    } else record.push_back(ch);
+  }
+  return read_any;
+}
+
 std::unordered_map<std::string, std::size_t> header_index(
     const std::vector<std::string>& header) {
   std::unordered_map<std::string, std::size_t> index;
@@ -139,12 +163,9 @@ CsvEventData import_csv_event_data_impl(
   }
 
   std::string line;
-  if (!std::getline(input, line)) {
+  if (!read_csv_record(input, line)) {
     return {};
   }
-  // getline consumes LF but leaves the CR in a CRLF record terminator. It is
-  // not a field value, including when preserving field whitespace.
-  if (!line.empty() && line.back() == '\r') line.pop_back();
 
   // Strip a leading UTF-8 byte-order mark so the first column name still
   // matches; spreadsheet exports routinely prepend one.
@@ -215,8 +236,7 @@ CsvEventData import_csv_event_data_impl(
 
   std::size_t line_number = 1;
   std::size_t input_order = 0;
-  while (std::getline(input, line)) {
-    if (!line.empty() && line.back() == '\r') line.pop_back();
+  while (read_csv_record(input, line)) {
     ++line_number;
     if (line.empty()) {
       continue;
