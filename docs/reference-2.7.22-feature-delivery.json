@@ -240,7 +240,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_timing_discovery_workflow_available",
       "package": "algo.discovery.batches",
       "parity_status": "complete",
       "selectors": [
@@ -417,7 +417,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_timing_discovery_workflow_available",
       "package": "algo.discovery.performance_spectrum",
       "parity_status": "complete",
       "selectors": [
@@ -2274,6 +2274,52 @@
         "The Windows server target uses the MSVC large-object option so the expanded native server compiles with the authoritative build configuration."
       ],
       "validation": "docs/feature-first-graph-discovery-validation.json"
+    },
+    {
+      "id": "native_performance_spectrum_and_batches_workbench",
+      "state": "all_native_spectrum_and_batch_adapters_controls_and_complete_exports_available",
+      "families": [
+        "algo.discovery.performance_spectrum",
+        "algo.discovery.batches"
+      ],
+      "variants": [
+        "LOG",
+        "DATAFRAME",
+        "LAZYFRAME",
+        "LOG_DISCONNECTED",
+        "DATAFRAME_DISCONNECTED",
+        "LAZYFRAME_DISCONNECTED",
+        "CONNECTED_COMPATIBILITY",
+        "DISCONNECTED_COMPATIBILITY",
+        "BATCH_LOG",
+        "BATCH_PANDAS",
+        "BATCH_POLARS",
+        "FULL_UINT64_SAMPLE_TEXT",
+        "CUSTOM_SELECTORS",
+        "EXPLICIT_START_FALLBACK",
+        "TABLE_EVENT_IDENTITIES",
+        "NATIVE_TIMESTAMP_PRECISION",
+        "COMPLETE_REPORTS_CSV"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/json_export.cpp",
+        "src/frontend/src/timing-discovery.ts",
+        "src/frontend/src/components/TimingDiscovery.tsx",
+        "src/frontend/src/components/PerformanceSpectrum.tsx"
+      ],
+      "added": [
+        "An independent Timing discovery workbench exposes performance spectra and batch detection from the current native source, including sources without timestamps so native requirements remain explicit.",
+        "All six explicit spectrum adapters and both compatibility variants expose activity patterns, full unsigned 64-bit sample text, event sorting and activity/timestamp/case selectors.",
+        "The completed spectrum uses native observations exclusively. It retains disconnected subpatterns, offsets, labels, native sampling endpoints and adapter-specific timestamp scales.",
+        "Batch discovery exposes log, pandas and polars variants, merge distance, minimum size, activity/resource/completion/case selectors, explicit start-field overrides and table event identities.",
+        "An enabled blank start selector preserves native completion-time fallback. Empty native results and invalid combinations remain explicit and inspectable.",
+        "Original response JSON, exact submitted request/report, complete analysis JSON, every native property table, complete row JSON and every-table CSV remain available beyond visualization and paging.",
+        "Source changes clear prior output and errors. Editing controls or changing families retains the last completed run with its original method, variant and source label.",
+        "Spectrum and batch JSON use scoped round-trip double precision, preserving minute gaps and fractional epoch timestamps while restoring caller stream precision.",
+        "Independent native operations and repeated exports preserve the current source/schema and cached workflow. Browser controls remain available on an untimed source and expose the native missing-timestamp error."
+      ],
+      "validation": "docs/feature-first-timing-discovery-validation.json"
     }
   ],
   "execution_priority": [
@@ -2291,7 +2337,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations and I/O. Footprints now expose all eight variants, all conformance methods, actual cached comparison models and complete native diagnostics. Transition systems expose both directions, all views, signed windows and complete traversal data. Declare/Log Skeleton, Inductive/POWL, Alpha/Heuristic, generators, model diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve the complete catalogue and all strict algorithm/adapter/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates."
+      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations and I/O. Timing discovery now exposes all spectrum and batch adapters with native controls, identities, intervals, precision and complete inspection/exports. Footprints, transition systems, Declare/Log Skeleton, Inductive/POWL, Alpha/Heuristic, generators, model diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve the complete catalogue and every strict algorithm/adapter/selector/default/error/type/numeric/order/Unicode/concurrency/performance gate."
     }
   ],
   "feature_status_meaning": {

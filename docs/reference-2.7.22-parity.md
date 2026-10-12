@@ -12963,3 +12963,42 @@ numeric object keys retain the app's enumeration convention.
 
 Evidence: docs/feature-first-graph-discovery-validation.json and
 docs/feature-first-graph-discovery-preview.jpg.
+
+
+### Feature delivery first: performance spectrum and batch discovery
+
+Added independent native Timing discovery for performance spectra and batch
+detection. All six explicit spectrum adapters and both compatibility variants
+expose pattern, full unsigned 64-bit sample text, event sorting and custom
+activity/timestamp/case selectors. The completed diagram uses native observations
+and retains every disconnected subpattern, offset, label and endpoint sample.
+Native timestamp scales remain explicit rather than being reinterpreted.
+
+Batch detection exposes log, pandas and polars adapters, merge distance, minimum
+size, activity/resource/completion/case/start selectors and table event identity.
+An enabled blank start override uses completion times. Complete native/request/
+analysis JSON, every native table, full-row JSON and all CSV exports preserve
+observations, intervals, categories and event references beyond preview/paging.
+Changed sources clear prior results and errors; edited controls retain the last
+completed run with its original method, variant and source label.
+
+Scoped round-trip double precision fixes rounded epoch timestamps in spectrum
+and batch JSON, preserving minute gaps and fractional seconds. Native algorithms
+and adapter semantics remain unchanged. Zero log-spectrum sampling retains two
+endpoints; disconnected adapters can return multiple observations per case.
+
+Validation: four focused native suites, 1,179 frontend tests (22 added) and
+production build; 43 native checks over 28 calls with seventeen actual fixtures;
+22 browser checks across all adapters and 453 downloads; 457 independent checks
+over 402 complete CSV tables and original JSON, with 21 repeated native/schema/
+cached-model calls. Untimed sources retain the discovery entry point and expose
+the native timestamp requirement. Source reopening clears old results and errors.
+
+All owned servers and the test tab were closed. Earlier compile/test-fixture/API/
+selector/artifact-path attempts remain retained. Only feature labels change:
+all 228 incomplete units and strict default/type/order/Unicode/adapter/sampling/
+concurrency/performance gates remain open. No package or module parity status is
+promoted. Broader timing features and every remaining catalogue unit stay in scope.
+
+Evidence: docs/feature-first-timing-discovery-validation.json and
+docs/feature-first-timing-discovery-results-preview.png.

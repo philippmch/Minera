@@ -1,0 +1,122 @@
+{
+  "spectrum-log": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "log",
+    "spectrum_activities": "A,B,D"
+  },
+  "spectrum-dataframe": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "dataframe",
+    "spectrum_activities": "A,B,D"
+  },
+  "spectrum-lazyframe": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "lazyframe",
+    "spectrum_activities": "A,B,D"
+  },
+  "spectrum-log_disconnected": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "log_disconnected",
+    "spectrum_activities": "A,B,D"
+  },
+  "spectrum-dataframe_disconnected": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "dataframe_disconnected",
+    "spectrum_activities": "A,B,D"
+  },
+  "spectrum-lazyframe_disconnected": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "lazyframe_disconnected",
+    "spectrum_activities": "A,B,D"
+  },
+  "spectrum-connected": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "connected",
+    "spectrum_activities": "A,B,D"
+  },
+  "spectrum-disconnected": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "disconnected",
+    "spectrum_activities": "A,B,D"
+  },
+  "spectrum-custom": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "dataframe_disconnected",
+    "spectrum_activities": "活動-A,活動-B,活動-D",
+    "spectrum_activity_key": "phase",
+    "spectrum_case_id_key": "bucket",
+    "spectrum_timestamp_key": "timestamp",
+    "spectrum_sort_log": "false",
+    "spectrum_sample_size": "25"
+  },
+  "spectrum-full-width": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "log",
+    "spectrum_activities": "A,D",
+    "spectrum_sample_size": "18446744073709551615"
+  },
+  "spectrum-zero-sample": {
+    "family": "spectrum",
+    "source_id": "2",
+    "spectrum_variant": "log",
+    "spectrum_activities": "A,D",
+    "spectrum_sample_size": "0"
+  },
+  "batches-log": {
+    "family": "batches",
+    "source_id": "2",
+    "batch_variant": "log",
+    "batch_start_timestamp_attribute": "start_time",
+    "batch_merge_distance_seconds": "0",
+    "batch_min_size": "2"
+  },
+  "batches-pandas": {
+    "family": "batches",
+    "source_id": "2",
+    "batch_variant": "pandas",
+    "batch_start_timestamp_attribute": "start_time",
+    "batch_merge_distance_seconds": "0",
+    "batch_min_size": "2"
+  },
+  "batches-polars": {
+    "family": "batches",
+    "source_id": "2",
+    "batch_variant": "polars",
+    "batch_start_timestamp_attribute": "start_time",
+    "batch_merge_distance_seconds": "0",
+    "batch_min_size": "2"
+  },
+  "batches-custom": {
+    "family": "batches",
+    "source_id": "2",
+    "batch_variant": "pandas",
+    "batch_activity_attribute": "phase",
+    "batch_resource_attribute": "resource",
+    "batch_case_id_attribute": "bucket",
+    "batch_timestamp_attribute": "timestamp",
+    "batch_start_timestamp_attribute": "start_time",
+    "batch_event_id_attribute": "event_id"
+  },
+  "batches-completion-start": {
+    "family": "batches",
+    "source_id": "2",
+    "batch_variant": "polars",
+    "batch_start_timestamp_attribute": ""
+  },
+  "batches-empty": {
+    "family": "batches",
+    "source_id": "2",
+    "batch_variant": "log",
+    "batch_min_size": "1000"
+  }
+}

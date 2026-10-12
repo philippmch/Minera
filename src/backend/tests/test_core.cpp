@@ -2625,9 +2625,9 @@ void performance_spectrum_finds_pattern_occurrences() {
   // c1 runs a→b once, with an unrelated activity in between (ignored by the
   // projection); c2 runs the pattern backwards (no match); c3 loops, so both
   // iterations count.
-  add_trace("c1", {{"a", "2024-01-01T10:00:00Z"},
+  add_trace("c1", {{"a", "2024-01-01T10:00:00.125Z"},
                    {"x", "2024-01-01T10:02:00Z"},
-                   {"b", "2024-01-01T10:05:00Z"}});
+                   {"b", "2024-01-01T10:05:00.375Z"}});
   add_trace("c2", {{"b", "2024-01-02T10:00:00Z"},
                    {"a", "2024-01-02T10:05:00Z"}});
   add_trace("c3", {{"a", "2024-01-03T10:00:00Z"},
@@ -2643,7 +2643,7 @@ void performance_spectrum_finds_pattern_occurrences() {
   assert(spectrum.observations[0].case_id == "c1");
   assert(spectrum.observations[0].instants[1] -
              spectrum.observations[0].instants[0] ==
-         300.0);
+         300.25);
   assert(spectrum.observations[1].case_id == "c3");
   assert(spectrum.observations[2].case_id == "c3");
 
@@ -2658,6 +2658,19 @@ void performance_spectrum_finds_pattern_occurrences() {
       nullptr, nullptr, nullptr, nullptr, &spectrum);
   assert(json.find("\"performance_spectrum\": {") != std::string::npos);
   assert(json.find("\"instants\": [") != std::string::npos);
+  const auto instants_begin = json.find("\"instants\": [") + 13;
+  const auto second_instant = json.find(',', instants_begin) + 1;
+  assert(std::stod(json.substr(instants_begin)) ==
+         spectrum.observations.front().instants[0]);
+  assert(std::stod(json.substr(second_instant)) ==
+         spectrum.observations.front().instants[1]);
+  std::ostringstream precise_output;
+  precise_output.precision(3);
+  minera::write_analysis_json(
+      precise_output, "t", log, graph, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &spectrum);
+  assert(precise_output.precision() == 3);
+  assert(precise_output.str().find("1704103200.125") != std::string::npos);
 
   minera::PerformanceSpectrumOptions disconnected_options;
   disconnected_options.variant =
@@ -2789,7 +2802,7 @@ void temporal_behavioral_json_validates_and_serializes_batches() {
   for (std::size_t batch_index = 0; batch_index < 5; ++batch_index) {
     minera::Batch batch;
     batch.type = static_cast<minera::BatchType>(batch_index);
-    batch.start = static_cast<double>(batch_index * 2);
+    batch.start = 1704103200.125 + static_cast<double>(batch_index * 2);
     batch.complete = batch.start + 1.5;
     for (std::size_t member = 0; member < 2; ++member) {
       const auto event_index = batch_index * 2 + member;
@@ -2830,6 +2843,8 @@ void temporal_behavioral_json_validates_and_serializes_batches() {
            std::string::npos);
   }
   assert(json.find("\"batch_count\": 5") != std::string::npos);
+  assert(json.find("\"start\": 1704103200.125, \"complete\": 1704103201.625") !=
+         std::string::npos);
 
   // Validation runs before any bytes are emitted.
   minera::PerformanceSpectrum malformed_spectrum;

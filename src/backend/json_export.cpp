@@ -2288,6 +2288,12 @@ void write_model_decoration(std::ostream& out,
 // observation (epoch seconds, one per pattern step, with the case id).
 void write_performance_spectrum(std::ostream& out,
                                 const PerformanceSpectrum& spectrum) {
+  struct RestorePrecision {
+    std::ostream& stream;
+    std::streamsize precision;
+    ~RestorePrecision() { stream.precision(precision); }
+  } restore_precision{
+      out, out.precision(std::numeric_limits<double>::max_digits10)};
   const auto variant_name = [&]() -> std::string_view {
     switch (spectrum.variant) {
       case PerformanceSpectrumVariant::kConnected: return "connected";
@@ -2924,6 +2930,12 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
 
 void write_batch_discovery(std::ostream& out, const BatchDiscovery& discovery,
                            const DirectlyFollowsGraph& graph) {
+  struct RestorePrecision {
+    std::ostream& stream;
+    std::streamsize precision;
+    ~RestorePrecision() { stream.precision(precision); }
+  } restore_precision{
+      out, out.precision(std::numeric_limits<double>::max_digits10)};
   out << "{\"groups\": [";
   for (std::size_t i = 0; i < discovery.groups.size(); ++i) {
     const auto& group = discovery.groups[i];

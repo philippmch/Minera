@@ -3218,6 +3218,60 @@ std::string discovery_model_json(std::string result_json,
 }
 
 // Variant-specific discovery runs without replacing the active analysis.
+void handle_timing_discovery(const httplib::Request& request,
+                             httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
+    if (!request.has_param("source_id") || request.get_param_value("source_id") != std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; refresh the timing source");
+    const auto family = request.get_param_value("family");
+    if (family != "spectrum" && family != "batches") throw std::invalid_argument("timing discovery family expects spectrum or batches");
+    static const std::set<std::string> spectrum_fields = {"spectrum_activities", "spectrum_variant", "spectrum_sample_size", "spectrum_sort_log", "spectrum_activity_key", "spectrum_timestamp_key", "spectrum_case_id_key"};
+    static const std::set<std::string> batch_fields = {"batch_variant", "batch_merge_distance_seconds", "batch_min_size", "batch_start_timestamp_attribute", "batch_activity_attribute", "batch_resource_attribute", "batch_timestamp_attribute", "batch_case_id_attribute", "batch_event_id_attribute"};
+    const auto& fields = family == "spectrum" ? spectrum_fields : batch_fields;
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "family" && key != "source_id" && !fields.contains(key)) throw std::invalid_argument("unknown timing discovery parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) { if (name == "batches" && family == "batches") return std::string("true"); return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
+    const auto present = [&](std::string_view name) { return (name == "batches" && family == "batches") || request.has_param(std::string(name)); };
+    const auto params = minera::parse_mine_params(lookup, present);
+    auto graph = minera::discover_directly_follows_graph(session->log);
+    std::optional<minera::PerformanceSpectrum> spectrum;
+    std::optional<minera::BatchDiscovery> batches;
+    if (family == "spectrum") {
+      if (params.spectrum_activities.empty()) throw std::invalid_argument("spectrum_activities requires at least two activities");
+      spectrum = discover_selected_performance_spectrum(session->log, params.spectrum_activities, params.spectrum);
+      for (const auto& activity : spectrum->activities) graph.ensure_activity(activity);
+    } else {
+      batches = discover_selected_batches(session->log, params.batch_options);
+      register_activity_selector_values(graph, session->log, params.batch_options.activity_attribute);
+    }
+    const auto result = minera::analysis_json(session->dataset, session->log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      spectrum ? &*spectrum : nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, batches ? &*batches : nullptr);
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    std::string variant;
+    if (spectrum) {
+      switch (spectrum->variant) {
+        case minera::PerformanceSpectrumVariant::kConnected: variant = "connected"; break;
+        case minera::PerformanceSpectrumVariant::kDisconnected: variant = "disconnected"; break;
+        case minera::PerformanceSpectrumVariant::kDataframe: variant = "dataframe"; break;
+        case minera::PerformanceSpectrumVariant::kLog: variant = "log"; break;
+        case minera::PerformanceSpectrumVariant::kDataframeDisconnected: variant = "dataframe_disconnected"; break;
+        case minera::PerformanceSpectrumVariant::kLogDisconnected: variant = "log_disconnected"; break;
+        case minera::PerformanceSpectrumVariant::kLazyframe: variant = "lazyframe"; break;
+        case minera::PerformanceSpectrumVariant::kLazyframeDisconnected: variant = "lazyframe_disconnected"; break;
+      }
+    } else variant = batches->variant == minera::BatchDiscoveryVariant::kLog ? "log" : batches->variant == minera::BatchDiscoveryVariant::kPandas ? "pandas" : "polars";
+    response.set_content("{\"family\":\"TIMING_DISCOVERY\",\"method\":" + quote(family) + ",\"variant\":" + quote(variant) + ",\"source_id\":" + quote(std::to_string(session->query_source_id)) +
+      ",\"dataset\":" + quote(session->dataset) + ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) + "},\"result\":" + result + '}', "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
 void handle_graph_discovery(const httplib::Request& request,
                             httplib::Response& response) {
   try {
@@ -9515,6 +9569,7 @@ int main(int argc, char** argv) {
   server.Options("/api/discover-alpha-plus", preflight);
   server.Options("/api/discover-constraints", preflight);
   server.Options("/api/discover-graph", preflight);
+  server.Options("/api/discover-timing", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/decision-tables", preflight);
@@ -9637,6 +9692,7 @@ int main(int argc, char** argv) {
   server.Post("/api/discover-workflow", handle_workflow_discovery);
   server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/discover-graph", handle_graph_discovery);
+  server.Post("/api/discover-timing", handle_timing_discovery);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);
