@@ -6127,6 +6127,22 @@ void json_export_carries_dfg_variants_contract() {
         "\"value\": -0.12345678901234566"}) {
     assert(json.find(fragment) != std::string::npos);
   }
+  const std::string marker = "\"stdev\": ";
+  const auto deviation = json.find(marker, json.find("\"performance_dfg\""));
+  assert(deviation != std::string::npos);
+  assert(std::stod(json.substr(deviation + marker.size())) ==
+         performance_edge.summary.standard_deviation);
+  std::ostringstream output;
+  output.precision(3);
+  minera::write_analysis_json(
+      output, "test", log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, &variants);
+  assert(output.precision() == 3);
   assert(minera::analysis_json("test", log, graph).find("\"dfg_variants\"") ==
          std::string::npos);
 

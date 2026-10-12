@@ -604,6 +604,7 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1.9fr) minmax(300px, 1fr);
   grid-template-areas:
+    "dfgdiscovery dfgdiscovery"
     "map variants"
     "activities variants"
     "dfgvariants dfgvariants"
@@ -615,6 +616,7 @@ body {
 }
 
 .map-panel { grid-area: map; }
+.dfg-discovery-workspace { grid-area: dfgdiscovery; min-width: 0; }
 .variants-panel {
   grid-area: variants;
   border-left: 1px solid var(--line);
@@ -632,7 +634,7 @@ body {
 @media (max-width: 980px) {
   .layout {
     grid-template-columns: 1fr;
-    grid-template-areas: "map" "variants" "activities" "dfgvariants" "dfgdataframe" "correlation" "efg";
+    grid-template-areas: "dfgdiscovery" "map" "variants" "activities" "dfgvariants" "dfgdataframe" "correlation" "efg";
   }
   .variants-panel { border-left: none; border-top: 1px solid var(--line); position: static; max-height: none; }
   .kpis { grid-template-columns: repeat(2, 1fr); }

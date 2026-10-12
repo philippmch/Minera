@@ -250,7 +250,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_configured_dfg_discovery_workflow_available",
       "package": "algo.discovery.causal",
       "parity_status": "complete",
       "selectors": [
@@ -277,7 +277,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_configured_dfg_discovery_workflow_available",
       "package": "algo.discovery.dfg",
       "parity_status": "complete",
       "selectors": [
@@ -2369,6 +2369,50 @@
         "Source changes clear old output/errors. Editing controls retains the completed result with its original method, variant, adapter and source. Untimed sources keep the workbench available, expose strict temporal errors and support native self-distance discovery."
       ],
       "validation": "docs/feature-first-behavior-analysis-validation.json"
+    },
+    {
+      "id": "native_configured_statistical_and_causal_dfg_workbench",
+      "state": "all_native_dfg_catalogue_selections_controls_complete_edges_samples_attributes_and_causal_exports_available",
+      "families": [
+        "algo.discovery.dfg",
+        "algo.discovery.causal"
+      ],
+      "variants": [
+        "NATIVE",
+        "FREQUENCY",
+        "FREQUENCY_GREEDY",
+        "FREQUENCY_TRIPLES",
+        "PERFORMANCE",
+        "PERFORMANCE_GREEDY",
+        "CASE_ATTRIBUTES",
+        "CLEAN",
+        "CLEAN_POLARS",
+        "CLEAN_TIME",
+        "ALPHA",
+        "HEURISTIC",
+        "ALL_PERFORMANCE_AGGREGATIONS",
+        "FULL_UINT64_WINDOW_TEXT",
+        "EXPLICIT_EMPTY_OVERRIDES",
+        "COMPLETE_SAMPLES_ATTRIBUTES_CSV_ROW_JSON"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/json_export.cpp",
+        "src/frontend/src/dfg-discovery.ts",
+        "src/frontend/src/components/DfgDiscovery.tsx"
+      ],
+      "added": [
+        "A source-bound Configured DFG discovery workbench runs all ten native statistical catalogue aliases and both causal variants independently on the cached EventLog.",
+        "Selections preserve native canonical order, aliases and default presence. Frequency, greedy frequency, triples, performance, greedy performance, case attributes, clean, clean_polars and clean_time outputs remain inspectable.",
+        "Controls expose full uint64 window text including zero, activity/completion/start selectors, per-case retention, all eight performance aggregations, business hours, fractional weekly slots, case-attribute selection and node attributes.",
+        "Enabled blank overrides preserve completion-time fallback, no active business slots and an explicit empty case-attribute list. Disabled overrides retain native defaults.",
+        "Original cached source-map edges remain available. Configured statistical and signed causal relationships live in the completed result with its selected labels, source, settings and full native analysis.",
+        "Complete JSON/report/analysis/variant exports and every full CSV retain all frequency edges, triples, boundaries, performance summaries, raw samples, aggregation values, case/node attributes and signed causal strengths.",
+        "Every inspection table supports complete selected-row JSON, including derived sample, attribute, boundary and configuration rows. Column/row paging preserves full exports and native long arrays.",
+        "DFG variant JSON preserves round-trip double precision and restores caller stream precision. Native statistical and causal algorithms remain unchanged.",
+        "Editing controls retains the completed result. Invalid selections produce visible errors; valid runs recover. Source changes clear old outputs/errors, and untimed sources support native frequency discovery."
+      ],
+      "validation": "docs/feature-first-dfg-discovery-validation.json"
     }
   ],
   "execution_priority": [
@@ -2386,7 +2430,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining discovery/statistical/causal algorithms, conformance, simulations, transformations and I/O. Independent behavior analysis now exposes temporal discovery/conformance, all minimum-self-distance variants and all correlation algorithm/input combinations, with exact JSON profile handoff and complete case/deviation/matrix exports. Timing, footprints, transition systems, Declare/Log Skeleton, Inductive/POWL, Alpha/Heuristic, generators, model diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve the complete catalogue and every strict algorithm/adapter/selector/default/error/type/numeric/order/Unicode/concurrency/performance gate."
+      "next_action": "Continue feature-first review across remaining algorithms, conformance, simulations, transformations, conversions and I/O. Configured statistical/causal DFG discovery now exposes all native catalogue selections, full window/retention/attribute/time/business-hour/aggregation settings and complete relationship/sample/attribute exports. Behavior analysis, timing, footprints, transition systems, constraint/structured/Alpha/Heuristic discovery, generators, diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve the complete catalogue and every strict algorithm/adapter/selector/default/error/type/numeric/order/Unicode/concurrency/performance gate."
     }
   ],
   "feature_status_meaning": {

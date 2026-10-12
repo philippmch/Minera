@@ -2248,3 +2248,32 @@ algorithms. Conformance uses `temporal_profile_json`. BEHAVIOR_ANALYSIS returns
 method/variant/adapter/source, full analysis and native profile/conformance data.
 Temporal/correlation JSON preserves round-trip double precision. Original table
 metadata/order, every remaining feature and strict reference parity stay in scope.
+
+
+### Configure statistical and causal DFG discovery independently
+
+Open a CSV or XES log and choose Directly-Follows Graph. Configured DFG discovery
+offers ten statistical catalogue selections and alpha/heuristic causal discovery.
+Select full unsigned window text (zero includes self-pairs), per-case retention,
+activity/completion/start fields, performance aggregation, business hours, weekly
+slots, case attributes and node attributes. Blank fields and native switches keep
+native defaults. Enabled blank overrides mean completion-time fallback, no active
+business slots or no case attributes. Fractional slots use start:end weekly seconds.
+
+Completed results retain their settings while controls are edited. The source map
+continues to show the cached analysis; configured statistical and causal results
+have their own full native output. Inspect every edge, triple, boundary, time,
+performance summary/sample/value, case/node attribute and signed causal strength.
+Download native/report/analysis/variants JSON or any full table CSV. Row and column
+paging never limits exports, and complete selected-row JSON includes long arrays
+and every derived row. Sample indexes locate positions in native sample vectors.
+Changed sources clear old results and errors. Untimed sources support frequency
+discovery. The separate dataframe DFG workspace retains its own input contract.
+
+POST /api/discover-dfg requires the current source_id and at least one of
+dfg_statistical_variants or dfg_causal_variants. Existing dfg_* window, retention,
+field, aggregation, business-hour, slot, case-attribute and node-attribute parameters
+feed the unchanged native EventLog algorithms. DFG_DISCOVERY returns source/counts,
+canonical selections and full analysis containing the configured dfg_variants.
+Variant JSON preserves round-trip double precision. Full reference parity and all
+remaining catalogue features and strict compatibility gates remain in scope.

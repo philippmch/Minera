@@ -3218,6 +3218,84 @@ std::string discovery_model_json(std::string result_json,
              : std::string("null")) + '}';
 }
 
+// Independent statistical and causal DFG discovery on the cached source.
+void handle_dfg_discovery(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
+    if (!request.has_param("source_id") || request.get_param_value("source_id") != std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; refresh the DFG discovery source");
+    static const std::set<std::string> allowed = {"source_id", "dfg_statistical_variants", "dfg_causal_variants", "dfg_window", "dfg_keep_once_per_case", "dfg_activity_attribute", "dfg_timestamp_attribute", "dfg_start_timestamp_attribute", "dfg_performance_aggregation", "dfg_business_hours", "dfg_business_hour_slots", "dfg_case_attributes", "dfg_return_node_attributes"};
+    for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown DFG discovery parameter: " + key); }
+    const auto lookup = [&](std::string_view name) { return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
+    const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const auto params = minera::parse_mine_params(lookup, present);
+    if (params.dfg_statistical_variants.empty() && params.dfg_causal_variants.empty()) throw std::invalid_argument("select at least one statistical or causal DFG variant");
+    auto graph = minera::discover_directly_follows_graph(session->log);
+    register_activity_selector_values(graph, session->log, params.dfg_statistics.activity_attribute);
+    const auto variants = analyze_dfg_variants(session->log, params.dfg_statistical_variants, params.dfg_causal_variants, params.dfg_statistics);
+    const auto result = minera::analysis_json(
+      /* dataset */ session->dataset,
+      /* event_log */ session->log,
+      /* graph */ graph,
+      /* tree */ nullptr,
+      /* net */ nullptr,
+      /* heuristics */ nullptr,
+      /* conformance */ nullptr,
+      /* performance */ nullptr,
+      /* resources */ nullptr,
+      /* variant_durations */ nullptr,
+      /* eventually_follows */ nullptr,
+      /* decisions */ nullptr,
+      /* petri_decoration */ nullptr,
+      /* spectrum */ nullptr,
+      /* inductive_net */ nullptr,
+      /* inductive_decoration */ nullptr,
+      /* heuristic_petri */ nullptr,
+      /* heuristic_decoration */ nullptr,
+      /* temporal_profile */ nullptr,
+      /* minimum_self_distances */ nullptr,
+      /* transition_system */ nullptr,
+      /* powl */ nullptr,
+      /* powl_petri */ nullptr,
+      /* powl_decoration */ nullptr,
+      /* log_skeleton */ nullptr,
+      /* log_skeleton_conformance */ nullptr,
+      /* declare */ nullptr,
+      /* declare_conformance */ nullptr,
+      /* footprints */ nullptr,
+      /* dfg_variants */ &variants,
+      /* correlation_mining */ nullptr,
+      /* batch_discovery */ nullptr,
+      /* dfg_alignment */ nullptr,
+      /* edit_distance */ nullptr,
+      /* edit_anti */ false,
+      /* dfg_projection */ nullptr,
+      /* dfg_projected_log */ nullptr,
+      /* edit_projected_log */ nullptr,
+      /* process_tree_alignment */ nullptr,
+      /* decomposed_alignment */ nullptr,
+      /* petri_anti_alignment */ nullptr,
+      /* petri_multi_alignment */ nullptr,
+      /* reduced_process_tree */ nullptr,
+      /* reduced_trace_index */ 0,
+      /* evaluation */ nullptr,
+      /* earth_movers_distance */ nullptr,
+      /* interval_event_overlap_counts */ nullptr,
+      /* case_overlap_counts */ nullptr,
+      /* concurrent_activity_overlap */ nullptr,
+      /* decision_tables */ nullptr,
+      /* minimum_self_distance_variant */ params.minimum_self_distance.variant,
+      /* typed_edit_distance */ nullptr);
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    const auto list = [&](const std::vector<std::string>& names) { std::string value = "["; for (std::size_t i = 0; i < names.size(); ++i) { if (i) value += ','; value += quote(names[i]); } return value + ']'; };
+    response.set_content("{\"family\":\"DFG_DISCOVERY\",\"source_id\":" + quote(std::to_string(session->query_source_id)) + ",\"dataset\":" + quote(session->dataset) +
+      ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) + "},\"input_origin\":\"cached_source_log\",\"statistical_variants\":" + list(params.dfg_statistical_variants) + ",\"causal_variants\":" + list(params.dfg_causal_variants) + ",\"result\":" + result + '}', "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
 // Source-bound behavioral discovery and temporal profile conformance.
 void handle_behavior_analysis(const httplib::Request& request,
                               httplib::Response& response) {
@@ -9710,6 +9788,7 @@ int main(int argc, char** argv) {
   server.Options("/api/discover-graph", preflight);
   server.Options("/api/discover-timing", preflight);
   server.Options("/api/analyze-behavior", preflight);
+  server.Options("/api/discover-dfg", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/decision-tables", preflight);
@@ -9834,6 +9913,7 @@ int main(int argc, char** argv) {
   server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/discover-timing", handle_timing_discovery);
   server.Post("/api/analyze-behavior", handle_behavior_analysis);
+  server.Post("/api/discover-dfg", handle_dfg_discovery);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);
