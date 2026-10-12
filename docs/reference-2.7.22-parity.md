@@ -12887,3 +12887,42 @@ selector list. All 228 incomplete units and strict full-parity gates remain open
 
 Evidence: docs/feature-first-structured-discovery-validation.json and
 docs/feature-first-structured-discovery-preview.jpg.
+
+
+### Feature delivery first: Declare and Log Skeleton constraint workflows
+
+Added source-bound classic discovery and exact-model conformance for Declare and
+Log Skeleton. Declare exposes eighteen templates, activity filters, support/
+confidence/automatic ratios and explicitly empty selections. Log Skeleton exposes
+noise and all six checking families; an empty checking selection retains its
+discovered model. Independent activity and diagnostic case-ID selectors preserve
+native typed metadata, counts, fitness values and every per-case deviation.
+
+Original/saved models remain identified. Complete model, case, deviation,
+diagnostic, error, activity and configuration tables retain every value in CSV,
+row JSON and original native/request/analysis/diagnostics exports. Generated log
+inspection uses a distinct summary selector. Log Skeleton displays its actual
+embedded conformance alongside the model.
+
+Optional prefix-safe Declare playout uses this discovered model, native length/
+case controls and full 64-bit seeds. Its original XES, generated analysis and
+completed conformance stay together. The seven-case, 25-event example retains
+only two fitting cases; five have pending obligations. Mining its exact XES
+preserves all counts, IDs and activity order, and keeps timestamps absent.
+
+Validation: five focused native suites; 1,130 frontend tests (21 added) and
+production build; 43 native checks across 24 calls with thirteen actual fixtures;
+fourteen browser checks and 224 downloads; 222 independent export checks across
+202 complete tables and the same-run log. All five exported results match native
+reruns. Source/schema and the cached workflow remain unchanged through discovery/
+export; explicit log handoff creates a new source and clears the previous result.
+
+Original native JSON preserves wire order. Derived object/CSV fields follow
+JavaScript numeric-key enumeration; exact source dictionary serialization order
+remains a parity gate. Earlier duplicate-selector/display and export-verifier
+attempts remain retained. Broad algorithms/defaults/types/selectors/RNG/order/
+Unicode/concurrency/performance gates and all 228 incomplete units remain open.
+Only feature-delivery labels change; no catalogue parity status is promoted.
+
+Evidence: docs/feature-first-constraint-discovery-validation.json and
+docs/feature-first-constraint-discovery-preview.jpg.

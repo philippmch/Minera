@@ -132,7 +132,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_constraint_workflow_available",
       "package": "algo.conformance.declare",
       "parity_status": "complete",
       "selectors": [
@@ -150,7 +150,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_constraint_workflow_available",
       "package": "algo.conformance.log_skeleton",
       "parity_status": "complete",
       "selectors": [
@@ -269,7 +269,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_constraint_workflow_available",
       "package": "algo.discovery.declare",
       "parity_status": "complete",
       "selectors": [
@@ -342,7 +342,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_constraint_workflow_available",
       "package": "algo.discovery.log_skeleton",
       "parity_status": "complete",
       "selectors": [
@@ -624,7 +624,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_constraint_workflow_available",
       "package": "algo.simulation.playout.declare",
       "parity_status": "complete",
       "selectors": [
@@ -2185,6 +2185,47 @@
         "Variant identity, source IDs, invalid parameters, stale source responses and cancellation guards remain explicit. Discovery/export calls preserve the cached source and analysis; explicit handoffs use the existing log/model import workflow."
       ],
       "validation": "docs/feature-first-structured-discovery-validation.json"
+    },
+    {
+      "id": "native_constraint_discovery_and_playout_workbench",
+      "state": "declare_and_log_skeleton_models_conformance_typed_diagnostics_complete_exports_and_same_model_playout_available",
+      "families": [
+        "algo.discovery.declare",
+        "algo.discovery.log_skeleton",
+        "algo.conformance.declare",
+        "algo.conformance.log_skeleton",
+        "algo.simulation.playout.declare"
+      ],
+      "variants": [
+        "CLASSIC",
+        "ALL_18_DECLARE_TEMPLATES",
+        "ALL_6_SKELETON_FAMILIES",
+        "EXPLICIT_EMPTY_SELECTIONS",
+        "INDEPENDENT_CONFORMANCE_SELECTOR",
+        "TYPED_DIAGNOSTICS",
+        "FULL_UINT64_SEEDS",
+        "PREFIX_SAFE_PLAYOUT",
+        "SAME_RUN_XES",
+        "COMPLETE_REPORTS_CSV"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/constraint-discovery.ts",
+        "src/frontend/src/components/ConstraintDiscovery.tsx",
+        "src/frontend/src/components/ProcessModel.tsx"
+      ],
+      "added": [
+        "Source-bound classic Declare and Log Skeleton discovery/conformance workflows replace cached-only model selection while retaining clearly identified saved models.",
+        "Declare exposes all eighteen templates, activity inference/explicit filtering, support/confidence ratios and automatic selection controls; explicit empty templates/activities remain distinct from omitted defaults.",
+        "Log Skeleton exposes native noise and all six conformance families; an explicit empty family selection retains the discovered model while checking no selected constraints.",
+        "Discovery and conformance activity selectors can be configured independently; typed native diagnostics retain selected case IDs, counts, fitness values, source metadata and int/float cells.",
+        "Complete model families, activity registry, source cases, deviations, typed diagnostic cells, errors and submitted configuration are available in paged inspection, row JSON and every-table CSV.",
+        "Original native JSON, captured request/report JSON, discovered analysis and native diagnostic exports preserve all values and numeric tokens; generated-log tables use a distinct root selector.",
+        "Optional Declare prefix-safe sampling uses the actual discovered model, full unsigned 64-bit seed text, case/minimum/maximum controls and a completed conformance result for every generated trace.",
+        "Same-run Declare XES and generated analysis export together; Mine discovered Declare playout opens the actual generated log for ordinary mining, preserving missing timestamps and clearing the previous discovery.",
+        "Invalid/stale/wrong-family requests and partial diagnostics/playout errors remain explicit. Discovery/export preserves the current source and cached workflow; only explicit log handoff replaces the source."
+      ],
+      "validation": "docs/feature-first-constraint-discovery-validation.json"
     }
   ],
   "execution_priority": [
@@ -2202,7 +2243,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations, conversions and I/O. Individual Inductive IM/IMf/IMd and all five native POWL variants now expose controls, original structures, complete inspection/formats, mapped adapted-source XES and log/model handoffs. Tree generators, Alpha/Heuristic discovery, model diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve all algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates, including recorded replay/default-cost and custom-source conformance observations."
+      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations and I/O. Declare and Log Skeleton now provide configurable discovery, exact-model conformance, typed diagnostics, full inspection/exports and same-model prefix-safe Declare playout/mining. Individual Inductive/POWL and Alpha/Heuristic discovery, tree generators, model diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve all strict algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates, including pending Declare obligations and numeric dictionary serialization order."
     }
   ],
   "feature_status_meaning": {
