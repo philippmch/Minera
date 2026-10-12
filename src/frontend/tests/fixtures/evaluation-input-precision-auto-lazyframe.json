@@ -1,0 +1,1 @@
+{"miner": "inductive", "precision": {"variant": "align_etconformance", "computed": true, "exhausted": false, "error": null, "precision": 1},"input_context":{"adapter":"lazyframe","origin":"cached_model_log","source_id":"1","dataset":"owned-evaluation.xes","case_count":60,"event_count":120,"activity_attribute":"concept:name","case_id_attribute":"case:concept:name"}}

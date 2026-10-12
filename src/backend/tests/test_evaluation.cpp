@@ -1,6 +1,8 @@
 #include "minera/evaluation.hpp"
 #include "minera/json_export.hpp"
 #include "minera/precomputed_replay_json.hpp"
+#include "minera/pnml.hpp"
+#include "minera/log_conversion.hpp"
 #include <cassert>
 #include <cmath>
 #include <limits>
@@ -69,6 +71,36 @@ static PetriNet sequence_net() {
   n.add_transition(0,{p0},{p1}); n.add_transition(1,{p1},{p2}); return n;
 }
 static EventLog log(std::initializer_list<std::initializer_list<const char*>> xs) { EventLog l; for(auto tr:xs){Trace t;for(auto a:tr)t.events.push_back(Event{"",a});l.traces.push_back(std::move(t));}return l; }
+
+static void flat_document_fitness_preserves_markings_and_case_selection() {
+  auto source=log({{"A","B"},{"A","B"},{"A","B"}});
+  for(std::size_t i=0;i<source.traces.size();++i) {
+    source.traces[i].case_id="case-"+std::to_string(i);
+    source.traces[i].attributes.push_back({"bucket",i<2?"shared":"separate",AttributeKind::kString});
+  }
+  PnmlDocument document;
+  document.net=sequence_net();document.initial_marking={1,0,0};document.final_marking={0,0,1};
+  document.initial_marking_keys={true,false,false};document.final_marking_keys={false,false,true};
+  document.place_ids={"p-start","p-middle","p-end"};document.transition_ids={"transition-A","transition-B"};
+  const auto stream=event_log_to_event_stream(source);const auto table=event_log_to_table(source);const auto lazy=event_log_to_lazy_table(source);
+  for(const auto& input:{EventDataView(stream),EventDataView(table),EventDataView(lazy)}) {
+    const auto result=evaluate_replay_fitness(input,document);
+    assert(result.computed && result.fitness==1 && result.trace_count==3);
+    ReplayFitnessOptions grouped;grouped.case_id_attribute="case:bucket";
+    const auto regrouped=evaluate_replay_fitness(input,document,ReplayFitnessVariant::TOKEN_BASED,grouped);
+    assert(regrouped.computed && regrouped.trace_count==2);
+    grouped.max_rows_to_materialize=5;
+    bool capped=false;
+    try { (void)evaluate_replay_fitness(input,document,ReplayFitnessVariant::TOKEN_BASED,grouped); }
+    catch(const std::length_error&) { capped=true; }
+    assert(capped);
+  }
+  document.initial_marking={TokenInteger("18446744073709551616"),0,0};
+  const auto direct=evaluate_replay_fitness(source,document,ReplayFitnessVariant::TOKEN_BASED);
+  const auto flat=evaluate_replay_fitness(EventDataView(stream),document);
+  assert(direct.computed && flat.computed && direct.token_result.remaining==flat.token_result.remaining &&
+         direct.token_result.produced==flat.token_result.produced && direct.fitness==flat.fitness);
+}
 
 static EventLog attributed_sequence_log() {
   EventLog result;
@@ -973,4 +1005,5 @@ int main() {
   composite_evaluation_serializes_as_a_model_family();
   emd_pyemd_variant_is_deterministic_and_strict();
   precomputed_json_keeps_native_aggregation();
+  flat_document_fitness_preserves_markings_and_case_selection();
 }

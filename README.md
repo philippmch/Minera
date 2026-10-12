@@ -2308,3 +2308,23 @@ evaluation and exact token totals/activations where applicable. The native JSON
 decoders are declared in minera/precomputed_replay_json.hpp. Existing log/model
 evaluation stays available; full typed input, adapters and reference parity remain
 in scope alongside the complete feature catalogue.
+
+
+### Choose the native input shape for model quality
+
+In Conformance > Model quality evaluation, choose log, event stream, dataframe or
+lazyframe for fitness, precision, generalization or composite evaluation. Shapes
+are constructed from the selected model's cached log. Activity/case selectors and
+row caps feed native evaluators; flat case regrouping can change evaluated trace
+counts. The result identifies source, shape and original model-input counts.
+
+Imported PNML fitness keeps supplied exact markings and membership. Simplicity
+uses only the model and hides log input controls. Inspect and save evaluation to
+download every native field, input context, request, complete CSV and comparison.
+Source changes reset stale output and controls. Native cap errors remain visible.
+
+POST /api/evaluate accepts evaluation_input_adapter=log,stream,dataframe,lazyframe
+and an optional source_id identity guard. Omission preserves the existing log
+path. Additive input_context accompanies the normal single-family result. The
+native EventDataView/PnmlDocument fitness overload preserves marked documents.
+Original table metadata and every remaining feature/strict parity gate stay open.

@@ -1953,6 +1953,11 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   if (!["replay_fitness", "precision", "generalization", "simplicity", "composite"].includes(family)) {
     throw new Error("evaluation_family is invalid");
   }
+  if (options.evaluation_input_adapter !== undefined &&
+      !["log", "stream", "dataframe", "lazyframe"].includes(options.evaluation_input_adapter)) {
+    throw new Error("evaluation_input_adapter is invalid");
+  }
+  if (options.source_id !== undefined && !options.source_id.trim()) throw new Error("source_id must not be empty");
   if (options.fitness_variant !== undefined && !["auto", "token_based", "alignment_based"].includes(options.fitness_variant)) {
     throw new Error("fitness_variant is invalid");
   }
@@ -2106,6 +2111,8 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   query.set("evaluation_family", family);
   const add = (name: string, value: unknown) => { if (value !== undefined) query.set(name, Array.isArray(value) ? value.join(",") : name.endsWith("_weight") && Object.is(value,-0) ? "-0" : String(value)); };
   add("fitness_variant", options.fitness_variant);
+  add("evaluation_input_adapter", options.evaluation_input_adapter);
+  add("source_id", options.source_id);
   if (options.evaluation_activity_attribute !== undefined) {
     add("evaluation_activity_attribute",
         options.evaluation_activity_attribute.trim());
@@ -2157,7 +2164,13 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
 export async function evaluateModel(miner: string, options: EvaluationOptions = {}): Promise<ModelEvaluation> {
   const query = new URLSearchParams(evaluationQuery(options));
   query.set("miner", miner);
-  return postNativeChecked(`/api/evaluate?${query.toString()}`, isModelEvaluation, "model evaluation");
+  const result=await postNativeChecked(`/api/evaluate?${query.toString()}`, isModelEvaluation, "model evaluation");
+  const expected=(options.evaluation_family??"composite")==="simplicity"?"model_only":options.evaluation_input_adapter??"log";
+  if (result.miner!==miner || (result.input_context && (result.input_context.adapter!==expected ||
+      (options.source_id!==undefined && result.input_context.source_id!==options.source_id)))) {
+    throw new Error("The native evaluation does not match the requested model, input shape or source.");
+  }
+  return result;
 }
 
 /** Stable query serialization for the native Petri-analysis families. */

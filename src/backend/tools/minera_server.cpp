@@ -6959,6 +6959,8 @@ void handle_evaluate(const httplib::Request& request,
 
   const std::string miner = request.get_param_value("miner");
   try {
+    if (request.has_param("source_id") && request.get_param_value("source_id") != std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; refresh the model evaluation source");
     std::optional<minera::PetriNet> converted;
     const auto& selected = select_cached_or_process_tree_net(
         request, *session, miner, converted);
@@ -6971,6 +6973,7 @@ void handle_evaluate(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     auto params = minera::parse_evaluation_params(lookup, present);
+    const auto adapter = minera::parse_evaluation_input_adapter(lookup, present);
     const auto* evaluation_document = miner == "imported" && session->imported_document && !converted
         ? &*session->imported_document : nullptr;
     std::optional<minera::EventLog> projected_powl_log;
@@ -6997,14 +7000,15 @@ void handle_evaluate(const httplib::Request& request,
     if (evaluation_input) evaluation_log = &*evaluation_input;
     minera::ModelEvaluation result;
     result.miner = miner;
+    const auto evaluate_input = [&](const auto& input) {
     switch (params.family) {
       case minera::EvaluationFamily::kReplayFitness:
         result.replay_fitness = evaluation_document
             ? minera::evaluate_replay_fitness(
-                  *evaluation_log, *evaluation_document, params.replay_fitness_variant,
+                  input, *evaluation_document, params.replay_fitness_variant,
                   params.replay_fitness_options)
             : minera::evaluate_replay_fitness(
-            *evaluation_log, selected, params.replay_fitness_variant,
+            input, selected, params.replay_fitness_variant,
             params.replay_fitness_options);
         break;
       case minera::EvaluationFamily::kPrecision:
@@ -7015,19 +7019,19 @@ void handle_evaluate(const httplib::Request& request,
         result.precision = evaluation_document && params.precision_variant ==
             minera::PrecisionVariant::ETCONFORMANCE_TOKEN
             ? minera::evaluate_precision(
-                  *evaluation_log, *evaluation_document, params.precision_variant,
+                  input, *evaluation_document, params.precision_variant,
                   params.precision_options)
             : minera::evaluate_precision(
-            *evaluation_log, selected, params.precision_variant,
+            input, selected, params.precision_variant,
             params.precision_options);
         break;
       case minera::EvaluationFamily::kGeneralization:
         result.generalization = evaluation_document
             ? minera::evaluate_generalization(
-                  *evaluation_log, *evaluation_document, params.generalization_variant,
+                  input, *evaluation_document, params.generalization_variant,
                   params.generalization_options)
             : minera::evaluate_generalization(
-            *evaluation_log, selected, params.generalization_variant,
+            input, selected, params.generalization_variant,
             params.generalization_options);
         break;
       case minera::EvaluationFamily::kSimplicity:
@@ -7041,14 +7045,38 @@ void handle_evaluate(const httplib::Request& request,
       case minera::EvaluationFamily::kComposite:
         result.composite = miner == "imported" && session->imported_document && !converted
             ? minera::evaluate_composite(
-                  *evaluation_log, *session->imported_document, params.composite_options)
+                  input, *session->imported_document, params.composite_options)
             : minera::evaluate_composite(
-                  *evaluation_log, selected, params.composite_options);
+                  input, selected, params.composite_options);
         break;
     }
-    response.set_content(
-        minera::model_evaluation_json(result, &session->graph),
-        "application/json");
+    };
+    std::optional<minera::ConvertedEventStream> stream;
+    std::optional<minera::LogConversionTable> table;
+    std::optional<minera::LazyEventTable> lazy;
+    if (adapter == "log" || params.family == minera::EvaluationFamily::kSimplicity) {
+      evaluate_input(*evaluation_log);
+    } else if (adapter == "stream") {
+      stream = minera::event_log_to_event_stream(*evaluation_log);
+      evaluate_input(minera::EventDataView(*stream));
+    } else if (adapter == "dataframe") {
+      table = minera::event_log_to_table(*evaluation_log);
+      evaluate_input(minera::EventDataView(*table));
+    } else {
+      lazy = minera::event_log_to_lazy_table(*evaluation_log);
+      evaluate_input(minera::EventDataView(*lazy));
+    }
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    const bool model_only = params.family == minera::EvaluationFamily::kSimplicity;
+    auto body = minera::model_evaluation_json(result, &session->graph);
+    body.pop_back();
+    body += ",\"input_context\":{\"adapter\":" + quote(model_only ? "model_only" : adapter) +
+      ",\"origin\":" + quote(model_only ? "model_only" : "cached_model_log") +
+      ",\"source_id\":" + quote(std::to_string(session->query_source_id)) + ",\"dataset\":" + quote(session->dataset) +
+      ",\"case_count\":" + std::to_string(evaluation_log->trace_count()) + ",\"event_count\":" + std::to_string(evaluation_log->event_count()) +
+      ",\"activity_attribute\":" + quote(model_only ? "" : params.replay_fitness_options.activity_attribute) +
+      ",\"case_id_attribute\":" + quote(model_only ? "" : params.replay_fitness_options.case_id_attribute) + "}}";
+    response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

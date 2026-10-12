@@ -457,7 +457,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_quality_input_adapters_and_complete_diagnostics_available",
       "package": "algo.evaluation",
       "parity_status": "partial",
       "selectors": [
@@ -473,7 +473,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_quality_input_adapters_and_complete_diagnostics_available",
       "package": "algo.evaluation.generalization",
       "parity_status": "partial",
       "selectors": [
@@ -481,7 +481,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_quality_input_adapters_and_complete_diagnostics_available",
       "package": "algo.evaluation.precision",
       "parity_status": "partial",
       "selectors": [
@@ -499,7 +499,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_log_model_and_precomputed_replay_fitness_workflows_available",
+      "feature_delivery_status": "native_quality_input_adapters_and_complete_diagnostics_available",
       "package": "algo.evaluation.replay_fitness",
       "parity_status": "partial",
       "selectors": [
@@ -508,7 +508,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_quality_input_adapters_and_complete_diagnostics_available",
       "package": "algo.evaluation.simplicity",
       "parity_status": "partial",
       "selectors": [
@@ -2450,6 +2450,46 @@
         "Standalone model-evaluation JSON now emits round-trip double precision. All native evaluation algorithms remain unchanged."
       ],
       "validation": "docs/feature-first-replay-result-fitness-validation.json"
+    },
+    {
+      "id": "native_model_quality_input_adapter_workflows",
+      "state": "all_native_quality_input_shapes_case_activity_projection_row_caps_marked_documents_and_context_exports_available",
+      "families": [
+        "algo.evaluation",
+        "algo.evaluation.replay_fitness",
+        "algo.evaluation.precision",
+        "algo.evaluation.generalization",
+        "algo.evaluation.simplicity"
+      ],
+      "variants": [
+        "LOG",
+        "STREAM",
+        "DATAFRAME",
+        "LAZYFRAME",
+        "MODEL_ONLY_SIMPLICITY",
+        "PNML_MARKED_FITNESS",
+        "NATIVE_CASE_REGROUPING",
+        "NATIVE_ROW_CAPS",
+        "COMPLETE_INPUT_CONTEXT_AND_DIAGNOSTICS"
+      ],
+      "entry_points": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/Conformance.tsx"
+      ],
+      "added": [
+        "Model quality evaluation now exposes log, event stream, dataframe and lazyframe inputs for fitness, precision, generalization and composite metrics.",
+        "Flat inputs are constructed from the selected model-specific cached log and use the existing native case/activity projection, grouping, ordering and row-cap behavior.",
+        "All native quality variants remain available. Default flat shapes preserve metric/typed-public values; custom case selection can regroup sixty source/model-input cases into three evaluated traces.",
+        "A native EventDataView/PnmlDocument fitness overload delegates to the same document evaluator, preserving supplied exact markings, membership and names across flat input shapes.",
+        "Imported models retain native marked-net behavior. Simplicity remains model-only, exposes no log input controls and bypasses log materialization.",
+        "Additive input_context identifies actual adapter, source identity, dataset, model-input counts and activity/case selectors. Source counts remain distinct from evaluated/regrouped case counts.",
+        "Optional source identity guards reject stale independent calls; frontend responses are bound to the requested model/input shape/source while legacy result shapes remain supported.",
+        "The existing full diagnostics workflow retains complete native/report/CSV output, every replay row, source/input context and saved comparison data beyond previews and paging."
+      ],
+      "validation": "docs/feature-first-evaluation-adapters-validation.json"
     }
   ],
   "execution_priority": [
@@ -2467,7 +2507,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining conformance/evaluation adapters and options, algorithms, simulations, transformations, conversions and I/O. Native replay-result fitness now aggregates precomputed token/alignment records with exact signed counts, saved token envelopes, alias/default/native-error behavior and complete original-input/metric exports. Existing discovery, behavior, timing, model diagnostics, alignment, simulation and transformation workflows remain available. Preserve the complete catalogue and every strict algorithm/adapter/selector/default/error/type/numeric/order/Unicode/concurrency/performance gate."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate."
     }
   ],
   "feature_status_meaning": {

@@ -509,6 +509,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] EvaluationParams parse_evaluation_params(
     const FieldLookup& field, const FieldPresence& present);
 
+// Input shape selection is independent of the requested quality family.
+// Simplicity uses only the model; all log-based families use these adapters.
+[[nodiscard]] std::string parse_evaluation_input_adapter(
+    const FieldLookup& field, const FieldPresence& present = {});
+
 [[nodiscard]] PetriAnalysisParams parse_petri_analysis_params(
     const FieldLookup& field);
 [[nodiscard]] PetriAnalysisParams parse_petri_analysis_params(
