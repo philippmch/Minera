@@ -462,6 +462,8 @@ using FieldPresence = std::function<bool(std::string_view)>;
     const FieldLookup& field);
 [[nodiscard]] TokenReplayOptions parse_token_replay_params(
     const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] std::string parse_token_replay_input_adapter(
+    const FieldLookup& field, const FieldPresence& present = {});
 
 // Builds the discovery options from a mine request's form fields. The
 // single-callback overload treats absent and empty fields alike, preserving the

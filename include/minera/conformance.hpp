@@ -491,6 +491,14 @@ replay_token_activation_sequences(const EventLog& event_log, const PetriNet& net
 [[nodiscard]] TokenReplayDiagnostics replay_token_diagnostics(
     const EventDataView& data, const PetriNet& net, TokenReplayOptions options = {});
 
+// Full forward replay uses the same projection, case grouping and hard caps
+// as the other native replay adapters. The supplied model/markings are retained.
+[[nodiscard]] inline TokenReplayResult replay_token_result(
+    const EventDataView& data, const PetriNet& net, TokenReplayOptions options = {}) {
+  const auto log = normalize_token_replay_event_log(data, options);
+  return replay_token_result(log, net, options);
+}
+
 template <typename Input>
 concept FlatTokenReplayInput = std::is_same_v<Input, EventStream> ||
     std::is_same_v<Input, EventTable> || std::is_same_v<Input, LazyEventTable>;
@@ -514,6 +522,12 @@ template <FlatTokenReplayInput Input>
 [[nodiscard]] inline TokenReplayDiagnostics replay_token_diagnostics(
     const Input& data, const PetriNet& net, TokenReplayOptions options = {}) {
   return replay_token_diagnostics(EventDataView(data), net, options);
+}
+
+template <FlatTokenReplayInput Input>
+[[nodiscard]] inline TokenReplayResult replay_token_result(
+    const Input& data, const PetriNet& net, TokenReplayOptions options = {}) {
+  return replay_token_result(EventDataView(data), net, options);
 }
 
 // Footprint (directly-follows relation) conformance between a log and a model.

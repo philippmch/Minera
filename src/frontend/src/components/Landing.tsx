@@ -12,9 +12,10 @@ interface LandingProps {
   onProcessCube?: () => void;
   onTreeGeneration?: () => void;
   onAcquisition?: () => void;
+  onTokenReplay?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -65,6 +66,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onProcessCube && <button className="landing-sample reveal" disabled={mining} onClick={onProcessCube}>Explore process cubes</button>}
         {onTreeGeneration && <button className="landing-sample reveal" disabled={mining} onClick={onTreeGeneration}>Generate process trees and logs</button>}
         {onAcquisition && <button className="landing-sample reveal" disabled={mining} onClick={onAcquisition}>Acquire source data</button>}
+        {onTokenReplay && <button className="landing-sample reveal" disabled={mining} onClick={onTokenReplay}>Replay a log against a PNML model</button>}
 
         <div className="landing-steps reveal">
           <div className="landing-step">

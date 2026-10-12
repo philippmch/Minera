@@ -13153,3 +13153,34 @@ concurrency/performance requirement remain open. No parity status is promoted.
 
 Evidence: docs/feature-first-evaluation-adapters-validation.json and
 docs/feature-first-evaluation-adapters-preview.png.
+
+
+### Feature delivery first: independent full token replay
+
+An independent original-log/PNML replay workbench is available from landing and
+both ordinary/object-centric toolbars. Forward replay exposes its complete typed
+public carrier and PLTR maps, grouping, names/labels, native policies and hidden
+path caches. Backwards exposes complete native trace diagnostics. All four native
+input shapes, source/evaluated counts and original PNML markings are retained.
+
+Flat CSV inputs retain original parser rows. The shared CSV reader now accepts
+quoted LF/CRLF fields and escaped quotes while preserving source positions and
+existing grouped-log timestamp sorting. Declared empty CSV inputs resolve their
+actual activity field in every shape, including custom/aliased columns and zero caps.
+
+Validation binds four native suites, 1,442 frontend tests, 221 application checks
+across 81 calls and 55 actual native fixtures. Twenty-seven browser checks retain
+fourteen exported runs and 228 downloads. Independent verification repeats fourteen
+requests and checks all 160 complete CSV tables, exact original inputs, reports,
+typed public results, large integer counters, selected final rows and cached-state
+preservation. Final sources, served assets and terminal owned-resource cleanup are
+bound in docs/feature-first-token-replay-validation.json.
+
+The complete scope remains 86 packages, 387 modules, 46 complete packages, 199
+complete modules and 228 incomplete units. No parity status or selector is promoted.
+Native replay algorithms and search limits, ordinary float formatting, broader
+input-object metadata, diagnostic helpers, defaults/errors, marked-net behavior,
+solver/concurrency/performance and remaining features remain independent gates.
+
+Evidence: docs/feature-first-token-replay-validation.json and
+docs/feature-first-token-replay-preview.png.

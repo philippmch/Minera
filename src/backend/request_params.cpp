@@ -942,6 +942,16 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field) {
   return parse_token_replay_params(field, FieldPresence{});
 }
 
+std::string parse_token_replay_input_adapter(const FieldLookup& field,
+                                            const FieldPresence& present) {
+  const auto name = std::string_view("token_replay_input_adapter");
+  const auto value = field(name);
+  if (!(present ? present(name) : !value.empty())) return "log";
+  if (value == "log" || value == "stream" || value == "dataframe" || value == "lazyframe") return value;
+  throw std::invalid_argument(
+      "token_replay_input_adapter: expected log, stream, dataframe, or lazyframe");
+}
+
 TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
                                             const FieldPresence& present) {
   TokenReplayOptions options;

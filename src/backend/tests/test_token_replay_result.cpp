@@ -2,12 +2,16 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/request_params.hpp"
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/log_conversion.hpp"
 #include "../petri_replay_internal.hpp"
 
 #include <cassert>
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 
 using namespace minera;
 namespace {
@@ -955,6 +959,47 @@ void flood_cleaning_combines_nested_split_branches() {
   assert(detail::cleaning_components(visited_output, initial, final, &names)
       == (detail::CleaningComponents{{0, 1, 2}}));
 }
+void full_result_flat_inputs_preserve_source_rows_and_markings() {
+  std::istringstream csv("case_id,activity,bucket,payload\n"
+      "z,A,one,first\na,A,one,second\nz,A,two,last\n");
+  const auto imported = import_csv_event_data(csv);
+  const auto net = model();
+  TokenReplayOptions policy;
+  policy.activity_attribute = "activity";
+  policy.case_id_attribute = "case_id";
+  policy.enable_pltr_fitness = true;
+  policy.disable_variants = true;
+  policy.exact_initial_marking = TokenMarking{TokenInteger("18446744073709551616"), 0, 0, 0};
+  policy.exact_final_marking = TokenMarking{0, 0, 1, 0};
+  policy.initial_marking_keys = {true, true, false, false};
+  policy.final_marking_keys = {false, false, true, false};
+  const auto stream = event_table_to_event_stream(imported.table);
+  const auto lazy = LazyEventTable::from_table(imported.table);
+  for (const auto view : {EventDataView(stream), EventDataView(imported.table), EventDataView(lazy)}) {
+    const auto result = replay_token_result(view, net, policy);
+    assert(result.traces.size() == 2 && result.pltr_fitness);
+    const auto z = std::find_if(result.traces.begin(), result.traces.end(),
+        [](const auto& row){return row.case_id == "z";});
+    assert(z != result.traces.end() && z->replayed_events == 2);
+    assert(z->produced == TokenInteger("18446744073709551618"));
+    assert(z->event_diagnostics.size() == 2);
+    assert(result.pltr_fitness->trace_references.size() == 2);
+    auto grouped_policy = policy;
+    grouped_policy.case_id_attribute = "bucket";
+    const auto grouped = replay_token_result(view, net, grouped_policy);
+    assert(grouped.traces.size() == 2);
+    assert(grouped.pltr_fitness->trace_references[0].value.events.size() >= 1);
+    auto capped = policy; capped.max_rows_to_materialize = 2;
+    bool rejected = false;
+    try { (void)replay_token_result(view, net, capped); }
+    catch (const std::length_error&) { rejected = true; }
+    assert(rejected);
+    capped.max_rows_to_materialize = 3;
+    assert(replay_token_result(view, net, capped).traces.size() == 2);
+  }
+  assert(replay_token_result(stream, net, policy).traces.front().case_id == "z");
+  assert(replay_token_result(imported.table, net, policy).traces.front().case_id == "a");
+}
 }  // namespace
 int main() {
   variants_and_keys();
@@ -980,5 +1025,6 @@ int main() {
   flood_cleaning_requires_a_new_place_name();
   flood_cleaning_preserves_ambiguous_marked_names();
   flood_cleaning_combines_nested_split_branches();
+  full_result_flat_inputs_preserve_source_rows_and_markings();
   std::cout << "full forward token replay result contracts passed\n";
 }

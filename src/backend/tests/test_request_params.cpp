@@ -2900,6 +2900,16 @@ void parse_native_adapter_params_contract() {
 }
 
 void parse_evaluation_params_defaults_and_variants() {
+  assert(minera::parse_token_replay_input_adapter(fields({})) == "log");
+  for (const auto& adapter : {"log", "stream", "dataframe", "lazyframe"})
+    assert(minera::parse_token_replay_input_adapter(fields({{"token_replay_input_adapter", adapter}})) == adapter);
+  for (const auto& invalid : {"", "pandas", "other", " Log"}) {
+    bool rejected=false;
+    try { (void)minera::parse_token_replay_input_adapter(fields({{"token_replay_input_adapter", invalid}}),
+      [](std::string_view name){return name == "token_replay_input_adapter";}); }
+    catch(const std::invalid_argument&) { rejected=true; }
+    assert(rejected);
+  }
   assert(minera::parse_evaluation_input_adapter(fields({})) == "log");
   for (const auto& adapter : {"log", "stream", "dataframe", "lazyframe"})
     assert(minera::parse_evaluation_input_adapter(fields({{"evaluation_input_adapter", adapter}})) == adapter);

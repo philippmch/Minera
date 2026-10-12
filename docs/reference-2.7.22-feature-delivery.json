@@ -198,7 +198,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_independent_full_token_replay_workflow_available",
       "package": "algo.conformance.tokenreplay",
       "parity_status": "partial",
       "selectors": [
@@ -2490,6 +2490,46 @@
         "The existing full diagnostics workflow retains complete native/report/CSV output, every replay row, source/input context and saved comparison data beyond previews and paging."
       ],
       "validation": "docs/feature-first-evaluation-adapters-validation.json"
+    },
+    {
+      "id": "native_independent_token_replay_workbench",
+      "state": "original_inputs_both_native_directions_four_shapes_full_forward_and_complete_diagnostics_available",
+      "families": [
+        "algo.conformance.tokenreplay"
+      ],
+      "variants": [
+        "FORWARD",
+        "BACKWARDS",
+        "LOG",
+        "STREAM",
+        "DATAFRAME",
+        "LAZYFRAME",
+        "FULL_FORWARD_PUBLIC_RESULT",
+        "PLTR_FITNESS",
+        "NAMED_RESULTS",
+        "VARIANT_GROUPING",
+        "HIDDEN_PATH_CACHE",
+        "EXACT_SUPPLIED_PNML_MARKINGS",
+        "DECLARED_EMPTY_CSV"
+      ],
+      "entry_points": [
+        "include/minera/conformance.hpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/token-replay-workbench.ts",
+        "src/frontend/src/components/TokenReplayWorkspace.tsx"
+      ],
+      "added": [
+        "An independent token-replay workbench is available from the landing page and both event-log and object-centric toolbars without requiring a discovered model or cached source.",
+        "Original CSV/TSV/XES/gzip-XES uploads and supplied PNML files are retained, hashed, and downloadable alongside the exact completed request and native response.",
+        "Forward replay exposes the native complete typed public carrier, place/transition/unknown-activity fitness maps, variant grouping, returned names/labels, hidden-path caches and native replay policies.",
+        "Backwards replay exposes its native complete trace diagnostics. The forward public carrier and PLTR maps remain explicitly unavailable for backwards requests; unsupported combinations return errors.",
+        "Log, stream, dataframe and lazyframe inputs are selectable. Flat CSV inputs use original parser rows and columns; native case grouping and ordering remain distinct from already grouped logs.",
+        "A native EventDataView and flat-input full-forward replay entry point delegates through the existing native projection, grouping and hard event caps without changing the replay algorithms.",
+        "The shared CSV reader preserves quoted LF/CRLF fields, escaped quotes, source row positions and timestamp-sorted grouped logs. Unterminated quoted fields retain an explicit native error.",
+        "Header-only CSV inputs resolve their declared activity column, including custom and aliased names, and accept exact zero-event caps in every native input shape and both directions.",
+        "Inspection and CSV exports retain every trace, per-event diagnostic, model ID, supplied marking and zero-key membership, typed public value/object key/float hex, and integer token beyond uint64. Paging and selected-row JSON retain complete values."
+      ],
+      "validation": "docs/feature-first-token-replay-validation.json"
     }
   ],
   "execution_priority": [
@@ -2507,7 +2547,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts."
     }
   ],
   "feature_status_meaning": {
@@ -2527,7 +2567,8 @@
     "related_logs_workflow_available": "Configurable active-log links, two-log timestamp interleavings and case-relation merging expose complete positional native data, source-bound reports/CSV, same-run merged XES and canonical formatting handoff. Existing reference parity statuses and exactness/performance gates remain independent.",
     "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates.",
     "structural_workflow_available": "Configurable native trie/interval workflows expose exact positional data, diagrams, query matches, complete JSON/report/CSV, same-run Petri conversion/PNML and conformance handoff. Existing reference parity statuses and remaining exactness/performance gates stay independent.",
-    "transformation_workflow_available": "Configurable native feature/target/label workflows expose matrix schemas, values, padding and source positions, complete native JSON/reports/CSV and transformed XES reopening with persistent selected activity fields. Existing parity statuses and open semantic/type/error/performance gates remain independent."
+    "transformation_workflow_available": "Configurable native feature/target/label workflows expose matrix schemas, values, padding and source positions, complete native JSON/reports/CSV and transformed XES reopening with persistent selected activity fields. Existing parity statuses and open semantic/type/error/performance gates remain independent.",
+    "native_independent_full_token_replay_workflow_available": "Independent original-log/PNML uploads expose both native replay directions, all four native input shapes, full forward public/PLTR results and complete trace/input/model inspection with exact downloads. Full reference behavior and remaining options/adapters remain parity gates."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

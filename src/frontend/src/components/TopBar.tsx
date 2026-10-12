@@ -11,9 +11,10 @@ interface TopBarProps {
   onProcessCube?: () => void;
   onTreeGeneration?: () => void;
   onAcquisition?: () => void;
+  onTokenReplay?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -36,6 +37,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onProcessCube && <button className="btn-ghost" onClick={onProcessCube}>Process cubes</button>}
       {onTreeGeneration && <button className="btn-ghost" onClick={onTreeGeneration}>Generate trees</button>}
       {onAcquisition && <button className="btn-ghost" onClick={onAcquisition}>Acquire source data</button>}
+      {onTokenReplay && <button className="btn-ghost" onClick={onTokenReplay}>Token replay</button>}
       <label className="btn-open">
         Open log
         <input

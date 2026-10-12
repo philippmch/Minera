@@ -2328,3 +2328,28 @@ and an optional source_id identity guard. Omission preserves the existing log
 path. Additive input_context accompanies the normal single-family result. The
 native EventDataView/PnmlDocument fitness overload preserves marked documents.
 Original table metadata and every remaining feature/strict parity gate stay open.
+
+### Replay original logs against independent PNML models
+
+Open **Replay a log against a PNML model** from the landing page, or **Token replay**
+from either toolbar. Upload CSV, TSV, XES or gzip XES and a PNML model. This workflow
+runs independently of the cached discovered model. Import controls cover custom
+columns, delimiters and all six existing XES importer selectors.
+
+Choose grouped log, event stream, dataframe or lazyframe inputs. Flat CSV inputs
+retain original parser rows, including quoted multiline values. Custom case fields
+can regroup those events; already grouped logs retain their trace boundaries.
+Declared empty CSV inputs retain their imported activity field and accept a zero cap.
+
+Forward replay exposes the native complete public result, place/transition fitness
+maps, variant grouping, returned names/labels and hidden-transition path caches.
+Backwards replay exposes its native trace diagnostics. PNML initial/final counts
+and explicit zero-key membership remain intact.
+
+Inspect every trace, per-event diagnostic, model ID and marking. Typed public
+inspection retains ordered object keys, float hex and exact integer tokens.
+Download complete native JSON, a request/input-hash report, every table as full CSV,
+the public forward result and the exact original log/PNML files. Results remain
+bound to the inputs and settings of their completed run.
+
+This is a feature checkpoint; strict full-reference replay parity remains open.
