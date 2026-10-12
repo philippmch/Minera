@@ -332,7 +332,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_variant_discovery_workflow_available",
       "package": "algo.discovery.inductive",
       "parity_status": "complete",
       "selectors": [
@@ -430,7 +430,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_variant_discovery_workflow_available",
       "package": "algo.discovery.powl",
       "parity_status": "complete",
       "selectors": [
@@ -2143,6 +2143,48 @@
         "Empty populations, request errors, per-model unsupported conversions and native enumeration flags remain explicit; generation leaves cached source and workflow unchanged"
       ],
       "validation": "docs/feature-first-tree-generation-validation.json"
+    },
+    {
+      "id": "structured_discovery_variant_workbench",
+      "state": "all_native_inductive_and_powl_variants_controls_original_structures_formats_and_handoffs_available",
+      "families": [
+        "algo.discovery.inductive",
+        "algo.discovery.powl"
+      ],
+      "variants": [
+        "IM",
+        "IMf",
+        "IMd",
+        "TREE",
+        "BRUTE_FORCE",
+        "MAXIMAL",
+        "DYNAMIC_CLUSTERING",
+        "DYNAMIC_CLUSTERING_PLAIN",
+        "STANDARD",
+        "TRANSITION_BORDERED",
+        "ADAPTED_SOURCE_XES",
+        "STRICT_POWL_PTML",
+        "FULL_UINT64_SEEDS",
+        "COMPLETE_REPORTS_CSV"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/workflow-discovery.ts",
+        "src/frontend/src/components/WorkflowDiscovery.tsx",
+        "src/frontend/src/components/ProcessModel.tsx",
+        "src/frontend/src/miners.ts"
+      ],
+      "added": [
+        "Individual source-bound Inductive IM/log, IMf and IMd/DFG workflows expose native source, noise, cut/fallthrough, parallel evaluation, timestamp sort and Standard/Transition bordered conversion controls.",
+        "Individual POWL Tree, Brute force, Maximal, frequency dynamic clustering and independent unweighted dynamic clustering workflows expose source grouping/order, filtering, frequency ratio and search-cap controls.",
+        "Each completed run retains the exact original native process tree or POWL, indexed activity registry, frequencies, partial-order edges and its actual converted Petri net; saved models retain an explicit unknown-variant label.",
+        "Complete source, adapted source, model, transitions, activities, format errors, configuration and node hierarchy tables export every value, including full nested native nodes and numeric tokens.",
+        "Original native JSON, request/report JSON, discovered analysis and same-model PNML/BPMN/PTML preserve the completed run. POWL PTML uses strict workflow-net conversion and retains unsupported-cycle/order errors without a block approximation.",
+        "Adapted source XES includes its actual activity/case/timestamp import mapping. Opening it preserves custom grouping, chronological projection, Unicode labels and case IDs rather than reopening with conventional defaults.",
+        "Optional bounded seeded playout retains full unsigned 64-bit seed text and exports XES from the actual discovered net. Adapted/generated logs open for mining and discovered PNML opens for current-source conformance.",
+        "Variant identity, source IDs, invalid parameters, stale source responses and cancellation guards remain explicit. Discovery/export calls preserve the cached source and analysis; explicit handoffs use the existing log/model import workflow."
+      ],
+      "validation": "docs/feature-first-structured-discovery-validation.json"
     }
   ],
   "execution_priority": [
@@ -2160,7 +2202,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations, conversions and I/O. Both native tree generators now expose model populations, original trees, native formats, all three tree playout variants and log/conformance handoffs. Complete model diagnostics, Alpha/Heuristic discovery, Monte Carlo, alignment inspection and guarded decision workflows are available. Preserve all strict algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates, including recorded repeated-label replay/default-cost behavior."
+      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations, conversions and I/O. Individual Inductive IM/IMf/IMd and all five native POWL variants now expose controls, original structures, complete inspection/formats, mapped adapted-source XES and log/model handoffs. Tree generators, Alpha/Heuristic discovery, model diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve all algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates, including recorded replay/default-cost and custom-source conformance observations."
     }
   ],
   "feature_status_meaning": {

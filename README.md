@@ -2097,3 +2097,33 @@ result and each model's original tree, formats/errors and optional native log.
 Population construction retains native bounds; optional logs are bounded to
 one million events across models. Reference algorithm/RNG/default/replay/
 conversion/numeric/performance parity remains open.
+
+
+### Discover individual Inductive and POWL models
+
+Choose Mine a Process Model, then an Inductive or POWL variant. Inductive offers
+IM/log, IMf and IMd/DFG with native noise, cut/fallthrough, parallel evaluation,
+timestamp sorting and Standard/Transition bordered conversion. POWL offers Tree,
+Brute force, Maximal and both independent dynamic-clustering variants, with
+filtering, order-frequency and search controls. Blank fields use native defaults.
+
+Inspect each run's original process tree/POWL, exact net and complete node,
+transition, activity, configuration and source tables. Download original JSON,
+the request report, every-table CSV and actual PNML/BPMN/PTML. Unsupported strict
+POWL-to-tree conversion retains its native error and original model. Saved
+models explicitly show when their discovery variant was not recorded.
+
+Custom activity/case/timestamp fields can regroup and reorder the discovery log.
+The original/adapted counts stay visible, and Open adapted discovery source uses
+the exported field mapping to preserve labels, case IDs and order. Optional
+seeded playout uses the discovered net. Generated XES opens for mining; Check
+this discovered workflow imports its PNML for conformance on the current source.
+Native diagnostic values and errors remain visible; a handoff does not establish
+fitness or full parity.
+
+`POST /api/discover-workflow` requires the current `source_id` and accepts
+`family=inductive` with existing `inductive_*`, `noise_threshold` and
+`discovery_tree_variant` controls, or `family=powl` with existing `powl_*` fields.
+Optional `discovery_playout_*` controls retain bounded native playout. The
+WORKFLOW_DISCOVERY response preserves original/adapted source counts, complete
+analysis, formats/errors and `source_xes_options` for the actual exported log.
