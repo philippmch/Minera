@@ -3216,6 +3216,106 @@ std::string discovery_model_json(std::string result_json,
 }
 
 // Variant-specific discovery runs without replacing the active analysis.
+void handle_constraint_discovery(const httplib::Request& request,
+                                 httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
+    if (!request.has_param("source_id") || request.get_param_value("source_id") != std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; refresh the constraint source");
+    const auto family = request.get_param_value("family");
+    if (family != "declare" && family != "log_skeleton")
+      throw std::invalid_argument("constraint family expects declare or log_skeleton");
+    static const std::set<std::string> declare_fields = {
+      "declare_activity_attribute", "declare_considered_activities", "declare_allowed_templates",
+      "declare_min_support_ratio", "declare_min_confidence_ratio", "declare_auto_selection_multiplier",
+      "generate_log", "declare_playout_traces", "declare_playout_min_length", "declare_playout_max_length", "declare_playout_seed"};
+    static const std::set<std::string> skeleton_fields = {
+      "log_skeleton_activity_attribute", "log_skeleton_noise_threshold", "log_skeleton_constraints"};
+    const auto& fields = family == "declare" ? declare_fields : skeleton_fields;
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "family" && key != "source_id" && key != "conformance_activity_key" && key != "diagnostics_case_id_key" && !fields.contains(key))
+        throw std::invalid_argument("unknown constraint discovery parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) { return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
+    const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const auto params = minera::parse_mine_params(lookup, present);
+    const auto activity = family == "declare" ? params.declare_options.activity_key : params.log_skeleton.activity_key;
+    const auto conformance_activity = request.has_param("conformance_activity_key") ? trim_text(request.get_param_value("conformance_activity_key")) : activity;
+    const auto diagnostics_case = request.has_param("diagnostics_case_id_key") ? trim_text(request.get_param_value("diagnostics_case_id_key")) : "case:concept:name";
+    if (conformance_activity.empty() || diagnostics_case.empty()) throw std::invalid_argument("constraint selectors must not be empty");
+    std::optional<minera::DeclareModel> declare;
+    std::optional<minera::LogSkeletonModel> skeleton;
+    std::optional<std::vector<minera::DeclareConformance>> declare_conformance;
+    std::optional<std::vector<minera::LogSkeletonConformance>> skeleton_conformance;
+    auto graph = minera::discover_directly_follows_graph(session->log);
+    std::string diagnostics, diagnostics_error, playout_xes, playout_result, playout_error;
+    if (family == "declare") {
+      declare = minera::discover_declare(session->log, params.declare_options);
+      auto options = params.declare_conformance_options; options.activity_key = conformance_activity;
+      declare_conformance = minera::check_declare_conformance(session->log, *declare, options);
+      for (const auto& [name, rules] : declare->rules) for (const auto& rule : rules) {
+        (void)name; graph.ensure_activity(rule.first); if (rule.binary) graph.ensure_activity(rule.second);
+      }
+      for (const auto& trace : *declare_conformance) for (const auto& deviation : trace.deviations) {
+        graph.ensure_activity(deviation.first); if (deviation.binary) graph.ensure_activity(deviation.second);
+      }
+      try { diagnostics = minera::serialize_event_table_json(minera::declare_conformance_diagnostics(session->log, *declare_conformance, {diagnostics_case})); }
+      catch (const std::exception& error) { diagnostics_error = error.what(); }
+      if (ocel_query_bool(request, "generate_log", false)) {
+        try {
+          const auto plookup = [&](std::string_view name) { return lookup("declare_playout_" + std::string(name)); };
+          const auto ppresent = [&](std::string_view name) { return present("declare_playout_" + std::string(name)); };
+          const auto playout_options = minera::parse_declare_playout_params(plookup, ppresent);
+          if (playout_options.max_length && playout_options.n_traces > 1000000 / playout_options.max_length)
+            throw std::invalid_argument("Declare playout exceeds the server event budget");
+          const auto generated = minera::declare_playout(*declare, playout_options);
+          auto generated_graph = minera::discover_directly_follows_graph(generated);
+          for (const auto& [name, rules] : declare->rules) for (const auto& rule : rules) {
+            (void)name; generated_graph.ensure_activity(rule.first); if (rule.binary) generated_graph.ensure_activity(rule.second);
+          }
+          const auto checked = minera::check_declare_conformance(generated, *declare);
+          playout_xes = minera::to_xes(generated, "Declare discovered-model playout");
+          playout_result = minera::analysis_json("Declare discovered-model playout", generated, generated_graph,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, &*declare, &checked);
+        } catch (const std::exception& error) { playout_error = error.what(); }
+      }
+    } else {
+      skeleton = minera::discover_log_skeleton(session->log, params.log_skeleton);
+      auto options = params.log_skeleton; options.activity_key = conformance_activity;
+      skeleton_conformance = minera::check_log_skeleton_conformance(session->log, *skeleton, options);
+      for (const auto* relations : {&skeleton->equivalence, &skeleton->always_after, &skeleton->always_before, &skeleton->never_together, &skeleton->directly_follows})
+        for (const auto& relation : *relations) { graph.ensure_activity(relation.source); graph.ensure_activity(relation.target); }
+      for (const auto& [name, frequencies] : skeleton->activ_freq) { (void)frequencies; graph.ensure_activity(name); }
+      for (const auto& trace : *skeleton_conformance) for (const auto& deviation : trace.deviations) {
+        if (deviation.constraint == "activ_freq") graph.ensure_activity(deviation.activity);
+        else { graph.ensure_activity(deviation.relation.source); graph.ensure_activity(deviation.relation.target); }
+      }
+      try { diagnostics = minera::serialize_event_table_json(minera::log_skeleton_conformance_diagnostics(session->log, *skeleton_conformance, {diagnostics_case})); }
+      catch (const std::exception& error) { diagnostics_error = error.what(); }
+    }
+    const auto result = minera::analysis_json(session->dataset, session->log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      skeleton ? &*skeleton : nullptr, skeleton_conformance ? &*skeleton_conformance : nullptr,
+      declare ? &*declare : nullptr, declare_conformance ? &*declare_conformance : nullptr);
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    const auto optional_json = [](const std::string& value) { return value.empty() ? std::string("null") : value; };
+    const auto optional_text = [&](const std::string& value) { return value.empty() ? std::string("null") : quote(value); };
+    response.set_content("{\"family\":\"CONSTRAINT_DISCOVERY\",\"method\":" + quote(family) +
+      ",\"variant\":\"classic\",\"source_id\":" + quote(std::to_string(session->query_source_id)) +
+      ",\"dataset\":" + quote(session->dataset) + ",\"activity_key\":" + quote(activity) +
+      ",\"conformance_activity_key\":" + quote(conformance_activity) + ",\"diagnostics_case_id_key\":" + quote(diagnostics_case) +
+      ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) +
+      "},\"result\":" + result + ",\"diagnostics\":" + optional_json(diagnostics) + ",\"diagnostics_error\":" + optional_text(diagnostics_error) +
+      ",\"playout_result\":" + optional_json(playout_result) + ",\"playout_xes\":" + optional_text(playout_xes) + ",\"playout_error\":" + optional_text(playout_error) + '}', "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
 void handle_structured_discovery(const httplib::Request& request,
                                 httplib::Response& response,
                                 const MinedSession& session,
@@ -9344,6 +9444,7 @@ int main(int argc, char** argv) {
   server.Options("/api/reduce-petri-net", preflight);
   server.Options("/api/align-dfg", preflight);
   server.Options("/api/discover-alpha-plus", preflight);
+  server.Options("/api/discover-constraints", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/decision-tables", preflight);
@@ -9464,6 +9565,7 @@ int main(int argc, char** argv) {
   server.Post("/api/align-dfg", handle_align_dfg);
   server.Post("/api/discover-alpha-plus", handle_alpha_plus_result);
   server.Post("/api/discover-workflow", handle_workflow_discovery);
+  server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);

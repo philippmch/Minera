@@ -2127,3 +2127,37 @@ fitness or full parity.
 Optional `discovery_playout_*` controls retain bounded native playout. The
 WORKFLOW_DISCOVERY response preserves original/adapted source counts, complete
 analysis, formats/errors and `source_xes_options` for the actual exported log.
+
+
+### Discover and check Declare and Log Skeleton constraints
+
+Choose Mine a Process Model, then Declare or Log Skeleton and Classic. Discover
+constraints from the active grouped source with native thresholds and activity
+selectors. Declare offers all eighteen templates, explicit activity filtering
+and support/confidence/automatic ratios. Log Skeleton offers noise and all six
+checking families. Selected families and activities can be explicitly empty;
+omitted fields retain native defaults. Conformance can use a separate activity
+field, and native diagnostics can select the case-ID field.
+
+Inspect the actual discovered model, every case/deviation and typed diagnostic
+cell. Download original JSON, the request report, analysis, native diagnostics
+and every-table CSV. Saved models retain their identity; fresh Log Skeleton
+models show their complete embedded conformance. Table paging retains all rows.
+Original JSON keeps native wire order; derived numeric dictionary keys follow
+the app's property enumeration.
+
+Optional Declare playout generates XES from this exact model with case/length
+controls and a full 64-bit seed. Prefix-safe sampling can leave obligations
+pending; the generated analysis includes every completed conformance result.
+Mine discovered Declare playout reopens the original log, retaining missing
+timestamps. Optional diagnostics/playout errors keep the model available.
+
+`POST /api/discover-constraints` requires the current `source_id` and accepts
+`family=declare` with existing `declare_*` discovery fields, or
+`family=log_skeleton` with existing `log_skeleton_*` fields. Independent
+`conformance_activity_key` and `diagnostics_case_id_key` select checking and
+diagnostic fields. `generate_log=true` uses `declare_playout_traces`,
+`declare_playout_min_length`, `declare_playout_max_length` and
+`declare_playout_seed`. CONSTRAINT_DISCOVERY returns the complete actual model/
+conformance analysis, typed diagnostics and optional generated analysis/XES,
+with explicit native errors and a one-million configured-event playout budget.

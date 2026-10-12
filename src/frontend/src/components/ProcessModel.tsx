@@ -4,6 +4,7 @@ import { type PetriLayout } from "../petri-layout";
 import { type MineraExport } from "../types";
 import { MINER_GROUPS, type MinerVariant } from "../miners";
 import { fetchBpmn, fetchPlayout, fetchPnml, fetchPtml, type CsvOptions } from "../api";
+import { ConstraintDiscovery } from "./ConstraintDiscovery";
 import { ProcessTree } from "./ProcessTree";
 import { PetriNet } from "./PetriNet";
 import { DependencyGraph } from "./DependencyGraph";
@@ -205,6 +206,8 @@ function ModelResult({
     return <WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} />;
   if (minerId === "inductive" || minerId === "powl")
     return <WorkflowDiscovery family={minerId} variant={(variant.id==='basic'?'log':variant.id==='configured'?'maximal':variant.id) as "log"|"imf"|"dfg"|"tree"|"brute_force"|"dynamic_clustering"|"dynamic_clustering_plain"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} />;
+  if (minerId === "declare" || minerId === "log_skeleton")
+    return <ConstraintDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onOpenLog={onOpenPlayout} />;
 
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
   // inductive tree or from the net's token semantics (converted server-side),
