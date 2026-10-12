@@ -2214,3 +2214,37 @@ Sources without timestamps keep this workflow available and show native errors.
 adapters. TIMING_DISCOVERY returns the completed method/variant/source and full
 analysis. Spectrum and batch JSON preserve fractional epoch timestamps with
 round-trip double precision. The feature catalogue retains all open parity gates.
+
+
+### Analyze temporal, repetition and correlation relationships independently
+
+Open a CSV or XES source and choose Behavior analysis. Temporal profile discovery
+and conformance support log, stream, dataframe and lazyframe inputs constructed
+from the cached log. Select activity/case/completion/start fields, strictness,
+business hours and fractional weekly slots. An enabled blank slot override means
+no active time. Conformance retains native zeta values, including inf and -inf.
+
+Download native profile JSON or choose Use this profile for temporal conformance.
+Profile JSON contains [source, target, mean_seconds, standard_deviation_seconds]
+tuples; strings can contain commas, colons, arrows, quotes and Unicode. An empty
+array checks an empty profile. Discovery counts remain in complete analysis/CSV.
+Every native case bucket and deviation is preserved, including empty buckets;
+flat case regrouping can differ from the original source case count.
+
+Minimum self-distance supports log/pandas/polars, activity/case selectors and all
+native witnesses. Correlation supports classic/classic_split/trace_based across
+all four inputs, activity/case/completion/start fields, exact time matching and
+full uint64 sample text. A blank enabled start override uses completion times.
+Inspect complete moments, witnesses and matrices; download original native JSON,
+request/report, analysis, profile/conformance files and every table as full CSV.
+Changed sources clear old output and errors. Untimed sources keep this workbench
+available, expose strict temporal errors and permit self-distance analysis.
+
+`POST /api/analyze-behavior` requires `source_id` and `family=temporal_profile`,
+`temporal_conformance`, `minimum_self_distance` or `correlation`. `variant` selects
+the native algorithm/input; correlation also uses `adapter`. Existing temporal,
+minimum-self-distance and correlation parameter names feed unchanged native
+algorithms. Conformance uses `temporal_profile_json`. BEHAVIOR_ANALYSIS returns
+method/variant/adapter/source, full analysis and native profile/conformance data.
+Temporal/correlation JSON preserves round-trip double precision. Original table
+metadata/order, every remaining feature and strict reference parity stay in scope.

@@ -39,6 +39,7 @@
 #include "minera/process_tree_alignment.hpp"
 #include "minera/timestamp.hpp"
 #include "minera/temporal_profile.hpp"
+#include "minera/temporal_profile_json.hpp"
 #include "minera/transition_system.hpp"
 #include "minera/minimum_self_distance.hpp"
 #include "minera/xes_event_log_importer.hpp"
@@ -225,6 +226,31 @@ minera::EventLog temporal_log(std::initializer_list<std::vector<std::string>> ro
   return log;
 }
 
+void temporal_profile_json_retains_native_moments_and_unrestricted_labels() {
+  const auto json = R"([["a:b,c->quote\"\u2603\uD83D\uDE80","end",0.12345678901234567,1.0000000000000002]])";
+  const auto profile = minera::parse_temporal_profile_json(json);
+  assert(profile.entries.size() == 1);
+  assert(profile.entries[0].source == "a:b,c->quote\"\xE2\x98\x83\xF0\x9F\x9A\x80");
+  const auto decoded = minera::parse_temporal_profile_json(
+      minera::temporal_profile_json(profile));
+  assert(decoded.entries[0].source == profile.entries[0].source);
+  assert(decoded.entries[0].target == profile.entries[0].target);
+  assert(decoded.entries[0].mean_seconds == profile.entries[0].mean_seconds);
+  assert(decoded.entries[0].standard_deviation_seconds ==
+         profile.entries[0].standard_deviation_seconds);
+  assert(minera::parse_temporal_profile_json("[]").entries.empty());
+  for (const auto invalid : {"{}", "[[1,\"b\",1,2]]", "[[\"a\",\"b\",true,2]]",
+       "[[\"a\",\"b\",01,2]]", "[[\"a\",\"b\",+1,2]]", "[[\"a\",\"b\",1.,2]]",
+       "[[\"a\",\"b\",-1,2]]", "[[\"a\",\"b\",1,1e400]]",
+       "[[\"a\",\"b\",1,2,3]]", "[[\"a\",\"b\",1,2]] trailing",
+       "[[\"\\ud800\",\"b\",1,2]]"}) {
+    bool rejected = false;
+    try { (void)minera::parse_temporal_profile_json(invalid); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
+}
+
 void temporal_profile_discovers_all_pairs_and_stats() {
   const auto log = temporal_log({{"2026-01-01T00:00:00", "2026-01-01T00:00:10",
                                   "2026-01-01T00:00:30"},
@@ -250,8 +276,11 @@ void temporal_profile_discovers_all_pairs_and_stats() {
   assert(json.find(
              "{\"source\": 0, \"target\": 2, \"count\": 2, \"mean_seconds\": 35") !=
          std::string::npos);
-  assert(json.find("\"standard_deviation_seconds\": 7.07107") !=
-         std::string::npos);
+  const auto deviation_begin = json.find("\"standard_deviation_seconds\": ",
+      json.find("{\"source\": 0, \"target\": 2,"));
+  assert(deviation_begin != std::string::npos);
+  assert(std::stod(json.substr(deviation_begin + 30)) ==
+         ac->standard_deviation_seconds);
   const auto ab_position = json.find("{\"source\": 0, \"target\": 1,");
   const auto ac_position = json.find("{\"source\": 0, \"target\": 2,");
   assert(ab_position < ac_position);
@@ -6992,6 +7021,7 @@ int main() {
   pripel_json_is_standalone_and_escapes_diagnostics();
   process_tree_alignment_json_carries_failure_and_moves();
   temporal_profile_discovers_all_pairs_and_stats();
+  temporal_profile_json_retains_native_moments_and_unrestricted_labels();
   minimum_self_distance_discovers_distances_and_witnesses();
   minimum_self_distance_supports_custom_activity_and_case_columns();
   minimum_self_distance_json_resolves_ids_and_validates_before_writing();

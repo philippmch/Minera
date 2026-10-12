@@ -151,6 +151,7 @@
 #include "minera/process_cube.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
+#include "minera/temporal_profile_json.hpp"
 #include "minera/timestamp_interleavings.hpp"
 #include "minera/minimum_self_distance.hpp"
 #include "minera/transition_system.hpp"
@@ -3215,6 +3216,144 @@ std::string discovery_model_json(std::string result_json,
          result_json + ",\"pnml\":" + (computed
              ? quote(minera::to_pnml(net, markings.initial, markings.final, "discovered"))
              : std::string("null")) + '}';
+}
+
+// Source-bound behavioral discovery and temporal profile conformance.
+void handle_behavior_analysis(const httplib::Request& request,
+                              httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
+    if (!request.has_param("source_id") || request.get_param_value("source_id") != std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; refresh the behavior source");
+    const auto family = request.get_param_value("family");
+    const bool temporal = family == "temporal_profile" || family == "temporal_conformance";
+    const bool conform = family == "temporal_conformance";
+    if (!temporal && family != "minimum_self_distance" && family != "correlation")
+      throw std::invalid_argument("unsupported behavior analysis family");
+    std::set<std::string> allowed = {"family", "source_id", "variant"};
+    if (temporal) {
+      allowed.insert({"temporal_activity_attribute", "temporal_case_id_attribute", "temporal_source_timestamp_attribute", "temporal_target_timestamp_attribute", "temporal_business_hours", "temporal_business_hour_slots", "temporal_strict_attributes"});
+      if (conform) allowed.insert({"temporal_profile_json", "temporal_zeta"});
+    } else if (family == "minimum_self_distance")
+      allowed.insert({"minimum_self_distance_activity_key", "minimum_self_distance_case_id_key"});
+    else
+      allowed.insert({"adapter", "correlation_activity_attribute", "correlation_timestamp_attribute", "correlation_start_timestamp_attribute", "correlation_case_id_attribute", "correlation_exact_time_matching", "correlation_sample_size"});
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key)) throw std::invalid_argument("unknown behavior analysis parameter: " + key);
+    }
+    auto variant = request.has_param("variant") ? request.get_param_value("variant") : (family == "correlation" ? "classic" : "log");
+    if (family == "correlation" && variant != "classic" && variant != "classic_split" && variant != "trace_based")
+      throw std::invalid_argument("correlation variant expects classic, classic_split, or trace_based");
+    const auto lookup = [&](std::string_view name) {
+      if (name == "minimum_self_distance_variant" && family == "minimum_self_distance") return variant;
+      if (name == "correlation_variants" && family == "correlation") return variant;
+      return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return (name == "minimum_self_distance_variant" && family == "minimum_self_distance") || (name == "correlation_variants" && family == "correlation") || request.has_param(std::string(name));
+    };
+    auto params = minera::parse_mine_params(lookup, present);
+    if (temporal && !present("temporal_strict_attributes")) params.temporal_profile.strict_attributes = true;
+    std::string adapter = family == "correlation" ? (request.has_param("adapter") ? request.get_param_value("adapter") : "dataframe") : variant;
+    if (family == "minimum_self_distance") {
+      variant = params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kLog ? "log" : params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kPandas ? "pandas" : "polars";
+      adapter = params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kLog ? "log" : params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kPandas ? "dataframe" : "lazyframe";
+    } else if (adapter != "log" && adapter != "stream" && adapter != "dataframe" && adapter != "lazyframe")
+      throw std::invalid_argument("behavior adapter expects log, stream, dataframe, or lazyframe");
+    std::optional<minera::ConvertedEventStream> stream;
+    std::optional<minera::LogConversionTable> table;
+    std::optional<minera::LazyEventTable> lazy;
+    const auto input = [&]() -> minera::EventDataView {
+      if (adapter == "log") return minera::EventDataView(session->log);
+      if (adapter == "stream") { stream = minera::event_log_to_event_stream(session->log); return minera::EventDataView(*stream); }
+      if (adapter == "dataframe") { table = minera::event_log_to_table(session->log); return minera::EventDataView(*table); }
+      lazy = minera::event_log_to_lazy_table(session->log); return minera::EventDataView(*lazy);
+    };
+    auto graph = minera::discover_directly_follows_graph(session->log);
+    std::optional<minera::TemporalProfile> profile;
+    std::optional<minera::MinimumSelfDistances> distances;
+    std::optional<minera::CorrelationVariantsAnalysis> correlations;
+    std::optional<minera::TemporalConformanceResult> conformance;
+    if (temporal) {
+      if (conform) {
+        if (!request.has_param("temporal_profile_json")) throw std::invalid_argument("temporal_profile_json is required");
+        profile = minera::parse_temporal_profile_json(request.get_param_value("temporal_profile_json"));
+        conformance = minera::conform_temporal_profile(input(), *profile, params.temporal_profile);
+      } else profile = minera::discover_temporal_profile(input(), params.temporal_profile);
+      for (const auto& entry : profile->entries) { graph.ensure_activity(entry.source); graph.ensure_activity(entry.target); }
+    } else if (family == "minimum_self_distance") {
+      distances = discover_selected_minimum_self_distances(session->log, params.minimum_self_distance);
+      for (const auto& distance : *distances) {
+        if (!distance.activity_is_null) graph.ensure_activity(distance.activity);
+        for (const auto& witness : distance.witnesses) graph.ensure_activity(witness);
+      }
+    } else {
+      correlations = analyze_correlation_variants(input(), params.correlation_variants, params.correlation);
+      minera::register_correlation_activities(graph, *correlations);
+    }
+    const auto result = minera::analysis_json(
+      /* dataset */ session->dataset,
+      /* event_log */ session->log,
+      /* graph */ graph,
+      /* tree */ nullptr,
+      /* net */ nullptr,
+      /* heuristics */ nullptr,
+      /* conformance */ nullptr,
+      /* performance */ nullptr,
+      /* resources */ nullptr,
+      /* variant_durations */ nullptr,
+      /* eventually_follows */ nullptr,
+      /* decisions */ nullptr,
+      /* petri_decoration */ nullptr,
+      /* spectrum */ nullptr,
+      /* inductive_net */ nullptr,
+      /* inductive_decoration */ nullptr,
+      /* heuristic_petri */ nullptr,
+      /* heuristic_decoration */ nullptr,
+      /* temporal_profile */ profile ? &*profile : nullptr,
+      /* minimum_self_distances */ distances ? &*distances : nullptr,
+      /* transition_system */ nullptr,
+      /* powl */ nullptr,
+      /* powl_petri */ nullptr,
+      /* powl_decoration */ nullptr,
+      /* log_skeleton */ nullptr,
+      /* log_skeleton_conformance */ nullptr,
+      /* declare */ nullptr,
+      /* declare_conformance */ nullptr,
+      /* footprints */ nullptr,
+      /* dfg_variants */ nullptr,
+      /* correlation_mining */ correlations ? &*correlations : nullptr,
+      /* batch_discovery */ nullptr,
+      /* dfg_alignment */ nullptr,
+      /* edit_distance */ nullptr,
+      /* edit_anti */ false,
+      /* dfg_projection */ nullptr,
+      /* dfg_projected_log */ nullptr,
+      /* edit_projected_log */ nullptr,
+      /* process_tree_alignment */ nullptr,
+      /* decomposed_alignment */ nullptr,
+      /* petri_anti_alignment */ nullptr,
+      /* petri_multi_alignment */ nullptr,
+      /* reduced_process_tree */ nullptr,
+      /* reduced_trace_index */ 0,
+      /* evaluation */ nullptr,
+      /* earth_movers_distance */ nullptr,
+      /* interval_event_overlap_counts */ nullptr,
+      /* case_overlap_counts */ nullptr,
+      /* concurrent_activity_overlap */ nullptr,
+      /* decision_tables */ nullptr,
+      /* minimum_self_distance_variant */ params.minimum_self_distance.variant,
+      /* typed_edit_distance */ nullptr);
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    auto body = "{\"family\":\"BEHAVIOR_ANALYSIS\",\"method\":" + quote(family) + ",\"variant\":" + quote(variant) + ",\"adapter\":" + quote(adapter) + ",\"source_id\":" + quote(std::to_string(session->query_source_id)) +
+      ",\"dataset\":" + quote(session->dataset) + ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) + "},\"input_origin\":\"cached_source_log_conversion\",\"result\":" + result;
+    if (profile) body += ",\"profile\":" + minera::temporal_profile_json(*profile);
+    if (conformance) body += ",\"conformance\":" + minera::temporal_conformance_json(*conformance);
+    response.set_content(body + '}', "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
 // Variant-specific discovery runs without replacing the active analysis.
@@ -9570,6 +9709,7 @@ int main(int argc, char** argv) {
   server.Options("/api/discover-constraints", preflight);
   server.Options("/api/discover-graph", preflight);
   server.Options("/api/discover-timing", preflight);
+  server.Options("/api/analyze-behavior", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/decision-tables", preflight);
@@ -9693,6 +9833,7 @@ int main(int argc, char** argv) {
   server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/discover-timing", handle_timing_discovery);
+  server.Post("/api/analyze-behavior", handle_behavior_analysis);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);

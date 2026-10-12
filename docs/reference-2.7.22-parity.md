@@ -13002,3 +13002,45 @@ promoted. Broader timing features and every remaining catalogue unit stay in sco
 
 Evidence: docs/feature-first-timing-discovery-validation.json and
 docs/feature-first-timing-discovery-results-preview.png.
+
+
+### Feature delivery first: behavior relationships and temporal conformance
+
+Added source-bound native Behavior analysis for temporal profile discovery and
+conformance, minimum self-distance/witnesses and correlation relationships.
+Temporal operations expose log/stream/dataframe/lazyframe adapters, independent
+completion/start selectors, strictness, business hours, fractional weekly slots,
+explicit empty schedules and native zeta conventions. A native JSON moment-tuple
+codec preserves arbitrary labels, separator/quote/supplementary Unicode and empty
+profiles. Discovered profiles hand off directly to conformance without changing
+native moment tokens; original discovery counts remain in analysis and CSV.
+
+Minimum self-distance exposes log/pandas/polars with activity/case selectors and
+complete witnesses. Correlation exposes classic/classic_split/trace_based across
+all four native input shapes with completion/start/activity/case fields, exact
+matching, full uint64 samples and explicit start fallback. Flat shapes convert
+the cached source log and retain native grouping/order rules. Original source
+counts stay distinct from conformance buckets: 96 cases can become four buckets
+with 2400 deviations. Empty buckets and every deviation remain inspectable.
+
+Temporal/correlation JSON now preserves round-trip double precision. Complete
+native/request/analysis/profile/conformance JSON, every native table, resolved
+relationship tables, case/deviation tables and selected-row JSON export all data
+beyond previews and paging. Changed sources clear old results/errors; untimed
+sources expose strict temporal errors and support self-distance discovery.
+
+Validation: seven native suites, 1234 frontend tests (55 added) and production
+build; 65 controlled native checks over 55 calls with 38 actual fixtures; 22
+browser checks and 813 downloads across 29 exported runs; 846 independent checks
+over 707 complete CSV tables, twelve profile files and seven conformance files,
+with 33 repeated native/schema/model calls. Served production assets and all
+source/object/binary/evidence bindings were verified; owned resources were closed.
+
+The first compiler/capture attempts remain retained. Algorithms are unchanged.
+Only feature labels change: all 228 incomplete units, complete catalogue scope,
+remaining discovery/statistics/causal/witness utilities and all strict native
+default/type/error/order/Unicode/adapter/concurrency/performance gates remain open.
+No package or module parity status is promoted.
+
+Evidence: docs/feature-first-behavior-analysis-validation.json and
+docs/feature-first-behavior-analysis-preview.png.
