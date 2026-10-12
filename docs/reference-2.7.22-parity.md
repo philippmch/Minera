@@ -13081,3 +13081,44 @@ native input contracts. Overall full parity remains active.
 
 Evidence: docs/feature-first-dfg-discovery-validation.json and
 docs/feature-first-dfg-discovery-preview.png.
+
+
+### Feature delivery first: precomputed replay-result fitness
+
+Added Replay-result fitness in Conformance and an independent native HTTP/API
+workflow for already-computed token and alignment replay records. The native
+evaluators remain unchanged. Token JSON retains exact signed counts, decimal
+strings, explicit zero/null alias precedence, all compact record fields and
+uint64 activations. Token arrays, trace containers and saved token fitness/replay
+envelopes are supported. Alignment arrays retain null/uncomputed rows for native
+exclusion and preserve cost/bwc conventions, fitting classification and errors.
+
+Every token record contributes according to native semantics, including records
+whose computed/error metadata indicate failure. Signed and nonpositive aggregate
+denominators, nonfinite trace fitness, activation overflow and native uncomputed
+variant results remain intact. Original input/metadata, token totals, activations,
+model evaluation and ordered typed token metrics remain inspectable/exportable.
+Standalone model-evaluation JSON now retains round-trip double precision.
+
+Complete native/report/input/evaluation JSON and every complete CSV retain all
+records and numeric tokens beyond previews, long-cell truncation and paging.
+The editor uses full panel width; table switches reset page/column/row selection.
+Validation errors retain the completed result; valid operations recover. Host log
+changes clear old output/errors without requiring a selected model at this API.
+
+Validation: four native suites, 1325 frontend tests (44 added), production build,
+91 native checks over 42 calls and 30 actual result fixtures, 15 browser checks,
+nine exported browser runs with 110 downloads, and 103 independent checks over
+74 complete CSV tables with 13 repeated native/source/model calls. Source/object/
+binary/served-asset/evidence bindings were verified and owned resources closed.
+Earlier capture, fixture-loader, visual and export-helper attempts are retained.
+
+This is delivered feature group 46. Compact replay adapters preserve original
+unused diagnostic metadata without rehydrating full opaque native trace/marking
+objects; grouped alignment variants are not silently weighted as separate cases.
+Those contracts, remaining features and every strict default/type/error/order/
+Unicode/adapter/concurrency/performance gate remain open. All 228 incomplete
+units and the complete catalogue stay in scope; no parity status is promoted.
+
+Evidence: docs/feature-first-replay-result-fitness-validation.json and
+docs/feature-first-replay-result-fitness-preview.png.

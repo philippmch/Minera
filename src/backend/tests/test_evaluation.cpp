@@ -1,10 +1,68 @@
 #include "minera/evaluation.hpp"
 #include "minera/json_export.hpp"
+#include "minera/precomputed_replay_json.hpp"
 #include <cassert>
 #include <cmath>
 #include <limits>
 
 using namespace minera;
+
+static void precomputed_json_keeps_native_aggregation() {
+  const auto rows = parse_precomputed_token_replay_json(R"([
+    {"computed":false,"trace_is_fit":true,"trace_fitness":1,
+     "missing_tokens":0,"missing":"9999999999999999999999999",
+     "consumed_tokens":"340282366920938463463374607431768211456",
+     "produced":"340282366920938463463374607431768211456",
+     "transition_activations":[18446744073709551615],"error":"資料☃🚀"},
+    {"exhausted":true,"trace_is_fit":false,"trace_fitness":0.5,
+     "missing":1,"consumed":4,"remaining":1,"produced":4,
+     "transition_activations":[1]}
+  ])");
+  assert(rows.size()==2 && rows[0].error=="資料☃🚀");
+  assert(rows[0].missing_tokens && *rows[0].missing_tokens==0);
+  const auto fitness=evaluate_replay_fitness(rows);
+  assert(fitness.computed && fitness.exhausted && fitness.trace_count==2);
+  assert(fitness.fitting_traces==1 && fitness.average_trace_fitness==0.75);
+  assert(fitness.token_result.consumed.decimal()=="340282366920938463463374607431768211460");
+  assert(fitness.token_result.transition_frequencies.empty());
+  const auto aliases=parse_precomputed_token_replay_json(R"({"trace_diagnostics":[
+    {"case_id":"case","missing_tokens":null,"missing":-3,"produced":4,"consumed":4}
+  ]})");
+  assert(!aliases[0].missing_tokens && aliases[0].missing==-3);
+  const auto wrapped=parse_precomputed_token_replay_json(R"({"miner":"native","replay_fitness":{
+    "token_replay":{"trace_diagnostics":[{"trace_is_fit":true,"trace_fitness":1,"produced":4,"consumed":4}]}
+  }})");
+  assert(wrapped.size()==1 && evaluate_replay_fitness(wrapped).fitness==1);
+  const auto alignment=parse_precomputed_alignment_replay_json(R"([
+    null,{"computed":false,"fitness":"nan"},
+    {"trace_is_fit":false,"fitness":1,"cost":0,"bwc":0},
+    {"fitness":0.5,"cost":1,"best_worst_cost":0,"bwc":2}
+  ])");
+  const auto aligned=evaluate_replay_fitness(alignment);
+  assert(alignment.size()==4 && !alignment[0].computed && aligned.trace_count==2);
+  assert(aligned.fitting_traces==1 && aligned.average_trace_fitness==0.75);
+  assert(aligned.fitness==0.5 && aligned.total_cost==1);
+  const auto nonfinite=precomputed_replay_fitness_json(
+      R"([{"trace_fitness":"nan","produced":1,"consumed":1}])","token");
+  assert(nonfinite.find("\"average_trace_fitness\": null")!=std::string::npos);
+  assert(nonfinite.find("\"hex\":\"nan\"")!=std::string::npos);
+  const auto precise=precomputed_replay_fitness_json(
+      R"([{"trace_fitness":0.33333333333333331,"produced":1,"consumed":1}])","token");
+  const auto marker=precise.find("\"average_trace_fitness\": ");
+  assert(marker!=std::string::npos && std::stod(precise.substr(marker+25))==1.0/3.0);
+  assert(precomputed_replay_fitness_json("[]","token").find("\"submitted_rows\":0")!=std::string::npos);
+  assert(precomputed_replay_fitness_json("[]","alignment").find("\"submitted_rows\":0")!=std::string::npos);
+  const auto mismatch=precomputed_replay_fitness_json("[]","token",ReplayFitnessVariant::AUTO);
+  assert(mismatch.find("precomputed token results require token-based replay")!=std::string::npos);
+  for (const auto bad : {"[null]","[{\"missing\":1.5}]","[{\"computed\":1}]",
+                         "[{\"trace_fitness\":1,\"trace_fitness\":0}]",
+                         "[{\"case_id\":\"\\ud800\"}]","[] trailing"}) {
+    bool rejected=false;
+    try { (void)parse_precomputed_token_replay_json(bad); }
+    catch(const std::invalid_argument&) { rejected=true; }
+    assert(rejected);
+  }
+}
 
 static PetriNet sequence_net() {
   PetriNet n; auto p0=n.add_place(), p1=n.add_place(), p2=n.add_place(); n.set_source(p0); n.set_sink(p2); n.set_activities({"A","B"});
@@ -914,4 +972,5 @@ int main() {
   composite_evaluation_uses_equal_and_custom_weights();
   composite_evaluation_serializes_as_a_model_family();
   emd_pyemd_variant_is_deterministic_and_strict();
+  precomputed_json_keeps_native_aggregation();
 }

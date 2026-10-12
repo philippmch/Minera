@@ -61,6 +61,8 @@ import { type AlignmentEntry, type AlignmentKind } from "../alignment-inspection
 import { ModelDiagnosticsInspection } from "./ModelDiagnosticsInspection";
 import { parseDiagnosticWeight, type DiagnosticEntry } from "../model-diagnostics";
 
+import { ReplayResultFitness } from "./ReplayResultFitness";
+
 type Step = "miner" | "method" | "result";
 
 /** The conformance tab's extra, non-miner model: a user-uploaded PNML or BPMN model. */
@@ -382,6 +384,7 @@ export function Conformance({
           </section>
         ))}
       <ModelEvaluationPanel key={`evaluation-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestEvaluation={onRequestEvaluation} onInspect={result=>saveDiagnostic("evaluation",result,result.miner)} />
+      <ReplayResultFitness key={`replay-result-fitness-${analysisId}`} />
       <DecisionWorkspace key={`decision-workspace-${analysisId}-${importedGeneration}`} models={evaluationModelIds(data,Boolean(currentImported || data.conformance?.imported))} live={!!onRequestDecisions} embedded={data.decision_tables} dataset={data.dataset} caseCount={data.trace_count} eventCount={data.event_count} onOpenUnderlying={onCheckModel?(file,sourceId)=>void uploadModel(file,sourceId):undefined}/>
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} onInspect={(result,model)=>saveDiagnostic("petri",result,model)} />
       <ModelDiagnosticsInspection key={`model-diagnostics-${analysisId}`} entries={diagnosticHistory.analysisId===analysisId?diagnosticHistory.entries:[]} />

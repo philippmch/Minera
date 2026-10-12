@@ -2277,3 +2277,34 @@ feed the unchanged native EventLog algorithms. DFG_DISCOVERY returns source/coun
 canonical selections and full analysis containing the configured dfg_variants.
 Variant JSON preserves round-trip double precision. Full reference parity and all
 remaining catalogue features and strict compatibility gates remain in scope.
+
+
+### Evaluate already-computed replay results
+
+Choose Conformance > Replay-result fitness. Paste or open JSON token or alignment
+replay records, choose the native fitness variant and evaluate. Token input also
+accepts traces/trace_diagnostics containers and saved token_replay/replay_fitness
+envelopes. Each record represents one native contribution; grouped alignment
+variant counts are not expanded. Additional metadata remains in original input.
+
+Token counts accept signed decimal JSON integers or decimal strings. Explicit
+*_tokens values, including zero, take precedence over short count aliases; null
+uses the alias. Every token record contributes, independently of computed/error
+metadata. Native nonpositive denominator rules and trace_is_fit classification
+remain intact. trace_fitness accepts "nan", "inf" and "-inf"; typed public metrics
+retain their native nonfinite conventions while ordinary summaries use null.
+
+Alignment evaluation skips null/uncomputed records, derives fitting records from
+numeric fitness and preserves best_worst_cost/bwc behavior. Incompatible explicit
+variants and invalid native metrics remain inspectable uncomputed results. Download
+native/report/original-input/evaluation JSON or every full CSV. Paging and long-cell
+previews preserve complete selected-row JSON. Edited controls retain the completed
+run; changed host logs clear old output/errors. The editor uses full panel width.
+
+POST /api/evaluate-replay-results accepts the original JSON request body with
+input_kind=token or alignment and optional fitness_variant. It requires no cached
+log or model. The response contains original input, submitted row count, native
+evaluation and exact token totals/activations where applicable. The native JSON
+decoders are declared in minera/precomputed_replay_json.hpp. Existing log/model
+evaluation stays available; full typed input, adapters and reference parity remain
+in scope alongside the complete feature catalogue.

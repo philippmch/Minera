@@ -152,6 +152,7 @@
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/temporal_profile_json.hpp"
+#include "minera/precomputed_replay_json.hpp"
 #include "minera/timestamp_interleavings.hpp"
 #include "minera/minimum_self_distance.hpp"
 #include "minera/transition_system.hpp"
@@ -6916,6 +6917,32 @@ void handle_compare_petri(const httplib::Request& request,
   }
 }
 
+void handle_precomputed_replay_fitness(const httplib::Request& request,
+                                      httplib::Response& response) {
+  try {
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "input_kind" && key != "fitness_variant")
+        throw std::invalid_argument("unknown replay-result fitness parameter: " + key);
+    }
+    const auto kind = request.has_param("input_kind")
+        ? request.get_param_value("input_kind") : std::string("token");
+    std::optional<minera::ReplayFitnessVariant> variant;
+    if (request.has_param("fitness_variant")) {
+      const auto params = minera::parse_evaluation_params(
+          [&](std::string_view name) { return name == "fitness_variant"
+              ? request.get_param_value("fitness_variant") : std::string{}; },
+          [&](std::string_view name) { return name == "fitness_variant"; });
+      variant = params.replay_fitness_variant;
+    }
+    response.set_content(minera::precomputed_replay_fitness_json(
+        request.body, kind, variant), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_evaluate(const httplib::Request& request,
                      httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -9789,6 +9816,7 @@ int main(int argc, char** argv) {
   server.Options("/api/discover-timing", preflight);
   server.Options("/api/analyze-behavior", preflight);
   server.Options("/api/discover-dfg", preflight);
+  server.Options("/api/evaluate-replay-results", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/decision-tables", preflight);
@@ -9914,6 +9942,7 @@ int main(int argc, char** argv) {
   server.Post("/api/discover-timing", handle_timing_discovery);
   server.Post("/api/analyze-behavior", handle_behavior_analysis);
   server.Post("/api/discover-dfg", handle_dfg_discovery);
+  server.Post("/api/evaluate-replay-results", handle_precomputed_replay_fitness);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);
