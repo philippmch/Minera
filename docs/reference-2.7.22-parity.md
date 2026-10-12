@@ -12926,3 +12926,40 @@ Only feature-delivery labels change; no catalogue parity status is promoted.
 
 Evidence: docs/feature-first-constraint-discovery-validation.json and
 docs/feature-first-constraint-discovery-preview.jpg.
+
+
+### Feature delivery first: footprints and transition-system discovery
+
+Added independent source-bound footprints and VIEW_BASED transition-system
+workbenches. Footprints expose all eight discovery variants, three conformance
+methods and six comparison models, with strictness, always-executed checks,
+selectors, table order/index/start-time and marking controls. The cached POWL
+node is retained exactly. A native codec exposes the actual compared footprint,
+including variant-specific absent fields. Alpha comparisons identify their
+cached input projection and actual activity alphabet; DFG comparisons identify
+their selected-source model origin. Results retain their own activity registry.
+
+Transition systems expose both directions, all three views, exact signed 64-bit
+window text and native activity/case/traversal controls. Original state identity,
+root membership, sequence/multiset/name order, adjacency and every traversal
+remain inspectable. Full-row native tables, row JSON, original native/request/
+analysis/model JSON and CSV export beyond preview/paging limits. Invalid model/
+variant combinations, overflowing windows and source changes remain explicit.
+
+Validation: seven focused native suites, 1,157 frontend tests (27 added) and
+production build; 47 native checks over 33 calls with twenty actual fixtures;
+eighteen browser checks and 536 downloads; 538 independent checks over 502 full
+CSV tables, three compared footprints, seven traversal tables and the exact
+wide-window diagram JSON. Ten exported runs match repeated native calls and
+preserve the current schema/cached net. Reopening the source clears prior output.
+
+The Windows server now uses MSVC /bigobj after reaching the object-section limit.
+Earlier compile, row-budget and CSV-parser attempts remain retained. Alpha's
+row materialization cap is an error budget, not truncation. Native coordinate/
+adapter/algorithm/default/type/order/Unicode/concurrency/performance gates and
+all 228 incomplete units remain open. Only feature labels change; no package or
+module parity status is promoted. Original JSON preserves wire order; derived
+numeric object keys retain the app's enumeration convention.
+
+Evidence: docs/feature-first-graph-discovery-validation.json and
+docs/feature-first-graph-discovery-preview.jpg.

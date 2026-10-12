@@ -140,7 +140,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_graph_discovery_workflow_available",
       "package": "algo.conformance.footprints",
       "parity_status": "complete",
       "selectors": [
@@ -292,7 +292,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_graph_discovery_workflow_available",
       "package": "algo.discovery.footprints",
       "parity_status": "complete",
       "selectors": [
@@ -449,7 +449,7 @@
       ]
     },
     {
-      "feature_delivery_status": "explorer_available",
+      "feature_delivery_status": "native_graph_discovery_workflow_available",
       "package": "algo.discovery.transition_system",
       "parity_status": "complete",
       "selectors": [
@@ -2226,6 +2226,54 @@
         "Invalid/stale/wrong-family requests and partial diagnostics/playout errors remain explicit. Discovery/export preserves the current source and cached workflow; only explicit log handoff replaces the source."
       ],
       "validation": "docs/feature-first-constraint-discovery-validation.json"
+    },
+    {
+      "id": "native_footprints_and_transition_system_workbench",
+      "state": "all_native_footprint_variants_comparisons_controls_and_transition_views_complete_exports_available",
+      "families": [
+        "algo.discovery.footprints",
+        "algo.conformance.footprints",
+        "algo.discovery.transition_system"
+      ],
+      "variants": [
+        "ALL_8_FOOTPRINT_DISCOVERY_VARIANTS",
+        "LOG_MODEL",
+        "LOG_EXTENSIVE",
+        "TRACE_EXTENSIVE",
+        "ALL_6_COMPARISON_MODELS",
+        "ACTUAL_CACHED_POWL",
+        "COMPARED_MODEL_FOOTPRINT",
+        "VIEW_BASED",
+        "FORWARD",
+        "BACKWARD",
+        "SEQUENCE",
+        "SET",
+        "MULTISET",
+        "FULL_INT64_WINDOWS",
+        "COMPLETE_TRAVERSALS",
+        "COMPLETE_REPORTS_CSV"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_server.cpp",
+        "include/minera/json_export.hpp",
+        "src/backend/json_export.cpp",
+        "src/frontend/src/graph-discovery.ts",
+        "src/frontend/src/components/GraphDiscovery.tsx",
+        "src/frontend/src/components/ProcessModel.tsx",
+        "src/frontend/src/components/TransitionSystemModel.tsx"
+      ],
+      "added": [
+        "Independent source-bound footprint and VIEW_BASED transition-system workbenches replace cached-only selection and retain explicitly identified saved results.",
+        "Footprints expose all eight native discovery variants, all three conformance variants, six comparison model choices, strictness, always-executed checks, selectors, table sorting and initial markings.",
+        "The exact cached POWL node is retained in the session rather than rediscovered with defaults. An explicit native footprint codec exposes the actual compared model, including absent/optional variant fields.",
+        "Original source and analysis source remain distinct; Alpha comparisons use the actual cached Alpha activity projection, while DFG comparisons identify their selected-source origin.",
+        "Transition systems expose forward/backward direction, sequence/set/multiset state views, the complete signed 64-bit window text, custom activity/case selectors and native traversal data.",
+        "Complete native states retain identity, root membership, payload/name order, starts/ends, adjacency and traversal occurrences. A flattened traversal table retains state/transition identity and every returned trace/event coordinate.",
+        "Original native JSON, exact request/report JSON, complete discovered analysis, compared model footprint, diagram model JSON and every-table CSV preserve all values/numeric tokens beyond card/table paging.",
+        "Source changes, invalid combinations and overflowing windows remain explicit and clear late results. Independent operations preserve the source/schema and cached net; reopening a source creates a new source ID.",
+        "The Windows server target uses the MSVC large-object option so the expanded native server compiles with the authoritative build configuration."
+      ],
+      "validation": "docs/feature-first-graph-discovery-validation.json"
     }
   ],
   "execution_priority": [
@@ -2243,7 +2291,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations and I/O. Declare and Log Skeleton now provide configurable discovery, exact-model conformance, typed diagnostics, full inspection/exports and same-model prefix-safe Declare playout/mining. Individual Inductive/POWL and Alpha/Heuristic discovery, tree generators, model diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve all strict algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates, including pending Declare obligations and numeric dictionary serialization order."
+      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations and I/O. Footprints now expose all eight variants, all conformance methods, actual cached comparison models and complete native diagnostics. Transition systems expose both directions, all views, signed windows and complete traversal data. Declare/Log Skeleton, Inductive/POWL, Alpha/Heuristic, generators, model diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve the complete catalogue and all strict algorithm/adapter/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates."
     }
   ],
   "feature_status_meaning": {

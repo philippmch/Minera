@@ -162,7 +162,7 @@ export const MINER_GROUPS: MinerGroup[] = [
         id: "configured",
         name: "Configured discovery",
         description:
-          "Discover and compare footprint variants using the settings selected in Miner settings.",
+          "Run selected native footprint variants and comparisons with independent source and marking controls.",
         artifact: "footprints",
       },
     ],
@@ -172,7 +172,7 @@ export const MINER_GROUPS: MinerGroup[] = [
 MINER_GROUPS.push({
   id:"transition_system",name:"Transition System",
   tagline:"Inspect activity-context states, transitions and native traversal counts.",
-  variants:[{id:"configured",name:"Configured discovery",description:"Render the sequence, set or multiset view discovered with the direction and window selected in Miner settings.",artifact:"transition-system"}],
+  variants:[{id:"configured",name:"Configured discovery",description:"Discover sequence, set or multiset states with independent direction, window and traversal controls.",artifact:"transition-system"}],
 });
 
 MINER_GROUPS.push(

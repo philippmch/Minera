@@ -77,6 +77,11 @@
 #include "minera/local_diagnostics.hpp"
 
 namespace minera {
+// Serialize one exact footprint against the supplied activity registry,
+// retaining the native variant's absent fields and indexed relations.
+[[nodiscard]] std::string footprint_json(
+    const Footprint& footprint, const DirectlyFollowsGraph& graph);
+
 // Opt-in serialization of supplied metadata; no discovery or naming rules.
 // Throws std::invalid_argument for duplicate IDs/marking places, invalid node
 // references, same-kind arcs or recursively non-finite property doubles.
