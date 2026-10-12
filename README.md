@@ -2161,3 +2161,30 @@ diagnostic fields. `generate_log=true` uses `declare_playout_traces`,
 `declare_playout_seed`. CONSTRAINT_DISCOVERY returns the complete actual model/
 conformance analysis, typed diagnostics and optional generated analysis/XES,
 with explicit native errors and a one-million configured-event playout budget.
+
+
+### Discover footprints and transition systems independently
+
+Choose Mine a Process Model, then Footprints or Transition System and Configured
+discovery. Footprints offers all eight native discovery adapters and all three
+conformance methods. Compare the actual cached process tree, POWL, Inductive,
+Alpha or Heuristic model, or the selected source DFG. Choose activity/case/time/
+start/index fields, table sorting, strictness, always-executed checks and initial
+marking text. The compared model footprint preserves native absent fields.
+Alpha input projection and original source counts remain explicit; cached models
+are retained rather than rediscovered with new defaults.
+
+Transition systems offer forward/backward direction, sequence/set/multiset views,
+the full signed 64-bit window range, activity/case selectors and optional event
+traversals. Inspect native state identities, root membership, payloads, adjacency
+and every returned occurrence. Cards/diagrams preview the model; complete tables,
+row JSON and CSV preserve all data. Original native/request/analysis JSON and the
+transition view's JSON download retain exact numeric tokens. A changed source
+clears the previous discovery, and saved models identify their recorded origin.
+
+`POST /api/discover-graph` requires `source_id` and `family=footprints` or
+`family=transition_system`. Existing `footprints_*` or `transition_*` fields feed
+the unchanged native algorithms. GRAPH_DISCOVERY returns original/analysis source
+counts, complete native analysis and the compared footprint/model origin when
+applicable. Marking/variant incompatibilities and invalid windows retain errors.
+The Windows CMake server target enables MSVC's large-object format.

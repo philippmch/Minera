@@ -7504,4 +7504,12 @@ std::string temporal_conformance_json(
   return out.str();
 }
 
+std::string footprint_json(const Footprint& footprint,
+                           const DirectlyFollowsGraph& graph) {
+  validate_footprint(footprint, graph);
+  std::ostringstream out;
+  write_footprint(out, footprint, graph);
+  return out.str();
+}
+
 }  // namespace minera

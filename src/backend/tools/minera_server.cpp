@@ -331,6 +331,7 @@ struct MinedSession {
   minera::DirectlyFollowsGraph graph;
   std::unordered_map<std::string, minera::PetriNet> nets;  // miner id -> net
   minera::ProcessTree tree;  // the inductive model, for on-demand BPMN export
+  std::optional<minera::PowlNode> powl;  // exact model retained for footprint comparisons
   minera::DeclareModel declare;  // classic Declare, for on-demand playout
   std::string dataset;       // uploaded file name, echoed into XES exports
   std::optional<minera::PnmlDocument> imported_document;
@@ -1126,6 +1127,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->nets.emplace("heuristic", heuristic_net);
     session->nets.emplace("powl", powl_net);
     session->tree = tree;
+    session->powl = powl;
     session->declare = declare;
     session->dataset = dataset;
     session->token_replay = minera::tools::default_replay_input_options(
@@ -3216,6 +3218,73 @@ std::string discovery_model_json(std::string result_json,
 }
 
 // Variant-specific discovery runs without replacing the active analysis.
+void handle_graph_discovery(const httplib::Request& request,
+                            httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
+    if (!request.has_param("source_id") || request.get_param_value("source_id") != std::to_string(session->query_source_id))
+      throw std::invalid_argument("the source log changed; refresh the graph discovery source");
+    const auto family = request.get_param_value("family");
+    if (family != "footprints" && family != "transition_system")
+      throw std::invalid_argument("graph discovery family expects footprints or transition_system");
+    static const std::set<std::string> footprint_fields = {
+      "footprints_discovery_variants", "footprints_model", "footprints_conformance_variants",
+      "footprints_strict", "footprints_enable_act_always_executed", "footprints_activity_attribute",
+      "footprints_case_id_attribute", "footprints_timestamp_attribute", "footprints_index_attribute",
+      "footprints_start_timestamp_attribute", "footprints_sort_required", "footprints_initial_marking"};
+    static const std::set<std::string> transition_fields = {
+      "transition_view", "transition_direction", "transition_window", "transition_include_data",
+      "transition_activity_attribute", "transition_case_id_attribute"};
+    const auto& fields = family == "footprints" ? footprint_fields : transition_fields;
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "family" && key != "source_id" && !fields.contains(key))
+        throw std::invalid_argument("unknown graph discovery parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) { return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
+    const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const auto params = minera::parse_mine_params(lookup, present);
+    const auto& input = family == "footprints" && params.footprints.model == "alpha" ? session->alpha_log : session->log;
+    auto graph = minera::discover_directly_follows_graph(input);
+    for (const auto& activity : session->graph.activities()) graph.ensure_activity(activity);
+    std::optional<minera::FootprintsAnalysis> footprints;
+    std::optional<minera::TransitionSystem> transitions;
+    std::string model_footprint, model_origin;
+    if (family == "footprints") {
+      if (!session->powl) throw std::invalid_argument("cached POWL model is unavailable; mine the source again");
+      register_activity_selector_values(graph, input, params.footprints.activity_attribute);
+      footprints = analyze_footprints(session->log, graph, session->alpha_log,
+        session->tree, *session->powl, session->nets.at("inductive"), session->nets.at("alpha"),
+        session->nets.at("heuristic"), session->nets.at("powl"), params.footprints);
+      model_footprint = minera::footprint_json(footprints->model_footprint, graph);
+      model_origin = params.footprints.model == "dfg" ? "selected_source_dfg" : "cached_analysis_model";
+    } else {
+      transitions = minera::discover_transition_system(session->log, params.transition_system);
+      for (const auto& state : transitions->states()) for (const auto& activity : state.payload) if (activity) graph.ensure_activity(*activity);
+      for (const auto& transition : transitions->transitions()) if (transition.label) graph.ensure_activity(*transition.label);
+    }
+    const auto result = minera::analysis_json(session->dataset, input, graph,
+      footprints ? &session->tree : nullptr, footprints ? &session->nets.at("alpha") : nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      footprints ? &session->nets.at("inductive") : nullptr, nullptr,
+      footprints ? &session->nets.at("heuristic") : nullptr, nullptr, nullptr, nullptr,
+      transitions ? &*transitions : nullptr, footprints ? &*session->powl : nullptr,
+      footprints ? &session->nets.at("powl") : nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, footprints ? &*footprints : nullptr);
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    response.set_content("{\"family\":\"GRAPH_DISCOVERY\",\"method\":" + quote(family) +
+      ",\"variant\":" + quote(family == "footprints" ? "aggregate" : "view_based") +
+      ",\"source_id\":" + quote(std::to_string(session->query_source_id)) + ",\"dataset\":" + quote(session->dataset) +
+      ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) +
+      "},\"analysis_source\":{\"case_count\":" + std::to_string(input.trace_count()) + ",\"event_count\":" + std::to_string(input.event_count()) +
+      ",\"origin\":" + quote(family == "footprints" && params.footprints.model == "alpha" ? "cached_alpha_projection" : "cached_source") +
+      "},\"model_origin\":" + (model_origin.empty() ? "null" : quote(model_origin)) +
+      ",\"model_footprint\":" + (model_footprint.empty() ? "null" : model_footprint) + ",\"result\":" + result + '}', "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
 void handle_constraint_discovery(const httplib::Request& request,
                                  httplib::Response& response) {
   try {
@@ -9445,6 +9514,7 @@ int main(int argc, char** argv) {
   server.Options("/api/align-dfg", preflight);
   server.Options("/api/discover-alpha-plus", preflight);
   server.Options("/api/discover-constraints", preflight);
+  server.Options("/api/discover-graph", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/decision-tables", preflight);
@@ -9566,6 +9636,7 @@ int main(int argc, char** argv) {
   server.Post("/api/discover-alpha-plus", handle_alpha_plus_result);
   server.Post("/api/discover-workflow", handle_workflow_discovery);
   server.Post("/api/discover-constraints", handle_constraint_discovery);
+  server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);

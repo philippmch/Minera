@@ -1,0 +1,155 @@
+{
+  "footprints-default": {
+    "family": "footprints",
+    "source_id": "1"
+  },
+  "footprints-all": {
+    "family": "footprints",
+    "footprints_discovery_variants": "entire_event_log,entire_dataframe,polars_lazyframes,trace_by_trace,dfg,petri_reach_graph,process_tree,powl",
+    "footprints_conformance_variants": "log_model,log_extensive,trace_extensive",
+    "footprints_strict": "true",
+    "footprints_enable_act_always_executed": "false",
+    "source_id": "1"
+  },
+  "footprints-model-process_tree": {
+    "family": "footprints",
+    "footprints_model": "process_tree",
+    "footprints_discovery_variants": "entire_event_log,trace_by_trace,dfg",
+    "footprints_conformance_variants": "log_model,log_extensive,trace_extensive",
+    "source_id": "1"
+  },
+  "footprints-model-powl": {
+    "family": "footprints",
+    "footprints_model": "powl",
+    "footprints_discovery_variants": "entire_event_log,trace_by_trace,dfg",
+    "footprints_conformance_variants": "log_model,log_extensive,trace_extensive",
+    "source_id": "1"
+  },
+  "footprints-model-inductive": {
+    "family": "footprints",
+    "footprints_model": "inductive",
+    "footprints_discovery_variants": "entire_event_log,trace_by_trace,dfg",
+    "footprints_conformance_variants": "log_model,log_extensive,trace_extensive",
+    "source_id": "1"
+  },
+  "footprints-model-alpha": {
+    "family": "footprints",
+    "footprints_model": "alpha",
+    "footprints_discovery_variants": "entire_event_log,trace_by_trace,dfg",
+    "footprints_conformance_variants": "log_model,log_extensive,trace_extensive",
+    "source_id": "1"
+  },
+  "footprints-model-heuristic": {
+    "family": "footprints",
+    "footprints_model": "heuristic",
+    "footprints_discovery_variants": "entire_event_log,trace_by_trace,dfg",
+    "footprints_conformance_variants": "log_model,log_extensive,trace_extensive",
+    "source_id": "1"
+  },
+  "footprints-model-dfg": {
+    "family": "footprints",
+    "footprints_model": "dfg",
+    "footprints_discovery_variants": "entire_event_log,trace_by_trace,dfg",
+    "footprints_conformance_variants": "log_model,log_extensive,trace_extensive",
+    "source_id": "1"
+  },
+  "footprints-selectors": {
+    "family": "footprints",
+    "footprints_discovery_variants": "entire_event_log,entire_dataframe,polars_lazyframes,trace_by_trace",
+    "footprints_conformance_variants": "log_model,log_extensive,trace_extensive",
+    "footprints_activity_attribute": "phase",
+    "footprints_case_id_attribute": "bucket",
+    "footprints_timestamp_attribute": "reverse_time",
+    "footprints_start_timestamp_attribute": "start_time",
+    "footprints_index_attribute": "ord",
+    "footprints_sort_required": "false",
+    "footprints_model": "powl",
+    "source_id": "1"
+  },
+  "footprints-empty-index": {
+    "family": "footprints",
+    "footprints_discovery_variants": "entire_dataframe,polars_lazyframes",
+    "footprints_index_attribute": "",
+    "footprints_start_timestamp_attribute": "none",
+    "source_id": "1"
+  },
+  "footprints-zero-marking": {
+    "family": "footprints",
+    "footprints_model": "inductive",
+    "footprints_discovery_variants": "petri_reach_graph",
+    "footprints_initial_marking": "0,0,0,0",
+    "source_id": "1"
+  },
+  "transition-forward-sequence": {
+    "family": "transition_system",
+    "transition_direction": "forward",
+    "transition_view": "sequence",
+    "transition_window": "2",
+    "transition_include_data": "true",
+    "transition_activity_attribute": "phase",
+    "source_id": "1"
+  },
+  "transition-forward-set": {
+    "family": "transition_system",
+    "transition_direction": "forward",
+    "transition_view": "set",
+    "transition_window": "2",
+    "transition_include_data": "true",
+    "transition_activity_attribute": "phase",
+    "source_id": "1"
+  },
+  "transition-forward-multiset": {
+    "family": "transition_system",
+    "transition_direction": "forward",
+    "transition_view": "multiset",
+    "transition_window": "2",
+    "transition_include_data": "true",
+    "transition_activity_attribute": "phase",
+    "source_id": "1"
+  },
+  "transition-backward-sequence": {
+    "family": "transition_system",
+    "transition_direction": "backward",
+    "transition_view": "sequence",
+    "transition_window": "2",
+    "transition_include_data": "true",
+    "transition_activity_attribute": "phase",
+    "source_id": "1"
+  },
+  "transition-backward-set": {
+    "family": "transition_system",
+    "transition_direction": "backward",
+    "transition_view": "set",
+    "transition_window": "2",
+    "transition_include_data": "true",
+    "transition_activity_attribute": "phase",
+    "source_id": "1"
+  },
+  "transition-backward-multiset": {
+    "family": "transition_system",
+    "transition_direction": "backward",
+    "transition_view": "multiset",
+    "transition_window": "2",
+    "transition_include_data": "true",
+    "transition_activity_attribute": "phase",
+    "source_id": "1"
+  },
+  "transition-wide-window": {
+    "family": "transition_system",
+    "transition_window": "9223372036854775807",
+    "source_id": "1"
+  },
+  "transition-negative-window": {
+    "family": "transition_system",
+    "transition_window": "-2",
+    "transition_view": "multiset",
+    "source_id": "1"
+  },
+  "transition-regrouped": {
+    "family": "transition_system",
+    "transition_case_id_attribute": "bucket",
+    "transition_activity_attribute": "phase",
+    "transition_include_data": "true",
+    "source_id": "1"
+  }
+}
