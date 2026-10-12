@@ -37,6 +37,7 @@ import { VariantList } from "./components/VariantList";
 import { DottedChartView } from "./components/DottedChart";
 import { PerformanceSpectrumView } from "./components/PerformanceSpectrum";
 import { Batches } from "./components/Batches";
+import { TimingDiscovery } from "./components/TimingDiscovery";
 import { buildDottedChart } from "./dotted-chart";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
@@ -706,6 +707,7 @@ export default function App() {
         >
           Directly-Follows Graph
         </button>
+        <button className={tab === "timing" ? "tab active" : "tab"} onClick={()=>setTab("timing")}>Timing discovery</button>
         <button
           className={tab === "model" ? "tab active" : "tab"}
           onClick={() => setTab("model")}
@@ -781,6 +783,7 @@ export default function App() {
           <Batches data={data} />
         </main>
       )}
+      {tab === "timing" && <TimingDiscovery key={cacheGeneration.current} data={data} available={source!==null} mining={mining}/>}
       {tab === "conformance" && (
         <main className="layout-log">
           <Conformance

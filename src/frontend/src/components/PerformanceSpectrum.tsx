@@ -10,6 +10,7 @@ const MAX_DRAWN_LINES = 2000;
 
 interface PerformanceSpectrumViewProps {
   data: MineraExport;
+  nativeOnly?: boolean;
 }
 
 // The performance spectrum: pick two or more activities as a pattern, and
@@ -18,7 +19,7 @@ interface PerformanceSpectrumViewProps {
 // averaged waiting time gives one number, the spectrum shows the flow times
 // evolving over the log's lifetime — batching as line bundles, overtaking as
 // crossings, slow cases as the flattest diagonals (colored by tercile).
-export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) {
+export function PerformanceSpectrumView({ data,nativeOnly=false }: PerformanceSpectrumViewProps) {
   const activities = data.activities;
   // The pattern under construction: activity ids, in order. Starts as a
   // sensible two-step default so the view is never an empty form.
@@ -75,11 +76,12 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
 
       {serverMode && spectrum.variant && (
         <p className="panel-meta spectrum-server-note">
-          Server spectrum ({spectrum.variant}); choose activities below for an interactive client-side spectrum.
-          {spectrum.variant === "disconnected" && " Partial lines are labeled by their contiguous subpattern."}
+          {nativeOnly?`Native spectrum (${spectrum.variant}) from this completed discovery. Change the pattern in the discovery controls.`:`Server spectrum (${spectrum.variant}); choose activities below for an interactive client-side spectrum.`}
+          {spectrum.variant.includes("disconnected") && " Partial lines are labeled by their contiguous subpattern."}
+          {nativeOnly && " Returned timestamp values retain the selected adapter's scale."}
         </p>
       )}
-      <div className="spectrum-pattern">
+      {!nativeOnly&&<div className="spectrum-pattern">
         <span className="spectrum-pattern-label">Steps</span>
         {[...pattern, -1].map((selected, index) => (
           <select
@@ -102,7 +104,7 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
             Clear
           </button>
         )}
-      </div>
+      </div>}
 
       {!serverMode && pattern.length < 2 ? (
         <p className="empty-note">
@@ -149,7 +151,7 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
                   })
                   .join(" ")}
               >
-                <title>{`${line.activityNames?.length ? `${line.activityNames.join(" → ")} · ` : ""}flow time ${formatDuration(line.duration / 1000)}`}</title>
+                <title>{`${line.activityNames?.length ? `${line.activityNames.join(" → ")} · ` : ""}${nativeOnly?`span ${line.duration / 1000} native timestamp units`:`flow time ${formatDuration(line.duration / 1000)}`}`}</title>
               </polyline>
             ))}
           </svg>

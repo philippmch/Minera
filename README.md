@@ -2188,3 +2188,29 @@ the unchanged native algorithms. GRAPH_DISCOVERY returns original/analysis sourc
 counts, complete native analysis and the compared footprint/model origin when
 applicable. Marking/variant incompatibilities and invalid windows retain errors.
 The Windows CMake server target enables MSVC's large-object format.
+
+
+### Discover performance spectra and batches independently
+
+Open a CSV or XES event source and choose Timing discovery. Select performance
+spectrum or batch detection, then a native adapter and its controls. Spectrum
+supports all log/dataframe/lazyframe connected/disconnected variants and the two
+compatibility variants, comma-separated activity patterns, full unsigned 64-bit
+sample text, native event sorting and custom activity/timestamp/case fields.
+The completed diagram uses native observations; spans retain adapter timestamp
+units. A zero sample size preserves the log adapter's endpoint observations.
+
+Batch detection supports log, pandas and polars, merge distance, minimum batch
+size, activity/resource/completion/case/start fields and table event identities.
+Enable the start-field override with a blank value to use completion times.
+Inspect every observation, offset, batch interval/category and event reference
+through complete tables and selected-row JSON. Download the original response,
+exact request/report, complete analysis and every table as CSV. Source changes
+clear previous results and errors; editing controls retains the completed run.
+Sources without timestamps keep this workflow available and show native errors.
+
+`POST /api/discover-timing` requires `source_id` and `family=spectrum` or
+`family=batches`. Existing `spectrum_*` or `batch_*` parameters feed the native
+adapters. TIMING_DISCOVERY returns the completed method/variant/source and full
+analysis. Spectrum and batch JSON preserve fractional epoch timestamps with
+round-trip double precision. The feature catalogue retains all open parity gates.
