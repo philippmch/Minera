@@ -4823,6 +4823,7 @@ std::string model_evaluation_json(const ModelEvaluation& result,
     throw std::invalid_argument(
         "evaluation result must contain exactly one family");
   std::ostringstream out;
+  out.precision(std::numeric_limits<double>::max_digits10);
   write_model_evaluation(out, result, graph, true);
   return out.str();
 }

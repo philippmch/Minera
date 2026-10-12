@@ -499,7 +499,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_log_model_and_precomputed_replay_fitness_workflows_available",
       "package": "algo.evaluation.replay_fitness",
       "parity_status": "partial",
       "selectors": [
@@ -2413,6 +2413,43 @@
         "Editing controls retains the completed result. Invalid selections produce visible errors; valid runs recover. Source changes clear old outputs/errors, and untimed sources support native frequency discovery."
       ],
       "validation": "docs/feature-first-dfg-discovery-validation.json"
+    },
+    {
+      "id": "native_precomputed_replay_result_fitness_workbench",
+      "state": "token_and_alignment_precomputed_records_native_fitness_exact_counts_original_inputs_and_complete_exports_available",
+      "families": [
+        "algo.evaluation.replay_fitness"
+      ],
+      "variants": [
+        "PRECOMPUTED_TOKEN_BASED",
+        "PRECOMPUTED_ALIGNMENT_BASED",
+        "NATIVE_UNCOMPUTED_VARIANTS",
+        "TOKEN_RESULT_ENVELOPES",
+        "EXACT_SIGNED_TOKEN_COUNTS",
+        "OPTIONAL_ALIAS_PRECEDENCE",
+        "NONFINITE_TRACE_FITNESS",
+        "NULL_ALIGNMENT_RECORDS",
+        "COMPLETE_INPUT_AND_AGGREGATE_EXPORTS"
+      ],
+      "entry_points": [
+        "include/minera/precomputed_replay_json.hpp",
+        "src/backend/precomputed_replay_json.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/replay-result-fitness.ts",
+        "src/frontend/src/components/ReplayResultFitness.tsx"
+      ],
+      "added": [
+        "A Replay-result fitness workbench in Conformance aggregates already-computed token replay and alignment records without rerunning replay or requiring a cached log/model at the API.",
+        "Native JSON decoders preserve signed arbitrary-size token counts, decimal strings, explicit zero/optional-null alias precedence, all compact replay fields and uint64 transition activations.",
+        "Token arrays, traces/trace_diagnostics containers and saved token_replay/replay_fitness envelopes feed the unchanged PrecomputedTokenReplay evaluator. Alignment arrays retain null entries as uncomputed records.",
+        "Native token semantics include every supplied row, independent trace_is_fit classification, nonpositive aggregate denominators, signed counts, nonfinite trace fitness and optional activation overflow.",
+        "Native alignment semantics exclude null/uncomputed records, determine fitting records from numeric fitness, retain best_worst_cost/bwc sentinel precedence and preserve native invalid metric/variant results.",
+        "Original input and unused metadata remain in the native envelope. Native token totals, activations, full model-evaluation summary and ordered typed token public metrics remain inspectable and downloadable.",
+        "Native/report/original-input/evaluation JSON and every complete CSV preserve exact numeric tokens, Unicode, every submitted row and long nested values beyond previews and paging.",
+        "The JSON editor uses the full panel width. Switching tables resets row/column paging and selected-row indexes. Errors retain completed results; successful operations recover and host-source changes clear old output/errors.",
+        "Standalone model-evaluation JSON now emits round-trip double precision. All native evaluation algorithms remain unchanged."
+      ],
+      "validation": "docs/feature-first-replay-result-fitness-validation.json"
     }
   ],
   "execution_priority": [
@@ -2430,7 +2467,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining algorithms, conformance, simulations, transformations, conversions and I/O. Configured statistical/causal DFG discovery now exposes all native catalogue selections, full window/retention/attribute/time/business-hour/aggregation settings and complete relationship/sample/attribute exports. Behavior analysis, timing, footprints, transition systems, constraint/structured/Alpha/Heuristic discovery, generators, diagnostics, Monte Carlo, alignment inspection and guarded decisions are available. Preserve the complete catalogue and every strict algorithm/adapter/selector/default/error/type/numeric/order/Unicode/concurrency/performance gate."
+      "next_action": "Continue feature-first review across remaining conformance/evaluation adapters and options, algorithms, simulations, transformations, conversions and I/O. Native replay-result fitness now aggregates precomputed token/alignment records with exact signed counts, saved token envelopes, alias/default/native-error behavior and complete original-input/metric exports. Existing discovery, behavior, timing, model diagnostics, alignment, simulation and transformation workflows remain available. Preserve the complete catalogue and every strict algorithm/adapter/selector/default/error/type/numeric/order/Unicode/concurrency/performance gate."
     }
   ],
   "feature_status_meaning": {
