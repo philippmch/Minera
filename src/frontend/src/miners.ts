@@ -36,17 +36,19 @@ export const MINER_GROUPS: MinerGroup[] = [
     id: "inductive",
     name: "Inductive Miner",
     tagline:
-      "Block-structured process trees, guaranteed sound and perfectly fitting.",
+      "Log, infrequent and directly-follows discovery with configurable source and cut controls.",
     variants: [
       {
         id: "basic",
-        name: "Basic",
+        name: "IM · log recursion",
         description:
           "Recursively cuts the directly-follows graph into exclusive-choice, " +
           "sequence, parallel and loop operators, yielding a block-structured " +
           "process tree that is always sound and perfectly fits the log.",
         artifact: "process-tree",
       },
+      {id:"imf",name:"IMf · infrequent",description:"Run infrequent Inductive discovery with its noise threshold, source selectors and native cut/fallthrough controls.",artifact:"process-tree"},
+      {id:"dfg",name:"IMd · DFG recursion",description:"Run the native graph-recursion variant and inspect its actual tree, converted net and model formats.",artifact:"process-tree"},
     ],
   },
   {
@@ -109,11 +111,15 @@ export const MINER_GROUPS: MinerGroup[] = [
     variants: [
       {
         id: "configured",
-        name: "Configured discovery",
+        name: "Maximal",
         description:
-          "Discover a POWL model using the algorithm and filtering settings selected in Miner settings.",
+          "Run native Maximal POWL discovery with independent source, filtering and order settings.",
         artifact: "powl",
       },
+      {id:"tree",name:"Tree",description:"Discover the native POWL tree variant and retain its exact ordered structure and same-model exports.",artifact:"powl"},
+      {id:"brute_force",name:"Brute force",description:"Discover POWL through native partition search with an optional activity cap.",artifact:"powl"},
+      {id:"dynamic_clustering",name:"Dynamic clustering (frequency)",description:"Run native frequency-based dynamic clustering with filtering and order controls.",artifact:"powl"},
+      {id:"dynamic_clustering_plain",name:"Dynamic clustering (unweighted)",description:"Run the independent native unweighted dynamic-clustering implementation.",artifact:"powl"},
     ],
   },
   {

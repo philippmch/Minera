@@ -3,7 +3,7 @@ import { type TreeLayout } from "../tree-layout";
 import { type PetriLayout } from "../petri-layout";
 import { type MineraExport } from "../types";
 import { MINER_GROUPS, type MinerVariant } from "../miners";
-import { fetchBpmn, fetchPlayout, fetchPnml, fetchPtml } from "../api";
+import { fetchBpmn, fetchPlayout, fetchPnml, fetchPtml, type CsvOptions } from "../api";
 import { ProcessTree } from "./ProcessTree";
 import { PetriNet } from "./PetriNet";
 import { DependencyGraph } from "./DependencyGraph";
@@ -33,7 +33,7 @@ interface ProcessModelProps {
   canExportPnml: boolean;
   mining?: boolean;
   onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
-  onOpenPlayout?: (file: File) => void;
+  onOpenPlayout?: (file: File,activityKey?:string,options?:CsvOptions) => void;
 }
 
 // A small wizard: pick a miner family, then a variant, then the mined model is
@@ -173,7 +173,7 @@ interface ModelResultProps {
   canExportPnml: boolean;
   mining: boolean;
   onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
-  onOpenPlayout?: (file: File) => void;
+  onOpenPlayout?: (file: File,activityKey?:string,options?:CsvOptions) => void;
 }
 
 // Renders the mined model for the chosen variant by its artifact type. A null
@@ -203,6 +203,8 @@ function ModelResult({
     return <NativeDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} />;
   if (minerId === "alpha" || minerId === "heuristic")
     return <WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} />;
+  if (minerId === "inductive" || minerId === "powl")
+    return <WorkflowDiscovery family={minerId} variant={(variant.id==='basic'?'log':variant.id==='configured'?'maximal':variant.id) as "log"|"imf"|"dfg"|"tree"|"brute_force"|"dynamic_clustering"|"dynamic_clustering_plain"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} />;
 
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
   // inductive tree or from the net's token semantics (converted server-side),

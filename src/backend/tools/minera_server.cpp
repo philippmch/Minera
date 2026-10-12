@@ -3216,6 +3216,114 @@ std::string discovery_model_json(std::string result_json,
 }
 
 // Variant-specific discovery runs without replacing the active analysis.
+void handle_structured_discovery(const httplib::Request& request,
+                                httplib::Response& response,
+                                const MinedSession& session,
+                                const std::string& family) {
+  static const std::set<std::string> inductive_fields = {
+      "inductive_variant", "noise_threshold", "inductive_disable_strict_sequence_cut",
+      "inductive_disable_fallthroughs", "inductive_multiprocessing",
+      "inductive_sort_events_by_timestamp", "inductive_activity_key",
+      "inductive_timestamp_key", "inductive_case_id_key", "discovery_tree_variant"};
+  static const std::set<std::string> powl_fields = {
+      "powl_variant", "powl_filtering_type", "powl_filtering_threshold",
+      "powl_order_frequency_ratio", "powl_brute_force_activity_limit",
+      "powl_activity_key", "powl_timestamp_key", "powl_case_id_key"};
+  const auto& allowed = family == "inductive" ? inductive_fields : powl_fields;
+  for (const auto& [key, value] : request.params) {
+    (void)value;
+    if (key != "family" && key != "source_id" &&
+        key != "discovery_playout_traces" && key != "discovery_playout_max_steps" &&
+        key != "discovery_playout_seed" && !allowed.contains(key))
+      throw std::invalid_argument("unknown structured discovery parameter: " + key);
+  }
+  const auto lookup = [&](std::string_view name) { return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
+  const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+  const auto params = minera::parse_mine_params(lookup, present);
+  std::optional<minera::ProcessTree> tree;
+  std::optional<minera::PowlNode> powl;
+  minera::EventLog discovery_log;
+  minera::PetriNet net;
+  std::string variant, activity;
+  if (family == "inductive") {
+    tree = minera::discover_process_tree(session.log, params.inductive);
+    discovery_log = minera::prepare_inductive_event_log(session.log, params.inductive);
+    const auto conversion = minera::parse_process_tree_petri_net_variant(
+        request.has_param("discovery_tree_variant") ? request.get_param_value("discovery_tree_variant") : "standard");
+    net = minera::to_petri_net(*tree, conversion);
+    variant = params.inductive.variant == minera::InductiveMinerVariant::kLog ? "log" :
+        params.inductive.variant == minera::InductiveMinerVariant::kImf ? "imf" : "dfg";
+    activity = params.inductive.activity_key;
+  } else {
+    powl = minera::discover_powl(session.log, params.powl);
+    discovery_log = minera::normalize_powl_event_log(session.log, params.powl);
+    net = minera::to_petri_net(*powl);
+    switch (params.powl.variant) {
+      case minera::PowlDiscoveryVariant::kTree: variant = "tree"; break;
+      case minera::PowlDiscoveryVariant::kBruteForce: variant = "brute_force"; break;
+      case minera::PowlDiscoveryVariant::kMaximal: variant = "maximal"; break;
+      case minera::PowlDiscoveryVariant::kDynamicClustering: variant = "dynamic_clustering"; break;
+      case minera::PowlDiscoveryVariant::kDynamicClusteringPlain: variant = "dynamic_clustering_plain"; break;
+    }
+    activity = params.powl.activity_key;
+  }
+  auto graph = minera::discover_directly_follows_graph(discovery_log);
+  for (const auto& name : net.activities()) graph.ensure_activity(name);
+  const auto result = minera::analysis_json(session.dataset, discovery_log, graph,
+      tree ? &*tree : nullptr, nullptr, nullptr, // tree, Alpha, heuristics
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      tree ? &net : nullptr, nullptr, nullptr, nullptr, // Inductive and heuristic nets/decorations
+      nullptr, nullptr, nullptr, // temporal, minimum-self-distance, transition system
+      powl ? &*powl : nullptr, powl ? &net : nullptr);
+  std::string pnml, bpmn, ptml, bpmn_error, ptml_error, playout, playout_error;
+  pnml = minera::to_pnml(net, family + " " + variant + " discovery");
+  try { bpmn = tree ? minera::to_bpmn(*tree) : minera::to_bpmn(net); }
+  catch (const std::exception& error) { bpmn_error = error.what(); }
+  // Sparse POWL orders must not be weakened into a block approximation.
+  try { ptml = minera::to_ptml(tree ? *tree : minera::to_process_tree(net), family + " " + variant + " discovery"); }
+  catch (const std::exception& error) { ptml_error = error.what(); }
+  const auto traces = ocel_query_size(request, "discovery_playout_traces", 0);
+  const auto steps = ocel_query_size(request, "discovery_playout_max_steps", 1000);
+  const auto seed = ocel_query_size(request, "discovery_playout_seed", 1);
+  if (traces > 10000 || steps > 10000 || (steps && traces > 1000000 / steps))
+    throw std::invalid_argument("discovery playout exceeds the server firing budget");
+  if (traces) {
+    try { minera::PlayoutOptions options; options.traces = traces; options.max_steps = steps; options.seed = seed;
+      playout = minera::to_xes(minera::playout(net, options), family + " " + variant + " discovery playout"); }
+    catch (const std::exception& error) { playout_error = error.what(); }
+  }
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  std::string xes_case = "concept:name", xes_activity = "concept:name", xes_timestamp = "time:timestamp";
+  if (!discovery_log.traces.empty()) {
+    const auto& first = discovery_log.traces.front();
+    if (!first.case_id_source_key.empty()) xes_case = first.case_id_source_key;
+    for (const auto& trace : discovery_log.traces) if (!trace.events.empty()) {
+      const auto& event = trace.events.front();
+      if (!event.activity_source_key.empty()) xes_activity = event.activity_source_key;
+      if (!event.timestamp_source_key.empty()) xes_timestamp = event.timestamp_source_key;
+      break;
+    }
+  }
+  response.set_content("{\"family\":\"WORKFLOW_DISCOVERY\",\"method\":" + quote(family) +
+      ",\"variant\":" + quote(variant) + ",\"activity_key\":" + quote(activity) +
+      ",\"source_id\":" + quote(std::to_string(session.query_source_id)) +
+      ",\"dataset\":" + quote(session.dataset) + ",\"source\":{\"case_count\":" +
+      std::to_string(session.log.trace_count()) + ",\"event_count\":" + std::to_string(session.log.event_count()) +
+      "},\"discovery_source\":{\"case_count\":" + std::to_string(discovery_log.trace_count()) +
+      ",\"event_count\":" + std::to_string(discovery_log.event_count()) + "},\"source_xes\":" +
+      quote(minera::to_xes(discovery_log, family + " adapted discovery source")) +
+      ",\"source_xes_options\":{\"xesActivityAttribute\":" + quote(xes_activity) +
+      ",\"xesCaseAttribute\":" + quote(xes_case) + ",\"xesTimestampAttribute\":" + quote(xes_timestamp) +
+      ",\"xesTimestampSort\":false}" +
+      ",\"result\":" + result + ",\"alpha_discovery\":null,\"pnml\":" + quote(pnml) +
+      ",\"pnml_error\":null,\"bpmn\":" + (bpmn.empty() ? "null" : quote(bpmn)) +
+      ",\"bpmn_error\":" + (bpmn_error.empty() ? "null" : quote(bpmn_error)) +
+      ",\"ptml\":" + (ptml.empty() ? "null" : quote(ptml)) +
+      ",\"ptml_error\":" + (ptml_error.empty() ? "null" : quote(ptml_error)) +
+      ",\"playout_xes\":" + (playout.empty() ? "null" : quote(playout)) +
+      ",\"playout_error\":" + (playout_error.empty() ? "null" : quote(playout_error)) + '}', "application/json");
+}
+
 void handle_workflow_discovery(const httplib::Request& request,
                                httplib::Response& response) {
   try {
@@ -3231,6 +3339,10 @@ void handle_workflow_discovery(const httplib::Request& request,
     if (request.get_param_value("source_id") != std::to_string(session->query_source_id))
       throw std::invalid_argument("the source log changed; refresh the discovery source");
     const auto family = request.get_param_value("family");
+    if (family == "inductive" || family == "powl") {
+      handle_structured_discovery(request, response, *session, family);
+      return;
+    }
     if (family != "alpha" && family != "heuristic")
       throw std::invalid_argument("workflow discovery family must be alpha or heuristic");
     static const std::set<std::string> alpha_fields = {

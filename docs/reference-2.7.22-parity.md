@@ -12849,3 +12849,41 @@ parity status is promoted.
 
 Evidence: docs/feature-first-tree-generation-validation.json and
 docs/feature-first-tree-generation-preview.jpg.
+
+
+### Feature delivery first: individual Inductive and POWL discovery variants
+
+Added source-bound IM/log, IMf and IMd/DFG workflows and all five native POWL
+variants: Tree, Brute force, Maximal, frequency dynamic clustering and independent
+unweighted dynamic clustering. Activity/case/timestamp, noise, cut/fallthrough,
+parallel evaluation, sorting, conversion, filtering, order-frequency and search
+controls feed the existing native implementations. Each run retains its original
+indexed process tree/POWL and actual converted net. Complete native structures,
+frequencies, partial-order edges, markings and configuration export beyond paging.
+
+Original JSON, request reports, discovered analysis, every-table CSV and actual
+PNML/BPMN/PTML preserve the completed model. POWL PTML uses strict net conversion;
+unresolved cycles retain an error without an approximate replacement tree.
+Adapted XES carries its real activity/case/timestamp import mapping, preserving
+custom grouping, Unicode labels, IDs and timestamp order on reopening. Optional
+bounded playout uses the actual net and exact unsigned 64-bit seeds. Adapted/log
+and discovered-model handoffs use ordinary mining and imported conformance.
+Saved models explicitly identify their variant as unrecorded.
+
+Validation: five focused native suites, 1,109 frontend tests (19 added) and
+production build; thirty native checks across twenty-five calls and twelve real
+fixtures; seventeen browser checks, ten exported runs and 158 downloads; 200
+independent artifact checks across eighty complete CSV tables, twenty-nine model
+formats, ten adapted logs and nine seeded playout logs. All exported runs match
+independently repeated native calls; all available model formats reopen. The
+original source/schema and cached net remain unchanged through those checks.
+
+The custom adapted-log POWL PNML handoff displays native token-replay fitness
+0.0%, with zero fitting cases out of two. This verifies handoff and preservation
+of diagnostics, not fitness or selector/marking parity. Earlier failed captures
+and asynchronous browser checks remain retained. This adds feature availability
+for Inductive and POWL without changing any package/module parity status or
+selector list. All 228 incomplete units and strict full-parity gates remain open.
+
+Evidence: docs/feature-first-structured-discovery-validation.json and
+docs/feature-first-structured-discovery-preview.jpg.
