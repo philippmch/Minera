@@ -12810,3 +12810,42 @@ algorithm/type/order/error/numeric/Unicode/concurrency/performance behavior
 remains open with all 228 incomplete units. No catalogue parity is promoted.
 Evidence: docs/feature-first-model-diagnostics-validation.json and
 docs/feature-first-model-diagnostics-preview.jpg.
+
+
+### Feature delivery first: standalone native tree generation and logs
+
+Added a landing/toolbar workflow for BASIC and PTANDLOGGENERATOR. Recursive,
+population/activity-count, operator/silent/duplicate, Unicode activity-label and
+full 64-bit seed controls feed the unchanged native generator. One call retains
+the full population, original indexed trees, native Standard/Transition bordered
+conversion and same-model PTML/PNML/BPMN or explicit conversion errors. Optional
+BASIC_PLAYOUT/TOPBOTTOM/EXTENSIVE generates logs from those actual trees, with
+case/step/language/loop/seed/time controls and native enumerated activity words.
+
+Original tree diagrams and complete node/model/net/marking/case/event/metadata/
+language tables retain every value. Original native JSON, request reports,
+selected-model JSON, every-table CSV, model formats and same-run XES export
+beyond paging. XES opens for mining; generated PNML checks the current source
+with explicit markings. Empty populations and native errors remain visible.
+Generation leaves the current source identity/schema and cached net unchanged.
+
+Validation: five focused native suites; 1,090 frontend tests (21 added) and
+production build; 68 native checks over 22 calls and eight actual fixtures;
+seventeen browser checks and 207 downloads; 257 independent artifact checks
+over 159 complete tables, twenty native model formats and five original logs.
+Eight exported results match repeated native calls. Every exported model format
+reopens in the native importer; PNML retains its complete document. Event/case
+counts, ordered labels and subsecond timestamps match original native logs.
+
+The repeated-label BASIC example preserves token replay fitness 0.777778 and
+default alignment fitness 0.999967. Zero silent-move costs yield alignment
+fitness 1.0 for all five simulated cases. This establishes model/log handoffs,
+not full replay/default-cost parity. Unsupported inclusive-choice Transition
+bordered conversion keeps its original error and tree/log instead of replacing
+the model. Full reference RNG/default/parameter/type/order/error/numeric/Unicode/
+algorithm/concurrency/performance parity and all 228 incomplete units remain
+open. Only the tree-generator feature-delivery label changes; no catalogue
+parity status is promoted.
+
+Evidence: docs/feature-first-tree-generation-validation.json and
+docs/feature-first-tree-generation-preview.jpg.

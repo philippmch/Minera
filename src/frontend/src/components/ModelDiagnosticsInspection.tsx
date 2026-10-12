@@ -46,7 +46,7 @@ function DiagnosticResult({ entry }: { entry: DiagnosticEntry }) {
     <details><summary>Complete diagnostics native result JSON</summary><pre>{nativeResponseJson(entry.result)}</pre></details>
   </>;
 }
-function DiagnosticTableView({ table }: { table: DiagnosticTable }) {
+export function DiagnosticTableView({ table, noun = "diagnostic" }: { table: DiagnosticTable; noun?: string }) {
   const [page, setPage] = useState(0); const [columnPage, setColumnPage] = useState(0); const [rowIndex, setRowIndex] = useState(0);
   const pages = Math.max(1, Math.ceil(table.rows.length/25)), columnPages = Math.max(1, Math.ceil(table.columns.length/8));
   const columns = diagnosticPage(table.columns, columnPage, 8);
@@ -59,12 +59,12 @@ function DiagnosticTableView({ table }: { table: DiagnosticTable }) {
     <div className="query-table-wrap"><table className="activity-table"><caption>{table.title}</caption><thead><tr>{columns.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>
       {diagnosticPage(table.rows,page).map((row,i) => <tr key={page*25+i}>{columns.map((column,j) => <td key={column}>{display(row[columnPage*8+j])}</td>)}</tr>)}
     </tbody></table>{!table.rows.length && <p>No rows were returned for this table.</p>}</div>
-    <div className="query-actions" aria-label="Diagnostic table paging">
-      <button className="btn-ghost" disabled={page===0} onClick={() => setPage(value => value-1)}>Previous diagnostic rows</button><span>Page {page+1} of {pages}</span><button className="btn-ghost" disabled={page+1>=pages} onClick={() => setPage(value => value+1)}>Next diagnostic rows</button>
-      {columnPages>1 && <><button className="btn-ghost" disabled={columnPage===0} onClick={() => setColumnPage(value => value-1)}>Previous diagnostic columns</button><span>Columns {columnPage*8+1}–{Math.min((columnPage+1)*8,table.columns.length)} of {table.columns.length}</span><button className="btn-ghost" disabled={columnPage+1>=columnPages} onClick={() => setColumnPage(value => value+1)}>Next diagnostic columns</button></>}
+    <div className="query-actions" aria-label={`${noun} table paging`}>
+      <button className="btn-ghost" disabled={page===0} onClick={() => setPage(value => value-1)}>Previous {noun} rows</button><span>Page {page+1} of {pages}</span><button className="btn-ghost" disabled={page+1>=pages} onClick={() => setPage(value => value+1)}>Next {noun} rows</button>
+      {columnPages>1 && <><button className="btn-ghost" disabled={columnPage===0} onClick={() => setColumnPage(value => value-1)}>Previous {noun} columns</button><span>Columns {columnPage*8+1}–{Math.min((columnPage+1)*8,table.columns.length)} of {table.columns.length}</span><button className="btn-ghost" disabled={columnPage+1>=columnPages} onClick={() => setColumnPage(value => value+1)}>Next {noun} columns</button></>}
     </div>
-    {table.records && table.records.length>0 && <details><summary>Complete selected diagnostic row JSON</summary>
-      <label className="filters-field"><span>Diagnostic row index (0–{table.records.length-1})</span><input type="number" min={0} max={table.records.length-1} value={rowIndex} onChange={event => { const value=Number(event.target.value);if(Number.isInteger(value)&&value>=0&&value<table.records!.length)setRowIndex(value); }} /></label>
+    {table.records && table.records.length>0 && <details><summary>Complete selected {noun} row JSON</summary>
+      <label className="filters-field"><span>{noun[0].toUpperCase()+noun.slice(1)} row index (0–{table.records.length-1})</span><input type="number" min={0} max={table.records.length-1} value={rowIndex} onChange={event => { const value=Number(event.target.value);if(Number.isInteger(value)&&value>=0&&value<table.records!.length)setRowIndex(value); }} /></label>
       <pre>{nativeJson(table.records[rowIndex],2)}</pre>
     </details>}
   </>;
