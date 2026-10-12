@@ -10,10 +10,11 @@ interface LandingProps {
   onStreaming?: () => void;
   onModelExchange?: () => void;
   onProcessCube?: () => void;
+  onTreeGeneration?: () => void;
   onAcquisition?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onAcquisition }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -62,6 +63,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onStreaming && <button className="landing-sample reveal" disabled={mining} onClick={onStreaming}>Replay event streams</button>}
         {onModelExchange && <button className="landing-sample reveal" disabled={mining} onClick={onModelExchange}>Inspect and convert model files</button>}
         {onProcessCube && <button className="landing-sample reveal" disabled={mining} onClick={onProcessCube}>Explore process cubes</button>}
+        {onTreeGeneration && <button className="landing-sample reveal" disabled={mining} onClick={onTreeGeneration}>Generate process trees and logs</button>}
         {onAcquisition && <button className="landing-sample reveal" disabled={mining} onClick={onAcquisition}>Acquire source data</button>}
 
         <div className="landing-steps reveal">

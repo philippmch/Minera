@@ -677,7 +677,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_generation_workflow_available",
       "package": "algo.simulation.tree_generator",
       "parity_status": "complete",
       "selectors": [
@@ -2100,6 +2100,49 @@
         "Opening a new source immediately hides and clears comparison history; imported model generations remain explicit in saved reports"
       ],
       "validation": "docs/feature-first-model-diagnostics-validation.json"
+    },
+    {
+      "id": "native_tree_generation_workbench",
+      "state": "both_native_generators_models_logs_formats_and_handoffs_available",
+      "families": [
+        "algo.simulation.tree_generator",
+        "algo.simulation.playout.process_tree"
+      ],
+      "variants": [
+        "BASIC",
+        "PTANDLOGGENERATOR",
+        "FULL_UINT64_SEEDS",
+        "COMPLETE_POPULATIONS",
+        "STANDARD",
+        "TRANSITION_BORDERED",
+        "BASIC_PLAYOUT",
+        "TOPBOTTOM",
+        "EXTENSIVE",
+        "ENUMERATED_WORDS",
+        "PTML",
+        "PNML",
+        "BPMN",
+        "SAME_RUN_XES",
+        "COMPLETE_REPORTS_CSV"
+      ],
+      "entry_points": [
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/tree-generation.ts",
+        "src/frontend/src/components/TreeGenerationWorkspace.tsx",
+        "src/frontend/src/App.tsx"
+      ],
+      "added": [
+        "Standalone BASIC and PTANDLOGGENERATOR workflows are reachable from the landing page and event-log/OCEL toolbars without an imported source",
+        "Native generator controls expose recursive depth/leaf probabilities, custom activity labels, population/triangular activity counts and sequence/choice/parallel/loop/inclusive/silent/duplicate probabilities",
+        "Full 64-bit generator/log seeds and omitted defaults travel as exact text; each population member retains its own model index, activity registry and ordered tree",
+        "One native generation call returns exact original generator data, each standalone tree, native Standard/Transition bordered conversion and PTML/PNML/BPMN formats or their actual conversion errors",
+        "Optional BASIC_PLAYOUT, TOPBOTTOM and EXTENSIVE logs use each actual generated tree with native case/step/language/loop/seed/time controls and optional enumerated words",
+        "The original tree renders with native labels/operators; complete models, node hierarchy, net/marking data, cases, events, metadata and language tables retain all rows beyond paging",
+        "Original native JSON, request/report JSON, selected-model JSON, every-table CSV, same-model XML and same-run XES remain downloadable",
+        "Generated XES opens for ordinary mining and generated PNML checks against the active source with explicit marking semantics and a current source ID",
+        "Empty populations, request errors, per-model unsupported conversions and native enumeration flags remain explicit; generation leaves cached source and workflow unchanged"
+      ],
+      "validation": "docs/feature-first-tree-generation-validation.json"
     }
   ],
   "execution_priority": [
@@ -2117,7 +2160,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review across remaining discovery, conformance, simulation, transformations, conversions and I/O. Complete evaluation/Petri diagnostic inspection, ordered public values, comparisons, exports, nonfinite weights and conversion join actual Alpha/Heuristic discovery, Monte Carlo, alignment inspection and guarded decision workflows. Preserve the full catalogue and exact algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates."
+      "next_action": "Continue feature-first review across remaining discovery, conformance, simulations, transformations, conversions and I/O. Both native tree generators now expose model populations, original trees, native formats, all three tree playout variants and log/conformance handoffs. Complete model diagnostics, Alpha/Heuristic discovery, Monte Carlo, alignment inspection and guarded decision workflows are available. Preserve all strict algorithm/selector/default/error/type/numeric/order/Unicode/concurrency/performance gates, including recorded repeated-label replay/default-cost behavior."
     }
   ],
   "feature_status_meaning": {

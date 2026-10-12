@@ -54,7 +54,7 @@ export function publicEvaluationTable(value: PublicEvaluationValue): DiagnosticT
 }
 
 /** Every property is retained; nested array cells include their complete JSON. */
-export function diagnosticTables(entry: DiagnosticEntry): DiagnosticTable[] {
+export function nativeObjectTables(result: object): DiagnosticTable[] {
   const tables: DiagnosticTable[] = [];
   const visit = (value: unknown, path: string) => {
     if (record(value)) {
@@ -73,7 +73,11 @@ export function diagnosticTables(entry: DiagnosticEntry): DiagnosticTable[] {
         rows: value.map((row, i) => [i, ...columns.map(key => record(row) ? nativeCell(row,key) : key === "value" ? nativeCell(value,i) : undefined)]) });
     }
   };
-  visit(entry.result, "");
+  visit(result, "");
+  return tables;
+}
+export function diagnosticTables(entry: DiagnosticEntry): DiagnosticTable[] {
+  const tables = nativeObjectTables(entry.result);
   const publicResult = entry.kind === "evaluation" ? (entry.result as ModelEvaluation).public_result : undefined;
   if (publicResult) tables.push(publicEvaluationTable(publicResult));
   const request = nativeResponseRequest(entry.result);

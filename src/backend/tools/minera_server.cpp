@@ -6076,6 +6076,106 @@ void handle_random_tree(const httplib::Request& request,
   }
 }
 
+// Generate independent models, formats and optional logs in one native run.
+// This workflow does not read or replace the cached mining session.
+void handle_tree_generation(const httplib::Request& request,
+                            httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "random_tree_variant", "random_tree_rec_depth", "random_tree_min_rec_depth",
+        "random_tree_max_rec_depth", "random_tree_prob_leaf", "random_tree_mode",
+        "random_tree_min", "random_tree_max", "random_tree_sequence", "random_tree_choice",
+        "random_tree_parallel", "random_tree_loop", "random_tree_or", "random_tree_silent",
+        "random_tree_duplicate", "random_tree_no_models", "random_tree_seed", "random_tree_activities",
+        "tree_variant", "generate_log", "playout_variant", "playout_traces", "playout_max_steps",
+        "playout_seed", "playout_min_length", "playout_max_length", "playout_max_loop_occurrences",
+        "playout_max_traces", "playout_return_set_strings", "playout_start",
+        "playout_case_interval", "playout_event_interval"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key)) throw std::invalid_argument("unknown tree-generation parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const auto params = minera::parse_random_tree_params(lookup, present);
+    const auto conversion = minera::parse_process_tree_petri_net_variant(
+        request.has_param("tree_variant") ? request.get_param_value("tree_variant") : "standard");
+    const auto with_log = ocel_query_bool(request, "generate_log", false);
+    auto playout_options = minera::parse_process_tree_playout_params(lookup, present);
+    playout_options.start = ocel_query_number(request, "playout_start", playout_options.start);
+    playout_options.case_interval = ocel_query_number(request, "playout_case_interval", playout_options.case_interval);
+    playout_options.event_interval = ocel_query_number(request, "playout_event_interval", playout_options.event_interval);
+    const auto trees = minera::generate_random_process_trees(params);
+    if (with_log) {
+      const auto extensive = playout_options.variant == minera::ProcessTreePlayoutVariant::kExtensive;
+      const auto length = extensive ? playout_options.max_length : playout_options.max_steps;
+      const auto cases = extensive ? playout_options.max_traces : playout_options.traces;
+      if (length > 10000 || cases > 10000 || playout_options.max_loop_occurrences > 1000 ||
+          (length && cases > 1000000 / length) ||
+          (length && cases && trees.size() > 1000000 / length / cases))
+        throw std::invalid_argument("generated logs exceed the one-million event budget");
+    }
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    std::ostringstream out;
+    out << "{\"family\":\"TREE_GENERATION\",\"tree_variant\":"
+        << quote(request.has_param("tree_variant") ? request.get_param_value("tree_variant") : "standard")
+        << ",\"generator\":" << minera::random_tree_json(trees, params.variant, params.activities)
+        << ",\"models\":[";
+    for (std::size_t i = 0; i < trees.size(); ++i) {
+      if (i) out << ',';
+      const auto& tree = trees[i];
+      const auto name = "Generated model " + std::to_string(i);
+      std::string ptml, ptml_error, pnml, pnml_error, bpmn, bpmn_error;
+      std::string net_json, log_json, xes, playout_error;
+      try { ptml = minera::to_ptml(tree, name); }
+      catch (const std::exception& error) { ptml_error = error.what(); }
+      try {
+        const auto net = minera::to_petri_net(tree, conversion);
+        pnml = minera::to_pnml(net, name);
+        net_json = minera::pnml_document_json(minera::parse_pnml_document(pnml));
+      } catch (const std::exception& error) { pnml_error = error.what(); }
+      try { bpmn = minera::to_bpmn(tree, name); }
+      catch (const std::exception& error) { bpmn_error = error.what(); }
+      if (with_log) {
+        try {
+          const auto generated = minera::process_tree_playout_result(tree, playout_options);
+          const auto playout_variant = playout_options.variant == minera::ProcessTreePlayoutVariant::kExtensive
+              ? "EXTENSIVE" : playout_options.variant == minera::ProcessTreePlayoutVariant::kBasicPlayout
+              ? "BASIC_PLAYOUT" : "TOPBOTTOM";
+          minera::LogConversionResult converted; converted.log = generated.log;
+          log_json = "{\"family\":\"GENERATED_TREE_PLAYOUT\",\"variant\":" + quote(playout_variant) +
+              ",\"return_set_strings\":" + (playout_options.return_set_strings ? "true" : "false") +
+              ",\"truncated\":" + (generated.truncated ? "true" : "false") +
+              ",\"case_count\":" + std::to_string(generated.log.trace_count()) +
+              ",\"event_count\":" + std::to_string(generated.log.event_count()) +
+              ",\"log\":" + minera::log_conversion_json(converted) +
+              ",\"language\":" + (playout_options.return_set_strings ? minera::serialize_process_tree_playout_json(generated) : "null") + '}';
+          xes = minera::to_xes(generated.log, name + " playout");
+        } catch (const std::exception& error) { playout_error = error.what(); }
+      }
+      const auto optional = [&](const char* key, const std::string& value) {
+        out << ",\"" << key << "\":" << (value.empty() ? "null" : quote(value));
+      };
+      out << "{\"model_index\":" << i << ",\"tree\":" << minera::process_tree_json(tree)
+          << ",\"net\":" << (net_json.empty() ? "null" : net_json)
+          << ",\"playout\":" << (log_json.empty() ? "null" : log_json);
+      optional("ptml", ptml); optional("ptml_error", ptml_error);
+      optional("pnml", pnml); optional("pnml_error", pnml_error);
+      optional("bpmn", bpmn); optional("bpmn_error", bpmn_error);
+      optional("playout_xes", xes); optional("playout_error", playout_error);
+      out << '}';
+    }
+    out << "]}";
+    response.set_content(out.str(), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 // Compares Petri-net element usage between the cached session log and an
 // uploaded reference log. The multipart field `reference_log` is required;
 // `miner` is optional and defaults to inductive.
@@ -9118,6 +9218,7 @@ int main(int argc, char** argv) {
   server.Options("/api/format-dataframe", preflight);
   server.Options("/api/timestamp-interleavings", preflight);
   server.Options("/api/random-tree", preflight);
+  server.Options("/api/generate-trees", preflight);
   server.Options("/api/compare-petri", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/evaluate", preflight);
@@ -9236,6 +9337,7 @@ int main(int argc, char** argv) {
   server.Post("/api/format-dataframe", handle_format_dataframe);
   server.Post("/api/timestamp-interleavings", handle_timestamp_interleavings);
   server.Get("/api/random-tree", handle_random_tree);
+  server.Post("/api/generate-trees", handle_tree_generation);
   server.Post("/api/compare-petri", handle_compare_petri);
   server.Post("/api/align", handle_align);
   server.Post("/api/evaluate", handle_evaluate);

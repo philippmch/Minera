@@ -2070,3 +2070,30 @@ empty tables and absent typed public values remain visible. Changing controls
 hides the previous current result; saved entries retain their original request.
 Opening a new log clears the comparison history. Export comparisons before
 navigating away or reloading. Full reference behavioral parity remains open.
+
+
+### Generate process trees and logs
+
+Choose Generate process trees and logs on the start page, or Generate trees in
+an event-log/OCEL toolbar. BASIC offers recursive depth, leaf probability and
+custom activity labels. PT-and-log offers model population and triangular
+activity counts, plus sequence/choice/parallel/loop/inclusive/silent/duplicate
+probabilities. Blank values use native defaults and full 64-bit seeds remain
+exact text. An imported source is optional.
+
+Select any generated model to inspect its original tree, native net/markings,
+complete hierarchy and same-model PTML/PNML/BPMN. Native conversion errors stay
+visible; the original tree remains available. Optional basic/top-bottom sampling
+or extensive enumeration generates a log from every actual model, with timing,
+seed, case/step/length/loop controls and enumerated words. Original JSON,
+request reports, selected-model JSON and every-table CSV preserve all data.
+Generated XES opens for ordinary mining. Generated PNML can check an active log
+using explicit source/marking semantics. Generation leaves cached models intact.
+
+`POST /api/generate-trees` accepts existing `random_tree_*` fields,
+`tree_variant`, `generate_log` and native `playout_*` controls, including start,
+case/event intervals. It returns TREE_GENERATION with the original RANDOM_TREE
+result and each model's original tree, formats/errors and optional native log.
+Population construction retains native bounds; optional logs are bounded to
+one million events across models. Reference algorithm/RNG/default/replay/
+conversion/numeric/performance parity remains open.

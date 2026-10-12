@@ -53,6 +53,8 @@ import { SourceAcquisitionWorkspace } from "./components/SourceAcquisitionWorksp
 import { StreamingWorkspace } from "./components/StreamingWorkspace";
 import { ModelExchangeWorkspace } from "./components/ModelExchangeWorkspace";
 import { ProcessCubeWorkspace } from "./components/ProcessCubeWorkspace";
+import { TreeGenerationWorkspace } from "./components/TreeGenerationWorkspace";
+import { requestLogQuerySchema } from "./log-query";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
 import { QueryWorkspace } from "./components/QueryWorkspace";
@@ -114,6 +116,7 @@ export default function App() {
   const [showStreaming, setShowStreaming] = useState(false);
   const [showModelExchange, setShowModelExchange] = useState(false);
   const [showProcessCube, setShowProcessCube] = useState(false);
+  const [showTreeGeneration, setShowTreeGeneration] = useState(false);
   const [showAcquisition, setShowAcquisition] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
@@ -360,6 +363,7 @@ export default function App() {
     setShowStreaming(false);
     setShowModelExchange(false);
     setShowProcessCube(false);
+    setShowTreeGeneration(false);
     setShowAcquisition(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
@@ -573,6 +577,7 @@ export default function App() {
 
   if (showModelExchange) return <><TopBar dataset={data?.dataset??ocelDataset??'Model files'} datasetKind="model exchange" onOpenFile={loadFile} onHome={()=>setShowModelExchange(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowModelExchange(false)}>Return to current workspace</button><ModelExchangeWorkspace available={source!==null} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setShowModelExchange(false);setTab("conformance");}}/></main></>;
   if (showProcessCube) return <><TopBar dataset={data?.dataset??ocelDataset??'Process cubes'} datasetKind="process cube" onOpenFile={loadFile} onHome={()=>setShowProcessCube(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowProcessCube(false)}>Return to current workspace</button><ProcessCubeWorkspace busy={mining}/></main></>;
+  if (showTreeGeneration) return <><TopBar dataset="Generated models" datasetKind="tree generation" onOpenFile={loadFile} onHome={()=>setShowTreeGeneration(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTreeGeneration(false)}>Return to current workspace</button><TreeGenerationWorkspace onOpenLog={loadFile} sourceAvailable={source!==null} onUseModel={async file=>{const generation=cacheGeneration.current;const schema=await requestLogQuerySchema();if(generation!==cacheGeneration.current)throw new Error("The active log changed; check this model again.");setDiscoveryModelDraft({generation,file,sourceId:schema.source_id,inferLegacyBoundaries:false});setShowTreeGeneration(false);setTab("conformance");}}/></main></>;
   if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} busy={mining} data={data??undefined} onOpen={loadFile}/></main></>;
   if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} available={source!==null} mining={mining} dataset={data?.dataset} onOpen={loadFile}/></main></>;
 
@@ -588,6 +593,7 @@ export default function App() {
           onStreaming={()=>setShowStreaming(true)}
           onModelExchange={()=>setShowModelExchange(true)}
           onProcessCube={()=>setShowProcessCube(true)}
+          onTreeGeneration={()=>setShowTreeGeneration(true)}
           onAcquisition={()=>setShowAcquisition(true)}
           onHome={() => {
             ocelRequest.current?.abort();
@@ -636,6 +642,7 @@ export default function App() {
           onStreaming={()=>setShowStreaming(true)}
           onModelExchange={()=>setShowModelExchange(true)}
           onProcessCube={()=>setShowProcessCube(true)}
+          onTreeGeneration={()=>setShowTreeGeneration(true)}
           onAcquisition={()=>setShowAcquisition(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
@@ -661,6 +668,7 @@ export default function App() {
         onStreaming={()=>setShowStreaming(true)}
         onModelExchange={()=>setShowModelExchange(true)}
           onProcessCube={()=>setShowProcessCube(true)}
+          onTreeGeneration={()=>setShowTreeGeneration(true)}
           onAcquisition={()=>setShowAcquisition(true)}
         onHome={() => {
           cacheGeneration.current += 1;
