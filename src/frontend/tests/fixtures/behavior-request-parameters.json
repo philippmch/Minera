@@ -1,0 +1,251 @@
+{
+  "temporal-log": {
+    "family": "temporal_profile",
+    "source_id": "2",
+    "variant": "log"
+  },
+  "temporal-stream": {
+    "family": "temporal_profile",
+    "source_id": "2",
+    "variant": "stream"
+  },
+  "temporal-dataframe": {
+    "family": "temporal_profile",
+    "source_id": "2",
+    "variant": "dataframe"
+  },
+  "temporal-lazyframe": {
+    "family": "temporal_profile",
+    "source_id": "2",
+    "variant": "lazyframe"
+  },
+  "self-log": {
+    "family": "minimum_self_distance",
+    "source_id": "2",
+    "variant": "log"
+  },
+  "self-pandas": {
+    "family": "minimum_self_distance",
+    "source_id": "2",
+    "variant": "pandas"
+  },
+  "self-polars": {
+    "family": "minimum_self_distance",
+    "source_id": "2",
+    "variant": "polars"
+  },
+  "correlation-classic-log": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic",
+    "adapter": "log"
+  },
+  "correlation-classic-stream": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic",
+    "adapter": "stream"
+  },
+  "correlation-classic-dataframe": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic",
+    "adapter": "dataframe"
+  },
+  "correlation-classic-lazyframe": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic",
+    "adapter": "lazyframe"
+  },
+  "correlation-classic_split-log": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic_split",
+    "adapter": "log"
+  },
+  "correlation-classic_split-stream": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic_split",
+    "adapter": "stream"
+  },
+  "correlation-classic_split-dataframe": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic_split",
+    "adapter": "dataframe"
+  },
+  "correlation-classic_split-lazyframe": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic_split",
+    "adapter": "lazyframe"
+  },
+  "correlation-trace_based-log": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "trace_based",
+    "adapter": "log"
+  },
+  "correlation-trace_based-stream": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "trace_based",
+    "adapter": "stream"
+  },
+  "correlation-trace_based-dataframe": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "trace_based",
+    "adapter": "dataframe"
+  },
+  "correlation-trace_based-lazyframe": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "trace_based",
+    "adapter": "lazyframe"
+  },
+  "conformance-log": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "log",
+    "temporal_profile_json": "[[\"A\",\"D\",0,1]]"
+  },
+  "conformance-stream": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "stream",
+    "temporal_profile_json": "[[\"A\",\"D\",0,1]]"
+  },
+  "conformance-dataframe": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "dataframe",
+    "temporal_profile_json": "[[\"A\",\"D\",0,1]]"
+  },
+  "conformance-lazyframe": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "lazyframe",
+    "temporal_profile_json": "[[\"A\",\"D\",0,1]]"
+  },
+  "temporal-custom-log": {
+    "family": "temporal_profile",
+    "source_id": "2",
+    "variant": "log",
+    "temporal_activity_attribute": "phase",
+    "temporal_case_id_attribute": "bucket",
+    "temporal_source_timestamp_attribute": "completion_time",
+    "temporal_target_timestamp_attribute": "start_time",
+    "temporal_strict_attributes": "true"
+  },
+  "temporal-custom-dataframe": {
+    "family": "temporal_profile",
+    "source_id": "2",
+    "variant": "dataframe",
+    "temporal_activity_attribute": "phase",
+    "temporal_case_id_attribute": "bucket",
+    "temporal_source_timestamp_attribute": "completion_time",
+    "temporal_target_timestamp_attribute": "start_time",
+    "temporal_strict_attributes": "true"
+  },
+  "temporal-empty-business": {
+    "family": "temporal_profile",
+    "source_id": "2",
+    "variant": "lazyframe",
+    "temporal_business_hours": "true",
+    "temporal_business_hour_slots": ""
+  },
+  "temporal-fractional-business": {
+    "family": "temporal_profile",
+    "source_id": "2",
+    "variant": "stream",
+    "temporal_business_hours": "true",
+    "temporal_business_hour_slots": "36000:36020.75"
+  },
+  "self-custom": {
+    "family": "minimum_self_distance",
+    "source_id": "2",
+    "variant": "pandas",
+    "minimum_self_distance_activity_key": "phase",
+    "minimum_self_distance_case_id_key": "bucket"
+  },
+  "self-empty": {
+    "family": "minimum_self_distance",
+    "source_id": "2",
+    "variant": "polars",
+    "minimum_self_distance_activity_key": "event_id"
+  },
+  "correlation-custom": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic_split",
+    "adapter": "dataframe",
+    "correlation_activity_attribute": "phase",
+    "correlation_case_id_attribute": "bucket",
+    "correlation_timestamp_attribute": "completion_time",
+    "correlation_start_timestamp_attribute": "start_time",
+    "correlation_sample_size": "7",
+    "correlation_exact_time_matching": "true"
+  },
+  "correlation-full-width": {
+    "family": "correlation",
+    "source_id": "2",
+    "variant": "classic_split",
+    "adapter": "lazyframe",
+    "correlation_sample_size": "18446744073709551615",
+    "correlation_start_timestamp_attribute": ""
+  },
+  "conformance-special-labels": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "log",
+    "temporal_activity_attribute": "phase",
+    "temporal_profile_json": "[[\"a:b,c->quote\\\"\\u2603\\ud83d\\ude80\",\"\\u6d3b\\u52d5-D\",0,1]]"
+  },
+  "conformance-empty-profile": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "stream",
+    "temporal_profile_json": "[]"
+  },
+  "conformance-native-profile": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "dataframe",
+    "temporal_profile_json": "[[\"A\",\"A\",30.49479166666666,0.35721725415588074],[\"A\",\"B\",10.98263888557753,0.6655601631630295],[\"A\",\"C\",44.877604166666686,15.289687212877395],[\"A\",\"D\",75.72760425259665,15.3023932531021],[\"B\",\"A\",19.51215278108915,0.7566449796976084],[\"B\",\"C\",49.142361114422485,0.6727699862755266],[\"B\",\"D\",79.9923612003525,0.9159723990001638],[\"C\",\"D\",30.85000008593003,0.6377592485576555]]"
+  },
+  "conformance-custom-grouping": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "dataframe",
+    "temporal_activity_attribute": "phase",
+    "temporal_case_id_attribute": "bucket",
+    "temporal_source_timestamp_attribute": "completion_time",
+    "temporal_target_timestamp_attribute": "start_time",
+    "temporal_profile_json": "[[\"a:b,c->quote\\\"☃🚀\", \"活動-D\", 0, 1]]"
+  },
+  "conformance-positive-infinity": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "log",
+    "temporal_profile_json": "[[\"A\", \"D\", 0, 1]]",
+    "temporal_zeta": "inf"
+  },
+  "conformance-negative-infinity": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "lazyframe",
+    "temporal_profile_json": "[[\"A\", \"D\", 0, 1]]",
+    "temporal_zeta": "-Infinity"
+  },
+  "conformance-empty-business": {
+    "family": "temporal_conformance",
+    "source_id": "2",
+    "variant": "stream",
+    "temporal_profile_json": "[[\"A\", \"D\", 0, 1]]",
+    "temporal_business_hours": "true",
+    "temporal_business_hour_slots": ""
+  }
+}

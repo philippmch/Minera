@@ -3200,6 +3200,12 @@ std::vector<ResolvedTemporalProfileEntry> resolve_temporal_profile(
 void write_temporal_profile(
     std::ostream& out,
     const std::vector<ResolvedTemporalProfileEntry>& profile) {
+  struct RestorePrecision {
+    std::ostream& stream;
+    std::streamsize precision;
+    ~RestorePrecision() { stream.precision(precision); }
+  } restore_precision{
+      out, out.precision(std::numeric_limits<double>::max_digits10)};
   out << "[";
   for (std::size_t i = 0; i < profile.size(); ++i) {
     const auto& entry = profile[i];
@@ -3943,6 +3949,12 @@ void write_correlation_matrix(
 void write_correlation_mining(
     std::ostream& out, const CorrelationVariantsAnalysis& variants,
     const DirectlyFollowsGraph& graph) {
+  struct RestorePrecision {
+    std::ostream& stream;
+    std::streamsize precision;
+    ~RestorePrecision() { stream.precision(precision); }
+  } restore_precision{
+      out, out.precision(std::numeric_limits<double>::max_digits10)};
   out << "{\"variants\": [";
   for (std::size_t i = 0; i < variants.variants.size(); ++i) {
     const auto& named = variants.variants[i];

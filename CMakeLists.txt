@@ -52,6 +52,7 @@ add_library(minera_core
   src/backend/concept_drift_table.cpp
   src/backend/cycle_time.cpp
   src/backend/correlation_miner.cpp
+  src/backend/temporal_profile_json.cpp
   src/backend/clustering.cpp
   src/backend/csv_event_log_importer.cpp
   src/backend/dataframe_validation.cpp
