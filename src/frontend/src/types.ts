@@ -3956,6 +3956,16 @@ function isCompositeEvaluation(value: unknown): value is CompositeEvaluation {
 /** Validates a standalone response from the model-quality endpoint. */
 export function isModelEvaluation(value: unknown): value is ModelEvaluation {
   if (!isRecord(value) || typeof value.miner !== "string") return false;
+  if (value.input_context !== undefined) {
+    const context=value.input_context;
+    if (!isRecord(context) || !["log","stream","dataframe","lazyframe","model_only"].includes(String(context.adapter)) ||
+        !["cached_model_log","model_only"].includes(String(context.origin)) ||
+        (context.adapter === "model_only") !== (context.origin === "model_only") ||
+        typeof context.source_id !== "string" || !context.source_id || typeof context.dataset !== "string" ||
+        !Number.isSafeInteger(context.case_count) || Number(context.case_count)<0 ||
+        !Number.isSafeInteger(context.event_count) || Number(context.event_count)<0 ||
+        typeof context.activity_attribute !== "string" || typeof context.case_id_attribute !== "string") return false;
+  }
   const present = [value.replay_fitness, value.precision, value.generalization, value.simplicity, value.composite]
     .filter((item) => item !== undefined).length;
   if (present !== 1) return false;
@@ -4975,6 +4985,10 @@ export interface EvaluationOptions {
   /** Selects the process-tree Petri construction for the inductive model. */
   process_tree_variant?: ProcessTreePetriNetVariant;
   evaluation_family?: EvaluationFamily;
+  /** Native input shape constructed from the selected model's cached log. */
+  evaluation_input_adapter?: "log" | "stream" | "dataframe" | "lazyframe";
+  /** Optional cached-source identity guard for independent callers. */
+  source_id?: string;
   fitness_variant?: ReplayFitnessVariant;
   evaluation_activity_attribute?: string;
   evaluation_case_id_attribute?: string;
@@ -5938,6 +5952,12 @@ export interface SimplicityEvaluation {
 }
 export interface ModelEvaluation {
   miner: string;
+  input_context?: {
+    adapter: "log" | "stream" | "dataframe" | "lazyframe" | "model_only";
+    origin: "cached_model_log" | "model_only";
+    source_id: string; dataset: string; case_count: number; event_count: number;
+    activity_attribute: string; case_id_attribute: string;
+  };
   /** Complete typed public value; float hex retains exact bits and signed zero. */
   public_result?: PublicEvaluationValue;
   replay_fitness?: ReplayFitnessEvaluation;

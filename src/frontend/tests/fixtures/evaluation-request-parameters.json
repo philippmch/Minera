@@ -1,0 +1,334 @@
+{
+  "fitness-token-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "log"
+  },
+  "fitness-token-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "stream"
+  },
+  "fitness-token-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "fitness-token-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "fitness-alignment-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "alignment_based",
+    "evaluation_input_adapter": "log"
+  },
+  "fitness-alignment-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "alignment_based",
+    "evaluation_input_adapter": "stream"
+  },
+  "fitness-alignment-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "alignment_based",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "fitness-alignment-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "alignment_based",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "fitness-auto-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "auto",
+    "evaluation_input_adapter": "log"
+  },
+  "fitness-auto-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "auto",
+    "evaluation_input_adapter": "stream"
+  },
+  "fitness-auto-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "auto",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "fitness-auto-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "auto",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "precision-token-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "etconformance_token",
+    "evaluation_input_adapter": "log"
+  },
+  "precision-token-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "etconformance_token",
+    "evaluation_input_adapter": "stream"
+  },
+  "precision-token-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "etconformance_token",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "precision-token-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "etconformance_token",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "precision-alignment-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "align_etconformance",
+    "evaluation_input_adapter": "log"
+  },
+  "precision-alignment-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "align_etconformance",
+    "evaluation_input_adapter": "stream"
+  },
+  "precision-alignment-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "align_etconformance",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "precision-alignment-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "align_etconformance",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "precision-automaton-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "automaton_after_align",
+    "evaluation_input_adapter": "log"
+  },
+  "precision-automaton-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "automaton_after_align",
+    "evaluation_input_adapter": "stream"
+  },
+  "precision-automaton-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "automaton_after_align",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "precision-automaton-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "automaton_after_align",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "precision-auto-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "auto",
+    "evaluation_input_adapter": "log"
+  },
+  "precision-auto-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "auto",
+    "evaluation_input_adapter": "stream"
+  },
+  "precision-auto-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "auto",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "precision-auto-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "precision",
+    "precision_variant": "auto",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "generalization-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "generalization",
+    "evaluation_input_adapter": "log"
+  },
+  "generalization-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "generalization",
+    "evaluation_input_adapter": "stream"
+  },
+  "generalization-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "generalization",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "generalization-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "generalization",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "composite-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "composite",
+    "evaluation_input_adapter": "log"
+  },
+  "composite-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "composite",
+    "evaluation_input_adapter": "stream"
+  },
+  "composite-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "composite",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "composite-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "composite",
+    "evaluation_input_adapter": "lazyframe"
+  },
+  "grouped-log": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "log",
+    "evaluation_activity_attribute": "phase",
+    "evaluation_case_id_attribute": "case:bucket"
+  },
+  "grouped-stream": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "stream",
+    "evaluation_activity_attribute": "phase",
+    "evaluation_case_id_attribute": "case:bucket"
+  },
+  "grouped-dataframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "dataframe",
+    "evaluation_activity_attribute": "phase",
+    "evaluation_case_id_attribute": "case:bucket"
+  },
+  "grouped-lazyframe": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "lazyframe",
+    "evaluation_activity_attribute": "phase",
+    "evaluation_case_id_attribute": "case:bucket"
+  },
+  "simplicity-arc_degree": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "simplicity",
+    "simplicity_variant": "arc_degree",
+    "evaluation_input_adapter": "lazyframe",
+    "evaluation_max_rows_to_materialize": "0"
+  },
+  "simplicity-extended_cardoso": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "simplicity",
+    "simplicity_variant": "extended_cardoso",
+    "evaluation_input_adapter": "lazyframe",
+    "evaluation_max_rows_to_materialize": "0"
+  },
+  "simplicity-extended_cyclomatic": {
+    "miner": "inductive",
+    "source_id": "1",
+    "evaluation_family": "simplicity",
+    "simplicity_variant": "extended_cyclomatic",
+    "evaluation_input_adapter": "lazyframe",
+    "evaluation_max_rows_to_materialize": "0"
+  },
+  "imported-fitness-log": {
+    "miner": "imported",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "log"
+  },
+  "imported-fitness-stream": {
+    "miner": "imported",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "stream"
+  },
+  "imported-fitness-dataframe": {
+    "miner": "imported",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "dataframe"
+  },
+  "imported-fitness-lazyframe": {
+    "miner": "imported",
+    "source_id": "1",
+    "evaluation_family": "replay_fitness",
+    "fitness_variant": "token_based",
+    "evaluation_input_adapter": "lazyframe"
+  }
+}

@@ -352,6 +352,10 @@ struct ModelEvaluation {
 // tagged EventDataView all preserve the grouped EventLog contract after
 // deterministic case/activity selector projection.
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
+    const EventDataView&, const PnmlDocument&,
+    ReplayFitnessVariant = ReplayFitnessVariant::TOKEN_BASED,
+    const ReplayFitnessOptions& = {});
+[[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
     const EventDataView&, const PetriNet&, ReplayFitnessVariant = ReplayFitnessVariant::AUTO,
     const ReplayFitnessOptions& = {});
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(

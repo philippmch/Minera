@@ -876,6 +876,16 @@ ReplayFitnessResult evaluate_replay_fitness(
 }
 
 ReplayFitnessResult evaluate_replay_fitness(
+    const EventDataView& data, const PnmlDocument& document,
+    ReplayFitnessVariant variant, const ReplayFitnessOptions& options) {
+  return evaluate_replay_fitness(
+      evaluation_event_log(data, options.activity_attribute,
+                           options.case_id_attribute,
+                           options.max_rows_to_materialize),
+      document, variant, options);
+}
+
+ReplayFitnessResult evaluate_replay_fitness(
     const EventDataView& data, const PetriNet& net, ReplayFitnessVariant variant,
     const ReplayFitnessOptions& options) {
   return evaluate_replay_fitness(

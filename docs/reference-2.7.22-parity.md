@@ -13122,3 +13122,34 @@ units and the complete catalogue stay in scope; no parity status is promoted.
 
 Evidence: docs/feature-first-replay-result-fitness-validation.json and
 docs/feature-first-replay-result-fitness-preview.png.
+
+
+### Feature delivery first: model quality input adapters
+
+Model quality evaluation now exposes log/stream/dataframe/lazyframe inputs for
+fitness, precision, generalization and composite metrics. Shapes use the selected
+model-specific cached log and native case/activity projection, ordering and row
+caps. Default shapes retain native metrics; custom grouping can turn sixty
+model-input cases into three evaluated traces. Simplicity remains model-only.
+
+A native EventDataView/PnmlDocument fitness overload preserves supplied exact
+markings, sparse membership and names through existing materialization/delegation.
+Algorithms are unchanged. Additive input context identifies actual shape, source,
+dataset, original model-input counts and selectors. Independent calls can guard
+source identity; frontend results bind model/shape/source and keep legacy support.
+Every native/request/report/table/comparison export and replay row remains available.
+
+Validation: four native suites, 1379 frontend tests (54 added), production build,
+135 API checks over 73 calls with 47 actual fixtures; twelve browser checks,
+thirteen exported runs and 147 downloads; 162 independent checks over 119 complete
+diagnostic CSVs, one comparison CSV and fourteen comparison entries, with nineteen
+repeated native/source/model calls. Exact source/object/binary/served-asset/evidence
+bindings passed and owned resources were closed. Earlier attempts are retained.
+
+This is delivered feature group 47. All 228 incomplete units and the complete
+catalogue remain in scope. Original flat table metadata/interleaving, arbitrary
+objects and every strict default/type/error/marking/Unicode/order/solver/
+concurrency/performance requirement remain open. No parity status is promoted.
+
+Evidence: docs/feature-first-evaluation-adapters-validation.json and
+docs/feature-first-evaluation-adapters-preview.png.

@@ -1290,6 +1290,16 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field) {
   return parse_evaluation_params(field, FieldPresence{});
 }
 
+std::string parse_evaluation_input_adapter(const FieldLookup& field,
+                                         const FieldPresence& present) {
+  const auto name = std::string_view("evaluation_input_adapter");
+  const auto value = field(name);
+  if (!(present ? present(name) : !value.empty())) return "log";
+  if (value == "log" || value == "stream" || value == "dataframe" || value == "lazyframe") return value;
+  throw std::invalid_argument(
+      "evaluation_input_adapter: expected log, stream, dataframe, or lazyframe");
+}
+
 EvaluationParams parse_evaluation_params(const FieldLookup& field,
                                          const FieldPresence& present) {
   EvaluationParams params;
