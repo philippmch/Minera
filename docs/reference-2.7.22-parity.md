@@ -13044,3 +13044,40 @@ No package or module parity status is promoted.
 
 Evidence: docs/feature-first-behavior-analysis-validation.json and
 docs/feature-first-behavior-analysis-preview.png.
+
+
+### Feature delivery first: configurable statistical and causal DFG discovery
+
+Added source-bound native DFG discovery independently of bundled mining, exposing
+all ten statistical catalogue aliases and both causal variants. Native alias
+relationships and canonical selection order remain intact. Controls cover full
+uint64 windows including zero, activity/completion/start fields, per-case edge
+retention, eight performance aggregations, business hours, fractional weekly slots,
+case attributes and node attributes. Enabled blank overrides preserve native
+completion fallback, empty schedules and empty attribute selections.
+
+The original cached source map stays available. Configured result tables preserve
+every edge, triple, boundary, time, performance summary/raw sample/aggregation,
+case/node attribute and signed causal relation. Complete native/report/analysis/
+variants JSON, every full CSV and every selected-row JSON remain available beyond
+paging and previews. Native sample indexes are vector positions. Scoped DFG JSON
+precision preserves round-trip doubles and caller stream settings. Algorithms are
+unchanged. Edited controls retain completed results; changed sources clear results
+and errors, and untimed logs support frequency discovery.
+
+Validation: five native suites, 1281 frontend tests (47 added), production build,
+57 native checks over 45 calls with 30 actual fixtures, 17 browser checks, 29
+exported browser runs and 975 downloads. Independent verification passed 980
+checks across 859 complete CSV tables, 17 complete sample tables and four complete
+attribute tables, with 33 repeated native/schema/model calls. Final source, object,
+binary, served-asset and evidence bindings were checked and owned resources closed.
+Earlier capture/inspection attempts remain retained in the validation report.
+
+This is feature group 45. Both discovery family feature labels change; every
+package/module parity status, all 228 incomplete units, the complete catalogue
+and strict defaults/types/errors/order/Unicode/input/calendar/concurrency/
+performance gates remain open. EventLog discovery and dataframe DFG retain their
+native input contracts. Overall full parity remains active.
+
+Evidence: docs/feature-first-dfg-discovery-validation.json and
+docs/feature-first-dfg-discovery-preview.png.

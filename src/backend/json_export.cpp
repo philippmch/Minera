@@ -3792,6 +3792,12 @@ void write_dfg_statistical_analysis(
 void write_dfg_variants(std::ostream& out,
                         const DfgVariantsAnalysis& variants,
                         const DirectlyFollowsGraph& graph) {
+  struct RestorePrecision {
+    std::ostream& stream;
+    std::streamsize precision;
+    ~RestorePrecision() { stream.precision(precision); }
+  } restore_precision{
+      out, out.precision(std::numeric_limits<double>::max_digits10)};
   out << "{\"statistical\": [";
   for (std::size_t i = 0; i < variants.statistical.size(); ++i) {
     write_dfg_statistical_analysis(out, variants.statistical[i], graph);

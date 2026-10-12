@@ -1,0 +1,154 @@
+{
+  "stat-native": {
+    "source_id": "1",
+    "dfg_statistical_variants": "native"
+  },
+  "stat-frequency": {
+    "source_id": "1",
+    "dfg_statistical_variants": "frequency"
+  },
+  "stat-frequency_greedy": {
+    "source_id": "1",
+    "dfg_statistical_variants": "frequency_greedy"
+  },
+  "stat-frequency_triples": {
+    "source_id": "1",
+    "dfg_statistical_variants": "frequency_triples"
+  },
+  "stat-performance": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance"
+  },
+  "stat-performance_greedy": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance_greedy"
+  },
+  "stat-case_attributes": {
+    "source_id": "1",
+    "dfg_statistical_variants": "case_attributes"
+  },
+  "stat-clean": {
+    "source_id": "1",
+    "dfg_statistical_variants": "clean"
+  },
+  "stat-clean_polars": {
+    "source_id": "1",
+    "dfg_statistical_variants": "clean_polars"
+  },
+  "stat-clean_time": {
+    "source_id": "1",
+    "dfg_statistical_variants": "clean_time"
+  },
+  "causal-alpha": {
+    "source_id": "1",
+    "dfg_causal_variants": "alpha"
+  },
+  "causal-heuristic": {
+    "source_id": "1",
+    "dfg_causal_variants": "heuristic"
+  },
+  "all-variants": {
+    "source_id": "1",
+    "dfg_statistical_variants": "native,frequency,frequency_greedy,frequency_triples,performance,performance_greedy,case_attributes,clean,clean_polars,clean_time",
+    "dfg_causal_variants": "alpha,heuristic"
+  },
+  "performance-mean": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_performance_aggregation": "mean"
+  },
+  "performance-median": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_performance_aggregation": "median"
+  },
+  "performance-min": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_performance_aggregation": "min"
+  },
+  "performance-max": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_performance_aggregation": "max"
+  },
+  "performance-stdev": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_performance_aggregation": "stdev"
+  },
+  "performance-sum": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_performance_aggregation": "sum"
+  },
+  "performance-raw_values": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_performance_aggregation": "raw_values"
+  },
+  "performance-all": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_performance_aggregation": "all"
+  },
+  "frequency-once": {
+    "source_id": "1",
+    "dfg_statistical_variants": "frequency",
+    "dfg_keep_once_per_case": "true"
+  },
+  "window-zero": {
+    "source_id": "1",
+    "dfg_statistical_variants": "frequency",
+    "dfg_causal_variants": "alpha,heuristic",
+    "dfg_window": "0"
+  },
+  "window-full-width": {
+    "source_id": "1",
+    "dfg_statistical_variants": "frequency",
+    "dfg_window": "18446744073709551615"
+  },
+  "custom-all": {
+    "source_id": "1",
+    "dfg_statistical_variants": "native,frequency,frequency_greedy,frequency_triples,performance,performance_greedy,case_attributes,clean,clean_polars,clean_time",
+    "dfg_causal_variants": "alpha,heuristic",
+    "dfg_activity_attribute": "phase",
+    "dfg_timestamp_attribute": "completion_time",
+    "dfg_start_timestamp_attribute": "start_time",
+    "dfg_performance_aggregation": "all",
+    "dfg_case_attributes": "region,priority,owner_code,concept:name",
+    "dfg_return_node_attributes": "true",
+    "dfg_business_hours": "true",
+    "dfg_business_hour_slots": "36000:44000.125,44000.125:54000"
+  },
+  "empty-case-attributes": {
+    "source_id": "1",
+    "dfg_statistical_variants": "case_attributes",
+    "dfg_case_attributes": "",
+    "dfg_return_node_attributes": "true"
+  },
+  "empty-business-hours": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_business_hours": "true",
+    "dfg_business_hour_slots": "",
+    "dfg_performance_aggregation": "raw_values"
+  },
+  "fractional-business-hours": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_business_hours": "true",
+    "dfg_business_hour_slots": "36000:36020.75",
+    "dfg_performance_aggregation": "all"
+  },
+  "completion-start-fallback": {
+    "source_id": "1",
+    "dfg_statistical_variants": "performance",
+    "dfg_start_timestamp_attribute": ""
+  },
+  "canonical-alias-selection": {
+    "source_id": "1",
+    "dfg_statistical_variants": "frequency,native,frequency,native",
+    "dfg_causal_variants": "heuristic,alpha,heuristic"
+  }
+}

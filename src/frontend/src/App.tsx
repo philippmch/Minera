@@ -45,6 +45,7 @@ import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
 import { EventuallyFollows } from "./components/EventuallyFollows";
 import { DfgVariants } from "./components/DfgVariants";
+import { DfgDiscovery } from "./components/DfgDiscovery";
 import { DfgDataframe } from "./components/DfgDataframe";
 import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
@@ -828,6 +829,7 @@ export default function App() {
       {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={source!==null} file={source?.file??null} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey,inferLegacyBoundaries)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries});setTab("conformance");}} /></main>}
       {tab === "dfg" && (
         <main className="layout">
+          <DfgDiscovery key={cacheGeneration.current} data={data} available={source!==null} mining={mining}/>
           <ProcessMap
             layout={layout}
             threshold={threshold}
