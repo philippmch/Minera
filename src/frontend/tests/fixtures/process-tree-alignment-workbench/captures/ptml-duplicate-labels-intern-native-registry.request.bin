@@ -1,0 +1,37 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+SEARCH_GRAPH_PT
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+ptml
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-ptml-duplicate-words.json"
+Content-Type: application/octet-stream
+
+["A","A"]
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-ptml-original-duplicate-labels.ptml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<ptml>
+  <processTree id="original-tree" name="Owned normative model 東京" root="original-root">
+    <sequence id="original-root" name="" />
+    <manualTask id="original-node-1" name="A" />
+    <manualTask id="original-node-2" name="A" />
+    <parentsNode id="original-edge-0" sourceId="original-root" targetId="original-node-1" />
+    <parentsNode id="original-edge-1" sourceId="original-root" targetId="original-node-2" />
+  </processTree>
+</ptml>
+--OwnedProcessTreeAlignmentFeature54--

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Independent process-tree alignment checked source"/>
+  <trace>
+    <string key="concept:name" value="trace_words"/>
+    <event>
+      <string key="concept:name" value="A"/>
+    </event>
+    <event>
+      <string key="concept:name" value="C"/>
+    </event>
+    <event>
+      <string key="concept:name" value="B"/>
+    </event>
+  </trace>
+</log>

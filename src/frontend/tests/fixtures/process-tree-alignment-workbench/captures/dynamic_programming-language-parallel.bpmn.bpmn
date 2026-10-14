@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+  <process id="process" name="Independent process-tree alignment model" isExecutable="false">
+    <startEvent id="StartEvent_0"/>
+    <parallelGateway id="parallelGateway_1"/>
+    <parallelGateway id="parallelGateway_2"/>
+    <task id="Activity_3" name="A"/>
+    <task id="Activity_6" name="B"/>
+    <endEvent id="EndEvent_9"/>
+    <sequenceFlow id="Flow_4" sourceRef="parallelGateway_1" targetRef="Activity_3"/>
+    <sequenceFlow id="Flow_5" sourceRef="Activity_3" targetRef="parallelGateway_2"/>
+    <sequenceFlow id="Flow_7" sourceRef="parallelGateway_1" targetRef="Activity_6"/>
+    <sequenceFlow id="Flow_8" sourceRef="Activity_6" targetRef="parallelGateway_2"/>
+    <sequenceFlow id="Flow_10" sourceRef="StartEvent_0" targetRef="parallelGateway_1"/>
+    <sequenceFlow id="Flow_11" sourceRef="parallelGateway_2" targetRef="EndEvent_9"/>
+  </process>
+</definitions>

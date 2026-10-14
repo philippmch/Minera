@@ -1,0 +1,33 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+SEARCH_GRAPH_PT
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+log
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+table
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="alignment_selectors_json"
+
+{"alignment_case_id_attribute":"batch","pt_alignment_activity_attribute":"phase"}
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-single-variant-table.json"
+Content-Type: application/octet-stream
+
+{"columns":["batch","phase"],"rows":[[{"value":"c1"},{"value":"A"}],[{"value":"c1"},{"value":"B"}]]}
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-normative-constructor.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B"],"root":{"op":"SEQUENCE","op_index":2,"activity":0,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]}]}}
+
+--OwnedProcessTreeAlignmentFeature54--

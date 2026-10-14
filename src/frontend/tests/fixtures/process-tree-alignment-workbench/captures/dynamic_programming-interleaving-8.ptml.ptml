@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ptml>
+  <processTree id="tree" name="Independent process-tree alignment model" root="node0">
+    <interleaving id="node0" name=""/>
+    <automaticTask id="node1" name=""/>
+    <automaticTask id="node2" name=""/>
+    <automaticTask id="node3" name=""/>
+    <automaticTask id="node4" name=""/>
+    <automaticTask id="node5" name=""/>
+    <automaticTask id="node6" name=""/>
+    <automaticTask id="node7" name=""/>
+    <automaticTask id="node8" name=""/>
+    <parentsNode id="edge0" sourceId="node0" targetId="node1"/>
+    <parentsNode id="edge1" sourceId="node0" targetId="node2"/>
+    <parentsNode id="edge2" sourceId="node0" targetId="node3"/>
+    <parentsNode id="edge3" sourceId="node0" targetId="node4"/>
+    <parentsNode id="edge4" sourceId="node0" targetId="node5"/>
+    <parentsNode id="edge5" sourceId="node0" targetId="node6"/>
+    <parentsNode id="edge6" sourceId="node0" targetId="node7"/>
+    <parentsNode id="edge7" sourceId="node0" targetId="node8"/>
+  </processTree>
+</ptml>

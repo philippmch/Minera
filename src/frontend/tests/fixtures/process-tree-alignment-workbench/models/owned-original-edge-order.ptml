@@ -1,0 +1,1 @@
+<ptml><processTree root="original-root"><sequence id="original-root"/><manualTask id="declared-first" name="A"/><manualTask id="declared-second" name="B"/><manualTask id="disconnected" name="unused"/><properties ignored="yes"/><parentsNode sourceId="original-root" targetId="declared-second"/><parentsNode sourceId="original-root" targetId="declared-first"/></processTree></ptml>

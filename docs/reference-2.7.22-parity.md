@@ -13367,3 +13367,40 @@ This checkpoint adds own-source native, frontend, API, publication and export ev
 This is implemented feature group 53. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
 
 Evidence: docs/feature-first-inductive-input-validation.json. No browser screenshot is claimed.
+
+
+### Feature delivery first: independent original process-tree alignment
+
+Independent process-tree alignment accepts original PTML and complete raw ProcessTree constructor JSON alongside original CSV/TSV/XES/gzip-XES, complete typed EventTable JSON or exact trace-word arrays from landing and both classic/OCEL toolbars, without accessing or replacing the cached mining session.
+
+All four existing native variants are selectable: SEARCH_GRAPH_PT, DYNAMIC_PROGRAMMING, MILP and APPROXIMATED_ORIGINAL. The workbench checks an original grouped log, one selected original trace or an explicit word array converted to a native EventLog with PRESENT activity cells, including empty words. Typed table grouping copies source data; complete before/after, original log and checked log remain inspectable.
+
+Complete original ProcessTree snapshots preserve duplicate and unused registry labels, every stored canonical operator and raw signed enum index, latent size_t activity indices, ordered children and unknown enums. The strict JSON parser checks grammar, fields, decoded duplicate keys, UTF-8 and exact integer bounds while leaving alignment/PTML semantic constraints to their existing native consumers.
+
+All twelve native option fields are configurable and inspectable with their actual variant index, bounds, activity selector, approximation thresholds and cache/batch settings. Four deadline request controls use milliseconds and the native options snapshot records their actual seconds. Zero bounds, defaults, literal whitespace and empty selectors retain native validation rather than silently changing the request.
+
+Complete native results retain computed/completed/timed_out/exhausted state, aggregate and per-trace uint64 costs, max_digits10 fitness, negative zero/nonfinite storage tags, every diagnostic counter/message and original trace words. Move type and raw index plus activity/log/model strings are always present; unused move sides remain empty strings. Incomplete or exhausted native returns remain executed result envelopes rather than fabricated request failures.
+
+Native MILP diagnostics identify the existing dependency-free residual A* unit-cost path, with lp_solved zero and no external LP solves. Duplicate successful words reuse a call-local native result cache for all four variants. Recursive cache/batch controls retain their native variant restrictions, and zero approximation thresholds retain the native exact-path behavior.
+
+Native failures retain the original tree, source/checked inputs and complete actual options with explicit errors. A narrow activity-leaf index guard prevents unsafe dereferences in all existing model exporters while retaining constructor-valid out-of-range indices and the full error envelope. A separate guard uses the same existing native alignment expansion limits, inclusive OR above twelve children or interleaving above eight, to suppress supplementary Petri-net/PNML/BPMN expansion with an explicit error; linear PTML export remains available. Input byte/depth/node bounds remain; complete native output serialization has no transport caps and preserves escaped lone-surrogate identity.
+
+Model conversion and export run independently of alignment from the same original tree. Both actual standard and transition_bordered Petri conversions expose complete native nets and conversion context; PTML, BPMN, PNML and checked-source XES retain separate artifact/error fields even when alignment fails or returns incomplete.
+
+Exact original source/model files, request fields, input hashes, typed source/options/tree/net/conversion records, complete JSON/reports, per-table/all-table CSV and selected records are inspectable and downloadable. Cancellation, input replacement and failed-request guards retain completed runs. Portable captured fixtures publish source, model, request, response and available exports byte-identically only after their export proof passes.
+
+Validation: {"api_calls": 258, "api_checks": 1401, "core_objects": 180, "export_csv_cells": 217920, "export_entries": 219, "export_numeric_literals": 14616, "export_selected_records": 41666, "export_tests": 224, "fresh_core_objects": 1, "frontend_files": 93, "frontend_tests": 2193, "native_sources": 643, "native_suites": 12, "process_tree_alignment_fixtures": 219, "published_files": 1338, "published_fixture_entries": 219, "reused_core_objects": 179, "unrelated_files_preserved": 110}. Source/compiler/object/binary/publication/served-production-asset bindings passed. Complete browser validation is explicitly false; one current exact-origin browser navigation retry was rejected before UI acquisition while Feature53 was live.
+
+This is a feature-delivery checkpoint, not full PM4Py parity. No package/module parity status or selector is promoted; all 228 incomplete units remain in scope.
+
+Complete browser interaction, downloads, visual screenshots and responsive inspection for Feature54 remain pending. After the user again reported all settings allowed, root refreshed CUA documentation/inventory and made one exact-origin navigation attempt at http://127.0.0.1:8562; the tool rejected it because of the saved permission/managed-policy gate. At that attempt PID20676 still served the prior Feature53 deployment. No Feature54 UI was served, loaded or inspected by the browser and no workaround or screenshot is claimed. The current failure and frozen Feature51 historical denial are recorded separately; local HTTP/listener/runtime checks are separate from browser validation.
+
+The word-array input is an explicit EventLog conversion because the public alignment API takes EventLog; it does not claim a separate raw-vector native overload. Table grouping and selected-trace copies preserve source state. Incomplete native results, native validation errors and independent model/export diagnostics remain distinct.
+
+MILP retains its current dependency-free A* implementation and diagnostic lp_solved zero; external solver parity is not claimed. Native call-local caching, variant-specific recursive cache controls and approximation thresholds retain their existing semantics. The activity-leaf dereference guard and supplementary expansion guard are distinct: the latter uses the same native OR/interleaving limits, leaves PTML available and changes no input transport, constructor, full-tree snapshot or alignment validation. The initial API capture remains an incomplete TimeoutError proof with immutable artifacts and is excluded from completed validation counts.
+
+This checkpoint adds own-source native, frontend, API, publication and export evidence, not a fresh public-reference differential corpus. Strict defaults, scalar/object identity, numeric ordering, schema/errors, Unicode, marking, solver, concurrency and performance gates remain independent parity work.
+
+This is implemented feature group 54. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
+
+Evidence: docs/feature-first-process-tree-alignment-validation.json. No browser screenshot is claimed.

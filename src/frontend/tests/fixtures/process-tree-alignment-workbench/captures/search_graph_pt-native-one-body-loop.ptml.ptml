@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ptml>
+  <processTree id="tree" name="Independent process-tree alignment model" root="node0">
+    <xorLoop id="node0" name=""/>
+    <manualTask id="node1" name="A"/>
+    <automaticTask id="node2" name=""/>
+    <automaticTask id="node3" name=""/>
+    <parentsNode id="edge0" sourceId="node0" targetId="node1"/>
+    <parentsNode id="edge1" sourceId="node0" targetId="node2"/>
+    <parentsNode id="edge2" sourceId="node0" targetId="node3"/>
+  </processTree>
+</ptml>

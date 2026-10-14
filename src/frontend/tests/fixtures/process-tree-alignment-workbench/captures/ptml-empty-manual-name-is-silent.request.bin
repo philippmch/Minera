@@ -1,0 +1,28 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+SEARCH_GRAPH_PT
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+ptml
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-empty-ptml-checked-word.json"
+Content-Type: application/octet-stream
+
+[""]
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-empty-manual-task.ptml"
+Content-Type: application/octet-stream
+
+<ptml><processTree root="n"><manualTask id="n" name=""/></processTree></ptml>
+--OwnedProcessTreeAlignmentFeature54--

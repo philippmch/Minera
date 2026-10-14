@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ptml>
+  <processTree id="tree" name="Independent process-tree alignment model" root="node0">
+    <sequence id="node0" name=""/>
+    <sequence id="node1" name=""/>
+    <sequence id="node2" name=""/>
+    <sequence id="node3" name=""/>
+    <sequence id="node4" name=""/>
+    <sequence id="node5" name=""/>
+    <sequence id="node6" name=""/>
+    <sequence id="node7" name=""/>
+    <sequence id="node8" name=""/>
+    <sequence id="node9" name=""/>
+    <sequence id="node10" name=""/>
+    <sequence id="node11" name=""/>
+    <sequence id="node12" name=""/>
+    <sequence id="node13" name=""/>
+    <sequence id="node14" name=""/>
+    <sequence id="node15" name=""/>
+    <sequence id="node16" name=""/>
+    <sequence id="node17" name=""/>
+    <sequence id="node18" name=""/>
+    <sequence id="node19" name=""/>
+    <sequence id="node20" name=""/>
+    <sequence id="node21" name=""/>
+    <sequence id="node22" name=""/>
+    <sequence id="node23" name=""/>
+    <sequence id="node24" name=""/>
+    <sequence id="node25" name=""/>
+    <sequence id="node26" name=""/>
+    <sequence id="node27" name=""/>
+    <sequence id="node28" name=""/>
+    <sequence id="node29" name=""/>
+    <sequence id="node30" name=""/>
+    <sequence id="node31" name=""/>
+    <sequence id="node32" name=""/>
+    <sequence id="node33" name=""/>
+    <sequence id="node34" name=""/>
+    <sequence id="node35" name=""/>
+    <sequence id="node36" name=""/>
+    <sequence id="node37" name=""/>
+    <sequence id="node38" name=""/>
+    <sequence id="node39" name=""/>
+    <sequence id="node40" name=""/>
+    <sequence id="node41" name=""/>
+    <sequence id="node42" name=""/>
+    <sequence id="node43" name=""/>
+    <sequence id="node44" name=""/>
+    <sequence id="node45" name=""/>
+    <sequence id="node46" name=""/>
+    <sequence id="node47" name=""/>
+    <sequence id="node48" name=""/>
+    <sequence id="node49" name=""/>
+    <sequence id="node50" name=""/>
+    <sequence id="node51" name=""/>
+    <sequence id="node52" name=""/>
+    <sequence id="node53" name=""/>
+    <sequence id="node54" name=""/>
+    <sequence id="node55" name=""/>
+    <sequence id="node56" name=""/>
+    <sequence id="node57" name=""/>
+    <sequence id="node58" name=""/>
+    <sequence id="node59" name=""/>
+    <sequence id="node60" name=""/>
+    <sequence id="node61" name=""/>
+    <sequence id="node62" name=""/>
+    <sequence id="node63" name=""/>
+    <sequence id="node64" name=""/>
+    <sequence id="node65" name=""/>
+    <sequence id="node66" name=""/>
+    <sequence id="node67" name=""/>
+    <sequence id="node68" name=""/>
+    <sequence id="node69" name=""/>
+    <manualTask id="node70" name="A"/>
+    <parentsNode id="edge0" sourceId="node69" targetId="node70"/>
+    <parentsNode id="edge1" sourceId="node68" targetId="node69"/>
+    <parentsNode id="edge2" sourceId="node67" targetId="node68"/>
+    <parentsNode id="edge3" sourceId="node66" targetId="node67"/>
+    <parentsNode id="edge4" sourceId="node65" targetId="node66"/>
+    <parentsNode id="edge5" sourceId="node64" targetId="node65"/>
+    <parentsNode id="edge6" sourceId="node63" targetId="node64"/>
+    <parentsNode id="edge7" sourceId="node62" targetId="node63"/>
+    <parentsNode id="edge8" sourceId="node61" targetId="node62"/>
+    <parentsNode id="edge9" sourceId="node60" targetId="node61"/>
+    <parentsNode id="edge10" sourceId="node59" targetId="node60"/>
+    <parentsNode id="edge11" sourceId="node58" targetId="node59"/>
+    <parentsNode id="edge12" sourceId="node57" targetId="node58"/>
+    <parentsNode id="edge13" sourceId="node56" targetId="node57"/>
+    <parentsNode id="edge14" sourceId="node55" targetId="node56"/>
+    <parentsNode id="edge15" sourceId="node54" targetId="node55"/>
+    <parentsNode id="edge16" sourceId="node53" targetId="node54"/>
+    <parentsNode id="edge17" sourceId="node52" targetId="node53"/>
+    <parentsNode id="edge18" sourceId="node51" targetId="node52"/>
+    <parentsNode id="edge19" sourceId="node50" targetId="node51"/>
+    <parentsNode id="edge20" sourceId="node49" targetId="node50"/>
+    <parentsNode id="edge21" sourceId="node48" targetId="node49"/>
+    <parentsNode id="edge22" sourceId="node47" targetId="node48"/>
+    <parentsNode id="edge23" sourceId="node46" targetId="node47"/>
+    <parentsNode id="edge24" sourceId="node45" targetId="node46"/>
+    <parentsNode id="edge25" sourceId="node44" targetId="node45"/>
+    <parentsNode id="edge26" sourceId="node43" targetId="node44"/>
+    <parentsNode id="edge27" sourceId="node42" targetId="node43"/>
+    <parentsNode id="edge28" sourceId="node41" targetId="node42"/>
+    <parentsNode id="edge29" sourceId="node40" targetId="node41"/>
+    <parentsNode id="edge30" sourceId="node39" targetId="node40"/>
+    <parentsNode id="edge31" sourceId="node38" targetId="node39"/>
+    <parentsNode id="edge32" sourceId="node37" targetId="node38"/>
+    <parentsNode id="edge33" sourceId="node36" targetId="node37"/>
+    <parentsNode id="edge34" sourceId="node35" targetId="node36"/>
+    <parentsNode id="edge35" sourceId="node34" targetId="node35"/>
+    <parentsNode id="edge36" sourceId="node33" targetId="node34"/>
+    <parentsNode id="edge37" sourceId="node32" targetId="node33"/>
+    <parentsNode id="edge38" sourceId="node31" targetId="node32"/>
+    <parentsNode id="edge39" sourceId="node30" targetId="node31"/>
+    <parentsNode id="edge40" sourceId="node29" targetId="node30"/>
+    <parentsNode id="edge41" sourceId="node28" targetId="node29"/>
+    <parentsNode id="edge42" sourceId="node27" targetId="node28"/>
+    <parentsNode id="edge43" sourceId="node26" targetId="node27"/>
+    <parentsNode id="edge44" sourceId="node25" targetId="node26"/>
+    <parentsNode id="edge45" sourceId="node24" targetId="node25"/>
+    <parentsNode id="edge46" sourceId="node23" targetId="node24"/>
+    <parentsNode id="edge47" sourceId="node22" targetId="node23"/>
+    <parentsNode id="edge48" sourceId="node21" targetId="node22"/>
+    <parentsNode id="edge49" sourceId="node20" targetId="node21"/>
+    <parentsNode id="edge50" sourceId="node19" targetId="node20"/>
+    <parentsNode id="edge51" sourceId="node18" targetId="node19"/>
+    <parentsNode id="edge52" sourceId="node17" targetId="node18"/>
+    <parentsNode id="edge53" sourceId="node16" targetId="node17"/>
+    <parentsNode id="edge54" sourceId="node15" targetId="node16"/>
+    <parentsNode id="edge55" sourceId="node14" targetId="node15"/>
+    <parentsNode id="edge56" sourceId="node13" targetId="node14"/>
+    <parentsNode id="edge57" sourceId="node12" targetId="node13"/>
+    <parentsNode id="edge58" sourceId="node11" targetId="node12"/>
+    <parentsNode id="edge59" sourceId="node10" targetId="node11"/>
+    <parentsNode id="edge60" sourceId="node9" targetId="node10"/>
+    <parentsNode id="edge61" sourceId="node8" targetId="node9"/>
+    <parentsNode id="edge62" sourceId="node7" targetId="node8"/>
+    <parentsNode id="edge63" sourceId="node6" targetId="node7"/>
+    <parentsNode id="edge64" sourceId="node5" targetId="node6"/>
+    <parentsNode id="edge65" sourceId="node4" targetId="node5"/>
+    <parentsNode id="edge66" sourceId="node3" targetId="node4"/>
+    <parentsNode id="edge67" sourceId="node2" targetId="node3"/>
+    <parentsNode id="edge68" sourceId="node1" targetId="node2"/>
+    <parentsNode id="edge69" sourceId="node0" targetId="node1"/>
+  </processTree>
+</ptml>

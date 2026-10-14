@@ -1,0 +1,1 @@
+{"activities":["A","B"],"root":{"op":"PARALLEL","op_index":5,"activity":18446744073709551615,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]}]}}

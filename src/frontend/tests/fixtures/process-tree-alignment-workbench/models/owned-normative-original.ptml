@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ptml>
+  <processTree id="original-tree" name="Owned normative model 東京" root="original-root">
+    <sequence id="original-root" name="" />
+    <manualTask id="original-node-1" name="A" />
+    <manualTask id="original-node-2" name="B" />
+    <parentsNode id="original-edge-0" sourceId="original-root" targetId="original-node-1" />
+    <parentsNode id="original-edge-1" sourceId="original-root" targetId="original-node-2" />
+  </processTree>
+  <processTree id="ignored-tree" root="ignored-node">
+    <manualTask id="ignored-node" name="ignored second tree" />
+  </processTree>
+</ptml>

@@ -1,0 +1,146 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ptml>
+  <processTree id="original-tree" name="Owned normative model 東京" root="original-root">
+    <sequence id="original-root" name="" />
+    <sequence id="original-node-1" name="" />
+    <sequence id="original-node-2" name="" />
+    <sequence id="original-node-3" name="" />
+    <sequence id="original-node-4" name="" />
+    <sequence id="original-node-5" name="" />
+    <sequence id="original-node-6" name="" />
+    <sequence id="original-node-7" name="" />
+    <sequence id="original-node-8" name="" />
+    <sequence id="original-node-9" name="" />
+    <sequence id="original-node-10" name="" />
+    <sequence id="original-node-11" name="" />
+    <sequence id="original-node-12" name="" />
+    <sequence id="original-node-13" name="" />
+    <sequence id="original-node-14" name="" />
+    <sequence id="original-node-15" name="" />
+    <sequence id="original-node-16" name="" />
+    <sequence id="original-node-17" name="" />
+    <sequence id="original-node-18" name="" />
+    <sequence id="original-node-19" name="" />
+    <sequence id="original-node-20" name="" />
+    <sequence id="original-node-21" name="" />
+    <sequence id="original-node-22" name="" />
+    <sequence id="original-node-23" name="" />
+    <sequence id="original-node-24" name="" />
+    <sequence id="original-node-25" name="" />
+    <sequence id="original-node-26" name="" />
+    <sequence id="original-node-27" name="" />
+    <sequence id="original-node-28" name="" />
+    <sequence id="original-node-29" name="" />
+    <sequence id="original-node-30" name="" />
+    <sequence id="original-node-31" name="" />
+    <sequence id="original-node-32" name="" />
+    <sequence id="original-node-33" name="" />
+    <sequence id="original-node-34" name="" />
+    <sequence id="original-node-35" name="" />
+    <sequence id="original-node-36" name="" />
+    <sequence id="original-node-37" name="" />
+    <sequence id="original-node-38" name="" />
+    <sequence id="original-node-39" name="" />
+    <sequence id="original-node-40" name="" />
+    <sequence id="original-node-41" name="" />
+    <sequence id="original-node-42" name="" />
+    <sequence id="original-node-43" name="" />
+    <sequence id="original-node-44" name="" />
+    <sequence id="original-node-45" name="" />
+    <sequence id="original-node-46" name="" />
+    <sequence id="original-node-47" name="" />
+    <sequence id="original-node-48" name="" />
+    <sequence id="original-node-49" name="" />
+    <sequence id="original-node-50" name="" />
+    <sequence id="original-node-51" name="" />
+    <sequence id="original-node-52" name="" />
+    <sequence id="original-node-53" name="" />
+    <sequence id="original-node-54" name="" />
+    <sequence id="original-node-55" name="" />
+    <sequence id="original-node-56" name="" />
+    <sequence id="original-node-57" name="" />
+    <sequence id="original-node-58" name="" />
+    <sequence id="original-node-59" name="" />
+    <sequence id="original-node-60" name="" />
+    <sequence id="original-node-61" name="" />
+    <sequence id="original-node-62" name="" />
+    <sequence id="original-node-63" name="" />
+    <sequence id="original-node-64" name="" />
+    <sequence id="original-node-65" name="" />
+    <sequence id="original-node-66" name="" />
+    <sequence id="original-node-67" name="" />
+    <sequence id="original-node-68" name="" />
+    <sequence id="original-node-69" name="" />
+    <manualTask id="original-node-70" name="A" />
+    <parentsNode id="original-edge-0" sourceId="original-node-69" targetId="original-node-70" />
+    <parentsNode id="original-edge-1" sourceId="original-node-68" targetId="original-node-69" />
+    <parentsNode id="original-edge-2" sourceId="original-node-67" targetId="original-node-68" />
+    <parentsNode id="original-edge-3" sourceId="original-node-66" targetId="original-node-67" />
+    <parentsNode id="original-edge-4" sourceId="original-node-65" targetId="original-node-66" />
+    <parentsNode id="original-edge-5" sourceId="original-node-64" targetId="original-node-65" />
+    <parentsNode id="original-edge-6" sourceId="original-node-63" targetId="original-node-64" />
+    <parentsNode id="original-edge-7" sourceId="original-node-62" targetId="original-node-63" />
+    <parentsNode id="original-edge-8" sourceId="original-node-61" targetId="original-node-62" />
+    <parentsNode id="original-edge-9" sourceId="original-node-60" targetId="original-node-61" />
+    <parentsNode id="original-edge-10" sourceId="original-node-59" targetId="original-node-60" />
+    <parentsNode id="original-edge-11" sourceId="original-node-58" targetId="original-node-59" />
+    <parentsNode id="original-edge-12" sourceId="original-node-57" targetId="original-node-58" />
+    <parentsNode id="original-edge-13" sourceId="original-node-56" targetId="original-node-57" />
+    <parentsNode id="original-edge-14" sourceId="original-node-55" targetId="original-node-56" />
+    <parentsNode id="original-edge-15" sourceId="original-node-54" targetId="original-node-55" />
+    <parentsNode id="original-edge-16" sourceId="original-node-53" targetId="original-node-54" />
+    <parentsNode id="original-edge-17" sourceId="original-node-52" targetId="original-node-53" />
+    <parentsNode id="original-edge-18" sourceId="original-node-51" targetId="original-node-52" />
+    <parentsNode id="original-edge-19" sourceId="original-node-50" targetId="original-node-51" />
+    <parentsNode id="original-edge-20" sourceId="original-node-49" targetId="original-node-50" />
+    <parentsNode id="original-edge-21" sourceId="original-node-48" targetId="original-node-49" />
+    <parentsNode id="original-edge-22" sourceId="original-node-47" targetId="original-node-48" />
+    <parentsNode id="original-edge-23" sourceId="original-node-46" targetId="original-node-47" />
+    <parentsNode id="original-edge-24" sourceId="original-node-45" targetId="original-node-46" />
+    <parentsNode id="original-edge-25" sourceId="original-node-44" targetId="original-node-45" />
+    <parentsNode id="original-edge-26" sourceId="original-node-43" targetId="original-node-44" />
+    <parentsNode id="original-edge-27" sourceId="original-node-42" targetId="original-node-43" />
+    <parentsNode id="original-edge-28" sourceId="original-node-41" targetId="original-node-42" />
+    <parentsNode id="original-edge-29" sourceId="original-node-40" targetId="original-node-41" />
+    <parentsNode id="original-edge-30" sourceId="original-node-39" targetId="original-node-40" />
+    <parentsNode id="original-edge-31" sourceId="original-node-38" targetId="original-node-39" />
+    <parentsNode id="original-edge-32" sourceId="original-node-37" targetId="original-node-38" />
+    <parentsNode id="original-edge-33" sourceId="original-node-36" targetId="original-node-37" />
+    <parentsNode id="original-edge-34" sourceId="original-node-35" targetId="original-node-36" />
+    <parentsNode id="original-edge-35" sourceId="original-node-34" targetId="original-node-35" />
+    <parentsNode id="original-edge-36" sourceId="original-node-33" targetId="original-node-34" />
+    <parentsNode id="original-edge-37" sourceId="original-node-32" targetId="original-node-33" />
+    <parentsNode id="original-edge-38" sourceId="original-node-31" targetId="original-node-32" />
+    <parentsNode id="original-edge-39" sourceId="original-node-30" targetId="original-node-31" />
+    <parentsNode id="original-edge-40" sourceId="original-node-29" targetId="original-node-30" />
+    <parentsNode id="original-edge-41" sourceId="original-node-28" targetId="original-node-29" />
+    <parentsNode id="original-edge-42" sourceId="original-node-27" targetId="original-node-28" />
+    <parentsNode id="original-edge-43" sourceId="original-node-26" targetId="original-node-27" />
+    <parentsNode id="original-edge-44" sourceId="original-node-25" targetId="original-node-26" />
+    <parentsNode id="original-edge-45" sourceId="original-node-24" targetId="original-node-25" />
+    <parentsNode id="original-edge-46" sourceId="original-node-23" targetId="original-node-24" />
+    <parentsNode id="original-edge-47" sourceId="original-node-22" targetId="original-node-23" />
+    <parentsNode id="original-edge-48" sourceId="original-node-21" targetId="original-node-22" />
+    <parentsNode id="original-edge-49" sourceId="original-node-20" targetId="original-node-21" />
+    <parentsNode id="original-edge-50" sourceId="original-node-19" targetId="original-node-20" />
+    <parentsNode id="original-edge-51" sourceId="original-node-18" targetId="original-node-19" />
+    <parentsNode id="original-edge-52" sourceId="original-node-17" targetId="original-node-18" />
+    <parentsNode id="original-edge-53" sourceId="original-node-16" targetId="original-node-17" />
+    <parentsNode id="original-edge-54" sourceId="original-node-15" targetId="original-node-16" />
+    <parentsNode id="original-edge-55" sourceId="original-node-14" targetId="original-node-15" />
+    <parentsNode id="original-edge-56" sourceId="original-node-13" targetId="original-node-14" />
+    <parentsNode id="original-edge-57" sourceId="original-node-12" targetId="original-node-13" />
+    <parentsNode id="original-edge-58" sourceId="original-node-11" targetId="original-node-12" />
+    <parentsNode id="original-edge-59" sourceId="original-node-10" targetId="original-node-11" />
+    <parentsNode id="original-edge-60" sourceId="original-node-9" targetId="original-node-10" />
+    <parentsNode id="original-edge-61" sourceId="original-node-8" targetId="original-node-9" />
+    <parentsNode id="original-edge-62" sourceId="original-node-7" targetId="original-node-8" />
+    <parentsNode id="original-edge-63" sourceId="original-node-6" targetId="original-node-7" />
+    <parentsNode id="original-edge-64" sourceId="original-node-5" targetId="original-node-6" />
+    <parentsNode id="original-edge-65" sourceId="original-node-4" targetId="original-node-5" />
+    <parentsNode id="original-edge-66" sourceId="original-node-3" targetId="original-node-4" />
+    <parentsNode id="original-edge-67" sourceId="original-node-2" targetId="original-node-3" />
+    <parentsNode id="original-edge-68" sourceId="original-node-1" targetId="original-node-2" />
+    <parentsNode id="original-edge-69" sourceId="original-root" targetId="original-node-1" />
+  </processTree>
+</ptml>
