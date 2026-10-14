@@ -1,0 +1,66 @@
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="algorithm"
+
+anti
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="model_format"
+
+pnml
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="marking_limit"
+
+1
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_file"; filename="owned-unreachable-b.json"
+Content-Type: application/octet-stream
+
+["b"]
+
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="model_file"; filename="owned-bounded-unreachable-loop.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="s">
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="f" />
+      <transition id="foreign-transition-0">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <arc id="loop-in" source="s" target="foreign-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="loop-out" source="foreign-transition-0" target="s">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="f">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedPetriAntiMultiFeature55--

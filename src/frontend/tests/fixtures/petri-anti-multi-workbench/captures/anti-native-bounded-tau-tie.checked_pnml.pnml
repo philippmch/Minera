@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Independent PNML model with resolved checked markings</text></name>
+    <page id="page1">
+      <place id="s">
+        <name><text>s</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="f">
+        <name><text>f</text></name>
+        <initialMarking><text>0</text></initialMarking>
+      </place>
+      <transition id="foreign-transition-0">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="foreign-transition-0"/>
+      </transition>
+      <transition id="foreign-transition-1">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="foreign-transition-1"/>
+      </transition>
+      <transition id="foreign-transition-2">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="foreign-transition-2"/>
+      </transition>
+      <arc id="exit0-in" source="s" target="foreign-transition-0"/>
+      <arc id="exit0-out" source="foreign-transition-0" target="f"/>
+      <arc id="loop-in" source="s" target="foreign-transition-1"/>
+      <arc id="loop-out" source="foreign-transition-1" target="s"/>
+      <arc id="exit2-in" source="s" target="foreign-transition-2"/>
+      <arc id="exit2-out" source="foreign-transition-2" target="f"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="s"><text>0</text></place>
+        <place idref="f"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

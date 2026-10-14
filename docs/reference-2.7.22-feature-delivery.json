@@ -124,7 +124,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_independent_petri_anti_multi_alignment_available",
       "package": "algo.conformance.antialignments",
       "parity_status": "complete",
       "selectors": [
@@ -158,7 +158,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_independent_petri_anti_multi_alignment_available",
       "package": "algo.conformance.multialignments",
       "parity_status": "complete",
       "selectors": [
@@ -2766,6 +2766,48 @@
       ],
       "validation": "docs/feature-first-process-tree-alignment-validation.json",
       "browser_validation_complete": false
+    },
+    {
+      "id": "native_independent_petri_anti_multi_alignment",
+      "state": "original_pnml_checked_log_trace_table_word_conversion_full_native_options_results_metadata_markings_and_exports_available",
+      "families": [
+        "algo.conformance.antialignments",
+        "algo.conformance.multialignments"
+      ],
+      "variants": [
+        "VERSION_DISCOUNTED_A_STAR",
+        "ANTI",
+        "MULTI",
+        "LOG",
+        "TRACE",
+        "WORDS",
+        "EVENT_TABLE",
+        "PNML"
+      ],
+      "entry_points": [
+        "include/minera/petri_anti_multi_workbench_json.hpp",
+        "src/backend/petri_anti_multi_workbench_json.cpp",
+        "include/minera/petri_anti_alignment.hpp",
+        "include/minera/petri_multi_alignment.hpp",
+        "src/backend/petri_anti_alignment.cpp",
+        "src/backend/petri_multi_alignment.cpp",
+        "src/backend/tools/petri_anti_multi_route.hpp",
+        "src/frontend/src/petri-anti-multi-workbench.ts",
+        "src/frontend/src/components/PetriAntiMultiWorkspace.tsx"
+      ],
+      "added": [
+        "Independent Petri anti-alignment and multi-alignment accept an original uploaded PNML document alongside original CSV/TSV/XES/gzip-XES, complete typed EventTable JSON or exact trace-word arrays from landing and both classic/OCEL toolbars, without accessing or replacing the cached mining session.",
+        "The workbench checks an original grouped log, one selected original trace or explicit words converted to the existing native EventLog API with PRESENT cells, including empty activity strings. Table grouping and selected-trace copies preserve source state; complete typed before/after, original log, checked log and exact input words remain inspectable.",
+        "Complete native options expose all eight anti fields and seven multi fields, actual VERSION_DISCOUNTED_A_STAR enum/index, exponent, anti epsilon, marking_limit/max_states, both marking vectors and literal activity selectors. Existing three variant aliases are retained. Finite strtod syntax includes hexadecimal, subnormal and negative-zero storage; exponent/epsilon/effective-bound domains remain native validation errors with model/input/options context.",
+        "Exact legacy comma and structured JSON marking overrides preserve nonnegative size_t values through the native maximum without token expansion. JSON [] suppresses PNML injection and requests the existing native one-token source/sink defaults; omitted overrides use range-checked original PNML markings independently, and nonempty zero vectors remain zero. Separate origins, actual configured vectors and effective checked vectors are retained, including native width and token-overflow errors.",
+        "Complete native PNML document snapshots retain arbitrary-width TokenInteger initial/final counts, raw source/sink values and boundary flags, original node IDs and explicit zero marking keys, ordered parallel/ordinary/reset/inhibitor arc occurrences with every weight/sign/id/type/index field, and optional full stochastic records with raw timing/distribution enums, every parameter/weight/priority and null-versus-empty identity. The complete executable net retains all native transition/activity/weight/display/discovery state.",
+        "Aggregate native anti/multi results retain every stored activity word, complete transition sequence including tau, cost/objective, anti precision or multi max_distance_to_log and all visited/queued/traversed/exhausted diagnostics. Double output uses max_digits10, negative zero and nonfinite tags; strings preserve exact UTF/WTF-8 identity and integer tokens remain exact. Completion/time/variant/per-trace fields absent from the native result are not fabricated.",
+        "All five existing PNML import options and their actual native defaults are configurable and inspectable. Original model PNML and a separate checked-model PNML with resolved markings export independently of alignment, alongside supported checked-source XES and separate artifact errors. PNML exports serialize native document semantics; the original uploaded source/model byte files remain separate verbatim artifacts.",
+        "Exact original files, request fields, input hashes, complete source/options/document/net/marking/result inspection, complete JSON/reports, per-table/all-table CSV and selected records are inspectable and downloadable. Cancellation, input replacement and failed-request guards retain completed runs. Portable source/model/request/response/export fixtures publish byte-identically after their export proof passes.",
+        "Structured marking input retains strict grammar, decoded duplicate-key/type/range checks and 32 MiB/depth64/one-million-value bounds. Complete native result/options/document serialization has no input transport limits, including arbitrary-width markings and deeply nested discovery metadata. Existing cached parsers/serializers and native algorithm bodies remain unchanged."
+      ],
+      "validation": "docs/feature-first-petri-anti-multi-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -2783,7 +2825,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. Independent Inductive discovery now exposes original event adapters, compact exact weighted variants and declared DFG constructor inputs with complete native preparation/tree/options/net/export inspection. Independent process-tree alignment now exposes original PTML/full constructor models, original checked logs/traces/tables/word-to-EventLog conversion, every native option/result field and independent model exports. The next confirmed input-surface gap is independently supplied PNML anti/multi alignment. Continue feature-first review across the full catalogue afterwards; the whole feature audit remains incomplete. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. Independent Inductive discovery now exposes original event adapters, compact exact weighted variants and declared DFG constructor inputs with complete native preparation/tree/options/net/export inspection. Independent process-tree alignment now exposes original PTML/full constructor models, original checked logs/traces/tables/word-to-EventLog conversion, every native option/result field and independent model exports. Independent PNML anti/multi alignment now exposes original supplied models and checked inputs, exact full native options/results/metadata and exports. Continue a fresh read-only feature-first audit across the whole catalogue to identify the next concrete missing usable entry points. The whole feature audit remains incomplete and every strict parity gate remains open. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence."
     }
   ],
   "feature_status_meaning": {
@@ -2810,7 +2852,8 @@
     "native_independent_workflow_discovery_inputs_available": "Independent Alpha/Heuristic native shapes, full typed/direct graph inputs, mutable pandas and complete snapshots/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates.",
     "native_independent_graph_alignment_workbench_available": "Independent DFG/decomposed native models, original checked logs/typed tables/trace words, full options and complete results/projections/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates.",
     "native_independent_inductive_input_discovery_available": "Independent Inductive IM/IMF/IMD event shapes, compact exact weighted variants, declared native DFG inputs and complete tree/options/prepared-source/net/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates.",
-    "native_independent_process_tree_alignment_available": "Independent original PTML/full-constructor process-tree models and checked original logs/traces/tables/explicit word-to-EventLog conversion expose all four existing native variants, complete options/results/diagnostics/models and inspection/downloads with own-source validation. Browser verification and strict reference parity remain separate gates."
+    "native_independent_process_tree_alignment_available": "Independent original PTML/full-constructor process-tree models and checked original logs/traces/tables/explicit word-to-EventLog conversion expose all four existing native variants, complete options/results/diagnostics/models and inspection/downloads with own-source validation. Browser verification and strict reference parity remain separate gates.",
+    "native_independent_petri_anti_multi_alignment_available": "Independent supplied PNML and original checked logs/traces/tables/explicit word-to-EventLog conversion expose both existing native anti/multi discounted searches, all actual options/results/markings/import controls and complete native PNML/net metadata with own-source inspection/download validation. Browser verification and strict reference parity remain separate gates."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

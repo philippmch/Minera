@@ -1,0 +1,100 @@
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="algorithm"
+
+anti
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="model_format"
+
+pnml
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="pnml_infer_initial_marking"
+
+FALSE
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="pnml_infer_final_marking"
+
+FALSE
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="pnml_import_stochastic_map"
+
+TRUE
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="pnml_require_workflow_boundaries"
+
+FALSE
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="pnml_public_marking_semantics"
+
+TRUE
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_file"; filename="owned-public-marking-a.json"
+Content-Type: application/octet-stream
+
+["A"]
+
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="model_file"; filename="owned-original-weighted-stochastic.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="foreign-place-0">
+        <initialMarking>
+          <text>2</text>
+        </initialMarking>
+      </place>
+      <place id="foreign-place-1">
+        <initialMarking>
+          <text>0</text>
+        </initialMarking>
+      </place>
+      <transition id="foreign-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+        <toolspecific tool="StochasticPetriNet" version="0.2">
+          <property key="distributionType">NORMAL</property>
+          <property key="distributionParameters">0.1;0.2</property>
+          <property key="weight">0.3</property>
+          <property key="priority">7</property>
+        </toolspecific>
+      </transition>
+      <arc id="original-duplicate-in-1" source="foreign-place-0" target="foreign-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-duplicate-in-2" source="foreign-place-0" target="foreign-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-weighted-out" source="foreign-transition-0" target="foreign-place-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="foreign-place-0">
+          <text>0</text>
+        </place>
+        <place idref="foreign-place-1">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedPetriAntiMultiFeature55--

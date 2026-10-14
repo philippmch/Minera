@@ -857,6 +857,32 @@ input[type="range"]::-moz-range-thumb {
 .workflow-input-workspace { min-width: 0; }
 .graph-alignment-workspace { min-width: 0; }
 .process-tree-alignment-workspace { min-width: 0; }
+.petri-anti-multi-workspace { min-width: 0; }
+.petri-anti-multi-workspace > .panel { min-width: 0; padding-bottom: 24px; }
+.petri-anti-multi-workspace > .panel > p,
+.petri-anti-multi-workspace > .panel > details,
+.petri-anti-multi-workspace > .panel > .query-actions,
+.petri-anti-multi-workspace > .panel > .filters-field { margin: 16px 24px; }
+.petri-anti-multi-workspace > .panel > fieldset { display: flex; flex-direction: column; gap: 16px; }
+.petri-anti-multi-workspace .query-options > .filters-field { flex: 1 1 245px; min-width: 0; }
+.petri-anti-multi-workspace .filters-field > label:first-child { display: flex; flex-direction: column; gap: 5px; }
+.petri-anti-multi-workspace input:not([type="checkbox"]),
+.petri-anti-multi-workspace select,
+.petri-anti-multi-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.petri-anti-multi-workspace input[type="checkbox"] { width: auto; min-width: 0; flex: 0 0 auto; }
+.petri-anti-multi-workspace textarea { resize: vertical; border: 1px solid var(--line); border-radius: 4px; padding: 9px 10px; background: var(--paper-raised); color: var(--ink); font: 13px var(--font-mono); }
+.petri-anti-multi-workspace p,
+.petri-anti-multi-workspace summary,
+.petri-anti-multi-workspace .query-check { overflow-wrap: anywhere; }
+.petri-anti-multi-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 450px; overflow: auto; }
+.petri-anti-multi-workspace .query-table-wrap td { white-space: pre-wrap; }
+@media (max-width: 700px) {
+  .petri-anti-multi-workspace > .panel > p,
+  .petri-anti-multi-workspace > .panel > details,
+  .petri-anti-multi-workspace > .panel > .query-actions,
+  .petri-anti-multi-workspace > .panel > .filters-field { margin-inline: 12px; }
+  .petri-anti-multi-workspace > .panel > fieldset { padding-inline: 12px; }
+}
 .process-tree-alignment-workspace > .panel { min-width: 0; padding-bottom: 24px; }
 .process-tree-alignment-workspace > .panel > p,
 .process-tree-alignment-workspace > .panel > details,

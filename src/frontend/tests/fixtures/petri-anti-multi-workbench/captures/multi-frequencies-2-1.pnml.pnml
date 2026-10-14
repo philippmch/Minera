@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Independent original PNML model</text></name>
+    <page id="page1">
+      <place id="original-source">
+        <name><text>original-source</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="original-sink">
+        <name><text>original-sink</text></name>
+      </place>
+      <transition id="foreign-transition-0">
+        <name><text>a</text></name>
+      </transition>
+      <transition id="foreign-transition-1">
+        <name><text>b</text></name>
+      </transition>
+      <arc id="a-in" source="original-source" target="foreign-transition-0"/>
+      <arc id="a-out" source="foreign-transition-0" target="original-sink"/>
+      <arc id="b-in" source="original-source" target="foreign-transition-1"/>
+      <arc id="b-out" source="foreign-transition-1" target="original-sink"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="original-sink"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

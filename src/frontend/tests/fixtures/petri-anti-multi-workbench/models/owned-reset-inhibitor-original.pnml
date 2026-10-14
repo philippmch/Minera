@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="s">
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="f" />
+      <place id="reset-p">
+        <initialMarking>
+          <text>2</text>
+        </initialMarking>
+      </place>
+      <place id="inhibitor-p" />
+      <transition id="foreign-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <arc id="i" source="s" target="foreign-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="o" source="foreign-transition-0" target="f">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="reset-original" source="reset-p" target="foreign-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+        <arctype>
+          <text>reset</text>
+        </arctype>
+      </arc>
+      <arc id="inhibitor-original" source="inhibitor-p" target="foreign-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+        <arctype>
+          <text>inhibitor</text>
+        </arctype>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="f">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

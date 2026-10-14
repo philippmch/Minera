@@ -7,3 +7,5 @@ src/frontend/tests/fixtures/inductive-input-workbench* -text -whitespace
 src/frontend/tests/fixtures/inductive-input-workbench/** -text -whitespace
 src/frontend/tests/fixtures/process-tree-alignment-workbench* -text -whitespace
 src/frontend/tests/fixtures/process-tree-alignment-workbench/** -text -whitespace
+src/frontend/tests/fixtures/petri-anti-multi-workbench* -text -whitespace
+src/frontend/tests/fixtures/petri-anti-multi-workbench/** -text -whitespace

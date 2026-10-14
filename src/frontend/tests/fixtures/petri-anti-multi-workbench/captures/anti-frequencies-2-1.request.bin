@@ -1,0 +1,81 @@
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="algorithm"
+
+anti
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_shape"
+
+log
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_format"
+
+table
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="model_format"
+
+pnml
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="alignment_selectors_json"
+
+{"alignment_case_id_attribute":"batch","activity_attribute":"phase"}
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_file"; filename="owned-frequency-two.json"
+Content-Type: application/octet-stream
+
+{"columns":["batch","phase"],"rows":[[{"value":"c0"},{"value":"a"}],[{"value":"c1"},{"value":"b"}],[{"value":"c2"},{"value":"a"}]]}
+
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="model_file"; filename="owned-native-choice.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="original-source">
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="original-sink" />
+      <transition id="foreign-transition-0">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <transition id="foreign-transition-1">
+        <name>
+          <text>b</text>
+        </name>
+      </transition>
+      <arc id="a-in" source="original-source" target="foreign-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a-out" source="foreign-transition-0" target="original-sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="b-in" source="original-source" target="foreign-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="b-out" source="foreign-transition-1" target="original-sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="original-sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedPetriAntiMultiFeature55--
