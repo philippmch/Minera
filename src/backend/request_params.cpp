@@ -23,8 +23,9 @@ class HeuristicDecorationValueParser {
  public:
   explicit HeuristicDecorationValueParser(std::string_view text,
       std::string_view parameter = "heuristic_plusplus_decoration_value",
-      bool alignment_costs = false)
-      : text_(text), parameter_(parameter), alignment_costs_(alignment_costs) {}
+      bool alignment_costs = false, bool reject_duplicate_keys = false)
+      : text_(text), parameter_(parameter), alignment_costs_(alignment_costs),
+        reject_duplicate_keys_(reject_duplicate_keys) {}
 
   HeuristicStructuredValue parse() {
     auto result = value(0);
@@ -264,8 +265,8 @@ class HeuristicDecorationValueParser {
         const auto key = string();
         whitespace();
         if (!consume(":")) fail("expected colon after object key");
-        if (alignment_costs_ && result.contains(key))
-          fail("duplicate cost label");
+        if ((alignment_costs_ || reject_duplicate_keys_) && result.contains(key))
+          fail(alignment_costs_ ? "duplicate cost label" : "duplicate object key");
         result.insert_or_assign(key, value(depth + 1));
         whitespace();
         if (consume("}")) return HeuristicStructuredValue{std::move(result)};
@@ -278,6 +279,7 @@ class HeuristicDecorationValueParser {
   std::string_view text_;
   std::string_view parameter_;
   bool alignment_costs_ = false;
+  bool reject_duplicate_keys_ = false;
   std::size_t position_ = 0;
 };
 
@@ -6014,9 +6016,38 @@ LocalDiagnosticsOptions parse_local_diagnostics_params(const FieldLookup& field,
   LocalDiagnosticsOptions options;
   const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
   const auto require = [&](std::string_view n) { const auto v = field(n); if (v.empty()) throw std::invalid_argument(std::string(n) + ": expected a value"); return v; };
+  if (supplied("local_diagnostics_groups") &&
+      supplied("local_diagnostics_groups_json"))
+    throw std::invalid_argument(
+        "local_diagnostics_groups/local_diagnostics_groups_json: choose one group carrier");
   if (supplied("local_diagnostics_group_attribute")) options.group_attribute = require("local_diagnostics_group_attribute");
   if (supplied("local_diagnostics_resource_attribute")) options.resource_attribute = require("local_diagnostics_resource_attribute");
   if (supplied("local_diagnostics_activity_attribute")) options.activity_attribute = require("local_diagnostics_activity_attribute");
+  if (supplied("local_diagnostics_groups_json")) {
+    constexpr std::string_view parameter = "local_diagnostics_groups_json";
+    const auto value = HeuristicDecorationValueParser(
+        require(parameter), parameter, false, true).parse();
+    const auto* groups = std::get_if<HeuristicStructuredValue::Object>(&value.value);
+    if (!groups)
+      throw std::invalid_argument(std::string(parameter) +
+                                  ": expected a JSON object of resource arrays");
+    for (const auto& [group, resources_value] : *groups) {
+      const auto* resources =
+          std::get_if<HeuristicStructuredValue::Array>(&resources_value.value);
+      if (!resources)
+        throw std::invalid_argument(std::string(parameter) +
+                                    ": expected an array of resource strings");
+      auto& destination = options.explicit_groups[group];
+      destination.reserve(resources->size());
+      for (const auto& resource_value : *resources) {
+        const auto* resource = std::get_if<std::string>(&resource_value.value);
+        if (!resource)
+          throw std::invalid_argument(std::string(parameter) +
+                                      ": expected a string resource name");
+        destination.push_back(*resource);
+      }
+    }
+  }
   if (supplied("local_diagnostics_groups")) {
     const auto encoded = require("local_diagnostics_groups");
     const auto trim = [](std::string value) {

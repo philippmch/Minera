@@ -39,6 +39,20 @@ int main() {
   const auto capped_result = discover_local_diagnostics(log, capped);
   assert(capped_result.diagnostics.output_truncated && capped_result.diagnostics.row_count == 1);
   assert(capped_result.group_relative_focus.at("g1").at("A") == 2.0 / 3.0);
+  assert(capped_result.diagnostics.group_count == 2);
+  const auto capped_json = local_diagnostics_json(capped_result);
+  assert(capped_json.find("\"row_count\":1") != std::string::npos &&
+         capped_json.find("\"group_count\":2") != std::string::npos);
+  LocalDiagnosticsOptions empty_group;
+  empty_group.explicit_groups = {{"unobserved", {}}};
+  const auto empty_group_result = discover_local_diagnostics(EventLog{}, empty_group);
+  assert(empty_group_result.diagnostics.group_count == 1 &&
+         empty_group_result.diagnostics.row_count == 0);
+  assert(!local_diagnostics_json(empty_group_result).empty());
+  auto bad_rows = capped_result;
+  ++bad_rows.diagnostics.row_count;
+  try { (void)local_diagnostics_json(bad_rows); assert(false); }
+  catch (const std::invalid_argument&) {}
 
   const auto json = local_diagnostics_json(result);
   assert(json.find("LOCAL_DIAGNOSTICS") != std::string::npos);

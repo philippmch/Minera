@@ -1,0 +1,1 @@
+{"family":"ROLE_DISCOVERY","variant":"log","roles":[],"diagnostics":{"computed":true,"output_truncated":false,"trace_count":1,"event_count":2,"activity_count":0,"resource_count":0,"role_count":0,"message":"no resource activity pairs"},"input_context":{"source_id":"4","dataset":"owned-resource-less.xes","case_count":1,"event_count":2}}

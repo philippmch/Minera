@@ -402,8 +402,15 @@ std::string resource_profiles_json(const ResourceProfilesResult& result) {
     if (row.resource.empty() || !std::isfinite(row.value) ||
         !keys.emplace(row.resource, row.activity, row.resource2).second)
       throw std::invalid_argument("resource profile row is invalid");
-    resources.insert(row.resource);
-    if (!row.resource2.empty()) resources.insert(row.resource2);
+    // Query-specific zero rows can name resources absent from the source.
+    // Their identities do not change the native source resource_count.
+    const bool queried_zero = row.count == 0 && row.value == 0.0 &&
+        (result.metric == ResourceProfileMetric::kSocialPosition ||
+         result.metric == ResourceProfileMetric::kInteractionTwoResources);
+    if (!queried_zero) {
+      resources.insert(row.resource);
+      if (!row.resource2.empty()) resources.insert(row.resource2);
+    }
   }
   if (result.diagnostics.resource_count < resources.size())
     throw std::invalid_argument("resource profile diagnostics are inconsistent");

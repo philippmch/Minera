@@ -534,7 +534,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_organizational_workbench_available",
       "package": "algo.organizational_mining.local_diagnostics",
       "parity_status": "complete",
       "selectors": [
@@ -542,7 +542,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_organizational_workbench_available",
       "package": "algo.organizational_mining.network_analysis",
       "parity_status": "complete",
       "selectors": [
@@ -550,7 +550,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_organizational_workbench_available",
       "package": "algo.organizational_mining.resource_profiles",
       "parity_status": "complete",
       "selectors": [
@@ -558,7 +558,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_organizational_workbench_available",
       "package": "algo.organizational_mining.roles",
       "parity_status": "complete",
       "selectors": [
@@ -567,7 +567,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_organizational_workbench_available",
       "package": "algo.organizational_mining.roles.common",
       "parity_status": "complete",
       "selectors": [
@@ -2565,6 +2565,43 @@
         "Uncomputed or exhausted results remain inspectable without presenting placeholder fitness/precision/cost as measurements. Errors retain the previously completed run, cancellation/stale guards prevent late updates, and opening a new host log exits the independent workspace."
       ],
       "validation": "docs/feature-first-petri-alignment-validation.json"
+    },
+    {
+      "id": "native_organizational_workbench",
+      "state": "roles_profiles_group_diagnostics_attribute_network_controls_and_complete_inspection_implemented",
+      "families": [
+        "algo.organizational_mining.local_diagnostics",
+        "algo.organizational_mining.network_analysis",
+        "algo.organizational_mining.resource_profiles",
+        "algo.organizational_mining.roles",
+        "algo.organizational_mining.roles.common"
+      ],
+      "variants": [
+        "LOG",
+        "PANDAS",
+        "ALL_11_RESOURCE_PROFILE_METRICS",
+        "GROUP_ATTRIBUTE",
+        "EXACT_JSON_GROUPS",
+        "DATAFRAME_NETWORK"
+      ],
+      "entry_points": [
+        "include/minera/request_params.hpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/organizational-workbench.ts",
+        "src/frontend/src/components/OrganizationalWorkspace.tsx",
+        "src/frontend/src/components/Resources.tsx"
+      ],
+      "added": [
+        "Resources now exposes independent role discovery, all eleven resource-profile metrics, local group diagnostics and attribute-network analysis. Each family has all existing native selectors and bounds, separate submitted options and retained completed results.",
+        "LOG/PANDAS roles preserve native role records and exact membership labels. Completed roles can populate exact JSON diagnostics groups with the selected activity/resource fields and an explicit source binding.",
+        "Exact JSON group transport supports Unicode, punctuation, overlapping groups, unobserved members, empty arrays and native blank-member semantics without delimiter encoding. Malformed shapes, duplicate decoded keys and conflicting legacy carriers are rejected.",
+        "Profiles expose activity/resource/case/start/completion/time-slot selectors and all query/cap controls. Networks expose node/relation/edge/sorting/performance fields, edge references, weekly business-hour slots and both output caps.",
+        "The frontend exposes native JSON, submitted requests, source-bound reports, complete generic and derived tables, selected-row inspection, paging, per-table CSV and a combined all-tables CSV. Complete role/profile browser downloads have independent byte/cell verification; remaining browser scenarios are explicitly pending.",
+        "Mining and schema responses provide additive source/dataset identity. The four organizational endpoints preserve legacy bodies unless source context is requested and check the requested session both before and after calculation.",
+        "Native JSON validators now accept valid capped-network aggregate totals, zero-query resource rows and empty explicit groups, while checking emitted scalar row counts. Native calculations are unchanged and real native-result regression tests cover these cases."
+      ],
+      "validation": "docs/feature-first-organizational-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -2582,7 +2619,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Next confirmed UI gaps are organizational roles/profiles/group diagnostics/attribute networks and direct DFG/table Alpha-Heuristic discovery inputs."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. The next confirmed missing feature surfaces are direct DFG/table Alpha-Heuristic discovery inputs, including typed mutable PLUSPLUS pandas dispatch."
     }
   ],
   "feature_status_meaning": {
@@ -2604,7 +2641,8 @@
     "structural_workflow_available": "Configurable native trie/interval workflows expose exact positional data, diagrams, query matches, complete JSON/report/CSV, same-run Petri conversion/PNML and conformance handoff. Existing reference parity statuses and remaining exactness/performance gates stay independent.",
     "transformation_workflow_available": "Configurable native feature/target/label workflows expose matrix schemas, values, padding and source positions, complete native JSON/reports/CSV and transformed XES reopening with persistent selected activity fields. Existing parity statuses and open semantic/type/error/performance gates remain independent.",
     "native_independent_full_token_replay_workflow_available": "Independent original-log/PNML uploads expose both native replay directions, all four native input shapes, full forward public/PLTR results and complete trace/input/model inspection with exact downloads. Full reference behavior and remaining options/adapters remain parity gates.",
-    "native_independent_petri_alignment_workflow_available": "Independent original-log/PNML alignment exposes all six native variants, four input shapes, cost/marking controls and complete result inspection/download. Strict reference behavior and remaining input/object contracts remain parity gates."
+    "native_independent_petri_alignment_workflow_available": "Independent original-log/PNML alignment exposes all six native variants, four input shapes, cost/marking controls and complete result inspection/download. Strict reference behavior and remaining input/object contracts remain parity gates.",
+    "native_organizational_workbench_available": "All four organizational native workflows have app controls, source bindings, full inspection/export code and captured API/frontend validation. Role/profile browser exports are verified; remaining browser checks and strict parity gates are explicitly open."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

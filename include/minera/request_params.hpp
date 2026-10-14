@@ -337,6 +337,12 @@ using FieldPresence = std::function<bool(std::string_view)>;
     const FieldLookup& field);
 [[nodiscard]] ResourceProfilesOptions parse_resource_profiles_params(
     const FieldLookup& field, const FieldPresence& present);
+// Local diagnostics accepts either legacy `group:resource,...;...` text in
+// local_diagnostics_groups or an exact JSON object in
+// local_diagnostics_groups_json. JSON group keys and resource-array members
+// preserve decoded strings, including empty names, whitespace and delimiters;
+// empty objects/arrays retain native map/vector semantics. Supplying both
+// carriers, duplicate decoded keys, or non-string resources is rejected.
 [[nodiscard]] LocalDiagnosticsOptions parse_local_diagnostics_params(
     const FieldLookup& field);
 [[nodiscard]] LocalDiagnosticsOptions parse_local_diagnostics_params(

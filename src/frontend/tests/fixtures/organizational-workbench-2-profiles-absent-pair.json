@@ -1,0 +1,1 @@
+{"family":"RESOURCE_PROFILES","metric":"interaction_two_resources","rows":[{"resource":"unseen:A","activity":"","resource2":"unseen:B","value":0,"count":0}],"diagnostics":{"computed":true,"output_truncated":false,"trace_count":1,"event_count":2,"resource_count":0,"message":"ok"},"input_context":{"source_id":"4","dataset":"owned-resource-less.xes","case_count":1,"event_count":2}}

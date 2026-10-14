@@ -1140,13 +1140,19 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->powl_activity_key = params.powl.activity_key;
     session->powl_timestamp_key = params.powl.timestamp_key;
     session->powl_case_id_key = params.powl.case_id_key;
+    const auto body_end = body.find_last_not_of(" \t\r\n");
+    if (body_end == std::string::npos || body[body_end] != '}')
+      throw std::logic_error("mining response is not a JSON object");
+    const auto bound_body = body.substr(0, body_end) + ",\"source_id\":" +
+        minera::embedding_runtime::detail::escape_json(std::to_string(session->query_source_id)) +
+        '}' + body.substr(body_end + 1);
     {
       std::lock_guard<std::mutex> lock(g_session_mutex);
       g_session = std::move(session);
       g_clustering_analysis.reset();
     }
 
-    response.set_content(body, "application/json");
+    response.set_content(bound_body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -4206,6 +4212,38 @@ void handle_organizational_sna(const httplib::Request& request,
   }
 }
 
+bool organizational_source_requested(const httplib::Request& request,
+                                     const MinedSession& session) {
+  if (request.has_param("source_id") && request.get_param_value("source_id") !=
+      std::to_string(session.query_source_id))
+    throw std::invalid_argument("the source log changed; refresh the organizational source");
+  if (!request.has_param("include_source")) return false;
+  const auto value = request.get_param_value("include_source");
+  if (value != "true" && value != "false")
+    throw std::invalid_argument("include_source must be true or false");
+  if (value == "true" && !request.has_param("source_id"))
+    throw std::invalid_argument("source_id is required for organizational analysis");
+  return value == "true";
+}
+
+std::string organizational_response(const httplib::Request& request,
+                                   const MinedSession& session,
+                                   std::string payload, bool include_source) {
+  if (request.has_param("source_id")) {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    if (!g_session || g_session->query_source_id != session.query_source_id)
+      throw std::invalid_argument("the source log changed during organizational analysis; refresh and run again");
+  }
+  if (!include_source) return payload;
+  if (payload.empty() || payload.back() != '}')
+    throw std::logic_error("organizational response is not a JSON object");
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  payload.pop_back();
+  return payload + ",\"input_context\":{\"source_id\":" + quote(std::to_string(session.query_source_id)) +
+      ",\"dataset\":" + quote(session.dataset) + ",\"case_count\":" + std::to_string(session.log.trace_count()) +
+      ",\"event_count\":" + std::to_string(session.log.event_count()) + "}}";
+}
+
 void handle_network_analysis(const httplib::Request& request, httplib::Response& response) {
   try {
     std::shared_ptr<const MinedSession> session;
@@ -4217,12 +4255,14 @@ void handle_network_analysis(const httplib::Request& request, httplib::Response&
       "network_analysis_edge_attribute", "network_analysis_edge_reference",
       "network_analysis_out_relation_attribute", "network_analysis_in_relation_attribute",
       "network_analysis_include_performance", "network_analysis_business_hours",
-      "network_analysis_business_hour_slots", "network_analysis_max_rows", "network_analysis_max_values"};
+      "network_analysis_business_hour_slots", "network_analysis_max_rows", "network_analysis_max_values", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown network analysis parameter: " + key); }
     const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
     const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
     const auto options = minera::parse_network_analysis_params(lookup, present);
-    response.set_content(minera::network_analysis_json(minera::discover_network_analysis(session->log, options)), "application/json");
+    const bool include_source = organizational_source_requested(request, *session);
+    response.set_content(organizational_response(request, *session,
+        minera::network_analysis_json(minera::discover_network_analysis(session->log, options)), include_source), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -4280,12 +4320,14 @@ void handle_roles(const httplib::Request& request, httplib::Response& response) 
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
-    static const std::set<std::string> allowed = {"roles_variant", "roles_activity_attribute", "roles_resource_attribute", "roles_threshold", "roles_max_resources", "roles_max_activities"};
+    static const std::set<std::string> allowed = {"roles_variant", "roles_activity_attribute", "roles_resource_attribute", "roles_threshold", "roles_max_resources", "roles_max_activities", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown roles parameter: " + key); }
     const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
     const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
     const auto options = minera::parse_role_discovery_params(lookup, present);
-    response.set_content(minera::role_discovery_json(minera::discover_roles(session->log, options)), "application/json");
+    const bool include_source = organizational_source_requested(request, *session);
+    response.set_content(organizational_response(request, *session,
+        minera::role_discovery_json(minera::discover_roles(session->log, options)), include_source), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -4294,12 +4336,14 @@ void handle_resource_profiles(const httplib::Request& request, httplib::Response
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
-    static const std::set<std::string> allowed = {"resource_profiles_metric", "resource_profiles_activity_attribute", "resource_profiles_resource_attribute", "resource_profiles_timestamp_attribute", "resource_profiles_start_timestamp_attribute", "resource_profiles_case_id_attribute", "resource_profiles_t1", "resource_profiles_t2", "resource_profiles_resource", "resource_profiles_activity", "resource_profiles_resource2", "resource_profiles_max_resources", "resource_profiles_max_rows"};
+    static const std::set<std::string> allowed = {"resource_profiles_metric", "resource_profiles_activity_attribute", "resource_profiles_resource_attribute", "resource_profiles_timestamp_attribute", "resource_profiles_start_timestamp_attribute", "resource_profiles_case_id_attribute", "resource_profiles_t1", "resource_profiles_t2", "resource_profiles_resource", "resource_profiles_activity", "resource_profiles_resource2", "resource_profiles_max_resources", "resource_profiles_max_rows", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown resource profile parameter: " + key); }
     const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
     const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
     const auto options = minera::parse_resource_profiles_params(lookup, present);
-    response.set_content(minera::resource_profiles_json(minera::discover_resource_profiles(session->log, options)), "application/json");
+    const bool include_source = organizational_source_requested(request, *session);
+    response.set_content(organizational_response(request, *session,
+        minera::resource_profiles_json(minera::discover_resource_profiles(session->log, options)), include_source), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -4415,7 +4459,7 @@ std::string duckdb_query_body(const minera::LogQueryTable& table,std::string_vie
 void handle_log_query_schema(const httplib::Request& request,httplib::Response& response){
  try{
   const auto session=query_session(request);const auto table=minera::log_query_table(session->log);const auto quote=minera::embedding_runtime::detail::escape_json;
-  std::string body="{\"family\":\"LOG_QUERY_SCHEMA\",\"source_id\":"+quote(std::to_string(session->query_source_id))+",\"event_count\":"+std::to_string(session->log.event_count())+",\"case_count\":"+std::to_string(session->log.trace_count())+",\"table_name\":\"dataframe\",\"event_index_column\":"+quote(table.event_index_column)+",\"sqlite_available\":"+(minera::sqlite_log_query_available()?"true":"false")+",\"duckdb_configured\":"+(!g_query_runtime_url.empty()?"true":"false")+",\"columns\":[";
+  std::string body="{\"family\":\"LOG_QUERY_SCHEMA\",\"source_id\":"+quote(std::to_string(session->query_source_id))+",\"dataset\":"+quote(session->dataset)+",\"event_count\":"+std::to_string(session->log.event_count())+",\"case_count\":"+std::to_string(session->log.trace_count())+",\"table_name\":\"dataframe\",\"event_index_column\":"+quote(table.event_index_column)+",\"sqlite_available\":"+(minera::sqlite_log_query_available()?"true":"false")+",\"duckdb_configured\":"+(!g_query_runtime_url.empty()?"true":"false")+",\"columns\":[";
   for(std::size_t c=0;c<table.table.columns.size();++c){if(c)body+=',';body+=quote(table.table.columns[c]);}body+="],\"cluster_runtime_configured\":"+std::string(!g_query_runtime_url.empty()?"true":"false")+"}";response.set_content(body,"application/json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
@@ -4490,12 +4534,14 @@ void handle_local_diagnostics(const httplib::Request& request, httplib::Response
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
-    static const std::set<std::string> allowed = {"local_diagnostics_group_attribute", "local_diagnostics_resource_attribute", "local_diagnostics_activity_attribute", "local_diagnostics_groups", "local_diagnostics_max_groups", "local_diagnostics_max_resources", "local_diagnostics_max_rows"};
+    static const std::set<std::string> allowed = {"local_diagnostics_group_attribute", "local_diagnostics_resource_attribute", "local_diagnostics_activity_attribute", "local_diagnostics_groups", "local_diagnostics_groups_json", "local_diagnostics_max_groups", "local_diagnostics_max_resources", "local_diagnostics_max_rows", "source_id", "include_source"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown local diagnostics parameter: " + key); }
     const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
     const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
     const auto options = minera::parse_local_diagnostics_params(lookup, present);
-    response.set_content(minera::local_diagnostics_json(minera::discover_local_diagnostics(session->log, options)), "application/json");
+    const bool include_source = organizational_source_requested(request, *session);
+    response.set_content(organizational_response(request, *session,
+        minera::local_diagnostics_json(minera::discover_local_diagnostics(session->log, options)), include_source), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 

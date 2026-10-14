@@ -2380,3 +2380,37 @@ POST /api/align-petri-workbench accepts multipart log/model fields and the displ
 alignment controls. It requires no cached source and never changes the host mining
 session. Independent numeric output retains native double precision; the existing
 /api/align serializer is unchanged. Full reference parity remains open.
+
+### Organizational analysis workbench
+
+Open **Resources** after mining a CSV/XES log. **Role discovery**, **Resource
+profiles**, **Local diagnostics** and **Attribute network** keep their forms and
+completed results independently. Blank controls use native defaults. Custom fields
+work even when the imported log has no default resource attribute.
+
+Roles offer LOG and PANDAS, similarity thresholds and native resource/activity
+bounds. **Use completed roles as diagnostics groups** copies every resource label
+into source-bound JSON groups and retains the role run's selectors. Explicit group
+JSON maps group names to resource arrays and supports overlap, unseen resources
+and empty memberships. Native blank-member rules are preserved.
+
+Profiles expose all eleven metrics, selectors, time bounds, resource/activity
+queries and row/resource caps. Attribute networks expose independent sorting and
+performance timestamps, source/target nodes, edge labels/references, outgoing/
+incoming relations, weekly business-hour slots and row/value caps.
+
+Inspect full native results and complete tables. Download native JSON, submitted
+requests, source-bound reports, individual table CSV or all tables CSV. Paging
+does not trim downloads. Native capped/empty/zero-query results retain their actual
+counts and diagnostics. Errors retain the completed run; source/request guards
+prevent stale in-process updates. Backend restart identity and lone-surrogate
+transport remain explicit compatibility boundaries.
+
+The existing four POST endpoints accept source_id/include_source for the
+workbench. Local diagnostics additionally accepts local_diagnostics_groups_json.
+Legacy organizational requests retain their existing result bodies.
+
+Native, frontend and captured API checks passed. Browser role/profile exports are
+verified; complete diagnostics/network UI checks and visual inspection remain
+pending because the browser tool's saved permission rule blocked the local site.
+See [validation and boundaries](docs/feature-first-organizational-validation.json).

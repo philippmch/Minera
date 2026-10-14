@@ -5212,6 +5212,192 @@ void role_discovery_params_contract() {
   }
 }
 
+void local_diagnostics_params_preserves_exact_json_groups() {
+  const std::string json =
+      std::string(R"({" a,b:c;=\"\\>> \t\n":[" r,a:b;c=\"\\>> \t\r\n",""," ","9007199254740993","18446744073709551616","same","same"],"\u4e2d":["\u96ea"],"\uD83D\uDE00":["\uD83D\uDE00"],")") +
+      "\xC3\xA9" + R"(":["\u00e9"],"e\u0301":["e\u0301"],"a\u0000b":["r\u0000s"],"9007199254740993":["123"],"18446744073709551616":["456"]})";
+  const std::map<std::string, std::string> values{
+      {"local_diagnostics_groups_json", " \n\t" + json + "\r "},
+      {"local_diagnostics_group_attribute", "team:group"},
+      {"local_diagnostics_resource_attribute", "team:resource"},
+      {"local_diagnostics_activity_attribute", "team:activity"},
+      {"local_diagnostics_max_groups", "12"},
+      {"local_diagnostics_max_resources", "20"},
+      {"local_diagnostics_max_rows", "80"}};
+  for (const bool use_presence : {false, true}) {
+    const auto parsed = use_presence ?
+        minera::parse_local_diagnostics_params(fields(values),
+            [&values](std::string_view key) {
+              return values.contains(std::string(key));
+            }) :
+        minera::parse_local_diagnostics_params(fields(values));
+    assert(parsed.explicit_groups.size() == 8);
+    assert((parsed.explicit_groups.at(" a,b:c;=\"\\>> \t\n") ==
+            std::vector<std::string>{" r,a:b;c=\"\\>> \t\r\n", "", " ",
+                "9007199254740993", "18446744073709551616", "same", "same"}));
+    assert((parsed.explicit_groups.at("\xE4\xB8\xAD") ==
+            std::vector<std::string>{"\xE9\x9B\xAA"}));
+    assert((parsed.explicit_groups.at("\xF0\x9F\x98\x80") ==
+            std::vector<std::string>{"\xF0\x9F\x98\x80"}));
+    assert((parsed.explicit_groups.at("\xC3\xA9") ==
+            std::vector<std::string>{"\xC3\xA9"}));
+    assert((parsed.explicit_groups.at("e\xCC\x81") ==
+            std::vector<std::string>{"e\xCC\x81"}));
+    assert((parsed.explicit_groups.at(std::string("a\0b", 3)) ==
+            std::vector<std::string>{std::string("r\0s", 3)}));
+    assert((parsed.explicit_groups.at("9007199254740993") ==
+            std::vector<std::string>{"123"}));
+    assert((parsed.explicit_groups.at("18446744073709551616") ==
+            std::vector<std::string>{"456"}));
+    assert(parsed.group_attribute == "team:group" &&
+           parsed.resource_attribute == "team:resource" &&
+           parsed.activity_attribute == "team:activity");
+    assert(parsed.max_groups == 12 && parsed.max_resources == 20 &&
+           parsed.max_rows == 80);
+  }
+}
+
+void local_diagnostics_params_accepts_empty_json_containers() {
+  assert(minera::parse_local_diagnostics_params(fields({})).explicit_groups.empty());
+  for (const bool use_presence : {false, true}) {
+    for (const auto& json : {std::string("{}"), std::string(" { } ")}) {
+      const auto lookup = fields({{"local_diagnostics_groups_json", json}});
+      const auto parsed = use_presence ?
+          minera::parse_local_diagnostics_params(lookup,
+              [](std::string_view key) { return key == "local_diagnostics_groups_json"; }) :
+          minera::parse_local_diagnostics_params(lookup);
+      assert(parsed.explicit_groups.empty());
+    }
+    const std::string json = R"({"empty":[],"":[]," ":[""," "]})";
+    const auto lookup = fields({{"local_diagnostics_groups_json", json}});
+    const auto parsed = use_presence ?
+        minera::parse_local_diagnostics_params(lookup,
+            [](std::string_view key) { return key == "local_diagnostics_groups_json"; }) :
+        minera::parse_local_diagnostics_params(lookup);
+    assert(parsed.explicit_groups.size() == 3);
+    assert(parsed.explicit_groups.at("empty").empty());
+    assert(parsed.explicit_groups.at("").empty());
+    assert((parsed.explicit_groups.at(" ") == std::vector<std::string>{"", " "}));
+  }
+  assert(minera::parse_local_diagnostics_params(
+      fields({{"local_diagnostics_groups_json", ""}})).explicit_groups.empty());
+  const auto ignored = minera::parse_local_diagnostics_params(
+      fields({{"local_diagnostics_groups_json", "invalid"}}),
+      [](std::string_view) { return false; });
+  assert(ignored.explicit_groups.empty());
+}
+
+void local_diagnostics_params_rejects_conflicting_group_carriers() {
+  for (const auto legacy : {"team:r1", ""}) {
+    for (const auto json : {"{}", ""}) {
+      const std::map<std::string, std::string> values{
+          {"local_diagnostics_groups", legacy},
+          {"local_diagnostics_groups_json", json}};
+      bool threw = false;
+      try {
+        (void)minera::parse_local_diagnostics_params(fields(values),
+            [&values](std::string_view key) {
+              return values.contains(std::string(key));
+            });
+      } catch (const std::invalid_argument& error) {
+        threw = true;
+        assert(std::string(error.what()).find("local_diagnostics_groups/local_diagnostics_groups_json") !=
+               std::string::npos);
+      }
+      assert(threw);
+    }
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_local_diagnostics_params(fields({
+        {"local_diagnostics_groups", "team:r1"},
+        {"local_diagnostics_groups_json", "{}"}}));
+  } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
+void local_diagnostics_params_rejects_duplicate_decoded_group_keys() {
+  const std::vector<std::string> duplicates{
+      R"({"A":["r1"],"A":["r2"]})",
+      R"({"A":[],"\u0041":["r2"]})",
+      R"({" a,b:c; ":[],"\u0020a,b:c; ":[]})",
+      R"({"a\u0000b":[],"a\u0000b":[]})",
+      std::string(R"({"\u00e9":[],")") + "\xC3\xA9" + R"(":[]})",
+      std::string(R"({"\uD83D\uDE00":[],")") + "\xF0\x9F\x98\x80" + R"(":[]})"};
+  for (const auto& json : duplicates) {
+    bool threw = false;
+    try {
+      (void)minera::parse_local_diagnostics_params(
+          fields({{"local_diagnostics_groups_json", json}}));
+    } catch (const std::invalid_argument& error) {
+      threw = true;
+      assert(std::string(error.what()).starts_with("local_diagnostics_groups_json:"));
+      assert(std::string(error.what()).find("duplicate object key") != std::string::npos);
+    }
+    assert(threw);
+  }
+}
+
+void local_diagnostics_params_rejects_invalid_json_groups() {
+  const std::vector<std::string> invalid{
+      "", " \t\r\n", "[]", "null", "true", "false", "0", "1.5",
+      "NaN", "Infinity", "-Infinity", "\"team:r1\"", "team:r1",
+      R"({"team":null})", R"({"team":true})", R"({"team":"r1"})",
+      R"({"team":{}})", R"({"team":1})", R"({"team":NaN})",
+      R"({"team":Infinity})", R"({"team":1e309})",
+      R"({"team":[null]})", R"({"team":[true]})", R"({"team":[false]})",
+      R"({"team":[0]})", R"({"team":[-1]})", R"({"team":[1.5]})",
+      R"({"team":[18446744073709551616]})", R"({"team":[NaN]})",
+      R"({"team":[Infinity]})", R"({"team":[-Infinity]})",
+      R"({"team":[1e309]})", R"({"team":[[]]})", R"({"team":[{}]})",
+      R"({"team":["r1",3]})", R"({1:["r1"]})", R"({team:["r1"]})",
+      R"({"team" ["r1"]})", R"({"team":["r1",]})", R"({"team":[,"r1"]})",
+      R"({"team":[],})", R"({"team":[]} trailing)", R"({"team":["\v"]})",
+      R"({"team":["\u00XZ"]})", R"({"team":["unterminated]})",
+      std::string("{\"team\":[\"raw") + '\0' + "control\"]}",
+      "{\"team\":[\"\xC0\xAF\"]}"};
+  for (const auto& json : invalid) {
+    const std::map<std::string, std::string> values{
+        {"local_diagnostics_groups_json", json}};
+    bool threw = false;
+    try {
+      (void)minera::parse_local_diagnostics_params(fields(values),
+          [&values](std::string_view key) {
+            return values.contains(std::string(key));
+          });
+    } catch (const std::invalid_argument& error) {
+      threw = true;
+      assert(std::string(error.what()).starts_with("local_diagnostics_groups_json:"));
+    }
+    assert(threw);
+  }
+}
+
+void local_diagnostics_params_preserves_legacy_groups() {
+  const auto parsed = minera::parse_local_diagnostics_params(fields({
+      {"local_diagnostics_groups", " team : r1, r2,r1 ; other : r3 "}}));
+  assert(parsed.explicit_groups.size() == 2);
+  assert((parsed.explicit_groups.at("team") ==
+          std::vector<std::string>{"r1", "r2", "r1"}));
+  assert((parsed.explicit_groups.at("other") == std::vector<std::string>{"r3"}));
+  assert(minera::parse_local_diagnostics_params(
+      fields({{"local_diagnostics_groups", ""}})).explicit_groups.empty());
+  for (const auto legacy : {"", " ", "team", ":r1", " :r1", "team:",
+                            "team:r1:", "team:r1,,r2", "team:,r1", "team:r1,",
+                            "team:r1;", ";team:r1", "team:r1;team:r2"}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_local_diagnostics_params(
+          fields({{"local_diagnostics_groups", legacy}}),
+          [](std::string_view key) { return key == "local_diagnostics_groups"; });
+    } catch (const std::invalid_argument& error) {
+      threw = true;
+      assert(std::string(error.what()).starts_with("local_diagnostics_groups:"));
+    }
+    assert(threw);
+  }
+}
+
 void trace_variant_query_params_contract() {
   const auto parsed = minera::parse_trace_variant_query_params(fields({
       {"tvq_variant", "sacofa"},
@@ -5541,6 +5727,12 @@ int main() {
   genetic_params_contract();
   organizational_sna_params_contract();
   role_discovery_params_contract();
+  local_diagnostics_params_preserves_exact_json_groups();
+  local_diagnostics_params_accepts_empty_json_containers();
+  local_diagnostics_params_rejects_conflicting_group_carriers();
+  local_diagnostics_params_rejects_duplicate_decoded_group_keys();
+  local_diagnostics_params_rejects_invalid_json_groups();
+  local_diagnostics_params_preserves_legacy_groups();
   trace_variant_query_params_contract();
   pripel_params_contract();
   link_analysis_params_contract();
