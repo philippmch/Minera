@@ -1,0 +1,19 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+imf
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+variants
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+variants_json
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-variants-zero-registry.json"
+Content-Type: application/octet-stream
+
+[{"activities":["A","B"],"count":3},{"activities":["unused \u6771\u4eac"],"count":0}]
+
+--OwnedInductiveInputFeature53--

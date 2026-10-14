@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+  <process id="process" name="Independent Inductive discovery" isExecutable="false">
+    <startEvent id="StartEvent_0"/>
+    <task id="Activity_1" name="a"/>
+    <exclusiveGateway id="exclusiveGateway_2"/>
+    <exclusiveGateway id="exclusiveGateway_3"/>
+    <task id="Activity_5" name="b"/>
+    <task id="Activity_6" name="c"/>
+    <endEvent id="EndEvent_11"/>
+    <sequenceFlow id="Flow_4" sourceRef="exclusiveGateway_2" targetRef="exclusiveGateway_3"/>
+    <sequenceFlow id="Flow_7" sourceRef="Activity_5" targetRef="Activity_6"/>
+    <sequenceFlow id="Flow_8" sourceRef="exclusiveGateway_2" targetRef="Activity_5"/>
+    <sequenceFlow id="Flow_9" sourceRef="Activity_6" targetRef="exclusiveGateway_3"/>
+    <sequenceFlow id="Flow_10" sourceRef="Activity_1" targetRef="exclusiveGateway_2"/>
+    <sequenceFlow id="Flow_12" sourceRef="StartEvent_0" targetRef="Activity_1"/>
+    <sequenceFlow id="Flow_13" sourceRef="exclusiveGateway_3" targetRef="EndEvent_11"/>
+  </process>
+</definitions>

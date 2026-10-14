@@ -1,0 +1,23 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+log
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+variants
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+variants_json
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_disable_strict_sequence_cut"
+
+true
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-strict-sequence.json"
+Content-Type: application/octet-stream
+
+[{"activities":["a"],"count":1},{"activities":["a","b","c"],"count":1}]
+
+--OwnedInductiveInputFeature53--

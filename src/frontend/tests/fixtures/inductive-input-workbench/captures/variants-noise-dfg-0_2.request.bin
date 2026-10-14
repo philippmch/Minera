@@ -1,0 +1,23 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+dfg
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+variants
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+variants_json
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="noise_threshold"
+
+0.2
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-noisy.json"
+Content-Type: application/octet-stream
+
+[{"activities":["a","b","c","d"],"count":20},{"activities":["a","c","a","b","c","d"],"count":1}]
+
+--OwnedInductiveInputFeature53--

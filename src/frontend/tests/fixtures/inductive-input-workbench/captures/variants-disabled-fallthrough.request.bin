@@ -1,0 +1,23 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+log
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+variants
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+variants_json
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_disable_fallthroughs"
+
+true
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-fallthrough.json"
+Content-Type: application/octet-stream
+
+[{"activities":["a","c","b","b"],"count":1},{"activities":["c","b","a"],"count":1}]
+
+--OwnedInductiveInputFeature53--

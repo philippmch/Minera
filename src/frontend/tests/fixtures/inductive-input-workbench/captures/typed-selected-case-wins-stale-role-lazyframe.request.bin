@@ -1,0 +1,23 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+log
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+lazyframe
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+table
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="discovery_selectors_json"
+
+{"inductive_case_id_key":"batch","inductive_activity_key":"phase","inductive_timestamp_key":"finish"}
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-stale-case-role.json"
+Content-Type: application/octet-stream
+
+{"columns":["old","case:concept:name","batch","phase","finish"],"rows":[[{"value":"c1","first_class_role":"case_id","first_class_state":"present","first_class_source_key":"old"},{"value":"c1"},{"value":"x"},{"value":"A"},{"value":"2024-01-01T00:00:00Z"}],[{"value":"c2","first_class_role":"case_id","first_class_state":"present","first_class_source_key":"old"},{"value":"c2"},{"value":"x"},{"value":"B"},{"value":"2024-01-01T00:00:00Z"}]]}
+
+--OwnedInductiveInputFeature53--

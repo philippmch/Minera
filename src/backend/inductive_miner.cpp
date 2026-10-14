@@ -2452,6 +2452,14 @@ EventLog prepare_inductive_event_log(const EventLog& event_log,
   return select_event_log_fields(event_log, options);
 }
 
+EventLog prepare_inductive_event_log(const EventDataView& data,
+                                     const InductiveMinerOptions& options) {
+  validate_options(options);
+  if (data.kind() == EventDataKind::kEventLog)
+    return prepare_inductive_event_log(*data.log(), options);
+  return event_data_to_log(data, options);
+}
+
 ProcessTree discover_process_tree(const EventLog& event_log,
                                   const InductiveMinerOptions& options) {
   validate_options(options);

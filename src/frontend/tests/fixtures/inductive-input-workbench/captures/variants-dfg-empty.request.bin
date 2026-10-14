@@ -1,0 +1,19 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+dfg
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+variants
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+variants_json
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-variants-empty.json"
+Content-Type: application/octet-stream
+
+[]
+
+--OwnedInductiveInputFeature53--

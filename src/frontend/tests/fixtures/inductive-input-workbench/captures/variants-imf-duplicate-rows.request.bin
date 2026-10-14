@@ -1,0 +1,19 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+imf
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+variants
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+variants_json
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-variants-duplicate-rows.json"
+Content-Type: application/octet-stream
+
+[{"activities":["A","B"],"count":12},{"activities":["A","B"],"count":3}]
+
+--OwnedInductiveInputFeature53--

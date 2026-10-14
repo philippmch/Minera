@@ -2465,3 +2465,30 @@ The additive POST /api/align-graph-workbench endpoint provides this workbench.
 Native, frontend, API, fixture publication and export checks passed. Complete
 browser/visual checks and strict reference parity remain pending; no new browser
 attempt is claimed. See [validation and boundaries](docs/feature-first-graph-alignment-validation.json).
+
+### Discover Inductive trees from original inputs
+
+Use **Discover an Inductive workflow from original inputs** on the landing page or the Inductive entry in either
+toolbar. Choose IM, IMF or IMD and an original CSV/TSV/XES/gzip-XES, complete
+typed EventTable JSON, compact weighted variants or a declared DFG constructor.
+Log, stream, dataframe and lazyframe retain their native input behavior. These
+requests preserve the current cached mining session.
+
+Weighted records keep their order, repeated rows, empty words, zero counts and
+exact uint64 frequencies without expanding cases. DFG input retains its ordered
+activity registry, indexed edge vector and start/end counts; discovery always
+uses the native graph-recursive IMD path. Literal selectors retain whitespace
+and explicit empty values, including native validation errors. Inspect actual
+options and unchanged typed tables before/after each run.
+
+Inspect the complete native ProcessTree registry and every stored node field,
+native preparation/source snapshots and real graph observations. Choose either
+standard or transition_bordered Petri conversion. Download complete native JSON,
+reports, all inspection CSV tables, original files and supported same-run PTML,
+BPMN, PNML and prepared-source XES. Legacy analysis, preparation and conversion/
+export failures retain available native results with separate explicit errors.
+
+The additive POST /api/discover-inductive-input endpoint provides this workbench.
+Native, frontend, API, fixture publication and export checks passed. Complete
+browser/visual checks and strict reference parity remain pending; no new browser
+attempt is claimed. See [validation and boundaries](docs/feature-first-inductive-input-validation.json).

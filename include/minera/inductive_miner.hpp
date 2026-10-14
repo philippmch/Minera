@@ -88,6 +88,14 @@ using InductiveMinerVariantLog =
     const EventLog& event_log,
     const InductiveMinerOptions& options = {});
 
+// Exposes the exact native discovery projection for every event-data adapter.
+// Logs retain the opportunistic projection rules above; flat stream/table/lazy
+// inputs require the selected case/activity/timestamp fields and always group
+// and stably sort by timestamp. The source adapter is not modified.
+[[nodiscard]] EventLog prepare_inductive_event_log(
+    const EventDataView& data,
+    const InductiveMinerOptions& options = {});
+
 // Discovers a block-structured process tree from an event log using the
 // Inductive Miner. The algorithm recursively detects exclusive-choice,
 // sequence, parallel and loop cuts on the directly-follows graph of the

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ptml>
+  <processTree id="tree" name="Independent Inductive discovery" root="node0">
+    <xor id="node0" name=""/>
+    <sequence id="node1" name=""/>
+    <manualTask id="node2" name="X"/>
+    <manualTask id="node3" name="Y"/>
+    <sequence id="node4" name=""/>
+    <manualTask id="node5" name="B"/>
+    <manualTask id="node6" name="A"/>
+    <parentsNode id="edge0" sourceId="node1" targetId="node2"/>
+    <parentsNode id="edge1" sourceId="node1" targetId="node3"/>
+    <parentsNode id="edge2" sourceId="node0" targetId="node1"/>
+    <parentsNode id="edge3" sourceId="node4" targetId="node5"/>
+    <parentsNode id="edge4" sourceId="node4" targetId="node6"/>
+    <parentsNode id="edge5" sourceId="node0" targetId="node4"/>
+  </processTree>
+</ptml>

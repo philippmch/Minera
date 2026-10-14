@@ -332,7 +332,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_variant_discovery_workflow_available",
+      "feature_delivery_status": "native_independent_inductive_input_discovery_available",
       "package": "algo.discovery.inductive",
       "parity_status": "complete",
       "selectors": [
@@ -2680,6 +2680,49 @@
       ],
       "validation": "docs/feature-first-graph-alignment-validation.json",
       "browser_validation_complete": false
+    },
+    {
+      "id": "native_independent_inductive_input_discovery",
+      "state": "original_four_shapes_compact_weighted_variants_native_dfg_full_tree_options_prepared_source_and_exports_available",
+      "families": [
+        "algo.discovery.inductive"
+      ],
+      "variants": [
+        "IM",
+        "IMF",
+        "IMD",
+        "LOG",
+        "STREAM",
+        "DATAFRAME",
+        "LAZYFRAME",
+        "WEIGHTED_VARIANTS",
+        "DFG_CONSTRUCTOR",
+        "STANDARD",
+        "TRANSITION_BORDERED"
+      ],
+      "entry_points": [
+        "include/minera/inductive_input_json.hpp",
+        "src/backend/inductive_input_json.cpp",
+        "include/minera/inductive_miner.hpp",
+        "src/backend/inductive_miner.cpp",
+        "src/backend/tools/inductive_input_route.hpp",
+        "src/frontend/src/inductive-input-workbench.ts",
+        "src/frontend/src/components/InductiveInputWorkspace.tsx"
+      ],
+      "added": [
+        "Independent Inductive IM, IMF and IMD discovery accepts original CSV/TSV/XES/gzip-XES, complete typed EventTable JSON, compact weighted-variant records and declared native DFG constructor inputs from landing and both classic/OCEL toolbars, without accessing or replacing the cached mining session.",
+        "All four native event-data shapes are selectable: log, stream, dataframe and lazyframe. Flat adapters retain native strict case/activity/timestamp projection and stable timestamp sorting; already grouped logs retain the native opportunistic case/timestamp projection rules. Typed before/after state remains unchanged and complete.",
+        "The public prepare_inductive_event_log(EventDataView) overload exposes the exact discovery adapter for an independent supplemental prepared-source snapshot. It preserves source data and does not replace discovery dispatch. Prepared logs, counts, real derived DFG observables and supported prepared-source XES exports remain separate from diagnostic serialization errors.",
+        "Compact weighted input preserves record order, repeated records/words, empty words, zero counts and exact uint64 values through UINT64_MAX. Original records are never expanded into invented cases, and counted entries are reported independently from unavailable event/case totals; native aggregation and discovery semantics remain authoritative.",
+        "Direct DFG input exposes the exact four-field from_frequencies constructor: ordered activity registry, ordered source/target/count edge vector and dense start/end counts. Zero pairs and all uint64 literals are retained. The complete seven-field native snapshot additionally reports actual activity counts, rework counts and variants without fabricating observations from declared frequencies.",
+        "Every native Inductive option is configurable and inspectable: actual variant/enum identity, noise threshold, activity/case/timestamp selectors, timestamp sorting, strict-sequence-cut control, multiprocessing and fall-through control. Literal selector JSON preserves whitespace and explicit empty strings; empty keys reach native validation rather than silently becoming defaults.",
+        "Complete native ProcessTree output retains the entire activity registry, every stored operator/enum/activity index, ordered children including empty vectors and latent activity values on nonleaf/tau nodes. Direct DFG dispatch records requested versus effective IMD semantics. A legacy event-log diagram is explicitly unavailable for direct graphs and compact variants, while complete native models remain usable.",
+        "Both actual process-tree-to-Petri conversion variants, standard and transition_bordered, are selectable. Complete native nets and separate conversion context remain alongside same-run PTML/BPMN/PNML exports, with supported prepared-source XES. Diagnostic or conversion/export failures retain the completed native tree and their explicit errors.",
+        "Exact original files, request fields, input hashes, typed source/options/tree/graph/net/conversion records, complete JSON/reports, per-table/all-table CSV and selected records are inspectable and downloadable. Cancellation, input replacement and failed-request guards retain completed runs. Portable captured fixtures are published byte-identically after their export proof passes.",
+        "Strict weighted/graph inputs reject malformed containers, duplicate decoded keys, wrong types and integer overflow, preserving escaped lone-surrogate identity. Input byte/node/depth bounds remain; complete native tree/options/graph serialization is uncapped and retains finite double precision, negative zero and nonfinite storage tags."
+      ],
+      "validation": "docs/feature-first-inductive-input-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -2697,7 +2740,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. The next confirmed input-surface gaps are independent Inductive discovery for existing EventDataView, exact weighted uint64 variants and direct DFG inputs, followed by independently supplied original PTML/process-tree alignment and PNML anti/multi alignment. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. Independent Inductive discovery now exposes original event adapters, compact exact weighted variants and declared DFG constructor inputs with complete native preparation/tree/options/net/export inspection. The next confirmed input-surface gaps are independently supplied original PTML/process-tree alignment and PNML anti/multi alignment. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence."
     }
   ],
   "feature_status_meaning": {
@@ -2722,7 +2765,8 @@
     "native_independent_petri_alignment_workflow_available": "Independent original-log/PNML alignment exposes all six native variants, four input shapes, cost/marking controls and complete result inspection/download. Strict reference behavior and remaining input/object contracts remain parity gates.",
     "native_organizational_workbench_available": "All four organizational native workflows have app controls, source bindings, full inspection/export code and captured API/frontend validation. Role/profile browser exports are verified; remaining browser checks and strict parity gates are explicitly open.",
     "native_independent_workflow_discovery_inputs_available": "Independent Alpha/Heuristic native shapes, full typed/direct graph inputs, mutable pandas and complete snapshots/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates.",
-    "native_independent_graph_alignment_workbench_available": "Independent DFG/decomposed native models, original checked logs/typed tables/trace words, full options and complete results/projections/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates."
+    "native_independent_graph_alignment_workbench_available": "Independent DFG/decomposed native models, original checked logs/typed tables/trace words, full options and complete results/projections/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates.",
+    "native_independent_inductive_input_discovery_available": "Independent Inductive IM/IMF/IMD event shapes, compact exact weighted variants, declared native DFG inputs and complete tree/options/prepared-source/net/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

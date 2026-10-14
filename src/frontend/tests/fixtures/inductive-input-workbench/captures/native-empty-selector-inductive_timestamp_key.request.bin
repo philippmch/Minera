@@ -1,0 +1,23 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+log
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+dfg
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+dfg_json
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="discovery_selectors_json"
+
+{"inductive_timestamp_key":""}
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-empty-selector-graph.json"
+Content-Type: application/octet-stream
+
+{"activities":[],"edges":[],"start_counts":[],"end_counts":[]}
+
+--OwnedInductiveInputFeature53--

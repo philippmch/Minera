@@ -540,6 +540,109 @@ void table_stream_lazy_and_custom_selectors() {
   assert(render(tie_tree, tie_tree.root()) == "->(B,A)");
 }
 
+void public_event_data_projection_matches_native_adapter_contracts() {
+  EventTable table = table_from_rows({"case", "act", "when"}, {
+      row({field("case", "c1"), field("act", "B"), field("when", "2026-01-01T00:00:02Z")}),
+      row({field("case", "c2"), field("act", "X"), field("when", "2026-01-01T00:00:00Z")}),
+      row({field("case", "c1"), field("act", "A"), field("when", "2026-01-01T00:00:01Z")}),
+      row({field("case", "c1"), field("act", "C"), field("when", "2026-01-01T00:00:01Z")})});
+  table.attributes.push_back(field("original metadata", "retained only on original table"));
+  const auto original_rows = table.rows;
+  const auto original_attributes = table.attributes;
+  const auto original_columns = table.columns;
+  EventStream stream;
+  for (const auto& source_row : table.rows) {
+    EventRecord item;
+    for (const auto& cell : source_row) item.fields.push_back(*cell);
+    stream.events.push_back(std::move(item));
+  }
+  stream.attributes = table.attributes;
+  const auto lazy = LazyEventTable::from_table(table);
+  InductiveMinerOptions options;
+  options.case_id_key = "case"; options.activity_key = "act"; options.timestamp_key = "when";
+  options.sort_events_by_timestamp = false;
+  for (const auto view : {EventDataView(table), EventDataView(stream), EventDataView(lazy)}) {
+    const auto projected = prepare_inductive_event_log(view, options);
+    assert(projected.traces.size() == 2 && projected.event_count() == 4);
+    assert(projected.traces[0].case_id == "c1" && projected.traces[1].case_id == "c2");
+    const auto& events = projected.traces[0].events;
+    assert(events[0].activity == "A" && events[1].activity == "C" && events[2].activity == "B");
+    assert(events[0].input_order == 2 && events[1].input_order == 3 && events[2].input_order == 0);
+    assert(events[0].activity_source_key == "act" && events[0].timestamp_source_key == "when" &&
+           events[0].case_id_source_key == "case");
+    assert(projected.attributes.empty() && events[0].attributes.empty());
+    const auto direct_tree = discover_process_tree(view, options);
+    const auto from_projection = discover_process_tree(projected);
+    assert(direct_tree.activities() == from_projection.activities() &&
+           same_tree(direct_tree.root(), from_projection.root()));
+  }
+  assert(table.rows == original_rows && table.columns == original_columns &&
+         table.attributes == original_attributes && stream.attributes == original_attributes);
+  for (std::size_t index = 0; index < stream.events.size(); ++index)
+    for (std::size_t column = 0; column < table.columns.size(); ++column)
+      assert(stream.events[index].fields[column] == *original_rows[index][column]);
+  assert(lazy.materialize().rows == original_rows);
+
+  auto log = log_from_variants({{"B", "A"}});
+  log.attributes.push_back(field("original metadata", "retained on grouped log"));
+  const auto grouped_attributes = log.attributes;
+  InductiveMinerOptions grouped;
+  grouped.case_id_key = "absent case"; grouped.timestamp_key = "absent time";
+  grouped.sort_events_by_timestamp = true;
+  const auto projected = prepare_inductive_event_log(EventDataView(log), grouped);
+  const auto original_overload = prepare_inductive_event_log(log, grouped);
+  assert(projected.traces.size() == 1 && projected.traces[0].case_id == "c0" &&
+         projected.traces[0].events[0].activity == "B" && projected.traces[0].events[1].activity == "A");
+  assert(projected.attributes == grouped_attributes && original_overload.attributes == projected.attributes &&
+         original_overload.traces[0].events[0].activity == projected.traces[0].events[0].activity);
+  assert(log.traces[0].events[0].activity == "B" && log.traces[0].events[1].activity == "A" &&
+         log.attributes == grouped_attributes);
+  grouped.timestamp_key.clear();
+  assert(throws([&] { (void)prepare_inductive_event_log(EventDataView(log), grouped); }));
+}
+
+void public_event_data_projection_preserves_strict_errors_and_literal_keys() {
+  InductiveMinerOptions options;
+  options.case_id_key = "case"; options.activity_key = "act"; options.timestamp_key = "when";
+  for (std::size_t column = 0; column < 3; ++column)
+    for (const int invalid : {0, 1, 2}) {
+      auto table = table_from_rows({"case", "act", "when"}, {
+          row({field("case", "c"), field("act", "A"), field("when", "2026-01-01T00:00:00Z")})});
+      if (invalid == 0) table.rows[0][column].reset();
+      else if (invalid == 1) table.rows[0][column]->is_null = true;
+      else table.rows[0][column]->value.clear();
+      const auto original = table.rows;
+      EventStream stream;
+      EventRecord item;
+      for (const auto& cell : table.rows[0]) if (cell) item.fields.push_back(*cell);
+      stream.events.push_back(std::move(item));
+      const auto lazy = LazyEventTable::from_table(table);
+      for (const auto view : {EventDataView(table), EventDataView(stream), EventDataView(lazy)})
+        assert(throws([&] { (void)prepare_inductive_event_log(view, options); }));
+      assert(table.rows == original && lazy.materialize().rows == original);
+    }
+  auto bad_time = table_from_rows({"case", "act", "when"}, {
+      row({field("case", "c"), field("act", "A"), field("when", "invalid")})});
+  EventStream stream;
+  stream.events.push_back(record({field("case", "c"), field("act", "A"), field("when", "invalid")}));
+  const auto lazy = LazyEventTable::from_table(bad_time);
+  for (const auto view : {EventDataView(bad_time), EventDataView(stream), EventDataView(lazy)}) {
+    bool rejected = false;
+    try { (void)prepare_inductive_event_log(view, options); }
+    catch (const std::invalid_argument& error) {
+      rejected = true;
+      assert(std::string(error.what()).find("timestamp field 'when' is invalid at row 0") != std::string::npos);
+    }
+    assert(rejected);
+  }
+  const auto literal = table_from_rows({" ", "  ", "   "}, {
+      row({field(" ", "c"), field("  ", "A"), field("   ", "2026-01-01T00:00:00Z")})});
+  options.case_id_key = " "; options.activity_key = "  "; options.timestamp_key = "   ";
+  const auto projected = prepare_inductive_event_log(EventDataView(literal), options);
+  assert(projected.traces.size() == 1 && projected.traces[0].events[0].activity == "A" &&
+         projected.traces[0].events[0].activity_source_key == "  ");
+}
+
 void invalid_tabular_values_and_options() {
   auto bad = standard_table(false);
   bad.rows[0][2] = field("time:timestamp", "not-a-time");
@@ -682,6 +785,8 @@ int main() {
   event_log_custom_selectors_and_ordering();
   custom_case_grouping_handles_empty_traces();
   table_stream_lazy_and_custom_selectors();
+  public_event_data_projection_matches_native_adapter_contracts();
+  public_event_data_projection_preserves_strict_errors_and_literal_keys();
   invalid_tabular_values_and_options();
   weighted_variant_input();
   variant_selector_contract();

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ptml>
+  <processTree id="tree" name="Independent Inductive discovery" root="node0">
+    <sequence id="node0" name=""/>
+    <manualTask id="node1" name="B"/>
+    <manualTask id="node2" name="A"/>
+    <parentsNode id="edge0" sourceId="node0" targetId="node1"/>
+    <parentsNode id="edge1" sourceId="node0" targetId="node2"/>
+  </processTree>
+</ptml>

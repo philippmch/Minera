@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0" xmlns="http://www.xes-standard.org/">
+  <trace>
+    <string key="concept:name" value="case-0" />
+    <event>
+      <string key="concept:name" value="B" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+    </event>
+  </trace>
+</log>

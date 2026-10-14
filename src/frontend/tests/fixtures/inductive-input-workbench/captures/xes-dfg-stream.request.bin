@@ -1,0 +1,376 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+dfg
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+stream
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+auto
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="xes_timestamp_sort"
+
+false
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-inductive.xes"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0" xmlns="http://www.xes-standard.org/">
+  <trace>
+    <string key="concept:name" value="case-0" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-1" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-2" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-3" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-4" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-5" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-6" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-7" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-8" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-9" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-10" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-11" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-12" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-13" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-14" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-15" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-16" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-17" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-18" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-19" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-20" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-21" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-22" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-23" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-24" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-25" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-26" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-27" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-28" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-29" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-30" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-31" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T00:00:01Z" />
+    </event>
+  </trace>
+</log>
+--OwnedInductiveInputFeature53--
