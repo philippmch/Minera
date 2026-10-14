@@ -856,6 +856,31 @@ input[type="range"]::-moz-range-thumb {
 .organizational-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 450px; overflow: auto; }
 .workflow-input-workspace { min-width: 0; }
 .graph-alignment-workspace { min-width: 0; }
+.inductive-input-workspace { min-width: 0; }
+.inductive-input-workspace > .panel { min-width: 0; padding-bottom: 24px; }
+.inductive-input-workspace > .panel > p,
+.inductive-input-workspace > .panel > details,
+.inductive-input-workspace > .panel > .query-actions,
+.inductive-input-workspace > .panel > .filters-field { margin: 16px 24px; }
+.inductive-input-workspace > .panel > fieldset { display: flex; flex-direction: column; gap: 16px; }
+.inductive-input-workspace .query-options > .filters-field { flex: 1 1 245px; min-width: 0; }
+.inductive-input-workspace .filters-field > label:first-child { display: flex; flex-direction: column; gap: 5px; }
+.inductive-input-workspace input:not([type="checkbox"]),
+.inductive-input-workspace select,
+.inductive-input-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.inductive-input-workspace input[type="checkbox"] { width: auto; min-width: 0; flex: 0 0 auto; }
+.inductive-input-workspace p,
+.inductive-input-workspace summary,
+.inductive-input-workspace .query-check { overflow-wrap: anywhere; }
+.inductive-input-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 450px; overflow: auto; }
+.inductive-input-workspace .query-table-wrap td { white-space: pre-wrap; }
+@media (max-width: 600px) {
+  .inductive-input-workspace > .panel > p,
+  .inductive-input-workspace > .panel > details,
+  .inductive-input-workspace > .panel > .query-actions,
+  .inductive-input-workspace > .panel > .filters-field { margin-inline: 12px; }
+  .inductive-input-workspace > .panel > fieldset { padding-inline: 12px; }
+}
 .graph-alignment-workspace > .panel { min-width: 0; padding-bottom: 24px; }
 .graph-alignment-workspace > .panel > p,
 .graph-alignment-workspace > .panel > details,

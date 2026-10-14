@@ -1,0 +1,23 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+dfg
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+dfg
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+dfg_json
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="noise_threshold"
+
+0.75
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-direct-graph.json"
+Content-Type: application/octet-stream
+
+{"activities":["B","A","unused \u6771\u4eac"],"edges":[{"source":1,"target":0,"count":18446744073709551615},{"source":0,"target":0,"count":0}],"start_counts":[0,18446744073709551615,0],"end_counts":[18446744073709551615,0,0]}
+
+--OwnedInductiveInputFeature53--

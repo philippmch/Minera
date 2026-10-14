@@ -1,0 +1,29 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+log
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+lazyframe
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+auto
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-missing-time.xes"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0" xmlns="http://www.xes-standard.org/">
+  <trace>
+    <string key="concept:name" value="case-0" />
+    <event>
+      <string key="concept:name" value="B" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+    </event>
+  </trace>
+</log>
+--OwnedInductiveInputFeature53--

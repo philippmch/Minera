@@ -61,6 +61,7 @@ import { TokenReplayWorkspace } from "./components/TokenReplayWorkspace";
 import { PetriAlignmentWorkspace } from "./components/PetriAlignmentWorkspace";
 import { WorkflowInputWorkspace } from "./components/WorkflowInputWorkspace";
 import { GraphAlignmentWorkspace } from "./components/GraphAlignmentWorkspace";
+import { InductiveInputWorkspace } from "./components/InductiveInputWorkspace";
 import { requestLogQuerySchema } from "./log-query";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
@@ -129,6 +130,7 @@ export default function App() {
   const [showPetriAlignment, setShowPetriAlignment] = useState(false);
   const [showWorkflowInputs, setShowWorkflowInputs] = useState(false);
   const [showGraphAlignment, setShowGraphAlignment] = useState(false);
+  const [showInductiveInputs, setShowInductiveInputs] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -380,6 +382,7 @@ export default function App() {
     setShowPetriAlignment(false);
     setShowWorkflowInputs(false);
     setShowGraphAlignment(false);
+    setShowInductiveInputs(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -587,6 +590,7 @@ export default function App() {
     [data, selectedVariant],
   );
 
+  if (showInductiveInputs) return <><TopBar dataset={data?.dataset??ocelDataset??'Inductive inputs'} datasetKind="independent Inductive discovery" onOpenFile={loadFile} onHome={()=>setShowInductiveInputs(false)}/><main className="layout-log inductive-input-workspace"><button className="btn-ghost" onClick={()=>setShowInductiveInputs(false)}>Return to current workspace</button><InductiveInputWorkspace file={source?.file??null}/></main></>;
   if (showGraphAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Graph alignment inputs'} datasetKind="independent graph alignment" onOpenFile={loadFile} onHome={()=>setShowGraphAlignment(false)}/><main className="layout-log graph-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowGraphAlignment(false)}>Return to current workspace</button><GraphAlignmentWorkspace file={source?.file??null}/></main></>;
   if (showWorkflowInputs) return <><TopBar dataset={data?.dataset??ocelDataset??'Workflow inputs'} datasetKind="independent workflow discovery" onOpenFile={loadFile} onHome={()=>setShowWorkflowInputs(false)}/><main className="layout-log workflow-input-workspace"><button className="btn-ghost" onClick={()=>setShowWorkflowInputs(false)}>Return to current workspace</button><WorkflowInputWorkspace file={source?.file??null}/></main></>;
   if (showPetriAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Alignment inputs'} datasetKind="Petri alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAlignment(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowPetriAlignment(false)}>Return to current workspace</button><PetriAlignmentWorkspace file={source?.file??null}/></main></>;
@@ -618,6 +622,7 @@ export default function App() {
           onPetriAlignment={()=>setShowPetriAlignment(true)}
           onWorkflowInputs={()=>setShowWorkflowInputs(true)}
           onGraphAlignment={()=>setShowGraphAlignment(true)}
+          onInductiveInputs={()=>setShowInductiveInputs(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -671,6 +676,7 @@ export default function App() {
           onPetriAlignment={()=>setShowPetriAlignment(true)}
           onWorkflowInputs={()=>setShowWorkflowInputs(true)}
           onGraphAlignment={()=>setShowGraphAlignment(true)}
+          onInductiveInputs={()=>setShowInductiveInputs(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -701,6 +707,7 @@ export default function App() {
           onPetriAlignment={()=>setShowPetriAlignment(true)}
           onWorkflowInputs={()=>setShowWorkflowInputs(true)}
           onGraphAlignment={()=>setShowGraphAlignment(true)}
+          onInductiveInputs={()=>setShowInductiveInputs(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);

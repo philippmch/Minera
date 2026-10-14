@@ -3,3 +3,5 @@ src/frontend/tests/fixtures/workflow-input-workbench* -text -whitespace
 src/frontend/tests/fixtures/workflow-input-workbench/** -text -whitespace
 src/frontend/tests/fixtures/graph-alignment-workbench* -text -whitespace
 src/frontend/tests/fixtures/graph-alignment-workbench/** -text -whitespace
+src/frontend/tests/fixtures/inductive-input-workbench* -text -whitespace
+src/frontend/tests/fixtures/inductive-input-workbench/** -text -whitespace

@@ -13328,3 +13328,42 @@ This checkpoint adds own-source native, frontend, API, publication and export ev
 This is implemented feature group 52. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
 
 Evidence: docs/feature-first-graph-alignment-validation.json. No browser screenshot is claimed.
+
+
+### Feature delivery first: independent Inductive original inputs
+
+Independent Inductive IM, IMF and IMD discovery accepts original CSV/TSV/XES/gzip-XES, complete typed EventTable JSON, compact weighted-variant records and declared native DFG constructor inputs from landing and both classic/OCEL toolbars, without accessing or replacing the cached mining session.
+
+All four native event-data shapes are selectable: log, stream, dataframe and lazyframe. Flat adapters retain native strict case/activity/timestamp projection and stable timestamp sorting; already grouped logs retain the native opportunistic case/timestamp projection rules. Typed before/after state remains unchanged and complete.
+
+The public prepare_inductive_event_log(EventDataView) overload exposes the exact discovery adapter for an independent supplemental prepared-source snapshot. It preserves source data and does not replace discovery dispatch. Prepared logs, counts, real derived DFG observables and supported prepared-source XES exports remain separate from diagnostic serialization errors.
+
+Compact weighted input preserves record order, repeated records/words, empty words, zero counts and exact uint64 values through UINT64_MAX. Original records are never expanded into invented cases, and counted entries are reported independently from unavailable event/case totals; native aggregation and discovery semantics remain authoritative.
+
+Direct DFG input exposes the exact four-field from_frequencies constructor: ordered activity registry, ordered source/target/count edge vector and dense start/end counts. Zero pairs and all uint64 literals are retained. The complete seven-field native snapshot additionally reports actual activity counts, rework counts and variants without fabricating observations from declared frequencies.
+
+Every native Inductive option is configurable and inspectable: actual variant/enum identity, noise threshold, activity/case/timestamp selectors, timestamp sorting, strict-sequence-cut control, multiprocessing and fall-through control. Literal selector JSON preserves whitespace and explicit empty strings; empty keys reach native validation rather than silently becoming defaults.
+
+Complete native ProcessTree output retains the entire activity registry, every stored operator/enum/activity index, ordered children including empty vectors and latent activity values on nonleaf/tau nodes. Direct DFG dispatch records requested versus effective IMD semantics. A legacy event-log diagram is explicitly unavailable for direct graphs and compact variants, while complete native models remain usable.
+
+Both actual process-tree-to-Petri conversion variants, standard and transition_bordered, are selectable. Complete native nets and separate conversion context remain alongside same-run PTML/BPMN/PNML exports, with supported prepared-source XES. Diagnostic or conversion/export failures retain the completed native tree and their explicit errors.
+
+Exact original files, request fields, input hashes, typed source/options/tree/graph/net/conversion records, complete JSON/reports, per-table/all-table CSV and selected records are inspectable and downloadable. Cancellation, input replacement and failed-request guards retain completed runs. Portable captured fixtures are published byte-identically after their export proof passes.
+
+Strict weighted/graph inputs reject malformed containers, duplicate decoded keys, wrong types and integer overflow, preserving escaped lone-surrogate identity. Input byte/node/depth bounds remain; complete native tree/options/graph serialization is uncapped and retains finite double precision, negative zero and nonfinite storage tags.
+
+Validation: {"api_calls": 153, "api_checks": 774, "core_objects": 179, "export_csv_cells": 113165, "export_entries": 124, "export_numeric_literals": 15205, "export_selected_records": 26864, "export_tests": 129, "fresh_core_objects": 2, "frontend_files": 91, "frontend_tests": 1954, "inductive_fixtures": 124, "native_sources": 639, "native_suites": 12, "published_files": 668, "published_fixture_entries": 124, "reused_core_objects": 177, "unrelated_files_preserved": 110}. Source/compiler/object/binary/publication/served-production-asset bindings passed. Complete browser validation is explicitly false; no new browser attempt is claimed.
+
+This is a feature-delivery checkpoint, not full PM4Py parity. No package/module parity status or selector is promoted; all 228 incomplete units remain in scope.
+
+Complete browser interaction, downloads, visual screenshots and responsive inspection for Feature53 remain pending. No new browser attempt or success is claimed. The frozen Feature51 saved-origin/managed-policy denial at http://127.0.0.1:8562 is retained as historical evidence; local HTTP/listener/runtime checks are separate from browser validation.
+
+Direct DFG input always invokes the existing graph-recursive IMD path, even when IM/IMF was requested. The selected variant and scalar options retain their native validation and actual requested values; compact weighted logs use the selected native variant without case expansion.
+
+Flat adapters require their selected native fields and always use stable timestamp ordering; grouped logs retain opportunistic projection. Empty literal selectors and other invalid native controls stay explicit errors. Native preparation, legacy analysis and conversion/model exports remain independently fallible and never substitute fabricated traces or trees.
+
+This checkpoint adds own-source native, frontend, API, publication and export evidence, not a fresh public-reference differential corpus. Strict defaults, scalar/object identity, numeric ordering, schema/errors, Unicode, marking, solver, concurrency and performance gates remain independent parity work.
+
+This is implemented feature group 53. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
+
+Evidence: docs/feature-first-inductive-input-validation.json. No browser screenshot is claimed.

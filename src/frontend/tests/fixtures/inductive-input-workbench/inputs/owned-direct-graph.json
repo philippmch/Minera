@@ -1,0 +1,1 @@
+{"activities":["B","A","unused \u6771\u4eac"],"edges":[{"source":1,"target":0,"count":18446744073709551615},{"source":0,"target":0,"count":0}],"start_counts":[0,18446744073709551615,0],"end_counts":[18446744073709551615,0,0]}

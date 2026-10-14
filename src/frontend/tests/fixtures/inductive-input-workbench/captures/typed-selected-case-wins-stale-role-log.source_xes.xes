@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Independent Inductive native prepared source"/>
+  <string key="origin" value="csv"/>
+  <trace>
+    <string key="batch" value="x"/>
+    <event>
+      <string key="phase" value="A"/>
+      <date key="finish" value="2024-01-01T00:00:00+00:00"/>
+      <string key="old" value="c1"/>
+      <string key="case:concept:name" value="c1"/>
+      <string key="finish" value="2024-01-01T00:00:00Z"/>
+    </event>
+    <event>
+      <string key="phase" value="B"/>
+      <date key="finish" value="2024-01-01T00:00:00+00:00"/>
+      <string key="old" value="c2"/>
+      <string key="case:concept:name" value="c2"/>
+      <string key="finish" value="2024-01-01T00:00:00Z"/>
+    </event>
+  </trace>
+</log>

@@ -16,9 +16,10 @@ interface LandingProps {
   onPetriAlignment?: () => void;
   onWorkflowInputs?: () => void;
   onGraphAlignment?: () => void;
+  onInductiveInputs?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -73,6 +74,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onPetriAlignment && <button className="landing-sample reveal" disabled={mining} onClick={onPetriAlignment}>Align a log against a PNML model</button>}
         {onWorkflowInputs && <button className="landing-sample reveal" disabled={mining} onClick={onWorkflowInputs}>Discover a workflow from original inputs</button>}
         {onGraphAlignment && <button className="landing-sample reveal" disabled={mining} onClick={onGraphAlignment}>Align original traces against a DFG or PNML model</button>}
+        {onInductiveInputs && <button className="landing-sample reveal" disabled={mining} onClick={onInductiveInputs}>Discover an Inductive workflow from original inputs</button>}
 
         <div className="landing-steps reveal">
           <div className="landing-step">

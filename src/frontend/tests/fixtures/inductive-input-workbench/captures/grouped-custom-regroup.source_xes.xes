@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Independent Inductive native prepared source"/>
+  <trace>
+    <string key="group" value="x"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <string key="group" value="x"/>
+    </event>
+    <event>
+      <string key="concept:name" value="B"/>
+      <string key="group" value="x"/>
+    </event>
+  </trace>
+</log>

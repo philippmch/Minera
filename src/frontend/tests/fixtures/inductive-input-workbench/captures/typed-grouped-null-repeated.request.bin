@@ -1,0 +1,23 @@
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="inductive_variant"
+
+log
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_shape"
+
+log
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input_format"
+
+table
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="discovery_selectors_json"
+
+{"inductive_case_id_key":"batch","inductive_activity_key":"phase","inductive_timestamp_key":"finish"}
+--OwnedInductiveInputFeature53
+Content-Disposition: form-data; name="input"; filename="owned-null-repeated.json"
+Content-Type: application/octet-stream
+
+{"columns":["batch","phase","finish"],"rows":[[{"value":"x"},{"null":true},{"value":"2024-01-01T00:00:00Z"}],[{"value":"x"},{"null":true},{"value":"2024-01-01T00:00:01Z"}]]}
+
+--OwnedInductiveInputFeature53--
