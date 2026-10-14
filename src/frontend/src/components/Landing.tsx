@@ -14,9 +14,10 @@ interface LandingProps {
   onAcquisition?: () => void;
   onTokenReplay?: () => void;
   onPetriAlignment?: () => void;
+  onWorkflowInputs?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -69,6 +70,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onAcquisition && <button className="landing-sample reveal" disabled={mining} onClick={onAcquisition}>Acquire source data</button>}
         {onTokenReplay && <button className="landing-sample reveal" disabled={mining} onClick={onTokenReplay}>Replay a log against a PNML model</button>}
         {onPetriAlignment && <button className="landing-sample reveal" disabled={mining} onClick={onPetriAlignment}>Align a log against a PNML model</button>}
+        {onWorkflowInputs && <button className="landing-sample reveal" disabled={mining} onClick={onWorkflowInputs}>Discover a workflow from original inputs</button>}
 
         <div className="landing-steps reveal">
           <div className="landing-step">

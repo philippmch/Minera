@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+  <process id="process" name="Independent workflow discovery" isExecutable="false">
+    <startEvent id="StartEvent_0"/>
+    <task id="Activity_1" name="loop 東京"/>
+    <sequenceFlow id="Flow_2" sourceRef="Activity_1" targetRef="Activity_1"/>
+  </process>
+</definitions>

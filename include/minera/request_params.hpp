@@ -134,7 +134,13 @@ struct MineParams {
   XesImportOptions xes;
   LogFilterOptions filter;
   InductiveMinerOptions inductive;
+  // Alpha's alpha_case_id_attribute/alpha_timestamp_attribute and sorting
+  // flags retain their native defaults. alpha_start_timestamp_attribute may
+  // be explicitly empty for the native start-column/completion fallback.
   AlphaMinerOptions alpha;
+  // heuristic_case_id_attribute groups flat inputs only. PLUSPLUS's optional
+  // heuristic_plusplus_min_activity_count/min_frequency accept IEEE numeric
+  // cutoffs separately from the unchanged integer CLASSIC filters.
   HeuristicMinerOptions heuristic;
   PowlDiscoveryOptions powl;
   // The standalone temporal adapters are strict by default. Mining bundles

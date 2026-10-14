@@ -49,6 +49,12 @@ void empty_and_space_selectors_use_json_input_columns() {
 int main() {
   date_metadata_round_trips_and_rejects_malformed_values();
   empty_and_space_selectors_use_json_input_columns();
+  // The new lossless discovery table codec opts into integer storage tags.
+  // The established formatter transport still rejects that additional field.
+  const std::string tagged = R"({"columns":["x"],"rows":[[{"kind":"int","typed_value":1,"integer_storage":"int64"}]]})";
+  const auto decoded_tagged = minera::parse_event_table_json(tagged);
+  assert(std::get<std::int64_t>(decoded_tagged.rows[0][0]->typed_value) == 1);
+  assert(rejected("{\"table\":" + tagged + '}'));
   const std::string valid = R"({"table":{"columns":["case:concept:name","concept:name","time:timestamp"],"dtypes":["uint64","str","str"],"rows":[[{"kind":"int","value":"18446744073709551615","typed_value":18446744073709551615},{"value":"A\uD83D\uDE00"},{"value":"2024-01-01"}]]}})";
   const auto result = minera::format_dataframe_json(valid);
   assert(result.success);

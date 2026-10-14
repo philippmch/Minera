@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+  <process id="process" name="Independent workflow discovery" isExecutable="false">
+    <startEvent id="StartEvent_0"/>
+    <endEvent id="EndEvent_1"/>
+  </process>
+</definitions>

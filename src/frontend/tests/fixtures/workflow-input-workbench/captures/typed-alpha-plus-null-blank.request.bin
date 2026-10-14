@@ -1,0 +1,27 @@
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="discovery_family"
+
+alpha
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_shape"
+
+log
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_format"
+
+table
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="alpha_variant"
+
+plus
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="discovery_selectors_json"
+
+{"alpha_case_id_attribute":"batch","alpha_activity_attribute":"phase","alpha_timestamp_attribute":"finish"}
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input"; filename="owned-null-blank.json"
+Content-Type: application/octet-stream
+
+{"columns":["batch","phase","finish"],"rows":[[{"value":"x"},{"null":true},{"kind":"date","value":"2024-01-01T00:00:00Z","typed_value":"2024-01-01T00:00:00Z","date_resolution":"ns","date_timezone":"UTC"}],[{"value":"x"},{"value":""},{"kind":"date","value":"2024-01-01T00:00:01Z","typed_value":"2024-01-01T00:00:01Z","date_resolution":"ns","date_timezone":"UTC"}]]}
+
+--OwnedWorkflowInputsFeature51--

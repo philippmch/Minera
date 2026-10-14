@@ -854,6 +854,32 @@ input[type="range"]::-moz-range-thumb {
 .organizational-workspace .query-options select,
 .organizational-workspace textarea { width: 100%; min-width: 0; }
 .organizational-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 450px; overflow: auto; }
+.workflow-input-workspace { min-width: 0; }
+.workflow-input-workspace > .panel { min-width: 0; padding-bottom: 24px; }
+.workflow-input-workspace > .panel > p,
+.workflow-input-workspace > .panel > details,
+.workflow-input-workspace > .panel > .query-actions,
+.workflow-input-workspace > .panel > .filters-field { margin: 16px 24px; }
+.workflow-input-workspace > .panel > fieldset { display: flex; flex-direction: column; gap: 16px; }
+.workflow-input-workspace .query-options > .filters-field { flex: 1 1 245px; min-width: 0; }
+.workflow-input-workspace .filters-field > label:first-child { display: flex; flex-direction: column; gap: 5px; }
+.workflow-input-workspace input:not([type="checkbox"]),
+.workflow-input-workspace select,
+.workflow-input-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.workflow-input-workspace input[type="checkbox"] { width: auto; min-width: 0; flex: 0 0 auto; }
+.workflow-input-workspace textarea { resize: vertical; border: 1px solid var(--line); border-radius: 4px; padding: 9px 10px; background: var(--paper-raised); color: var(--ink); font: 13px var(--font-mono); }
+.workflow-input-workspace p,
+.workflow-input-workspace summary,
+.workflow-input-workspace .query-check { overflow-wrap: anywhere; }
+.workflow-input-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 450px; overflow: auto; }
+.workflow-input-workspace .query-table-wrap td { white-space: pre-wrap; }
+@media (max-width: 600px) {
+  .workflow-input-workspace > .panel > p,
+  .workflow-input-workspace > .panel > details,
+  .workflow-input-workspace > .panel > .query-actions,
+  .workflow-input-workspace > .panel > .filters-field { margin-inline: 12px; }
+  .workflow-input-workspace > .panel > fieldset { padding-inline: 12px; }
+}
 @media (max-width: 900px) {
   .layout-resources { grid-template-columns: 1fr; }
 }

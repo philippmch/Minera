@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+  <process id="process" name="Independent workflow discovery" isExecutable="false">
+    <startEvent id="StartEvent_0"/>
+    <endEvent id="EndEvent_1"/>
+    <task id="Activity_2" name="A"/>
+    <parallelGateway id="parallelGateway_3"/>
+    <parallelGateway id="parallelGateway_5"/>
+    <task id="Activity_6" name="B"/>
+    <sequenceFlow id="Flow_4" sourceRef="Activity_2" targetRef="parallelGateway_3"/>
+    <sequenceFlow id="Flow_7" sourceRef="parallelGateway_5" targetRef="Activity_6"/>
+    <sequenceFlow id="Flow_8" sourceRef="StartEvent_0" targetRef="parallelGateway_5"/>
+    <sequenceFlow id="Flow_9" sourceRef="parallelGateway_3" targetRef="EndEvent_1"/>
+    <sequenceFlow id="Flow_10" sourceRef="parallelGateway_3" targetRef="parallelGateway_5"/>
+  </process>
+</definitions>

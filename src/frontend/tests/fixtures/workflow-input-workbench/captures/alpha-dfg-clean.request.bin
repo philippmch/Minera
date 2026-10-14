@@ -1,0 +1,23 @@
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="discovery_family"
+
+alpha
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_shape"
+
+dfg
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_format"
+
+dfg_json
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="alpha_variant"
+
+classic
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input"; filename="owned-alpha-clean.json"
+Content-Type: application/octet-stream
+
+{"kind":"clean","dfg":[{"source":" A,;\u6771\u4eac ","target":"B\u0000end","count":2}],"start_activities":{},"end_activities":{}}
+
+--OwnedWorkflowInputsFeature51--

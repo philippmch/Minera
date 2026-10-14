@@ -2414,3 +2414,28 @@ Native, frontend and captured API checks passed. Browser role/profile exports ar
 verified; complete diagnostics/network UI checks and visual inspection remain
 pending because the browser tool's saved permission rule blocked the local site.
 See [validation and boundaries](docs/feature-first-organizational-validation.json).
+
+### Discovery from original workflow inputs
+
+Use **Discover a workflow from original inputs** on the landing page or
+**Workflow inputs** in either toolbar. Select Alpha Classic/Alpha+ or Heuristic
+Classic/Heuristics++, then an original CSV/TSV/XES/gzip-XES, a typed EventTable
+JSON file, or a structured direct graph. Log, stream, dataframe and lazyframe
+shapes retain their native behavior. Direct graphs use Classic discovery.
+
+Typed tables retain cells, dtypes, indices, categories and metadata. The separate
+mutable Heuristics++ pandas path shows the complete table before and after a run,
+including changes made before a native error. Literal selector controls support
+empty column labels. Graph counts retain exact uint64 integers and boundary
+presence; the complete Heuristic graph carrier also accepts performance values.
+
+Inspect complete native Petri/Heuristics snapshots and Alpha+ live/detached
+markings. Download native JSON, original inputs, submitted requests, reports,
+every inspection table and supported same-run model formats. A failed diagram
+or model conversion retains the complete native result and its export error.
+These independent requests preserve the current cached mining session.
+
+The additive POST /api/discover-workflow-input endpoint provides the workbench.
+Native, frontend, API and export checks passed. Complete browser/visual checks
+and strict reference parity remain pending; see
+[validation and boundaries](docs/feature-first-workflow-input-validation.json).

@@ -101,6 +101,8 @@
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
 #include "minera/dataframe_format_json.hpp"
+#include "minera/workflow_discovery_input_json.hpp"
+#include "minera/workflow_input_result_json.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
@@ -3897,6 +3899,8 @@ void handle_workflow_discovery(const httplib::Request& request,
     response.set_content(error_json(error.what()), "application/json");
   }
 }
+
+#include "workflow_input_route.hpp"
 
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
@@ -10326,6 +10330,7 @@ int main(int argc, char** argv) {
   server.Post("/api/align-dfg", handle_align_dfg);
   server.Post("/api/discover-alpha-plus", handle_alpha_plus_result);
   server.Post("/api/discover-workflow", handle_workflow_discovery);
+  server.Post("/api/discover-workflow-input", handle_workflow_input_discovery);
   server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/discover-timing", handle_timing_discovery);

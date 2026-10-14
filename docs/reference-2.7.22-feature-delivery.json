@@ -231,7 +231,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_independent_workflow_discovery_inputs_available",
       "package": "algo.discovery.alpha",
       "parity_status": "partial",
       "selectors": [
@@ -315,7 +315,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_independent_workflow_discovery_inputs_available",
       "package": "algo.discovery.heuristics",
       "parity_status": "partial",
       "selectors": [
@@ -2602,6 +2602,45 @@
       ],
       "validation": "docs/feature-first-organizational-validation.json",
       "browser_validation_complete": false
+    },
+    {
+      "id": "native_independent_workflow_discovery_inputs",
+      "state": "alpha_heuristic_original_typed_table_direct_graph_mutable_pandas_and_complete_inspection_available",
+      "families": [
+        "algo.discovery.alpha",
+        "algo.discovery.heuristics"
+      ],
+      "variants": [
+        "ALPHA_CLASSIC",
+        "ALPHA_PLUS",
+        "HEURISTIC_CLASSIC",
+        "HEURISTIC_PLUSPLUS",
+        "LOG",
+        "STREAM",
+        "DATAFRAME",
+        "LAZYFRAME",
+        "DFG",
+        "PANDAS_MUTABLE"
+      ],
+      "entry_points": [
+        "include/minera/workflow_discovery_input_json.hpp",
+        "include/minera/workflow_input_result_json.hpp",
+        "src/backend/tools/workflow_input_route.hpp",
+        "src/frontend/src/workflow-input-workbench.ts",
+        "src/frontend/src/components/WorkflowInputWorkspace.tsx"
+      ],
+      "added": [
+        "Independent Alpha CLASSIC/PLUS and Heuristic CLASSIC/PLUSPLUS discovery accepts original CSV/TSV/XES/gzip-XES, complete typed EventTable JSON, event streams, dataframes and lazyframes from landing and both event/OCEL toolbars without replacing the cached mining session.",
+        "Direct graph inputs expose all native CLASSIC Alpha graph/sparse/explicit-boundary/clean forms and the full HeuristicClassicDfgInput carrier. Ordered activity registries, zero keys, omitted versus empty boundaries, exact uint64 counts, window-two paths/triples and scalar/sample/summary/structured performance payloads are retained.",
+        "A separate mutable Heuristics++ pandas path retains complete typed input_before/input_after on success and native failure, including dtype/index/category/metadata changes. CSV parser row interleaving and native shape dispatch remain authoritative.",
+        "All existing native Alpha/Heuristic controls and import selectors are exposed. Exact selector JSON preserves literal empty and whitespace labels; PLUSPLUS cutoffs retain signed, fractional and nonfinite native double spellings. Selected-case regrouping uses a copy so stale role/prefixed metadata cannot overwrite the requested case identity.",
+        "Complete Petri snapshots preserve transition identities, optional/null activities, supplied display names, every arc and signed/magnitude weight, source/sink presence and exact root/detached markings. Heuristics snapshots preserve all 35 public native fields and typed performance representations independently of the optional legacy diagram result.",
+        "Complete Alpha+ structural place names, live markings and detached markings come from the same native run for all event shapes. Unsupported detached-marking PNML and non-workflow diagram conversions return explicit export errors while retaining native results.",
+        "The workbench exposes native JSON, original files, input hashes, exact requests, complete reports, typed cells, all generic/derived inspection tables, per-table/all-table CSV and same-run supported model downloads. Request/file/cancellation guards retain completed runs independently from failed native attempts.",
+        "New typed/structured transports retain int64/uint64 storage, NaN/Inf/-Inf, missing versus present-null cells, nested values and accepted lone-surrogate labels. Input depth/node/byte bounds remain; native output snapshots do not reapply input limits. The new response escapes raw native surrogate bytes before browser UTF-8 decoding."
+      ],
+      "validation": "docs/feature-first-workflow-input-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -2619,7 +2658,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. The next confirmed missing feature surfaces are direct DFG/table Alpha-Heuristic discovery inputs, including typed mutable PLUSPLUS pandas dispatch."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; the next confirmed missing surfaces are independently supplied DFG/decomposed alignment models and tested logs."
     }
   ],
   "feature_status_meaning": {
@@ -2642,7 +2681,8 @@
     "transformation_workflow_available": "Configurable native feature/target/label workflows expose matrix schemas, values, padding and source positions, complete native JSON/reports/CSV and transformed XES reopening with persistent selected activity fields. Existing parity statuses and open semantic/type/error/performance gates remain independent.",
     "native_independent_full_token_replay_workflow_available": "Independent original-log/PNML uploads expose both native replay directions, all four native input shapes, full forward public/PLTR results and complete trace/input/model inspection with exact downloads. Full reference behavior and remaining options/adapters remain parity gates.",
     "native_independent_petri_alignment_workflow_available": "Independent original-log/PNML alignment exposes all six native variants, four input shapes, cost/marking controls and complete result inspection/download. Strict reference behavior and remaining input/object contracts remain parity gates.",
-    "native_organizational_workbench_available": "All four organizational native workflows have app controls, source bindings, full inspection/export code and captured API/frontend validation. Role/profile browser exports are verified; remaining browser checks and strict parity gates are explicitly open."
+    "native_organizational_workbench_available": "All four organizational native workflows have app controls, source bindings, full inspection/export code and captured API/frontend validation. Role/profile browser exports are verified; remaining browser checks and strict parity gates are explicitly open.",
+    "native_independent_workflow_discovery_inputs_available": "Independent Alpha/Heuristic native shapes, full typed/direct graph inputs, mutable pandas and complete snapshots/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

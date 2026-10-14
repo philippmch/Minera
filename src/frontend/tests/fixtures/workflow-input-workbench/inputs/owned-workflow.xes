@@ -1,0 +1,419 @@
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0" xmlns="http://www.xes-standard.org/">
+  <trace>
+    <string key="concept:name" value="case-0" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:00:10Z" />
+      <string key="org:resource" value="R0" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:00:05Z" />
+      <string key="org:resource" value="R0" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-1" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:01:10Z" />
+      <string key="org:resource" value="R1" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:01:05Z" />
+      <string key="org:resource" value="R1" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-2" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:02:10Z" />
+      <string key="org:resource" value="R2" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:02:05Z" />
+      <string key="org:resource" value="R2" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-3" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:03:10Z" />
+      <string key="org:resource" value="R3" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:03:05Z" />
+      <string key="org:resource" value="R3" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-4" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:04:10Z" />
+      <string key="org:resource" value="R4" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:04:05Z" />
+      <string key="org:resource" value="R4" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-5" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:05:10Z" />
+      <string key="org:resource" value="R5" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:05:05Z" />
+      <string key="org:resource" value="R5" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-6" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:06:10Z" />
+      <string key="org:resource" value="R6" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:06:05Z" />
+      <string key="org:resource" value="R6" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-7" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:07:10Z" />
+      <string key="org:resource" value="R7" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:07:05Z" />
+      <string key="org:resource" value="R7" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-8" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:08:10Z" />
+      <string key="org:resource" value="R8" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:08:05Z" />
+      <string key="org:resource" value="R8" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-9" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:09:10Z" />
+      <string key="org:resource" value="R9" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:09:05Z" />
+      <string key="org:resource" value="R9" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-10" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:10:10Z" />
+      <string key="org:resource" value="R10" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:10:05Z" />
+      <string key="org:resource" value="R10" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-11" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:11:10Z" />
+      <string key="org:resource" value="R11" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:11:05Z" />
+      <string key="org:resource" value="R11" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-12" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:12:10Z" />
+      <string key="org:resource" value="R12" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:12:05Z" />
+      <string key="org:resource" value="R12" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-13" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:13:10Z" />
+      <string key="org:resource" value="R13" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:13:05Z" />
+      <string key="org:resource" value="R13" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-14" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:14:10Z" />
+      <string key="org:resource" value="R14" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:14:05Z" />
+      <string key="org:resource" value="R14" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-15" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:15:10Z" />
+      <string key="org:resource" value="R15" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:15:05Z" />
+      <string key="org:resource" value="R15" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-16" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:16:10Z" />
+      <string key="org:resource" value="R16" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:16:05Z" />
+      <string key="org:resource" value="R16" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-17" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:17:10Z" />
+      <string key="org:resource" value="R17" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:17:05Z" />
+      <string key="org:resource" value="R17" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-18" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:18:10Z" />
+      <string key="org:resource" value="R18" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:18:05Z" />
+      <string key="org:resource" value="R18" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-19" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:19:10Z" />
+      <string key="org:resource" value="R19" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:19:05Z" />
+      <string key="org:resource" value="R19" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-20" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:20:10Z" />
+      <string key="org:resource" value="R20" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:20:05Z" />
+      <string key="org:resource" value="R20" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-21" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:21:10Z" />
+      <string key="org:resource" value="R21" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:21:05Z" />
+      <string key="org:resource" value="R21" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-22" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:22:10Z" />
+      <string key="org:resource" value="R22" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:22:05Z" />
+      <string key="org:resource" value="R22" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-23" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:23:10Z" />
+      <string key="org:resource" value="R23" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:23:05Z" />
+      <string key="org:resource" value="R23" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-24" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:24:10Z" />
+      <string key="org:resource" value="R24" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:24:05Z" />
+      <string key="org:resource" value="R24" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-25" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:25:10Z" />
+      <string key="org:resource" value="R25" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:25:05Z" />
+      <string key="org:resource" value="R25" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-26" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:26:10Z" />
+      <string key="org:resource" value="R26" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:26:05Z" />
+      <string key="org:resource" value="R26" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-27" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:27:10Z" />
+      <string key="org:resource" value="R27" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:27:05Z" />
+      <string key="org:resource" value="R27" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-28" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:28:10Z" />
+      <string key="org:resource" value="R28" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:28:05Z" />
+      <string key="org:resource" value="R28" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-29" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:29:10Z" />
+      <string key="org:resource" value="R29" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:29:05Z" />
+      <string key="org:resource" value="R29" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-30" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:30:10Z" />
+      <string key="org:resource" value="R30" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:30:05Z" />
+      <string key="org:resource" value="R30" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case-31" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2024-01-01T07:31:10Z" />
+      <string key="org:resource" value="R31" />
+    </event>
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2024-01-01T07:31:05Z" />
+      <string key="org:resource" value="R31" />
+    </event>
+  </trace>
+</log>
