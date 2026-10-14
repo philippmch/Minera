@@ -2644,6 +2644,32 @@ MineParams parse_mine_params(const FieldLookup& field,
     }
     params.alpha.activity_attribute = value;
   }
+  for (const auto& [name, destination] : {
+           std::pair<std::string_view, std::string*>{
+               "alpha_case_id_attribute", &params.alpha.case_id_attribute},
+           {"alpha_timestamp_attribute", &params.alpha.timestamp_attribute}}) {
+    if (!supplied(name)) continue;
+    const auto value = trim_text(field(name));
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-empty name");
+    *destination = value;
+  }
+  if (supplied("alpha_start_timestamp_attribute")) {
+    // An explicit empty selector retains the native conventional start-column
+    // probe followed by completion-time fallback.
+    params.alpha.start_timestamp_attribute =
+        trim_text(field("alpha_start_timestamp_attribute"));
+  }
+  if (supplied("alpha_sort_caseid_required")) {
+    params.alpha.sort_caseid_required = parse_boolean(
+        field("alpha_sort_caseid_required"), "alpha_sort_caseid_required");
+  }
+  if (supplied("alpha_sort_timestamp_along_case_id")) {
+    params.alpha.sort_timestamp_along_case_id = parse_boolean(
+        field("alpha_sort_timestamp_along_case_id"),
+        "alpha_sort_timestamp_along_case_id");
+  }
   if (supplied("alpha_remove_unconnected")) {
     params.alpha.remove_unconnected = parse_boolean(
         field("alpha_remove_unconnected"), "alpha_remove_unconnected");
@@ -2670,6 +2696,13 @@ MineParams parse_mine_params(const FieldLookup& field,
           "heuristic_activity_attribute: expected a non-empty name");
     params.heuristic.activity_attribute = value;
   }
+  if (supplied("heuristic_case_id_attribute")) {
+    const auto value = trim_text(field("heuristic_case_id_attribute"));
+    if (value.empty())
+      throw std::invalid_argument(
+          "heuristic_case_id_attribute: expected a non-empty name");
+    params.heuristic.case_id_attribute = value;
+  }
   if (supplied("heuristic_timestamp_attribute")) {
     const auto value = trim_text(field("heuristic_timestamp_attribute"));
     if (value.empty())
@@ -2685,6 +2718,10 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.heuristic.and_threshold =
         parse_finite_double(value, "and_threshold");
   }
+  if (supplied("heuristic_connect_all")) {
+    params.heuristic.connect_all = parse_boolean(
+        field("heuristic_connect_all"), "heuristic_connect_all");
+  }
   if (const auto value = field("min_edge_frequency"); !value.empty()) {
     params.heuristic.min_frequency =
         parse_nonnegative_size(value, "min_edge_frequency");
@@ -2692,6 +2729,16 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("heuristic_min_activity_count"); !value.empty()) {
     params.heuristic.min_activity_count =
         parse_nonnegative_size(value, "heuristic_min_activity_count");
+  }
+  if (supplied("heuristic_plusplus_min_activity_count")) {
+    params.heuristic.plusplus_min_activity_count = parse_ieee_double(
+        field("heuristic_plusplus_min_activity_count"),
+        "heuristic_plusplus_min_activity_count");
+  }
+  if (supplied("heuristic_plusplus_min_frequency")) {
+    params.heuristic.plusplus_min_frequency = parse_ieee_double(
+        field("heuristic_plusplus_min_frequency"),
+        "heuristic_plusplus_min_frequency");
   }
   if (const auto value = field("heuristic_decoration"); !value.empty()) {
     if (value == "frequency")

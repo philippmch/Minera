@@ -92,7 +92,16 @@ void parse_mine_params_defaults_when_empty() {
   assert(!params.inductive.multiprocessing);
   assert(!params.alpha.short_loops);  // classic Alpha is the default variant
   assert(params.alpha.activity_attribute == "concept:name");
+  assert(params.alpha.case_id_attribute == "case:concept:name");
+  assert(params.alpha.timestamp_attribute == "time:timestamp");
+  assert(params.alpha.start_timestamp_attribute.empty());
+  assert(params.alpha.sort_caseid_required);
+  assert(params.alpha.sort_timestamp_along_case_id);
   assert(!params.alpha.remove_unconnected);
+  assert(params.heuristic.case_id_attribute == "case:concept:name");
+  assert(!params.heuristic.connect_all);
+  assert(!params.heuristic.plusplus_min_activity_count);
+  assert(!params.heuristic.plusplus_min_frequency);
   assert(params.powl.activity_key == "concept:name");
   assert(params.powl.timestamp_key == "time:timestamp");
   assert(params.powl.case_id_key == "case:concept:name");
@@ -1439,11 +1448,21 @@ void parse_mine_params_maps_alpha_options_and_presence() {
   const auto params = minera::parse_mine_params(fields({
       {"alpha_variant", "plus"},
       {"alpha_activity_attribute", " phase "},
+      {"alpha_case_id_attribute", " batch "},
+      {"alpha_timestamp_attribute", " finished_at "},
+      {"alpha_start_timestamp_attribute", " began_at "},
+      {"alpha_sort_caseid_required", "false"},
+      {"alpha_sort_timestamp_along_case_id", "0"},
       {"alpha_remove_unconnected", "true"},
       {"alpha_max_rows_to_materialize", "12"},
   }));
   assert(params.alpha.short_loops);
   assert(params.alpha.activity_attribute == "phase");
+  assert(params.alpha.case_id_attribute == "batch");
+  assert(params.alpha.timestamp_attribute == "finished_at");
+  assert(params.alpha.start_timestamp_attribute == "began_at");
+  assert(!params.alpha.sort_caseid_required);
+  assert(!params.alpha.sort_timestamp_along_case_id);
   assert(params.alpha.remove_unconnected);
   assert(params.alpha.max_rows_to_materialize == 12);
   const auto zero_cap = minera::parse_mine_params(fields({
@@ -1468,6 +1487,10 @@ void parse_mine_params_maps_alpha_options_and_presence() {
 
   for (const auto& item : {
            std::pair{"alpha_activity_attribute", "  "},
+           std::pair{"alpha_case_id_attribute", "  "},
+           std::pair{"alpha_timestamp_attribute", "\t"},
+           std::pair{"alpha_sort_caseid_required", "yes"},
+           std::pair{"alpha_sort_timestamp_along_case_id", "2"},
            std::pair{"alpha_remove_unconnected", "yes"},
            std::pair{"alpha_variant", "unknown"},
            std::pair{"alpha_max_rows_to_materialize", "-1"},
@@ -1486,6 +1509,188 @@ void parse_mine_params_maps_alpha_options_and_presence() {
     }
     assert(threw);
   }
+}
+
+void parse_mine_params_preserves_flat_discovery_presence_and_ieee_cutoffs() {
+  const auto defaults = minera::parse_mine_params(fields({}));
+  assert(!defaults.heuristic.start_timestamp_attribute);
+  const auto custom = minera::parse_mine_params(fields({
+      {"heuristic_case_id_attribute", " bucket "},
+      {"heuristic_connect_all", "1"},
+      {"heuristic_plusplus_min_activity_count", "-0.5"},
+      {"heuristic_plusplus_min_frequency", "2.25"},
+      {"heuristic_min_activity_count", "7"},
+      {"min_edge_frequency", "9"},
+  }));
+  assert(custom.heuristic.case_id_attribute == "bucket");
+  assert(custom.heuristic.connect_all);
+  assert(custom.heuristic.plusplus_min_activity_count == -0.5);
+  assert(custom.heuristic.plusplus_min_frequency == 2.25);
+  assert(custom.heuristic.min_activity_count == 7);
+  assert(custom.heuristic.min_frequency == 9);
+
+  for (const auto* name : {"heuristic_plusplus_min_activity_count",
+                           "heuristic_plusplus_min_frequency"}) {
+    for (const auto* encoded : {"NaN", "nan", "Inf", "-Infinity", "+inf"}) {
+      const auto params = minera::parse_mine_params(fields({{name, encoded}}));
+      const auto value = std::string_view(name) ==
+                                "heuristic_plusplus_min_activity_count"
+                            ? params.heuristic.plusplus_min_activity_count
+                            : params.heuristic.plusplus_min_frequency;
+      assert(value);
+      if (std::string_view(encoded) == "NaN" ||
+          std::string_view(encoded) == "nan")
+        assert(std::isnan(*value));
+      else
+        assert(std::isinf(*value));
+    }
+    for (const auto* malformed : {"", "1.5junk", "1e9999"}) {
+      const std::map<std::string, std::string> values{{name, malformed}};
+      bool threw = false;
+      try {
+        (void)minera::parse_mine_params(fields(values), [&](std::string_view key) {
+          return values.contains(std::string(key));
+        });
+      } catch (const std::invalid_argument& error) {
+        threw = true;
+        assert(std::string(error.what()).starts_with(name));
+      }
+      assert(threw);
+    }
+  }
+
+  const std::map<std::string, std::string> empty_start{
+      {"alpha_start_timestamp_attribute", ""},
+      {"heuristic_start_timestamp_attribute", ""}};
+  const auto starts = minera::parse_mine_params(fields(empty_start),
+      [&](std::string_view key) { return empty_start.contains(std::string(key)); });
+  assert(starts.alpha.start_timestamp_attribute.empty());
+  // Preserve the established heuristic wire behavior. The standalone exact
+  // selector carrier separately represents native optional empty selectors.
+  assert(!starts.heuristic.start_timestamp_attribute);
+
+  for (const auto* name : {"alpha_case_id_attribute", "alpha_timestamp_attribute",
+                           "alpha_sort_caseid_required",
+                           "alpha_sort_timestamp_along_case_id",
+                           "heuristic_case_id_attribute", "heuristic_connect_all"}) {
+    const std::map<std::string, std::string> values{{name, ""}};
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields(values), [&](std::string_view key) {
+        return values.contains(std::string(key));
+      });
+    } catch (const std::invalid_argument& error) {
+      threw = true;
+      assert(std::string(error.what()).starts_with(name));
+    }
+    assert(threw);
+    // A FieldPresence callback is authoritative even if its lookup has data.
+    const auto omitted = minera::parse_mine_params(
+        fields({{name, "present-but-not-selected"}}),
+        [](std::string_view) { return false; });
+    assert(omitted.alpha.case_id_attribute == "case:concept:name");
+    assert(omitted.alpha.timestamp_attribute == "time:timestamp");
+    assert(omitted.alpha.sort_caseid_required);
+    assert(omitted.alpha.sort_timestamp_along_case_id);
+    assert(omitted.heuristic.case_id_attribute == "case:concept:name");
+    assert(!omitted.heuristic.connect_all);
+  }
+  for (const auto* encoded : {"false", "0", "true", "1"}) {
+    const auto params = minera::parse_mine_params(fields({
+        {"alpha_sort_caseid_required", encoded},
+        {"alpha_sort_timestamp_along_case_id", encoded},
+        {"heuristic_connect_all", encoded}}));
+    const bool expected = std::string_view(encoded) == "true" ||
+                          std::string_view(encoded) == "1";
+    assert(params.alpha.sort_caseid_required == expected);
+    assert(params.alpha.sort_timestamp_along_case_id == expected);
+    assert(params.heuristic.connect_all == expected);
+  }
+}
+
+void parse_mine_params_drives_native_flat_alpha_and_heuristic_dispatch() {
+  minera::EventTable input;
+  input.columns = {"bucket", "phase", "finished_at", "began_at"};
+  const auto add_row = [&](const char* bucket, const char* phase,
+                           const char* completion, const char* start) {
+    input.rows.push_back({
+        minera::EventAttribute{"bucket", bucket},
+        minera::EventAttribute{"phase", phase},
+        minera::EventAttribute{"finished_at", completion,
+                                minera::AttributeKind::kDate},
+        minera::EventAttribute{"began_at", start, minera::AttributeKind::kDate}});
+  };
+  add_row("c", "B", "2024-01-01T00:00:10Z", "2024-01-01T00:00:00Z");
+  add_row("d", "X", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z");
+  add_row("c", "A", "2024-01-01T00:00:05Z", "2024-01-01T00:00:02Z");
+  add_row("d", "Y", "2024-01-01T00:00:01Z", "2024-01-01T00:00:01Z");
+  const auto connects = [](const minera::PetriNet& net, const char* from,
+                            const char* to) {
+    for (const auto& source : net.transitions()) {
+      if (!source.activity || net.activities()[*source.activity] != from)
+        continue;
+      for (const auto& target : net.transitions()) {
+        if (!target.activity || net.activities()[*target.activity] != to)
+          continue;
+        for (const auto place : source.outputs)
+          for (const auto input_place : target.inputs)
+            if (place == input_place) return true;
+      }
+    }
+    return false;
+  };
+  std::map<std::string, std::string> options{
+      {"alpha_activity_attribute", "phase"},
+      {"alpha_case_id_attribute", "bucket"},
+      {"alpha_timestamp_attribute", "finished_at"}};
+  const auto chronological = minera::discover_petri_net(
+      input, minera::parse_mine_params(fields(options)).alpha);
+  assert(connects(chronological, "A", "B"));
+  assert(!connects(chronological, "B", "A"));
+  options["alpha_start_timestamp_attribute"] = "began_at";
+  const auto started = minera::discover_petri_net(
+      input, minera::parse_mine_params(fields(options)).alpha);
+  assert(connects(started, "B", "A"));
+  assert(!connects(started, "A", "B"));
+  options["alpha_sort_timestamp_along_case_id"] = "false";
+  const auto case_only = minera::discover_petri_net(
+      input, minera::parse_mine_params(fields(options)).alpha);
+  assert(connects(case_only, "B", "A"));
+  assert(connects(case_only, "X", "Y"));
+  options["alpha_sort_caseid_required"] = "false";
+  const auto unsorted = minera::discover_petri_net(
+      input, minera::parse_mine_params(fields(options)).alpha);
+  assert(!connects(unsorted, "B", "A"));
+  assert(!connects(unsorted, "X", "Y"));
+  options["alpha_variant"] = "plus";
+  const auto plus = minera::discover_petri_net(
+      input, minera::parse_mine_params(fields(options)).alpha);
+  assert(connects(plus, "B", "A"));
+  assert(connects(plus, "X", "Y"));
+  options["alpha_max_rows_to_materialize"] = "3";
+  bool capped = false;
+  try {
+    (void)minera::discover_petri_net(
+        input, minera::parse_mine_params(fields(options)).alpha);
+  } catch (const std::length_error&) {
+    capped = true;
+  }
+  assert(capped);
+
+  minera::EventStream stream;
+  for (const auto& row : input.rows) {
+    minera::EventRecord event;
+    event.fields.push_back({"case:concept:name", "stale-case"});
+    for (const auto& cell : row) event.fields.push_back(*cell);
+    stream.events.push_back(std::move(event));
+  }
+  const auto heuristic_options = minera::parse_mine_params(fields({
+      {"heuristic_case_id_attribute", "bucket"},
+      {"heuristic_activity_attribute", "phase"}})).heuristic;
+  const auto flat = minera::discover_heuristics_net(stream, heuristic_options);
+  assert(flat.raw_dfg.size() == 2);
+  assert(flat.raw_dfg.contains({"B", "A"}));
+  assert(flat.raw_dfg.contains({"X", "Y"}));
 }
 
 void parse_mine_params_rejects_variant_and_endpoint_filter_errors() {
@@ -3873,6 +4078,8 @@ void parse_mine_params_rejects_unknown_heuristic_settings() {
            {"heuristic_variant", "bogus"},
            {"heuristic_activity_attribute", "   "},
            {"heuristic_timestamp_attribute", "   "},
+           {"heuristic_case_id_attribute", "   "},
+           {"heuristic_connect_all", "maybe"},
            {"heuristic_decoration", "bogus"},
            {"heuristic_business_hours", "maybe"},
            {"heuristic_business_hour_slots", "0-0"},
@@ -5626,6 +5833,8 @@ int main() {
   parse_mine_params_rejects_a_malformed_succession();
   parse_mine_params_rejects_an_unknown_alpha_variant();
   parse_mine_params_maps_alpha_options_and_presence();
+  parse_mine_params_preserves_flat_discovery_presence_and_ieee_cutoffs();
+  parse_mine_params_drives_native_flat_alpha_and_heuristic_dispatch();
   parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_rejects_invalid_inductive_options();
   parse_mine_params_accepts_infrequent_inductive_variant();

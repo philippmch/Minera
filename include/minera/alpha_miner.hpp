@@ -117,6 +117,16 @@ struct AlphaPlusDiscoveryResult {
 // root/detached marking identities in PetriNet::discovery_markings().
 [[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(
     const EventLog& event_log, const AlphaMinerOptions& options = {});
+// Flat entry points use the same input projection as native Alpha+ discovery
+// and return its complete place names and live/detached markings in one run.
+[[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const EventDataView& data, const AlphaMinerOptions& options = {});
+[[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const EventStream& data, const AlphaMinerOptions& options = {});
+[[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const EventTable& data, const AlphaMinerOptions& options = {});
+[[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const LazyEventTable& data, const AlphaMinerOptions& options = {});
 
 [[nodiscard]] PetriNet discover_petri_net(
     const EventDataView& data, const AlphaMinerOptions& options = {});

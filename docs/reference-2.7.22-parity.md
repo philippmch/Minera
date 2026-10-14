@@ -13256,3 +13256,38 @@ All existing algorithm defaults, ordering, numeric values, grouping, truncation 
 This is implemented feature group 50. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
 
 Evidence: docs/feature-first-organizational-validation.json. No screenshot preview is claimed.
+
+
+### Feature delivery first: independent workflow discovery inputs
+
+Independent Alpha CLASSIC/PLUS and Heuristic CLASSIC/PLUSPLUS discovery accepts original CSV/TSV/XES/gzip-XES, complete typed EventTable JSON, event streams, dataframes and lazyframes from landing and both event/OCEL toolbars without replacing the cached mining session.
+
+Direct graph inputs expose all native CLASSIC Alpha graph/sparse/explicit-boundary/clean forms and the full HeuristicClassicDfgInput carrier. Ordered activity registries, zero keys, omitted versus empty boundaries, exact uint64 counts, window-two paths/triples and scalar/sample/summary/structured performance payloads are retained.
+
+A separate mutable Heuristics++ pandas path retains complete typed input_before/input_after on success and native failure, including dtype/index/category/metadata changes. CSV parser row interleaving and native shape dispatch remain authoritative.
+
+All existing native Alpha/Heuristic controls and import selectors are exposed. Exact selector JSON preserves literal empty and whitespace labels; PLUSPLUS cutoffs retain signed, fractional and nonfinite native double spellings. Selected-case regrouping uses a copy so stale role/prefixed metadata cannot overwrite the requested case identity.
+
+Complete Petri snapshots preserve transition identities, optional/null activities, supplied display names, every arc and signed/magnitude weight, source/sink presence and exact root/detached markings. Heuristics snapshots preserve all 35 public native fields and typed performance representations independently of the optional legacy diagram result.
+
+Complete Alpha+ structural place names, live markings and detached markings come from the same native run for all event shapes. Unsupported detached-marking PNML and non-workflow diagram conversions return explicit export errors while retaining native results.
+
+The workbench exposes native JSON, original files, input hashes, exact requests, complete reports, typed cells, all generic/derived inspection tables, per-table/all-table CSV and same-run supported model downloads. Request/file/cancellation guards retain completed runs independently from failed native attempts.
+
+New typed/structured transports retain int64/uint64 storage, NaN/Inf/-Inf, missing versus present-null cells, nested values and accepted lone-surrogate labels. Input depth/node/byte bounds remain; native output snapshots do not reapply input limits. The new response escapes raw native surrogate bytes before browser UTF-8 decoding.
+
+Validation: {"api_calls": 106, "api_checks": 416, "core_objects": 177, "export_csv_cells": 278971, "export_entries": 85, "export_numeric_literals": 17867, "export_selected_records": 43805, "export_tests": 90, "frontend_files": 87, "frontend_tests": 1714, "native_suites": 12, "unrelated_files_preserved": 110, "workflow_fixtures": 85}. Source/compiler/object/binary/served-production-asset bindings passed. Complete browser validation is explicitly false.
+
+This is a feature-delivery checkpoint, not full PM4Py parity. No package/module parity status or selector is promoted; all 228 incomplete units remain in scope.
+
+Complete browser interaction, downloads, visual screenshot and responsive inspection for this new workbench remain pending. The prior browser tool reported a saved-origin/managed-policy denial at http://127.0.0.1:8562 despite human authorization and reported Allow settings; the permission-state mismatch remains unresolved. Local HTTP and Windows listener checks are recorded separately from browser validation.
+
+Alpha+ and Heuristic PLUSPLUS do not accept direct DFG input in the existing native API; controls offer CLASSIC only for that shape, and native invalid requests are retained as errors.
+
+Complete native results remain available when legacy diagram/Petri conversion or a model format is unavailable. Mutable pandas preserves native dtype/order/error/mutation behavior; failed attempts do not imply a discovered model.
+
+This checkpoint adds own-source native, frontend, API and export evidence, not a fresh public-reference differential corpus. Remaining defaults, scalar identity, object behavior, numeric ordering, schema/errors, Unicode and performance/concurrency/solver gates remain independent parity work.
+
+This is implemented feature group 51. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
+
+Evidence: docs/feature-first-workflow-input-validation.json. No browser screenshot is claimed.

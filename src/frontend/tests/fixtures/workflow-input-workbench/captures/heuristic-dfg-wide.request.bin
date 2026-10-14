@@ -1,0 +1,31 @@
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="discovery_family"
+
+heuristic
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_shape"
+
+dfg
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_format"
+
+dfg_json
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="heuristic_variant"
+
+classic
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="dependency_threshold"
+
+0
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="heuristic_dfg_pre_cleaning_noise_threshold"
+
+0
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input"; filename="owned-heuristic-wide.json"
+Content-Type: application/octet-stream
+
+{"dfg":[{"source":"A","target":"B","count":18446744073709551615},{"source":"A","target":"C","count":18446744073709551615}]}
+
+--OwnedWorkflowInputsFeature51--

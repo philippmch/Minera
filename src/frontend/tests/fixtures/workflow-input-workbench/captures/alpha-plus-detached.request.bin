@@ -1,0 +1,23 @@
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="discovery_family"
+
+alpha
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_shape"
+
+lazyframe
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_format"
+
+auto
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="alpha_variant"
+
+plus
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input"; filename="owned-loop.xes"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<log><trace><string key="concept:name" value="loop-case" /><event><string key="concept:name" value="loop 東京" /><date key="time:timestamp" value="2024-01-01T00:00:00Z" /></event><event><string key="concept:name" value="loop 東京" /><date key="time:timestamp" value="2024-01-01T00:00:00Z" /></event></trace></log>
+--OwnedWorkflowInputsFeature51--

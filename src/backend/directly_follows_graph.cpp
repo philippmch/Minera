@@ -32,6 +32,33 @@ std::string variant_key(const std::vector<std::string>& activities) {
 
 }  // namespace
 
+DirectlyFollowsGraph DirectlyFollowsGraph::from_frequencies(
+    const std::vector<std::string>& activities,
+    const std::vector<DirectlyFollowsEdge>& edges,
+    const std::vector<std::uint64_t>& start_counts,
+    const std::vector<std::uint64_t>& end_counts) {
+  if (start_counts.size() != activities.size() ||
+      end_counts.size() != activities.size())
+    throw std::invalid_argument("DFG boundary count widths differ from activities");
+  DirectlyFollowsGraph graph;
+  for (const auto& activity : activities) {
+    if (graph.activity_id(activity))
+      throw std::invalid_argument("DFG activity registry contains duplicate labels");
+    graph.intern_activity(activity);
+  }
+  graph.start_activity_counts_ = start_counts;
+  graph.end_activity_counts_ = end_counts;
+  for (const auto& edge : edges) {
+    if (edge.source >= activities.size() || edge.target >= activities.size())
+      throw std::invalid_argument("DFG edge refers to an unknown activity index");
+    const auto key = edge_key(edge.source, edge.target);
+    if (!graph.edge_ids_.emplace(key, graph.edges_.size()).second)
+      throw std::invalid_argument("DFG contains duplicate activity pairs");
+    graph.edges_.push_back(edge);
+  }
+  return graph;
+}
+
 std::optional<std::size_t> DirectlyFollowsGraph::activity_id(
     std::string_view activity) const {
   const auto it = activity_ids_.find(std::string(activity));

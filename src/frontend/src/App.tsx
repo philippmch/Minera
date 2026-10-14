@@ -59,6 +59,7 @@ import { ProcessCubeWorkspace } from "./components/ProcessCubeWorkspace";
 import { TreeGenerationWorkspace } from "./components/TreeGenerationWorkspace";
 import { TokenReplayWorkspace } from "./components/TokenReplayWorkspace";
 import { PetriAlignmentWorkspace } from "./components/PetriAlignmentWorkspace";
+import { WorkflowInputWorkspace } from "./components/WorkflowInputWorkspace";
 import { requestLogQuerySchema } from "./log-query";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
@@ -125,6 +126,7 @@ export default function App() {
   const [showAcquisition, setShowAcquisition] = useState(false);
   const [showTokenReplay, setShowTokenReplay] = useState(false);
   const [showPetriAlignment, setShowPetriAlignment] = useState(false);
+  const [showWorkflowInputs, setShowWorkflowInputs] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -374,6 +376,7 @@ export default function App() {
     setShowAcquisition(false);
     setShowTokenReplay(false);
     setShowPetriAlignment(false);
+    setShowWorkflowInputs(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -581,6 +584,7 @@ export default function App() {
     [data, selectedVariant],
   );
 
+  if (showWorkflowInputs) return <><TopBar dataset={data?.dataset??ocelDataset??'Workflow inputs'} datasetKind="independent workflow discovery" onOpenFile={loadFile} onHome={()=>setShowWorkflowInputs(false)}/><main className="layout-log workflow-input-workspace"><button className="btn-ghost" onClick={()=>setShowWorkflowInputs(false)}>Return to current workspace</button><WorkflowInputWorkspace file={source?.file??null}/></main></>;
   if (showPetriAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Alignment inputs'} datasetKind="Petri alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAlignment(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowPetriAlignment(false)}>Return to current workspace</button><PetriAlignmentWorkspace file={source?.file??null}/></main></>;
   if (showTokenReplay) return <><TopBar dataset={data?.dataset??ocelDataset??'Replay inputs'} datasetKind="token replay" onOpenFile={loadFile} onHome={()=>setShowTokenReplay(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTokenReplay(false)}>Return to current workspace</button><TokenReplayWorkspace file={source?.file??null}/></main></>;
   if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
@@ -608,6 +612,7 @@ export default function App() {
           onAcquisition={()=>setShowAcquisition(true)}
           onTokenReplay={()=>setShowTokenReplay(true)}
           onPetriAlignment={()=>setShowPetriAlignment(true)}
+          onWorkflowInputs={()=>setShowWorkflowInputs(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -659,6 +664,7 @@ export default function App() {
           onAcquisition={()=>setShowAcquisition(true)}
           onTokenReplay={()=>setShowTokenReplay(true)}
           onPetriAlignment={()=>setShowPetriAlignment(true)}
+          onWorkflowInputs={()=>setShowWorkflowInputs(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -687,6 +693,7 @@ export default function App() {
           onAcquisition={()=>setShowAcquisition(true)}
           onTokenReplay={()=>setShowTokenReplay(true)}
           onPetriAlignment={()=>setShowPetriAlignment(true)}
+          onWorkflowInputs={()=>setShowWorkflowInputs(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);

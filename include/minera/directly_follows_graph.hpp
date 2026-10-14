@@ -25,6 +25,15 @@ struct TraceVariant {
 
 class DirectlyFollowsGraph {
  public:
+  // Construct an exact declared graph without manufacturing event traces.
+  // Registry order and zero-valued topology entries are retained. Counts do
+  // not imply activity occurrences, variants or rework observations.
+  [[nodiscard]] static DirectlyFollowsGraph from_frequencies(
+      const std::vector<std::string>& activities,
+      const std::vector<DirectlyFollowsEdge>& edges,
+      const std::vector<std::uint64_t>& start_counts,
+      const std::vector<std::uint64_t>& end_counts);
+
   [[nodiscard]] const std::vector<std::string>& activities() const noexcept {
     return activities_;
   }

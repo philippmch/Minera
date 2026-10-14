@@ -1,0 +1,31 @@
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="discovery_family"
+
+heuristic
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_shape"
+
+dfg
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input_format"
+
+dfg_json
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="heuristic_variant"
+
+classic
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="dependency_threshold"
+
+0
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="heuristic_dfg_pre_cleaning_noise_threshold"
+
+0
+--OwnedWorkflowInputsFeature51
+Content-Disposition: form-data; name="input"; filename="owned-heuristic-incomplete.json"
+Content-Type: application/octet-stream
+
+{"dfg":[{"source":"B","target":"A","count":5},{"source":"A","target":"B","count":2}],"activities":["B","A","A"," isolated "],"activity_counts":{"A":7,"B":7},"start_counts":{},"end_counts":{"A":1},"window_two_dfg":[{"source":"A","target":"A","count":2}],"frequency_triples":[{"source":"A","via":"B","target":"A","count":3}],"dfg_window_2_supplied":false,"freq_triples_supplied":true,"start_activities":["B","B"],"end_activities":{"A":0},"dfg_order":[{"source":"B","target":"A"},{"source":"A","target":"B"}],"performance_dfg":[{"source":"B","target":"A","samples":[0.125,1.25]}],"performance_values":[{"source":"B","target":"A","value":{"type":"structured","value":{"type":"object","value":{"i":{"type":"int64","value":1},"u":{"type":"uint64","value":18446744073709551615},"f":{"type":"float","value":0.125},"s":{"type":"string","value":"\u6771\u4eac\u0000;"},"n":{"type":"null","value":null},"b":{"type":"boolean","value":true},"a":{"type":"array","value":[]}}}}}]}
+
+--OwnedWorkflowInputsFeature51--

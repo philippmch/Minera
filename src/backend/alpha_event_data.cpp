@@ -313,6 +313,25 @@ EventLog normalize_alpha_event_log(const LazyEventTable& data,
   return normalize_alpha_event_log(EventDataView(data), options);
 }
 
+AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const EventDataView& data, const AlphaMinerOptions& options) {
+  if (data.kind() == EventDataKind::kEventLog)
+    return discover_alpha_plus_result(*data.log(), options);
+  return discover_alpha_plus_result(normalize_alpha_event_log(data, options), options);
+}
+AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const EventStream& data, const AlphaMinerOptions& options) {
+  return discover_alpha_plus_result(EventDataView(data), options);
+}
+AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const EventTable& data, const AlphaMinerOptions& options) {
+  return discover_alpha_plus_result(EventDataView(data), options);
+}
+AlphaPlusDiscoveryResult discover_alpha_plus_result(
+    const LazyEventTable& data, const AlphaMinerOptions& options) {
+  return discover_alpha_plus_result(EventDataView(data), options);
+}
+
 PetriNet discover_petri_net(const EventDataView& data,
                             const AlphaMinerOptions& options) {
   if (data.kind() == EventDataKind::kEventLog)
