@@ -191,13 +191,15 @@ std::string local_diagnostics_json(const LocalDiagnosticsResult& r) {
     throw std::invalid_argument("local diagnostics ratio is invalid");
   std::set<std::string> groups;
   std::set<std::string> resources;
+  std::size_t rows = 0;
   for (const auto& [group, values] : r.group_relative_focus) {
-    (void)values; groups.insert(group);
+    rows += values.size(); groups.insert(group);
   }
   for (const auto& [group, values] : r.group_relative_stake) {
-    (void)values; groups.insert(group);
+    rows += values.size(); groups.insert(group);
   }
   for (const auto& [group, values] : r.group_coverage) {
+    rows += values.size();
     groups.insert(group);
     for (const auto& [resource, value] : values) {
       (void)value; resources.insert(resource);
@@ -206,11 +208,14 @@ std::string local_diagnostics_json(const LocalDiagnosticsResult& r) {
   for (const auto& [group, by_resource] : r.group_member_contribution) {
     groups.insert(group);
     for (const auto& [resource, activities] : by_resource) {
-      (void)activities; resources.insert(resource);
+      rows += activities.size(); resources.insert(resource);
     }
   }
-  if (r.diagnostics.group_count != groups.size() ||
+  // Membership totals include groups with no scalar output, and truncation
+  // may omit whole groups. Serialized leaves still exactly match row_count.
+  if (r.diagnostics.group_count < groups.size() ||
       r.diagnostics.resource_count < resources.size() ||
+      r.diagnostics.row_count != rows ||
       r.diagnostics.skipped_events > r.diagnostics.event_count)
     throw std::invalid_argument("local diagnostics counts are inconsistent");
   std::ostringstream out;

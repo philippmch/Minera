@@ -327,7 +327,7 @@ export function isNetworkAnalysisResult(value: unknown): value is NetworkAnalysi
   const d = v.diagnostics as Partial<NetworkAnalysisDiagnostics>;
   const performanceCount = v.edges.reduce((sum, edge) => sum + edge.performance.length, 0);
   const linkCount = v.edges.reduce((sum, edge) => sum + edge.count, 0);
-  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && ["trace_count", "event_count", "link_count", "row_count", "performance_value_count"].every((k) => { const n = d[k as keyof NetworkAnalysisDiagnostics]; return typeof n === "number" && Number.isInteger(n) && n >= 0; }) && d.row_count === v.edges.length && d.link_count === linkCount && d.performance_value_count === performanceCount && typeof d.message === "string";
+  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && ["trace_count", "event_count", "link_count", "row_count", "performance_value_count"].every((k) => { const n = d[k as keyof NetworkAnalysisDiagnostics]; return typeof n === "number" && Number.isInteger(n) && n >= 0; }) && d.row_count === v.edges.length && d.link_count! >= linkCount && d.performance_value_count! >= performanceCount && (d.output_truncated || (d.link_count === linkCount && d.performance_value_count === performanceCount)) && typeof d.message === "string";
 }
 export function isOrganizationalSnaResult(value: unknown): value is OrganizationalSnaResult {
   if (!value || typeof value !== "object") return false;
@@ -406,12 +406,14 @@ export function isResourceProfilesResult(value: unknown): value is ResourceProfi
   if (!value || typeof value !== "object") return false; const c = value as Partial<ResourceProfilesResult>; const d = c.diagnostics;
   const metrics = new Set<ResourceProfilesMetric>(["distinct_activities", "activity_frequency", "activity_completions", "case_completions", "fraction_case_completions", "average_workload", "multitasking", "average_duration_activity", "average_case_duration", "interaction_two_resources", "social_position"]);
   if (c.family !== "RESOURCE_PROFILES" || typeof c.metric !== "string" || !metrics.has(c.metric as ResourceProfilesMetric) || !Array.isArray(c.rows) || !c.rows.every((r) => !!r && typeof r.resource === "string" && r.resource.length > 0 && typeof r.activity === "string" && typeof r.resource2 === "string" && typeof r.value === "number" && Number.isFinite(r.value) && Number.isInteger(r.count) && r.count >= 0) || !d || typeof d.computed !== "boolean" || typeof d.output_truncated !== "boolean" || ![d.trace_count,d.event_count,d.resource_count].every((n) => Number.isInteger(n) && (n as number) >= 0) || typeof d.message !== "string") return false;
-  const keys = c.rows.map((row) => `${row.resource}\0${row.activity}\0${row.resource2}`);
-  const resources = new Set(c.rows.flatMap((row) => row.resource2 ? [row.resource, row.resource2] : [row.resource]));
+  const keys = c.rows.map((row) => JSON.stringify([row.resource,row.activity,row.resource2]));
+  const resources = new Set(c.rows.flatMap((row) =>
+    row.count === 0 && row.value === 0 && (c.metric === "social_position" || c.metric === "interaction_two_resources")
+      ? [] : row.resource2 ? [row.resource, row.resource2] : [row.resource]));
   return new Set(keys).size === keys.length && d.resource_count >= resources.size;
 }
 
-export interface LocalDiagnosticsOptions { local_diagnostics_group_attribute?: string; local_diagnostics_resource_attribute?: string; local_diagnostics_activity_attribute?: string; local_diagnostics_groups?: string; local_diagnostics_max_groups?: number; local_diagnostics_max_resources?: number; local_diagnostics_max_rows?: number; }
+export interface LocalDiagnosticsOptions { local_diagnostics_group_attribute?: string; local_diagnostics_resource_attribute?: string; local_diagnostics_activity_attribute?: string; local_diagnostics_groups?: string; local_diagnostics_groups_json?: string; local_diagnostics_max_groups?: number; local_diagnostics_max_resources?: number; local_diagnostics_max_rows?: number; }
 export interface LocalDiagnosticsResult { family: "LOCAL_DIAGNOSTICS"; group_relative_focus: Record<string, Record<string, number>>; group_relative_stake: Record<string, Record<string, number>>; group_coverage: Record<string, Record<string, number>>; group_member_contribution: Record<string, Record<string, Record<string, number>>>; diagnostics: { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; group_count: number; resource_count: number; row_count: number; skipped_events: number; message: string }; }
 export type ClusteringVariant = "DMM_LEVEN" | "AVG_LEVEN" | "DMM_VEC" | "AVG_VEC" | "DFG";
 export interface ClusteringOptions {
@@ -6822,6 +6824,8 @@ export interface DataPetriNetResult {
 
 export interface MineraExport {
   dataset: string;
+  /** Cached HTTP source identity; absent from standalone and legacy exports. */
+  source_id?: string;
   generator?: string;
   trace_count: number;
   event_count: number;
@@ -7055,6 +7059,7 @@ function isBatchEvent(value: unknown): value is BatchEvent {
 export function isMineraExport(value: unknown): value is MineraExport {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const data = value as MineraExport;
+  if (data.source_id !== undefined && (typeof data.source_id !== "string" || !data.source_id)) return false;
   if (!Array.isArray(data.activities) || !Array.isArray(data.edges) ||
       !Array.isArray(data.variants) ||
       !Number.isSafeInteger(data.trace_count) || data.trace_count < 0 ||

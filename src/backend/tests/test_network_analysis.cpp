@@ -43,6 +43,18 @@ int main() {
   NetworkAnalysisOptions custom; custom.max_rows = 1;
   auto bounded = discover_network_analysis(sample(), custom);
   assert(bounded.edges.size() == 1 && bounded.diagnostics.output_truncated);
+  custom.include_performance = true;
+  const auto bounded_performance = discover_network_analysis(sample(), custom);
+  assert(bounded_performance.diagnostics.link_count == 2 &&
+         bounded_performance.diagnostics.performance_value_count == 2 &&
+         bounded_performance.edges.front().performance.size() == 1);
+  const auto bounded_json = network_analysis_json(bounded_performance);
+  assert(bounded_json.find("\"link_count\":2") != std::string::npos &&
+         bounded_json.find("\"performance_value_count\":2") != std::string::npos);
+  auto bad_bounded = bounded_performance;
+  bad_bounded.diagnostics.link_count = 0;
+  try { (void)network_analysis_json(bad_bounded); assert(false); }
+  catch (const std::invalid_argument&) {}
   EventLog missing = sample(); missing.traces[0].events[1].resource.clear();
   for (const auto& edge : discover_network_analysis(missing).edges) assert(!edge.source.empty() && !edge.target.empty());
   EventLog case_attribute_log;
@@ -58,6 +70,9 @@ int main() {
   NetworkAnalysisOptions values; values.include_performance = true; values.max_values = 1;
   auto limited = discover_network_analysis(sample(), values);
   assert(limited.diagnostics.performance_value_count == 1 && limited.diagnostics.output_truncated);
+  assert(!network_analysis_json(limited).empty());
+  values.max_rows = 1;
+  assert(!network_analysis_json(discover_network_analysis(sample(), values)).empty());
   NetworkAnalysisOptions slots; slots.include_performance = true; slots.business_hours = true;
   auto bh = discover_network_analysis(sample(), slots);
   assert(bh.edges[0].performance[0] == 3600.0);

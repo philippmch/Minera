@@ -7417,9 +7417,12 @@ std::string network_analysis_json(const NetworkAnalysisResult& result) {
     links += edge.count;
     performance_values += edge.performance.size();
   }
-  if (result.diagnostics.row_count != result.edges.size() ||
-      result.diagnostics.link_count != links ||
-      result.diagnostics.performance_value_count != performance_values)
+  const auto& diagnostics = result.diagnostics;
+  if (diagnostics.row_count != result.edges.size() ||
+      diagnostics.link_count < links ||
+      diagnostics.performance_value_count < performance_values ||
+      (!diagnostics.output_truncated &&
+       (diagnostics.link_count != links || diagnostics.performance_value_count != performance_values)))
     throw std::invalid_argument("network analysis diagnostics are inconsistent");
   std::ostringstream out;
   out << "{\"family\":\"NETWORK_ANALYSIS\",\"variant\":\"dataframe\",\"edges\":[";

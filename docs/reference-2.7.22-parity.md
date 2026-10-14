@@ -13221,3 +13221,38 @@ Native empty-activity limitations remain open: the aligner omits a blank XES log
 This is delivered feature group 49. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
 
 Evidence: docs/feature-first-petri-alignment-validation.json and docs/feature-first-petri-alignment-preview.png.
+
+
+### Feature delivery first: organizational analysis workbench
+
+Resources now exposes independent role discovery, all eleven resource-profile metrics, local group diagnostics and attribute-network analysis. Each family has all existing native selectors and bounds, separate submitted options and retained completed results.
+
+LOG/PANDAS roles preserve native role records and exact membership labels. Completed roles can populate exact JSON diagnostics groups with the selected activity/resource fields and an explicit source binding.
+
+Exact JSON group transport supports Unicode, punctuation, overlapping groups, unobserved members, empty arrays and native blank-member semantics without delimiter encoding. Malformed shapes, duplicate decoded keys and conflicting legacy carriers are rejected.
+
+Profiles expose activity/resource/case/start/completion/time-slot selectors and all query/cap controls. Networks expose node/relation/edge/sorting/performance fields, edge references, weekly business-hour slots and both output caps.
+
+The frontend exposes native JSON, submitted requests, source-bound reports, complete generic and derived tables, selected-row inspection, paging, per-table CSV and a combined all-tables CSV. Complete role/profile browser downloads have independent byte/cell verification; remaining browser scenarios are explicitly pending.
+
+Mining and schema responses provide additive source/dataset identity. The four organizational endpoints preserve legacy bodies unless source context is requested and check the requested session both before and after calculation.
+
+Native JSON validators now accept valid capped-network aggregate totals, zero-query resource rows and empty explicit groups, while checking emitted scalar row counts. Native calculations are unchanged and real native-result regression tests cover these cases.
+
+Validation: {"actual_family_responses": 39, "actual_fixture_tests": 49, "actual_mine_schema_responses": 9, "all_tables_csv_files": 2, "application_calls": 90, "application_checks": 243, "browser_downloads": 22, "completed_browser_export_runs": 2, "fixture_files": 49, "frontend_tests": 1605, "independent_calls": 6, "independent_export_checks": 98, "independently_verified_csv_files": 14, "individual_csv_tables": 12, "native_test_suites": 6, "passed_browser_checks": 9, "request_manifest_files": 1}. Native/source/object/binary/served-production-asset bindings passed. Complete browser validation is explicitly false.
+
+Feature delivery is not full parity. No package/module status or selector is promoted. The complete catalogue and all 228 incomplete units remain in scope.
+
+Browser validation is partial because a saved-origin permission rule continued rejecting http://127.0.0.1:8562 after human authorization, permission changes and app restart. No alternate browser surface, raw protocol or indirect page automation was used.
+
+Pending browser checks include complete explicit-group diagnostic exports/selected rows, attribute-network run/exports, errors/cancellation/source replacement/empty-resource branch, visual and responsive inspection. There is no completed screenshot preview for this checkpoint.
+
+Source IDs are unique within a backend process; the existing counter resets after restart. A different same-name/same-count source can reuse identity across process lifetimes; process-unique identity remains an explicit boundary.
+
+The exact group parser accepts lone JSON surrogate escapes using the shared WTF-8 convention; current diagnostics string emission can lose those keys through browser UTF-8 decoding. Complete lone-surrogate transport remains an explicit boundary.
+
+All existing algorithm defaults, ordering, numeric values, grouping, truncation and native errors remain authoritative. This feature checkpoint adds no fresh public-reference differential corpus and does not certify broader dataframe/object/concurrency/performance behavior.
+
+This is implemented feature group 50. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
+
+Evidence: docs/feature-first-organizational-validation.json. No screenshot preview is claimed.

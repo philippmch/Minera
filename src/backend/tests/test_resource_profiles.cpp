@@ -135,6 +135,24 @@ int main() {
   capped.max_rows = 1;
   const auto truncated = discover_resource_profiles(log, capped);
   assert(truncated.rows.size() == 1 && truncated.diagnostics.output_truncated);
+  assert(!resource_profiles_json(truncated).empty());
+  for (const auto metric : {ResourceProfileMetric::kSocialPosition,
+                            ResourceProfileMetric::kInteractionTwoResources}) {
+    ResourceProfilesOptions absent;
+    absent.metric = metric;
+    absent.resource = "not-in-source";
+    absent.resource2 = "also-absent";
+    const auto zero = discover_resource_profiles(EventLog{}, absent);
+    assert(zero.diagnostics.resource_count == 0 && zero.rows.size() == 1 &&
+           zero.rows[0].count == 0 && zero.rows[0].value == 0.0);
+    const auto zero_json = resource_profiles_json(zero);
+    assert(zero_json.find("not-in-source") != std::string::npos &&
+           zero_json.find("\"resource_count\":0") != std::string::npos);
+    auto bad_zero = zero;
+    bad_zero.rows[0].count = 1;
+    try { (void)resource_profiles_json(bad_zero); assert(false); }
+    catch (const std::invalid_argument&) {}
+  }
 
   ResourceProfilesOptions bad; bad.t1 = "bad";
   try { (void)discover_resource_profiles(log, bad); assert(false); } catch (const std::invalid_argument&) {}

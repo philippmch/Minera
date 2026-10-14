@@ -1,0 +1,1 @@
+{"family":"RESOURCE_PROFILES","metric":"average_workload","rows":[{"resource":"R05","activity":"","resource2":"","value":1,"count":0}],"diagnostics":{"computed":true,"output_truncated":false,"trace_count":4,"event_count":46,"resource_count":30,"message":"ok"},"input_context":{"source_id":"2","dataset":"owned-organization.xes","case_count":4,"event_count":46}}
