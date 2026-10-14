@@ -13291,3 +13291,40 @@ This checkpoint adds own-source native, frontend, API and export evidence, not a
 This is implemented feature group 51. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
 
 Evidence: docs/feature-first-workflow-input-validation.json. No browser screenshot is claimed.
+
+
+### Feature delivery first: independent DFG and decomposed alignment
+
+Independent DFG CLASSIC and decomposed RECOMPOS_MAXIMAL alignment accepts original CSV/TSV/XES/gzip-XES, typed EventTable JSON or literal trace-word JSON against independently supplied DFG JSON/text or PNML models, from landing and both classic/OCEL toolbars without accessing or replacing the cached mining session.
+
+Grouped-log, selected original trace and literal-word entry points invoke the matching native overload. Typed tables preserve cells, dtype/index/category/metadata and native case grouping; physical selected case columns take precedence over stale first-class roles. CSV/XES retain their grouped importer order.
+
+Every native DFG and decomposed option is configurable and inspectable through options_context. Exact-label JSON cost maps preserve empty labels, delimiters, Unicode, NUL, negative zero and the four independent DFG supplied-empty flags. Bounds, cache controls, literal selectors and actual invoked defaults remain observable.
+
+Independent DFG JSON retains pair records, exact uint64 frequencies and explicit start/end maps, including empty maps and zero entries. Sparse/clean/ordered-registry declarations remain inspectable, while .dfg interchange uses the existing native parser; no normative model is inferred from the checked log.
+
+PNML import controls preserve original IDs, arcs, silent/null versus empty visible labels, sparse marking keys and complete document/native-net snapshots. Exact size_t JSON overrides and effective vectors are separately retained; explicit [] suppresses PNML injection and keeps native source/sink defaults, whereas dense zero vectors remain explicit zero markings.
+
+Complete native trace/log results retain all stored fields: raw DFG undefined fitness and best/worst values, uncomputed records, exact counters, original unsigned transition sentinels, decomposed moves/diagnostics/counts and complete/incomplete/time/exhaustion states. Native zero decomposed bounds return their actual incomplete result without fabricating timeout or exhaustion.
+
+Both DFG metric and log projections consume the same native alignment result. Independent projection/model export failures remain separate from successful alignment data; parsed native invocation failures retain input/model snapshots and actual configured options.
+
+Complete input/model/options/result tables, exact requests and input hashes, native JSON/reports, per-table/all-table CSV, selected records and byte-identical original files are inspectable and downloadable. Same-run DFG/PNML/projected-XES exports and explicit cancellation/input-replacement guards retain completed runs.
+
+The new codecs preserve finite double precision, nonfinite tags, negative zero, exact unsigned counts and escaped lone-surrogate identity. Input byte/node/schema bounds remain; result and option serialization does not apply input transport caps. Portable captured fixtures are published byte-identically only after their export proof passes.
+
+Validation: {"alignment_fixtures": 76, "api_calls": 114, "api_checks": 458, "core_objects": 178, "export_csv_cells": 55430, "export_entries": 76, "export_numeric_literals": 7940, "export_selected_records": 13881, "export_tests": 81, "fresh_core_objects": 2, "frontend_files": 89, "frontend_tests": 1810, "native_sources": 635, "native_suites": 10, "published_files": 252, "published_fixture_entries": 76, "reused_core_objects": 176, "unrelated_files_preserved": 110}. Source/compiler/object/binary/publication/served-production-asset bindings passed. Complete browser validation is explicitly false; no new browser attempt is claimed.
+
+This is a feature-delivery checkpoint, not full PM4Py parity. No package/module parity status or selector is promoted; all 228 incomplete units remain in scope.
+
+Complete browser interaction, downloads, visual screenshots and responsive inspection for Feature52 remain pending. No new browser attempt or success is claimed. The frozen Feature51 saved-origin/managed-policy denial at http://127.0.0.1:8562 is retained as historical evidence; local HTTP/listener/runtime checks are separate from browser validation.
+
+DFG projections require grouped-log alignment. Raw trace-word alignment retains native undefined scores and uncomputed behavior; existing native APIs, including no-accepting-path log baseline errors, remain authoritative.
+
+Supplied markings use the native decomposed size_t representation. Imported PNML data outside that invocation range stays inspectable with an explicit native error; unavailable projections/diagnostics/model exports do not imply successful conversion.
+
+This checkpoint adds own-source native, frontend, API, publication and export evidence, not a fresh public-reference differential corpus. Strict defaults, scalar/object identity, numeric ordering, schema/errors, Unicode, marking, solver, concurrency and performance gates remain independent parity work.
+
+This is implemented feature group 52. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
+
+Evidence: docs/feature-first-graph-alignment-validation.json. No browser screenshot is claimed.

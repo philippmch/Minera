@@ -3810,6 +3810,233 @@ void native_json_contracts() {
          sj.find("\"log\":") != std::string::npos);
 }
 
+void graph_alignment_json_costs_preserve_exact_labels_and_native_presence() {
+  const auto literal = R"({"":0," \t\n ":0.25," a,b:c=\"\\>> ":1.25,"a\u0000b":2,"\uD800":3,"\uD800\u0041":4,"\uDC00":5,"\uD83D\uDE00":6,"large":1267650600228229401496703205376,"tiny":1e-400,"zero":-0.000e309,"max":1.7976931348623157e308})";
+  const std::map<std::string, double> expected{
+      {"", 0}, {" \t\n ", 0.25}, {" a,b:c=\"\\>> ", 1.25},
+      {std::string("a\0b", 3), 2}, {"\xED\xA0\x80", 3},
+      {std::string("\xED\xA0\x80") + "A", 4}, {"\xED\xB0\x80", 5},
+      {"\xF0\x9F\x98\x80", 6}, {"large", std::ldexp(1.0, 100)},
+      {"tiny", 0}, {"zero", -0.0}, {"max", std::numeric_limits<double>::max()}};
+  const auto dfg = minera::parse_dfg_alignment_params(fields({
+      {"dfg_sync_cost_json", literal}, {"dfg_model_move_cost_json", literal},
+      {"dfg_log_move_cost_json", literal}, {"dfg_internal_log_move_cost_json", literal}}));
+  for (const auto* map : {&dfg.sync_cost, &dfg.model_move_cost, &dfg.log_move_cost,
+                          &dfg.internal_log_move_cost}) {
+    assert(*map == expected);
+    assert(std::signbit(map->at("zero")) && !std::signbit(map->at("tiny")));
+  }
+  assert(dfg.sync_cost_supplied && dfg.model_move_cost_supplied &&
+         dfg.log_move_cost_supplied && dfg.internal_log_move_cost_supplied);
+  const auto decomposed = minera::parse_graph_alignment_decomposed_params(fields({
+      {"activity_log_costs_json", literal}, {"activity_model_costs_json", literal},
+      {"activity_sync_costs_json", literal}}));
+  for (const auto* map : {&decomposed.activity_log_costs,
+                          &decomposed.activity_model_costs,
+                          &decomposed.activity_sync_costs}) {
+    assert(map->size() == expected.size());
+    for (const auto& [label, cost] : expected) assert(map->at(label) == cost);
+    assert(std::signbit(map->at("zero")) && !std::signbit(map->at("tiny")));
+  }
+  const auto omitted = minera::parse_dfg_alignment_params(fields({}));
+  assert(!omitted.sync_cost_supplied && !omitted.model_move_cost_supplied &&
+         !omitted.log_move_cost_supplied && !omitted.internal_log_move_cost_supplied);
+  const auto empty = minera::parse_dfg_alignment_params(fields({
+      {"dfg_sync_cost_json", "{}"}, {"dfg_model_move_cost_json", " {} "},
+      {"dfg_log_move_cost_json", "{}"}, {"dfg_internal_log_move_cost_json", "{}"}}));
+  assert(empty.sync_cost.empty() && empty.sync_cost_supplied &&
+         empty.model_move_cost.empty() && empty.model_move_cost_supplied &&
+         empty.log_move_cost.empty() && empty.log_move_cost_supplied &&
+         empty.internal_log_move_cost.empty() && empty.internal_log_move_cost_supplied);
+  const auto empty_decomposed = minera::parse_graph_alignment_decomposed_params(fields({
+      {"activity_log_costs_json", "{}"}, {"activity_model_costs_json", "{}"},
+      {"activity_sync_costs_json", "{}"}}));
+  assert(empty_decomposed.activity_log_costs.empty() &&
+         empty_decomposed.activity_model_costs.empty() &&
+         empty_decomposed.activity_sync_costs.empty() &&
+         empty_decomposed.log_move_cost == 10000 &&
+         empty_decomposed.model_move_cost == 10000 &&
+         empty_decomposed.tau_model_cost == 1 && empty_decomposed.sync_cost == 0);
+}
+
+void graph_alignment_json_costs_reject_invalid_literals_and_conflicts() {
+  const std::vector<std::string> names{
+      "dfg_sync_cost_json", "dfg_model_move_cost_json", "dfg_log_move_cost_json",
+      "dfg_internal_log_move_cost_json", "activity_log_costs_json",
+      "activity_model_costs_json", "activity_sync_costs_json"};
+  const auto rejects = [](const std::string& name,
+                          const std::map<std::string, std::string>& values) {
+    bool rejected = false;
+    const auto present = [&values](std::string_view key) {
+      return values.contains(std::string(key));
+    };
+    try {
+      if (name.starts_with("dfg_"))
+        (void)minera::parse_dfg_alignment_params(fields(values), present);
+      else (void)minera::parse_graph_alignment_decomposed_params(fields(values), present);
+    } catch (const std::invalid_argument& error) {
+      rejected = true;
+      assert(std::string(error.what()).find(name) != std::string::npos);
+    }
+    assert(rejected);
+  };
+  for (const auto& name : names) {
+    for (const auto literal : {"-1", "-1e-400", "-0.0001e-999", "-5e-324",
+                               "NaN", "Infinity", "-Infinity", "1e309", "true",
+                               "false", "null", "\"1\"", "[]", "{}"})
+      rejects(name, {{name, "{\"label\":" + std::string(literal) + "}"}});
+    for (const auto text : {"", " \t\r\n", "[]", "null", "true", "1", "a=2",
+                            "{\"a\":01}", "{\"a\":.5}", "{\"a\":+1}",
+                            "{\"a\":1,}", "{\"a\":1} trailing",
+                            "{\"a\":1,\"\\u0061\":2}",
+                            "{\"\":1,\"\":2}",
+                            "{\"\\uD800\":1,\"\\ud800\":2}",
+                            "{\"\\uD800\\u0041\":1,\"\\ud800A\":2}"})
+      rejects(name, {{name, text}});
+    rejects(name, {{name, std::string("{\"") + "\xED\xA0\x80" + "\":1}"}});
+  }
+  const std::vector<std::pair<std::string, std::vector<std::string>>> carriers{
+      {"dfg_sync_cost_json", {"dfg_sync_cost", "sync_cost", "sync_costs", "dfg_sync_costs"}},
+      {"dfg_model_move_cost_json", {"dfg_model_move_cost", "model_move_cost", "model_costs", "dfg_model_cost", "dfg_model_move_costs"}},
+      {"dfg_log_move_cost_json", {"dfg_log_move_cost", "log_move_cost", "log_costs", "dfg_log_cost", "dfg_log_move_costs"}},
+      {"dfg_internal_log_move_cost_json", {"dfg_internal_log_move_cost", "internal_log_move_cost", "internal_costs", "dfg_internal_cost", "dfg_internal_log_move_costs"}},
+      {"activity_log_costs_json", {"activity_log_costs"}},
+      {"activity_model_costs_json", {"activity_model_costs"}},
+      {"activity_sync_costs_json", {"activity_sync_costs"}}};
+  for (const auto& [name, legacy_names] : carriers)
+    for (const auto& legacy : legacy_names)
+      for (const auto value : {"", "A=1"})
+        rejects(name, {{name, "{}"}, {legacy, value}});
+  // Legacy aliases and overwrite grammar remain unchanged when no JSON map is supplied.
+  const auto legacy = minera::parse_dfg_alignment_params(fields({
+      {"dfg_sync_cost", "A=1,A=2"}, {"sync_costs", "A=9"}}));
+  assert(legacy.sync_cost.at("A") == 2);
+}
+
+void graph_alignment_json_markings_preserve_empty_and_native_integer_range() {
+  const auto largest = std::to_string(std::numeric_limits<std::size_t>::max());
+  const auto parsed = minera::parse_graph_alignment_decomposed_params(fields({
+      {"initial_marking_json", " [0,1," + largest + "] "},
+      {"final_marking_json", "[2,0,0]"}}));
+  assert((parsed.initial_marking == std::vector<std::size_t>{0, 1,
+           std::numeric_limits<std::size_t>::max()}));
+  assert((parsed.final_marking == std::vector<std::size_t>{2, 0, 0}));
+  const auto empty = minera::parse_graph_alignment_decomposed_params(fields({
+      {"initial_marking_json", "[]"}, {"final_marking_json", " [] "}}));
+  assert(empty.initial_marking.empty() && empty.final_marking.empty());
+  const auto omitted = minera::parse_graph_alignment_decomposed_params(fields({}));
+  assert(omitted.initial_marking.empty() && omitted.final_marking.empty());
+  for (const auto name : {"initial_marking_json", "final_marking_json"}) {
+    for (const auto text : {"", " \t\n", "{}", "null", "true", "0,1", "[1,]",
+                            "[01]", "[+1]", "[-0]", "[-1]", "[-1e-400]",
+                            "[1.0]", "[1e0]", "[true]", "[null]", "[\"1\"]",
+                            "[[]]", "[{}]", "[NaN]", "[Infinity]",
+                            "[18446744073709551616]", "[1] trailing"}) {
+      const std::map<std::string, std::string> values{{name, text}};
+      bool rejected = false;
+      try {
+        (void)minera::parse_graph_alignment_decomposed_params(fields(values),
+            [&values](std::string_view key) {return values.contains(std::string(key));});
+      } catch (const std::invalid_argument& error) {
+        rejected = true;
+        assert(std::string(error.what()).find(name) != std::string::npos);
+      }
+      assert(rejected);
+    }
+    const auto legacy = std::string(name).substr(0, std::string(name).size() - 5);
+    for (const auto value : {"", "1,0"}) {
+      const std::map<std::string, std::string> values{{name, "[]"}, {legacy, value}};
+      bool rejected = false;
+      try {
+        (void)minera::parse_graph_alignment_decomposed_params(fields(values),
+            [&values](std::string_view key) {return values.contains(std::string(key));});
+      } catch (const std::invalid_argument&) {rejected = true;}
+      assert(rejected);
+    }
+  }
+}
+
+void graph_alignment_json_controls_reach_actual_native_algorithms() {
+  const std::string label = " a,b:; ";
+  const auto dfg_options = minera::parse_dfg_alignment_params(fields({
+      {"dfg_sync_cost_json", R"({" a,b:; ":0.25})"},
+      {"dfg_model_move_cost_json", R"({" a,b:; ":2})"},
+      {"dfg_log_move_cost_json", R"({" a,b:; ":3})"},
+      {"dfg_internal_log_move_cost_json", R"({" a,b:; ":1})"}}));
+  const auto dfg = minera::align_trace_on_dfg({label}, {}, {{label, 1}}, {{label, 1}}, dfg_options);
+  assert(dfg.computed && dfg.alignment.size() == 1 && dfg.cost == 0.25 && dfg.internal_cost == 0.25);
+  bool missing_cost = false;
+  try {
+    (void)minera::align_trace_on_dfg({label}, {}, {{label, 1}}, {{label, 1}},
+        minera::parse_dfg_alignment_params(fields({{"dfg_sync_cost_json", "{}"}})));
+  } catch (const std::invalid_argument&) {missing_cost = true;}
+  assert(missing_cost);
+  minera::PetriNet net;
+  const auto source = net.add_place(), sink = net.add_place();
+  net.set_source(source); net.set_sink(sink); net.set_activities({label});
+  net.add_transition(0, {source}, {sink});
+  for (const bool empty_marking : {false, true}) {
+    const auto options = minera::parse_graph_alignment_decomposed_params(fields({
+        {"activity_sync_costs_json", R"({" a,b:; ":0.25})"},
+        {"activity_model_costs_json", R"({" a,b:; ":2})"},
+        {"activity_log_costs_json", R"({" a,b:; ":3})"},
+        {"initial_marking_json", empty_marking ? "[]" : "[1,0]"},
+        {"final_marking_json", empty_marking ? "[]" : "[0,1]"}}));
+    const auto result = minera::align_trace_decomposed({label}, net, options);
+    assert(result.complete && result.alignment.size() == 1 && result.cost == 0.25);
+  }
+  for (const auto name : {"max_states", "max_total_states"}) {
+    const auto options = minera::parse_graph_alignment_decomposed_params(fields({{name, "0"}}));
+    assert((std::string(name) == "max_states" ? options.max_states : options.max_total_states) == 0);
+    const auto result = minera::align_trace_decomposed({label}, net, options);
+    assert(!result.complete && result.alignment.empty());
+    minera::EventLog log; minera::Trace trace;
+    trace.events.push_back(minera::Event{"case", label});
+    log.traces.push_back(std::move(trace));
+    const auto body = minera::align_decomposed(log, net, options);
+    assert(!body.complete && body.trace_count == 1 && body.traces.empty() &&
+           !body.timed_out && !body.exhausted && body.diagnostics.visited_states == 0);
+    bool legacy_rejected = false;
+    try { (void)minera::parse_decomposed_alignment_params(fields({{name, "0"}})); }
+    catch (const std::invalid_argument&) {legacy_rejected = true;}
+    assert(legacy_rejected);
+  }
+}
+
+void graph_alignment_decomposed_entry_preserves_every_native_control() {
+  const auto options = minera::parse_graph_alignment_decomposed_params(fields({
+      {"variant", "RECOMPOS_MAXIMAL"}, {"threshold_border_agreement", "0"},
+      {"max_time_trace", "0.125"}, {"max_time_total", "2.5"},
+      {"max_states", "0"}, {"max_total_states", "17"},
+      {"use_cache", "false"}, {"clear_cache", "true"},
+      {"log_move_cost", "2"}, {"model_move_cost", "3"},
+      {"tau_model_cost", "4"}, {"sync_cost", "0.25"},
+      {"activity_attribute", " phase "}}));
+  assert(options.variant == minera::DecomposedAlignmentVariant::kRecomposMaximal &&
+         options.threshold_border_agreement == 0 && options.max_time_trace == 0.125 &&
+         options.max_time_total == 2.5 && options.max_states == 0 &&
+         options.max_total_states == 17 && !options.use_cache && options.clear_cache &&
+         options.log_move_cost == 2 && options.model_move_cost == 3 &&
+         options.tau_model_cost == 4 && options.sync_cost == 0.25 &&
+         options.activity_attribute == "phase");
+  const auto largest = std::to_string(std::numeric_limits<std::size_t>::max());
+  const auto bounds = minera::parse_graph_alignment_decomposed_params(fields({
+      {"max_states", largest}, {"max_total_states", largest}}));
+  assert(bounds.max_states == std::numeric_limits<std::size_t>::max() &&
+         bounds.max_total_states == std::numeric_limits<std::size_t>::max());
+  for (const auto name : {"max_states", "max_total_states"})
+    for (const auto value : {"", " ", "-1", "+1", "1.0", "1e2", "NaN",
+                             "18446744073709551616"}) {
+      const std::map<std::string, std::string> values{{name, value}};
+      bool rejected = false;
+      try {
+        (void)minera::parse_graph_alignment_decomposed_params(fields(values),
+            [&values](std::string_view key) {return values.contains(std::string(key));});
+      } catch (const std::invalid_argument&) {rejected = true;}
+      assert(rejected);
+    }
+}
+
 void parse_dfg_and_edit_alignment_params_contract() {
   const auto d = minera::parse_dfg_alignment_params(fields({
       {"dfg_variant", "CLASSIC"}, {"dfg_max_states", "0"},
@@ -5910,6 +6137,11 @@ int main() {
   parse_alignment_input_adapter_defaults_and_rejects_invalid_shapes();
   parse_alignment_costs_preserves_existing_variant_validation();
   parse_dfg_and_edit_alignment_params_contract();
+  graph_alignment_json_costs_preserve_exact_labels_and_native_presence();
+  graph_alignment_json_costs_reject_invalid_literals_and_conflicts();
+  graph_alignment_json_markings_preserve_empty_and_native_integer_range();
+  graph_alignment_json_controls_reach_actual_native_algorithms();
+  graph_alignment_decomposed_entry_preserves_every_native_control();
   parse_process_tree_alignment_params_maps_variants_and_limits();
   parse_process_tree_alignment_params_rejects_bad_values();
   parse_native_adapter_params_contract();

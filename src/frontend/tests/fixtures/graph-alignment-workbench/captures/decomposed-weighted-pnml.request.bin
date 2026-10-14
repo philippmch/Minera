@@ -1,0 +1,69 @@
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="mode"
+
+RECOMPOS_MAXIMAL
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_format"
+
+auto
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_file"; filename="owned-one-word.json"
+Content-Type: application/octet-stream
+
+["A"]
+
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_file"; filename="owned-weighted.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="owned-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="owned-page">
+      <place id="source 東京">
+        <initialMarking>
+          <text>2</text>
+        </initialMarking>
+      </place>
+      <place id="place,1">
+        <initialMarking>
+          <text>0</text>
+        </initialMarking>
+      </place>
+      <transition id="transition,0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <arc id="arc,0,True" source="source 東京" target="transition,0">
+        <inscription>
+          <text>2</text>
+        </inscription>
+      </arc>
+      <arc id="arc,0,False" source="transition,0" target="place,1">
+        <inscription>
+          <text>2</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="place,1">
+          <text>2</text>
+        </place>
+        <place idref="source 東京">
+          <text>0</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedGraphAlignmentFeature52--

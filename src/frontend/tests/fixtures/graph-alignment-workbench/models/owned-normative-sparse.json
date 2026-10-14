@@ -1,0 +1,1 @@
+{"kind":"sparse","dfg":[{"source":"A","target":"B","count":5}],"start_activities":{"A":2},"end_activities":{"B":3}}

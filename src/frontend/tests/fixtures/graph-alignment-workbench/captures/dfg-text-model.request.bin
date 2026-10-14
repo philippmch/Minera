@@ -1,0 +1,36 @@
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="mode"
+
+DFG_CLASSIC
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_format"
+
+dfg
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_file"; filename="owned-perfect-words.json"
+Content-Type: application/octet-stream
+
+["A","B"]
+
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_file"; filename="owned-normative.dfg"
+Content-Type: application/octet-stream
+
+2
+A
+B
+1
+0x2
+1
+1x3
+0>1x5
+
+--OwnedGraphAlignmentFeature52--

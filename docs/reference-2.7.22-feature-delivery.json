@@ -78,7 +78,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_independent_graph_alignment_workbench_available",
       "package": "algo.conformance.alignments.decomposed",
       "parity_status": "partial",
       "selectors": [
@@ -86,7 +86,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_independent_graph_alignment_workbench_available",
       "package": "algo.conformance.alignments.dfg",
       "parity_status": "partial",
       "selectors": [
@@ -2641,6 +2641,45 @@
       ],
       "validation": "docs/feature-first-workflow-input-validation.json",
       "browser_validation_complete": false
+    },
+    {
+      "id": "native_independent_graph_alignment_workbench",
+      "state": "independent_dfg_decomposed_models_original_checked_inputs_full_options_projections_and_complete_inspection_available",
+      "families": [
+        "algo.conformance.alignments.dfg",
+        "algo.conformance.alignments.decomposed"
+      ],
+      "variants": [
+        "DFG_CLASSIC",
+        "RECOMPOS_MAXIMAL",
+        "LOG",
+        "TRACE",
+        "TRACE_WORDS",
+        "TYPED_TABLE",
+        "DFG_JSON",
+        "DFG_TEXT",
+        "PNML"
+      ],
+      "entry_points": [
+        "include/minera/graph_alignment_workbench_json.hpp",
+        "src/backend/graph_alignment_workbench_json.cpp",
+        "src/backend/tools/graph_alignment_route.hpp",
+        "src/frontend/src/graph-alignment-workbench.ts",
+        "src/frontend/src/components/GraphAlignmentWorkspace.tsx"
+      ],
+      "added": [
+        "Independent DFG CLASSIC and decomposed RECOMPOS_MAXIMAL alignment accepts original CSV/TSV/XES/gzip-XES, typed EventTable JSON or literal trace-word JSON against independently supplied DFG JSON/text or PNML models, from landing and both classic/OCEL toolbars without accessing or replacing the cached mining session.",
+        "Grouped-log, selected original trace and literal-word entry points invoke the matching native overload. Typed tables preserve cells, dtype/index/category/metadata and native case grouping; physical selected case columns take precedence over stale first-class roles. CSV/XES retain their grouped importer order.",
+        "Every native DFG and decomposed option is configurable and inspectable through options_context. Exact-label JSON cost maps preserve empty labels, delimiters, Unicode, NUL, negative zero and the four independent DFG supplied-empty flags. Bounds, cache controls, literal selectors and actual invoked defaults remain observable.",
+        "Independent DFG JSON retains pair records, exact uint64 frequencies and explicit start/end maps, including empty maps and zero entries. Sparse/clean/ordered-registry declarations remain inspectable, while .dfg interchange uses the existing native parser; no normative model is inferred from the checked log.",
+        "PNML import controls preserve original IDs, arcs, silent/null versus empty visible labels, sparse marking keys and complete document/native-net snapshots. Exact size_t JSON overrides and effective vectors are separately retained; explicit [] suppresses PNML injection and keeps native source/sink defaults, whereas dense zero vectors remain explicit zero markings.",
+        "Complete native trace/log results retain all stored fields: raw DFG undefined fitness and best/worst values, uncomputed records, exact counters, original unsigned transition sentinels, decomposed moves/diagnostics/counts and complete/incomplete/time/exhaustion states. Native zero decomposed bounds return their actual incomplete result without fabricating timeout or exhaustion.",
+        "Both DFG metric and log projections consume the same native alignment result. Independent projection/model export failures remain separate from successful alignment data; parsed native invocation failures retain input/model snapshots and actual configured options.",
+        "Complete input/model/options/result tables, exact requests and input hashes, native JSON/reports, per-table/all-table CSV, selected records and byte-identical original files are inspectable and downloadable. Same-run DFG/PNML/projected-XES exports and explicit cancellation/input-replacement guards retain completed runs.",
+        "The new codecs preserve finite double precision, nonfinite tags, negative zero, exact unsigned counts and escaped lone-surrogate identity. Input byte/node/schema bounds remain; result and option serialization does not apply input transport caps. Portable captured fixtures are published byte-identically only after their export proof passes."
+      ],
+      "validation": "docs/feature-first-graph-alignment-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -2658,7 +2697,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; the next confirmed missing surfaces are independently supplied DFG/decomposed alignment models and tested logs."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. The next confirmed input-surface gaps are independent Inductive discovery for existing EventDataView, exact weighted uint64 variants and direct DFG inputs, followed by independently supplied original PTML/process-tree alignment and PNML anti/multi alignment. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence."
     }
   ],
   "feature_status_meaning": {
@@ -2682,7 +2721,8 @@
     "native_independent_full_token_replay_workflow_available": "Independent original-log/PNML uploads expose both native replay directions, all four native input shapes, full forward public/PLTR results and complete trace/input/model inspection with exact downloads. Full reference behavior and remaining options/adapters remain parity gates.",
     "native_independent_petri_alignment_workflow_available": "Independent original-log/PNML alignment exposes all six native variants, four input shapes, cost/marking controls and complete result inspection/download. Strict reference behavior and remaining input/object contracts remain parity gates.",
     "native_organizational_workbench_available": "All four organizational native workflows have app controls, source bindings, full inspection/export code and captured API/frontend validation. Role/profile browser exports are verified; remaining browser checks and strict parity gates are explicitly open.",
-    "native_independent_workflow_discovery_inputs_available": "Independent Alpha/Heuristic native shapes, full typed/direct graph inputs, mutable pandas and complete snapshots/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates."
+    "native_independent_workflow_discovery_inputs_available": "Independent Alpha/Heuristic native shapes, full typed/direct graph inputs, mutable pandas and complete snapshots/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates.",
+    "native_independent_graph_alignment_workbench_available": "Independent DFG/decomposed native models, original checked logs/typed tables/trace words, full options and complete results/projections/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

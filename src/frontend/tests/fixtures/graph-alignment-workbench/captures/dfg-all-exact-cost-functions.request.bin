@@ -1,0 +1,45 @@
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="mode"
+
+DFG_CLASSIC
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_format"
+
+auto
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="dfg_sync_cost_json"
+
+{"A": 0, "B": 0, "": 0.5}
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="dfg_model_move_cost_json"
+
+{"A": 3, "B": 5}
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="dfg_log_move_cost_json"
+
+{"A": 1, "X": 7, "B": 1}
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="dfg_internal_log_move_cost_json"
+
+{"A": 1, "X": 0.25, "B": 1}
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_file"; filename="owned-words.json"
+Content-Type: application/octet-stream
+
+["A","X","B"]
+
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_file"; filename="owned-normative.json"
+Content-Type: application/octet-stream
+
+{"kind":"clean","dfg":[{"source":"A","target":"B","count":5}],"start_activities":{"A":2},"end_activities":{"B":3}}
+
+--OwnedGraphAlignmentFeature52--

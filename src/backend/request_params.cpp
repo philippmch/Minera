@@ -23,9 +23,11 @@ class HeuristicDecorationValueParser {
  public:
   explicit HeuristicDecorationValueParser(std::string_view text,
       std::string_view parameter = "heuristic_plusplus_decoration_value",
-      bool alignment_costs = false, bool reject_duplicate_keys = false)
+      bool alignment_costs = false, bool reject_duplicate_keys = false,
+      bool unsigned_integer_numbers = false)
       : text_(text), parameter_(parameter), alignment_costs_(alignment_costs),
-        reject_duplicate_keys_(reject_duplicate_keys) {}
+        reject_duplicate_keys_(reject_duplicate_keys),
+        unsigned_integer_numbers_(unsigned_integer_numbers) {}
 
   HeuristicStructuredValue parse() {
     auto result = value(0);
@@ -174,6 +176,8 @@ class HeuristicDecorationValueParser {
       while (digit()) ++position_;
     }
     const auto token = text_.substr(start, position_ - start);
+    if (unsigned_integer_numbers_ && (floating || token.front() == '-'))
+      fail("expected unsigned integer marking entries");
     if (alignment_costs_) {
       // Reject a negative nonzero literal before floating-point underflow can
       // round it to -0.0. A zero mantissa remains valid regardless of exponent.
@@ -280,6 +284,7 @@ class HeuristicDecorationValueParser {
   std::string_view parameter_;
   bool alignment_costs_ = false;
   bool reject_duplicate_keys_ = false;
+  bool unsigned_integer_numbers_ = false;
   std::size_t position_ = 0;
 };
 
@@ -326,6 +331,32 @@ std::vector<double> parse_alignment_cost_array(std::string_view text,
   result.reserve(array->size());
   for (const auto& cost : *array)
     result.push_back(parse_alignment_cost_value(cost, name));
+  return result;
+}
+
+std::vector<std::size_t> parse_size_marking_json(std::string_view text,
+                                              std::string_view name) {
+  const auto value = HeuristicDecorationValueParser(text, name, false, true, true).parse();
+  const auto* array = std::get_if<HeuristicStructuredValue::Array>(&value.value);
+  if (!array)
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a JSON array of unsigned integer marking entries");
+  std::vector<std::size_t> result;
+  result.reserve(array->size());
+  for (const auto& item : *array) {
+    std::uint64_t tokens;
+    if (const auto* number = std::get_if<std::uint64_t>(&item.value))
+      tokens = *number;
+    else if (const auto* number = std::get_if<std::int64_t>(&item.value);
+             number && *number >= 0)
+      tokens = static_cast<std::uint64_t>(*number);
+    else
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected unsigned integer marking entries");
+    if (tokens > std::numeric_limits<std::size_t>::max())
+      throw std::invalid_argument(std::string(name) + ": marking entry is out of range");
+    result.push_back(static_cast<std::size_t>(tokens));
+  }
   return result;
 }
 
@@ -948,8 +979,18 @@ DfgAlignmentOptions parse_dfg_alignment_params(const FieldLookup& field,
       throw std::invalid_argument(
           "dfg_timestamp_attribute: expected a non-empty attribute name");
   }
-  const auto map_field = [&](std::string_view canonical, std::initializer_list<std::string_view> aliases,
+  const auto map_field = [&](std::string_view canonical, std::string_view json_name,
+                             std::initializer_list<std::string_view> aliases,
                              std::map<std::string,double>& dst, bool& cost_supplied) {
+    if (supplied(json_name)) {
+      if (supplied(canonical) || std::any_of(aliases.begin(), aliases.end(), supplied))
+        throw std::invalid_argument(std::string(json_name) +
+                                    ": cannot coexist with a legacy cost carrier");
+      const auto parsed = parse_alignment_cost_map(require(json_name), json_name);
+      dst.insert(parsed.begin(), parsed.end());
+      cost_supplied = true;
+      return;
+    }
     std::string_view found = canonical;
     if (!supplied(found)) for (auto a : aliases) if (supplied(a)) { found = a; break; }
     if (supplied(found)) {
@@ -959,10 +1000,10 @@ DfgAlignmentOptions parse_dfg_alignment_params(const FieldLookup& field,
       cost_supplied = true;
     }
   };
-  map_field("dfg_sync_cost", {"sync_cost", "sync_costs", "dfg_sync_costs"}, o.sync_cost, o.sync_cost_supplied);
-  map_field("dfg_model_move_cost", {"model_move_cost", "model_costs", "dfg_model_cost", "dfg_model_move_costs"}, o.model_move_cost, o.model_move_cost_supplied);
-  map_field("dfg_log_move_cost", {"log_move_cost", "log_costs", "dfg_log_cost", "dfg_log_move_costs"}, o.log_move_cost, o.log_move_cost_supplied);
-  map_field("dfg_internal_log_move_cost", {"internal_log_move_cost", "internal_costs", "dfg_internal_cost", "dfg_internal_log_move_costs"}, o.internal_log_move_cost, o.internal_log_move_cost_supplied);
+  map_field("dfg_sync_cost", "dfg_sync_cost_json", {"sync_cost", "sync_costs", "dfg_sync_costs"}, o.sync_cost, o.sync_cost_supplied);
+  map_field("dfg_model_move_cost", "dfg_model_move_cost_json", {"model_move_cost", "model_costs", "dfg_model_cost", "dfg_model_move_costs"}, o.model_move_cost, o.model_move_cost_supplied);
+  map_field("dfg_log_move_cost", "dfg_log_move_cost_json", {"log_move_cost", "log_costs", "dfg_log_cost", "dfg_log_move_costs"}, o.log_move_cost, o.log_move_cost_supplied);
+  map_field("dfg_internal_log_move_cost", "dfg_internal_log_move_cost_json", {"internal_log_move_cost", "internal_costs", "dfg_internal_cost", "dfg_internal_log_move_costs"}, o.internal_log_move_cost, o.internal_log_move_cost_supplied);
   return o;
 }
 
@@ -1307,19 +1348,48 @@ DecomposedAlignmentOptions parse_decomposed_alignment_params(const FieldLookup& 
   return parse_decomposed_alignment_params(field, FieldPresence{});
 }
 
-DecomposedAlignmentOptions parse_decomposed_alignment_params(const FieldLookup& field,
-                                                             const FieldPresence& present) {
+namespace {
+DecomposedAlignmentOptions parse_decomposed_alignment_options(
+    const FieldLookup& field, const FieldPresence& present,
+    bool allow_zero_search_bounds) {
   DecomposedAlignmentOptions o;
   const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
   const auto require = [&](std::string_view n) { const auto v = field(n); if (!supplied(n) || v.empty()) throw std::invalid_argument(std::string(n)+": expected a value"); return v; };
   if (supplied("variant")) { const auto v=require("variant"); if(v!="recompos_maximal"&&v!="RECOMPOS_MAXIMAL"&&v!="Variants.RECOMPOS_MAXIMAL") throw std::invalid_argument("variant: expected recompos_maximal"); }
   auto nonneg = [&](std::string_view n,double& d){ if(supplied(n)){ d=parse_finite_double(require(n),n); if(d<0) throw std::invalid_argument(std::string(n)+": expected a non-negative number"); }};
   nonneg("threshold_border_agreement",o.threshold_border_agreement); nonneg("max_time_trace",o.max_time_trace); nonneg("max_time_total",o.max_time_total);
-  if(supplied("max_states")) o.max_states=parse_positive_size(require("max_states"),"max_states"); if(supplied("max_total_states")) o.max_total_states=parse_positive_size(require("max_total_states"),"max_total_states");
+  const auto states = [&](std::string_view name, std::size_t& destination) {
+    if (!supplied(name)) return;
+    destination = allow_zero_search_bounds ? parse_nonnegative_size(require(name), name)
+                                           : parse_positive_size(require(name), name);
+  };
+  states("max_states", o.max_states);
+  states("max_total_states", o.max_total_states);
   if(supplied("use_cache")) o.use_cache=parse_boolean(require("use_cache"),"use_cache"); if(supplied("clear_cache")) o.clear_cache=parse_boolean(require("clear_cache"),"clear_cache");
   nonneg("log_move_cost",o.log_move_cost); nonneg("model_move_cost",o.model_move_cost); nonneg("tau_move_cost",o.tau_model_cost); nonneg("tau_model_cost",o.tau_model_cost); nonneg("sync_move_cost",o.sync_cost); nonneg("sync_cost",o.sync_cost);
-  parse_activity_cost_field(field,present,"activity_log_costs",o.activity_log_costs); parse_activity_cost_field(field,present,"activity_model_costs",o.activity_model_costs); parse_activity_cost_field(field,present,"activity_sync_costs",o.activity_sync_costs);
-  if(supplied("initial_marking")) o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking")) o.final_marking=parse_marking(require("final_marking"),"final_marking");
+  const auto costs = [&](std::string_view legacy, std::string_view json_name,
+                         std::unordered_map<std::string, double>& destination) {
+    if (supplied(json_name)) {
+      if (supplied(legacy))
+        throw std::invalid_argument(std::string(json_name) +
+                                    ": cannot coexist with a legacy cost carrier");
+      destination = parse_alignment_cost_map(require(json_name), json_name);
+    } else parse_activity_cost_field(field, present, legacy, destination);
+  };
+  costs("activity_log_costs", "activity_log_costs_json", o.activity_log_costs);
+  costs("activity_model_costs", "activity_model_costs_json", o.activity_model_costs);
+  costs("activity_sync_costs", "activity_sync_costs_json", o.activity_sync_costs);
+  const auto marking = [&](std::string_view legacy, std::string_view json_name,
+                           std::vector<std::size_t>& destination) {
+    if (supplied(json_name)) {
+      if (supplied(legacy))
+        throw std::invalid_argument(std::string(json_name) +
+                                    ": cannot coexist with a legacy marking carrier");
+      destination = parse_size_marking_json(require(json_name), json_name);
+    } else if (supplied(legacy)) destination = parse_marking(require(legacy), legacy);
+  };
+  marking("initial_marking", "initial_marking_json", o.initial_marking);
+  marking("final_marking", "final_marking_json", o.final_marking);
   if (supplied("activity_attribute")) {
     o.activity_attribute = trim_text(require("activity_attribute"));
     if (o.activity_attribute.empty())
@@ -1327,6 +1397,17 @@ DecomposedAlignmentOptions parse_decomposed_alignment_params(const FieldLookup& 
           "activity_attribute: expected a non-empty attribute name");
   }
   return o;
+}
+}  // namespace
+
+DecomposedAlignmentOptions parse_decomposed_alignment_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  return parse_decomposed_alignment_options(field, present, false);
+}
+
+DecomposedAlignmentOptions parse_graph_alignment_decomposed_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  return parse_decomposed_alignment_options(field, present, true);
 }
 
 PetriAntiAlignmentOptions parse_petri_anti_alignment_params(const FieldLookup& field) { return parse_petri_anti_alignment_params(field, FieldPresence{}); }
