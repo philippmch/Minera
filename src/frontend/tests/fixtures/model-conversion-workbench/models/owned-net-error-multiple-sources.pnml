@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="source0">
+        <name>
+          <text>Original source0</text>
+        </name>
+      </place>
+      <place id="source1">
+        <name>
+          <text>Original source1</text>
+        </name>
+      </place>
+      <place id="sink">
+        <name>
+          <text>Original sink</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-1">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <arc id="in0" source="source0" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="out0" source="original-transition-0" target="sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="in1" source="source1" target="original-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="out1" source="original-transition-1" target="sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking />
+    </finalmarkings>
+  </net>
+</pnml>

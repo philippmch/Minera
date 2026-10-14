@@ -19,9 +19,10 @@ interface LandingProps {
   onInductiveInputs?: () => void;
   onTreeAlignment?: () => void;
   onPetriAntiMulti?: () => void;
+  onModelConversion?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -79,6 +80,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onInductiveInputs && <button className="landing-sample reveal" disabled={mining} onClick={onInductiveInputs}>Discover an Inductive workflow from original inputs</button>}
         {onTreeAlignment && <button className="landing-sample reveal" disabled={mining} onClick={onTreeAlignment}>Align original traces against a process-tree model</button>}
         {onPetriAntiMulti && <button className="landing-sample reveal" disabled={mining} onClick={onPetriAntiMulti}>Compare original traces with an independent PNML model</button>}
+        {onModelConversion && <button className="landing-sample reveal" disabled={mining} onClick={onModelConversion}>Convert or reduce an original process model</button>}
 
         <div className="landing-steps reveal">
           <div className="landing-step">

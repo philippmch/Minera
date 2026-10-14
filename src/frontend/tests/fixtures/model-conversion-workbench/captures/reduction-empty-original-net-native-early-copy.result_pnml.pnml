@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Reduced original PNML model</text></name>
+    <page id="page1">
+    </page>
+    <finalmarkings>
+      <marking>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

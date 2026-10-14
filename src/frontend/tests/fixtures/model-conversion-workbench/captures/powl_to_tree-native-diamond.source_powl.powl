@@ -1,0 +1,1 @@
+PO=(nodes={T("A"),T("B"),T("C"),T("D")},order={A-->B,A-->C,A-->D,B-->D,C-->D})

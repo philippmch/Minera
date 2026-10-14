@@ -1,0 +1,276 @@
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="n-place-0">
+        <name>
+          <text>Original n-place-0</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="n-place-1">
+        <name>
+          <text>Original n-place-1</text>
+        </name>
+      </place>
+      <place id="n-place-2">
+        <name>
+          <text>Original n-place-2</text>
+        </name>
+      </place>
+      <place id="n-place-3">
+        <name>
+          <text>Original n-place-3</text>
+        </name>
+      </place>
+      <place id="n-place-4">
+        <name>
+          <text>Original n-place-4</text>
+        </name>
+      </place>
+      <place id="n-place-5">
+        <name>
+          <text>Original n-place-5</text>
+        </name>
+      </place>
+      <place id="n-place-6">
+        <name>
+          <text>Original n-place-6</text>
+        </name>
+      </place>
+      <place id="n-place-7">
+        <name>
+          <text>Original n-place-7</text>
+        </name>
+      </place>
+      <place id="n-place-8">
+        <name>
+          <text>Original n-place-8</text>
+        </name>
+      </place>
+      <place id="n-place-9">
+        <name>
+          <text>Original n-place-9</text>
+        </name>
+      </place>
+      <place id="n-place-10">
+        <name>
+          <text>Original n-place-10</text>
+        </name>
+      </place>
+      <place id="n-place-11">
+        <name>
+          <text>Original n-place-11</text>
+        </name>
+      </place>
+      <place id="n-place-12">
+        <name>
+          <text>Original n-place-12</text>
+        </name>
+      </place>
+      <place id="n-place-13">
+        <name>
+          <text>Original n-place-13</text>
+        </name>
+      </place>
+      <place id="n-place-14">
+        <name>
+          <text>Original n-place-14</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <transition id="original-transition-1">
+        <name>
+          <text>B</text>
+        </name>
+      </transition>
+      <transition id="original-transition-2">
+        <name>
+          <text>C</text>
+        </name>
+      </transition>
+      <transition id="original-transition-3">
+        <name>
+          <text>D</text>
+        </name>
+      </transition>
+      <transition id="original-transition-4">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-5">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-6">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-7">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-8">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-9">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-10">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-11">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <arc id="n-0-True-0" source="n-place-2" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-0-False-0" source="original-transition-0" target="n-place-3">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-1-True-0" source="n-place-4" target="original-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-1-False-0" source="original-transition-1" target="n-place-5">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-2-True-0" source="n-place-6" target="original-transition-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-2-False-0" source="original-transition-2" target="n-place-7">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-3-True-0" source="n-place-8" target="original-transition-3">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-3-False-0" source="original-transition-3" target="n-place-9">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-4-True-0" source="n-place-0" target="original-transition-4">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-4-False-0" source="original-transition-4" target="n-place-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-4-False-1" source="original-transition-4" target="n-place-4">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-5-True-0" source="n-place-3" target="original-transition-5">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-5-False-0" source="original-transition-5" target="n-place-10">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-6-True-0" source="n-place-5" target="original-transition-6">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-6-False-0" source="original-transition-6" target="n-place-11">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-6-False-1" source="original-transition-6" target="n-place-12">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-7-True-0" source="n-place-10" target="original-transition-7">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-7-True-1" source="n-place-11" target="original-transition-7">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-7-False-0" source="original-transition-7" target="n-place-6">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-8-True-0" source="n-place-12" target="original-transition-8">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-8-False-0" source="original-transition-8" target="n-place-8">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-9-True-0" source="n-place-7" target="original-transition-9">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-9-False-0" source="original-transition-9" target="n-place-13">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-10-True-0" source="n-place-9" target="original-transition-10">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-10-False-0" source="original-transition-10" target="n-place-14">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-11-True-0" source="n-place-13" target="original-transition-11">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-11-True-1" source="n-place-14" target="original-transition-11">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="n-11-False-0" source="original-transition-11" target="n-place-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="n-place-1">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

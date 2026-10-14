@@ -3369,6 +3369,28 @@ void parse_native_adapter_params_contract() {
   assert((net_reduction.final_marking == minera::Marking{0, 0, 1}));
   assert(net_reduction.enable_parallel_place_fusion &&
          net_reduction.enable_abstraction);
+  assert(!net_reduction.preserve_join_bridges);
+  for (const auto& value : {"true", "1", "false", "0"}) {
+    const auto parsed = minera::parse_petri_net_reduction_params(fields({
+        {"petri_reduction_preserve_join_bridges", value}}));
+    assert(parsed.preserve_join_bridges ==
+           (std::string_view(value) == "true" || std::string_view(value) == "1"));
+    assert(parsed.initial_marking.empty() && parsed.final_marking.empty());
+    assert(!parsed.enable_parallel_place_fusion && !parsed.enable_abstraction);
+  }
+  for (const auto& value : {"", "TRUE", "yes", " true", "2"}) {
+    bool rejected = false;
+    try {
+      (void)minera::parse_petri_net_reduction_params(
+          fields({{"petri_reduction_preserve_join_bridges", value}}),
+          [](std::string_view name) {
+            return name == "petri_reduction_preserve_join_bridges";
+          });
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
   for (const auto& invalid : {
            std::pair{"petri_reduction_initial_marking", "1,-1"},
            std::pair{"petri_reduction_parallel_place_fusion", "maybe"}}) {

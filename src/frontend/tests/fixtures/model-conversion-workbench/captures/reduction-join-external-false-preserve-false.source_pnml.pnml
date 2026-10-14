@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original imported PNML model</text></name>
+    <page id="page1">
+      <place id="source">
+        <name><text>source</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="private">
+        <name><text>private</text></name>
+      </place>
+      <place id="join">
+        <name><text>join</text></name>
+      </place>
+      <place id="sink">
+        <name><text>sink</text></name>
+      </place>
+      <transition id="original-transition-0">
+        <name><text>a</text></name>
+      </transition>
+      <transition id="original-transition-1">
+        <name><text>b</text></name>
+      </transition>
+      <transition id="original-transition-2">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-2"/>
+      </transition>
+      <transition id="original-transition-3">
+        <name><text>c</text></name>
+      </transition>
+      <transition id="original-transition-4">
+        <name><text>d</text></name>
+      </transition>
+      <arc id="a-in" source="source" target="original-transition-0"/>
+      <arc id="a-out" source="original-transition-0" target="private"/>
+      <arc id="b-in" source="source" target="original-transition-1"/>
+      <arc id="b-out" source="original-transition-1" target="private"/>
+      <arc id="bridge-in" source="private" target="original-transition-2"/>
+      <arc id="bridge-out" source="original-transition-2" target="join"/>
+      <arc id="c-in" source="join" target="original-transition-3"/>
+      <arc id="c-out" source="original-transition-3" target="sink"/>
+      <arc id="d-in" source="join" target="original-transition-4"/>
+      <arc id="d-out" source="original-transition-4" target="sink"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

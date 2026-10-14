@@ -1,0 +1,15 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+tree_to_powl
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-empty-sequence.json"
+Content-Type: application/octet-stream
+
+{"activities":[],"root":{"op":"SEQUENCE","op_index":2,"activity":18446744073709551615,"children":[]}}
+
+--OwnedModelConversionFeature56--

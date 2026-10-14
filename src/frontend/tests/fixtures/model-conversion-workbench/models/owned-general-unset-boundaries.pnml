@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="only">
+        <name>
+          <text>Original only</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <arc id="self-in" source="only" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="self-out" source="original-transition-0" target="only">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking />
+    </finalmarkings>
+  </net>
+</pnml>

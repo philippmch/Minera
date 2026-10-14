@@ -13443,3 +13443,46 @@ This checkpoint adds own-source native, frontend, API, publication and export ev
 This is implemented feature group 55. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
 
 Evidence: docs/feature-first-petri-anti-multi-validation.json. No browser screenshot is claimed.
+
+
+### Feature delivery first: independent original-model conversion and reduction
+
+An independent original-model conversion and reduction workbench is reachable from the landing page and classic/OCEL toolbars. Its additive POST /api/model-conversion-workbench endpoint accepts an original PTML/full process-tree constructor, original PNML document or native POWL text without reading or replacing the cached mining session.
+
+All five existing public converter overloads are invoked directly: ProcessTree to POWL, PetriNet to POWL, POWL to ProcessTree, PetriNet to ProcessTree and POWL to PetriNet. Converters have no invented variant/options object. Original model state and actual native results remain separate, with source immutability and actual call success/error contexts.
+
+Full POWL snapshots retain every native getter at every node: canonical kind and raw enum index, literal label, signed minimum and nullable maximum frequency, ordered children and the exact stored transitive-closure pair vector. Empty visible transitions remain distinct from SILENT. Native POWL parse/serialize text is retained independently of complete JSON; no replacement DSL or serialization-readback validation is introduced.
+
+Original PTML/full constructor inputs and converted trees retain the complete activity registry, duplicate/unused labels, raw operator/index and stored activity index on every node, every ordered child and empty container. Original PNML inputs retain the complete executable net and native document metadata, arbitrary-width marking values, raw boundary state, original IDs/zero keys, ordered weighted ordinary/reset/inhibitor occurrences and nullable full stochastic records through all five native import controls.
+
+Original PNML reduction exposes all five native option fields: initial/final signed int64 vectors, parallel-place fusion, abstraction and preserve_join_bridges. The missing preserve_join_bridges control is also added narrowly to the existing parser and cached-route allowlist with unchanged defaults and the existing true/false/1/0 syntax. Other legacy parser contracts and native algorithm/converter/reduction bodies remain unchanged.
+
+Scoped reduction marking carriers preserve exact INT64_MIN through INT64_MAX and zero entries without token expansion. Corresponding legacy comma/JSON fields conflict by presence, including blank values; JSON [] suppresses PNML injection and retains native unspecified-vector semantics. Omitted vectors use range-checked original PNML counts; marking width and signed fusion overflow are native outcomes. Negative signed markings remain valid native reduction inputs.
+
+Complete reduction results retain the actual reconstructed native net, initial/final signed result vectors, every original-place and original-transition mapping with the exact raw size_t removal sentinel, and changed. No completion or model-identity claims are inferred: changed=false can still accompany native metadata reconstruction. All original/result snapshots are displayed independently.
+
+Complete model/options/result inspection retains UTF/WTF-8 identity, control characters, exact integers and full native numeric storage, with escaped lone UTF-16 surrogates and no output transport caps. Native exceptions retain original model and applicable options/import context. Canonical POWL, PTML and PNML exports are independent artifact calls with explicit per-artifact errors; original uploaded bytes remain a separate verbatim download.
+
+Exact request fields, original model bytes/hashes, full original HTTP JSON and reports, all inspection CSV tables and selected records remain downloadable. Cancellation, per-operation model identity and replacement/stale-completion guards retain completed results and native-error envelopes. Frozen capture records audit every SHA/byte length, reject case-insensitive ID collisions and preserve immutable shared models; fixture publication retains byte-identical request/model/response/available-export artifacts after independent export validation.
+
+Validation: {"api_calls": 228, "api_checks": 1770, "core_objects": 182, "export_csv_cells": 83571, "export_entries": 155, "export_numeric_literals": 15602, "export_selected_records": 18938, "export_tests": 160, "fresh_core_objects": 2, "frontend_files": 97, "frontend_tests": 2512, "model_conversion_fixtures": 155, "native_sources": 651, "native_suites": 12, "published_files": 666, "published_fixture_entries": 155, "reused_core_objects": 180, "unrelated_files_preserved": 110}. Source/compiler/object/binary/publication/served-production-asset bindings passed. Complete browser validation is explicitly false; no Feature56 browser attempt is claimed and the frozen Feature54 denial remains historical evidence.
+
+This is implemented feature delivery, not full PM4Py parity. Every catalogue family, feature status, package/module parity status and selector is preserved unchanged; all 228 incomplete units remain in scope.
+
+Complete browser interaction, downloads, screenshots and responsive inspection for Feature56 remain pending. No Feature56 browser attempt, UI load or success is claimed. The frozen Feature54 exact-origin saved-permission/managed-policy denial remains historical evidence; its actual attempt occurred while PID20676 served Feature53 and loaded no browser UI. API-only port8568 and coherent native/production-asset HTTP verification on port8562 remain separate evidence.
+
+PetriNet to ProcessTree requires the native exact block-structured reduction and rejects unresolved partial orders. POWL to ProcessTree instead uses the existing deterministic closest block-structured approximation for sparse connected partial orders. These are distinct public overload semantics, not an exact-language equivalence claim.
+
+Native POWL factories enforce minimum 0/1 and maximum one/unbounded. The native text parser permits literal UTF/WTF bytes but its quoted Unicode escapes accept only ASCII; the workbench does not broaden that DSL. Native canonical relation text can reparse numeric or @digit activity labels as indices, so canonical text export never serves as a validity/readback gate for the complete stored POWL snapshot.
+
+Native PNML source metadata can exceed int64; omitted reduction marking injection remains range-checked while explicit JSON [] can retain unspecified native vectors. Reduction validates supplied vector width, accepts signed counts and reports checked-add overflow during fusion. Native changed=false is not metadata identity: the ordinary reconstruction can change boundary flags, weights or names, while native early unchanged returns retain the input. The actual native result is serialized without correction.
+
+The first Feature56 capture stopped at a fixture expectation: it expected HTTP200 for a small-weight PNML reverse conversion, while the unchanged native converter returned HTTP400 because its final marking was unreachable. Small PNML weights 2/3 had become repeated incidence endpoints; those multiplicities remain native execution structure, while only compact weight vectors are removed in the reverse-conversion validation copy. This establishes no native defect. The incomplete capture report, executed recipe, original models, request/response bytes and all referenced file hashes/sizes remain bound, and its calls/fixtures are excluded from completed validation counts. Only the fresh completed capture contributes to successful API/publication/export counts.
+
+The second Feature56 capture stopped on an incorrect envelope assumption after PNML import rejected ordinary/reset input arcs sharing the same place-transition pair. Its expected HTTP400 occurred before conversion and returned the existing generic import-error object without family; the validator raised KeyError rather than accepting that transport/import boundary. This establishes no native source defect. Both incomplete capture attempts remain separate, fully bound fixture-expectation histories and contribute no calls, fixtures or checks to completed validation counts. Replacement fixtures distinguish import rejection from the converter response for valid extended guards on separate places.
+
+This checkpoint adds own-source native/frontend/API/export/publication evidence, not a fresh public-reference differential corpus. Defaults, scalar/object identity, ordering, schema/errors, Unicode, marking, solver, concurrency and performance parity gates remain independent. The historical bounded whole-catalogue audit is still incomplete; partial parity and native_proof_exists statuses do not imply missing native algorithms.
+
+This is implemented feature group 56. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
+
+Evidence: docs/feature-first-model-conversion-validation.json. No browser screenshot is claimed.

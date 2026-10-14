@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="original-place-0">
+        <name>
+          <text>Original original-place-0</text>
+        </name>
+        <initialMarking>
+          <text>8</text>
+        </initialMarking>
+      </place>
+      <place id="original-place-1">
+        <name>
+          <text>Original original-place-1</text>
+        </name>
+        <initialMarking>
+          <text>0</text>
+        </initialMarking>
+      </place>
+      <transition id="original-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+        <toolspecific tool="StochasticPetriNet" version="0.2">
+          <property key="distributionType">NORMAL</property>
+          <property key="distributionParameters">0.1;0.2</property>
+          <property key="weight">0.3</property>
+          <property key="priority">7</property>
+        </toolspecific>
+      </transition>
+      <arc id="duplicate-id" source="original-place-0" target="original-transition-0">
+        <inscription>
+          <text>2</text>
+        </inscription>
+      </arc>
+      <arc id="duplicate-id" source="original-place-0" target="original-transition-0">
+        <inscription>
+          <text>3</text>
+        </inscription>
+      </arc>
+      <arc id="zero-out" source="original-transition-0" target="original-place-1">
+        <inscription>
+          <text>0</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="original-place-0">
+          <text>0</text>
+        </place>
+        <place idref="original-place-1">
+          <text>9</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

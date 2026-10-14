@@ -1,0 +1,104 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+pnml
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+net_to_powl
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="pnml_require_workflow_boundaries"
+
+false
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-net-error-unsound.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="source">
+        <name>
+          <text>Original source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="left">
+        <name>
+          <text>Original left</text>
+        </name>
+      </place>
+      <place id="right">
+        <name>
+          <text>Original right</text>
+        </name>
+      </place>
+      <place id="sink">
+        <name>
+          <text>Original sink</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <transition id="original-transition-1">
+        <name>
+          <text>B</text>
+        </name>
+      </transition>
+      <transition id="original-transition-2">
+        <name>
+          <text>C</text>
+        </name>
+      </transition>
+      <arc id="a-in" source="source" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a-out" source="original-transition-0" target="left">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="b-in" source="source" target="original-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="b-out" source="original-transition-1" target="right">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="c-in1" source="left" target="original-transition-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="c-in2" source="right" target="original-transition-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="c-out" source="original-transition-2" target="sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedModelConversionFeature56--
