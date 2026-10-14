@@ -13,9 +13,10 @@ interface LandingProps {
   onTreeGeneration?: () => void;
   onAcquisition?: () => void;
   onTokenReplay?: () => void;
+  onPetriAlignment?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -67,6 +68,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onTreeGeneration && <button className="landing-sample reveal" disabled={mining} onClick={onTreeGeneration}>Generate process trees and logs</button>}
         {onAcquisition && <button className="landing-sample reveal" disabled={mining} onClick={onAcquisition}>Acquire source data</button>}
         {onTokenReplay && <button className="landing-sample reveal" disabled={mining} onClick={onTokenReplay}>Replay a log against a PNML model</button>}
+        {onPetriAlignment && <button className="landing-sample reveal" disabled={mining} onClick={onPetriAlignment}>Align a log against a PNML model</button>}
 
         <div className="landing-steps reveal">
           <div className="landing-step">

@@ -2764,6 +2764,295 @@ void parse_alignment_params_rejects_invalid_and_dependent_values() {
   assert(threw);
 }
 
+void parse_alignment_params_preserves_exact_json_cost_labels() {
+  const std::string trace_costs =
+      std::string(R"({" a,b:c=\"\\>> \t\n":1.25,"":0,"\u4e2d":2,"\uD83D\uDE00":3,")") +
+      "\xC3\xA9" + R"(":4,"e\u0301":5,"a\u0000b":6})";
+  const auto p = minera::parse_alignment_params(fields({
+      {"alignment_trace_costs", trace_costs},
+      {"alignment_model_costs", R"({" ":0,"a,b":2.5,">>":3})"},
+      {"alignment_sync_costs", R"({" leading ":0.25,"trailing ":0})"},
+      {"trace_cost", "7"}, {"model_cost", "8"}, {"sync_cost", "0.5"}}));
+  assert(p.trace_costs.size() == 7);
+  assert(p.trace_costs.at(" a,b:c=\"\\>> \t\n") == 1.25);
+  assert(p.trace_costs.at("") == 0.0);
+  assert(p.trace_costs.at("\xE4\xB8\xAD") == 2.0);
+  assert(p.trace_costs.at("\xF0\x9F\x98\x80") == 3.0);
+  assert(p.trace_costs.at("\xC3\xA9") == 4.0);
+  assert(p.trace_costs.at("e\xCC\x81") == 5.0);
+  assert(p.trace_costs.at(std::string("a\0b", 3)) == 6.0);
+  assert(p.model_costs.size() == 3 && p.model_costs.at(" ") == 0.0);
+  assert(p.model_costs.at("a,b") == 2.5 && p.model_costs.at(">>") == 3.0);
+  assert(p.sync_costs.size() == 2 && p.sync_costs.at(" leading ") == 0.25);
+  assert(p.sync_costs.at("trailing ") == 0.0);
+  assert(p.default_trace_cost == 7.0 && p.default_model_cost == 8.0);
+  assert(p.default_sync_cost == 0.5);
+}
+
+void parse_alignment_params_maps_numeric_arrays_and_empty_containers() {
+  const auto p = minera::parse_alignment_params(fields({
+      {"alignment_trace_costs_by_position", " [0, 1.25, 2e-3, -0.0] "},
+      {"alignment_model_costs_by_transition", "[18446744073709551615,1.7976931348623157e308]"},
+      {"alignment_sync_costs_by_transition", "[0,2,3.5]"}}));
+  assert((p.trace_costs_by_position == std::vector<double>{0, 1.25, 0.002, 0}));
+  assert(p.model_costs_by_transition.size() == 2);
+  assert(p.model_costs_by_transition[0] ==
+         static_cast<double>(std::numeric_limits<std::uint64_t>::max()));
+  assert(p.model_costs_by_transition[1] == std::numeric_limits<double>::max());
+  assert((p.sync_costs_by_transition == std::vector<double>{0, 2, 3.5}));
+
+  for (const bool explicit_empty : {false, true}) {
+    const auto empty = minera::parse_alignment_params(fields(explicit_empty ?
+        std::map<std::string, std::string>{
+            {"alignment_trace_costs", "{}"}, {"alignment_model_costs", "{}"},
+            {"alignment_sync_costs", "{}"},
+            {"alignment_trace_costs_by_position", "[]"},
+            {"alignment_model_costs_by_transition", "[]"},
+            {"alignment_sync_costs_by_transition", "[]"}} :
+        std::map<std::string, std::string>{}));
+    assert(empty.trace_costs.empty() && empty.model_costs.empty() &&
+           empty.sync_costs.empty());
+    assert(empty.trace_costs_by_position.empty() &&
+           empty.model_costs_by_transition.empty() &&
+           empty.sync_costs_by_transition.empty());
+    assert(empty.initial_marking.empty() && empty.final_marking.empty());
+    assert(!empty.default_trace_cost && !empty.default_model_cost &&
+           !empty.default_sync_cost && !empty.default_silent_cost);
+    assert(empty.variant == minera::AlignmentVariant::kDijkstraLessMemory);
+    assert(empty.cost_profile == minera::AlignmentCostProfile::kLegacyUnit);
+  }
+}
+
+void parse_alignment_params_rejects_invalid_json_costs() {
+  const std::vector<std::string> invalid_values{
+      "true", "false", "\"2\"", "null", "-1", "-0.5", "NaN", "Infinity",
+      "-Infinity", "1e309", "[]", "{}"};
+  for (const auto name : {"alignment_trace_costs", "alignment_model_costs",
+                          "alignment_sync_costs"}) {
+    for (const auto& value : invalid_values) {
+      bool threw = false;
+      try {
+        (void)minera::parse_alignment_params(fields({
+            {name, "{\"label\":" + value + "}"}}));
+      } catch (const std::invalid_argument& error) {
+        threw = true;
+        assert(std::string(error.what()).find(name) != std::string::npos);
+      }
+      assert(threw);
+    }
+    for (const auto value : {"[]", "null", "true", "\"a=2\"", "a=2",
+                             "{label:2}", "{\"a\":2,}", "{\"a\":2} trailing",
+                             "{\"a\":01}", "{\"a\":.5}", "{\"a\":+2}"}) {
+      bool threw = false;
+      try { (void)minera::parse_alignment_params(fields({{name, value}})); }
+      catch (const std::invalid_argument&) { threw = true; }
+      assert(threw);
+    }
+  }
+  for (const auto name : {"alignment_trace_costs_by_position",
+                          "alignment_model_costs_by_transition",
+                          "alignment_sync_costs_by_transition"}) {
+    for (const auto& value : invalid_values) {
+      bool threw = false;
+      try {
+        (void)minera::parse_alignment_params(fields({
+            {name, "[0," + value + "]"}}));
+      } catch (const std::invalid_argument& error) {
+        threw = true;
+        assert(std::string(error.what()).find(name) != std::string::npos);
+      }
+      assert(threw);
+    }
+    for (const auto value : {"{}", "null", "true", "0,1", "[1,]", "[,1]",
+                             "[1] trailing", "[01]", "[.5]", "[+2]"}) {
+      bool threw = false;
+      try { (void)minera::parse_alignment_params(fields({{name, value}})); }
+      catch (const std::invalid_argument&) { threw = true; }
+      assert(threw);
+    }
+  }
+  // FieldPresence distinguishes an explicit empty wire value from omission.
+  for (const auto name : {"alignment_trace_costs", "alignment_model_costs",
+                          "alignment_sync_costs", "alignment_trace_costs_by_position",
+                          "alignment_model_costs_by_transition",
+                          "alignment_sync_costs_by_transition"}) {
+    for (const auto value : {"", " \t\r\n"}) {
+      const std::map<std::string, std::string> values{{name, value}};
+      bool threw = false;
+      try {
+        (void)minera::parse_alignment_params(fields(values),
+            [&values](std::string_view key) {
+              return values.contains(std::string(key));
+            });
+      } catch (const std::invalid_argument&) { threw = true; }
+      assert(threw);
+    }
+  }
+}
+
+void parse_alignment_params_maps_and_validates_native_markings() {
+  const auto largest = std::to_string(std::numeric_limits<int>::max());
+  const auto p = minera::parse_alignment_params(fields({
+      {"alignment_initial_marking", " 0,\t1, " + largest + "\r\n"},
+      {"alignment_final_marking", "2,0,0"}}));
+  assert((p.initial_marking ==
+          std::vector<int>{0, 1, std::numeric_limits<int>::max()}));
+  assert((p.final_marking == std::vector<int>{2, 0, 0}));
+  const auto overflow = std::to_string(
+      static_cast<std::uint64_t>(std::numeric_limits<int>::max()) + 1);
+  for (const auto name : {"alignment_initial_marking", "alignment_final_marking"}) {
+    for (const auto& value : std::vector<std::string>{
+             "", " \t\n", "-1", "+1", "1.0", "1e2", "[1,0]", "0,,1",
+             "0,", ",0", "0, \t ,1", overflow,
+             "18446744073709551616"}) {
+      const std::map<std::string, std::string> values{{name, value}};
+      bool threw = false;
+      try {
+        (void)minera::parse_alignment_params(fields(values),
+            [&values](std::string_view key) {
+              return values.contains(std::string(key));
+            });
+      } catch (const std::invalid_argument& error) {
+        threw = true;
+        assert(std::string(error.what()).find(name) != std::string::npos);
+      }
+      assert(threw);
+    }
+  }
+}
+
+void parse_alignment_json_costs_validates_literal_boundaries() {
+  const auto p = minera::parse_alignment_params(fields({
+      {"alignment_trace_costs",
+       R"({"large":18446744073709551616,"larger":1267650600228229401496703205376,"small":1e-400,"zero":-0.000e309})"},
+      {"alignment_trace_costs_by_position",
+       "[18446744073709551616,1267650600228229401496703205376,1e-400,-0e-400]"}}));
+  assert(p.trace_costs.at("large") == std::ldexp(1.0, 64));
+  assert(p.trace_costs.at("larger") == std::ldexp(1.0, 100));
+  assert(p.trace_costs.at("small") == 0.0 && !std::signbit(p.trace_costs.at("small")));
+  assert(p.trace_costs.at("zero") == 0.0 && std::signbit(p.trace_costs.at("zero")));
+  assert((p.trace_costs_by_position ==
+          std::vector<double>{std::ldexp(1.0, 64), std::ldexp(1.0, 100), 0, 0}));
+  assert(std::signbit(p.trace_costs_by_position[3]));
+
+  const auto integer_overflow = std::string("1") + std::string(309, '0');
+  for (const auto name : {"alignment_trace_costs", "alignment_model_costs",
+                          "alignment_sync_costs", "alignment_trace_costs_by_position",
+                          "alignment_model_costs_by_transition",
+                          "alignment_sync_costs_by_transition"}) {
+    const bool array = std::string(name).find("_by_") != std::string::npos;
+    for (const auto& literal : std::vector<std::string>{
+             "-1e-400", "-0.0001e-999", "-5e-324", integer_overflow}) {
+      const auto json = array ? "[" + literal + "]" :
+                                "{\"A\":" + literal + "}";
+      bool threw = false;
+      try { (void)minera::parse_alignment_params(fields({{name, json}})); }
+      catch (const std::invalid_argument& error) {
+        threw = true;
+        assert(std::string(error.what()).find(name) != std::string::npos);
+      }
+      assert(threw);
+    }
+  }
+}
+
+void parse_alignment_json_costs_rejects_duplicate_decoded_labels() {
+  const std::vector<std::string> duplicates{
+      R"({"A":2,"A":3})", R"({"A":true,"\u0041":2})",
+      R"({"A":-1,"A":2})", R"({" a,b ":1,"\u0020a,b ":2})",
+      R"({"a\u0000b":1,"a\u0000b":2})",
+      std::string(R"({"\u00e9":1,")") + "\xC3\xA9" + R"(":2})"};
+  for (const auto name : {"alignment_trace_costs", "alignment_model_costs",
+                          "alignment_sync_costs"}) {
+    for (const auto& json : duplicates) {
+      bool threw = false;
+      try { (void)minera::parse_alignment_params(fields({{name, json}})); }
+      catch (const std::invalid_argument& error) {
+        threw = true;
+        assert(std::string(error.what()).find(name) != std::string::npos);
+      }
+      assert(threw);
+    }
+  }
+}
+
+void parse_alignment_input_adapter_defaults_and_rejects_invalid_shapes() {
+  assert(minera::parse_alignment_input_adapter(fields({})) == "log");
+  assert(minera::parse_alignment_input_adapter(fields({}),
+      [](std::string_view) { return false; }) == "log");
+  for (const auto value : {"log", "stream", "dataframe", "lazyframe"}) {
+    assert(minera::parse_alignment_input_adapter(fields({
+        {"alignment_input_adapter", value}})) == value);
+  }
+  for (const auto value : {"", " ", "LOG", " log", "log ", "table", "[]",
+                           "null", "event_log", "log,stream"}) {
+    const std::map<std::string, std::string> values{
+        {"alignment_input_adapter", value}};
+    bool threw = false;
+    try {
+      (void)minera::parse_alignment_input_adapter(fields(values),
+          [&values](std::string_view key) {
+            return values.contains(std::string(key));
+          });
+    } catch (const std::invalid_argument& error) {
+      threw = true;
+      assert(std::string(error.what()).find("alignment_input_adapter") !=
+             std::string::npos);
+    }
+    assert(threw);
+  }
+}
+
+void parse_alignment_costs_preserves_existing_variant_validation() {
+  const std::map<std::string, std::string> costs{
+      {"alignment_trace_costs", R"({"A":2})"},
+      {"alignment_model_costs", R"({"B":3})"},
+      {"alignment_sync_costs", R"({"A":0})"},
+      {"alignment_trace_costs_by_position", "[2]"},
+      {"alignment_model_costs_by_transition", "[3]"},
+      {"alignment_sync_costs_by_transition", "[0]"},
+      {"alignment_initial_marking", "1,0"},
+      {"alignment_final_marking", "0,1"}};
+  for (const auto variant : {"state_equation_a_star", "dijkstra_no_heuristics",
+                             "dijkstra_less_memory", "discounted_a_star",
+                             "generator_dijkstra_no_heuristics",
+                             "generator_dijkstra_less_memory"}) {
+    auto values = costs;
+    values.emplace("alignment_variant", variant);
+    const bool discounted = std::string(variant) == "discounted_a_star";
+    const bool generator = std::string(variant).find("generator_") == 0;
+    if (discounted) {
+      values.emplace("theta", "3");
+      values.emplace("synchronous_dijkstra", "false");
+    }
+    if (generator) values.emplace("max_alignments", "5");
+    const auto p = minera::parse_alignment_params(fields(values));
+    assert(p.trace_costs.at("A") == 2 && p.model_costs.at("B") == 3);
+    assert(p.sync_costs.at("A") == 0 && p.trace_costs_by_position[0] == 2);
+    assert(p.model_costs_by_transition[0] == 3 && p.sync_costs_by_transition[0] == 0);
+    assert((p.initial_marking == std::vector<int>{1, 0}));
+    assert((p.final_marking == std::vector<int>{0, 1}));
+    if (discounted) assert(p.exponent == 3 && !p.synchronous_dijkstra);
+    if (generator) assert(p.max_alignments == 5);
+
+    for (const auto& invalid : {
+             std::map<std::string, std::string>{{"exponent", "3"}},
+             std::map<std::string, std::string>{{"theta", "3"}},
+             std::map<std::string, std::string>{{"synchronous_dijkstra", "false"}},
+             std::map<std::string, std::string>{{"max_alignments", "5"}}}) {
+      const bool requires_discounted = !invalid.contains("max_alignments");
+      if (requires_discounted ? discounted : generator) continue;
+      auto invalid_values = costs;
+      invalid_values.emplace("alignment_variant", variant);
+      invalid_values.insert(invalid.begin(), invalid.end());
+      bool threw = false;
+      try { (void)minera::parse_alignment_params(fields(invalid_values)); }
+      catch (const std::invalid_argument&) { threw = true; }
+      assert(threw);
+    }
+  }
+}
+
 void parse_process_tree_alignment_params_maps_variants_and_limits() {
   for (const auto& value : {"SEARCH_GRAPH_PT", "search_graph_pt",
                             "Variants.SEARCH_GRAPH_PT", "DYNAMIC_PROGRAMMING", "MILP",
@@ -5217,6 +5506,14 @@ int main() {
   parse_mine_params_rejects_invalid_dataframe_dfg_options();
   parse_alignment_params_maps_variants_and_costs();
   parse_alignment_params_rejects_invalid_and_dependent_values();
+  parse_alignment_params_preserves_exact_json_cost_labels();
+  parse_alignment_params_maps_numeric_arrays_and_empty_containers();
+  parse_alignment_params_rejects_invalid_json_costs();
+  parse_alignment_params_maps_and_validates_native_markings();
+  parse_alignment_json_costs_validates_literal_boundaries();
+  parse_alignment_json_costs_rejects_duplicate_decoded_labels();
+  parse_alignment_input_adapter_defaults_and_rejects_invalid_shapes();
+  parse_alignment_costs_preserves_existing_variant_validation();
   parse_dfg_and_edit_alignment_params_contract();
   parse_process_tree_alignment_params_maps_variants_and_limits();
   parse_process_tree_alignment_params_rejects_bad_values();

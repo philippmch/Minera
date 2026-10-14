@@ -316,6 +316,11 @@ void write_analysis_json(std::ostream& out,
 // model's `alignments`), for the server's on-demand alignment endpoint.
 [[nodiscard]] std::string alignment_json(const AlignmentResult& alignment,
                                          const DirectlyFollowsGraph& graph);
+// Explicit precision leaves the legacy serializer unchanged while allowing
+// standalone inspections to round-trip the native floating-point values.
+[[nodiscard]] std::string alignment_json(const AlignmentResult& alignment,
+                                         const DirectlyFollowsGraph& graph,
+                                         int float_precision);
 
 // Serializes the conformance of an imported (user-supplied) model for the
 // server's model-checking endpoint: `model` holds the same object written per

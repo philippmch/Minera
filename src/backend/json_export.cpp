@@ -4841,6 +4841,17 @@ std::string alignment_json(const AlignmentResult& alignment,
   return out.str();
 }
 
+std::string alignment_json(const AlignmentResult& alignment,
+                           const DirectlyFollowsGraph& graph,
+                           int float_precision) {
+  if (float_precision < 1 || float_precision > std::numeric_limits<double>::max_digits10)
+    throw std::invalid_argument("alignment JSON precision is out of range");
+  std::ostringstream out;
+  out.precision(float_precision);
+  write_alignments(out, alignment, graph);
+  return out.str();
+}
+
 std::string process_tree_alignment_json(const ProcessTreeAlignmentResult& result) {
   std::ostringstream out;
   write_process_tree_alignment(out, result);

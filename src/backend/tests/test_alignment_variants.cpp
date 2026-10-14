@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/json_export.hpp"
 
 namespace {
 minera::EventLog log_of(std::initializer_list<std::string> activities) {
@@ -54,6 +55,27 @@ int main() {
   assert(default_alignment.diagnostics.visited_states > 0);
   assert(default_alignment.diagnostics.queued_states > 0);
   assert(default_alignment.diagnostics.lp_solved == 0);
+
+  // Standalone inspection can retain every native double without changing
+  // the ordinary API's existing precision and formatting contract.
+  minera::DirectlyFollowsGraph numeric_graph;
+  auto numeric_result = default_alignment;
+  numeric_result.total_cost = 1.2345678901234567;
+  const auto legacy_json = minera::alignment_json(numeric_result, numeric_graph);
+  const auto precise_json = minera::alignment_json(numeric_result, numeric_graph,
+      std::numeric_limits<double>::max_digits10);
+  const auto field_value = [](const std::string& json) {
+    const std::string key = "\"total_cost\": ";
+    return std::stod(json.substr(json.find(key) + key.size()));
+  };
+  assert(field_value(precise_json) == numeric_result.total_cost);
+  assert(field_value(legacy_json) != numeric_result.total_cost);
+  for (const int precision : {0, std::numeric_limits<double>::max_digits10 + 1}) {
+    bool rejected = false;
+    try { (void)minera::alignment_json(numeric_result, numeric_graph, precision); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+  }
 
   const auto attributed = log_with_activity_attribute();
   minera::AlignmentOptions attributed_options;

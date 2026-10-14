@@ -58,6 +58,7 @@ import { ModelExchangeWorkspace } from "./components/ModelExchangeWorkspace";
 import { ProcessCubeWorkspace } from "./components/ProcessCubeWorkspace";
 import { TreeGenerationWorkspace } from "./components/TreeGenerationWorkspace";
 import { TokenReplayWorkspace } from "./components/TokenReplayWorkspace";
+import { PetriAlignmentWorkspace } from "./components/PetriAlignmentWorkspace";
 import { requestLogQuerySchema } from "./log-query";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
@@ -123,6 +124,7 @@ export default function App() {
   const [showTreeGeneration, setShowTreeGeneration] = useState(false);
   const [showAcquisition, setShowAcquisition] = useState(false);
   const [showTokenReplay, setShowTokenReplay] = useState(false);
+  const [showPetriAlignment, setShowPetriAlignment] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -370,6 +372,8 @@ export default function App() {
     setShowProcessCube(false);
     setShowTreeGeneration(false);
     setShowAcquisition(false);
+    setShowTokenReplay(false);
+    setShowPetriAlignment(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -577,6 +581,7 @@ export default function App() {
     [data, selectedVariant],
   );
 
+  if (showPetriAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Alignment inputs'} datasetKind="Petri alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAlignment(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowPetriAlignment(false)}>Return to current workspace</button><PetriAlignmentWorkspace file={source?.file??null}/></main></>;
   if (showTokenReplay) return <><TopBar dataset={data?.dataset??ocelDataset??'Replay inputs'} datasetKind="token replay" onOpenFile={loadFile} onHome={()=>setShowTokenReplay(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTokenReplay(false)}>Return to current workspace</button><TokenReplayWorkspace file={source?.file??null}/></main></>;
   if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
   if (showAcquisition) return <><TopBar dataset={data?.dataset??ocelDataset??'Activity sources'} datasetKind="source acquisition" onOpenFile={loadFile} onHome={()=>setShowAcquisition(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowAcquisition(false)}>Return to current workspace</button><SourceAcquisitionWorkspace busy={mining} onOpen={loadFile}/></main></>;
@@ -602,6 +607,7 @@ export default function App() {
           onTreeGeneration={()=>setShowTreeGeneration(true)}
           onAcquisition={()=>setShowAcquisition(true)}
           onTokenReplay={()=>setShowTokenReplay(true)}
+          onPetriAlignment={()=>setShowPetriAlignment(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -652,6 +658,7 @@ export default function App() {
           onTreeGeneration={()=>setShowTreeGeneration(true)}
           onAcquisition={()=>setShowAcquisition(true)}
           onTokenReplay={()=>setShowTokenReplay(true)}
+          onPetriAlignment={()=>setShowPetriAlignment(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -679,6 +686,7 @@ export default function App() {
           onTreeGeneration={()=>setShowTreeGeneration(true)}
           onAcquisition={()=>setShowAcquisition(true)}
           onTokenReplay={()=>setShowTokenReplay(true)}
+          onPetriAlignment={()=>setShowPetriAlignment(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);

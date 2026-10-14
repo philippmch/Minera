@@ -13184,3 +13184,40 @@ solver/concurrency/performance and remaining features remain independent gates.
 
 Evidence: docs/feature-first-token-replay-validation.json and
 docs/feature-first-token-replay-preview.png.
+
+
+### Feature delivery first: independent Petri alignment
+
+An independent Petri-alignment workbench accepts original CSV/TSV/XES/gzip-XES and PNML uploads from landing and both event-log/object-centric toolbars without changing the cached mining session.
+
+All six existing native search variants and grouped log, event stream, dataframe and lazyframe inputs are selectable. Flat CSV adapters retain parser rows, native case regrouping and projection; grouped logs retain trace boundaries.
+
+Import selectors, state/time/event bounds, generator alternative limits, discounted controls, cost profiles, scalar costs, exact-label JSON cost maps, position/transition arrays and native-int marking overrides are exposed.
+
+Strict shared request parsing preserves exact JSON labels and rejects malformed containers, duplicate decoded keys, nonfinite/negative costs and negative underflow while supporting finite large integer spellings and explicit empty containers.
+
+Uploaded PNML IDs, supplied markings and zero-key membership are retained alongside effective marking overrides. Returned complete moves preserve native transition identity and explicit silent model routing.
+
+Every trace group, returned alternative, complete move, model projection and visited marking is inspectable with full numeric literals, request fields, input SHA256 hashes, complete CSV/JSON/report downloads and exact original files.
+
+Uncomputed or exhausted results remain inspectable without presenting placeholder fitness/precision/cost as measurements. Errors retain the previously completed run, cancellation/stale guards prevent late updates, and opening a new host log exits the independent workspace.
+
+Validation: {"actual_native_fixtures": 80, "application_calls": 118, "application_checks": 478, "browser_checks": 15, "browser_downloads": 101, "browser_exported_runs": 5, "complete_csv_tables": 80, "frontend_tests": 1538, "independent_calls": 9, "independent_export_checks": 107, "native_test_suites": 4, "retained_failed_native_expectations": 6}. Native/source/object/binary/served-asset/evidence bindings and owned-resource cleanup passed. Sandbox-blocked preliminary frontend, background server and API attempts are retained.
+
+Feature delivery only. No package/module status, selector or strict parity gate is promoted; all 228 incomplete catalogue units and the complete original catalogue remain in scope.
+
+Native search algorithms, limits, grouping/tie rules, callback semantics and cost precedence are retained. Full solver, ordering, Unicode, marking, concurrency and performance parity remains open.
+
+Alignment uses existing native int markings; PNML counts outside that range are rejected unless explicitly replaced with representable input vectors. Arbitrary reference marking objects remain a separate gate.
+
+Flat CSV input retains native parser rows. XES flat adapters convert the imported grouped log; arbitrary external dataframe metadata, indices, categorical/dtype identity and object contracts remain separate gates.
+
+The independent response uses max_digits10 for native doubles and retains numeric text in inspection/export. Legacy serializers remain unchanged; full reference numeric/format behavior is not certified.
+
+Cost maps are keyed by native activity label; transition arrays address root transition indices. Native inactive/ignored cost conventions, alternative completeness and marked-net semantics are not changed by transport.
+
+Native empty-activity limitations remain open: the aligner omits a blank XES log move from returned paths, and an empty CSV generic activity field is treated as missing. The original failed expectations and independent repeat observations are retained; no algorithm repair is claimed.
+
+This is delivered feature group 49. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
+
+Evidence: docs/feature-first-petri-alignment-validation.json and docs/feature-first-petri-alignment-preview.png.
