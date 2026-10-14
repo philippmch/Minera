@@ -18,9 +18,10 @@ interface TopBarProps {
   onInductiveInputs?: () => void;
   onTreeAlignment?: () => void;
   onPetriAntiMulti?: () => void;
+  onModelConversion?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -50,6 +51,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onInductiveInputs && <button className="btn-ghost" onClick={onInductiveInputs}>Inductive inputs</button>}
       {onTreeAlignment && <button className="btn-ghost" onClick={onTreeAlignment}>Tree alignment</button>}
       {onPetriAntiMulti && <button className="btn-ghost" onClick={onPetriAntiMulti}>Anti/multi alignment</button>}
+      {onModelConversion && <button className="btn-ghost" onClick={onModelConversion}>Convert models</button>}
       <label className="btn-open">
         Open log
         <input

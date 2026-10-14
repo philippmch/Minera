@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original imported PNML model</text></name>
+    <page id="page1">
+      <place id="original-place-0">
+        <name><text>original-place-0</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="original-place-1">
+        <name><text>original-place-1</text></name>
+      </place>
+      <transition id="original-transition-0">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-0"/>
+      </transition>
+      <arc id="original-in-0" source="original-place-0" target="original-transition-0"/>
+      <arc id="original-out-0" source="original-transition-0" target="original-place-1"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="original-place-1"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

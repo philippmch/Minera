@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original imported PNML model</text></name>
+    <page id="page1">
+      <place id="original-place-0">
+        <name><text>original-place-0</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="original-place-1">
+        <name><text>original-place-1</text></name>
+      </place>
+      <place id="original-place-2">
+        <name><text>original-place-2</text></name>
+      </place>
+      <place id="original-place-3">
+        <name><text>original-place-3</text></name>
+      </place>
+      <place id="original-place-4">
+        <name><text>original-place-4</text></name>
+      </place>
+      <transition id="original-transition-0">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-0"/>
+      </transition>
+      <transition id="original-transition-1">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-1"/>
+      </transition>
+      <transition id="original-transition-2">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-2"/>
+      </transition>
+      <transition id="original-transition-3">
+        <name><text>a</text></name>
+      </transition>
+      <arc id="original-in-0" source="original-place-0" target="original-transition-0"/>
+      <arc id="original-in-1" source="original-place-1" target="original-transition-1"/>
+      <arc id="original-in-2" source="original-place-2" target="original-transition-2"/>
+      <arc id="original-in-3" source="original-place-3" target="original-transition-3"/>
+      <arc id="original-out-0" source="original-transition-0" target="original-place-1"/>
+      <arc id="original-out-1" source="original-transition-1" target="original-place-2"/>
+      <arc id="original-out-2" source="original-transition-2" target="original-place-3"/>
+      <arc id="original-out-3" source="original-transition-3" target="original-place-4"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="original-place-4"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

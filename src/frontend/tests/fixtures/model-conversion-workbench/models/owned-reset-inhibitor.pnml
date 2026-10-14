@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="source">
+        <name>
+          <text>Original source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="sink">
+        <name>
+          <text>Original sink</text>
+        </name>
+      </place>
+      <place id="reset-guard">
+        <name>
+          <text>Original reset-guard</text>
+        </name>
+      </place>
+      <place id="inhibitor-guard">
+        <name>
+          <text>Original inhibitor-guard</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <arc id="in" source="source" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="out" source="original-transition-0" target="sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="reset" source="reset-guard" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+        <arctype>
+          <text>reset</text>
+        </arctype>
+      </arc>
+      <arc id="inhibitor" source="inhibitor-guard" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+        <arctype>
+          <text>inhibitor</text>
+        </arctype>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

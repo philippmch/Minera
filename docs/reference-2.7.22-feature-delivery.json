@@ -2808,6 +2808,55 @@
       ],
       "validation": "docs/feature-first-petri-anti-multi-validation.json",
       "browser_validation_complete": false
+    },
+    {
+      "id": "native_independent_model_conversion_reduction",
+      "state": "original_ptml_tree_pnml_powl_public_converters_and_full_native_reduction_options_results_exports_available",
+      "families": [
+        "algo.discovery.powl"
+      ],
+      "supporting_native_surfaces": [
+        "to_powl(ProcessTree)",
+        "to_powl(PetriNet)",
+        "to_process_tree(PowlNode)",
+        "to_process_tree(PetriNet)",
+        "to_petri_net(PowlNode)",
+        "reduce_petri_net(PetriNet, PetriNetReductionOptions)"
+      ],
+      "operations": [
+        "tree_to_powl",
+        "net_to_powl",
+        "powl_to_tree",
+        "net_to_tree",
+        "powl_to_net",
+        "reduce_petri"
+      ],
+      "entry_points": [
+        "include/minera/model_conversion_workbench_json.hpp",
+        "src/backend/model_conversion_workbench_json.cpp",
+        "include/minera/powl.hpp",
+        "include/minera/powl_conversion.hpp",
+        "include/minera/petri_net_reduction.hpp",
+        "src/backend/powl_conversion.cpp",
+        "src/backend/petri_net_reduction.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/model_conversion_route.hpp",
+        "src/frontend/src/model-conversion-workbench.ts",
+        "src/frontend/src/components/ModelConversionWorkspace.tsx"
+      ],
+      "added": [
+        "An independent original-model conversion and reduction workbench is reachable from the landing page and classic/OCEL toolbars. Its additive POST /api/model-conversion-workbench endpoint accepts an original PTML/full process-tree constructor, original PNML document or native POWL text without reading or replacing the cached mining session.",
+        "All five existing public converter overloads are invoked directly: ProcessTree to POWL, PetriNet to POWL, POWL to ProcessTree, PetriNet to ProcessTree and POWL to PetriNet. Converters have no invented variant/options object. Original model state and actual native results remain separate, with source immutability and actual call success/error contexts.",
+        "Full POWL snapshots retain every native getter at every node: canonical kind and raw enum index, literal label, signed minimum and nullable maximum frequency, ordered children and the exact stored transitive-closure pair vector. Empty visible transitions remain distinct from SILENT. Native POWL parse/serialize text is retained independently of complete JSON; no replacement DSL or serialization-readback validation is introduced.",
+        "Original PTML/full constructor inputs and converted trees retain the complete activity registry, duplicate/unused labels, raw operator/index and stored activity index on every node, every ordered child and empty container. Original PNML inputs retain the complete executable net and native document metadata, arbitrary-width marking values, raw boundary state, original IDs/zero keys, ordered weighted ordinary/reset/inhibitor occurrences and nullable full stochastic records through all five native import controls.",
+        "Original PNML reduction exposes all five native option fields: initial/final signed int64 vectors, parallel-place fusion, abstraction and preserve_join_bridges. The missing preserve_join_bridges control is also added narrowly to the existing parser and cached-route allowlist with unchanged defaults and the existing true/false/1/0 syntax. Other legacy parser contracts and native algorithm/converter/reduction bodies remain unchanged.",
+        "Scoped reduction marking carriers preserve exact INT64_MIN through INT64_MAX and zero entries without token expansion. Corresponding legacy comma/JSON fields conflict by presence, including blank values; JSON [] suppresses PNML injection and retains native unspecified-vector semantics. Omitted vectors use range-checked original PNML counts; marking width and signed fusion overflow are native outcomes. Negative signed markings remain valid native reduction inputs.",
+        "Complete reduction results retain the actual reconstructed native net, initial/final signed result vectors, every original-place and original-transition mapping with the exact raw size_t removal sentinel, and changed. No completion or model-identity claims are inferred: changed=false can still accompany native metadata reconstruction. All original/result snapshots are displayed independently.",
+        "Complete model/options/result inspection retains UTF/WTF-8 identity, control characters, exact integers and full native numeric storage, with escaped lone UTF-16 surrogates and no output transport caps. Native exceptions retain original model and applicable options/import context. Canonical POWL, PTML and PNML exports are independent artifact calls with explicit per-artifact errors; original uploaded bytes remain a separate verbatim download.",
+        "Exact request fields, original model bytes/hashes, full original HTTP JSON and reports, all inspection CSV tables and selected records remain downloadable. Cancellation, per-operation model identity and replacement/stale-completion guards retain completed results and native-error envelopes. Frozen capture records audit every SHA/byte length, reject case-insensitive ID collisions and preserve immutable shared models; fixture publication retains byte-identical request/model/response/available-export artifacts after independent export validation."
+      ],
+      "validation": "docs/feature-first-model-conversion-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -2825,7 +2874,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. Independent Inductive discovery now exposes original event adapters, compact exact weighted variants and declared DFG constructor inputs with complete native preparation/tree/options/net/export inspection. Independent process-tree alignment now exposes original PTML/full constructor models, original checked logs/traces/tables/word-to-EventLog conversion, every native option/result field and independent model exports. Independent PNML anti/multi alignment now exposes original supplied models and checked inputs, exact full native options/results/metadata and exports. Continue a fresh read-only feature-first audit across the whole catalogue to identify the next concrete missing usable entry points. The whole feature audit remains incomplete and every strict parity gate remains open. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. Independent Inductive discovery now exposes original event adapters, compact exact weighted variants and declared DFG constructor inputs with complete native preparation/tree/options/net/export inspection. Independent process-tree alignment now exposes original PTML/full constructor models, original checked logs/traces/tables/word-to-EventLog conversion, every native option/result field and independent model exports. Independent PNML anti/multi alignment now exposes original supplied models and checked inputs, exact full native options/results/metadata and exports. Independent POWL model conversions and original-PNML reduction now expose all five public converters and complete native reduction controls/results. The next confirmed input-surface gaps from the bounded whole-catalogue audit are complete native typed tables as active sources, independently supplied-model Monte Carlo including net-only execution, and original-model Petri/DFG/process-tree playout with native controls. Continue feature-first review across the whole catalogue; the whole feature audit remains incomplete and every strict parity gate remains open. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence."
     }
   ],
   "feature_status_meaning": {

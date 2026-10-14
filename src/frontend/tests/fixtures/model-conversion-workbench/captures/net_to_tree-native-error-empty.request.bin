@@ -1,0 +1,34 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+pnml
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+net_to_tree
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="pnml_require_workflow_boundaries"
+
+false
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="pnml_infer_initial_marking"
+
+false
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="pnml_infer_final_marking"
+
+false
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-net-error-empty.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page" />
+    <finalmarkings>
+      <marking />
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedModelConversionFeature56--

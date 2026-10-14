@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original imported PNML model</text></name>
+    <page id="page1">
+      <place id="source">
+        <name><text>source</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="left">
+        <name><text>left</text></name>
+      </place>
+      <place id="right">
+        <name><text>right</text></name>
+      </place>
+      <place id="sink">
+        <name><text>sink</text></name>
+      </place>
+      <transition id="original-transition-0">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-0"/>
+      </transition>
+      <transition id="original-transition-1">
+        <name><text>a</text></name>
+      </transition>
+      <transition id="original-transition-2">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-2"/>
+      </transition>
+      <arc id="fan-in" source="source" target="original-transition-0"/>
+      <arc id="fan-left" source="original-transition-0" target="left"/>
+      <arc id="fan-right" source="original-transition-0" target="right"/>
+      <arc id="a-left-in" source="left" target="original-transition-1"/>
+      <arc id="a-right-in" source="right" target="original-transition-1"/>
+      <arc id="a-left-out" source="original-transition-1" target="left"/>
+      <arc id="a-right-out" source="original-transition-1" target="right"/>
+      <arc id="exit-left" source="left" target="original-transition-2"/>
+      <arc id="exit-right" source="right" target="original-transition-2"/>
+      <arc id="exit-out" source="original-transition-2" target="sink"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

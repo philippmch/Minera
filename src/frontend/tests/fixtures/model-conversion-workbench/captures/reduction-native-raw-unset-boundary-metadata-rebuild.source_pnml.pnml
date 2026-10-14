@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original imported PNML model</text></name>
+    <page id="page1">
+      <place id="only">
+        <name><text>only</text></name>
+      </place>
+      <transition id="original-transition-0">
+        <name><text>A</text></name>
+      </transition>
+      <arc id="self-in" source="only" target="original-transition-0"/>
+      <arc id="self-out" source="original-transition-0" target="only"/>
+    </page>
+    <finalmarkings>
+      <marking>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

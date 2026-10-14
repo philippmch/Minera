@@ -1474,6 +1474,10 @@ PetriNetReductionOptions parse_petri_net_reduction_params(
     options.enable_abstraction = parse_boolean(
         require("petri_reduction_abstraction"),
         "petri_reduction_abstraction");
+  if (supplied("petri_reduction_preserve_join_bridges"))
+    options.preserve_join_bridges = parse_boolean(
+        require("petri_reduction_preserve_join_bridges"),
+        "petri_reduction_preserve_join_bridges");
   return options;
 }
 

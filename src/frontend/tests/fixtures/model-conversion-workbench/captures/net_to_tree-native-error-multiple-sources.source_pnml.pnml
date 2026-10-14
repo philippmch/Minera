@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original imported PNML model</text></name>
+    <page id="page1">
+      <place id="source0">
+        <name><text>source0</text></name>
+      </place>
+      <place id="source1">
+        <name><text>source1</text></name>
+      </place>
+      <place id="sink">
+        <name><text>sink</text></name>
+      </place>
+      <transition id="original-transition-0">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-0"/>
+      </transition>
+      <transition id="original-transition-1">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-1"/>
+      </transition>
+      <arc id="in0" source="source0" target="original-transition-0"/>
+      <arc id="out0" source="original-transition-0" target="sink"/>
+      <arc id="in1" source="source1" target="original-transition-1"/>
+      <arc id="out1" source="original-transition-1" target="sink"/>
+    </page>
+    <finalmarkings>
+      <marking>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

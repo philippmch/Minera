@@ -64,6 +64,7 @@ import { GraphAlignmentWorkspace } from "./components/GraphAlignmentWorkspace";
 import { InductiveInputWorkspace } from "./components/InductiveInputWorkspace";
 import { ProcessTreeAlignmentWorkspace } from "./components/ProcessTreeAlignmentWorkspace";
 import { PetriAntiMultiWorkspace } from "./components/PetriAntiMultiWorkspace";
+import { ModelConversionWorkspace } from "./components/ModelConversionWorkspace";
 import { requestLogQuerySchema } from "./log-query";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
@@ -135,6 +136,7 @@ export default function App() {
   const [showInductiveInputs, setShowInductiveInputs] = useState(false);
   const [showTreeAlignment, setShowTreeAlignment] = useState(false);
   const [showPetriAntiMulti, setShowPetriAntiMulti] = useState(false);
+  const [showModelConversion, setShowModelConversion] = useState(false);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -389,6 +391,7 @@ export default function App() {
     setShowInductiveInputs(false);
     setShowTreeAlignment(false);
     setShowPetriAntiMulti(false);
+    setShowModelConversion(false);
     ocelRequest.current?.abort();
     ocelRequest.current = null;
     setMining(true);
@@ -596,6 +599,7 @@ export default function App() {
     [data, selectedVariant],
   );
 
+  if (showModelConversion) return <><TopBar dataset={data?.dataset??ocelDataset??'Original model conversion'} datasetKind="independent model conversion and reduction" onOpenFile={loadFile} onHome={()=>setShowModelConversion(false)}/><main className="layout-log model-conversion-workspace"><button className="btn-ghost" onClick={()=>setShowModelConversion(false)}>Return to current workspace</button><ModelConversionWorkspace/></main></>;
   if (showPetriAntiMulti) return <><TopBar dataset={data?.dataset??ocelDataset??'Anti/multi alignment inputs'} datasetKind="independent Petri anti/multi alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAntiMulti(false)}/><main className="layout-log petri-anti-multi-workspace"><button className="btn-ghost" onClick={()=>setShowPetriAntiMulti(false)}>Return to current workspace</button><PetriAntiMultiWorkspace file={source?.file??null}/></main></>;
   if (showTreeAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Tree alignment inputs'} datasetKind="independent process-tree alignment" onOpenFile={loadFile} onHome={()=>setShowTreeAlignment(false)}/><main className="layout-log process-tree-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowTreeAlignment(false)}>Return to current workspace</button><ProcessTreeAlignmentWorkspace file={source?.file??null}/></main></>;
   if (showInductiveInputs) return <><TopBar dataset={data?.dataset??ocelDataset??'Inductive inputs'} datasetKind="independent Inductive discovery" onOpenFile={loadFile} onHome={()=>setShowInductiveInputs(false)}/><main className="layout-log inductive-input-workspace"><button className="btn-ghost" onClick={()=>setShowInductiveInputs(false)}>Return to current workspace</button><InductiveInputWorkspace file={source?.file??null}/></main></>;
@@ -633,6 +637,7 @@ export default function App() {
           onInductiveInputs={()=>setShowInductiveInputs(true)}
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
+          onModelConversion={()=>setShowModelConversion(true)}
           onHome={() => {
             ocelRequest.current?.abort();
             ocelRequest.current = null;
@@ -689,6 +694,7 @@ export default function App() {
           onInductiveInputs={()=>setShowInductiveInputs(true)}
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
+          onModelConversion={()=>setShowModelConversion(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
@@ -722,6 +728,7 @@ export default function App() {
           onInductiveInputs={()=>setShowInductiveInputs(true)}
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
+          onModelConversion={()=>setShowModelConversion(true)}
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);

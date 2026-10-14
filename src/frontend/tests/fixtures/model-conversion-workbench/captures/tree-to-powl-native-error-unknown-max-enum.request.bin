@@ -1,0 +1,15 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+tree_to_powl
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-tree-native-error-unknown-max-enum.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","unused"],"root":{"op":"UNKNOWN","op_index":2147483647,"activity":0,"children":[]}}
+
+--OwnedModelConversionFeature56--

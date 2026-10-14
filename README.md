@@ -2553,3 +2553,32 @@ browser/visual checks and strict reference parity remain pending. No Feature55
 browser attempt is claimed; the frozen Feature54 saved permission/policy denial
 is retained as historical evidence. No browser screenshot is claimed.
 See [validation and boundaries](docs/feature-first-petri-anti-multi-validation.json).
+
+### Convert or reduce original process models
+
+Use **Convert or reduce an original process model** on the landing page or **Convert models** in either
+classic/OCEL toolbar. Supply an original PTML/full process-tree constructor,
+PNML model or native POWL text. Choose Tree to POWL, Net to POWL, POWL to Tree,
+Net to Tree, POWL to Net or PNML reduction. These requests preserve the cached
+mining session and use the existing public native overloads directly.
+
+Inspect complete original/result trees, POWL getters and closure pairs, native
+PNML/net metadata, every reduction option, signed marking origins and exact
+place/transition mappings. Explicit JSON [] retains unspecified reduction
+vectors; omitted vectors use range-checked PNML markings, while signed and zero
+entries retain native semantics. Native changed=false can still accompany
+metadata reconstruction. Net to Tree requires exact native blocks; POWL to
+Tree may use the native block-structured approximation.
+
+Download the original model bytes separately from complete native JSON,
+request/reports, inspection CSV and available POWL/PTML/PNML exports. Native
+canonical POWL text is retained without requiring successful reparse; literal
+numeric relation labels retain the existing native grammar boundary. Export
+errors remain separate from conversion/reduction errors.
+
+The additive POST /api/model-conversion-workbench endpoint provides this workbench.
+Native, frontend, API, fixture publication and export checks passed. Complete
+browser/visual checks and strict reference parity remain pending. No Feature56
+browser attempt or screenshot is claimed; the frozen Feature54 saved permission/
+policy denial remains historical evidence.
+See [validation and boundaries](docs/feature-first-model-conversion-validation.json).

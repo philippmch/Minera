@@ -1,0 +1,23 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+auto
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+tree_to_powl
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-original-sequence.ptml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<ptml>
+  <processTree name="Owned original tree" root="node-0">
+    <sequence id="node-0" />
+    <manualTask id="node-1" name="A" />
+    <parentsNode id="edge-node-1" sourceId="node-0" targetId="node-1" />
+    <manualTask id="node-2" name="B" />
+    <parentsNode id="edge-node-2" sourceId="node-0" targetId="node-2" />
+  </processTree>
+</ptml>
+--OwnedModelConversionFeature56--

@@ -1,0 +1,15 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+tree_to_powl
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-tree-native-error-or-13.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","unused"],"root":{"op":"INCLUSIVE_CHOICE","op_index":4,"activity":0,"children":[{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]},{"op":"TAU","op_index":1,"activity":0,"children":[]}]}}
+
+--OwnedModelConversionFeature56--

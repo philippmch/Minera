@@ -1,0 +1,14 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+powl_text
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+powl_to_net
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-native-empty-spo.powl"
+Content-Type: application/octet-stream
+
+PO=(nodes={},order={})
+--OwnedModelConversionFeature56--

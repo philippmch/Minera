@@ -1,0 +1,55 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+pnml
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+net_to_powl
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-net-weighted-structural-native.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="original-place-0">
+        <name>
+          <text>Original original-place-0</text>
+        </name>
+        <initialMarking>
+          <text>8</text>
+        </initialMarking>
+      </place>
+      <place id="original-place-1">
+        <name>
+          <text>Original original-place-1</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <arc id="weight2" source="original-place-0" target="original-transition-0">
+        <inscription>
+          <text>2</text>
+        </inscription>
+      </arc>
+      <arc id="weight3" source="original-transition-0" target="original-place-1">
+        <inscription>
+          <text>3</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="original-place-1">
+          <text>9</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedModelConversionFeature56--

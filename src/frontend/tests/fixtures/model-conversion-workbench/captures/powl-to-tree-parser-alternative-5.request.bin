@@ -1,0 +1,14 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+auto
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+powl_to_tree
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-parser-alternative-5.powl"
+Content-Type: application/octet-stream
+
+PO=(nodes={T("A"),T("B")},order={"A"-->"B"})
+--OwnedModelConversionFeature56--

@@ -1,0 +1,115 @@
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_format"
+
+pnml
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="operation"
+
+reduce_petri
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="petri_reduction_parallel_place_fusion"
+
+false
+--OwnedModelConversionFeature56
+Content-Disposition: form-data; name="model_file"; filename="owned-parallel-fusion.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="source">
+        <name>
+          <text>Original source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="left">
+        <name>
+          <text>Original left</text>
+        </name>
+      </place>
+      <place id="right">
+        <name>
+          <text>Original right</text>
+        </name>
+      </place>
+      <place id="sink">
+        <name>
+          <text>Original sink</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <transition id="original-transition-1">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <transition id="original-transition-2">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <arc id="fan-in" source="source" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="fan-left" source="original-transition-0" target="left">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="fan-right" source="original-transition-0" target="right">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a-left-in" source="left" target="original-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a-right-in" source="right" target="original-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a-left-out" source="original-transition-1" target="left">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a-right-out" source="original-transition-1" target="right">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="exit-left" source="left" target="original-transition-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="exit-right" source="right" target="original-transition-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="exit-out" source="original-transition-2" target="sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedModelConversionFeature56--
