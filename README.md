@@ -2492,3 +2492,34 @@ The additive POST /api/discover-inductive-input endpoint provides this workbench
 Native, frontend, API, fixture publication and export checks passed. Complete
 browser/visual checks and strict reference parity remain pending; no new browser
 attempt is claimed. See [validation and boundaries](docs/feature-first-inductive-input-validation.json).
+
+### Align against original process-tree models
+
+Use **Align original traces against a process-tree model** on the landing page or the Tree alignment entry in
+either toolbar. Choose SEARCH_GRAPH_PT, DYNAMIC_PROGRAMMING, MILP or
+APPROXIMATED_ORIGINAL, an original PTML/full ProcessTree JSON model and original
+CSV/TSV/XES/gzip-XES, complete typed EventTable JSON or exact trace words.
+Check the grouped log or a selected original trace; explicit words become a
+native EventLog with PRESENT cells, including empty activity strings. These
+requests preserve the current cached mining session.
+
+Inspect all twelve actual native options, including four time limits in seconds
+whose request controls use milliseconds, exact bounds and literal selectors.
+The complete original tree retains duplicate/unused labels, latent activity
+indices, every operator/raw enum and ordered children. Results preserve exact
+costs, full-precision fitness, every move string and diagnostic, including
+executed incomplete results. Native errors retain model/input/options context.
+
+Model exports run independently from the same original tree. Choose standard
+or transition_bordered Petri conversion and inspect its complete native net.
+Download complete JSON, reports, all inspection CSV tables, original files and
+available same-run PTML, BPMN, PNML and checked-source XES; conversion/export
+errors remain separate. The native MILP variant uses its dependency-free A*
+path, with zero external LP solves; strict solver parity remains pending.
+
+The additive POST /api/align-process-tree-workbench endpoint provides this workbench.
+Native, frontend, API, fixture publication and export checks passed. Complete
+browser/visual checks and strict reference parity remain pending. The current
+exact-origin browser retry was rejected by the saved permission/policy gate
+while the previous Feature53 deployment was live; no Feature54 UI check completed.
+See [validation and boundaries](docs/feature-first-process-tree-alignment-validation.json).

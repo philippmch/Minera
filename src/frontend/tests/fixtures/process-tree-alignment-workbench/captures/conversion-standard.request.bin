@@ -1,0 +1,33 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+SEARCH_GRAPH_PT
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="discovery_tree_variant"
+
+standard
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-deviating-words.json"
+Content-Type: application/octet-stream
+
+["A","X"]
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-normative-constructor.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B"],"root":{"op":"SEQUENCE","op_index":2,"activity":0,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]}]}}
+
+--OwnedProcessTreeAlignmentFeature54--

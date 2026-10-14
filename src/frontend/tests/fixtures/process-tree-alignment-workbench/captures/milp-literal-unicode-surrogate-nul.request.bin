@@ -1,0 +1,33 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+MILP
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="alignment_selectors_json"
+
+{"pt_alignment_activity_attribute":" selected \ud800 "}
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-literal-words.json"
+Content-Type: application/octet-stream
+
+[""," \t\n\u6771\u4eac,;\"","\ud800","a\u0000b"]
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-literal-model.json"
+Content-Type: application/octet-stream
+
+{"activities":[""," \t\n\u6771\u4eac,;\"","\ud800","a\u0000b"],"root":{"op":"SEQUENCE","op_index":2,"activity":18446744073709551615,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":2,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":3,"children":[]}]}}
+
+--OwnedProcessTreeAlignmentFeature54--

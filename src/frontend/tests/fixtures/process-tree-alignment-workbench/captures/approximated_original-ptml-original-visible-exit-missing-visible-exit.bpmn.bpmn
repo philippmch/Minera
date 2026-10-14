@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+  <process id="process" name="Independent process-tree alignment model" isExecutable="false">
+    <startEvent id="StartEvent_0"/>
+    <task id="Activity_1" name="register &amp; file"/>
+    <exclusiveGateway id="exclusiveGateway_2"/>
+    <exclusiveGateway id="exclusiveGateway_3"/>
+    <task id="Activity_4" name="work"/>
+    <task id="Activity_7" name="redo"/>
+    <task id="Activity_10" name="close"/>
+    <endEvent id="EndEvent_13"/>
+    <sequenceFlow id="Flow_5" sourceRef="exclusiveGateway_2" targetRef="Activity_4"/>
+    <sequenceFlow id="Flow_6" sourceRef="Activity_4" targetRef="exclusiveGateway_3"/>
+    <sequenceFlow id="Flow_8" sourceRef="exclusiveGateway_3" targetRef="Activity_7"/>
+    <sequenceFlow id="Flow_9" sourceRef="Activity_7" targetRef="exclusiveGateway_2"/>
+    <sequenceFlow id="Flow_11" sourceRef="exclusiveGateway_3" targetRef="Activity_10"/>
+    <sequenceFlow id="Flow_12" sourceRef="Activity_1" targetRef="exclusiveGateway_2"/>
+    <sequenceFlow id="Flow_14" sourceRef="StartEvent_0" targetRef="Activity_1"/>
+    <sequenceFlow id="Flow_15" sourceRef="Activity_10" targetRef="EndEvent_13"/>
+  </process>
+</definitions>

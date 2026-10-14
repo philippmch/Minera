@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+  <process id="process" name="Independent process-tree alignment model" isExecutable="false">
+    <startEvent id="StartEvent_0"/>
+    <inclusiveGateway id="inclusiveGateway_1"/>
+    <inclusiveGateway id="inclusiveGateway_2"/>
+    <endEvent id="EndEvent_15"/>
+    <sequenceFlow id="Flow_3" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_4" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_5" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_6" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_7" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_8" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_9" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_10" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_11" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_12" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_13" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_14" sourceRef="inclusiveGateway_1" targetRef="inclusiveGateway_2"/>
+    <sequenceFlow id="Flow_16" sourceRef="StartEvent_0" targetRef="inclusiveGateway_1"/>
+    <sequenceFlow id="Flow_17" sourceRef="inclusiveGateway_2" targetRef="EndEvent_15"/>
+  </process>
+</definitions>

@@ -1,0 +1,33 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+MILP
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+log
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+table
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="alignment_selectors_json"
+
+{"alignment_case_id_attribute":"batch","pt_alignment_activity_attribute":"phase"}
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-typed-table.json"
+Content-Type: application/octet-stream
+
+{"columns":["batch","phase","finish","begin","missing","null","empty","NA","signed","unsigned","nan","infinity","negative_zero","category","bytes","identifier","nested"],"dtypes":["str","str","datetime64[ns, UTC]","datetime64[ns, UTC]","object","object","str","object","int64","uint64","float64","float64","float64","category","object","object","object"],"rows":[[{"value":"c"},{"value":"B"},{"kind":"date","value":"2024-01-01T00:00:10Z","typed_value":"2024-01-01T00:00:10Z","date_resolution":"ns","date_timezone":"UTC"},{"kind":"date","value":"2024-01-01T00:00:00Z","typed_value":"2024-01-01T00:00:00Z","date_resolution":"ns","date_timezone":"UTC"},null,{"null":true},{"value":""},{"kind":"na","value":"<NA>","typed_value":"NA"},{"kind":"int","typed_value":1,"integer_storage":"int64"},{"kind":"int","typed_value":18446744073709551615,"integer_storage":"uint64"},{"kind":"float","value":"nan","typed_value":"NaN"},{"kind":"float","value":"inf","typed_value":"INF"},{"kind":"float","value":"-0","typed_value":-0.0},{"kind":"int","typed_value":1,"integer_storage":"int64"},{"kind":"bytes","value":"QQ=="},{"kind":"id","value":"id-\u6771\u4eac"},{"container":"tuple","value":"wrapped","children":[{"key":"duplicate","value":"A"},{"key":"duplicate","value":"B"}]}],[{"value":"d"},{"value":"X"},{"kind":"date","value":"2024-01-01T00:00:00Z","typed_value":"2024-01-01T00:00:00Z","date_resolution":"ns","date_timezone":"UTC"},{"kind":"date","value":"2024-01-01T00:00:00Z","typed_value":"2024-01-01T00:00:00Z","date_resolution":"ns","date_timezone":"UTC"},null,{"null":true},{"value":""},{"kind":"na","value":"<NA>","typed_value":"NA"},{"kind":"int","typed_value":1,"integer_storage":"int64"},{"kind":"int","typed_value":18446744073709551615,"integer_storage":"uint64"},{"kind":"float","value":"nan","typed_value":"NaN"},{"kind":"float","value":"inf","typed_value":"INF"},{"kind":"float","value":"-0","typed_value":-0.0},{"kind":"int","typed_value":1,"integer_storage":"int64"},{"kind":"bytes","value":"QQ=="},{"kind":"id","value":"id-\u6771\u4eac"},{"container":"tuple","value":"wrapped","children":[{"key":"duplicate","value":"A"},{"key":"duplicate","value":"B"}]}],[{"value":"c"},{"value":"A"},{"kind":"date","value":"2024-01-01T00:00:05Z","typed_value":"2024-01-01T00:00:05Z","date_resolution":"ns","date_timezone":"UTC"},{"kind":"date","value":"2024-01-01T00:00:02Z","typed_value":"2024-01-01T00:00:02Z","date_resolution":"ns","date_timezone":"UTC"},null,{"null":true},{"value":""},{"kind":"na","value":"<NA>","typed_value":"NA"},{"kind":"int","typed_value":1,"integer_storage":"int64"},{"kind":"int","typed_value":18446744073709551615,"integer_storage":"uint64"},{"kind":"float","value":"nan","typed_value":"NaN"},{"kind":"float","value":"inf","typed_value":"INF"},{"kind":"float","value":"-0","typed_value":-0.0},{"kind":"int","typed_value":1,"integer_storage":"int64"},{"kind":"bytes","value":"QQ=="},{"kind":"id","value":"id-\u6771\u4eac"},{"container":"tuple","value":"wrapped","children":[{"key":"duplicate","value":"A"},{"key":"duplicate","value":"B"}]}],[{"value":"d"},{"value":"Y"},{"kind":"date","value":"2024-01-01T00:00:01Z","typed_value":"2024-01-01T00:00:01Z","date_resolution":"ns","date_timezone":"UTC"},{"kind":"date","value":"2024-01-01T00:00:01Z","typed_value":"2024-01-01T00:00:01Z","date_resolution":"ns","date_timezone":"UTC"},null,{"null":true},{"value":""},{"kind":"na","value":"<NA>","typed_value":"NA"},{"kind":"int","typed_value":1,"integer_storage":"int64"},{"kind":"int","typed_value":18446744073709551615,"integer_storage":"uint64"},{"kind":"float","value":"nan","typed_value":"NaN"},{"kind":"float","value":"inf","typed_value":"INF"},{"kind":"float","value":"-0","typed_value":-0.0},{"kind":"int","typed_value":1,"integer_storage":"int64"},{"kind":"bytes","value":"QQ=="},{"kind":"id","value":"id-\u6771\u4eac"},{"container":"tuple","value":"wrapped","children":[{"key":"duplicate","value":"A"},{"key":"duplicate","value":"B"}]}]],"attributes":[{"key":"wrapped","value":"root","scalar_wrapper":true,"scalar_children_list":true,"children":[{"key":"same","kind":"int","typed_value":1,"integer_storage":"int64"},{"key":"same","kind":"int","typed_value":2,"integer_storage":"uint64"}]}],"metadata":{"extensions":[{"name":" n ","prefix":"p","uri":"u"}],"classifiers":[{"name":" c ","keys":["phase","phase"]}],"trace_globals":[{"key":"t","kind":"int","typed_value":3,"integer_storage":"int64"}],"event_globals":[{"key":"e","kind":"int","typed_value":4,"integer_storage":"uint64"}],"properties":[{"key":"p","value":"\u6771\u4eac\n,;"}],"globals":[{"scope":"trace","attributes":[{"key":"g","value":"global"}]}]},"categorical_dtypes":[null,null,null,null,null,null,null,null,null,null,null,null,null,{"categories_dtype":"int64","ordered":true,"categories":[{"kind":"int","typed_value":1,"integer_storage":"int64"}]},null,null,null],"index":{"class":"MultiIndex","dtype":"object","names":[null," idx "],"labels":[{"kind":"tuple","items":[{"kind":"scalar","value":{"kind":"int","typed_value":0,"integer_storage":"int64"}},{"kind":"scalar","value":{"value":"a\u0000b"}}]},{"kind":"tuple","items":[{"kind":"scalar","value":{"kind":"int","typed_value":1,"integer_storage":"int64"}},{"kind":"scalar","value":{"value":"a\u0000b"}}]},{"kind":"tuple","items":[{"kind":"scalar","value":{"kind":"int","typed_value":2,"integer_storage":"int64"}},{"kind":"scalar","value":{"value":"a\u0000b"}}]},{"kind":"tuple","items":[{"kind":"scalar","value":{"kind":"int","typed_value":3,"integer_storage":"int64"}},{"kind":"scalar","value":{"value":"a\u0000b"}}]}]}}
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-normative-constructor.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B"],"root":{"op":"SEQUENCE","op_index":2,"activity":0,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]}]}}
+
+--OwnedProcessTreeAlignmentFeature54--

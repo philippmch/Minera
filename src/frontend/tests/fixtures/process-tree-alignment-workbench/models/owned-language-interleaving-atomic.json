@@ -1,0 +1,1 @@
+{"activities":["A","B","C"],"root":{"op":"INTERLEAVING","op_index":6,"activity":18446744073709551615,"children":[{"op":"SEQUENCE","op_index":2,"activity":18446744073709551615,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]}]},{"op":"ACTIVITY","op_index":0,"activity":2,"children":[]}]}}

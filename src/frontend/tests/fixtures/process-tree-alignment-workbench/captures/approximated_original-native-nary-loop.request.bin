@@ -1,0 +1,29 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+APPROXIMATED_ORIGINAL
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-nary-loop-words.json"
+Content-Type: application/octet-stream
+
+["A","C","A"]
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-nary-redo-loop.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B","C"],"root":{"op":"LOOP","op_index":7,"activity":18446744073709551615,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":2,"children":[]}]}}
+
+--OwnedProcessTreeAlignmentFeature54--

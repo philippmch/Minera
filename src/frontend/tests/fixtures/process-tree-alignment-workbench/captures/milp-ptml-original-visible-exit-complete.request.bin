@@ -1,0 +1,43 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+MILP
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+auto
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-visible-exit-complete.json"
+Content-Type: application/octet-stream
+
+["register & file","work","redo","work","close"]
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-original-three-child-visible-exit.ptml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<ptml>
+  <processTree id="original-tree" name="Owned normative model 東京" root="original-root">
+    <sequence id="original-root" name="" />
+    <manualTask id="original-node-1" name="register &amp; file" />
+    <xorLoop id="original-node-2" name="" />
+    <manualTask id="original-node-3" name="work" />
+    <manualTask id="original-node-4" name="redo" />
+    <manualTask id="original-node-5" name="close" />
+    <parentsNode id="original-edge-0" sourceId="original-root" targetId="original-node-1" />
+    <parentsNode id="original-edge-1" sourceId="original-node-2" targetId="original-node-3" />
+    <parentsNode id="original-edge-2" sourceId="original-node-2" targetId="original-node-4" />
+    <parentsNode id="original-edge-3" sourceId="original-node-2" targetId="original-node-5" />
+    <parentsNode id="original-edge-4" sourceId="original-root" targetId="original-node-2" />
+  </processTree>
+</ptml>
+--OwnedProcessTreeAlignmentFeature54--

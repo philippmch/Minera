@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Independent process-tree alignment checked source"/>
+  <string key="origin" value="csv"/>
+  <trace>
+    <string key="concept:name" value="x"/>
+    <event>
+      <string key="old_case" value="c1"/>
+      <string key="case:concept:name" value="c1"/>
+      <string key="phase" value="A"/>
+    </event>
+    <event>
+      <string key="old_case" value="c2"/>
+      <string key="case:concept:name" value="c2"/>
+      <string key="phase" value="B"/>
+    </event>
+  </trace>
+</log>

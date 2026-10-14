@@ -1,0 +1,172 @@
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="pt_alignment_variant"
+
+APPROXIMATED_ORIGINAL
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_shape"
+
+trace
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_format"
+
+auto
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_format"
+
+ptml
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="trace_index"
+
+31
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="input_file"; filename="owned-process-tree-alignment.csv"
+Content-Type: application/octet-stream
+
+case_id,activity,timestamp,resource,payload
+case-0,B,2024-01-01T00:00:02Z,R0,"東京,;""quoted""
+B"
+case-0,A,2024-01-01T00:00:01Z,R0,"東京,;""quoted""
+A"
+case-1,B,2024-01-01T00:01:02Z,R1,"東京,;""quoted""
+B"
+case-1,A,2024-01-01T00:01:01Z,R1,"東京,;""quoted""
+A"
+case-2,B,2024-01-01T00:02:02Z,R2,"東京,;""quoted""
+B"
+case-2,A,2024-01-01T00:02:01Z,R2,"東京,;""quoted""
+A"
+case-3,B,2024-01-01T00:03:02Z,R3,"東京,;""quoted""
+B"
+case-3,A,2024-01-01T00:03:01Z,R3,"東京,;""quoted""
+A"
+case-4,B,2024-01-01T00:04:02Z,R4,"東京,;""quoted""
+B"
+case-4,A,2024-01-01T00:04:01Z,R4,"東京,;""quoted""
+A"
+case-5,B,2024-01-01T00:05:02Z,R5,"東京,;""quoted""
+B"
+case-5,A,2024-01-01T00:05:01Z,R5,"東京,;""quoted""
+A"
+case-6,B,2024-01-01T00:06:02Z,R6,"東京,;""quoted""
+B"
+case-6,A,2024-01-01T00:06:01Z,R6,"東京,;""quoted""
+A"
+case-7,B,2024-01-01T00:07:02Z,R7,"東京,;""quoted""
+B"
+case-7,A,2024-01-01T00:07:01Z,R7,"東京,;""quoted""
+A"
+case-8,B,2024-01-01T00:08:02Z,R8,"東京,;""quoted""
+B"
+case-8,A,2024-01-01T00:08:01Z,R8,"東京,;""quoted""
+A"
+case-9,B,2024-01-01T00:09:02Z,R9,"東京,;""quoted""
+B"
+case-9,A,2024-01-01T00:09:01Z,R9,"東京,;""quoted""
+A"
+case-10,B,2024-01-01T00:10:02Z,R10,"東京,;""quoted""
+B"
+case-10,A,2024-01-01T00:10:01Z,R10,"東京,;""quoted""
+A"
+case-11,B,2024-01-01T00:11:02Z,R11,"東京,;""quoted""
+B"
+case-11,A,2024-01-01T00:11:01Z,R11,"東京,;""quoted""
+A"
+case-12,B,2024-01-01T00:12:02Z,R12,"東京,;""quoted""
+B"
+case-12,A,2024-01-01T00:12:01Z,R12,"東京,;""quoted""
+A"
+case-13,B,2024-01-01T00:13:02Z,R13,"東京,;""quoted""
+B"
+case-13,A,2024-01-01T00:13:01Z,R13,"東京,;""quoted""
+A"
+case-14,B,2024-01-01T00:14:02Z,R14,"東京,;""quoted""
+B"
+case-14,A,2024-01-01T00:14:01Z,R14,"東京,;""quoted""
+A"
+case-15,B,2024-01-01T00:15:02Z,R15,"東京,;""quoted""
+B"
+case-15,A,2024-01-01T00:15:01Z,R15,"東京,;""quoted""
+A"
+case-16,B,2024-01-01T00:16:02Z,R16,"東京,;""quoted""
+B"
+case-16,A,2024-01-01T00:16:01Z,R16,"東京,;""quoted""
+A"
+case-17,B,2024-01-01T00:17:02Z,R17,"東京,;""quoted""
+B"
+case-17,A,2024-01-01T00:17:01Z,R17,"東京,;""quoted""
+A"
+case-18,B,2024-01-01T00:18:02Z,R18,"東京,;""quoted""
+B"
+case-18,A,2024-01-01T00:18:01Z,R18,"東京,;""quoted""
+A"
+case-19,B,2024-01-01T00:19:02Z,R19,"東京,;""quoted""
+B"
+case-19,A,2024-01-01T00:19:01Z,R19,"東京,;""quoted""
+A"
+case-20,B,2024-01-01T00:20:02Z,R20,"東京,;""quoted""
+B"
+case-20,A,2024-01-01T00:20:01Z,R20,"東京,;""quoted""
+A"
+case-21,B,2024-01-01T00:21:02Z,R21,"東京,;""quoted""
+B"
+case-21,A,2024-01-01T00:21:01Z,R21,"東京,;""quoted""
+A"
+case-22,B,2024-01-01T00:22:02Z,R22,"東京,;""quoted""
+B"
+case-22,A,2024-01-01T00:22:01Z,R22,"東京,;""quoted""
+A"
+case-23,B,2024-01-01T00:23:02Z,R23,"東京,;""quoted""
+B"
+case-23,A,2024-01-01T00:23:01Z,R23,"東京,;""quoted""
+A"
+case-24,B,2024-01-01T00:24:02Z,R24,"東京,;""quoted""
+B"
+case-24,A,2024-01-01T00:24:01Z,R24,"東京,;""quoted""
+A"
+case-25,B,2024-01-01T00:25:02Z,R25,"東京,;""quoted""
+B"
+case-25,A,2024-01-01T00:25:01Z,R25,"東京,;""quoted""
+A"
+case-26,B,2024-01-01T00:26:02Z,R26,"東京,;""quoted""
+B"
+case-26,A,2024-01-01T00:26:01Z,R26,"東京,;""quoted""
+A"
+case-27,B,2024-01-01T00:27:02Z,R27,"東京,;""quoted""
+B"
+case-27,A,2024-01-01T00:27:01Z,R27,"東京,;""quoted""
+A"
+case-28,B,2024-01-01T00:28:02Z,R28,"東京,;""quoted""
+B"
+case-28,A,2024-01-01T00:28:01Z,R28,"東京,;""quoted""
+A"
+case-29,B,2024-01-01T00:29:02Z,R29,"東京,;""quoted""
+B"
+case-29,A,2024-01-01T00:29:01Z,R29,"東京,;""quoted""
+A"
+case-30,B,2024-01-01T00:30:02Z,R30,"東京,;""quoted""
+B"
+case-30,A,2024-01-01T00:30:01Z,R30,"東京,;""quoted""
+A"
+case-31,B,2024-01-01T00:31:02Z,R31,"東京,;""quoted""
+B"
+case-31,A,2024-01-01T00:31:01Z,R31,"東京,;""quoted""
+A"
+
+--OwnedProcessTreeAlignmentFeature54
+Content-Disposition: form-data; name="model_file"; filename="owned-normative-original.ptml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<ptml>
+  <processTree id="original-tree" name="Owned normative model 東京" root="original-root">
+    <sequence id="original-root" name="" />
+    <manualTask id="original-node-1" name="A" />
+    <manualTask id="original-node-2" name="B" />
+    <parentsNode id="original-edge-0" sourceId="original-root" targetId="original-node-1" />
+    <parentsNode id="original-edge-1" sourceId="original-root" targetId="original-node-2" />
+  </processTree>
+  <processTree id="ignored-tree" root="ignored-node">
+    <manualTask id="ignored-node" name="ignored second tree" />
+  </processTree>
+</ptml>
+--OwnedProcessTreeAlignmentFeature54--

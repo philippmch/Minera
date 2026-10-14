@@ -76,6 +76,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/inductive_input_json.hpp"
+#include "minera/process_tree_alignment_workbench_json.hpp"
 #include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
@@ -3905,6 +3906,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "workflow_input_route.hpp"
 #include "graph_alignment_route.hpp"
 #include "inductive_input_route.hpp"
+#include "process_tree_alignment_route.hpp"
 
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
@@ -10222,6 +10224,7 @@ int main(int argc, char** argv) {
   server.Options("/api/align-petri-workbench", preflight);
   server.Options("/api/align-graph-workbench", preflight);
   server.Options("/api/discover-inductive-input", preflight);
+  server.Options("/api/align-process-tree-workbench", preflight);
   server.Options("/api/replay-fitness", preflight);
   server.Options("/api/process-tree-petri", preflight);
   server.Options("/api/playout", preflight);
@@ -10338,6 +10341,7 @@ int main(int argc, char** argv) {
   server.Post("/api/discover-workflow", handle_workflow_discovery);
   server.Post("/api/discover-workflow-input", handle_workflow_input_discovery);
   server.Post("/api/discover-inductive-input", handle_inductive_input_discovery);
+  server.Post("/api/align-process-tree-workbench", handle_process_tree_alignment_workbench);
   server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/discover-timing", handle_timing_discovery);
