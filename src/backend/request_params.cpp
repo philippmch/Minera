@@ -22,8 +22,9 @@ namespace {
 class HeuristicDecorationValueParser {
  public:
   explicit HeuristicDecorationValueParser(std::string_view text,
-      std::string_view parameter = "heuristic_plusplus_decoration_value")
-      : text_(text), parameter_(parameter) {}
+      std::string_view parameter = "heuristic_plusplus_decoration_value",
+      bool alignment_costs = false)
+      : text_(text), parameter_(parameter), alignment_costs_(alignment_costs) {}
 
   HeuristicStructuredValue parse() {
     auto result = value(0);
@@ -172,7 +173,17 @@ class HeuristicDecorationValueParser {
       while (digit()) ++position_;
     }
     const auto token = text_.substr(start, position_ - start);
-    if (floating) {
+    if (alignment_costs_) {
+      // Reject a negative nonzero literal before floating-point underflow can
+      // round it to -0.0. A zero mantissa remains valid regardless of exponent.
+      const auto mantissa = token.substr(0, token.find_first_of("eE"));
+      if (token.front() == '-' &&
+          mantissa.find_first_of("123456789") != std::string_view::npos)
+        fail("expected finite non-negative numeric costs");
+    }
+    // Alignment cost storage uses doubles, so integer spellings are subject
+    // to that range rather than the structured value's int64/uint64 bounds.
+    if (floating || alignment_costs_) {
       double parsed;
       const auto result = std::from_chars(token.data(), token.data() + token.size(), parsed);
       if (result.ec == std::errc::result_out_of_range) {
@@ -253,6 +264,8 @@ class HeuristicDecorationValueParser {
         const auto key = string();
         whitespace();
         if (!consume(":")) fail("expected colon after object key");
+        if (alignment_costs_ && result.contains(key))
+          fail("duplicate cost label");
         result.insert_or_assign(key, value(depth + 1));
         whitespace();
         if (consume("}")) return HeuristicStructuredValue{std::move(result)};
@@ -264,8 +277,55 @@ class HeuristicDecorationValueParser {
 
   std::string_view text_;
   std::string_view parameter_;
+  bool alignment_costs_ = false;
   std::size_t position_ = 0;
 };
+
+double parse_alignment_cost_value(const HeuristicStructuredValue& value,
+                                  std::string_view name) {
+  double result;
+  if (const auto* number = std::get_if<double>(&value.value))
+    result = *number;
+  else if (const auto* number = std::get_if<std::int64_t>(&value.value))
+    result = static_cast<double>(*number);
+  else if (const auto* number = std::get_if<std::uint64_t>(&value.value))
+    result = static_cast<double>(*number);
+  else
+    throw std::invalid_argument(std::string(name) +
+                                ": expected finite non-negative numeric costs");
+  if (!std::isfinite(result) || result < 0.0)
+    throw std::invalid_argument(std::string(name) +
+                                ": expected finite non-negative numeric costs");
+  return result;
+}
+
+std::unordered_map<std::string, double> parse_alignment_cost_map(
+    std::string_view text, std::string_view name) {
+  const auto value = HeuristicDecorationValueParser(text, name, true).parse();
+  const auto* object = std::get_if<HeuristicStructuredValue::Object>(&value.value);
+  if (!object)
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a JSON object of numeric costs");
+  std::unordered_map<std::string, double> result;
+  result.reserve(object->size());
+  for (const auto& [label, cost] : *object)
+    result.emplace(label, parse_alignment_cost_value(cost, name));
+  return result;
+}
+
+std::vector<double> parse_alignment_cost_array(std::string_view text,
+                                               std::string_view name) {
+  const auto value = HeuristicDecorationValueParser(text, name, true).parse();
+  const auto* array = std::get_if<HeuristicStructuredValue::Array>(&value.value);
+  if (!array)
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a JSON array of numeric costs");
+  std::vector<double> result;
+  result.reserve(array->size());
+  for (const auto& cost : *array)
+    result.push_back(parse_alignment_cost_value(cost, name));
+  return result;
+}
 
 EventAttribute hidden_cache_value(const HeuristicStructuredValue& value,
                                  std::string key = {}) {
@@ -1035,6 +1095,17 @@ AlignmentOptions parse_alignment_params(const FieldLookup& field) {
   return parse_alignment_params(field, FieldPresence{});
 }
 
+std::string parse_alignment_input_adapter(const FieldLookup& field,
+                                         const FieldPresence& present) {
+  const auto name = std::string_view("alignment_input_adapter");
+  const auto value = field(name);
+  if (!(present ? present(name) : !value.empty())) return "log";
+  if (value == "log" || value == "stream" || value == "dataframe" ||
+      value == "lazyframe") return value;
+  throw std::invalid_argument(
+      "alignment_input_adapter: expected log, stream, dataframe, or lazyframe");
+}
+
 AlignmentOptions parse_alignment_params(const FieldLookup& field,
                                         const FieldPresence& present) {
   AlignmentOptions options;
@@ -1103,6 +1174,33 @@ AlignmentOptions parse_alignment_params(const FieldLookup& field,
   parse_cost("model_cost", options.default_model_cost);
   parse_cost("silent_model_cost", options.default_silent_cost);
   parse_cost("sync_cost", options.default_sync_cost);
+  if (supplied("alignment_trace_costs"))
+    options.trace_costs = parse_alignment_cost_map(
+        require("alignment_trace_costs"), "alignment_trace_costs");
+  if (supplied("alignment_model_costs"))
+    options.model_costs = parse_alignment_cost_map(
+        require("alignment_model_costs"), "alignment_model_costs");
+  if (supplied("alignment_sync_costs"))
+    options.sync_costs = parse_alignment_cost_map(
+        require("alignment_sync_costs"), "alignment_sync_costs");
+  if (supplied("alignment_trace_costs_by_position"))
+    options.trace_costs_by_position = parse_alignment_cost_array(
+        require("alignment_trace_costs_by_position"),
+        "alignment_trace_costs_by_position");
+  if (supplied("alignment_model_costs_by_transition"))
+    options.model_costs_by_transition = parse_alignment_cost_array(
+        require("alignment_model_costs_by_transition"),
+        "alignment_model_costs_by_transition");
+  if (supplied("alignment_sync_costs_by_transition"))
+    options.sync_costs_by_transition = parse_alignment_cost_array(
+        require("alignment_sync_costs_by_transition"),
+        "alignment_sync_costs_by_transition");
+  if (supplied("alignment_initial_marking"))
+    options.initial_marking = parse_int_marking(
+        require("alignment_initial_marking"), "alignment_initial_marking");
+  if (supplied("alignment_final_marking"))
+    options.final_marking = parse_int_marking(
+        require("alignment_final_marking"), "alignment_final_marking");
   if (options.variant != AlignmentVariant::kDiscountedAStar) {
     for (const auto name : {std::string_view{"exponent"}, std::string_view{"theta"}})
       if (supplied(name)) throw std::invalid_argument(std::string(name) + ": requires alignment_variant=discounted_a_star");

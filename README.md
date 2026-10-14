@@ -2353,3 +2353,30 @@ the public forward result and the exact original log/PNML files. Results remain
 bound to the inputs and settings of their completed run.
 
 This is a feature checkpoint; strict full-reference replay parity remains open.
+
+### Align independent logs against PNML models
+
+Open **Align a log against a PNML model** from landing, or **Petri alignment** from
+either toolbar. Upload CSV, TSV, XES or gzip XES and the original PNML model.
+Choose any of the six native alignment variants and grouped log, event stream,
+dataframe or lazyframe inputs. CSV flat shapes retain parser rows; case selection
+can regroup them. Grouped logs preserve their trace boundaries.
+
+Import settings, event/state/time bounds, generator alternatives and discounted
+search controls are available. Blank values use native defaults. Cost maps are JSON
+objects keyed by exact activity labels; positional log arrays and indexed model/
+sync arrays address event positions and PNML transition order. Explicit {} and []
+retain native defaults. Marking overrides require one nonnegative native-int count
+per PNML place, in the order displayed under model_context/places.
+
+Inspect every trace group, complete move, returned alternative, projection and
+marking. IDs distinguish duplicate-label transitions. Original and effective
+markings remain separate. Download native JSON, the completed request/hash report,
+every complete table CSV and exact original files. Paging does not limit exports.
+Uncomputed searches retain diagnostics and do not display placeholder measurements.
+Edited controls and failed requests retain the last completed result and its inputs.
+
+POST /api/align-petri-workbench accepts multipart log/model fields and the displayed
+alignment controls. It requires no cached source and never changes the host mining
+session. Independent numeric output retains native double precision; the existing
+/api/align serializer is unchanged. Full reference parity remains open.

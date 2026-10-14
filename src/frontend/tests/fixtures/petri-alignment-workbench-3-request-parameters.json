@@ -1,0 +1,31 @@
+{
+  "observed-blank-xes": {
+    "fields": {
+      "alignment_variant": "dijkstra_less_memory",
+      "alignment_input_adapter": "log"
+    },
+    "status": 200,
+    "log": "owned-blank-activity.xes",
+    "model": "owned-replay.pnml",
+    "log_bytes": 1798,
+    "model_bytes": 1115,
+    "log_sha256": "4677f86b3ca2f53100d0875756782e29457de8f79f4220a15eb139229c3f4f88",
+    "model_sha256": "a1f206efa0f52f425e53774373e13e64fb284ae24616913ab9fe4e948ee2b097",
+    "response_sha256": "c1e1a394093c71901890ca379394a9d6ec450d8deb225743c2b6f1c529cbe241"
+  },
+  "observed-blank-generic-attribute": {
+    "fields": {
+      "alignment_variant": "dijkstra_less_memory",
+      "alignment_input_adapter": "log",
+      "alignment_activity_attribute": "phase"
+    },
+    "status": 400,
+    "log": "owned-blank-attribute.csv",
+    "model": "owned-replay.pnml",
+    "log_bytes": 129,
+    "model_bytes": 1115,
+    "log_sha256": "bb3994d05a7a504417fdc0c9fdf4b61a403824b17002d3cddcbe365c44f8a52d",
+    "model_sha256": "a1f206efa0f52f425e53774373e13e64fb284ae24616913ab9fe4e948ee2b097",
+    "response_sha256": "2bcd59e4ab2bb260a0bbeb2c83566e87bc981375a6013d57c844bb758358124e"
+  }
+}

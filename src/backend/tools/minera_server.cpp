@@ -5497,6 +5497,195 @@ void handle_token_replay_workbench(const httplib::Request& request,
   }
 }
 
+// Alignment uses independent original inputs; the cached mining session is
+// neither required nor changed. Flat CSV adapters retain the parser's rows.
+void handle_petri_alignment_workbench(const httplib::Request& request,
+                                      httplib::Response& response) {
+  try {
+    if (!request.is_multipart_form_data() || !request.has_file("log") ||
+        !request.has_file("model"))
+      throw std::invalid_argument("Petri alignment requires multipart fields log and model");
+    const auto lookup = [&](std::string_view name) {
+      const std::string key(name);
+      return request.has_file(key) ? form_field(request, key)
+             : request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      const std::string key(name);
+      return request.has_file(key) || request.has_param(key);
+    };
+    const auto params = minera::parse_mine_params(lookup, present);
+    auto options = minera::parse_alignment_params(lookup, present);
+    const auto adapter = minera::parse_alignment_input_adapter(lookup, present);
+    const auto& file = request.get_file_value("log");
+    const auto& model_file = request.get_file_value("model");
+    const bool is_xes = looks_like_xes(file.filename, file.content);
+    std::istringstream input(file.content);
+    minera::EventLog source_log;
+    std::optional<minera::EventTable> source_table;
+    if (is_xes) source_log = minera::import_xes_event_log(input, params.xes);
+    else {
+      auto imported = minera::import_csv_event_data(input, params.csv);
+      source_log = std::move(imported.log);
+      source_table = std::move(imported.table);
+    }
+    auto import_options = minera::tools::pnml_model_import_options();
+    import_options.import_stochastic_map = false;
+    const auto document = minera::parse_pnml_document(model_file.content, import_options);
+    if (!present("alignment_initial_marking"))
+      options.initial_marking = minera::tools::pnml_marking<int>(document.initial_marking);
+    if (!present("alignment_final_marking"))
+      options.final_marking = minera::tools::pnml_marking<int>(document.final_marking);
+    if (options.initial_marking.size() != document.net.place_count() ||
+        options.final_marking.size() != document.net.place_count())
+      throw std::invalid_argument("alignment markings require one token count per PNML place");
+
+    const auto input_key = [](std::string_view name) -> std::string_view {
+      if (name == "token_replay_activity_attribute") return "alignment_activity_attribute";
+      if (name == "token_replay_case_id_attribute") return "alignment_case_id_attribute";
+      if (name == "token_replay_max_rows_to_materialize") return "alignment_max_rows_to_materialize";
+      return {};
+    };
+    auto projection = minera::parse_token_replay_params(
+        [&](std::string_view name) { const auto key = input_key(name); return key.empty() ? std::string{} : lookup(key); },
+        [&](std::string_view name) { const auto key = input_key(name); return !key.empty() && present(key); });
+    projection = minera::tools::default_replay_input_options(
+        source_log, projection, present("alignment_activity_attribute"));
+    if (source_table && source_log.event_count() == 0 && !present("alignment_activity_attribute")) {
+      auto selected = std::find(source_table->columns.begin(), source_table->columns.end(), params.csv.activity_column);
+      if (selected == source_table->columns.end()) {
+        const auto alias = params.csv.activity_column == "activity" ? "concept:name"
+            : params.csv.activity_column == "concept:name" ? "activity" : "";
+        selected = std::find(source_table->columns.begin(), source_table->columns.end(), alias);
+      }
+      if (selected != source_table->columns.end()) projection.activity_attribute = *selected;
+    }
+    if (!is_xes && !present("alignment_case_id_attribute"))
+      projection.case_id_attribute = params.csv.case_id_column;
+    options.activity_attribute = projection.activity_attribute;
+    minera::EventLog evaluated;
+    if (adapter == "log") {
+      if (projection.max_rows_to_materialize && source_log.event_count() > *projection.max_rows_to_materialize)
+        throw std::length_error("alignment: event materialization cap exceeded");
+      evaluated = source_log;
+    }
+    else if (adapter == "stream") {
+      const auto stream = source_table ? minera::event_table_to_event_stream(*source_table)
+                                      : minera::event_log_to_event_stream(source_log);
+      evaluated = minera::normalize_token_replay_event_log(minera::EventDataView(stream), projection);
+    } else if (adapter == "dataframe") {
+      const auto table = source_table ? *source_table : minera::event_log_to_table(source_log);
+      evaluated = minera::normalize_token_replay_event_log(minera::EventDataView(table), projection);
+    } else {
+      const auto lazy = source_table ? minera::LazyEventTable::from_table(*source_table)
+                                    : minera::event_log_to_lazy_table(source_log);
+      evaluated = minera::normalize_token_replay_event_log(minera::EventDataView(lazy), projection);
+    }
+    auto attribute_projection = minera::tools::evaluation_input_log(evaluated, options.activity_attribute);
+    const auto& alignment_log = attribute_projection ? *attribute_projection : evaluated;
+    const auto result = minera::check_alignment(alignment_log, document.net, options);
+    minera::DirectlyFollowsGraph graph;
+    for (const auto& label : document.net.activities()) graph.ensure_activity(label);
+    std::vector<std::vector<std::string>> traces;
+    for (const auto& trace : alignment_log.traces) {
+      std::vector<std::string> names;
+      for (const auto& event : trace.events) {
+        const auto* field = options.activity_attribute == "activity" || options.activity_attribute == "concept:name"
+            ? &event.activity : event.attribute(options.activity_attribute);
+        if (!field) throw std::invalid_argument("alignment input is missing activity attribute: " + options.activity_attribute);
+        names.push_back(*field);
+        graph.ensure_activity(*field);
+      }
+      traces.push_back(std::move(names));
+    }
+    const auto quote = minera::embedding_runtime::detail::escape_json;
+    std::ostringstream body;
+    body.precision(std::numeric_limits<double>::max_digits10);
+    body << "{\"family\":\"PETRI_ALIGNMENT_WORKFLOW\",\"input_context\":{\"adapter\":" << quote(adapter)
+         << ",\"origin\":" << quote(source_table && adapter != "log" ? "uploaded_csv_rows" : "uploaded_grouped_log")
+         << ",\"dataset\":" << quote(file.filename) << ",\"model\":" << quote(model_file.filename)
+         << ",\"log_bytes\":" << file.content.size() << ",\"model_bytes\":" << model_file.content.size()
+         << ",\"source_case_count\":" << source_log.trace_count() << ",\"source_event_count\":" << source_log.event_count()
+         << ",\"evaluated_case_count\":" << alignment_log.trace_count() << ",\"evaluated_event_count\":" << alignment_log.event_count()
+         << ",\"activity_attribute\":" << quote(options.activity_attribute)
+         << ",\"case_id_attribute\":" << quote(projection.case_id_attribute) << "},\"model_context\":{\"places\":[";
+    for (std::size_t p = 0; p < document.net.place_count(); ++p) {
+      if (p) body << ',';
+      body << "{\"index\":" << p << ",\"id\":" << quote(document.place_ids.at(p))
+           << ",\"pnml_initial_tokens\":" << minera::TokenInteger(document.initial_marking.at(p)).decimal()
+           << ",\"pnml_final_tokens\":" << minera::TokenInteger(document.final_marking.at(p)).decimal()
+           << ",\"effective_initial_tokens\":" << options.initial_marking.at(p)
+           << ",\"effective_final_tokens\":" << options.final_marking.at(p)
+           << ",\"initial_key\":" << (document.initial_marking_keys.at(p) ? "true" : "false")
+           << ",\"final_key\":" << (document.final_marking_keys.at(p) ? "true" : "false") << '}';
+    }
+    body << "],\"transitions\":[";
+    for (std::size_t t = 0; t < document.net.transitions().size(); ++t) {
+      if (t) body << ',';
+      const auto& transition = document.net.transitions()[t];
+      body << "{\"index\":" << t << ",\"id\":" << quote(document.transition_ids.at(t))
+           << ",\"label\":" << (transition.activity ? quote(document.net.activities().at(*transition.activity)) : "null") << '}';
+    }
+    body << "]},\"activities\":[";
+    for (std::size_t i = 0; i < graph.activities().size(); ++i) { if (i) body << ','; body << quote(graph.activities()[i]); }
+    body << "],\"result\":" << minera::alignment_json(result, graph, std::numeric_limits<double>::max_digits10)
+         << ",\"variant_details\":[";
+    const auto write_transition = [&](std::size_t transition) {
+      if (transition == static_cast<std::size_t>(-1)) body << "null"; else body << transition;
+    };
+    const auto write_moves = [&](const std::vector<minera::AlignmentMove>& moves) {
+      body << '[';
+      for (std::size_t i = 0; i < moves.size(); ++i) {
+        if (i) body << ',';
+        const auto& move = moves[i];
+        const bool silent = move.type == minera::AlignmentMoveType::kModel &&
+            move.transition < document.net.transitions().size() && document.net.transitions()[move.transition].silent();
+        body << "{\"type\":" << quote(move.type == minera::AlignmentMoveType::kSynchronous ? "sync" : move.type == minera::AlignmentMoveType::kLog ? "log" : "model")
+             << ",\"activity_name\":" << (silent ? "null" : quote(move.activity)) << ",\"transition\":";
+        write_transition(move.transition); body << '}';
+      }
+      body << ']';
+    };
+    const auto write_marking = [&](const std::vector<int>& marking) {
+      body << '['; for (std::size_t i = 0; i < marking.size(); ++i) { if (i) body << ','; body << marking[i]; } body << ']';
+    };
+    for (std::size_t i = 0; i < result.variants.size(); ++i) {
+      if (i) body << ',';
+      const auto& variant = result.variants[i];
+      body << "{\"variant_index\":" << i << ",\"worst_cost\":" << variant.worst_cost << ",\"complete_moves\":";
+      write_moves(variant.complete_moves);
+      body << ",\"projected_model_moves\":[";
+      for (std::size_t j = 0; j < variant.projected_model_moves.size(); ++j) {
+        if (j) body << ',';
+        const auto& move = variant.projected_model_moves[j];
+        body << "{\"activity_name\":" << quote(move.activity) << ",\"transition\":";
+        write_transition(move.transition); body << ",\"marking_before\":"; write_marking(move.marking_before);
+        body << ",\"marking_after\":"; write_marking(move.marking_after); body << '}';
+      }
+      body << "],\"optimal_alignments\":[";
+      for (std::size_t j = 0; j < variant.optimal_alignments.size(); ++j) { if (j) body << ','; write_moves(variant.optimal_alignments[j]); }
+      body << "]}";
+    }
+    body << "],\"trace_groups\":[";
+    for (std::size_t i = 0; i < alignment_log.traces.size(); ++i) {
+      if (i) body << ',';
+      const auto& trace = alignment_log.traces[i];
+      body << "{\"trace_index\":" << i << ",\"case_id\":" << quote(trace.case_id)
+           << ",\"event_count\":" << trace.events.size() << ",\"activities\":[";
+      for (std::size_t j = 0; j < traces[i].size(); ++j) { if (j) body << ','; body << quote(traces[i][j]); }
+      body << "],\"variant_index\":";
+      const auto match = std::find_if(result.variants.begin(), result.variants.end(), [&](const auto& variant) { return variant.activities == traces[i]; });
+      if (match == result.variants.end()) body << "null"; else body << std::distance(result.variants.begin(), match);
+      body << '}';
+    }
+    body << "]}";
+    response.set_content(body.str(), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_replay_fitness(const httplib::Request& request,
                            httplib::Response& response) {
   try {
@@ -5677,9 +5866,12 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     auto options = minera::parse_alignment_params(lookup, present);
     if (miner == "imported" && !request.has_param("alignment_activity_attribute"))
       options.activity_attribute = session->imported_activity_attribute;
-    if (miner == "imported" && session->imported_document)
-      options = minera::tools::pnml_alignment_options(
-          *session->imported_document, options);
+    if (miner == "imported" && session->imported_document) {
+      if (!present("alignment_initial_marking"))
+        options.initial_marking = minera::tools::pnml_marking<int>(session->imported_document->initial_marking);
+      if (!present("alignment_final_marking"))
+        options.final_marking = minera::tools::pnml_marking<int>(session->imported_document->final_marking);
+    }
     std::optional<minera::EventLog> projected_powl_log;
     const minera::EventLog* alignment_log =
         &cached_model_log(*session, miner);
@@ -9973,6 +10165,7 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
   server.Options("/api/token-replay", preflight);
   server.Options("/api/replay-token-workbench", preflight);
+  server.Options("/api/align-petri-workbench", preflight);
   server.Options("/api/replay-fitness", preflight);
   server.Options("/api/process-tree-petri", preflight);
   server.Options("/api/playout", preflight);
@@ -10100,6 +10293,7 @@ int main(int argc, char** argv) {
   server.Post("/api/check-model", handle_check_model);
   server.Post("/api/token-replay", handle_token_replay);
   server.Post("/api/replay-token-workbench", handle_token_replay_workbench);
+  server.Post("/api/align-petri-workbench", handle_petri_alignment_workbench);
   server.Post("/api/replay-fitness", handle_replay_fitness);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/process-tree-petri", handle_process_tree_petri);

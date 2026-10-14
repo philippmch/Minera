@@ -438,9 +438,19 @@ using FieldPresence = std::function<bool(std::string_view)>;
 // Fields use the wire names documented by /api/align (alignment_variant,
 // max_states, max_align_time, ...).  Invalid or dependent settings throw
 // std::invalid_argument rather than silently falling back to defaults.
+// alignment_trace_costs, alignment_model_costs, and alignment_sync_costs are
+// JSON objects with exact label keys and finite, non-negative numeric values.
+// Their _by_position/_by_transition counterparts are JSON numeric arrays;
+// empty containers retain the native default semantics. Initial/final markings
+// use alignment_initial_marking/alignment_final_marking and are non-empty,
+// comma-separated vectors of non-negative native int values.
 [[nodiscard]] AlignmentOptions parse_alignment_params(const FieldLookup& field);
 [[nodiscard]] AlignmentOptions parse_alignment_params(const FieldLookup& field,
                                                        const FieldPresence& present);
+// alignment_input_adapter defaults to log when omitted. Explicit values must
+// be log, stream, dataframe, or lazyframe.
+[[nodiscard]] std::string parse_alignment_input_adapter(
+    const FieldLookup& field, const FieldPresence& present = {});
 
 // Parses process-tree alignment settings. Wire fields use the canonical
 // `pt_alignment_` prefix (for example `pt_alignment_variant` and

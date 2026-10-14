@@ -102,7 +102,7 @@
       ]
     },
     {
-      "feature_delivery_status": "feature_review_pending",
+      "feature_delivery_status": "native_independent_petri_alignment_workflow_available",
       "package": "algo.conformance.alignments.petri_net",
       "parity_status": "partial",
       "selectors": [
@@ -2530,6 +2530,41 @@
         "Inspection and CSV exports retain every trace, per-event diagnostic, model ID, supplied marking and zero-key membership, typed public value/object key/float hex, and integer token beyond uint64. Paging and selected-row JSON retain complete values."
       ],
       "validation": "docs/feature-first-token-replay-validation.json"
+    },
+    {
+      "id": "native_independent_petri_alignment_workbench",
+      "state": "original_inputs_six_native_variants_four_shapes_costs_markings_and_complete_inspection_available",
+      "families": [
+        "algo.conformance.alignments.petri_net"
+      ],
+      "variants": [
+        "STATE_EQUATION_A_STAR",
+        "DIJKSTRA_NO_HEURISTICS",
+        "DIJKSTRA_LESS_MEMORY",
+        "DISCOUNTED_A_STAR",
+        "GENERATOR_DIJKSTRA_NO_HEURISTICS",
+        "GENERATOR_DIJKSTRA_LESS_MEMORY",
+        "LOG",
+        "STREAM",
+        "DATAFRAME",
+        "LAZYFRAME"
+      ],
+      "entry_points": [
+        "include/minera/request_params.hpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/frontend/src/petri-alignment-workbench.ts",
+        "src/frontend/src/components/PetriAlignmentWorkspace.tsx"
+      ],
+      "added": [
+        "An independent Petri-alignment workbench accepts original CSV/TSV/XES/gzip-XES and PNML uploads from landing and both event-log/object-centric toolbars without changing the cached mining session.",
+        "All six existing native search variants and grouped log, event stream, dataframe and lazyframe inputs are selectable. Flat CSV adapters retain parser rows, native case regrouping and projection; grouped logs retain trace boundaries.",
+        "Import selectors, state/time/event bounds, generator alternative limits, discounted controls, cost profiles, scalar costs, exact-label JSON cost maps, position/transition arrays and native-int marking overrides are exposed.",
+        "Strict shared request parsing preserves exact JSON labels and rejects malformed containers, duplicate decoded keys, nonfinite/negative costs and negative underflow while supporting finite large integer spellings and explicit empty containers.",
+        "Uploaded PNML IDs, supplied markings and zero-key membership are retained alongside effective marking overrides. Returned complete moves preserve native transition identity and explicit silent model routing.",
+        "Every trace group, returned alternative, complete move, model projection and visited marking is inspectable with full numeric literals, request fields, input SHA256 hashes, complete CSV/JSON/report downloads and exact original files.",
+        "Uncomputed or exhausted results remain inspectable without presenting placeholder fitness/precision/cost as measurements. Errors retain the previously completed run, cancellation/stale guards prevent late updates, and opening a new host log exits the independent workspace."
+      ],
+      "validation": "docs/feature-first-petri-alignment-validation.json"
     }
   ],
   "execution_priority": [
@@ -2547,7 +2582,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Next confirmed UI gaps are organizational roles/profiles/group diagnostics/attribute networks and direct DFG/table Alpha-Heuristic discovery inputs."
     }
   ],
   "feature_status_meaning": {
@@ -2568,7 +2603,8 @@
     "runtime_and_search_available": "A real local encoder and usable case/event search and vector-export entry point are validated. Exact reference behavior and native log filtering remain independent gates.",
     "structural_workflow_available": "Configurable native trie/interval workflows expose exact positional data, diagrams, query matches, complete JSON/report/CSV, same-run Petri conversion/PNML and conformance handoff. Existing reference parity statuses and remaining exactness/performance gates stay independent.",
     "transformation_workflow_available": "Configurable native feature/target/label workflows expose matrix schemas, values, padding and source positions, complete native JSON/reports/CSV and transformed XES reopening with persistent selected activity fields. Existing parity statuses and open semantic/type/error/performance gates remain independent.",
-    "native_independent_full_token_replay_workflow_available": "Independent original-log/PNML uploads expose both native replay directions, all four native input shapes, full forward public/PLTR results and complete trace/input/model inspection with exact downloads. Full reference behavior and remaining options/adapters remain parity gates."
+    "native_independent_full_token_replay_workflow_available": "Independent original-log/PNML uploads expose both native replay directions, all four native input shapes, full forward public/PLTR results and complete trace/input/model inspection with exact downloads. Full reference behavior and remaining options/adapters remain parity gates.",
+    "native_independent_petri_alignment_workflow_available": "Independent original-log/PNML alignment exposes all six native variants, four input shapes, cost/marking controls and complete result inspection/download. Strict reference behavior and remaining input/object contracts remain parity gates."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [
