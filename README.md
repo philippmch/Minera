@@ -2439,3 +2439,29 @@ The additive POST /api/discover-workflow-input endpoint provides the workbench.
 Native, frontend, API and export checks passed. Complete browser/visual checks
 and strict reference parity remain pending; see
 [validation and boundaries](docs/feature-first-workflow-input-validation.json).
+
+### Align original inputs against independent graph models
+
+Use **Align original traces against a DFG or PNML model** on the landing page or
+**Graph alignment** in either toolbar. Choose DFG Classic with DFG JSON/text,
+or decomposed RECOMPOS_MAXIMAL with a PNML model. Check an original CSV/TSV/XES/
+gzip-XES log, a typed EventTable JSON file, one original trace, or literal trace
+words. These requests preserve the current cached mining session.
+
+Configure exact-label cost maps, literal activity/case/timestamp selectors,
+native bounds, cache controls and PNML import/marking options. Inspect the full
+actual invoked options, original model and effective markings. Explicit empty
+DFG cost functions retain their supplied flags. Empty decomposed marking arrays
+use native source/sink defaults; dense zero vectors remain explicit.
+
+Inspect every native alignment field, move and diagnostic, including undefined
+raw-trace scores, uncomputed or incomplete results and exact transition IDs.
+Grouped DFG runs can produce both metric and log projections from the same
+alignment. Download complete native JSON, reports, all inspection CSV tables,
+original files and supported same-run DFG/PNML/projected-XES artifacts. Native
+errors and conversion failures retain their available snapshots separately.
+
+The additive POST /api/align-graph-workbench endpoint provides this workbench.
+Native, frontend, API, fixture publication and export checks passed. Complete
+browser/visual checks and strict reference parity remain pending; no new browser
+attempt is claimed. See [validation and boundaries](docs/feature-first-graph-alignment-validation.json).

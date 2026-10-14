@@ -1,0 +1,29 @@
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="mode"
+
+DFG_CLASSIC
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_shape"
+
+words
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_format"
+
+trace_words
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_format"
+
+dfg_json
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_file"; filename="owned-perfect-words.json"
+Content-Type: application/octet-stream
+
+["A","B"]
+
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_file"; filename="owned-wide.json"
+Content-Type: application/octet-stream
+
+{"kind":"clean","dfg":[{"source":"A","target":"B","count":18446744073709551615}],"start_activities":{"A":18446744073709551615},"end_activities":{"B":3}}
+
+--OwnedGraphAlignmentFeature52--

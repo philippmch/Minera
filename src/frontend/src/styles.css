@@ -855,6 +855,32 @@ input[type="range"]::-moz-range-thumb {
 .organizational-workspace textarea { width: 100%; min-width: 0; }
 .organizational-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 450px; overflow: auto; }
 .workflow-input-workspace { min-width: 0; }
+.graph-alignment-workspace { min-width: 0; }
+.graph-alignment-workspace > .panel { min-width: 0; padding-bottom: 24px; }
+.graph-alignment-workspace > .panel > p,
+.graph-alignment-workspace > .panel > details,
+.graph-alignment-workspace > .panel > .query-actions,
+.graph-alignment-workspace > .panel > .filters-field { margin: 16px 24px; }
+.graph-alignment-workspace > .panel > fieldset { display: flex; flex-direction: column; gap: 16px; }
+.graph-alignment-workspace .query-options > .filters-field { flex: 1 1 245px; min-width: 0; }
+.graph-alignment-workspace .filters-field > label:first-child { display: flex; flex-direction: column; gap: 5px; }
+.graph-alignment-workspace input:not([type="checkbox"]),
+.graph-alignment-workspace select,
+.graph-alignment-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.graph-alignment-workspace input[type="checkbox"] { width: auto; min-width: 0; flex: 0 0 auto; }
+.graph-alignment-workspace textarea { resize: vertical; border: 1px solid var(--line); border-radius: 4px; padding: 9px 10px; background: var(--paper-raised); color: var(--ink); font: 13px var(--font-mono); }
+.graph-alignment-workspace p,
+.graph-alignment-workspace summary,
+.graph-alignment-workspace .query-check { overflow-wrap: anywhere; }
+.graph-alignment-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 450px; overflow: auto; }
+.graph-alignment-workspace .query-table-wrap td { white-space: pre-wrap; }
+@media (max-width: 600px) {
+  .graph-alignment-workspace > .panel > p,
+  .graph-alignment-workspace > .panel > details,
+  .graph-alignment-workspace > .panel > .query-actions,
+  .graph-alignment-workspace > .panel > .filters-field { margin-inline: 12px; }
+  .graph-alignment-workspace > .panel > fieldset { padding-inline: 12px; }
+}
 .workflow-input-workspace > .panel { min-width: 0; padding-bottom: 24px; }
 .workflow-input-workspace > .panel > p,
 .workflow-input-workspace > .panel > details,

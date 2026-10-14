@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Independent decomposed alignment model</text></name>
+    <page id="page1">
+      <place id="source 東京">
+        <name><text>source 東京</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="place,1">
+        <name><text>place,1</text></name>
+        <initialMarking><text>0</text></initialMarking>
+      </place>
+      <place id="place,2">
+        <name><text>place,2</text></name>
+      </place>
+      <transition id="transition,0">
+        <name><text>A</text></name>
+      </transition>
+      <transition id="transition,1">
+        <name><text>B</text></name>
+      </transition>
+      <arc id="arc,0,True" source="source 東京" target="transition,0"/>
+      <arc id="arc,0,False" source="transition,0" target="place,1"/>
+      <arc id="arc,1,True" source="place,1" target="transition,1"/>
+      <arc id="arc,1,False" source="transition,1" target="place,2"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="source 東京"><text>0</text></place>
+        <place idref="place,2"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

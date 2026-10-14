@@ -103,6 +103,7 @@
 #include "minera/dataframe_format_json.hpp"
 #include "minera/workflow_discovery_input_json.hpp"
 #include "minera/workflow_input_result_json.hpp"
+#include "minera/graph_alignment_workbench_json.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
@@ -3901,6 +3902,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 }
 
 #include "workflow_input_route.hpp"
+#include "graph_alignment_route.hpp"
 
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
@@ -10216,6 +10218,7 @@ int main(int argc, char** argv) {
   server.Options("/api/token-replay", preflight);
   server.Options("/api/replay-token-workbench", preflight);
   server.Options("/api/align-petri-workbench", preflight);
+  server.Options("/api/align-graph-workbench", preflight);
   server.Options("/api/replay-fitness", preflight);
   server.Options("/api/process-tree-petri", preflight);
   server.Options("/api/playout", preflight);
@@ -10345,6 +10348,7 @@ int main(int argc, char** argv) {
   server.Post("/api/token-replay", handle_token_replay);
   server.Post("/api/replay-token-workbench", handle_token_replay_workbench);
   server.Post("/api/align-petri-workbench", handle_petri_alignment_workbench);
+  server.Post("/api/align-graph-workbench", handle_graph_alignment_workbench);
   server.Post("/api/replay-fitness", handle_replay_fitness);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/process-tree-petri", handle_process_tree_petri);

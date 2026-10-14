@@ -1,0 +1,33 @@
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="mode"
+
+DFG_CLASSIC
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_shape"
+
+log
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_format"
+
+table
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_format"
+
+auto
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="alignment_selectors_json"
+
+{"alignment_case_id_attribute":""}
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="input_file"; filename="owned-empty-case-selector.json"
+Content-Type: application/octet-stream
+
+{"columns":["","old_case","case:concept:name","concept:name","time:timestamp"],"rows":[[{"value":"x"},{"value":"c1","first_class_role":"case_id","first_class_state":"present","first_class_source_key":""},{"value":"c1"},{"value":"A"},{"value":"2024-01-01T00:00:00Z","kind":"date"}],[{"value":"x"},{"value":"c2","first_class_role":"case_id","first_class_state":"present","first_class_source_key":""},{"value":"c2"},{"value":"B"},{"value":"2024-01-01T00:00:00Z","kind":"date"}]]}
+
+--OwnedGraphAlignmentFeature52
+Content-Disposition: form-data; name="model_file"; filename="owned-normative.json"
+Content-Type: application/octet-stream
+
+{"kind":"clean","dfg":[{"source":"A","target":"B","count":5}],"start_activities":{"A":2},"end_activities":{"B":3}}
+
+--OwnedGraphAlignmentFeature52--

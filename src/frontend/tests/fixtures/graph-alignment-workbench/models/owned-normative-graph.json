@@ -1,0 +1,1 @@
+{"kind":"graph","dfg":[{"source":"A","target":"B","count":5}],"start_activities":{"A":2},"end_activities":{"B":3},"activities":["B","A","isolated \u6771\u4eac"]}

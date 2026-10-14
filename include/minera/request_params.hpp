@@ -435,8 +435,12 @@ using FieldPresence = std::function<bool(std::string_view)>;
 // edit_* prefixes; selectors use dfg_activity_attribute/dfg_timestamp_attribute
 // and edit_activity_attribute/edit_timestamp_attribute. Map values are
 // comma-separated `activity=value` pairs (a colon is accepted as a
-// compatibility separator). Explicitly present empty values are rejected for
-// every option.
+// compatibility separator). dfg_sync_cost_json, dfg_model_move_cost_json,
+// dfg_log_move_cost_json and dfg_internal_log_move_cost_json accept JSON objects
+// with exact label keys and finite, non-negative double costs. {} is a supplied
+// empty function, distinct from omitted default costs. A JSON carrier cannot
+// coexist with any legacy carrier for the same map. Explicitly present empty
+// wire text is rejected.
 [[nodiscard]] DfgAlignmentOptions parse_dfg_alignment_params(
     const FieldLookup& field);
 [[nodiscard]] DfgAlignmentOptions parse_dfg_alignment_params(
@@ -504,10 +508,22 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field,
                                            const FieldPresence& present);
 
+// activity_log_costs_json/activity_model_costs_json/activity_sync_costs_json
+// carry exact-label finite, non-negative double cost maps. Empty maps retain
+// native default-cost semantics. initial_marking_json/final_marking_json carry
+// unsigned JSON integer arrays bounded by native size_t; [] retains native
+// default source/sink markings. JSON and legacy carriers for the same value
+// cannot coexist. Existing escaped map and comma-separated marking grammars
+// remain unchanged.
 [[nodiscard]] DecomposedAlignmentOptions parse_decomposed_alignment_params(
     const FieldLookup& field);
 [[nodiscard]] DecomposedAlignmentOptions parse_decomposed_alignment_params(
     const FieldLookup& field, const FieldPresence& present);
+// The source-independent graph-alignment workbench also exposes zero native
+// search bounds, which produce an incomplete native result. Legacy decomposed
+// routes retain their positive-bound requirement.
+[[nodiscard]] DecomposedAlignmentOptions parse_graph_alignment_decomposed_params(
+    const FieldLookup& field, const FieldPresence& present = {});
 [[nodiscard]] PetriAntiAlignmentOptions parse_petri_anti_alignment_params(
     const FieldLookup& field);
 [[nodiscard]] PetriAntiAlignmentOptions parse_petri_anti_alignment_params(

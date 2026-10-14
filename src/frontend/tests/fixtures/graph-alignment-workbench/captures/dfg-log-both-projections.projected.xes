@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Independent DFG alignment projection"/>
+  <string key="@@aligned_dfg" value="[{(&apos;A&apos;, &apos;B&apos;): 5}, {&apos;A&apos;: 2}, {&apos;B&apos;: 3}]"/>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:00:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:00:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:01:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:01:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:02:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:02:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:03:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:03:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:04:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:04:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:05:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:05:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:06:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:06:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:07:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:07:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:08:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:08:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:09:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:09:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:10:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:10:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:11:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:11:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:12:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:12:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:13:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:13:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:14:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:14:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:15:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:15:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:16:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:16:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:17:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:17:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:18:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:18:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:19:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:19:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:20:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:20:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:21:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:21:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:22:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:22:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:23:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:23:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:24:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:24:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:25:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:25:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:26:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:26:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:27:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:27:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:28:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:28:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:29:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:29:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:30:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:30:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="@@original_trace" value="A,X,B"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:31:00+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:31:01+00:00"/>
+      <boolean key="@@is_conforming" value="true"/>
+    </event>
+  </trace>
+</log>
