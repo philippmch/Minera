@@ -1,0 +1,1 @@
+SELECT "__minera_event_index" FROM dataframe WHERE "__minera_event_index" IN (1,4) ORDER BY "__minera_event_index"

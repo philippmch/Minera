@@ -13486,3 +13486,10 @@ This checkpoint adds own-source native/frontend/API/export/publication evidence,
 This is implemented feature group 56. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
 
 Evidence: docs/feature-first-model-conversion-validation.json. No browser screenshot is claimed.
+
+
+### Feature57: owned typed active sources and native shape dispatch
+
+The main workspace accepts complete native EventTable JSON as an active source, with literal case/activity/timestamp/resource/lifecycle selectors and explicit log, stream, dataframe or lazyframe dispatch. Original CSV/XES inputs remain available and preserve their actual native import and grouped-log defaults. Independent mining and analysis consumers report their actual native input kind, complete options, execution status, full native result and native error. Successful flat consumers and original input remain available when grouped-log preparation or classic analysis fails; unavailable logs/models are guarded explicitly rather than inferred from empty results. The unchanged original typed file and source settings can be reused in seven independent workflows: Alpha/Heuristic, Inductive, graph/decomposed alignment, process-tree alignment, anti/multi alignment, token replay and Petri alignment. Their original models and native prepared inputs remain separate from the active source.
+
+Validation: 17 assertion-enabled native suites, 2777 frontend tests, 241 real API calls and 2052 checks. Exact captured bytes and exports are independently verified. Evidence: docs/feature-first-active-source-validation.json. Browser validation remains pending after the exact-origin policy rejection. Full catalogue unchanged: 86 packages, 387 modules, 228 incomplete strict units.

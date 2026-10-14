@@ -2582,3 +2582,6 @@ browser/visual checks and strict reference parity remain pending. No Feature56
 browser attempt or screenshot is claimed; the frozen Feature54 saved permission/
 policy denial remains historical evidence.
 See [validation and boundaries](docs/feature-first-model-conversion-validation.json).
+
+
+The workspace now accepts full native typed tables as active inputs in log, stream, dataframe and lazyframe shapes. Original sources, native preparation failures, provenance and per-consumer outcomes remain inspectable; source-only inputs support event SQL and original/JSON/report/CSV downloads. Seven independent discovery/alignment workbenches can reuse the original typed file. Validation and remaining browser/parity boundaries are recorded in `docs/feature-first-active-source-validation.json`.

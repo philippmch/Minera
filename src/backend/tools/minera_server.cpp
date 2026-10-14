@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <initializer_list>
 #include <limits>
 #include <map>
 #include <memory>
@@ -27,6 +28,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -79,6 +81,7 @@
 #include "minera/process_tree_alignment_workbench_json.hpp"
 #include "minera/petri_anti_multi_workbench_json.hpp"
 #include "minera/model_conversion_workbench_json.hpp"
+#include "minera/active_event_source.hpp"
 #include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
@@ -267,56 +270,59 @@ minera::EventLog project_powl_activity(const minera::EventLog& source,
 
 minera::MinimumSelfDistances discover_selected_minimum_self_distances(
     const minera::EventLog& log,
-    const minera::MinimumSelfDistanceOptions& options) {
+    const minera::MinimumSelfDistanceOptions& options,
+    const minera::ActiveEventSource* active_source = nullptr) {
   switch (options.variant) {
     case minera::MinimumSelfDistanceVariant::kLog:
-      return minera::MinimumSelfDistanceLogDiscovery::apply(log, options);
+      return minera::MinimumSelfDistanceLogDiscovery::apply(active_source ? active_source->checked_log() : log, options);
     case minera::MinimumSelfDistanceVariant::kPandas:
       return minera::MinimumSelfDistancePandasDiscovery::apply(
-          minera::event_log_to_table(log), options);
+          active_source ? active_source->checked_table() : minera::event_log_to_table(log), options);
     case minera::MinimumSelfDistanceVariant::kPolars:
       return minera::MinimumSelfDistancePolarsDiscovery::apply(
-          minera::event_log_to_lazy_table(log), options);
+          active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log), options);
   }
   throw std::invalid_argument("minimum self-distance variant is invalid");
 }
 
 minera::PerformanceSpectrum discover_selected_performance_spectrum(
     const minera::EventLog& log, const std::vector<std::string>& activities,
-    const minera::PerformanceSpectrumOptions& options) {
+    const minera::PerformanceSpectrumOptions& options,
+    const minera::ActiveEventSource* active_source = nullptr) {
   switch (options.variant) {
     case minera::PerformanceSpectrumVariant::kDataframe:
       return minera::discover_performance_spectrum_dataframe(
-          minera::event_log_to_table(log), activities, options);
+          active_source ? active_source->checked_table() : minera::event_log_to_table(log), activities, options);
     case minera::PerformanceSpectrumVariant::kDataframeDisconnected:
       return minera::discover_performance_spectrum_dataframe_disconnected(
-          minera::event_log_to_table(log), activities, options);
+          active_source ? active_source->checked_table() : minera::event_log_to_table(log), activities, options);
     case minera::PerformanceSpectrumVariant::kLazyframe:
       return minera::discover_performance_spectrum_lazyframe(
-          minera::event_log_to_lazy_table(log), activities, options);
+          active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log), activities, options);
     case minera::PerformanceSpectrumVariant::kLazyframeDisconnected:
       return minera::discover_performance_spectrum_lazyframe_disconnected(
-          minera::event_log_to_lazy_table(log), activities, options);
+          active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log), activities, options);
     case minera::PerformanceSpectrumVariant::kConnected:
     case minera::PerformanceSpectrumVariant::kDisconnected:
     case minera::PerformanceSpectrumVariant::kLog:
     case minera::PerformanceSpectrumVariant::kLogDisconnected:
-      return minera::compute_performance_spectrum(log, activities, options);
+      return minera::compute_performance_spectrum(active_source ? active_source->checked_log() : log, activities, options);
   }
   throw std::invalid_argument("performance spectrum variant is invalid");
 }
 
 minera::BatchDiscovery discover_selected_batches(
-    const minera::EventLog& log, const minera::BatchDiscoveryOptions& options) {
+    const minera::EventLog& log, const minera::BatchDiscoveryOptions& options,
+    const minera::ActiveEventSource* active_source = nullptr) {
   switch (options.variant) {
     case minera::BatchDiscoveryVariant::kLog:
-      return minera::BatchLogDiscovery::apply(log, options);
+      return minera::BatchLogDiscovery::apply(active_source ? active_source->checked_log() : log, options);
     case minera::BatchDiscoveryVariant::kPandas:
       return minera::BatchPandasDiscovery::apply(
-          minera::event_log_to_table(log), options);
+          active_source ? active_source->checked_table() : minera::event_log_to_table(log), options);
     case minera::BatchDiscoveryVariant::kPolars:
       return minera::BatchPolarsDiscovery::apply(
-          minera::event_log_to_lazy_table(log), options);
+          active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log), options);
   }
   throw std::invalid_argument("batch discovery variant is invalid");
 }
@@ -329,6 +335,18 @@ minera::BatchDiscovery discover_selected_batches(
 std::atomic<std::uint64_t> g_query_source_sequence{0};
 struct MinedSession {
   std::uint64_t query_source_id=++g_query_source_sequence;
+  std::shared_ptr<const minera::ActiveEventSource> active_source;
+  // Literal/typed/native-flat mining binds defaults to the retained source;
+  // legacy grouped-log mining keeps its existing native selector defaults.
+  bool active_source_native_dispatch = false;
+  bool log_ready = true;
+  bool alpha_log_ready = true;
+  bool inductive_log_ready = true;
+  bool tree_ready = true;
+  bool graph_ready = true;
+  bool declare_ready = true;
+  std::string mining_request_id;
+  std::string paired_csv_import_error;
   minera::EventLog log;
   // Exact selector/regrouping/order projection used to discover the inductive
   // model. Model-specific replay must use this alphabet rather than the
@@ -348,17 +366,53 @@ struct MinedSession {
   minera::TokenReplayOptions token_replay;
   minera::InductiveMinerOptions inductive_options;
   std::string alpha_activity_attribute = "concept:name";
+  std::string alpha_case_id_attribute = "case:concept:name";
   std::string powl_activity_key = "concept:name";
   std::string heuristic_activity_attribute = "concept:name";
+  std::string heuristic_case_id_attribute = "case:concept:name";
   std::string powl_timestamp_key = "time:timestamp";
   std::string powl_case_id_key = "case:concept:name";
 };
 
+const minera::EventLog& require_prepared_log(const MinedSession& session) {
+  if (!session.log_ready) throw std::invalid_argument(
+      "the active source has no prepared EventLog; inspect its preparation error");
+  return session.log;
+}
+
+const minera::ProcessTree& require_process_tree(const MinedSession& session) {
+  if (!session.tree_ready) throw std::invalid_argument(
+      "the active source has no successfully discovered process tree");
+  return session.tree;
+}
+
+const minera::DirectlyFollowsGraph& require_graph(const MinedSession& session) {
+  if (!session.graph_ready) throw std::invalid_argument(
+      "the active source has no successfully discovered directly-follows graph");
+  return session.graph;
+}
+
+minera::EventDataView cached_source_view(const MinedSession& session,
+                                       minera::EventDataKind kind) {
+  if (session.active_source) return session.active_source->view(kind);
+  if (kind == minera::EventDataKind::kEventLog)
+    return minera::EventDataView(require_prepared_log(session));
+  throw std::invalid_argument("this cached source has no retained flat native input");
+}
+
 const minera::EventLog& cached_model_log(const MinedSession& session,
                                          std::string_view miner) {
-  return miner == "inductive" || miner == "process_tree"
-             ? session.inductive_log
-             : miner == "alpha" ? session.alpha_log : session.log;
+  if (miner == "inductive" || miner == "process_tree") {
+    if (!session.inductive_log_ready)
+      throw std::invalid_argument("the cached Inductive prepared log is unavailable");
+    return session.inductive_log;
+  }
+  if (miner == "alpha") {
+    if (!session.alpha_log_ready)
+      throw std::invalid_argument("the cached Alpha prepared log is unavailable");
+    return session.alpha_log;
+  }
+  return require_prepared_log(session);
 }
 
 // Marking defaults belong to the cached supplied document. An explicitly
@@ -412,7 +466,7 @@ std::optional<minera::PetriNet> selected_process_tree_net(
   const auto variant =
       minera::parse_process_tree_petri_net_variant(
           request.get_param_value("process_tree_variant"));
-  return minera::to_petri_net(session.tree, variant);
+  return minera::to_petri_net(require_process_tree(session), variant);
 }
 
 const minera::PetriNet& select_cached_or_process_tree_net(
@@ -632,12 +686,13 @@ minera::FootprintsAnalysis analyze_footprints(
     const minera::ProcessTree& tree, const minera::PowlNode& powl,
     const minera::PetriNet& inductive_net, const minera::PetriNet& alpha_net,
     const minera::PetriNet& heuristic_net, const minera::PetriNet& powl_net,
-    const minera::FootprintsOptions& options) {
+    const minera::FootprintsOptions& options,
+    const minera::ActiveEventSource* active_source = nullptr) {
   minera::FootprintsAnalysis analysis;
   analysis.model = options.model;
   analysis.strict = options.strict;
   const auto discovery_options = footprints_discovery_options(options);
-  const auto& selected_log = options.model == "alpha" ? alpha_log : log;
+  const auto& selected_log = options.model == "alpha" ? alpha_log : active_source ? active_source->checked_log() : log;
   analysis.activity_attribute = discovery_options.activity_attribute;
   analysis.case_id_attribute = discovery_options.case_id_attribute;
   analysis.trace_case_ids = minera::resolve_footprints_case_ids(
@@ -687,7 +742,7 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("entire_dataframe")) {
     if (!dataframe) {
       dataframe =
-          minera::prepare_footprints_event_table(selected_log, discovery_options);
+          active_source ? active_source->checked_table() : minera::prepare_footprints_event_table(selected_log, discovery_options);
     }
     analysis.entire_dataframe = minera::discover_footprints(
         *dataframe, discovery_options);
@@ -695,7 +750,7 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("polars_lazyframes")) {
     if (!lazy_dataframe) {
       lazy_dataframe =
-          minera::prepare_footprints_lazy_table(selected_log, discovery_options);
+          active_source ? active_source->checked_lazy() : minera::prepare_footprints_lazy_table(selected_log, discovery_options);
     }
     analysis.polars_lazyframes = minera::discover_footprints(
         *lazy_dataframe, discovery_options);
@@ -829,8 +884,13 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
   return result;
 }
 
+#include "active_source_route.hpp"
+#include "active_source_options.hpp"
+#include "active_source_mining.hpp"
+
 void handle_mine(const httplib::Request& request, httplib::Response& response) {
   try {
+    const auto ticket = begin_active_mining(request);
     std::string csv;
     std::string dataset = "event log";
     minera::MineParams params;
@@ -866,30 +926,23 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           });
     }
 
-    const bool xes_input = looks_like_xes(dataset, csv);
-    std::istringstream input(csv);
-    minera::EventLog log;
+    std::string paired_csv_import_error;
+    auto active_source = std::make_shared<const minera::ActiveEventSource>(
+        prepare_active_event_source(request, csv, dataset, params, &paired_csv_import_error, true));
+    const auto literal_source_selectors = active_source_supplied(request, "mining_selectors_json")
+        ? minera::parse_workflow_selector_strings_json(active_source_field(request, "mining_selectors_json"))
+        : std::map<std::string, std::string>{};
+    if (active_source->file().format == "table" ||
+        active_source->selected_kind() != minera::EventDataKind::kEventLog || !literal_source_selectors.empty()) {
+      ticket->native_source_dispatch = true;
+      handle_active_source_mining(request, response, dataset, params, active_source, ticket, paired_csv_import_error);
+      return;
+    }
+    const bool xes_input = active_source->file().format == "xes";
+    auto log = active_source->checked_log();
     std::optional<minera::CsvEventData> csv_data;
-    if (xes_input) {
-      log = minera::import_xes_event_log(input, params.xes);
-    } else if (!params.correlation_variants.empty()) {
-      csv_data = minera::import_csv_event_data(input, params.csv);
-      log = std::move(csv_data->log);
-    } else {
-      log = minera::import_csv_event_log(input, params.csv);
-    }
-    if (params.filter.any()) {
-      log = minera::filter_event_log(log, params.filter);
-    }
-    if (params.segment_enabled && params.segment) {
-      log = minera::filter_segments(log, *params.segment);
-    }
-    if (params.path_enabled && params.path) {
-      log = minera::filter_adjacent_path(log, *params.path);
-    }
-    if (params.ltl_enabled && params.ltl) {
-      log = minera::filter_ltl_event_log(log, *params.ltl);
-    }
+    if (!xes_input && !params.correlation_variants.empty())
+      csv_data = minera::CsvEventData{active_source->original_log(), active_source->original_table()};
     auto graph = minera::discover_directly_follows_graph(log);
     register_activity_selector_values(graph, log,
                                       params.token_replay.activity_attribute);
@@ -1127,6 +1180,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all models up front.
     auto session = std::make_shared<MinedSession>();
+    session->active_source = active_source;
+    session->paired_csv_import_error = paired_csv_import_error;
     session->log = log;
     session->inductive_log = inductive_log;
     session->alpha_log = alpha_log;
@@ -1143,7 +1198,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         log, params.token_replay, params.token_replay_activity_attribute_supplied);
     session->inductive_options = params.inductive;
     session->alpha_activity_attribute = params.alpha.activity_attribute;
+    session->alpha_case_id_attribute = params.alpha.case_id_attribute;
     session->heuristic_activity_attribute = params.heuristic.activity_attribute;
+    session->heuristic_case_id_attribute = params.heuristic.case_id_attribute;
     session->powl_activity_key = params.powl.activity_key;
     session->powl_timestamp_key = params.powl.timestamp_key;
     session->powl_case_id_key = params.powl.case_id_key;
@@ -1152,12 +1209,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       throw std::logic_error("mining response is not a JSON object");
     const auto bound_body = body.substr(0, body_end) + ",\"source_id\":" +
         minera::embedding_runtime::detail::escape_json(std::to_string(session->query_source_id)) +
+        ",\"active_source\":" + active_source_snapshot_json(*session) +
         '}' + body.substr(body_end + 1);
-    {
-      std::lock_guard<std::mutex> lock(g_session_mutex);
-      g_session = std::move(session);
-      g_clustering_analysis.reset();
-    }
+    publish_active_mining(ticket, session);
 
     response.set_content(bound_body, "application/json");
   } catch (const std::exception& error) {
@@ -3247,12 +3301,12 @@ void handle_dfg_discovery(const httplib::Request& request,
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
     const auto params = minera::parse_mine_params(lookup, present);
     if (params.dfg_statistical_variants.empty() && params.dfg_causal_variants.empty()) throw std::invalid_argument("select at least one statistical or causal DFG variant");
-    auto graph = minera::discover_directly_follows_graph(session->log);
-    register_activity_selector_values(graph, session->log, params.dfg_statistics.activity_attribute);
-    const auto variants = analyze_dfg_variants(session->log, params.dfg_statistical_variants, params.dfg_causal_variants, params.dfg_statistics);
+    auto graph = minera::discover_directly_follows_graph(require_prepared_log(*session));
+    register_activity_selector_values(graph, require_prepared_log(*session), params.dfg_statistics.activity_attribute);
+    const auto variants = analyze_dfg_variants(require_prepared_log(*session), params.dfg_statistical_variants, params.dfg_causal_variants, params.dfg_statistics);
     const auto result = minera::analysis_json(
       /* dataset */ session->dataset,
-      /* event_log */ session->log,
+      /* event_log */ require_prepared_log(*session),
       /* graph */ graph,
       /* tree */ nullptr,
       /* net */ nullptr,
@@ -3306,7 +3360,7 @@ void handle_dfg_discovery(const httplib::Request& request,
     const auto quote = minera::embedding_runtime::detail::escape_json;
     const auto list = [&](const std::vector<std::string>& names) { std::string value = "["; for (std::size_t i = 0; i < names.size(); ++i) { if (i) value += ','; value += quote(names[i]); } return value + ']'; };
     response.set_content("{\"family\":\"DFG_DISCOVERY\",\"source_id\":" + quote(std::to_string(session->query_source_id)) + ",\"dataset\":" + quote(session->dataset) +
-      ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) + "},\"input_origin\":\"cached_source_log\",\"statistical_variants\":" + list(params.dfg_statistical_variants) + ",\"causal_variants\":" + list(params.dfg_causal_variants) + ",\"result\":" + result + '}', "application/json");
+      ",\"source\":{\"case_count\":" + std::to_string(require_prepared_log(*session).trace_count()) + ",\"event_count\":" + std::to_string(require_prepared_log(*session).event_count()) + "},\"input_origin\":\"cached_source_log\",\"statistical_variants\":" + list(params.dfg_statistical_variants) + ",\"causal_variants\":" + list(params.dfg_causal_variants) + ",\"result\":" + result + '}', "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -3355,16 +3409,14 @@ void handle_behavior_analysis(const httplib::Request& request,
       adapter = params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kLog ? "log" : params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kPandas ? "dataframe" : "lazyframe";
     } else if (adapter != "log" && adapter != "stream" && adapter != "dataframe" && adapter != "lazyframe")
       throw std::invalid_argument("behavior adapter expects log, stream, dataframe, or lazyframe");
-    std::optional<minera::ConvertedEventStream> stream;
-    std::optional<minera::LogConversionTable> table;
-    std::optional<minera::LazyEventTable> lazy;
+    overlay_cached_source_selectors(request, *session, params, adapter != "log");
     const auto input = [&]() -> minera::EventDataView {
-      if (adapter == "log") return minera::EventDataView(session->log);
-      if (adapter == "stream") { stream = minera::event_log_to_event_stream(session->log); return minera::EventDataView(*stream); }
-      if (adapter == "dataframe") { table = minera::event_log_to_table(session->log); return minera::EventDataView(*table); }
-      lazy = minera::event_log_to_lazy_table(session->log); return minera::EventDataView(*lazy);
+      const auto kind = adapter == "log" ? minera::EventDataKind::kEventLog :
+          adapter == "stream" ? minera::EventDataKind::kEventStream :
+          adapter == "dataframe" ? minera::EventDataKind::kEventTable : minera::EventDataKind::kLazyEventTable;
+      return cached_source_view(*session,kind);
     };
-    auto graph = minera::discover_directly_follows_graph(session->log);
+    auto graph = session->log_ready ? minera::discover_directly_follows_graph(require_prepared_log(*session)) : minera::DirectlyFollowsGraph{};
     std::optional<minera::TemporalProfile> profile;
     std::optional<minera::MinimumSelfDistances> distances;
     std::optional<minera::CorrelationVariantsAnalysis> correlations;
@@ -3377,7 +3429,17 @@ void handle_behavior_analysis(const httplib::Request& request,
       } else profile = minera::discover_temporal_profile(input(), params.temporal_profile);
       for (const auto& entry : profile->entries) { graph.ensure_activity(entry.source); graph.ensure_activity(entry.target); }
     } else if (family == "minimum_self_distance") {
-      distances = discover_selected_minimum_self_distances(session->log, params.minimum_self_distance);
+      distances = [&]() -> minera::MinimumSelfDistances {
+        switch (params.minimum_self_distance.variant) {
+          case minera::MinimumSelfDistanceVariant::kLog:
+            return minera::MinimumSelfDistanceLogDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kEventLog),params.minimum_self_distance);
+          case minera::MinimumSelfDistanceVariant::kPandas:
+            return minera::MinimumSelfDistancePandasDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kEventTable),params.minimum_self_distance);
+          case minera::MinimumSelfDistanceVariant::kPolars:
+            return minera::MinimumSelfDistancePolarsDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kLazyEventTable),params.minimum_self_distance);
+        }
+        throw std::invalid_argument("minimum self-distance variant is invalid");
+      }();
       for (const auto& distance : *distances) {
         if (!distance.activity_is_null) graph.ensure_activity(distance.activity);
         for (const auto& witness : distance.witnesses) graph.ensure_activity(witness);
@@ -3386,9 +3448,10 @@ void handle_behavior_analysis(const httplib::Request& request,
       correlations = analyze_correlation_variants(input(), params.correlation_variants, params.correlation);
       minera::register_correlation_activities(graph, *correlations);
     }
-    const auto result = minera::analysis_json(
+    std::string result = "null", result_error;
+    if (session->log_ready) try { result = minera::analysis_json(
       /* dataset */ session->dataset,
-      /* event_log */ session->log,
+      /* event_log */ require_prepared_log(*session),
       /* graph */ graph,
       /* tree */ nullptr,
       /* net */ nullptr,
@@ -3438,10 +3501,16 @@ void handle_behavior_analysis(const httplib::Request& request,
       /* concurrent_activity_overlap */ nullptr,
       /* decision_tables */ nullptr,
       /* minimum_self_distance_variant */ params.minimum_self_distance.variant,
-      /* typed_edit_distance */ nullptr);
+      /* typed_edit_distance */ nullptr); } catch (const std::exception& error) { result_error = error.what(); }
     const auto quote = minera::embedding_runtime::detail::escape_json;
     auto body = "{\"family\":\"BEHAVIOR_ANALYSIS\",\"method\":" + quote(family) + ",\"variant\":" + quote(variant) + ",\"adapter\":" + quote(adapter) + ",\"source_id\":" + quote(std::to_string(session->query_source_id)) +
-      ",\"dataset\":" + quote(session->dataset) + ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) + "},\"input_origin\":\"cached_source_log_conversion\",\"result\":" + result;
+      ",\"dataset\":" + quote(session->dataset) + ",\"source\":{\"case_count\":" + (session->log_ready ? std::to_string(require_prepared_log(*session).trace_count()) : std::string("null")) + ",\"event_count\":" + (session->active_source && session->active_source->checked_table_if_available() ? std::to_string(session->active_source->checked_table().rows.size()) : session->log_ready ? std::to_string(require_prepared_log(*session).event_count()) : std::string("null")) + "},\"input_origin\":\"cached_source_log_conversion\",\"result\":" + result;
+    std::string native_result = "null";
+    if (profile) native_result = minera::serialize_active_source_temporal_profile_json(*profile);
+    if (conformance) native_result = minera::serialize_active_source_temporal_conformance_json(*conformance);
+    if (distances) native_result = minera::serialize_active_source_distances_json(*distances);
+    if (correlations) native_result = minera::serialize_active_source_correlation_json(*correlations);
+    body += ",\"native_result\":" + native_result + ",\"result_error\":" + (result_error.empty() ? "null" : quote(result_error));
     if (profile) body += ",\"profile\":" + minera::temporal_profile_json(*profile);
     if (conformance) body += ",\"conformance\":" + minera::temporal_conformance_json(*conformance);
     response.set_content(body + '}', "application/json");
@@ -3468,22 +3537,45 @@ void handle_timing_discovery(const httplib::Request& request,
     }
     const auto lookup = [&](std::string_view name) { if (name == "batches" && family == "batches") return std::string("true"); return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
     const auto present = [&](std::string_view name) { return (name == "batches" && family == "batches") || request.has_param(std::string(name)); };
-    const auto params = minera::parse_mine_params(lookup, present);
-    auto graph = minera::discover_directly_follows_graph(session->log);
+    auto params = minera::parse_mine_params(lookup, present);
+    const bool flat_timing = family == "spectrum"
+        ? params.spectrum.variant == minera::PerformanceSpectrumVariant::kDataframe ||
+          params.spectrum.variant == minera::PerformanceSpectrumVariant::kDataframeDisconnected ||
+          params.spectrum.variant == minera::PerformanceSpectrumVariant::kLazyframe ||
+          params.spectrum.variant == minera::PerformanceSpectrumVariant::kLazyframeDisconnected
+        : params.batch_options.variant != minera::BatchDiscoveryVariant::kLog;
+    overlay_cached_source_selectors(request, *session, params, flat_timing);
+    auto graph = session->log_ready ? minera::discover_directly_follows_graph(require_prepared_log(*session)) : minera::DirectlyFollowsGraph{};
     std::optional<minera::PerformanceSpectrum> spectrum;
     std::optional<minera::BatchDiscovery> batches;
     if (family == "spectrum") {
       if (params.spectrum_activities.empty()) throw std::invalid_argument("spectrum_activities requires at least two activities");
-      spectrum = discover_selected_performance_spectrum(session->log, params.spectrum_activities, params.spectrum);
+      spectrum = [&]() {
+        const auto kind = params.spectrum.variant == minera::PerformanceSpectrumVariant::kDataframe || params.spectrum.variant == minera::PerformanceSpectrumVariant::kDataframeDisconnected
+            ? minera::EventDataKind::kEventTable : params.spectrum.variant == minera::PerformanceSpectrumVariant::kLazyframe || params.spectrum.variant == minera::PerformanceSpectrumVariant::kLazyframeDisconnected
+            ? minera::EventDataKind::kLazyEventTable : minera::EventDataKind::kEventLog;
+        return minera::compute_performance_spectrum(cached_source_view(*session,kind),params.spectrum_activities,params.spectrum);
+      }();
       for (const auto& activity : spectrum->activities) graph.ensure_activity(activity);
     } else {
-      batches = discover_selected_batches(session->log, params.batch_options);
-      register_activity_selector_values(graph, session->log, params.batch_options.activity_attribute);
+      batches = [&]() -> minera::BatchDiscovery {
+        switch (params.batch_options.variant) {
+          case minera::BatchDiscoveryVariant::kLog:
+            return minera::BatchLogDiscovery::apply(*cached_source_view(*session,minera::EventDataKind::kEventLog).log(),params.batch_options);
+          case minera::BatchDiscoveryVariant::kPandas:
+            return minera::BatchPandasDiscovery::apply(*cached_source_view(*session,minera::EventDataKind::kEventTable).table(),params.batch_options);
+          case minera::BatchDiscoveryVariant::kPolars:
+            return minera::BatchPolarsDiscovery::apply(*cached_source_view(*session,minera::EventDataKind::kLazyEventTable).lazy_table(),params.batch_options);
+        }
+        throw std::invalid_argument("batch discovery variant is invalid");
+      }();
+      if (session->log_ready) register_activity_selector_values(graph, require_prepared_log(*session), params.batch_options.activity_attribute);
     }
-    const auto result = minera::analysis_json(session->dataset, session->log, graph,
+    std::string result = "null", result_error;
+    if (session->log_ready) try { result = minera::analysis_json(session->dataset, require_prepared_log(*session), graph,
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
       spectrum ? &*spectrum : nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, batches ? &*batches : nullptr);
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, batches ? &*batches : nullptr); } catch (const std::exception& error) { result_error = error.what(); }
     const auto quote = minera::embedding_runtime::detail::escape_json;
     std::string variant;
     if (spectrum) {
@@ -3498,8 +3590,9 @@ void handle_timing_discovery(const httplib::Request& request,
         case minera::PerformanceSpectrumVariant::kLazyframeDisconnected: variant = "lazyframe_disconnected"; break;
       }
     } else variant = batches->variant == minera::BatchDiscoveryVariant::kLog ? "log" : batches->variant == minera::BatchDiscoveryVariant::kPandas ? "pandas" : "polars";
+    const auto native_result = spectrum ? minera::serialize_active_source_spectrum_json(*spectrum) : minera::serialize_active_source_batches_json(*batches);
     response.set_content("{\"family\":\"TIMING_DISCOVERY\",\"method\":" + quote(family) + ",\"variant\":" + quote(variant) + ",\"source_id\":" + quote(std::to_string(session->query_source_id)) +
-      ",\"dataset\":" + quote(session->dataset) + ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) + "},\"result\":" + result + '}', "application/json");
+      ",\"dataset\":" + quote(session->dataset) + ",\"source\":{\"case_count\":" + (session->log_ready ? std::to_string(require_prepared_log(*session).trace_count()) : std::string("null")) + ",\"event_count\":" + (session->active_source && session->active_source->checked_table_if_available() ? std::to_string(session->active_source->checked_table().rows.size()) : session->log_ready ? std::to_string(require_prepared_log(*session).event_count()) : std::string("null")) + "},\"result\":" + result + ",\"result_error\":" + (result_error.empty() ? "null" : quote(result_error)) + ",\"native_result\":" + native_result + '}', "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -3530,43 +3623,50 @@ void handle_graph_discovery(const httplib::Request& request,
     }
     const auto lookup = [&](std::string_view name) { return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
-    const auto params = minera::parse_mine_params(lookup, present);
-    const auto& input = family == "footprints" && params.footprints.model == "alpha" ? session->alpha_log : session->log;
-    auto graph = minera::discover_directly_follows_graph(input);
-    for (const auto& activity : session->graph.activities()) graph.ensure_activity(activity);
+    auto params = minera::parse_mine_params(lookup, present);
+    const bool flat_footprints = family == "footprints" &&
+        (params.footprints.discovery_variants.contains("entire_dataframe") ||
+         params.footprints.discovery_variants.contains("polars_lazyframes"));
+    overlay_cached_source_selectors(request, *session, params, flat_footprints);
+    const minera::EventLog* input = nullptr;
+    if (family == "footprints") input = params.footprints.model == "alpha" ? &cached_model_log(*session,"alpha") : &require_prepared_log(*session);
+    else if (session->log_ready) input = &require_prepared_log(*session);
+    auto graph = input ? minera::discover_directly_follows_graph(*input) : minera::DirectlyFollowsGraph{};
+    if (session->graph_ready) for (const auto& activity : require_graph(*session).activities()) graph.ensure_activity(activity);
     std::optional<minera::FootprintsAnalysis> footprints;
     std::optional<minera::TransitionSystem> transitions;
     std::string model_footprint, model_origin;
     if (family == "footprints") {
       if (!session->powl) throw std::invalid_argument("cached POWL model is unavailable; mine the source again");
-      register_activity_selector_values(graph, input, params.footprints.activity_attribute);
-      footprints = analyze_footprints(session->log, graph, session->alpha_log,
-        session->tree, *session->powl, session->nets.at("inductive"), session->nets.at("alpha"),
-        session->nets.at("heuristic"), session->nets.at("powl"), params.footprints);
+      register_activity_selector_values(graph, *input, params.footprints.activity_attribute);
+      footprints = analyze_footprints(require_prepared_log(*session), graph, cached_model_log(*session,"alpha"),
+        require_process_tree(*session), *session->powl, session->nets.at("inductive"), session->nets.at("alpha"),
+        session->nets.at("heuristic"), session->nets.at("powl"), params.footprints, session->active_source.get());
       model_footprint = minera::footprint_json(footprints->model_footprint, graph);
       model_origin = params.footprints.model == "dfg" ? "selected_source_dfg" : "cached_analysis_model";
     } else {
-      transitions = minera::discover_transition_system(session->log, params.transition_system);
+      transitions = minera::discover_transition_system(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.transition_system);
       for (const auto& state : transitions->states()) for (const auto& activity : state.payload) if (activity) graph.ensure_activity(*activity);
       for (const auto& transition : transitions->transitions()) if (transition.label) graph.ensure_activity(*transition.label);
     }
-    const auto result = minera::analysis_json(session->dataset, input, graph,
-      footprints ? &session->tree : nullptr, footprints ? &session->nets.at("alpha") : nullptr,
+    std::string result = "null", result_error;
+    if (input) try { result = minera::analysis_json(session->dataset, *input, graph,
+      footprints ? &require_process_tree(*session) : nullptr, footprints ? &session->nets.at("alpha") : nullptr,
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
       footprints ? &session->nets.at("inductive") : nullptr, nullptr,
       footprints ? &session->nets.at("heuristic") : nullptr, nullptr, nullptr, nullptr,
       transitions ? &*transitions : nullptr, footprints ? &*session->powl : nullptr,
       footprints ? &session->nets.at("powl") : nullptr, nullptr,
-      nullptr, nullptr, nullptr, nullptr, footprints ? &*footprints : nullptr);
+      nullptr, nullptr, nullptr, nullptr, footprints ? &*footprints : nullptr); } catch (const std::exception& error) { result_error = error.what(); }
     const auto quote = minera::embedding_runtime::detail::escape_json;
     response.set_content("{\"family\":\"GRAPH_DISCOVERY\",\"method\":" + quote(family) +
       ",\"variant\":" + quote(family == "footprints" ? "aggregate" : "view_based") +
       ",\"source_id\":" + quote(std::to_string(session->query_source_id)) + ",\"dataset\":" + quote(session->dataset) +
-      ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) +
-      "},\"analysis_source\":{\"case_count\":" + std::to_string(input.trace_count()) + ",\"event_count\":" + std::to_string(input.event_count()) +
+      ",\"source\":{\"case_count\":" + (session->log_ready ? std::to_string(require_prepared_log(*session).trace_count()) : std::string("null")) + ",\"event_count\":" + (session->active_source && session->active_source->checked_table_if_available() ? std::to_string(session->active_source->checked_table().rows.size()) : session->log_ready ? std::to_string(require_prepared_log(*session).event_count()) : std::string("null")) +
+      "},\"analysis_source\":{\"case_count\":" + (input ? std::to_string(input->trace_count()) : std::string("null")) + ",\"event_count\":" + (input ? std::to_string(input->event_count()) : std::string("null")) +
       ",\"origin\":" + quote(family == "footprints" && params.footprints.model == "alpha" ? "cached_alpha_projection" : "cached_source") +
       "},\"model_origin\":" + (model_origin.empty() ? "null" : quote(model_origin)) +
-      ",\"model_footprint\":" + (model_footprint.empty() ? "null" : model_footprint) + ",\"result\":" + result + '}', "application/json");
+      ",\"model_footprint\":" + (model_footprint.empty() ? "null" : model_footprint) + ",\"result\":" + result + ",\"result_error\":" + (result_error.empty() ? "null" : quote(result_error)) + ",\"native_result\":" + (transitions ? minera::serialize_active_source_transition_json(*transitions) : std::string("null")) + '}', "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -3595,7 +3695,8 @@ void handle_constraint_discovery(const httplib::Request& request,
     }
     const auto lookup = [&](std::string_view name) { return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
-    const auto params = minera::parse_mine_params(lookup, present);
+    auto params = minera::parse_mine_params(lookup, present);
+    overlay_cached_source_selectors(request, *session, params);
     const auto activity = family == "declare" ? params.declare_options.activity_key : params.log_skeleton.activity_key;
     const auto conformance_activity = request.has_param("conformance_activity_key") ? trim_text(request.get_param_value("conformance_activity_key")) : activity;
     const auto diagnostics_case = request.has_param("diagnostics_case_id_key") ? trim_text(request.get_param_value("diagnostics_case_id_key")) : "case:concept:name";
@@ -3604,19 +3705,19 @@ void handle_constraint_discovery(const httplib::Request& request,
     std::optional<minera::LogSkeletonModel> skeleton;
     std::optional<std::vector<minera::DeclareConformance>> declare_conformance;
     std::optional<std::vector<minera::LogSkeletonConformance>> skeleton_conformance;
-    auto graph = minera::discover_directly_follows_graph(session->log);
+    auto graph = session->log_ready ? minera::discover_directly_follows_graph(require_prepared_log(*session)) : minera::DirectlyFollowsGraph{};
     std::string diagnostics, diagnostics_error, playout_xes, playout_result, playout_error;
     if (family == "declare") {
-      declare = minera::discover_declare(session->log, params.declare_options);
+      declare = minera::discover_declare(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.declare_options);
       auto options = params.declare_conformance_options; options.activity_key = conformance_activity;
-      declare_conformance = minera::check_declare_conformance(session->log, *declare, options);
+      declare_conformance = minera::check_declare_conformance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *declare, options);
       for (const auto& [name, rules] : declare->rules) for (const auto& rule : rules) {
         (void)name; graph.ensure_activity(rule.first); if (rule.binary) graph.ensure_activity(rule.second);
       }
       for (const auto& trace : *declare_conformance) for (const auto& deviation : trace.deviations) {
         graph.ensure_activity(deviation.first); if (deviation.binary) graph.ensure_activity(deviation.second);
       }
-      try { diagnostics = minera::serialize_event_table_json(minera::declare_conformance_diagnostics(session->log, *declare_conformance, {diagnostics_case})); }
+      try { diagnostics = minera::serialize_event_table_input_json(minera::declare_conformance_diagnostics(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *declare_conformance, {diagnostics_case})); }
       catch (const std::exception& error) { diagnostics_error = error.what(); }
       if (ocel_query_bool(request, "generate_log", false)) {
         try {
@@ -3639,9 +3740,9 @@ void handle_constraint_discovery(const httplib::Request& request,
         } catch (const std::exception& error) { playout_error = error.what(); }
       }
     } else {
-      skeleton = minera::discover_log_skeleton(session->log, params.log_skeleton);
+      skeleton = minera::discover_log_skeleton(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.log_skeleton);
       auto options = params.log_skeleton; options.activity_key = conformance_activity;
-      skeleton_conformance = minera::check_log_skeleton_conformance(session->log, *skeleton, options);
+      skeleton_conformance = minera::check_log_skeleton_conformance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *skeleton, options);
       for (const auto* relations : {&skeleton->equivalence, &skeleton->always_after, &skeleton->always_before, &skeleton->never_together, &skeleton->directly_follows})
         for (const auto& relation : *relations) { graph.ensure_activity(relation.source); graph.ensure_activity(relation.target); }
       for (const auto& [name, frequencies] : skeleton->activ_freq) { (void)frequencies; graph.ensure_activity(name); }
@@ -3649,23 +3750,25 @@ void handle_constraint_discovery(const httplib::Request& request,
         if (deviation.constraint == "activ_freq") graph.ensure_activity(deviation.activity);
         else { graph.ensure_activity(deviation.relation.source); graph.ensure_activity(deviation.relation.target); }
       }
-      try { diagnostics = minera::serialize_event_table_json(minera::log_skeleton_conformance_diagnostics(session->log, *skeleton_conformance, {diagnostics_case})); }
+      try { diagnostics = minera::serialize_event_table_input_json(minera::log_skeleton_conformance_diagnostics(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *skeleton_conformance, {diagnostics_case})); }
       catch (const std::exception& error) { diagnostics_error = error.what(); }
     }
-    const auto result = minera::analysis_json(session->dataset, session->log, graph,
+    std::string result = "null", result_error;
+    if (session->log_ready) try { result = minera::analysis_json(session->dataset, require_prepared_log(*session), graph,
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
       skeleton ? &*skeleton : nullptr, skeleton_conformance ? &*skeleton_conformance : nullptr,
-      declare ? &*declare : nullptr, declare_conformance ? &*declare_conformance : nullptr);
+      declare ? &*declare : nullptr, declare_conformance ? &*declare_conformance : nullptr); } catch (const std::exception& error) { result_error = error.what(); }
     const auto quote = minera::embedding_runtime::detail::escape_json;
+    const auto native_result = declare ? minera::serialize_active_source_declare_json(*declare,declare_conformance ? &*declare_conformance : nullptr) : minera::serialize_active_source_skeleton_json(*skeleton,skeleton_conformance ? &*skeleton_conformance : nullptr);
     const auto optional_json = [](const std::string& value) { return value.empty() ? std::string("null") : value; };
     const auto optional_text = [&](const std::string& value) { return value.empty() ? std::string("null") : quote(value); };
     response.set_content("{\"family\":\"CONSTRAINT_DISCOVERY\",\"method\":" + quote(family) +
       ",\"variant\":\"classic\",\"source_id\":" + quote(std::to_string(session->query_source_id)) +
       ",\"dataset\":" + quote(session->dataset) + ",\"activity_key\":" + quote(activity) +
       ",\"conformance_activity_key\":" + quote(conformance_activity) + ",\"diagnostics_case_id_key\":" + quote(diagnostics_case) +
-      ",\"source\":{\"case_count\":" + std::to_string(session->log.trace_count()) + ",\"event_count\":" + std::to_string(session->log.event_count()) +
-      "},\"result\":" + result + ",\"diagnostics\":" + optional_json(diagnostics) + ",\"diagnostics_error\":" + optional_text(diagnostics_error) +
+      ",\"source\":{\"case_count\":" + (session->log_ready ? std::to_string(require_prepared_log(*session).trace_count()) : std::string("null")) + ",\"event_count\":" + (session->active_source && session->active_source->checked_table_if_available() ? std::to_string(session->active_source->checked_table().rows.size()) : session->log_ready ? std::to_string(require_prepared_log(*session).event_count()) : std::string("null")) +
+      "},\"result\":" + result + ",\"result_error\":" + (result_error.empty() ? "null" : quote(result_error)) + ",\"native_result\":" + native_result + ",\"diagnostics\":" + optional_json(diagnostics) + ",\"diagnostics_error\":" + optional_text(diagnostics_error) +
       ",\"playout_result\":" + optional_json(playout_result) + ",\"playout_xes\":" + optional_text(playout_xes) + ",\"playout_error\":" + optional_text(playout_error) + '}', "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
@@ -3693,15 +3796,16 @@ void handle_structured_discovery(const httplib::Request& request,
   }
   const auto lookup = [&](std::string_view name) { return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
   const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
-  const auto params = minera::parse_mine_params(lookup, present);
+  auto params = minera::parse_mine_params(lookup, present);
+  overlay_cached_source_selectors(request,session,params);
   std::optional<minera::ProcessTree> tree;
   std::optional<minera::PowlNode> powl;
   minera::EventLog discovery_log;
   minera::PetriNet net;
   std::string variant, activity;
   if (family == "inductive") {
-    tree = minera::discover_process_tree(session.log, params.inductive);
-    discovery_log = minera::prepare_inductive_event_log(session.log, params.inductive);
+    tree = minera::discover_process_tree(session.active_source ? session.active_source->selected_view() : minera::EventDataView(require_prepared_log(session)), params.inductive);
+    discovery_log = minera::prepare_inductive_event_log(session.active_source ? session.active_source->selected_view() : minera::EventDataView(require_prepared_log(session)), params.inductive);
     const auto conversion = minera::parse_process_tree_petri_net_variant(
         request.has_param("discovery_tree_variant") ? request.get_param_value("discovery_tree_variant") : "standard");
     net = minera::to_petri_net(*tree, conversion);
@@ -3709,8 +3813,8 @@ void handle_structured_discovery(const httplib::Request& request,
         params.inductive.variant == minera::InductiveMinerVariant::kImf ? "imf" : "dfg";
     activity = params.inductive.activity_key;
   } else {
-    powl = minera::discover_powl(session.log, params.powl);
-    discovery_log = minera::normalize_powl_event_log(session.log, params.powl);
+    powl = minera::discover_powl(require_prepared_log(session), params.powl);
+    discovery_log = minera::normalize_powl_event_log(require_prepared_log(session), params.powl);
     net = minera::to_petri_net(*powl);
     switch (params.powl.variant) {
       case minera::PowlDiscoveryVariant::kTree: variant = "tree"; break;
@@ -3762,7 +3866,7 @@ void handle_structured_discovery(const httplib::Request& request,
       ",\"variant\":" + quote(variant) + ",\"activity_key\":" + quote(activity) +
       ",\"source_id\":" + quote(std::to_string(session.query_source_id)) +
       ",\"dataset\":" + quote(session.dataset) + ",\"source\":{\"case_count\":" +
-      std::to_string(session.log.trace_count()) + ",\"event_count\":" + std::to_string(session.log.event_count()) +
+      (session.log_ready ? std::to_string(require_prepared_log(session).trace_count()) : std::string("null")) + ",\"event_count\":" + (session.active_source && session.active_source->checked_table_if_available() ? std::to_string(session.active_source->checked_table().rows.size()) : session.log_ready ? std::to_string(require_prepared_log(session).event_count()) : std::string("null")) +
       "},\"discovery_source\":{\"case_count\":" + std::to_string(discovery_log.trace_count()) +
       ",\"event_count\":" + std::to_string(discovery_log.event_count()) + "},\"source_xes\":" +
       quote(minera::to_xes(discovery_log, family + " adapted discovery source")) +
@@ -3825,6 +3929,8 @@ void handle_workflow_discovery(const httplib::Request& request,
     };
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
     auto params = minera::parse_mine_params(lookup, present);
+    overlay_cached_source_selectors(request,*session,params);
+    const auto discovery_input = session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session));
     if (family == "heuristic")
       params.heuristic.connect_all = ocel_query_bool(request, "heuristic_connect_all", params.heuristic.connect_all);
     std::optional<minera::HeuristicsNet> heuristic;
@@ -3834,20 +3940,21 @@ void handle_workflow_discovery(const httplib::Request& request,
       (params.heuristic.variant == minera::HeuristicMinerVariant::kPlusPlus ? "plusplus" : "classic");
     if (family == "alpha") {
       if (params.alpha.short_loops) {
-        alpha_plus = minera::discover_alpha_plus_result(session->log, params.alpha);
+        alpha_plus = minera::discover_alpha_plus_result(discovery_input, params.alpha);
         net = alpha_plus->net;
-      } else net = minera::discover_alpha_classic(session->log, params.alpha);
+      } else net = minera::discover_petri_net(discovery_input, params.alpha);
     } else {
-      heuristic = minera::discover_heuristics_net(session->log, params.heuristic);
+      heuristic = minera::discover_heuristics_net(discovery_input, params.heuristic);
       net = minera::to_petri_net(*heuristic);
     }
-    auto graph = minera::discover_directly_follows_graph(session->log);
+    auto graph = session->log_ready ? minera::discover_directly_follows_graph(require_prepared_log(*session)) : minera::DirectlyFollowsGraph{};
     for (const auto& activity : net.activities()) graph.ensure_activity(activity);
     if (heuristic) for (const auto& activity : heuristic->activities) graph.ensure_activity(activity);
-    const auto result = minera::analysis_json(session->dataset, session->log, graph,
+    std::string result = "null", result_error;
+    if (session->log_ready) try { result = minera::analysis_json(session->dataset, require_prepared_log(*session), graph,
       nullptr, family == "alpha" ? &net : nullptr, heuristic ? &*heuristic : nullptr,
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-      nullptr, nullptr, family == "heuristic" ? &net : nullptr);
+      nullptr, nullptr, family == "heuristic" ? &net : nullptr); } catch (const std::exception& error) { result_error = error.what(); }
     std::string pnml, pnml_error;
     try {
       if (alpha_plus) {
@@ -3888,8 +3995,9 @@ void handle_workflow_discovery(const httplib::Request& request,
       ",\"variant\":" + quote(variant) + ",\"activity_key\":" + quote(activity) +
       ",\"source_id\":" + quote(std::to_string(session->query_source_id)) +
       ",\"dataset\":" + quote(session->dataset) + ",\"source\":{\"case_count\":" +
-      std::to_string(session->log.trace_count()) + ",\"event_count\":" +
-      std::to_string(session->log.event_count()) + "},\"result\":" + result +
+      (session->log_ready ? std::to_string(require_prepared_log(*session).trace_count()) : std::string("null")) + ",\"event_count\":" +
+      (session->active_source && session->active_source->checked_table_if_available() ? std::to_string(session->active_source->checked_table().rows.size()) : session->log_ready ? std::to_string(require_prepared_log(*session).event_count()) : std::string("null")) + "},\"result\":" + result +
+      ",\"result_error\":" + (result_error.empty() ? "null" : quote(result_error)) + ",\"native_result\":{\"petri_net\":" + minera::workflow_input_petri_json(net) + ",\"heuristics\":" + (heuristic ? minera::workflow_input_heuristics_json(*heuristic) : "null") + "}" +
       ",\"alpha_discovery\":" + (alpha_plus ? minera::alpha_plus_result_json(*alpha_plus) : "null") +
       ",\"pnml\":" + (pnml.empty() ? "null" : quote(pnml)) +
       ",\"pnml_error\":" + (pnml_error.empty() ? "null" : quote(pnml_error)) +
@@ -3952,7 +4060,7 @@ void handle_ilp_mine(const httplib::Request& request,
     if (options.max_nodes > kServerIlpMaxNodes) {
       throw std::invalid_argument("ilp_max_nodes exceeds the server safety cap");
     }
-    const auto result = minera::mine_ilp(session->log, options);
+    const auto result = minera::mine_ilp(require_prepared_log(*session), options);
     auto body = minera::ilp_miner_json(result);
     if (include_model) body = discovery_model_json(std::move(body), result.net,
         result.markings, *session, result.diagnostics.computed);
@@ -4011,7 +4119,7 @@ void handle_genetic_request(const httplib::Request& request,
         options.max_states > kServerGeneticMaxStates) {
       throw std::invalid_argument("genetic safety bound exceeded");
     }
-    const auto result = minera::mine_genetic(session->log, options);
+    const auto result = minera::mine_genetic(require_prepared_log(*session), options);
     if (convert_matrix) {
       const auto variant = request.has_param("genetic_conversion_variant")
           ? minera::parse_genetic_matrix_conversion_variant(
@@ -4170,8 +4278,25 @@ void handle_log_conversion(const httplib::Request& request,
       throw std::invalid_argument(
           "log_conversion_max_variants_to_return exceeds the server safety cap");
     }
-    const auto result = minera::convert_event_log(session->log, options);
+    const auto result = [&]() -> minera::LogConversionResult {
+      if (!session->active_source) return minera::convert_event_log(require_prepared_log(*session),options);
+      const auto data = session->active_source->selected_view();
+      minera::LogConversionResult converted; converted.variant = options.variant;
+      switch (options.variant) {
+        case minera::LogConversionVariant::kToEventLog: converted.log = minera::event_data_to_event_log(data,options); break;
+        case minera::LogConversionVariant::kToEventStream: converted.stream = minera::event_data_to_event_stream(data,options); break;
+        case minera::LogConversionVariant::kToDataFrame:
+          converted.table = minera::event_data_to_table(data,options);
+          if(options.lazy_output) converted.lazy_table = minera::event_data_to_lazy_table(data,options);
+          break;
+        default: return minera::convert_event_log(require_prepared_log(*session),options);
+      }
+      return converted;
+    }();
     auto body = minera::log_conversion_json(result);
+    if (session->active_source && result.variant == minera::LogConversionVariant::kToDataFrame) {
+      body.pop_back(); body += ",\"native_table\":" + minera::serialize_event_table_input_json(result.table) + '}';
+    }
     if (include_source) {
       const bool log_output = result.variant == minera::LogConversionVariant::kToEventLog ||
           result.variant == minera::LogConversionVariant::kOneTracePerVariant ||
@@ -4217,7 +4342,7 @@ void handle_organizational_sna(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const auto options = minera::parse_organizational_sna_params(lookup, present);
-    const auto result = minera::discover_organizational_sna(session->log, options);
+    const auto result = minera::discover_organizational_sna(require_prepared_log(*session), options);
     response.set_content(minera::organizational_sna_json(result),
                          "application/json");
   } catch (const std::exception& error) {
@@ -4254,8 +4379,8 @@ std::string organizational_response(const httplib::Request& request,
   const auto quote = minera::embedding_runtime::detail::escape_json;
   payload.pop_back();
   return payload + ",\"input_context\":{\"source_id\":" + quote(std::to_string(session.query_source_id)) +
-      ",\"dataset\":" + quote(session.dataset) + ",\"case_count\":" + std::to_string(session.log.trace_count()) +
-      ",\"event_count\":" + std::to_string(session.log.event_count()) + "}}";
+      ",\"dataset\":" + quote(session.dataset) + ",\"case_count\":" + std::to_string(require_prepared_log(session).trace_count()) +
+      ",\"event_count\":" + std::to_string(require_prepared_log(session).event_count()) + "}}";
 }
 
 void handle_network_analysis(const httplib::Request& request, httplib::Response& response) {
@@ -4276,7 +4401,7 @@ void handle_network_analysis(const httplib::Request& request, httplib::Response&
     const auto options = minera::parse_network_analysis_params(lookup, present);
     const bool include_source = organizational_source_requested(request, *session);
     response.set_content(organizational_response(request, *session,
-        minera::network_analysis_json(minera::discover_network_analysis(session->log, options)), include_source), "application/json");
+        minera::network_analysis_json(minera::discover_network_analysis(require_prepared_log(*session), options)), include_source), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -4313,7 +4438,7 @@ void handle_link_analysis(const httplib::Request& request,
     const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_link_analysis_params(lookup, present);
     auto payload = minera::link_analysis_json(
-        minera::discover_link_analysis(session->log, options));
+        minera::discover_link_analysis(require_prepared_log(*session), options));
     if (include_source) {
       payload.pop_back();
       payload += ",\"source_id\":" + minera::embedding_runtime::detail::escape_json(
@@ -4341,7 +4466,7 @@ void handle_roles(const httplib::Request& request, httplib::Response& response) 
     const auto options = minera::parse_role_discovery_params(lookup, present);
     const bool include_source = organizational_source_requested(request, *session);
     response.set_content(organizational_response(request, *session,
-        minera::role_discovery_json(minera::discover_roles(session->log, options)), include_source), "application/json");
+        minera::role_discovery_json(minera::discover_roles(require_prepared_log(*session), options)), include_source), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -4357,7 +4482,7 @@ void handle_resource_profiles(const httplib::Request& request, httplib::Response
     const auto options = minera::parse_resource_profiles_params(lookup, present);
     const bool include_source = organizational_source_requested(request, *session);
     response.set_content(organizational_response(request, *session,
-        minera::resource_profiles_json(minera::discover_resource_profiles(session->log, options)), include_source), "application/json");
+        minera::resource_profiles_json(minera::discover_resource_profiles(require_prepared_log(*session), options)), include_source), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -4472,14 +4597,14 @@ std::string duckdb_query_body(const minera::LogQueryTable& table,std::string_vie
 }
 void handle_log_query_schema(const httplib::Request& request,httplib::Response& response){
  try{
-  const auto session=query_session(request);const auto table=minera::log_query_table(session->log);const auto quote=minera::embedding_runtime::detail::escape_json;
-  std::string body="{\"family\":\"LOG_QUERY_SCHEMA\",\"source_id\":"+quote(std::to_string(session->query_source_id))+",\"dataset\":"+quote(session->dataset)+",\"event_count\":"+std::to_string(session->log.event_count())+",\"case_count\":"+std::to_string(session->log.trace_count())+",\"table_name\":\"dataframe\",\"event_index_column\":"+quote(table.event_index_column)+",\"sqlite_available\":"+(minera::sqlite_log_query_available()?"true":"false")+",\"duckdb_configured\":"+(!g_query_runtime_url.empty()?"true":"false")+",\"columns\":[";
+  const auto session=query_session(request);const auto table=cached_source_query_table(*session);const auto quote=minera::embedding_runtime::detail::escape_json;
+  std::string body="{\"family\":\"LOG_QUERY_SCHEMA\",\"source_id\":"+quote(std::to_string(session->query_source_id))+",\"dataset\":"+quote(session->dataset)+",\"event_count\":"+std::to_string(table.table.rows.size())+",\"case_count\":"+(session->log_ready ? std::to_string(require_prepared_log(*session).trace_count()) : std::string("null"))+",\"table_name\":\"dataframe\",\"event_index_column\":"+quote(table.event_index_column)+",\"sqlite_available\":"+(minera::sqlite_log_query_available()?"true":"false")+",\"duckdb_configured\":"+(!g_query_runtime_url.empty()?"true":"false")+",\"columns\":[";
   for(std::size_t c=0;c<table.table.columns.size();++c){if(c)body+=',';body+=quote(table.table.columns[c]);}body+="],\"cluster_runtime_configured\":"+std::string(!g_query_runtime_url.empty()?"true":"false")+"}";response.set_content(body,"application/json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 void handle_log_query(const httplib::Request& request,httplib::Response& response){
  try{
-  validate_query_fields(request);const auto session=query_session(request);const auto table=minera::log_query_table(session->log);const auto engine=query_engine(request);const auto limit=query_limit(request,1000);const auto source=std::to_string(session->query_source_id);
+  validate_query_fields(request);const auto session=query_session(request);const auto table=cached_source_query_table(*session);const auto engine=query_engine(request);const auto limit=query_limit(request,1000);const auto source=std::to_string(session->query_source_id);
   if(engine=="sqlite"){
    minera::LogQueryOptions options;options.max_rows=limit;const auto result=minera::query_log_sqlite(table,request.body,options);auto body=minera::log_query_json(result);body.pop_back();body+=",\"source_id\":\""+source+"\"}";response.set_content(body,"application/json");
   }else{
@@ -4491,19 +4616,25 @@ void handle_log_query(const httplib::Request& request,httplib::Response& respons
 void handle_log_query_export(const httplib::Request& request,httplib::Response& response){
  try{
   validate_query_fields(request);if(!request.has_param("source_id"))throw std::invalid_argument("source_id is required for filtered log export");
-  const auto session=query_session(request);const auto table=minera::log_query_table(session->log);const auto engine=query_engine(request);std::vector<std::size_t> indices;
+  const auto session=query_session(request);const auto table=cached_source_query_table(*session);const auto engine=query_engine(request);std::vector<std::size_t> indices;
   if(engine=="sqlite"){
    minera::LogQueryOptions options;options.max_rows=1000000;const auto result=minera::query_log_sqlite(table,request.body,options);if(!result.can_filter||result.output_truncated)throw std::invalid_argument("filter SQL must return valid event indices for a complete selection");indices=result.selected_event_indices;
   }else{
    if(g_query_runtime_url.empty())throw std::invalid_argument("DuckDB requires --query-runtime-url");
-   const auto body=duckdb_query_body(table,request.body,1000000,std::to_string(session->query_source_id));const auto result=minera::query_runtime::request(g_query_runtime_url,"/select",&body);if(result->status!=200){response.status=result->status;response.set_content(result->body,"application/json");return;}indices=minera::query_runtime::parse_indices(result->body,session->log.event_count());
+   const auto body=duckdb_query_body(table,request.body,1000000,std::to_string(session->query_source_id));const auto result=minera::query_runtime::request(g_query_runtime_url,"/select",&body);if(result->status!=200){response.status=result->status;response.set_content(result->body,"application/json");return;}indices=minera::query_runtime::parse_indices(result->body,table.table.rows.size());
   }
   const auto mode=request.has_param("mode")?request.get_param_value("mode"):"cases";if(mode!="cases"&&mode!="events")throw std::invalid_argument("filter mode must be cases or events");
-  const auto filtered=minera::filter_query_events(session->log,indices,mode=="cases");const auto format=request.has_param("format")?request.get_param_value("format"):"xes";
-  response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
-  if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
-  else if(format=="json"){minera::LogConversionOptions options;options.variant=minera::LogConversionVariant::kToDataFrame;response.set_content(minera::log_conversion_json(minera::convert_event_log(filtered,options)),"application/json");}
-  else throw std::invalid_argument("filter export format must be xes or json");
+  const auto format=request.has_param("format")?request.get_param_value("format"):"xes";
+  if(format=="json"){
+    const auto body=active_source_table_json(*session,indices,mode=="cases");
+    response.set_header("X-Minera-Event-Count",std::to_string(active_source_selected_row_count(*session,indices,mode=="cases")));
+    if(session->log_ready){const auto selected=select_active_source_rows(*session,indices,mode=="cases");response.set_header("X-Minera-Case-Count",std::to_string(selected.trace_count()));}
+    response.set_content(body,"application/json");
+  }else if(format=="xes"){
+    const auto filtered=select_active_source_rows(*session,indices,mode=="cases");
+    response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
+    minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");
+  }else throw std::invalid_argument("filter export format must be xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 
@@ -4515,12 +4646,12 @@ void handle_log_cluster(const httplib::Request& request,httplib::Response& respo
   if(request.body.size()>1024u*1024u)throw std::invalid_argument("cluster regex exceeds 1 MiB");
   if(g_query_runtime_url.empty()){response.status=503;response.set_content(error_json("case clustering requires --query-runtime-url and scripts/query_runtime.py"),"application/json");return;}
   const auto session=query_session(request);const auto name=request.has_param("name")?request.get_param_value("name"):"";const auto activity=request.has_param("activity_attribute")?request.get_param_value("activity_attribute"):"";
-  const auto indices=minera::log_cluster_runtime::select(g_query_runtime_url,session->log,request.body,activity);const auto filtered=minera::filter_query_events(session->log,indices,true);
+  const auto indices=minera::log_cluster_runtime::select(g_query_runtime_url,require_prepared_log(*session),request.body,activity);const auto filtered=minera::filter_query_events(require_prepared_log(*session),indices,true);
   response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
   const auto format=request.has_param("format")?request.get_param_value("format"):"summary";
   if(format=="summary")response.set_content(minera::log_cluster_runtime::summary(filtered,name,request.body,indices,std::to_string(session->query_source_id)),"application/json");
   else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
-  else if(format=="json")response.set_content(minera::log_cluster_runtime::table_json(session->log,indices),"application/json");
+  else if(format=="json")response.set_content(active_source_table_json_from_log_indices(*session,indices,true),"application/json");
   else throw std::invalid_argument("cluster format must be summary, xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
@@ -4537,7 +4668,7 @@ void handle_llm_context(const httplib::Request& request,httplib::Response& respo
    if(request.has_file("ocel"))throw std::invalid_argument("traditional context cannot use an OCEL file");if(!has("source_id"))throw std::invalid_argument("source_id is required for a cached-log context");const auto session=query_session(request);source=std::to_string(session->query_source_id);if(get("source_id")!=source)throw std::invalid_argument("the source log changed; refresh the context source");
    const minera::PetriNet* net=nullptr;const minera::PnmlDocument* document=nullptr;
    if(options.variant=="petri_net"){const auto miner=has("miner")?get("miner"):"inductive";const auto found=session->nets.find(miner);if(found==session->nets.end())throw std::invalid_argument("the requested context model is unavailable");net=&found->second;if(miner=="imported"&&session->imported_document)document=&*session->imported_document;}
-   result=minera::build_llm_context(session->log,options,net,document);
+   result=minera::build_llm_context(require_prepared_log(*session),options,net,document);
   }
   response.set_content(minera::llm_context_json(result,source),"application/json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
@@ -4555,7 +4686,7 @@ void handle_local_diagnostics(const httplib::Request& request, httplib::Response
     const auto options = minera::parse_local_diagnostics_params(lookup, present);
     const bool include_source = organizational_source_requested(request, *session);
     response.set_content(organizational_response(request, *session,
-        minera::local_diagnostics_json(minera::discover_local_diagnostics(session->log, options)), include_source), "application/json");
+        minera::local_diagnostics_json(minera::discover_local_diagnostics(require_prepared_log(*session), options)), include_source), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -4600,9 +4731,9 @@ std::string clustering_analysis_json(std::shared_ptr<ClusteringAnalysis> analysi
   std::string body = "{\"family\":\"CLUSTER_ANALYSIS\",\"analysis_id\":" + quote(analysis->id) +
       ",\"source_id\":" + quote(std::to_string(analysis->source->query_source_id)) +
       ",\"result\":" + result_json + ",\"cases\":[";
-  for (std::size_t i = 0; i < analysis->source->log.traces.size(); ++i) {
+  for (std::size_t i = 0; i < require_prepared_log(*analysis->source).traces.size(); ++i) {
     if (i) body += ',';
-    const auto& trace = analysis->source->log.traces[i];
+    const auto& trace = require_prepared_log(*analysis->source).traces[i];
     body += "{\"index\":" + std::to_string(i) + ",\"case_id\":" + quote(trace.case_id) +
         ",\"event_count\":" + std::to_string(trace.events.size()) + '}';
   }
@@ -4685,9 +4816,9 @@ void handle_clustering_export(const httplib::Request& request,
     }
     std::sort(indices.begin(), indices.end());
     indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
-    auto selected = analysis->source->log;
+    auto selected = require_prepared_log(*analysis->source);
     selected.traces.clear();
-    for (const auto index : indices) selected.traces.push_back(analysis->source->log.traces.at(index));
+    for (const auto index : indices) selected.traces.push_back(require_prepared_log(*analysis->source).traces.at(index));
     const auto format = request.has_param("format") ? request.get_param_value("format") : "xes";
     response.set_header("X-Minera-Case-Count", std::to_string(selected.trace_count()));
     response.set_header("X-Minera-Event-Count", std::to_string(selected.event_count()));
@@ -4695,8 +4826,15 @@ void handle_clustering_export(const httplib::Request& request,
       minera::XesExportOptions options; options.preserve_nulls = true;
       response.set_content(minera::serialize_xes(selected, options), "application/xml");
     } else if (format == "json") {
-      minera::LogConversionOptions options; options.variant = minera::LogConversionVariant::kToDataFrame;
-      response.set_content(minera::log_conversion_json(minera::convert_event_log(selected, options)), "application/json");
+      std::vector<std::size_t> event_indices;
+      std::size_t ordinal = 0;
+      for (std::size_t trace_index = 0; trace_index < require_prepared_log(*analysis->source).traces.size(); ++trace_index) {
+        const auto& trace = require_prepared_log(*analysis->source).traces[trace_index];
+        const bool included = std::binary_search(indices.begin(), indices.end(), trace_index);
+        for (std::size_t event_index = 0; event_index < trace.events.size(); ++event_index, ++ordinal)
+          if (included) event_indices.push_back(ordinal);
+      }
+      response.set_content(active_source_table_json_from_log_indices(*analysis->source,event_indices,true), "application/json");
     } else throw std::invalid_argument("clustering export format must be xes or json");
   } catch (const std::exception& error) {
     response.status = 400; response.set_content(error_json(error.what()), "application/json");
@@ -4714,12 +4852,12 @@ void handle_clustering(const httplib::Request& request, httplib::Response& respo
     const auto present=[&](std::string_view n){return request.has_param(std::string(n));};
     const bool include_cases = clustering_cases_requested(request, *session);
     const auto o=minera::parse_clustering_params(lookup,present);
-    const auto result = minera::discover_trace_attribute_clustering(session->log,o);
+    const auto result = minera::discover_trace_attribute_clustering(require_prepared_log(*session),o);
     auto body = minera::trace_attribute_clustering_json(result);
     if (include_cases) {
       auto analysis = std::make_shared<ClusteringAnalysis>();
       analysis->source = session; analysis->hierarchy = result;
-      analysis->groups = minera::trace_attribute_clustering_groups(session->log, o.trace_attribute);
+      analysis->groups = minera::trace_attribute_clustering_groups(require_prepared_log(*session), o.trace_attribute);
       body = clustering_analysis_json(std::move(analysis), std::move(body));
     }
     response.set_content(body,"application/json");
@@ -4766,7 +4904,7 @@ void handle_profile_clustering(const httplib::Request& request,
         options.max_features > kServerProfileMaxFeatures) {
       throw std::invalid_argument("profile clustering safety bound exceeded");
     }
-    const auto result = minera::discover_profile_clustering(session->log, options);
+    const auto result = minera::discover_profile_clustering(require_prepared_log(*session), options);
     auto body = minera::profile_clustering_json(result);
     if (include_cases) {
       auto analysis = std::make_shared<ClusteringAnalysis>();
@@ -4813,7 +4951,7 @@ void handle_chaotic_activities(const httplib::Request& request,
       throw std::invalid_argument("chaotic-activities safety bound exceeded");
     response.set_content(
         minera::chaotic_activities_json(
-            minera::discover_chaotic_activities(session->log, options)),
+            minera::discover_chaotic_activities(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -4853,7 +4991,7 @@ void handle_passed_time(const httplib::Request& request,
     const auto options = minera::parse_passed_time_params(lookup, present);
     response.set_content(
         minera::passed_time_json(
-            minera::discover_passed_time(session->log, options)),
+            minera::discover_passed_time(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -4892,7 +5030,7 @@ void handle_service_time(const httplib::Request& request,
     const auto options = minera::parse_service_time_params(lookup, present);
     response.set_content(
         minera::service_time_json(
-            minera::discover_service_time(session->log, options)),
+            minera::discover_service_time(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -4928,7 +5066,7 @@ void handle_rework(const httplib::Request& request,
     };
     const auto options = minera::parse_rework_params(lookup, present);
     response.set_content(
-        minera::rework_json(minera::discover_rework(session->log, options)),
+        minera::rework_json(minera::discover_rework(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -4965,7 +5103,7 @@ void handle_cycle_time(const httplib::Request& request,
     const auto options = minera::parse_cycle_time_params(lookup, present);
     response.set_content(
         minera::cycle_time_json(
-            minera::discover_cycle_time(session->log, options)),
+            minera::discover_cycle_time(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -5003,7 +5141,7 @@ void handle_case_arrival(const httplib::Request& request,
     const auto options = minera::parse_case_arrival_params(lookup, present);
     response.set_content(
         minera::case_arrival_json(
-            minera::discover_case_arrival(session->log, options)),
+            minera::discover_case_arrival(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -5045,7 +5183,7 @@ void handle_case_statistics(const httplib::Request& request,
     const auto options = minera::parse_case_statistics_params(lookup, present);
     response.set_content(
         minera::case_statistics_json(
-            minera::discover_case_statistics(session->log, options)),
+            minera::discover_case_statistics(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -5085,7 +5223,7 @@ void handle_attribute_statistics(const httplib::Request& request,
         minera::parse_attribute_statistics_params(lookup, present);
     response.set_content(
         minera::attribute_statistics_json(
-            minera::discover_attribute_statistics(session->log, options)),
+            minera::discover_attribute_statistics(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -5125,7 +5263,7 @@ void handle_attribute_distribution(const httplib::Request& request,
         minera::parse_attribute_distribution_params(lookup, present);
     response.set_content(
         minera::attribute_distribution_json(
-            minera::discover_event_distribution(session->log, options)),
+            minera::discover_event_distribution(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -5168,7 +5306,7 @@ void handle_attribute_kde(const httplib::Request& request,
     }
     response.set_content(
         minera::attribute_kde_json(
-            minera::discover_attribute_kde(session->log, options)),
+            minera::discover_attribute_kde(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -5207,7 +5345,7 @@ void handle_boundary_activities(const httplib::Request& request,
         minera::parse_boundary_activities_params(lookup, present);
     response.set_content(
         minera::boundary_activities_json(
-            minera::discover_boundary_activities(session->log, options)),
+            minera::discover_boundary_activities(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -5246,7 +5384,7 @@ void handle_variant_statistics(const httplib::Request& request,
         minera::parse_variant_statistics_params(lookup, present);
     response.set_content(
         minera::variant_statistics_json(
-            minera::discover_variant_statistics(session->log, options)),
+            minera::discover_variant_statistics(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -5322,7 +5460,7 @@ void handle_trace_variant_query(const httplib::Request& request,
       throw std::invalid_argument("tvq_max_output_traces exceeds the server safety cap");
     if (options.max_output_variants > kServerTvqMaxOutputVariants)
       throw std::invalid_argument("tvq_max_output_variants exceeds the server safety cap");
-    const auto result = minera::anonymize_trace_variant_query(session->log, options);
+    const auto result = minera::anonymize_trace_variant_query(require_prepared_log(*session), options);
     auto body = minera::trace_variant_query_json(result);
     if (release) body = anonymization_release_json(std::move(body), result.log, *session);
     response.set_content(body, "application/json");
@@ -5388,7 +5526,7 @@ void handle_pripel(const httplib::Request& request,
     const auto options = minera::parse_pripel_params(lookup, present);
     if (options.max_output_traces > kServerPripelMaxOutputTraces)
       throw std::invalid_argument("pripel_max_output_traces exceeds the server safety cap");
-    const auto result = minera::anonymize_pripel(session->log, query, options);
+    const auto result = minera::anonymize_pripel(require_prepared_log(*session), query, options);
     auto body = minera::pripel_json(result);
     if (release) body = anonymization_release_json(std::move(body), result.log, *session);
     response.set_content(body, "application/json");
@@ -5457,25 +5595,26 @@ void handle_token_replay_workbench(const httplib::Request& request,
     const auto adapter = minera::parse_token_replay_input_adapter(lookup, present);
     const auto& file = request.get_file_value("log");
     const auto& model_file = request.get_file_value("model");
-    const bool is_xes = looks_like_xes(file.filename, file.content);
-    std::istringstream input(file.content);
-    minera::EventLog source_log;
+    auto source_params = params;
+    const auto owned_source = prepare_active_event_source(request, file.content, file.filename, source_params);
+    const bool typed_source = owned_source.file().format == "table";
+    const bool is_xes = owned_source.file().format == "xes";
+    const auto source_log = owned_source.checked_log();
     std::optional<minera::EventTable> source_table;
-    if (is_xes) source_log = minera::import_xes_event_log(input, params.xes);
-    else {
-      auto imported = minera::import_csv_event_data(input, params.csv);
-      source_log = std::move(imported.log);
-      source_table = std::move(imported.table);
-    }
+    if (!is_xes) source_table = owned_source.checked_table();
     auto import_options = minera::tools::pnml_model_import_options();
     import_options.import_stochastic_map = false;
     const auto document = minera::parse_pnml_document(model_file.content, import_options);
     auto options = minera::tools::default_replay_input_options(
         source_log, minera::tools::pnml_replay_options(document, params.token_replay),
         params.token_replay_activity_attribute_supplied);
+    if (typed_source || present("mining_selectors_json")) {
+      if (!present("token_replay_activity_attribute")) options.activity_attribute = owned_source.selectors().activity_key;
+      if (!present("token_replay_case_id_attribute")) options.case_id_attribute = owned_source.selectors().case_id_key;
+    }
     // Header-only CSV inputs still declare their imported activity field.
     // With no events, the ordinary default helper has no source cell to inspect.
-    if (source_table && source_log.event_count() == 0 &&
+    if (!typed_source && source_table && source_log.event_count() == 0 &&
         !params.token_replay_activity_attribute_supplied) {
       auto selected = std::find(source_table->columns.begin(), source_table->columns.end(),
                                 params.csv.activity_column);
@@ -5486,7 +5625,7 @@ void handle_token_replay_workbench(const httplib::Request& request,
       }
       if (selected != source_table->columns.end()) options.activity_attribute = *selected;
     }
-    if (!is_xes && !present("token_replay_case_id_attribute"))
+    if (!typed_source && !present("mining_selectors_json") && !is_xes && !present("token_replay_case_id_attribute"))
       options.case_id_attribute = params.csv.case_id_column;
     const bool forward = options.variant == minera::TokenReplayVariant::kForward;
     if (!forward && (options.enable_pltr_fitness || options.return_names ||
@@ -5522,7 +5661,8 @@ void handle_token_replay_workbench(const httplib::Request& request,
     const auto quote = minera::embedding_runtime::detail::escape_json;
     std::string body = "{\"family\":\"TOKEN_REPLAY_WORKFLOW\",\"variant\":" +
         quote(forward ? "forward" : "backwards") + ",\"input_context\":{\"adapter\":" + quote(adapter) +
-        ",\"origin\":" + quote(source_table && adapter != "log" ? "uploaded_csv_rows" : "uploaded_grouped_log") +
+        ",\"origin\":" + quote(typed_source ? "uploaded_typed_table" : source_table && adapter != "log" ? "uploaded_csv_rows" : "uploaded_grouped_log") +
+        ",\"detected_format\":" + quote(owned_source.file().format) +
         ",\"dataset\":" + quote(file.filename) + ",\"model\":" + quote(model_file.filename) +
         ",\"log_bytes\":" + std::to_string(file.content.size()) +
         ",\"model_bytes\":" + std::to_string(model_file.content.size()) +
@@ -5549,8 +5689,11 @@ void handle_token_replay_workbench(const httplib::Request& request,
           ",\"label\":" + (transition.activity ? quote(document.net.activities().at(*transition.activity)) : "null") + '}';
     }
     body += "]},\"full_result\":" + full_result + ",\"diagnostics\":" +
-        minera::token_replay_traces_json(rows, options.variant) + '}';
-    response.set_content(body, "application/json");
+        minera::token_replay_traces_json(rows, options.variant) +
+        ",\"input_before\":" + (source_table ? minera::serialize_event_table_input_json(*source_table) : "null") +
+        ",\"input_after\":" + (source_table ? minera::serialize_event_table_input_json(*source_table) : "null") +
+        ",\"prepared_log\":" + minera::serialize_active_source_log_json(replay_log) + '}';
+    response.set_content(active_source_safe_json(body), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -5579,16 +5722,13 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     const auto adapter = minera::parse_alignment_input_adapter(lookup, present);
     const auto& file = request.get_file_value("log");
     const auto& model_file = request.get_file_value("model");
-    const bool is_xes = looks_like_xes(file.filename, file.content);
-    std::istringstream input(file.content);
-    minera::EventLog source_log;
+    auto source_params = params;
+    const auto owned_source = prepare_active_event_source(request, file.content, file.filename, source_params);
+    const bool typed_source = owned_source.file().format == "table";
+    const bool is_xes = owned_source.file().format == "xes";
+    const auto source_log = owned_source.checked_log();
     std::optional<minera::EventTable> source_table;
-    if (is_xes) source_log = minera::import_xes_event_log(input, params.xes);
-    else {
-      auto imported = minera::import_csv_event_data(input, params.csv);
-      source_log = std::move(imported.log);
-      source_table = std::move(imported.table);
-    }
+    if (!is_xes) source_table = owned_source.checked_table();
     auto import_options = minera::tools::pnml_model_import_options();
     import_options.import_stochastic_map = false;
     const auto document = minera::parse_pnml_document(model_file.content, import_options);
@@ -5611,7 +5751,11 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
         [&](std::string_view name) { const auto key = input_key(name); return !key.empty() && present(key); });
     projection = minera::tools::default_replay_input_options(
         source_log, projection, present("alignment_activity_attribute"));
-    if (source_table && source_log.event_count() == 0 && !present("alignment_activity_attribute")) {
+    if (typed_source || present("mining_selectors_json")) {
+      if (!present("alignment_activity_attribute")) projection.activity_attribute = owned_source.selectors().activity_key;
+      if (!present("alignment_case_id_attribute")) projection.case_id_attribute = owned_source.selectors().case_id_key;
+    }
+    if (!typed_source && source_table && source_log.event_count() == 0 && !present("alignment_activity_attribute")) {
       auto selected = std::find(source_table->columns.begin(), source_table->columns.end(), params.csv.activity_column);
       if (selected == source_table->columns.end()) {
         const auto alias = params.csv.activity_column == "activity" ? "concept:name"
@@ -5620,7 +5764,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
       }
       if (selected != source_table->columns.end()) projection.activity_attribute = *selected;
     }
-    if (!is_xes && !present("alignment_case_id_attribute"))
+    if (!typed_source && !present("mining_selectors_json") && !is_xes && !present("alignment_case_id_attribute"))
       projection.case_id_attribute = params.csv.case_id_column;
     options.activity_attribute = projection.activity_attribute;
     minera::EventLog evaluated;
@@ -5662,7 +5806,8 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     std::ostringstream body;
     body.precision(std::numeric_limits<double>::max_digits10);
     body << "{\"family\":\"PETRI_ALIGNMENT_WORKFLOW\",\"input_context\":{\"adapter\":" << quote(adapter)
-         << ",\"origin\":" << quote(source_table && adapter != "log" ? "uploaded_csv_rows" : "uploaded_grouped_log")
+         << ",\"origin\":" << quote(typed_source ? "uploaded_typed_table" : source_table && adapter != "log" ? "uploaded_csv_rows" : "uploaded_grouped_log")
+         << ",\"detected_format\":" << quote(owned_source.file().format)
          << ",\"dataset\":" << quote(file.filename) << ",\"model\":" << quote(model_file.filename)
          << ",\"log_bytes\":" << file.content.size() << ",\"model_bytes\":" << model_file.content.size()
          << ",\"source_case_count\":" << source_log.trace_count() << ",\"source_event_count\":" << source_log.event_count()
@@ -5738,8 +5883,10 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
       if (match == result.variants.end()) body << "null"; else body << std::distance(result.variants.begin(), match);
       body << '}';
     }
-    body << "]}";
-    response.set_content(body.str(), "application/json");
+    body << "],\"input_before\":" << (source_table ? minera::serialize_event_table_input_json(*source_table) : "null")
+         << ",\"input_after\":" << (source_table ? minera::serialize_event_table_input_json(*source_table) : "null")
+         << ",\"prepared_log\":" << minera::serialize_active_source_log_json(alignment_log) << '}';
+    response.set_content(active_source_safe_json(body.str()), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -5837,6 +5984,9 @@ void handle_check_model(const httplib::Request& request,
                document->net);
 
     auto next_session = std::make_shared<MinedSession>(*session);
+    // A later model import acknowledges the source. A stale cancellation of
+    // its original upload must not roll back this subsequent model edit.
+    next_session->mining_request_id.clear();
     for (const auto& activity : imported.activities()) {
       next_session->graph.ensure_activity(activity);
     }
@@ -5854,14 +6004,14 @@ void handle_check_model(const httplib::Request& request,
     std::optional<minera::EventLog> footprint_input;
     if (replay_options.activity_attribute != "activity" &&
         replay_options.activity_attribute != "concept:name") {
-      footprint_input = session->log;
+      footprint_input = require_prepared_log(*session);
       for (auto& trace : footprint_input->traces) for (auto& event : trace.events) {
         const auto* activity = minera::dfg_event_field_value(event, replay_options.activity_attribute);
         if (!activity) throw std::invalid_argument("missing model activity field: " + replay_options.activity_attribute);
         event.activity = *activity;
       }
     }
-    const auto& footprint_log = footprint_input ? *footprint_input : session->log;
+    const auto& footprint_log = footprint_input ? *footprint_input : require_prepared_log(*session);
     const auto gated = minera::tools::pnml_conformance_gate(
         imported, document ? &*document : nullptr);
     const minera::ModelConformance conformance = gated ? *gated : minera::ModelConformance{
@@ -5869,7 +6019,7 @@ void handle_check_model(const httplib::Request& request,
             ? minera::final_marking_reachable(imported,
                   replay_options.initial_marking, replay_options.final_marking)
             : minera::final_marking_reachable(imported),
-        minera::check_conformance(session->log, imported, replay_options),
+        minera::check_conformance(require_prepared_log(*session), imported, replay_options),
         document ? minera::check_footprints(footprint_log, imported,
                                              replay_options.initial_marking)
                  : minera::check_footprints(footprint_log, imported),
@@ -5941,7 +6091,7 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     }
     if (miner == "powl") {
       projected_powl_log = project_powl_activity(
-          session->log, options.activity_attribute,
+          require_prepared_log(*session), options.activity_attribute,
           session->powl_timestamp_key, session->powl_case_id_key);
       alignment_log = &*projected_powl_log;
     }
@@ -6035,7 +6185,7 @@ void handle_concept_drift(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const auto options = minera::parse_concept_drift_params(lookup, present);
-    const auto result = minera::detect_concept_drift(session->log, options);
+    const auto result = minera::detect_concept_drift(require_prepared_log(*session), options);
     response.set_content(minera::concept_drift_json(result), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -6209,9 +6359,9 @@ std::string transformation_json(const MinedSession& session,
   const auto quote = minera::embedding_runtime::detail::escape_json;
   std::string body = "{\"family\":\"LOG_TRANSFORMATION\",\"source_id\":" +
       quote(std::to_string(session.query_source_id)) + ",\"cases\":[";
-  for (std::size_t i = 0; i < session.log.traces.size(); ++i) {
+  for (std::size_t i = 0; i < require_prepared_log(session).traces.size(); ++i) {
     if (i) body += ',';
-    const auto& trace = session.log.traces[i];
+    const auto& trace = require_prepared_log(session).traces[i];
     body += "{\"index\":" + std::to_string(i) + ",\"case_id\":" + quote(trace.case_id) +
         ",\"event_count\":" + std::to_string(trace.events.size()) + '}';
   }
@@ -6236,7 +6386,7 @@ std::string transformation_json(const MinedSession& session,
     for (std::size_t i = 0; i < split->log.traces.size(); ++i) {
       for (std::size_t j = 0; j < split->log.traces[i].events.size(); ++j) {
         if (!first) body += ','; first = false;
-        const auto& before = session.log.traces[i].events[j];
+        const auto& before = require_prepared_log(session).traces[i].events[j];
         const auto& after = split->log.traces[i].events[j];
         const auto output = value(after, options->target_key);
         complete = complete && !output.empty();
@@ -6289,7 +6439,7 @@ void handle_log_to_target(const httplib::Request& request,
     const auto options = minera::parse_log_to_target_params(lookup, present);
     if (include_source && options.pad_size > 100000)
       throw std::invalid_argument("target padding exceeds the workflow limit of 100000 rows per case");
-    const auto result = minera::log_to_target(session->log, options);
+    const auto result = minera::log_to_target(require_prepared_log(*session), options);
     auto body = minera::log_to_target_json(result);
     if (include_source) body = transformation_json(*session, std::move(body));
     response.set_content(body, "application/json");
@@ -6347,7 +6497,7 @@ void handle_log_to_features(const httplib::Request& request,
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
     const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_log_to_features_params(lookup, present);
-    auto body = minera::log_to_features_json(minera::log_to_features(session->log, options));
+    auto body = minera::log_to_features_json(minera::log_to_features(require_prepared_log(*session), options));
     if (include_source) body = transformation_json(*session, std::move(body));
     response.set_content(body, "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
@@ -6443,18 +6593,18 @@ void handle_log_util(const httplib::Request& request,
       }
       if (request.has_param("seed")) options.seed = parse_size("seed", std::numeric_limits<std::size_t>::max());
       const auto result = minera::split_log_train_test(
-          session->log, options.train_percentage, options.seed);
+          require_prepared_log(*session), options.train_percentage, options.seed);
       publish(minera::log_train_test_json(result), {{"training", "Training log", &result.training},
                                                   {"testing", "Testing log", &result.testing}});
     } else if (variant_text == "fixed_prefixes") {
       options.variant = minera::LogUtilityVariant::kFixedPrefixes;
       options.prefix_length = parse_size("prefix_length", 100000);
-      const auto result = minera::get_log_prefixes(session->log, options.prefix_length);
+      const auto result = minera::get_log_prefixes(require_prepared_log(*session), options.prefix_length);
       publish(minera::log_prefix_json(result, options.variant), {{"log", "Fixed prefixes", &result}});
     } else if (variant_text == "all_prefixes") {
-      if (session->log.event_count() > 50000)
+      if (require_prepared_log(*session).event_count() > 50000)
         throw std::invalid_argument("all_prefixes input exceeds the safety limit");
-      const auto result = minera::get_log_with_prefixes(session->log);
+      const auto result = minera::get_log_with_prefixes(require_prepared_log(*session));
       if (result.log.traces.size() > 100000)
         throw std::invalid_argument("all_prefixes output exceeds the safety limit");
       publish(minera::log_prefix_json(result.log, minera::LogUtilityVariant::kAllPrefixes,
@@ -6469,7 +6619,7 @@ void handle_log_util(const httplib::Request& request,
                                   ? value("timestamp_key")
                                   : "timestamp";
       const auto result = minera::get_log_traces_until_activity(
-          session->log, options.activity, options);
+          require_prepared_log(*session), options.activity, options);
       publish(minera::log_until_activity_json(result), {{"log", "Cases before activity", &result.log}});
     } else if (variant_text == "to_activities") {
       if (!request.has_param("activities"))
@@ -6482,7 +6632,7 @@ void handle_log_util(const httplib::Request& request,
                                   ? value("timestamp_key")
                                   : "timestamp";
       const auto result = minera::get_log_traces_to_activities(
-          session->log, split_escaped(value("activities"), "activities"), options);
+          require_prepared_log(*session), split_escaped(value("activities"), "activities"), options);
       std::vector<PreparationLogView> outputs;
       for (std::size_t i = 0; i < result.logs.size(); ++i)
         outputs.push_back({"target/" + std::to_string(i), result.activities[i], &result.logs[i]});
@@ -6512,7 +6662,7 @@ void handle_log_util(const httplib::Request& request,
         feature_options.mandatory_attributes =
             split_escaped(value("feature_mandatory_attributes"),
                           "feature_mandatory_attributes");
-      publish(minera::log_feature_selection_json(minera::select_log_features(session->log,
+      publish(minera::log_feature_selection_json(minera::select_log_features(require_prepared_log(*session),
                                                                             feature_options)));
     } else {
       throw std::invalid_argument(
@@ -6560,7 +6710,7 @@ void handle_embeddings(const httplib::Request& request,
              (g_embedding_runtime_enabled && name == "embedding_provider");
     };
     const auto options = minera::parse_embedding_params(lookup, present);
-    const auto result = minera::to_embeddings(session->log, options);
+    const auto result = minera::to_embeddings(require_prepared_log(*session), options);
     if (request.has_param("embedding_target")) {
       const auto target = request.get_param_value("embedding_target");
       if (target.empty())
@@ -6603,7 +6753,7 @@ void handle_label_splitting(const httplib::Request& request,
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
     const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_label_splitting_params(lookup, present);
-    const auto result = minera::split_activity_labels(session->log, options);
+    const auto result = minera::split_activity_labels(require_prepared_log(*session), options);
     auto body = minera::label_splitting_json(result);
     if (include_source) body = transformation_json(*session, std::move(body), &result, &options);
     response.set_content(body, "application/json");
@@ -6618,9 +6768,9 @@ std::string structural_json(const MinedSession& session, std::string result,
   std::string body = "{\"family\":\"STRUCTURAL_TRANSFORMATION\",\"source_id\":" +
       quote(std::to_string(session.query_source_id)) + ",\"activity_key\":" +
       quote(activity_key) + ",\"result\":" + result + ",\"cases\":[";
-  for (std::size_t i = 0; i < session.log.traces.size(); ++i) {
+  for (std::size_t i = 0; i < require_prepared_log(session).traces.size(); ++i) {
     if (i) body += ',';
-    const auto& trace = session.log.traces[i];
+    const auto& trace = require_prepared_log(session).traces[i];
     body += "{\"index\":" + std::to_string(i) + ",\"case_id\":" + quote(trace.case_id) +
         ",\"event_count\":" + std::to_string(trace.events.size()) + '}';
   }
@@ -6662,7 +6812,7 @@ void handle_trie(const httplib::Request& request,
     };
     const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_trie_params(lookup, present);
-    const auto trie = minera::discover_trie(session->log, options);
+    const auto trie = minera::discover_trie(require_prepared_log(*session), options);
     auto body = minera::trie_json(trie);
     if (include_source) body = structural_json(*session, std::move(body), options.activity_key);
     response.set_content(body, "application/json");
@@ -6703,7 +6853,7 @@ void handle_trie_to_petri(const httplib::Request& request,
     };
     const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_trie_params(lookup, present);
-    const auto trie = minera::discover_trie(session->log, options);
+    const auto trie = minera::discover_trie(require_prepared_log(*session), options);
     const auto net = minera::convert_trie_to_petri_net(trie);
     auto body = minera::serialize_trie_petri_net_json(net);
     if (include_source) body = structural_json(*session, std::move(body), options.activity_key, &trie, &net);
@@ -6748,7 +6898,7 @@ void handle_interval_tree(const httplib::Request& request,
     const bool include_source = transformation_source_requested(request, *session);
     const auto options = minera::parse_interval_tree_params(lookup, present);
     const auto intervals =
-        minera::discover_open_path_intervals(session->log, options);
+        minera::discover_open_path_intervals(require_prepared_log(*session), options);
     const auto query = minera::query_open_path_intervals(
         intervals, minera::interval_tree_query_options(options));
     auto body = minera::interval_tree_json(query);
@@ -7274,7 +7424,7 @@ void handle_compare_petri(const httplib::Request& request,
         &cached_model_log(*session, miner);
     if (miner == "powl") {
       projected_powl_log = project_powl_activity(
-          session->log, comparison_options.activity_attribute,
+          require_prepared_log(*session), comparison_options.activity_attribute,
           session->powl_timestamp_key, session->powl_case_id_key);
       comparison_log = &*projected_powl_log;
       reference = project_powl_activity(
@@ -7351,11 +7501,12 @@ void handle_evaluate(const httplib::Request& request,
     const auto* evaluation_document = miner == "imported" && session->imported_document && !converted
         ? &*session->imported_document : nullptr;
     std::optional<minera::EventLog> projected_powl_log;
-    const minera::EventLog* evaluation_log =
-        &cached_model_log(*session, miner);
-    if (miner == "powl") {
+    const bool model_only = params.family == minera::EvaluationFamily::kSimplicity;
+    const minera::EventLog* evaluation_log = nullptr;
+    if (!model_only && adapter == "log") evaluation_log = &cached_model_log(*session, miner);
+    if (!model_only && adapter == "log" && miner == "powl") {
       projected_powl_log = project_powl_activity(
-          session->log, session->powl_activity_key,
+          require_prepared_log(*session), session->powl_activity_key,
           session->powl_timestamp_key, session->powl_case_id_key);
       evaluation_log = &*projected_powl_log;
     }
@@ -7366,12 +7517,39 @@ void handle_evaluate(const httplib::Request& request,
         : miner == "powl" ? std::string_view(session->powl_activity_key)
         : miner == "imported" ? std::string_view(session->imported_activity_attribute)
         : std::string_view("concept:name");
+    std::optional<minera::EventLog> evaluation_input;
+    if (!model_only && adapter == "log") {
     params = minera::tools::default_evaluation_input_params(
         *evaluation_log, std::move(params),
         request.has_param("evaluation_activity_attribute"), model_activity);
-    const auto evaluation_input = minera::tools::evaluation_input_log(
+    evaluation_input = minera::tools::evaluation_input_log(
         *evaluation_log, params.replay_fitness_options.activity_attribute);
     if (evaluation_input) evaluation_log = &*evaluation_input;
+    }
+    if (!model_only && adapter != "log") {
+      overlay_cached_source_selectors(request, *session, params, true);
+      if (!request.has_param("evaluation_activity_attribute") && session->active_source) {
+        const auto& source = *session->active_source;
+        const bool original_flat_mining = source.selected_kind() != minera::EventDataKind::kEventLog;
+        const auto activity = original_flat_mining || (model_activity != "concept:name" && model_activity != "activity")
+            ? std::string(model_activity) : source.selectors().activity_key;
+        params.replay_fitness_options.activity_attribute = activity;
+        params.precision_options.activity_attribute = activity;
+        params.generalization_options.activity_attribute = activity;
+        params.composite_options.activity_attribute = activity;
+      }
+      if (!request.has_param("evaluation_case_id_attribute") && session->active_source &&
+          session->active_source->selected_kind() != minera::EventDataKind::kEventLog) {
+        const auto& case_id = miner == "alpha" ? session->alpha_case_id_attribute :
+            miner == "heuristic" ? session->heuristic_case_id_attribute :
+            miner == "inductive" ? session->inductive_options.case_id_key :
+            miner == "powl" ? session->powl_case_id_key : session->active_source->selectors().case_id_key;
+        params.replay_fitness_options.case_id_attribute = case_id;
+        params.precision_options.case_id_attribute = case_id;
+        params.generalization_options.case_id_attribute = case_id;
+        params.composite_options.case_id_attribute = case_id;
+      }
+    }
     minera::ModelEvaluation result;
     result.miner = miner;
     const auto evaluate_input = [&](const auto& input) {
@@ -7425,29 +7603,24 @@ void handle_evaluate(const httplib::Request& request,
         break;
     }
     };
-    std::optional<minera::ConvertedEventStream> stream;
-    std::optional<minera::LogConversionTable> table;
-    std::optional<minera::LazyEventTable> lazy;
-    if (adapter == "log" || params.family == minera::EvaluationFamily::kSimplicity) {
+    if (model_only) {
+      result.simplicity = evaluation_document
+          ? minera::evaluate_simplicity(*evaluation_document,params.simplicity_variant,params.simplicity_options)
+          : minera::evaluate_simplicity(selected,params.simplicity_variant,params.simplicity_options);
+    } else if (adapter == "log") {
       evaluate_input(*evaluation_log);
-    } else if (adapter == "stream") {
-      stream = minera::event_log_to_event_stream(*evaluation_log);
-      evaluate_input(minera::EventDataView(*stream));
-    } else if (adapter == "dataframe") {
-      table = minera::event_log_to_table(*evaluation_log);
-      evaluate_input(minera::EventDataView(*table));
     } else {
-      lazy = minera::event_log_to_lazy_table(*evaluation_log);
-      evaluate_input(minera::EventDataView(*lazy));
+      const auto kind = adapter == "stream" ? minera::EventDataKind::kEventStream :
+          adapter == "dataframe" ? minera::EventDataKind::kEventTable : minera::EventDataKind::kLazyEventTable;
+      evaluate_input(cached_source_view(*session,kind));
     }
     const auto quote = minera::embedding_runtime::detail::escape_json;
-    const bool model_only = params.family == minera::EvaluationFamily::kSimplicity;
-    auto body = minera::model_evaluation_json(result, &session->graph);
+    auto body = minera::model_evaluation_json(result, session->graph_ready ? &session->graph : nullptr);
     body.pop_back();
     body += ",\"input_context\":{\"adapter\":" + quote(model_only ? "model_only" : adapter) +
       ",\"origin\":" + quote(model_only ? "model_only" : "cached_model_log") +
       ",\"source_id\":" + quote(std::to_string(session->query_source_id)) + ",\"dataset\":" + quote(session->dataset) +
-      ",\"case_count\":" + std::to_string(evaluation_log->trace_count()) + ",\"event_count\":" + std::to_string(evaluation_log->event_count()) +
+      ",\"case_count\":" + (evaluation_log ? std::to_string(evaluation_log->trace_count()) : std::string("null")) + ",\"event_count\":" + (evaluation_log ? std::to_string(evaluation_log->event_count()) : std::string("null")) +
       ",\"activity_attribute\":" + quote(model_only ? "" : params.replay_fitness_options.activity_attribute) +
       ",\"case_id_attribute\":" + quote(model_only ? "" : params.replay_fitness_options.case_id_attribute) + "}}";
     response.set_content(body, "application/json");
@@ -7503,7 +7676,7 @@ void handle_petri_analysis(const httplib::Request& request,
             &cached_model_log(*session, params.miner);
         if (params.miner == "powl") {
           projected_powl_log = project_powl_activity(
-              session->log, session->powl_activity_key,
+              require_prepared_log(*session), session->powl_activity_key,
               session->powl_timestamp_key, session->powl_case_id_key);
           analysis_log = &*projected_powl_log;
         }
@@ -7616,7 +7789,7 @@ void handle_evaluate_emd(const httplib::Request& request,
             ? minera::import_xes_event_log(input)
             : minera::import_csv_event_log(input);
     const auto result = minera::evaluate_emd(
-        minera::derive_stochastic_language(session->log),
+        minera::derive_stochastic_language(require_prepared_log(*session)),
         minera::derive_stochastic_language(reference), options);
     response.set_content(minera::emd_json(result), "application/json");
   } catch (const std::exception& error) {
@@ -7666,8 +7839,8 @@ void handle_align_process_tree(const httplib::Request& request,
       return request.has_param(key) || request.has_file(key);
     };
     const auto options = minera::parse_process_tree_alignment_params(lookup, present);
-    const auto result = minera::align_process_tree(session->inductive_log,
-                                                   session->tree,
+    const auto result = minera::align_process_tree(cached_model_log(*session,"inductive"),
+                                                   require_process_tree(*session),
                                                    options);
     response.set_content(minera::process_tree_alignment_json(result),
                          "application/json");
@@ -7697,7 +7870,7 @@ void handle_align_decomposed(const httplib::Request& request, httplib::Response&
         throw std::invalid_argument(
             "unknown decomposed alignment parameter: " + key);
     }
-    const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_decomposed_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(session->log,o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
+    const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_decomposed_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
   catch(const std::exception& e){response.status=400; response.set_content(error_json(e.what()),"application/json");}
 }
 
@@ -7705,20 +7878,20 @@ void handle_align_petri_anti(const httplib::Request& request, httplib::Response&
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
   const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
-  try { static const std::set<std::string> allowed = {"miner", "variant", "exponent", "epsilon", "marking_limit", "max_states", "initial_marking", "final_marking", "activity_attribute"}; for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown Petri anti-alignment parameter: " + key); } const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_petri_anti_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(session->log,o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::anti_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_anti_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { static const std::set<std::string> allowed = {"miner", "variant", "exponent", "epsilon", "marking_limit", "max_states", "initial_marking", "final_marking", "activity_attribute"}; for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown Petri anti-alignment parameter: " + key); } const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_petri_anti_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::anti_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_anti_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_align_petri_multi(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
   const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
-  try { static const std::set<std::string> allowed = {"miner", "variant", "exponent", "marking_limit", "max_states", "initial_marking", "final_marking", "activity_attribute"}; for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown Petri multi-alignment parameter: " + key); } const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_petri_multi_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(session->log,o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::multi_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_multi_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { static const std::set<std::string> allowed = {"miner", "variant", "exponent", "marking_limit", "max_states", "initial_marking", "final_marking", "activity_attribute"}; for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown Petri multi-alignment parameter: " + key); } const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_petri_multi_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::multi_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_multi_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_reduce_process_tree(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
-  try { if(!request.has_param("trace_index")) throw std::invalid_argument("trace_index: expected a non-negative integer"); const auto text=request.get_param_value("trace_index"); std::size_t idx=0; const auto r=std::from_chars(text.data(),text.data()+text.size(),idx); if(r.ec!=std::errc{}||r.ptr!=text.data()+text.size()||idx>=session->inductive_log.traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_process_tree_reduction_params(lookup,present); const auto reduced=minera::reduce_process_tree(session->tree,session->inductive_log.traces[idx],o); response.set_content(minera::process_tree_reduction_json(reduced,session->graph,idx),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { if(!request.has_param("trace_index")) throw std::invalid_argument("trace_index: expected a non-negative integer"); const auto text=request.get_param_value("trace_index"); std::size_t idx=0; const auto r=std::from_chars(text.data(),text.data()+text.size(),idx); if(r.ec!=std::errc{}||r.ptr!=text.data()+text.size()||idx>=cached_model_log(*session,"inductive").traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_process_tree_reduction_params(lookup,present); const auto reduced=minera::reduce_process_tree(require_process_tree(*session),cached_model_log(*session,"inductive").traces[idx],o); response.set_content(minera::process_tree_reduction_json(reduced,session->graph,idx),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_alpha_plus_result(const httplib::Request& request, httplib::Response& response) {
@@ -7744,7 +7917,8 @@ void handle_alpha_plus_result(const httplib::Request& request, httplib::Response
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name)) || request.has_file(std::string(name));
     };
-    const auto options = minera::parse_mine_params(lookup, present).alpha;
+    auto params = minera::parse_mine_params(lookup, present);
+    auto options = params.alpha;
     minera::EventLog log;
     if (request.has_file("log") || (!request.is_multipart_form_data() && !request.body.empty())) {
       const auto body = request.has_file("log") ? request.get_file_value("log").content : request.body;
@@ -7760,7 +7934,10 @@ void handle_alpha_plus_result(const httplib::Request& request, httplib::Response
         response.set_content(error_json("no mined log; upload a log or mine one first"), "application/json");
         return;
       }
-      log = session->log;
+      overlay_cached_source_selectors(request,*session,params);
+      options = params.alpha;
+      response.set_content(minera::alpha_plus_result_json(minera::discover_alpha_plus_result(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)),options)),"application/json");
+      return;
     }
     response.set_content(minera::alpha_plus_result_json(
         minera::discover_alpha_plus_result(log, options)), "application/json");
@@ -7794,11 +7971,11 @@ void handle_align_dfg(const httplib::Request& request, httplib::Response& respon
     auto options = minera::parse_dfg_alignment_params(lookup, present);
     const auto projection = present("projection") ? lookup("projection") : std::string("none");
     if (projection != "none" && projection != "log" && projection != "metrics") throw std::invalid_argument("projection expects none, log, or metrics");
-    minera::DfgStatisticalOptions dopt; dopt.window = 1; dopt.activity_attribute = options.activity_attribute; dopt.timestamp_attribute = options.timestamp_attribute; const auto dfg = minera::discover_frequency_dfg(session->log, dopt);
-    std::map<std::string,std::uint64_t> starts, ends; for (const auto& t:session->log.traces) if(!t.events.empty()){ const auto* first = minera::dfg_event_field_value(t.events.front(), options.activity_attribute); const auto* last = minera::dfg_event_field_value(t.events.back(), options.activity_attribute); if (!first || !last) throw std::invalid_argument("DFG alignment: event is missing activity attribute '" + options.activity_attribute + "'"); ++starts[*first];++ends[*last]; }
-    const auto result = minera::align_log_on_dfg(session->log, dfg, starts, ends, options);
-    if (projection == "log") { const auto projected = minera::project_log_on_dfg(session->log, dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(result, nullptr, &projected), "application/json"); }
-    else if (projection == "metrics") { const auto metrics = minera::project_alignments_on_dfg(session->log, dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(result, &metrics), "application/json"); }
+    minera::DfgStatisticalOptions dopt; dopt.window = 1; dopt.activity_attribute = options.activity_attribute; dopt.timestamp_attribute = options.timestamp_attribute; const auto dfg = minera::discover_frequency_dfg(require_prepared_log(*session), dopt);
+    std::map<std::string,std::uint64_t> starts, ends; for (const auto& t:require_prepared_log(*session).traces) if(!t.events.empty()){ const auto* first = minera::dfg_event_field_value(t.events.front(), options.activity_attribute); const auto* last = minera::dfg_event_field_value(t.events.back(), options.activity_attribute); if (!first || !last) throw std::invalid_argument("DFG alignment: event is missing activity attribute '" + options.activity_attribute + "'"); ++starts[*first];++ends[*last]; }
+    const auto result = minera::align_log_on_dfg(require_prepared_log(*session), dfg, starts, ends, options);
+    if (projection == "log") { const auto projected = minera::project_log_on_dfg(require_prepared_log(*session), dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(result, nullptr, &projected), "application/json"); }
+    else if (projection == "metrics") { const auto metrics = minera::project_alignments_on_dfg(require_prepared_log(*session), dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(result, &metrics), "application/json"); }
     else response.set_content(minera::dfg_alignment_json(result), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
@@ -7823,12 +8000,22 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
     const auto reference = minera::looks_like_xes(file.filename, file.content) ? minera::import_xes_event_log(input) : minera::import_csv_event_log(input);
     const auto lookup = [&](std::string_view n) { const auto key=std::string(n); if (request.has_param(key)) return request.get_param_value(key); if (request.has_file(key)) return request.get_file_value(key).content; return std::string{}; };
     const auto present = [&](std::string_view n) { const auto key=std::string(n); return request.has_param(key) || request.has_file(key); };
-    const auto options = minera::parse_edit_distance_params(lookup, present);
+    auto options = minera::parse_edit_distance_params(lookup, present);
+    if (cached_source_uses_bound_defaults(*session)) {
+      const auto& selectors = session->active_source->selectors();
+      if (!present("edit_activity_attribute")) options.activity_attribute = selectors.activity_key;
+      if (!present("edit_timestamp_attribute")) options.timestamp_attribute = selectors.timestamp_key;
+      options.case_id_attribute = selectors.case_id_key;
+    }
     const auto projection = present("projection") ? lookup("projection") : std::string("none");
     if (projection != "none" && projection != "log") throw std::invalid_argument("projection expects none or log");
     const auto result =
-        minera::align_typed_edit_distance(session->log, reference, options);
-    if (projection == "log") { const auto projected = minera::project_log_on_typed_alignments(session->log, result, options); response.set_content(minera::typed_edit_distance_json(result, options.perform_anti_alignment, &projected), "application/json"); }
+        minera::align_typed_edit_distance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), minera::EventDataView(reference), options);
+    if (projection == "log") { const auto projected = [&]() {
+      minera::LogConversionOptions conversion; conversion.case_id_key = options.case_id_attribute;
+      const auto projection_source = minera::event_data_to_event_log(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), conversion);
+      return minera::project_log_on_typed_alignments(projection_source,result,options);
+    }(); response.set_content(minera::typed_edit_distance_json(result, options.perform_anti_alignment, &projected), "application/json"); }
     else response.set_content(minera::typed_edit_distance_json(result, options.perform_anti_alignment), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
@@ -7921,7 +8108,7 @@ void handle_decide(const httplib::Request& request,
         &cached_model_log(*session, miner);
     if (miner == "powl") {
       projected_powl_log = project_powl_activity(
-          session->log, options.activity_attribute,
+          require_prepared_log(*session), options.activity_attribute,
           session->powl_timestamp_key, session->powl_case_id_key);
       decision_log = &*projected_powl_log;
     }
@@ -7999,7 +8186,7 @@ void handle_process_tree_petri(const httplib::Request& request,
                                         : std::string{};
     const auto variant =
         minera::parse_process_tree_petri_net_variant(value);
-    const auto net = minera::to_petri_net(session->tree, variant);
+    const auto net = minera::to_petri_net(require_process_tree(*session), variant);
     response.set_content(
         minera::serialize_process_tree_petri_net_json(net, variant),
         "application/json");
@@ -8034,7 +8221,7 @@ void handle_ptml(const httplib::Request& request,
                          : std::string("inductive");
   try {
     if (miner == "inductive") {
-      response.set_content(minera::to_ptml(session->tree, session->dataset),
+      response.set_content(minera::to_ptml(require_process_tree(*session), session->dataset),
                            "application/xml");
       return;
     }
@@ -8074,7 +8261,7 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
   try {
     if (miner == "inductive" &&
         !request.has_param("process_tree_variant")) {
-      response.set_content(minera::to_bpmn(session->tree, "process"),
+      response.set_content(minera::to_bpmn(require_process_tree(*session), "process"),
                            "application/xml");
       return;
     }
@@ -8151,8 +8338,8 @@ std::string simulation_workspace_json(const minera::MonteCarloResult& result,
   return "{\"family\":\"SIMULATION_WORKSPACE\",\"source_id\":" +
       quote(std::to_string(session.query_source_id)) + ",\"dataset\":" +
       quote(session.dataset) + ",\"miner\":" + quote(miner) +
-      ",\"source\":{\"case_count\":" + std::to_string(session.log.trace_count()) +
-      ",\"event_count\":" + std::to_string(session.log.event_count()) +
+      ",\"source\":{\"case_count\":" + (session.log_ready ? std::to_string(require_prepared_log(session).trace_count()) : std::string("null")) +
+      ",\"event_count\":" + (session.active_source && session.active_source->checked_table_if_available() ? std::to_string(session.active_source->checked_table().rows.size()) : session.log_ready ? std::to_string(require_prepared_log(session).event_count()) : std::string("null")) +
       "},\"result\":" + minera::monte_carlo_json(result) +
       ",\"simulated_log\":" + minera::log_conversion_json(simulated) +
       ",\"xes\":" + quote(minera::to_xes(result.log, miner + " Monte Carlo playout")) +
@@ -8217,7 +8404,7 @@ void handle_monte_carlo_json(const httplib::Request& request,
       if (!request.has_param("monte_carlo_timestamp_key"))
         options.timestamp_key = session->powl_timestamp_key;
       projected_powl_log = project_powl_activity(
-          session->log, options.activity_key, options.timestamp_key,
+          require_prepared_log(*session), options.activity_key, options.timestamp_key,
           session->powl_case_id_key);
       simulation_log = &*projected_powl_log;
     }
@@ -8246,7 +8433,7 @@ std::string decision_workspace_json(const std::string& result,const minera::Petr
   std::string pnml;
   if(miner=="imported"&&session.imported_document){auto document=*session.imported_document;document.net=net;pnml=minera::to_pnml(document,"decision underlying model");}
   else {const auto markings=minera::default_workflow_markings(net);pnml=minera::to_pnml(net,markings.initial,markings.final,"decision underlying model");}
-  return "{\"family\":\"DECISION_WORKSPACE\",\"source_id\":"+quote(std::to_string(session.query_source_id))+",\"dataset\":"+quote(session.dataset)+",\"miner\":"+quote(miner)+",\"mode\":"+quote(mode)+",\"source\":{\"case_count\":"+std::to_string(session.log.trace_count())+",\"event_count\":"+std::to_string(session.log.event_count())+"},\"result\":"+result+",\"underlying_pnml\":"+quote(pnml)+"}";
+  return "{\"family\":\"DECISION_WORKSPACE\",\"source_id\":"+quote(std::to_string(session.query_source_id))+",\"dataset\":"+quote(session.dataset)+",\"miner\":"+quote(miner)+",\"mode\":"+quote(mode)+",\"source\":{\"case_count\":"+(session.log_ready ? std::to_string(require_prepared_log(session).trace_count()) : std::string("null"))+",\"event_count\":"+(session.active_source && session.active_source->checked_table_if_available() ? std::to_string(session.active_source->checked_table().rows.size()) : session.log_ready ? std::to_string(require_prepared_log(session).event_count()) : std::string("null"))+"},\"result\":"+result+",\"underlying_pnml\":"+quote(pnml)+"}";
 }
 void handle_decision_tables(const httplib::Request& request,
                             httplib::Response& response) {
@@ -8286,7 +8473,7 @@ void handle_decision_tables(const httplib::Request& request,
         &cached_model_log(*session, miner);
     if (miner == "powl") {
       projected_powl_log = project_powl_activity(
-          session->log, mining.activity_attribute,
+          require_prepared_log(*session), mining.activity_attribute,
           session->powl_timestamp_key, session->powl_case_id_key);
       decision_log = &*projected_powl_log;
     }
@@ -8338,7 +8525,7 @@ void handle_data_petri_net(const httplib::Request& request,
         &cached_model_log(*session, miner);
     if (miner == "powl") {
       projected_powl_log = project_powl_activity(
-          session->log, options.decision_options.activity_attribute,
+          require_prepared_log(*session), options.decision_options.activity_attribute,
           session->powl_timestamp_key, session->powl_case_id_key);
       decision_log = &*projected_powl_log;
     }
@@ -8492,7 +8679,7 @@ void handle_stochastic_map(const httplib::Request& request,
           &cached_model_log(*session, miner);
       if (miner == "powl") {
         projected_powl_log = project_powl_activity(
-            session->log, session->powl_activity_key,
+            require_prepared_log(*session), session->powl_activity_key,
             session->powl_timestamp_key, session->powl_case_id_key);
         fit_log = &*projected_powl_log;
       }
@@ -8507,9 +8694,9 @@ void handle_stochastic_map(const httplib::Request& request,
       skipped = report.skipped_traces;
       owned_net = it->second;
     } else {
-      const auto performance = minera::discover_performance_dfg(session->log);
+      const auto performance = minera::discover_performance_dfg(require_prepared_log(*session));
       const auto model = minera::stochastic_map_from_performance_dfg(
-          session->graph, performance, params.performance);
+          require_graph(*session), performance, params.performance);
       map = model.map;
       owned_net = model.net;
       net_json = minera::serialize_dfg_petri_net_json(
@@ -8635,7 +8822,7 @@ void handle_playout(const httplib::Request& request,
         if (!request.has_param("monte_carlo_timestamp_key"))
           options.timestamp_key = session->powl_timestamp_key;
         projected_powl_log = project_powl_activity(
-            session->log, options.activity_key, options.timestamp_key,
+            require_prepared_log(*session), options.activity_key, options.timestamp_key,
             session->powl_case_id_key);
         simulation_log = &*projected_powl_log;
       }
@@ -8680,11 +8867,11 @@ void handle_playout(const httplib::Request& request,
         return;
       }
       std::optional<minera::EventLog> projected_powl_log;
-      const minera::EventLog* fit_log =
-          &cached_model_log(*session, selected_miner);
+      const minera::EventLog* fit_log = nullptr;
+      if (options.fit_from_log) fit_log = &cached_model_log(*session, selected_miner);
       if (options.fit_from_log && selected_miner == "powl") {
         projected_powl_log = project_powl_activity(
-            session->log, session->powl_activity_key,
+            require_prepared_log(*session), session->powl_activity_key,
             session->powl_timestamp_key, session->powl_case_id_key);
         fit_log = &*projected_powl_log;
       }
@@ -8763,7 +8950,7 @@ void handle_playout(const httplib::Request& request,
         return;
       }
       const auto result =
-          minera::process_tree_playout_result(session->tree, options);
+          minera::process_tree_playout_result(require_process_tree(*session), options);
       if (options.return_set_strings) {
         response.set_content(
             minera::serialize_process_tree_playout_json(result),
@@ -8826,9 +9013,9 @@ void handle_playout(const httplib::Request& request,
       if (options.max_execution_time_ms == 0)
         options.max_execution_time_ms = 5000;
       minera::DfgStatisticalOptions dfg_options;
-      const auto frequency = minera::discover_frequency_dfg(session->log, dfg_options);
+      const auto frequency = minera::discover_frequency_dfg(require_prepared_log(*session), dfg_options);
       minera::DfgActivityCounts starts, ends;
-      for (const auto& trace : session->log.traces) {
+      for (const auto& trace : require_prepared_log(*session).traces) {
         if (!trace.events.empty()) {
           ++starts[trace.events.front().activity];
           ++ends[trace.events.back().activity];
@@ -8836,7 +9023,7 @@ void handle_playout(const httplib::Request& request,
       }
       std::optional<minera::DfgPerformance> performance;
       if (options.variant == minera::DfgPlayoutVariant::kPerformance) {
-        performance = minera::discover_performance_dfg(session->log, dfg_options);
+        performance = minera::discover_performance_dfg(require_prepared_log(*session), dfg_options);
       }
       const auto result = minera::dfg_playout_result(
           frequency, starts, ends, options,
@@ -8896,7 +9083,10 @@ void handle_playout(const httplib::Request& request,
         return request.has_param(std::string(name));
       };
       const auto options = minera::parse_declare_playout_params(lookup, present);
-      const auto log = minera::declare_playout(session->declare, options);
+      const auto log = minera::declare_playout([&]() -> const minera::DeclareModel& {
+        if (!session->declare_ready) throw std::invalid_argument("the cached Declare model is unavailable");
+        return session->declare;
+      }(), options);
       response.set_content(minera::to_xes(log, "declare playout"),
                            "application/xml");
     } catch (const std::exception& error) {
@@ -9064,7 +9254,7 @@ void handle_xes(const httplib::Request& request, httplib::Response& response) {
     options.preserve_nulls =
         ocel_query_bool(request, "xes_preserve_nulls", false);
     const bool compressed = options.compress.value_or(false);
-    response.set_content(minera::serialize_xes(session->log, options),
+    response.set_content(minera::serialize_xes(require_prepared_log(*session), options),
                          compressed ? "application/gzip" : "application/xml");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -9110,7 +9300,7 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
           "keep_all_activities requires paths_percentage or keep_connected");
     }
 
-    auto filtered = minera::make_dfg_filter_data(session->graph);
+    auto filtered = minera::make_dfg_filter_data(require_graph(*session));
     if (request.has_param("noise_threshold")) {
       std::set<std::pair<std::string, std::string>> most_common_paths;
       if (request.has_param("most_common_paths")) {
@@ -9207,8 +9397,10 @@ void handle_dfg_dataframe(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto params = minera::parse_mine_params(lookup, present);
-    const auto table = minera::event_log_to_table(session->log);
+    auto params = minera::parse_mine_params(lookup, present);
+    overlay_cached_source_selectors(request, *session, params, true);
+    const auto table_view = cached_source_view(*session,minera::EventDataKind::kEventTable);
+    const auto& table = *table_view.table();
     if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
       if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
         response.set_content(
@@ -9216,7 +9408,8 @@ void handle_dfg_dataframe(const httplib::Request& request,
                 minera::discover_pandas_dfg(table, params.dfg_table_options)),
             "application/json");
       } else {
-        const auto lazy = minera::LazyEventTable::from_table(table);
+        const auto lazy_view = cached_source_view(*session,minera::EventDataKind::kLazyEventTable);
+        const auto& lazy = *lazy_view.lazy_table();
         response.set_content(
             minera::serialize_dfg_dataframe_json(
                 minera::discover_polars_dfg(lazy, params.dfg_table_options)),
@@ -9231,7 +9424,8 @@ void handle_dfg_dataframe(const httplib::Request& request,
                     table, params.dfg_table_options)),
             "application/json");
       } else {
-        const auto lazy = minera::LazyEventTable::from_table(table);
+        const auto lazy_view = cached_source_view(*session,minera::EventDataKind::kLazyEventTable);
+        const auto& lazy = *lazy_view.lazy_table();
         response.set_content(
             minera::serialize_dfg_partial_order_json(
                 minera::discover_polars_partial_order(
@@ -9246,7 +9440,8 @@ void handle_dfg_dataframe(const httplib::Request& request,
                     table, params.dfg_table_options)),
             "application/json");
       } else {
-        const auto lazy = minera::LazyEventTable::from_table(table);
+        const auto lazy_view = cached_source_view(*session,minera::EventDataKind::kLazyEventTable);
+        const auto& lazy = *lazy_view.lazy_table();
         response.set_content(
             minera::serialize_dfg_concurrent_events_json(
                 minera::discover_polars_concurrent_events(
@@ -9454,6 +9649,8 @@ void handle_dfg_precision(const httplib::Request& request,
     minera::DfgPrecisionOptions options;
     if (request.has_param("activity_attribute"))
       options.activity_attribute = request.get_param_value("activity_attribute");
+    if (cached_source_uses_bound_defaults(*session) && !request.has_param("activity_attribute")) options.activity_attribute = session->active_source->selectors().activity_key;
+    if (cached_source_uses_bound_defaults(*session)) options.case_id_attribute = session->active_source->selectors().case_id_key;
     if (options.activity_attribute.empty())
       throw std::invalid_argument("activity_attribute must not be empty");
     const auto body = ocel_request_body(request, "dfg");
@@ -9461,7 +9658,7 @@ void handle_dfg_precision(const httplib::Request& request,
     response.set_content(
         minera::serialize_dfg_precision_json(
             minera::evaluate_dfg_precision(
-                session->log, minera::parse_dfg(body), options)),
+                session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), minera::parse_dfg(body), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -9792,7 +9989,12 @@ void handle_temporal_conformance(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    auto options = minera::parse_mine_params(lookup, present).temporal_profile;
+    auto params = minera::parse_mine_params(lookup, present);
+    const auto variant = present("temporal_variant")
+                             ? request.get_param_value("temporal_variant")
+                             : std::string{"log"};
+    overlay_cached_source_selectors(request, *session, params, variant == "dataframe");
+    auto options = params.temporal_profile;
     // This route is an explicit conformance request, unlike bundled discovery.
     // Preserve the strict standalone component default unless it is overridden.
     if (!present("temporal_strict_attributes")) {
@@ -9800,16 +10002,13 @@ void handle_temporal_conformance(const httplib::Request& request,
     }
     const auto profile = parse_temporal_profile_parameter(
         request.get_param_value("temporal_profile"), "temporal_profile");
-    const auto variant = present("temporal_variant")
-                             ? request.get_param_value("temporal_variant")
-                             : std::string{"log"};
     minera::TemporalConformanceResult result;
     if (variant == "log") {
-      result = minera::conform_temporal_profile_log(session->log, profile,
+      result = minera::conform_temporal_profile_log(require_prepared_log(*session), profile,
                                                     options);
     } else if (variant == "dataframe") {
       result = minera::conform_temporal_profile_dataframe(
-          minera::event_log_to_table(session->log), profile, options);
+          *cached_source_view(*session,minera::EventDataKind::kEventTable).table(), profile, options);
     } else {
       throw std::invalid_argument(
           "temporal_variant must be log or dataframe");
@@ -10114,6 +10313,11 @@ int main(int argc, char** argv) {
   httplib::Server server;
   // Bound multipart bodies before the HTTP library buffers or parses them.
   server.set_payload_max_length(32u * 1024u * 1024u);
+  server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
+    if (request.path.starts_with("/api/") &&
+        response.get_header_value("Content-Type").starts_with("application/json"))
+      response.body = active_source_safe_json(response.body);
+  });
 
   // The app is local-first; permissive CORS keeps the Vite dev server (a
   // different port) working against this backend.
@@ -10253,6 +10457,9 @@ int main(int argc, char** argv) {
   server.Options("/api/knowledge-injection", preflight);
 
   server.Post("/api/mine", handle_mine);
+  server.Post("/api/cancel-mine", handle_cancel_mine);
+  server.Get("/api/active-source", handle_active_source);
+  server.Get("/api/active-source-file", handle_active_source_file);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
   server.Post("/api/ocel/split", handle_ocel_split);
   server.Post("/api/ocel/enrich", handle_ocel_enrichment);

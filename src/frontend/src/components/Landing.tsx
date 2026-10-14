@@ -20,9 +20,10 @@ interface LandingProps {
   onTreeAlignment?: () => void;
   onPetriAntiMulti?: () => void;
   onModelConversion?: () => void;
+  onActiveSource?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onActiveSource }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -33,7 +34,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         <h1 className="landing-title reveal">Minera</h1>
         <p className="landing-tagline reveal">process intelligence</p>
         <p className="landing-lede reveal">
-          Local process mining for CSV/XES event logs and object-centric JSON.
+          Local process mining for CSV/XES event logs, native EventTable JSON and object-centric JSON.
         </p>
 
         <label className={mining ? "landing-drop mining" : "landing-drop"}>
@@ -81,6 +82,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onTreeAlignment && <button className="landing-sample reveal" disabled={mining} onClick={onTreeAlignment}>Align original traces against a process-tree model</button>}
         {onPetriAntiMulti && <button className="landing-sample reveal" disabled={mining} onClick={onPetriAntiMulti}>Compare original traces with an independent PNML model</button>}
         {onModelConversion && <button className="landing-sample reveal" disabled={mining} onClick={onModelConversion}>Convert or reduce an original process model</button>}
+        {onActiveSource && <button className="landing-sample reveal" disabled={mining} onClick={onActiveSource}>Open and inspect a native mining source</button>}
 
         <div className="landing-steps reveal">
           <div className="landing-step">

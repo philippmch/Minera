@@ -1,3 +1,4 @@
+import {miningSourceWorkbenchFields, type ActiveMiningSourceDescriptor} from "../active-mining-source";
 import {useEffect, useMemo, useRef, useState} from "react";
 import {
   TREE_ALIGNMENT_CONTROLS, TREE_ALIGNMENT_CONVERSIONS, TREE_ALIGNMENT_INPUT_FORMATS, TREE_ALIGNMENT_INPUT_SHAPES,
@@ -20,7 +21,7 @@ const variantLabels = {SEARCH_GRAPH_PT: "Search graph", DYNAMIC_PROGRAMMING: "Dy
 const inputLabels = {auto: "CSV / TSV / XES / gzip XES", table: "Typed EventTable JSON", trace_words: "Literal trace words JSON"};
 const shapeLabels = {log: "Every grouped trace", trace: "One selected original trace", words: "Literal trace words"};
 const modelLabels = {auto: "Detect from model file", ptml: "PTML process tree", tree_json: "Complete native tree JSON"};
-export function ProcessTreeAlignmentWorkspace({file: original = null}: {file?: File | null}) {
+export function ProcessTreeAlignmentWorkspace({file: original = null, source = null}: {file?: File | null; source?: ActiveMiningSourceDescriptor | null}) {
   const [input, setInput] = useState<File | null>(original), [model, setModel] = useState<File | null>(null), [form, setForm] = useState(defaultProcessTreeAlignmentForm);
   const [completed, setCompleted] = useState<ProcessTreeAlignmentRun | null>(null), [failed, setFailed] = useState<ProcessTreeAlignmentRun | null>(null);
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
@@ -29,7 +30,8 @@ export function ProcessTreeAlignmentWorkspace({file: original = null}: {file?: F
   const clearResults = () => {setCompleted(null); setFailed(null); setError(null);};
   const chooseInput = (value: File | null) => {cancel(); identities.current.input = value; setInput(value); clearResults();};
   const chooseModel = (value: File | null) => {cancel(); identities.current.model = value; setModel(value); clearResults();};
-  useEffect(() => {chooseInput(original);}, [original]);
+  const adoptSource = () => {chooseInput(original); if (source) {const mapped = miningSourceWorkbenchFields(source, {case_id_key: "alignment_case_id_attribute", activity_key: "pt_alignment_activity_attribute"}); setForm(current => ({...current, inputFormat: source.format, inputShape: current.inputShape === "words" ? "log" : current.inputShape, fields: {...current.fields, ...mapped.fields}, explicitEmptySelectors: {...current.explicitEmptySelectors, ...mapped.explicitEmptySelectors}, importFields: mapped.importFields}));}};
+  useEffect(() => {adoptSource();}, [original, source]);
   useEffect(() => () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null;}, []);
   const field = (key: string, value: string) => setForm(current => ({...current, fields: {...current.fields, [key]: value}}));
   const importField = (key: string, value: string) => setForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));
@@ -62,7 +64,7 @@ export function ProcessTreeAlignmentWorkspace({file: original = null}: {file?: F
           <label className="filters-field"><span>Tree alignment model format</span><select value={form.modelFormat} onChange={event => setForm(current => ({...current, modelFormat: event.target.value as ProcessTreeAlignmentForm["modelFormat"]}))}>{TREE_ALIGNMENT_MODEL_FORMATS.map(value => <option key={value} value={value}>{modelLabels[value]}</option>)}</select></label>
           <label className="filters-field"><span>Original-tree Petri conversion</span><select value={form.conversion} onChange={event => setForm(current => ({...current, conversion: event.target.value as ProcessTreeAlignmentForm["conversion"]}))}>{TREE_ALIGNMENT_CONVERSIONS.map(value => <option key={value} value={value}>{value === "standard" ? "Standard" : "Transition bordered"}</option>)}</select></label>
         </div>
-        {original && <button className="btn-ghost" onClick={() => {chooseInput(original); inputFormat("auto");}}>Use current original log for tree alignment</button>}
+        {original && <button className="btn-ghost" onClick={adoptSource}>Use current original log for tree alignment</button>}
         {form.inputFormat === "trace_words" && <details open><summary>Literal trace words JSON</summary><p>Upload one JSON array of strings. The route builds a grouped log for the native alignment call. Repeats, whitespace, empty labels and Unicode retain their exact input spelling; native validation determines accepted activities.</p><pre>{TREE_ALIGNMENT_TRACE_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(TREE_ALIGNMENT_TRACE_EXAMPLE, "minera-tree-alignment-words.json")}>Download literal tree alignment trace example</button></details>}
         {form.inputFormat === "table" && <details><summary>Typed event table JSON</summary><p>The original table preserves every cell, dtype, index, category and metadata field. Generic log conversion groups it by the literal case selector. Missing values, present nulls and empty strings remain distinct.</p><pre>{WORKFLOW_INPUT_TABLE_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(WORKFLOW_INPUT_TABLE_EXAMPLE, "minera-tree-alignment-table.json")}>Download typed tree alignment table example</button></details>}
         <details><summary>Complete native process-tree JSON</summary><p>The model declares an ordered activities registry and a root with operator, operator index, stored activity index and ordered children at every node. Duplicate or unused registry labels and latent indices remain in the supplied model. The complete model is inspectable even when native alignment rejects it.</p><pre>{TREE_ALIGNMENT_MODEL_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(TREE_ALIGNMENT_MODEL_EXAMPLE, "minera-tree-alignment-model.json")}>Download native tree model example</button></details>

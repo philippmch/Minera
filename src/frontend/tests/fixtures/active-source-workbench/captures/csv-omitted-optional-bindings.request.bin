@@ -1,0 +1,17 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+1bb6a47f-b5f0-4984-8899-783ebae684b5
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-csv-omitted-optional.csv"
+Content-Type: application/octet-stream
+
+case_id,concept:name
+one,B
+one,A
+
+--OwnedActiveEventSourceFeature57--

@@ -65,6 +65,7 @@ add_library(minera_core
   src/backend/process_tree_alignment_workbench_json.cpp
   src/backend/petri_anti_multi_workbench_json.cpp
   src/backend/model_conversion_workbench_json.cpp
+  src/backend/active_event_source.cpp
   src/backend/data_petri_net.cpp
   src/backend/declare.cpp
   src/backend/declare_playout.cpp
@@ -561,7 +562,7 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_dataframe_format_json_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dataframe_format_json_tests COMMAND minera_dataframe_format_json_tests)
 
-  foreach(workflow_input_test dfg_graph_input workflow_input_alpha_result workflow_discovery_input_json workflow_input_result_json graph_alignment_workbench_json inductive_input_json process_tree_alignment_workbench_json petri_anti_multi_workbench_json model_conversion_workbench_json)
+  foreach(workflow_input_test dfg_graph_input workflow_input_alpha_result workflow_discovery_input_json workflow_input_result_json graph_alignment_workbench_json inductive_input_json process_tree_alignment_workbench_json petri_anti_multi_workbench_json model_conversion_workbench_json active_event_source)
     add_executable(minera_${workflow_input_test}_tests src/backend/tests/test_${workflow_input_test}.cpp)
     target_link_libraries(minera_${workflow_input_test}_tests PRIVATE minera::core)
     target_compile_features(minera_${workflow_input_test}_tests PRIVATE cxx_std_20)

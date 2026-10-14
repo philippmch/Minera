@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+  <process id="process" name="process" isExecutable="false">
+    <startEvent id="StartEvent_0"/>
+    <endEvent id="EndEvent_1"/>
+    <task id="Activity_2" name="B"/>
+    <task id="Activity_3" name="A"/>
+    <sequenceFlow id="Flow_4" sourceRef="StartEvent_0" targetRef="Activity_2"/>
+    <sequenceFlow id="Flow_5" sourceRef="Activity_2" targetRef="Activity_3"/>
+    <sequenceFlow id="Flow_6" sourceRef="Activity_3" targetRef="EndEvent_1"/>
+  </process>
+</definitions>

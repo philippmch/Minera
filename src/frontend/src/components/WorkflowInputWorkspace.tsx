@@ -1,3 +1,4 @@
+import {miningSourceWorkbenchFields, type ActiveMiningSourceDescriptor} from "../active-mining-source";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   WORKFLOW_INPUT_CONTROLS, WORKFLOW_INPUT_FORMATS, WORKFLOW_INPUT_SHAPES, WORKFLOW_INPUT_TABLE_EXAMPLE, WORKFLOW_INPUT_XES_VARIANTS,
@@ -15,14 +16,15 @@ import { ModelGraph } from "./ModelGraph";
 
 const SHAPE_LABELS: Record<WorkflowInputShape, string> = {log: "Grouped log", stream: "Event stream", dataframe: "Dataframe", lazyframe: "Lazyframe", dfg: "Direct structured DFG", pandas_mutable: "Mutable Heuristics++ pandas table"};
 const FORMAT_LABELS: Record<WorkflowInputFormat, string> = {auto: "CSV / TSV / XES / gzip XES", table: "Typed EventTable JSON", dfg_json: "Structured DFG JSON"};
-export function WorkflowInputWorkspace({file: original = null}: {file?: File | null}) {
+export function WorkflowInputWorkspace({file: original = null, source = null}: {file?: File | null; source?: ActiveMiningSourceDescriptor | null}) {
   const [input, setInput] = useState<File | null>(original), [form, setForm] = useState(defaultWorkflowInputForm);
   const [completed, setCompleted] = useState<WorkflowInputRun | null>(null), [failed, setFailed] = useState<WorkflowInputRun | null>(null);
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null), gate = useRef(new WorkflowInputRequestGate()), inputIdentity = useRef<File | null>(original);
   const cancel = () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null; setPending(false);};
   const chooseInput = (value: File | null) => {cancel(); inputIdentity.current = value; setInput(value); setCompleted(null); setFailed(null); setError(null);};
-  useEffect(() => {chooseInput(original);}, [original]);
+  const adoptSource = () => {chooseInput(original); if (source) {const mapped = miningSourceWorkbenchFields(source, {case_id_key: ["alpha_case_id_attribute", "heuristic_case_id_attribute"], activity_key: ["alpha_activity_attribute", "heuristic_activity_attribute"], timestamp_key: ["alpha_timestamp_attribute", "heuristic_timestamp_attribute"]}); setForm(current => ({...current, format: source.format, shape: source.shape, fields: {...current.fields, ...mapped.fields}, explicitEmptySelectors: {...current.explicitEmptySelectors, ...mapped.explicitEmptySelectors}, importFields: mapped.importFields}));}};
+  useEffect(() => {adoptSource();}, [original, source]);
   useEffect(() => () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null;}, []);
   const field = (key: string, value: string) => setForm(current => ({...current, fields: {...current.fields, [key]: value}}));
   const importField = (key: string, value: string) => setForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));
@@ -64,7 +66,7 @@ export function WorkflowInputWorkspace({file: original = null}: {file?: File | n
           <label className="filters-field"><span>Independent discovery input shape</span><select value={form.shape} onChange={event => shape(event.target.value as WorkflowInputShape)}>{WORKFLOW_INPUT_SHAPES.map(value => <option key={value} value={value}>{SHAPE_LABELS[value]}</option>)}</select></label>
           <label className="filters-field"><span>Independent discovery input format</span><select value={form.format} onChange={event => format(event.target.value as WorkflowInputFormat)}>{WORKFLOW_INPUT_FORMATS.map(value => <option key={value} value={value}>{FORMAT_LABELS[value]}</option>)}</select></label>
         </div>
-        {original && <button className="btn-ghost" onClick={() => {chooseInput(original); format("auto");}}>Use current original log</button>}
+        {original && <button className="btn-ghost" onClick={adoptSource}>Use current original log</button>}
         <InputGuide form={form} />
         {form.format === "table" && <details><summary>Typed EventTable JSON example and fields</summary>
           <p>The table retains ordered columns and rows, declared dtypes, index labels, categorical dtypes, attributes and metadata. A null row cell is missing; a typed cell with null:true is a present null. Integer cells can declare integer_storage as int64 or uint64. Typed float values retain native NaN/INF/-INF strings.</p>

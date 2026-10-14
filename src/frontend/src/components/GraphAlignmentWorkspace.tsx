@@ -1,3 +1,4 @@
+import {miningSourceWorkbenchFields, type ActiveMiningSourceDescriptor} from "../active-mining-source";
 import {useEffect, useRef, useState} from "react";
 import {
   GRAPH_ALIGNMENT_CONTROLS, GRAPH_ALIGNMENT_DFG_EXAMPLE, GRAPH_ALIGNMENT_INPUT_FORMATS, GRAPH_ALIGNMENT_INPUT_SHAPES,
@@ -22,7 +23,7 @@ const initialState = (input: File | null): Record<GraphAlignmentMode, ModeState>
   DFG_CLASSIC: {form: defaultGraphAlignmentForm("DFG_CLASSIC"), input, model: null, completed: null, failed: null},
   RECOMPOS_MAXIMAL: {form: defaultGraphAlignmentForm("RECOMPOS_MAXIMAL"), input, model: null, completed: null, failed: null},
 });
-export function GraphAlignmentWorkspace({file: original = null}: {file?: File | null}) {
+export function GraphAlignmentWorkspace({file: original = null, source = null}: {file?: File | null; source?: ActiveMiningSourceDescriptor | null}) {
   const [mode, setMode] = useState<GraphAlignmentMode>("DFG_CLASSIC"), [states, setStates] = useState(() => initialState(original));
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null), gate = useRef(new GraphAlignmentRequestGate());
@@ -34,8 +35,8 @@ export function GraphAlignmentWorkspace({file: original = null}: {file?: File | 
   const chooseModel = (value: File | null) => {cancel(); identities.current[mode].model = value; update(current => ({...current, model: value, completed: null, failed: null})); setError(null);};
   useEffect(() => {
     cancel(); for (const value of GRAPH_ALIGNMENT_MODES) identities.current[value].input = original;
-    setStates(current => Object.fromEntries(GRAPH_ALIGNMENT_MODES.map(value => [value, {...current[value], input: original, completed: null, failed: null}])) as Record<GraphAlignmentMode, ModeState>); setError(null);
-  }, [original]);
+    setStates(current => Object.fromEntries(GRAPH_ALIGNMENT_MODES.map(value => {const mapped = source ? miningSourceWorkbenchFields(source, value === "DFG_CLASSIC" ? {case_id_key: "alignment_case_id_attribute", activity_key: "dfg_activity_attribute", timestamp_key: "dfg_timestamp_attribute"} : {case_id_key: "alignment_case_id_attribute", activity_key: "activity_attribute"}) : null; return [value, {...current[value], input: original, completed: null, failed: null, form: mapped ? {...current[value].form, inputFormat: source!.format, inputShape: current[value].form.inputShape === "words" ? "log" : current[value].form.inputShape, fields: {...current[value].form.fields, ...mapped.fields}, explicitEmptySelectors: {...current[value].form.explicitEmptySelectors, ...mapped.explicitEmptySelectors}, importFields: mapped.importFields} : current[value].form}];})) as Record<GraphAlignmentMode, ModeState>); setError(null);
+  }, [original, source]);
   useEffect(() => () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null;}, []);
   const selected = states[mode], form = selected.form;
   const editForm = (change: (form: GraphAlignmentForm) => GraphAlignmentForm) => update(current => ({...current, form: change(current.form)}));
@@ -74,7 +75,7 @@ export function GraphAlignmentWorkspace({file: original = null}: {file?: File | 
           </select></label>
           {mode === "DFG_CLASSIC" && form.inputShape === "log" && <label className="filters-field"><span>Same-run DFG projection</span><select value={form.projection} onChange={event => editForm(current => ({...current, projection: event.target.value as GraphAlignmentForm["projection"]}))}>{GRAPH_ALIGNMENT_PROJECTIONS.map(value => <option key={value} value={value}>{value === "none" ? "No projection" : value === "log" ? "Projected log" : value === "metrics" ? "Projected metrics" : "Projected log and metrics"}</option>)}</select></label>}
         </div>
-        {original && <button className="btn-ghost" onClick={() => {chooseInput(original); inputFormat("auto");}}>Use current original log for graph alignment</button>}
+        {original && <button className="btn-ghost" onClick={() => {chooseInput(original); if (source) {const mapped = miningSourceWorkbenchFields(source, mode === "DFG_CLASSIC" ? {case_id_key: "alignment_case_id_attribute", activity_key: "dfg_activity_attribute", timestamp_key: "dfg_timestamp_attribute"} : {case_id_key: "alignment_case_id_attribute", activity_key: "activity_attribute"}); editForm(current => ({...current, inputFormat: source.format, inputShape: current.inputShape === "words" ? "log" : current.inputShape, fields: {...current.fields, ...mapped.fields}, explicitEmptySelectors: {...current.explicitEmptySelectors, ...mapped.explicitEmptySelectors}, importFields: mapped.importFields}));} else inputFormat("auto");}}>Use current original log for graph alignment</button>}
         {form.inputFormat === "trace_words" && <details open><summary>Literal trace words JSON</summary><p>Upload one JSON array of strings. Repeats, empty labels, whitespace and Unicode remain literal activities in the selected native trace alignment.</p><pre>{GRAPH_ALIGNMENT_TRACE_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(GRAPH_ALIGNMENT_TRACE_EXAMPLE, "minera-graph-alignment-trace-words.json")}>Download literal trace example</button></details>}
         {form.inputFormat === "table" && <details><summary>Typed event table JSON</summary><p>The original table retains cells, dtypes, indices, categories and metadata. Conversion groups it by the selected case attribute. Missing cells, present nulls and empty labels retain their native meaning.</p><pre>{WORKFLOW_INPUT_TABLE_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(WORKFLOW_INPUT_TABLE_EXAMPLE, "minera-graph-alignment-table.json")}>Download typed alignment table example</button></details>}
         {mode === "DFG_CLASSIC" && <details><summary>Normative structured DFG input</summary><p>Upload structured Alpha DFG JSON with kind sparse, clean or graph, or classic .dfg text. The supplied graph and boundaries define the alignment model.</p><pre>{GRAPH_ALIGNMENT_DFG_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(GRAPH_ALIGNMENT_DFG_EXAMPLE, "minera-graph-alignment-model.json")}>Download normative DFG example</button></details>}

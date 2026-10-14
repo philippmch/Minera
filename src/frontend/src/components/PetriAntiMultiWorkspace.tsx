@@ -1,3 +1,4 @@
+import {miningSourceWorkbenchFields, type ActiveMiningSourceDescriptor} from "../active-mining-source";
 import {useEffect, useMemo, useRef, useState} from "react";
 import {
   PETRI_ANTI_MULTI_ALGORITHMS, PETRI_ANTI_MULTI_CONTROLS, PETRI_ANTI_MULTI_INPUT_FORMATS, PETRI_ANTI_MULTI_INPUT_SHAPES,
@@ -20,7 +21,7 @@ const algorithmLabel = (algorithm: PetriAntiMultiAlgorithm) => algorithm === "an
 const inputLabels = {auto: "CSV / TSV / XES / gzip XES", table: "Typed EventTable JSON", trace_words: "Literal trace words JSON"};
 const shapeLabels = {log: "Every grouped trace", trace: "One selected original trace", words: "Literal trace words"};
 const initialState = (input: File | null): Record<PetriAntiMultiAlgorithm, AlgorithmState> => ({anti: {form: defaultPetriAntiMultiForm("anti"), input, model: null, returned: null, failed: null}, multi: {form: defaultPetriAntiMultiForm("multi"), input, model: null, returned: null, failed: null}});
-export function PetriAntiMultiWorkspace({file: original = null}: {file?: File | null}) {
+export function PetriAntiMultiWorkspace({file: original = null, source = null}: {file?: File | null; source?: ActiveMiningSourceDescriptor | null}) {
   const [algorithm, setAlgorithm] = useState<PetriAntiMultiAlgorithm>("anti"), [states, setStates] = useState(() => initialState(original));
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null), gate = useRef(new PetriAntiMultiRequestGate()), activeAlgorithm = useRef(algorithm);
@@ -31,8 +32,8 @@ export function PetriAntiMultiWorkspace({file: original = null}: {file?: File | 
   const chooseModel = (value: File | null) => {cancel(); identities.current[algorithm].model = value; update(current => ({...current, model: value, returned: null, failed: null})); setError(null);};
   useEffect(() => {
     cancel(); for (const value of PETRI_ANTI_MULTI_ALGORITHMS) identities.current[value].input = original;
-    setStates(current => Object.fromEntries(PETRI_ANTI_MULTI_ALGORITHMS.map(value => [value, {...current[value], input: original, returned: null, failed: null}])) as Record<PetriAntiMultiAlgorithm, AlgorithmState>); setError(null);
-  }, [original]);
+    setStates(current => Object.fromEntries(PETRI_ANTI_MULTI_ALGORITHMS.map(value => {const mapped = source ? miningSourceWorkbenchFields(source, {case_id_key: "alignment_case_id_attribute", activity_key: "activity_attribute"}) : null; return [value, {...current[value], input: original, returned: null, failed: null, form: mapped ? {...current[value].form, inputFormat: source!.format, inputShape: current[value].form.inputShape === "words" ? "log" : current[value].form.inputShape, fields: {...current[value].form.fields, ...mapped.fields}, explicitEmptySelectors: {...current[value].form.explicitEmptySelectors, ...mapped.explicitEmptySelectors}, importFields: mapped.importFields} : current[value].form}];})) as Record<PetriAntiMultiAlgorithm, AlgorithmState>); setError(null);
+  }, [original, source]);
   useEffect(() => () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null;}, []);
   const selected = states[algorithm], form = selected.form;
   const editForm = (change: (form: PetriAntiMultiForm) => PetriAntiMultiForm) => update(current => ({...current, form: change(current.form)}));
@@ -66,7 +67,7 @@ export function PetriAntiMultiWorkspace({file: original = null}: {file?: File | 
           <label className="filters-field"><span>Normative PNML format</span><select value={form.modelFormat} onChange={event => editForm(current => ({...current, modelFormat: event.target.value as PetriAntiMultiForm["modelFormat"]}))}>{PETRI_ANTI_MULTI_MODEL_FORMATS.map(value => <option key={value} value={value}>{value === "auto" ? "Detect PNML model" : "PNML"}</option>)}</select></label>
           <label className="filters-field"><span>Native anti/multi variant</span><select value={PETRI_ANTI_MULTI_VARIANT} disabled><option>{PETRI_ANTI_MULTI_VARIANT}</option></select></label>
         </div>
-        {original && <button className="btn-ghost" onClick={() => {chooseInput(original); inputFormat("auto");}}>Use current original log for anti/multi alignment</button>}
+        {original && <button className="btn-ghost" onClick={() => {chooseInput(original); if (source) {const mapped = miningSourceWorkbenchFields(source, {case_id_key: "alignment_case_id_attribute", activity_key: "activity_attribute"}); editForm(current => ({...current, inputFormat: source.format, inputShape: current.inputShape === "words" ? "log" : current.inputShape, fields: {...current.fields, ...mapped.fields}, explicitEmptySelectors: {...current.explicitEmptySelectors, ...mapped.explicitEmptySelectors}, importFields: mapped.importFields}));} else inputFormat("auto");}}>Use current original log for anti/multi alignment</button>}
         {form.inputFormat === "trace_words" && <details open><summary>Literal trace words JSON</summary><p>Upload one ordered JSON string array. It becomes one grouped trace with present activity values, preserving repeats, empty labels, whitespace and Unicode. An empty array represents one empty trace.</p><pre>{PETRI_ANTI_MULTI_TRACE_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(PETRI_ANTI_MULTI_TRACE_EXAMPLE, "minera-petri-anti-multi-words.json")}>Download anti/multi trace example</button></details>}
         {form.inputFormat === "table" && <details><summary>Typed anti/multi input table</summary><p>Generic log conversion uses the literal case selector. The original table preserves missing cells, present nulls, lexical values, dtypes, indices, categories and metadata.</p><pre>{WORKFLOW_INPUT_TABLE_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(WORKFLOW_INPUT_TABLE_EXAMPLE, "minera-petri-anti-multi-table.json")}>Download anti/multi table example</button></details>}
         {form.inputFormat === "auto" && <details><summary>Anti/multi import settings</summary><div className="query-options">

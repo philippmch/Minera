@@ -1,0 +1,3 @@
+case_id,activity,concept:name,timestamp,time:timestamp,resource,org:resource,lifecycle,lifecycle:transition
+one,B,X,2026-01-01T10:01:00Z,2026-01-01T09:00:00Z,bob,alice,start,complete
+one,A,Y,2026-01-01T10:00:00Z,2026-01-01T11:00:00Z,bob,alice,start,complete

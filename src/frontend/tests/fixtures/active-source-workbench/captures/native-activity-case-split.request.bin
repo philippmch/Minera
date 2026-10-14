@@ -1,0 +1,27 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_format"
+
+table
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+0fb31b79-3af9-40b5-b05c-854e0a46d97f
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="activity_split"
+
+A
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="activity_split_separator"
+
+::piece::
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-native-repeated.json"
+Content-Type: application/octet-stream
+
+{"columns":["case:concept:name","concept:name","time:timestamp","org:resource","lifecycle:transition"],"rows":[[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:00Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:01Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:02Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:03Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:04Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:05Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}]],"dtypes":[],"categorical_dtypes":[],"index":{"class":"RangeIndex","dtype":"int64","names":[null],"labels":[{"kind":"scalar","value":{"key":"","value":"40","kind":"int","container":"scalar","null":false,"typed_value":40,"integer_storage":"int64"}},{"kind":"scalar","value":{"key":"","value":"41","kind":"int","container":"scalar","null":false,"typed_value":41,"integer_storage":"int64"}},{"kind":"scalar","value":{"key":"","value":"42","kind":"int","container":"scalar","null":false,"typed_value":42,"integer_storage":"int64"}},{"kind":"scalar","value":{"key":"","value":"43","kind":"int","container":"scalar","null":false,"typed_value":43,"integer_storage":"int64"}},{"kind":"scalar","value":{"key":"","value":"44","kind":"int","container":"scalar","null":false,"typed_value":44,"integer_storage":"int64"}},{"kind":"scalar","value":{"key":"","value":"45","kind":"int","container":"scalar","null":false,"typed_value":45,"integer_storage":"int64"}}]},"attributes":[],"metadata":{}}
+
+--OwnedActiveEventSourceFeature57--

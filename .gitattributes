@@ -11,3 +11,5 @@ src/frontend/tests/fixtures/petri-anti-multi-workbench* -text -whitespace
 src/frontend/tests/fixtures/petri-anti-multi-workbench/** -text -whitespace
 src/frontend/tests/fixtures/model-conversion-workbench* -text -whitespace
 src/frontend/tests/fixtures/model-conversion-workbench/** -text -whitespace
+src/frontend/tests/fixtures/active-source-workbench* -text -whitespace
+src/frontend/tests/fixtures/active-source-workbench/** -text -whitespace

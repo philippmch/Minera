@@ -1,0 +1,13 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+2036d7f1-40e7-4431-a76f-8d56de12b94c
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-legacy-duplicate-header.csv"
+Content-Type: application/octet-stream
+
+case_id,activity,activity,timestamp
+one,A,X,2026-01-01T00:00:00Z
+one,B,Y,2026-01-01T00:00:01Z
+
+--OwnedActiveEventSourceFeature57--

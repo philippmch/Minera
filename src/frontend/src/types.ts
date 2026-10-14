@@ -737,7 +737,7 @@ export type LogConversionVariant =
   | "TO_NX"
   | "DF_TO_EVENT_LOG_1V"
   | "DF_TO_EVENT_LOG_NV";
-export type LogConversionAttributeKind = "string" | "date" | "int" | "float" | "boolean" | "id" | "bytes";
+export type LogConversionAttributeKind = "string" | "date" | "int" | "float" | "boolean" | "id" | "bytes" | "na";
 export type LogConversionContainer = "scalar" | "list" | "container" | "tuple" | "set" | "frozenset";
 export type LogConversionFirstClassRole =
   | "none" | "case_id" | "activity" | "timestamp" | "resource" | "lifecycle";
@@ -872,7 +872,7 @@ function isLogConversionAttribute(value: unknown): value is LogConversionAttribu
   const candidate = value as Partial<LogConversionAttribute>;
   if (typeof candidate.key !== "string" || typeof candidate.value !== "string" ||
       !("kind" in candidate) ||
-      !(["string", "date", "int", "float", "boolean", "id", "bytes"] as const)
+      !(["string", "date", "int", "float", "boolean", "id", "bytes", "na"] as const)
         .includes(candidate.kind as LogConversionAttributeKind) ||
       (candidate.container !== undefined &&
        !(["scalar", "list", "container", "tuple", "set", "frozenset"] as const)
@@ -1080,7 +1080,7 @@ function isLogConversionTableCell(value: unknown): value is LogConversionTableCe
   if (isLogConversionAttribute(value)) return true;
   const cell = value as Partial<LogConversionTableCell>;
   return typeof cell.value === "string" &&
-    (["string", "date", "int", "float", "boolean", "id", "bytes"] as const)
+    (["string", "date", "int", "float", "boolean", "id", "bytes", "na"] as const)
       .includes(cell.kind as LogConversionAttributeKind) &&
     (cell.null === undefined || typeof cell.null === "boolean") &&
     (cell.container === undefined ||
@@ -6826,6 +6826,8 @@ export interface MineraExport {
   dataset: string;
   /** Cached HTTP source identity; absent from standalone and legacy exports. */
   source_id?: string;
+  /** Complete immutable native input and its actual prepared source views. */
+  active_source?: import("./active-mining-source").ActiveMiningSourceSnapshot;
   generator?: string;
   trace_count: number;
   event_count: number;
@@ -7060,6 +7062,7 @@ export function isMineraExport(value: unknown): value is MineraExport {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const data = value as MineraExport;
   if (data.source_id !== undefined && (typeof data.source_id !== "string" || !data.source_id)) return false;
+  if (data.active_source !== undefined && (!data.active_source || typeof data.active_source !== "object" || Array.isArray(data.active_source) || data.active_source.source_id !== data.source_id)) return false;
   if (!Array.isArray(data.activities) || !Array.isArray(data.edges) ||
       !Array.isArray(data.variants) ||
       !Number.isSafeInteger(data.trace_count) || data.trace_count < 0 ||

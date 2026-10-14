@@ -2552,3 +2552,11 @@ input[type="range"]::-moz-range-thumb {
 .declare-stream-chart > p,.declare-stream-chart > .query-actions { margin:16px 24px; }
 .declare-stream-chart svg { width:100%;min-width:500px;color:var(--ink);font:12px var(--font-mono); }
 .declare-stream-chart svg text { fill:var(--ink); }
+
+.active-mining-source-workspace { display: grid; gap: 1.1rem; }
+.active-mining-source-workspace .panel { width: 100%; min-width: 0; }
+.active-mining-source-workspace .query-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: .85rem; }
+.active-mining-source-workspace .query-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin: .7rem 0; }
+.active-mining-source-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.active-mining-source-workspace .query-check { display: flex; gap: .45rem; align-items: center; }
+.active-mining-source-workspace .query-check input { width: auto; }

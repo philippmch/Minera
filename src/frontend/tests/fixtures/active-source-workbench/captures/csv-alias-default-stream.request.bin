@@ -1,0 +1,17 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+stream
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+d364a124-942f-42f2-9edc-1523c54b176b
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-csv-canonical-aliases.csv"
+Content-Type: application/octet-stream
+
+case_id,concept:name,time:timestamp,org:resource,lifecycle:transition
+one,B,2026-01-01T10:01:00Z,alice,complete
+one,A,2026-01-01T10:00:00Z,alice,complete
+
+--OwnedActiveEventSourceFeature57--

@@ -42,7 +42,10 @@ describe("case clustering and executable hypotheses",()=>{
   vi.stubGlobal("fetch",vi.fn(async()=>({ok:false,status:400,json:async()=>({error:"bad regular expression"})})));await expect(requestClusterExport(schema,{name:"Review",regex:"["},"xes")).rejects.toThrow(/bad regular/);
  });
  it("keeps failed hypotheses alongside later real query results",async()=>{
-  const fetch=vi.fn(async(_path:string,options:RequestInit)=>options.body==="SELECT missing"?{ok:false,status:400,json:async()=>({error:"missing field"})}:{ok:true,json:async()=>({family:"LOG_QUERY",source_id:schema.source_id,engine:"sqlite",sql:options.body,event_index_column:schema.event_index_column,columns:["events"],rows:[[5]],output_truncated:false,can_filter:false,selected_event_indices:[]})});vi.stubGlobal("fetch",fetch);
+  const fetch=vi.fn(async(_path:string,options:RequestInit)=>{
+   expect(options.body).toBeInstanceOf(Uint8Array);const sql=new TextDecoder().decode(options.body as Uint8Array);
+   return sql==="SELECT missing"?{ok:false,status:400,json:async()=>({error:"missing field"})}:{ok:true,json:async()=>({family:"LOG_QUERY",source_id:schema.source_id,engine:"sqlite",sql,event_index_column:schema.event_index_column,columns:["events"],rows:[[5]],output_truncated:false,can_filter:false,selected_event_indices:[]})};
+  });vi.stubGlobal("fetch",fetch);
   const results=await executeHypotheses(schema,"sqlite",[{description:"Bad",sql:"SELECT missing"},{description:"Count",sql:"SELECT COUNT(*) FROM dataframe"}],7);
   expect(results[0]).toMatchObject({result:null,error:"missing field"});expect(results[1].result?.rows).toEqual([[5]]);expect(fetch).toHaveBeenCalledTimes(2);
  });

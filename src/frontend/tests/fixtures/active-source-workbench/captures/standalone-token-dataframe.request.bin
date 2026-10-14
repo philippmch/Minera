@@ -1,0 +1,21 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_format"
+
+table
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="token_replay_input_adapter"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-standalone-native-input.json"
+Content-Type: application/octet-stream
+
+{"columns":["case:concept:name","concept:name","time:timestamp","org:resource","lifecycle:transition"],"rows":[[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:00Z","kind":"date","container":"scalar","null":false,"typed_value":"2026-01-01T00:00:00Z","date_resolution":"ns","date_timezone":"UTC"},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:01Z","kind":"date","container":"scalar","null":false,"typed_value":"2026-01-01T00:00:01Z","date_resolution":"ns","date_timezone":"UTC"},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:02Z","kind":"date","container":"scalar","null":false,"typed_value":"2026-01-01T00:00:02Z","date_resolution":"ns","date_timezone":"UTC"},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:03Z","kind":"date","container":"scalar","null":false,"typed_value":"2026-01-01T00:00:03Z","date_resolution":"ns","date_timezone":"UTC"},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}]],"dtypes":["object","object","datetime64[ns, UTC]","object","object"],"categorical_dtypes":[],"index":null,"attributes":[],"metadata":{}}
+
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="model"; filename="owned-original.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml><net id="owned-net"><page id="owned-page"><place id="p0"><name><text>Original place 0</text></name><initialMarking><text>1</text></initialMarking></place><place id="p1"><name><text>Original place 1</text></name></place><place id="p2"><name><text>Original place 2</text></name></place><transition id="t0"><name><text>A</text></name></transition><arc id="in-0" source="p0" target="t0" /><arc id="out-0" source="t0" target="p1" /><transition id="t1"><name><text>B</text></name></transition><arc id="in-1" source="p1" target="t1" /><arc id="out-1" source="t1" target="p2" /></page><finalmarkings><marking><place idref="p2"><text>1</text></place></marking></finalmarkings></net></pnml>
+--OwnedActiveEventSourceFeature57--
