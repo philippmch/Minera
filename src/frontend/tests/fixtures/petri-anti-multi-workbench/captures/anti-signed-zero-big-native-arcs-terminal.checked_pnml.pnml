@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Independent PNML model with resolved checked markings</text></name>
+    <page id="page1">
+      <place id="foreign-place-0">
+        <name><text>foreign-place-0</text></name>
+        <initialMarking><text>0</text></initialMarking>
+      </place>
+      <place id="foreign-place-1">
+        <name><text>foreign-place-1</text></name>
+        <initialMarking><text>0</text></initialMarking>
+      </place>
+      <transition id="foreign-transition-0">
+        <name><text>A</text></name>
+      </transition>
+      <arc id="signed-in" source="foreign-place-0" target="foreign-transition-0"><inscription><text>-3</text></inscription></arc>
+      <arc id="big-in" source="foreign-place-0" target="foreign-transition-0"><inscription><text>340282366920938463463374607431768211455</text></inscription></arc>
+      <arc id="zero-out" source="foreign-transition-0" target="foreign-place-1"><inscription><text>0</text></inscription></arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="foreign-place-0"><text>0</text></place>
+        <place idref="foreign-place-1"><text>0</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

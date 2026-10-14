@@ -2523,3 +2523,33 @@ browser/visual checks and strict reference parity remain pending. The current
 exact-origin browser retry was rejected by the saved permission/policy gate
 while the previous Feature53 deployment was live; no Feature54 UI check completed.
 See [validation and boundaries](docs/feature-first-process-tree-alignment-validation.json).
+
+### Compare traces with original PNML models
+
+Use **Compare original traces with an independent PNML model** on the landing page or **Anti/multi alignment** in either
+toolbar. Choose the existing native discounted anti-alignment or multi-alignment
+search, an original PNML model and original CSV/TSV/XES/gzip-XES, complete typed
+EventTable JSON or exact trace words. Check the grouped log or a selected trace;
+explicit words become a native EventLog with PRESENT cells, including empty
+activity strings. These requests preserve the current cached mining session.
+
+Inspect all eight anti/seven multi options, literal selectors, exact marking
+vectors and origins, and every aggregate result/diagnostic field. Explicit JSON
+[] requests native boundary defaults; omitted markings retain PNML defaults,
+and nonempty zero vectors remain zero. The effective positive revisit bound is
+max_states when nonzero, otherwise marking_limit. Native validation errors
+retain original source/model and actual options.
+
+Inspect complete native PNML/net state, including arbitrary-width markings,
+original IDs/zero keys, ordered weighted/extended arcs and stochastic metadata.
+Download complete JSON, reports, all inspection CSV tables, original files and
+available original/checked-model PNML and checked-source XES. PNML exports
+serialize native document semantics; the uploaded byte file remains a separate
+verbatim artifact. Export errors remain separate from native alignment errors.
+
+The additive POST /api/align-petri-anti-multi-workbench endpoint provides this workbench.
+Native, frontend, API, fixture publication and export checks passed. Complete
+browser/visual checks and strict reference parity remain pending. No Feature55
+browser attempt is claimed; the frozen Feature54 saved permission/policy denial
+is retained as historical evidence. No browser screenshot is claimed.
+See [validation and boundaries](docs/feature-first-petri-anti-multi-validation.json).

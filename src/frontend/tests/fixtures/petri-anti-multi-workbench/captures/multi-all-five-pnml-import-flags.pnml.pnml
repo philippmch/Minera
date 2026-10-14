@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Independent original PNML model</text></name>
+    <page id="page1">
+      <place id="foreign-place-0">
+        <name><text>foreign-place-0</text></name>
+        <initialMarking><text>2</text></initialMarking>
+      </place>
+      <place id="foreign-place-1">
+        <name><text>foreign-place-1</text></name>
+      </place>
+      <transition id="foreign-transition-0">
+        <name><text>A</text></name>
+        <toolspecific tool="StochasticPetriNet" version="0.2">
+          <property key="distributionType">NORMAL</property>
+          <property key="distributionParameters">0.10000000000000001;0.20000000000000001</property>
+          <property key="priority">7</property>
+          <property key="invisible">false</property>
+          <property key="weight">0.29999999999999999</property>
+        </toolspecific>
+      </transition>
+      <arc id="original-duplicate-in-1" source="foreign-place-0" target="foreign-transition-0"/>
+      <arc id="original-duplicate-in-2" source="foreign-place-0" target="foreign-transition-0"/>
+      <arc id="original-weighted-out" source="foreign-transition-0" target="foreign-place-1"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="foreign-place-1"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

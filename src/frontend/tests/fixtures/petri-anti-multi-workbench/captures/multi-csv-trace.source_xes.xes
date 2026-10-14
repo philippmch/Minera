@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Independent Petri anti/multi checked source"/>
+  <trace>
+    <string key="case_id" value="case-31"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:31:01+00:00"/>
+      <string key="resource" value="R31"/>
+      <string key="payload" value="東京,;&quot;quoted&quot;"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-01T00:31:02+00:00"/>
+      <string key="resource" value="R31"/>
+      <string key="payload" value="東京,;&quot;quoted&quot;"/>
+    </event>
+  </trace>
+</log>

@@ -1,0 +1,1 @@
+<log><trace><string key="batch" value="x"/><event><string key="phase" value="A"/><date key="finish" value="2024-01-01T00:00:01Z"/><string key="actor" value="東京"/><string key="life" value="complete"/></event><event><string key="phase" value="B"/><date key="finish" value="2024-01-01T00:00:02Z"/></event></trace></log>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Independent Petri anti/multi checked source"/>
+  <string key="origin" value="csv"/>
+  <trace>
+    <string key="batch" value="c0"/>
+    <event>
+      <string key="phase" value="a"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="batch" value="c1"/>
+    <event>
+      <string key="phase" value="b"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="batch" value="c2"/>
+    <event>
+      <string key="phase" value="a"/>
+    </event>
+  </trace>
+</log>

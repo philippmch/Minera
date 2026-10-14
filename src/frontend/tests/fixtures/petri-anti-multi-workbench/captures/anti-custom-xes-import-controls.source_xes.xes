@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Independent Petri anti/multi checked source"/>
+  <trace>
+    <string key="batch" value="x"/>
+    <event>
+      <string key="phase" value="A"/>
+      <date key="finish" value="2024-01-01T00:00:01+00:00"/>
+      <string key="actor" value="東京"/>
+      <string key="life" value="complete"/>
+    </event>
+    <event>
+      <string key="phase" value="B"/>
+      <date key="finish" value="2024-01-01T00:00:02+00:00"/>
+    </event>
+  </trace>
+</log>

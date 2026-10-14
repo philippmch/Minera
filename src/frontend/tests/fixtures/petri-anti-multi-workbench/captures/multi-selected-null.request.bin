@@ -1,0 +1,82 @@
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="algorithm"
+
+multi
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_shape"
+
+log
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_format"
+
+table
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="model_format"
+
+pnml
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="alignment_selectors_json"
+
+{"alignment_case_id_attribute":"batch","activity_attribute":"phase"}
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="input_file"; filename="owned-selected-null.json"
+Content-Type: application/octet-stream
+
+{"columns":["batch","phase"],"rows":[[{"value":"x"},{"null":true}]]}
+
+--OwnedPetriAntiMultiFeature55
+Content-Disposition: form-data; name="model_file"; filename="owned-original-normative.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="foreign-place-0">
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="foreign-place-1" />
+      <place id="foreign-place-2" />
+      <transition id="foreign-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <transition id="foreign-transition-1">
+        <name>
+          <text>B</text>
+        </name>
+      </transition>
+      <arc id="original-in-0" source="foreign-place-0" target="foreign-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-in-1" source="foreign-place-1" target="foreign-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-out-0" source="foreign-transition-0" target="foreign-place-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-out-1" source="foreign-transition-1" target="foreign-place-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="foreign-place-2">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedPetriAntiMultiFeature55--

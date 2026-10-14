@@ -13404,3 +13404,42 @@ This checkpoint adds own-source native, frontend, API, publication and export ev
 This is implemented feature group 54. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
 
 Evidence: docs/feature-first-process-tree-alignment-validation.json. No browser screenshot is claimed.
+
+
+### Feature delivery first: independent original PNML anti/multi alignment
+
+Independent Petri anti-alignment and multi-alignment accept an original uploaded PNML document alongside original CSV/TSV/XES/gzip-XES, complete typed EventTable JSON or exact trace-word arrays from landing and both classic/OCEL toolbars, without accessing or replacing the cached mining session.
+
+The workbench checks an original grouped log, one selected original trace or explicit words converted to the existing native EventLog API with PRESENT cells, including empty activity strings. Table grouping and selected-trace copies preserve source state; complete typed before/after, original log, checked log and exact input words remain inspectable.
+
+Complete native options expose all eight anti fields and seven multi fields, actual VERSION_DISCOUNTED_A_STAR enum/index, exponent, anti epsilon, marking_limit/max_states, both marking vectors and literal activity selectors. Existing three variant aliases are retained. Finite strtod syntax includes hexadecimal, subnormal and negative-zero storage; exponent/epsilon/effective-bound domains remain native validation errors with model/input/options context.
+
+Exact legacy comma and structured JSON marking overrides preserve nonnegative size_t values through the native maximum without token expansion. JSON [] suppresses PNML injection and requests the existing native one-token source/sink defaults; omitted overrides use range-checked original PNML markings independently, and nonempty zero vectors remain zero. Separate origins, actual configured vectors and effective checked vectors are retained, including native width and token-overflow errors.
+
+Complete native PNML document snapshots retain arbitrary-width TokenInteger initial/final counts, raw source/sink values and boundary flags, original node IDs and explicit zero marking keys, ordered parallel/ordinary/reset/inhibitor arc occurrences with every weight/sign/id/type/index field, and optional full stochastic records with raw timing/distribution enums, every parameter/weight/priority and null-versus-empty identity. The complete executable net retains all native transition/activity/weight/display/discovery state.
+
+Aggregate native anti/multi results retain every stored activity word, complete transition sequence including tau, cost/objective, anti precision or multi max_distance_to_log and all visited/queued/traversed/exhausted diagnostics. Double output uses max_digits10, negative zero and nonfinite tags; strings preserve exact UTF/WTF-8 identity and integer tokens remain exact. Completion/time/variant/per-trace fields absent from the native result are not fabricated.
+
+All five existing PNML import options and their actual native defaults are configurable and inspectable. Original model PNML and a separate checked-model PNML with resolved markings export independently of alignment, alongside supported checked-source XES and separate artifact errors. PNML exports serialize native document semantics; the original uploaded source/model byte files remain separate verbatim artifacts.
+
+Exact original files, request fields, input hashes, complete source/options/document/net/marking/result inspection, complete JSON/reports, per-table/all-table CSV and selected records are inspectable and downloadable. Cancellation, input replacement and failed-request guards retain completed runs. Portable source/model/request/response/export fixtures publish byte-identically after their export proof passes.
+
+Structured marking input retains strict grammar, decoded duplicate-key/type/range checks and 32 MiB/depth64/one-million-value bounds. Complete native result/options/document serialization has no input transport limits, including arbitrary-width markings and deeply nested discovery metadata. Existing cached parsers/serializers and native algorithm bodies remain unchanged.
+
+Validation: {"api_calls": 175, "api_checks": 805, "core_objects": 181, "export_csv_cells": 126247, "export_entries": 124, "export_numeric_literals": 10160, "export_selected_records": 26740, "export_tests": 129, "fresh_core_objects": 1, "frontend_files": 95, "frontend_tests": 2337, "native_sources": 647, "native_suites": 12, "petri_anti_multi_fixtures": 124, "published_files": 650, "published_fixture_entries": 124, "reused_core_objects": 180, "unrelated_files_preserved": 110}. Source/compiler/object/binary/publication/served-production-asset bindings passed. Complete browser validation is explicitly false; no Feature55 browser attempt is claimed and the frozen Feature54 denial remains historical evidence.
+
+This is a feature-delivery checkpoint, not full PM4Py parity. No package/module parity status or selector is promoted; all 228 incomplete units remain in scope.
+
+Complete browser interaction, downloads, visual screenshots and responsive inspection for Feature55 remain pending. No Feature55 browser attempt or success is claimed. The frozen Feature54 exact-origin saved-permission/managed-policy denial is retained as historical evidence; its actual attempt occurred while PID20676 served Feature53, and it loaded no browser UI. Local HTTP/listener/runtime checks and API-only port8567 validation remain separate from browser validation.
+
+Both public APIs take EventLog and return a single aggregate search result across native distinct word variants. Explicit word input is an EventLog conversion, not a new raw-vector overload. Native exceptions retain no invented partial result; a returned result may have exhausted=true. Native max_states is an alias overriding marking_limit when nonzero, and the effective positive limit bounds closed-marking revisits rather than supplying a global visited-state or time cap.
+
+PNML TokenInteger metadata can exceed size_t; native option injection is range-checked and preserves the original document when conversion fails. Native empty-vector defaults use the raw source/sink getters even when boundary flags are unset; no additional workflow restriction is imposed. PNML exports retain native semantics rather than promising byte identity with the original XML. The first Feature55 native build failed at server compilation before any CTest suite or API start. The first API capture stopped on an incorrect selected-field assertion although unchanged source snapshots retained the selected generic cells and native search had returned success. Both immutable incomplete attempts remain excluded from successful validation counts.
+
+The second API capture claimed completion, but case-only alias IDs mapped to the same Windows artifact paths and overwrote one recorded request body. Its record-level SHA claim was contradicted by the first export-integrity run, which failed. Both reports, executed recipes, validator source bindings, streams and the actual captured-byte snapshot remain bound as historical evidence; the incorrect record SHA is retained only as a failed claim. Neither attempt contributes to successful API, fixture or export counts. Replacement captures use unique indexed alias IDs, reject case-insensitive ID collisions, preserve shared input/model bytes immutably and audit every record SHA before completion.
+
+This checkpoint adds own-source native, frontend, API, publication and export evidence, not a fresh public-reference differential corpus. Strict defaults, scalar/object identity, numeric ordering, schema/errors, Unicode, marking, solver, concurrency and performance gates remain independent parity work.
+
+This is implemented feature group 55. The full catalogue remains 86 packages / 387 modules, 46 complete packages / 199 complete modules and 228 incomplete units.
+
+Evidence: docs/feature-first-petri-anti-multi-validation.json. No browser screenshot is claimed.
