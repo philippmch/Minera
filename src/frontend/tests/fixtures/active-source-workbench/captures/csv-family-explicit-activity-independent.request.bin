@@ -1,0 +1,21 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="inductive_activity_key"
+
+concept:name
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+27986047-0ab3-496d-93f8-27ba2120754d
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-csv-exact-and-alias-headers.csv"
+Content-Type: application/octet-stream
+
+case_id,activity,concept:name,timestamp,time:timestamp,resource,org:resource,lifecycle,lifecycle:transition
+one,B,X,2026-01-01T10:01:00Z,2026-01-01T09:00:00Z,bob,alice,start,complete
+one,A,Y,2026-01-01T10:00:00Z,2026-01-01T11:00:00Z,bob,alice,start,complete
+
+--OwnedActiveEventSourceFeature57--

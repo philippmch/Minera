@@ -1,0 +1,1 @@
+{"kind":"graph","activities":["A","B"],"dfg":[{"source":"A","target":"B","count":2}],"start_activities":{"A":2},"end_activities":{"B":2}}

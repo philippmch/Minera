@@ -1,4 +1,5 @@
 import { afterEach,describe,expect,it,vi } from "vitest";
+import {activeMiningSourceBytes} from "../src/active-mining-source";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QueryWorkspace } from "../src/components/QueryWorkspace";
@@ -43,7 +44,7 @@ describe("log query and filter delivery",()=>{
     const signal=new AbortController().signal;const sql="SELECT * FROM dataframe WHERE activity='Review α'";
     expect(await requestLogQuery(schema,"sqlite",sql,7,signal)).toEqual(result);
     const [url,options]=fetch.mock.calls[0];expect(url).toBe("/api/log-query?source_id=source+7&engine=sqlite&limit=7");
-    expect(options).toEqual({method:"POST",headers:{"Content-Type":"text/plain; charset=utf-8"},body:sql,signal});
+    expect(options).toEqual({method:"POST",headers:{"Content-Type":"text/plain; charset=utf-8"},body:activeMiningSourceBytes(sql),signal});
     await expect(requestLogQuery(schema,"sqlite",sql,0)).rejects.toThrow(/Row limit/);
     await expect(requestLogQuery(schema,"sqlite"," ",7)).rejects.toThrow(/Enter SQL/);
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -58,7 +59,7 @@ describe("log query and filter delivery",()=>{
     const blob=new Blob(["<log/>"],{type:"application/xml"});const fetch=vi.fn(async(_path:string,_options:RequestInit)=>({ok:true,blob:async()=>blob}));vi.stubGlobal("fetch",fetch);
     expect(await requestQueryFilter(schema,"duckdb",result.sql,"cases","xes")).toBe(blob);
     const [url,options]=fetch.mock.calls[0];expect(url).toBe("/api/log-query/export?source_id=source+7&engine=duckdb&mode=cases&format=xes");
-    expect(url).not.toContain("limit");expect(options.body).toBe(result.sql);
+    expect(url).not.toContain("limit");expect(options.body).toEqual(activeMiningSourceBytes(result.sql));
   });
   it("keeps generation separate from execution and uses only the displayed schema prompt",async()=>{
     const fetch=vi.fn(async(_path:string,_options:RequestInit)=>({ok:true,json:async()=>({family:"LLM_COMPLETION",provider:"openai",model:"fixture",text:"```sql\nSELECT COUNT(*) FROM dataframe\n```",finish_reason:"stop",usage:{input_tokens:1,output_tokens:1},response:{}})}));vi.stubGlobal("fetch",fetch);

@@ -1,3 +1,4 @@
+import {miningSourceWorkbenchFields, type ActiveMiningSourceDescriptor} from "../active-mining-source";
 import {useEffect, useMemo, useRef, useState} from "react";
 import {
   INDUCTIVE_INPUT_CONTROLS, INDUCTIVE_INPUT_CONVERSIONS, INDUCTIVE_INPUT_FORMATS, INDUCTIVE_INPUT_SHAPES, INDUCTIVE_INPUT_VARIANTS,
@@ -18,14 +19,15 @@ import {ModelGraph} from "./ModelGraph";
 const variantLabels = {log: "IM · log recursion", imf: "IMf · infrequent", dfg: "IMd · graph recursion"};
 const shapeLabels = {log: "Grouped log", stream: "Event stream", dataframe: "Dataframe", lazyframe: "Lazyframe", dfg: "Direct native DFG", variants: "Compact weighted variants"};
 const formatLabels = {auto: "CSV / TSV / XES / gzip XES", table: "Typed EventTable JSON", dfg_json: "Native DFG JSON", variants_json: "Weighted variants JSON"};
-export function InductiveInputWorkspace({file: original = null}: {file?: File | null}) {
+export function InductiveInputWorkspace({file: original = null, source = null}: {file?: File | null; source?: ActiveMiningSourceDescriptor | null}) {
   const [input, setInput] = useState<File | null>(original), [form, setForm] = useState(defaultInductiveInputForm);
   const [completed, setCompleted] = useState<InductiveInputRun | null>(null), [failed, setFailed] = useState<InductiveInputRun | null>(null);
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null), gate = useRef(new InductiveInputRequestGate()), identity = useRef<File | null>(original);
   const cancel = () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null; setPending(false);};
   const chooseInput = (file: File | null) => {cancel(); identity.current = file; setInput(file); setCompleted(null); setFailed(null); setError(null);};
-  useEffect(() => {chooseInput(original);}, [original]);
+  const adoptSource = () => {chooseInput(original); if (source) {const mapped = miningSourceWorkbenchFields(source, {case_id_key: "inductive_case_id_key", activity_key: "inductive_activity_key", timestamp_key: "inductive_timestamp_key"}); setForm(current => ({...current, format: source.format, shape: source.shape, fields: {...current.fields, ...mapped.fields}, explicitEmptySelectors: {...current.explicitEmptySelectors, ...mapped.explicitEmptySelectors}, importFields: mapped.importFields}));}};
+  useEffect(() => {adoptSource();}, [original, source]);
   useEffect(() => () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null;}, []);
   const field = (key: string, value: string) => setForm(current => ({...current, fields: {...current.fields, [key]: value}}));
   const importField = (key: string, value: string) => setForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));
@@ -55,7 +57,7 @@ export function InductiveInputWorkspace({file: original = null}: {file?: File | 
           <label className="filters-field"><span>Independent Inductive input format</span><select value={form.format} onChange={event => format(event.target.value as InductiveInputForm["format"])}>{INDUCTIVE_INPUT_FORMATS.map(value => <option key={value} value={value}>{formatLabels[value]}</option>)}</select></label>
           <label className="filters-field"><span>Discovered-tree Petri conversion</span><select value={form.conversion} onChange={event => setForm(current => ({...current, conversion: event.target.value as InductiveInputForm["conversion"]}))}>{INDUCTIVE_INPUT_CONVERSIONS.map(value => <option key={value} value={value}>{value === "standard" ? "Standard" : "Transition bordered"}</option>)}</select></label>
         </div>
-        {original && <button className="btn-ghost" onClick={() => {chooseInput(original); format("auto");}}>Use current original log for Inductive discovery</button>}
+        {original && <button className="btn-ghost" onClick={adoptSource}>Use current original log for Inductive discovery</button>}
         {form.shape === "dfg" ? <p>Direct graph input uses native IMd graph recursion. The requested variant and configured options remain in the result alongside the effective discovery behavior.</p> : form.shape === "variants" ? <p>Weighted variants go directly to the compact native overload. Counts retain exact unsigned 64-bit values; rows, repeated words and zero counts remain in the source carrier.</p> : form.shape === "log" ? <p>Grouped-log discovery retains imported trace boundaries and event order by default. Custom case and timestamp selectors follow the grouped-log preparation rules.</p> : <p>Event streams, dataframes and lazyframes group by the exact case selector and use stable timestamp ordering. Selected activity, case and timestamp fields must satisfy native flat-input validation.</p>}
         {form.format === "table" && <details><summary>Typed Inductive event-table JSON</summary><p>The original table preserves every cell, dtype, index, category and metadata field. Missing cells, present nulls and empty values remain distinct.</p><pre>{WORKFLOW_INPUT_TABLE_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(WORKFLOW_INPUT_TABLE_EXAMPLE, "minera-inductive-input-table.json")}>Download Inductive table example</button></details>}
         {form.format === "variants_json" && <details open><summary>Compact weighted-variant JSON</summary><p>Upload a bare array of records with activities as an ordered string array and count as an unsigned integer. Repeated records, empty words, literal empty activities and zero counts retain their native input meaning.</p><pre>{INDUCTIVE_WEIGHTED_VARIANTS_EXAMPLE}</pre><button className="btn-ghost" onClick={() => download(INDUCTIVE_WEIGHTED_VARIANTS_EXAMPLE, "minera-inductive-weighted-variants.json")}>Download weighted Inductive variant example</button></details>}

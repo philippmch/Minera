@@ -254,6 +254,7 @@ import {
 import { nativeJson } from "./native-json";
 import { readAlignmentResponse } from "./alignment-inspection";
 import { readNativeResponse } from "./native-response";
+import {isActiveSourceMining, miningSourceFields, type ActiveDatasetResult, type MiningInputOptions} from "./active-mining-source";
 
 export interface CsvOptions {
   caseColumn?: string;
@@ -643,7 +644,7 @@ export interface MinerOptions {
   overlapStrict?: boolean;
 }
 
-export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
+export type MineOptions = CsvOptions & FilterOptions & MinerOptions & MiningInputOptions;
 
 /**
  * The form fields a mine request sends for the given options, as name/value
@@ -652,6 +653,10 @@ export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
  * in charge. Activity lists are comma-joined to match the backend's parser.
  */
 export function mineFormEntries(options: MineOptions): Array<[string, string]> {
+  if (options.miningInputFormat === "table") {
+    options = {...options};
+    for (const key of ["caseColumn", "activityColumn", "timestampColumn", "delimiter", "xesVariant", "xesCaseAttribute", "xesActivityAttribute", "xesTimestampAttribute", "xesResourceAttribute", "xesLifecycleAttribute", "xesRequireTimestamp", "xesTimestampSort", "xesReverseSort", "xesMaxTraces", "xesAttributesToRead", "xesMaxDecompressedBytes"] as const) delete options[key];
+  }
   const entries: Array<[string, string]> = [];
   const add = (name: string, value: string) => entries.push([name, value]);
   const validateNonnegativeInteger = (name: string, value: number) => {
@@ -1703,28 +1708,34 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (options.overlapStrict) add("overlap_strict", "true");
   }
 
-  return entries;
+  const sourceFields = miningSourceFields(options), overridden = new Set(sourceFields.map(([key]) => key));
+  return [...entries.filter(([key]) => !overridden.has(key)), ...sourceFields];
 }
 
-/** Uploads a CSV event log to the local Minera backend for mining. */
-export async function mineCsv(
+/** Upload the unchanged original file and retain typed source-only outcomes. */
+export async function mineActiveDataset(
   file: File,
   options: MineOptions = {},
-): Promise<MineraExport> {
+  signal?: AbortSignal,
+): Promise<ActiveDatasetResult> {
   const form = new FormData();
   form.append("log", file, file.name);
-  for (const [name, value] of mineFormEntries(options)) form.append(name, value);
+  const fields = mineFormEntries({...options, miningRequestId: options.miningRequestId ?? crypto.randomUUID()});
+  for (const [name, value] of fields) form.append(name, value);
 
   let response: Response;
   try {
-    response = await fetch("/api/mine", { method: "POST", body: form });
-  } catch {
+    response = await fetch("/api/mine", { method: "POST", body: form, signal });
+  } catch (cause) {
+    if (signal?.aborted) throw cause;
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
     );
   }
 
-  const parsed: unknown = await response.json().catch(() => null);
+  const parsed: unknown = await readNativeResponse(response, {path: "/api/mine", fields});
+  signal?.throwIfAborted();
+  if (isActiveSourceMining(parsed)) return parsed;
   if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
     throw new Error(String((parsed as { error: unknown }).error));
   }
@@ -1736,6 +1747,8 @@ export async function mineCsv(
   }
   return parsed;
 }
+/** Historical callers require an analysis; the active-source API retains independent native failures. */
+export async function mineCsv(file: File, options: MineOptions = {}, signal?: AbortSignal): Promise<MineraExport> {const value = await mineActiveDataset(file, options, signal); if (isActiveSourceMining(value)) {if (value.analysis) return value.analysis; throw new Error(value.error?.message ?? "The source is active, but no classic analysis is available. Inspect its native family results.");} return value;}
 
 /**
  * Asks the backend to align the most recently mined log against one miner's

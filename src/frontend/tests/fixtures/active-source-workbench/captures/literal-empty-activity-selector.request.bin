@@ -1,0 +1,23 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_format"
+
+table
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+bc41c919-b886-42b1-8a4f-365b2eb9c873
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_selectors_json"
+
+{"activity_key": ""}
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-empty-activity-selector.json"
+Content-Type: application/octet-stream
+
+{"columns":["case:concept:name","","time:timestamp","org:resource","lifecycle:transition"],"rows":[[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:00Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:01Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:02Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:03Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}]],"dtypes":[],"categorical_dtypes":[],"index":null,"attributes":[],"metadata":{}}
+
+--OwnedActiveEventSourceFeature57--

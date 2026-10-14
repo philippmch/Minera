@@ -1,0 +1,37 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="case_column"
+
+ticket
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="activity_column"
+
+phase
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="timestamp_column"
+
+clock
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="resource_column"
+
+worker
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="lifecycle_column"
+
+state
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+7b439a94-0601-4a12-8740-7dcfbdcffb91
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-csv-custom-exact-headers.csv"
+Content-Type: application/octet-stream
+
+ticket,phase,clock,worker,state
+one,B,2026-01-01T10:01:00Z,alice,complete
+one,A,2026-01-01T10:00:00Z,alice,complete
+
+--OwnedActiveEventSourceFeature57--

@@ -1,3 +1,4 @@
+import {MINING_SOURCE_SELECTORS, activeMiningSourceAllTablesCsv, activeMiningSourceBytes, activeMiningSourceTableFileName, miningSourceWorkbenchFields, type ActiveMiningSourceDescriptor} from "../active-mining-source";
 import { useEffect, useRef, useState } from "react";
 import {
   defaultPetriAlignmentWorkbenchForm, PETRI_ALIGNMENT_CONTROLS, PETRI_ALIGNMENT_VARIANTS, PETRI_ALIGNMENT_XES_VARIANTS,
@@ -11,11 +12,16 @@ import { nativeJson } from "../native-json";
 import { downloadQueryBlob } from "../log-query";
 import { DiagnosticTableView } from "./ModelDiagnosticsInspection";
 
-export function PetriAlignmentWorkspace({file}: {file: File | null}) {
+export function PetriAlignmentWorkspace({file, source = null}: {file: File | null; source?: ActiveMiningSourceDescriptor | null}) {
   const [log, setLog] = useState<File | null>(file), [model, setModel] = useState<File | null>(null);
   const [form, setForm] = useState(defaultPetriAlignmentWorkbenchForm), [run, setRun] = useState<PetriAlignmentWorkbenchRun | null>(null);
   const [tableId, setTableId] = useState("/trace_groups"), [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const cancel = () => {controller.current?.abort(); controller.current = null; setPending(false);};
+  const chooseLog = (value: File | null) => {cancel(); setLog(value); setRun(null); setError(null);};
+  const chooseModel = (value: File | null) => {cancel(); setModel(value); setRun(null); setError(null);};
+  const adoptSource = () => {chooseLog(file); if (source) {const mapped = miningSourceWorkbenchFields(source, {}); setForm(current => ({...current, inputFormat: source.format, adapter: source.shape, miningSelectors: {...source.selectors}, importFields: mapped.importFields}));}};
+  useEffect(() => {adoptSource();}, [file, source]);
   useEffect(() => () => {controller.current?.abort(); controller.current = null;}, []);
   const setImport = (key: string, value: string) => setForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));
   const setAlignment = (key: string, value: string) => setForm(current => ({...current, alignmentFields: {...current.alignmentFields, [key]: value}}));
@@ -33,7 +39,7 @@ export function PetriAlignmentWorkspace({file}: {file: File | null}) {
     }
   };
   const table = run?.tables.find(item => item.id === tableId) ?? run?.tables[0], input = run?.value.input_context;
-  const download = (raw: string, name: string, type = "application/json") => downloadQueryBlob(new Blob([raw], {type}), name);
+  const download = (raw: string, name: string, type = "application/json") => downloadQueryBlob(new Blob([activeMiningSourceBytes(raw)], {type}), name);
   const isXes = /\.(?:xes|xes\.gz|gz)$/i.test(log?.name ?? "");
   const activeControls = PETRI_ALIGNMENT_CONTROLS.filter(([,,, scope]) => petriAlignmentControlActive(scope, form.variant));
   const control = ([key, label, kind]: typeof PETRI_ALIGNMENT_CONTROLS[number]) => <label className="filters-field" key={key}>
@@ -51,8 +57,8 @@ export function PetriAlignmentWorkspace({file}: {file: File | null}) {
       <p>Upload a log and its model, choose the alignment search and costs, then inspect every trace group, move, alternative and visited marking.</p>
       <fieldset className="query-fields" disabled={pending}>
         <div className="query-options">
-          <label className="filters-field"><span>Alignment log file</span><input type="file" accept=".csv,.tsv,.xes,.xes.gz,.gz,text/csv,application/xml,application/gzip" onChange={event => setLog(event.target.files?.[0] ?? null)} /><span>{log?.name ?? "Choose CSV, TSV or XES"}</span></label>
-          <label className="filters-field"><span>Alignment PNML model</span><input type="file" accept=".pnml,.xml,application/xml" onChange={event => setModel(event.target.files?.[0] ?? null)} /><span>{model?.name ?? "Choose PNML"}</span></label>
+          <label className="filters-field"><span>Alignment log file</span><input type="file" accept=".csv,.tsv,.xes,.xes.gz,.gz,.json,text/csv,application/xml,application/gzip,application/json" onChange={event => chooseLog(event.target.files?.[0] ?? null)} /><span>{log?.name ?? "Choose CSV, TSV or XES"}</span></label>
+          <label className="filters-field"><span>Alignment PNML model</span><input type="file" accept=".pnml,.xml,application/xml" onChange={event => chooseModel(event.target.files?.[0] ?? null)} /><span>{model?.name ?? "Choose PNML"}</span></label>
           <label className="filters-field"><span>Alignment search variant</span><select value={form.variant} onChange={event => setForm(current => ({...current, variant: event.target.value as typeof form.variant}))}>
             {PETRI_ALIGNMENT_VARIANTS.map(value => <option key={value} value={value}>{value}</option>)}
           </select></label>
@@ -60,8 +66,10 @@ export function PetriAlignmentWorkspace({file}: {file: File | null}) {
             <option value="log">Grouped log</option><option value="stream">Event stream</option><option value="dataframe">Dataframe</option><option value="lazyframe">Lazyframe</option>
           </select></label>
         </div>
-        {file && <button className="btn-ghost" onClick={() => setLog(file)}>Use current original log</button>}
-        <details><summary>Alignment import settings</summary><div className="query-options">
+        {file && <button className="btn-ghost" onClick={adoptSource}>Use current original source settings</button>}
+        <label className="filters-field"><span>Alignment original source format</span><select value={form.inputFormat ?? "auto"} onChange={event => setForm(current => ({...current, inputFormat: event.target.value as "auto" | "table"}))}><option value="auto">CSV / TSV / XES / gzip XES</option><option value="table">Full native EventTable JSON</option></select></label>
+        <details><summary>Literal source selectors</summary><p>Source selectors configure the uploaded source. Specific alignment options below can override their activity and case defaults.</p><div className="query-options">{MINING_SOURCE_SELECTORS.map(([key, label, canonical]) => <div className="filters-field" key={key}><label><span>{label}</span><input disabled={form.miningSelectors?.[key] === undefined} value={form.miningSelectors?.[key] ?? ""} placeholder={canonical} onChange={event => setForm(current => ({...current, miningSelectors: {...current.miningSelectors, [key]: event.target.value}}))} /></label><label className="query-check"><input type="checkbox" checked={form.miningSelectors?.[key] !== undefined} onChange={event => setForm(current => {const selectors = {...current.miningSelectors}; if (event.target.checked) selectors[key] = ""; else delete selectors[key]; return {...current, miningSelectors: selectors};})} />Submit exact selector, including empty</label></div>)}</div></details>
+        {form.inputFormat !== "table" && <details><summary>Alignment import settings</summary><div className="query-options">
           {TOKEN_REPLAY_IMPORT_CONTROLS.filter(([key]) => isXes ? key.startsWith("xes_") : !key.startsWith("xes_")).map(([key, label, placeholder]) => <label className="filters-field" key={key}>
             <span>{label}</span><input value={form.importFields[key] ?? ""} placeholder={placeholder} onChange={event => setImport(key, event.target.value)} />
           </label>)}
@@ -75,7 +83,7 @@ export function PetriAlignmentWorkspace({file}: {file: File | null}) {
           </> : <label className="filters-field"><span>CSV delimiter</span><select value={form.importFields.delimiter ?? ""} onChange={event => setImport("delimiter", event.target.value)}>
             <option value="">Native default (tab for TSV)</option><option value=",">Comma</option><option value=";">Semicolon</option><option value={"\t"}>Tab</option><option value="|">Pipe</option>
           </select></label>}
-        </div></details>
+        </div></details>}
         <div className="query-options">{activeControls.filter(([,, kind]) => !["map", "array", "marking"].includes(kind)).map(control)}</div>
         <details><summary>Alignment cost maps and marking overrides</summary><div className="query-options">{activeControls.filter(([,, kind]) => ["map", "array", "marking"].includes(kind)).map(control)}</div></details>
         <p>Flat inputs retain original row order and columns; the case attribute can regroup events. Grouped logs retain trace boundaries. Blank settings use native defaults. Explicit empty cost objects and arrays are submitted as entered. Marking positions follow the PNML place order shown in the result.</p>
@@ -93,7 +101,8 @@ export function PetriAlignmentWorkspace({file}: {file: File | null}) {
       <div className="query-actions">
         <button className="btn-ghost" onClick={() => download(run.raw, "minera-petri-alignment-native.json")}>Download complete alignment native JSON</button>
         <button className="btn-ghost" onClick={() => download(petriAlignmentWorkbenchReport(run), "minera-petri-alignment-report.json")}>Download alignment report</button>
-        <button className="btn-ghost" onClick={() => download(diagnosticCsv(table), `minera-petri-alignment-${encodeURIComponent(table.id)}.csv`, "text/csv;charset=utf-8")}>Download complete alignment table CSV</button>
+        <button className="btn-ghost" onClick={() => download(diagnosticCsv(table), `minera-petri-alignment-${activeMiningSourceTableFileName(table.id)}.csv`, "text/csv;charset=utf-8")}>Download complete alignment table CSV</button>
+        <button className="btn-ghost" onClick={() => download(activeMiningSourceAllTablesCsv(run.tables), "minera-petri-alignment-all-tables.csv", "text/csv;charset=utf-8")}>Download all complete native tables CSV</button>
         <button className="btn-ghost" onClick={() => downloadQueryBlob(run.inputs.log, run.inputs.log.name)}>Download original alignment log</button>
         <button className="btn-ghost" onClick={() => downloadQueryBlob(run.inputs.model, run.inputs.model.name)}>Download original alignment PNML</button>
       </div>

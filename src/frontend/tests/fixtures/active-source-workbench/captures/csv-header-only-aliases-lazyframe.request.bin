@@ -1,0 +1,15 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+lazyframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+405d3ff0-763e-48e1-852e-6b5d81202a9f
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-csv-header-only-aliases.csv"
+Content-Type: application/octet-stream
+
+case_id,concept:name,time:timestamp,org:resource,lifecycle:transition
+
+--OwnedActiveEventSourceFeature57--

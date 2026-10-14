@@ -1,0 +1,19 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_format"
+
+table
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+49f73dc4-133a-40ff-944d-02fbf05b785f
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-implicit-index.json"
+Content-Type: application/octet-stream
+
+{"columns":["case:concept:name","concept:name","time:timestamp","org:resource","lifecycle:transition"],"rows":[[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:00Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:01Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:02Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:03Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:04Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:05Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}]],"dtypes":[],"categorical_dtypes":[],"index":null,"attributes":[],"metadata":{}}
+
+--OwnedActiveEventSourceFeature57--

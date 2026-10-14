@@ -1,8 +1,10 @@
+import {activeMiningSourceTables} from "./active-mining-source";
+import {isWorkflowInputTable, type WorkflowInputTable} from "./workflow-input-workbench";
 import type { Alignments, AlignmentVariant } from "./types";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import { nativeResponseJson, nativeResponseRequest, readNativeResponse } from "./native-response";
-import { nativeObjectTables, type DiagnosticTable } from "./model-diagnostics";
-import { TOKEN_REPLAY_IMPORT_CONTROLS, TOKEN_REPLAY_XES_BOOLEAN_CONTROLS, type TokenReplayAdapter } from "./token-replay-workbench";
+import { type DiagnosticTable } from "./model-diagnostics";
+import { tokenReplayInputFields, TOKEN_REPLAY_IMPORT_CONTROLS, TOKEN_REPLAY_XES_BOOLEAN_CONTROLS, type TokenReplayAdapter } from "./token-replay-workbench";
 
 export const PETRI_ALIGNMENT_VARIANTS = [
   "state_equation_a_star", "dijkstra_no_heuristics", "dijkstra_less_memory", "discounted_a_star",
@@ -13,6 +15,8 @@ export type PetriAlignmentAdapter = TokenReplayAdapter;
 export interface PetriAlignmentWorkbenchForm {
   variant: AlignmentVariant;
   adapter: PetriAlignmentAdapter;
+  inputFormat?: "auto" | "table";
+  miningSelectors?: Partial<Record<"case_id_key" | "activity_key" | "timestamp_key" | "resource_key" | "lifecycle_key", string>>;
   importFields: Record<string, string>;
   alignmentFields: Record<string, string>;
 }
@@ -62,6 +66,8 @@ export function petriAlignmentWorkbenchFields(form: PetriAlignmentWorkbenchForm,
   if (!supportedVariant(form.variant)) throw new Error("Select a supported Petri alignment variant.");
   if (!["log", "stream", "dataframe", "lazyframe"].includes(form.adapter)) throw new Error("Select a supported alignment input shape.");
   const fields: Array<[string, string]> = [["alignment_variant", form.variant], ["alignment_input_adapter", form.adapter]];
+  fields.push(...tokenReplayInputFields(form));
+  if (form.inputFormat !== "table") {
   for (const [key] of TOKEN_REPLAY_IMPORT_CONTROLS) {
     const value = form.importFields[key];
     if (value !== undefined && value !== "") fields.push([key, value]);
@@ -80,6 +86,7 @@ export function petriAlignmentWorkbenchFields(form: PetriAlignmentWorkbenchForm,
   if (delimiter) {
     if (delimiter.length !== 1) throw new Error("The CSV delimiter must be one character.");
     fields.push(["delimiter", delimiter]);
+  }
   }
   for (const [key, label, kind, scope] of PETRI_ALIGNMENT_CONTROLS) {
     if (!petriAlignmentControlActive(scope, form.variant)) continue;
@@ -106,8 +113,9 @@ export interface PetriAlignmentCompleteMove {
 }
 export interface PetriAlignmentWorkflow {
   family: "PETRI_ALIGNMENT_WORKFLOW";
+  input_before?: WorkflowInputTable | null; input_after?: WorkflowInputTable | null; prepared_log?: Record<string, unknown>;
   input_context: {
-    adapter: PetriAlignmentAdapter; origin: "uploaded_csv_rows" | "uploaded_grouped_log"; dataset: string; model: string;
+    adapter: PetriAlignmentAdapter; origin: "uploaded_csv_rows" | "uploaded_grouped_log" | "uploaded_typed_table"; dataset: string; model: string;
     log_bytes: number; model_bytes: number; source_case_count: number; source_event_count: number;
     evaluated_case_count: number; evaluated_event_count: number; activity_attribute: string; case_id_attribute: string;
   };
@@ -127,7 +135,8 @@ export interface PetriAlignmentWorkflow {
 export function isPetriAlignmentWorkflow(value: unknown): value is PetriAlignmentWorkflow {
   if (!object(value) || value.family !== "PETRI_ALIGNMENT_WORKFLOW" || !object(value.input_context) || !object(value.model_context) || !object(value.result)) return false;
   const input = value.input_context, model = value.model_context, result = value.result;
-  if (!["log", "stream", "dataframe", "lazyframe"].includes(String(input.adapter)) || !["uploaded_csv_rows", "uploaded_grouped_log"].includes(String(input.origin)) ||
+  if (["input_before", "input_after"].some(key => value[key] !== undefined && value[key] !== null && !isWorkflowInputTable(value[key])) || value.prepared_log !== undefined && !object(value.prepared_log)) return false;
+  if (!["log", "stream", "dataframe", "lazyframe"].includes(String(input.adapter)) || !["uploaded_csv_rows", "uploaded_grouped_log", "uploaded_typed_table"].includes(String(input.origin)) ||
     !["dataset", "model", "activity_attribute", "case_id_attribute"].every(key => typeof input[key] === "string") ||
     !["log_bytes", "model_bytes", "source_case_count", "source_event_count", "evaluated_case_count", "evaluated_event_count"].every(key => index(input[key]))) return false;
   if (!Array.isArray(model.places) || !model.places.every((row, i) => object(row) && row.index === i && typeof row.id === "string" &&
@@ -169,7 +178,7 @@ export function isPetriAlignmentWorkflow(value: unknown): value is PetriAlignmen
 }
 
 export function petriAlignmentWorkbenchTables(value: PetriAlignmentWorkflow, fields?: Array<[string, string]>): DiagnosticTable[] {
-  const tables = nativeObjectTables(value);
+  const tables = activeMiningSourceTables(value);
   const moveRecords: unknown[] = [], moveRows: unknown[][] = [], alternativeRecords: unknown[] = [], alternativeRows: unknown[][] = [];
   const projectionRecords: unknown[] = [], projectionRows: unknown[][] = [];
   for (const detail of value.variant_details) {
@@ -223,6 +232,7 @@ export async function runPetriAlignmentWorkbench(log: File, model: File, form: P
     input.log_bytes !== log.size || input.model_bytes !== model.size ||
     (submitted.alignment_activity_attribute !== undefined && input.activity_attribute !== submitted.alignment_activity_attribute.trim()) ||
     (submitted.alignment_case_id_attribute !== undefined && input.case_id_attribute !== submitted.alignment_case_id_attribute.trim())) throw new Error("The alignment response does not match the submitted inputs and options.");
+  if (form.inputFormat === "table" && input.origin !== "uploaded_typed_table") throw new Error("The native result did not retain the uploaded typed source.");
   return {value, raw: nativeResponseJson(value), fields, tables: petriAlignmentWorkbenchTables(value, fields), inputs: {log, model, log_sha256: logHash, model_sha256: modelHash}};
 }
 export function petriAlignmentWorkbenchReport(run: PetriAlignmentWorkbenchRun): string {

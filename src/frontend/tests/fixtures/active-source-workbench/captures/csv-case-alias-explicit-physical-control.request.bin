@@ -1,0 +1,21 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="case_column"
+
+case:concept:name
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+b033c76a-2065-47bf-a0c2-b0019daaf6db
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-csv-case-alias-opt-in-exact.csv"
+Content-Type: application/octet-stream
+
+case:concept:name,concept:name,time:timestamp,org:resource,lifecycle:transition
+one,B,2026-01-01T10:01:00Z,alice,complete
+one,A,2026-01-01T10:00:00Z,alice,complete
+
+--OwnedActiveEventSourceFeature57--

@@ -1,11 +1,15 @@
+import {activeMiningSourceTables} from "./active-mining-source";
+import {isWorkflowInputTable, type WorkflowInputTable} from "./workflow-input-workbench";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import { nativeResponseJson, nativeResponseRequest, readNativeResponse } from "./native-response";
-import { nativeObjectTables, type DiagnosticTable } from "./model-diagnostics";
+import { type DiagnosticTable } from "./model-diagnostics";
 
 export type TokenReplayAdapter = "log" | "stream" | "dataframe" | "lazyframe";
 export interface TokenReplayWorkbenchForm {
   variant: "forward" | "backwards";
   adapter: TokenReplayAdapter;
+  inputFormat?: "auto" | "table";
+  miningSelectors?: Partial<Record<"case_id_key" | "activity_key" | "timestamp_key" | "resource_key" | "lifecycle_key", string>>;
   importFields: Record<string,string>;
   replayFields: Record<string,string>;
 }
@@ -43,10 +47,19 @@ export const TOKEN_REPLAY_XES_BOOLEAN_CONTROLS = [
 export const defaultTokenReplayWorkbenchForm = (): TokenReplayWorkbenchForm => ({
   variant:"forward", adapter:"log", importFields:{}, replayFields:{token_replay_enable_pltr_fitness:"true"},
 });
+/** Source selectors are exact strings; this carrier is separate from replay-specific options. */
+export function tokenReplayInputFields(form: Pick<TokenReplayWorkbenchForm, "inputFormat" | "miningSelectors">): Array<[string,string]> {
+  const fields: Array<[string,string]> = [];
+  if (form.inputFormat !== undefined) {if (!["auto", "table"].includes(form.inputFormat)) throw new Error("Select CSV/XES or native EventTable input."); fields.push(["mining_input_format", form.inputFormat]);}
+  if (form.miningSelectors !== undefined) {for (const [key, value] of Object.entries(form.miningSelectors)) if (!["case_id_key", "activity_key", "timestamp_key", "resource_key", "lifecycle_key"].includes(key) || typeof value !== "string") throw new Error("Source selectors must map native selector names to exact strings."); fields.push(["mining_selectors_json", JSON.stringify(form.miningSelectors)]);}
+  return fields;
+}
 export function tokenReplayWorkbenchFields(form:TokenReplayWorkbenchForm, logName:string): Array<[string,string]> {
   if (!["forward","backwards"].includes(form.variant)) throw new Error("Select forward or backwards replay.");
   if (!["log","stream","dataframe","lazyframe"].includes(form.adapter)) throw new Error("Select a supported replay input shape.");
   const fields:Array<[string,string]> = [["token_replay_variant",form.variant],["token_replay_input_adapter",form.adapter]];
+  fields.push(...tokenReplayInputFields(form));
+  if (form.inputFormat !== "table") {
   for (const [key] of TOKEN_REPLAY_IMPORT_CONTROLS) if (form.importFields[key] !== undefined && form.importFields[key] !== "") fields.push([key,form.importFields[key]]);
   for (const key of IMPORT_BOOLEAN_KEYS) {
     const value = form.importFields[key];
@@ -58,6 +71,7 @@ export function tokenReplayWorkbenchFields(form:TokenReplayWorkbenchForm, logNam
   }
   const delimiter = form.importFields.delimiter || (/\.tsv$/i.test(logName) ? "\t" : "");
   if (delimiter) { if (delimiter.length !== 1) throw new Error("The CSV delimiter must be one character."); fields.push(["delimiter",delimiter]); }
+  }
   for (const [key,,kind,scope] of TOKEN_REPLAY_CONTROLS) {
     if (scope === "forward" && form.variant !== "forward") continue;
     const value = form.replayFields[key];
@@ -95,7 +109,8 @@ export function isReplayTaggedValue(value:unknown):boolean {
 }
 export interface TokenReplayWorkflow {
   family:"TOKEN_REPLAY_WORKFLOW"; variant:"forward"|"backwards";
-  input_context:{adapter:TokenReplayAdapter;origin:"uploaded_csv_rows"|"uploaded_grouped_log";dataset:string;model:string;
+  input_before?: WorkflowInputTable | null; input_after?: WorkflowInputTable | null; prepared_log?: Record<string, unknown>;
+  input_context:{adapter:TokenReplayAdapter;origin:"uploaded_csv_rows"|"uploaded_grouped_log"|"uploaded_typed_table";dataset:string;model:string;
     log_bytes:number;model_bytes:number;source_case_count:number;source_event_count:number;
     evaluated_case_count:number;evaluated_event_count:number;activity_attribute:string;case_id_attribute:string};
   model_context:{places:Array<{index:number;id:string;initial_tokens:number;final_tokens:number;initial_key:boolean;final_key:boolean}>;
@@ -111,7 +126,8 @@ function taggedReplayRows(value:Record<string,unknown>):unknown[]|undefined {
 export function isTokenReplayWorkflow(value:unknown):value is TokenReplayWorkflow {
   if (!object(value)||value.family!=="TOKEN_REPLAY_WORKFLOW"||!["forward","backwards"].includes(String(value.variant))||!object(value.input_context)||!object(value.model_context)||!object(value.diagnostics)) return false;
   const input=value.input_context,model=value.model_context,diagnostics=value.diagnostics;
-  if (!["log","stream","dataframe","lazyframe"].includes(String(input.adapter))||!["uploaded_csv_rows","uploaded_grouped_log"].includes(String(input.origin))||
+  if (["input_before", "input_after"].some(key => value[key] !== undefined && value[key] !== null && !isWorkflowInputTable(value[key])) || value.prepared_log !== undefined && !object(value.prepared_log)) return false;
+  if (!["log","stream","dataframe","lazyframe"].includes(String(input.adapter))||!["uploaded_csv_rows","uploaded_grouped_log","uploaded_typed_table"].includes(String(input.origin))||
       !["dataset","model","activity_attribute","case_id_attribute"].every(key=>typeof input[key]==="string")||
       !["log_bytes","model_bytes","source_case_count","source_event_count","evaluated_case_count","evaluated_event_count"].every(key=>index(input[key]))) return false;
   if (!Array.isArray(model.places)||!model.places.every((row,i)=>object(row)&&row.index===i&&typeof row.id==="string"&&integer(row,"initial_tokens")&&integer(row,"final_tokens")&&typeof row.initial_key==="boolean"&&typeof row.final_key==="boolean")||
@@ -140,7 +156,7 @@ export function replayTaggedTable(value:Record<string,unknown>):DiagnosticTable 
   visit(value,"/full_result");return {id:"tagged_values",title:"Every typed public value and dictionary entry",columns:["path","dictionary_key","type","float_hex","value","index"],rows,records};
 }
 export function tokenReplayWorkbenchTables(value:TokenReplayWorkflow,fields?:Array<[string,string]>):DiagnosticTable[] {
-  const tables=nativeObjectTables(value);
+  const tables=activeMiningSourceTables(value);
   if(value.full_result){
     tables.push(replayTaggedTable(value.full_result));
     const rows=taggedReplayRows(value.full_result)??[];
@@ -162,11 +178,13 @@ export async function runTokenReplayWorkbench(log:File,model:File,form:TokenRepl
   signal?.throwIfAborted();const body=new FormData();body.append("log",log);body.append("model",model);fields.forEach(([key,value])=>body.append(key,value));
   const path="/api/replay-token-workbench";const response=await fetch(path,{method:"POST",body,signal});
   const value=await readNativeResponse(response,{path,fields});
+  signal?.throwIfAborted();
   if(!response.ok)throw new Error(object(value)&&typeof value.error==="string"?value.error:`Token replay failed (${response.status}).`);
   if(!isTokenReplayWorkflow(value))throw new Error("The server did not return a valid native token-replay workflow.");
   const input=value.input_context;
   if(value.variant!==form.variant||input.adapter!==form.adapter||input.dataset!==log.name||input.model!==model.name||input.log_bytes!==log.size||input.model_bytes!==model.size||
       (value.variant==="forward"&&(value.full_result?.type==="tuple")!==(form.replayFields.token_replay_enable_pltr_fitness==="true")))throw new Error("The replay response does not match the submitted inputs and options.");
+  if (form.inputFormat === "table" && input.origin !== "uploaded_typed_table") throw new Error("The native result did not retain the uploaded typed source.");
   return {value,raw:nativeResponseJson(value),fields,tables:tokenReplayWorkbenchTables(value,fields),inputs:{log,model,log_sha256:logHash,model_sha256:modelHash}};
 }
 export function tokenReplayWorkbenchReport(run:TokenReplayWorkbenchRun):string{

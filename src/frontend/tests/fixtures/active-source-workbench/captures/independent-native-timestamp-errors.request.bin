@@ -1,0 +1,31 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_format"
+
+table
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+3e9effc8-0912-438d-9677-717dba98efaa
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="correlation_variants"
+
+classic
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="batches"
+
+true
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="batch_variant"
+
+pandas
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-native-invalid-timestamps.json"
+Content-Type: application/octet-stream
+
+{"columns":["case:concept:name","concept:name","time:timestamp","org:resource","lifecycle:transition"],"rows":[[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"invalid-native-timestamp","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"invalid-native-timestamp","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"invalid-native-timestamp","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"invalid-native-timestamp","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"invalid-native-timestamp","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"case:concept:name","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"invalid-native-timestamp","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}]],"dtypes":[],"categorical_dtypes":[],"index":null,"attributes":[],"metadata":{}}
+
+--OwnedActiveEventSourceFeature57--

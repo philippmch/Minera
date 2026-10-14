@@ -1,0 +1,4 @@
+{"activities": [
+    {"name": "A", "count": 2, "start_count": 2, "end_count": 0, "rework_cases": 0},
+    {"name": "B", "count": 2, "start_count": 0, "end_count": 2, "rework_cases": 0}
+  ], "model": {"sound": true, "token_replay": {"fitness": 1, "precision": 1, "generalization": 0.292893, "simplicity": 1, "fitting_traces": 2, "trace_count": 2, "produced": 6, "consumed": 6, "missing": 0, "remaining": 0, "activity_attribute": "concept:name", "variants": [{"activities": [0, 1], "activity_names": ["A", "B"], "count": 2, "fitness": 1}]}, "footprints": {"fitness": 1, "precision": 1, "log_relations": 1, "model_relations": 1, "shared_relations": 1, "exhausted": false, "log_only": [], "model_only": []}}}

@@ -21,7 +21,6 @@ import {
   type EventAttributeStat,
   type MineraExport,
   type OcelDiscoveryResult,
-  isMineraExport,
   numberFormat,
 } from "./types";
 import { computeLayout } from "./layout";
@@ -65,6 +64,8 @@ import { InductiveInputWorkspace } from "./components/InductiveInputWorkspace";
 import { ProcessTreeAlignmentWorkspace } from "./components/ProcessTreeAlignmentWorkspace";
 import { PetriAntiMultiWorkspace } from "./components/PetriAntiMultiWorkspace";
 import { ModelConversionWorkspace } from "./components/ModelConversionWorkspace";
+import {ActiveMiningSource} from "./components/ActiveMiningSource";
+import {activeDatasetAnalysis, activeMiningSourceText, assertMiningSourceBinding, cancelMiningRequest, classifyMiningJson, isActiveSourceMining, miningSourceDescriptor, miningSourceHash, miningSourceOptions, MiningSourceRequestGate, suggestMiningSourceForm, type ActiveMiningSourceDescriptor, type ActiveSourceMining} from "./active-mining-source";
 import { requestLogQuerySchema } from "./log-query";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
@@ -100,11 +101,12 @@ import {
   type DecisionMiningOptions,
   checkModel,
   decideModel,
-  mineCsv,
+  mineActiveDataset,
   requestOcelDiscovery,
   type FilterOptions,
   type CsvOptions,
   type MinerOptions,
+  type MineOptions,
   type OcelDiscoveryOptions,
 } from "./api";
 import {
@@ -113,7 +115,6 @@ import {
   hasActiveMinerOptions,
   initialTab,
   isJsonExport,
-  isOcelJsonDocument,
   logLifecycles,
   maxEdgeCount,
   type Tab,
@@ -137,6 +138,12 @@ export default function App() {
   const [showTreeAlignment, setShowTreeAlignment] = useState(false);
   const [showPetriAntiMulti, setShowPetriAntiMulti] = useState(false);
   const [showModelConversion, setShowModelConversion] = useState(false);
+  const [showActiveSource, setShowActiveSource] = useState(false);
+  const [pendingSourceFile, setPendingSourceFile] = useState<File | null>(null);
+  const [sourceOutcome, setSourceOutcome] = useState<ActiveSourceMining | null>(null);
+  const [liveSourceId, setLiveSourceId] = useState<string | null>(null);
+  const liveSource = useRef<string | null>(null), sourceGate = useRef(new MiningSourceRequestGate());
+  const sourceRequest = useRef<{controller: AbortController; request_id: string; posted: boolean} | null>(null);
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -152,8 +159,7 @@ export default function App() {
   const ocelQuestions=useRef<HTMLDetailsElement|null>(null);
   // The CSV upload behind the current view, kept so filters can re-mine it.
   // null when the data came from a pre-mined JSON export (not re-minable).
-  const [source, setSource] = useState<{
-    file: File;
+  const [source, setSource] = useState<ActiveMiningSourceDescriptor & {
     delimiter?: string;
     xesActivityAttribute?: string;
     xesOptions?: CsvOptions;
@@ -183,6 +189,11 @@ export default function App() {
   // Any result started under an older backend session may still resolve, but
   // must never repopulate caches cleared for the new session.
   const cacheGeneration = useRef(0);
+  const sourceAvailable = source !== null && liveSourceId === source.source_id;
+  const clearSourceCaches = () => {cacheGeneration.current += 1; alignCache.current = {}; decideCache.current = {}; dfgCache.current = {}; editCache.current = {}; processTreeCache.current = {}; decomposedCache.current = {}; petriAntiCache.current = {}; petriMultiCache.current = {}; reductionCache.current = {}; evaluationCache.current = {}; petriAnalysisCache.current = {}; emdCache.current = {}; conceptDriftCache.current = {};};
+  const cancelSourceLoad = () => {sourceGate.current.invalidate(); const previous = sourceRequest.current; sourceRequest.current = null; previous?.controller.abort(); if (previous?.posted) cancelMiningRequest(previous.request_id); ocelRequest.current?.abort(); ocelRequest.current = null; setMining(false);};
+  const beginSourceLoad = () => {cancelSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false}; setMining(true); setError(null); return {ticket, controller};};
+  useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
@@ -193,7 +204,7 @@ export default function App() {
   const requestAlignment = useCallback(
     async (minerId: string, options: AlignmentOptions = {}): Promise<Alignments> => {
       const effective = { ...DEFAULT_ALIGNMENT_OPTIONS, ...options };
-      const cacheKey = `${minerId}|${JSON.stringify(effective)}`;
+      const cacheKey = `${liveSource.current ?? 'offline'}|${minerId}|${JSON.stringify(effective)}`;
       const embedded = data?.conformance?.[minerId]?.alignments;
       const isDefault =
         effective.variant === DEFAULT_ALIGNMENT_OPTIONS.variant &&
@@ -202,9 +213,10 @@ export default function App() {
       if (embedded && isDefault) return embedded;
       const cached = alignCache.current[cacheKey];
       if (cached) return cached;
-      const generation = cacheGeneration.current;
-      const result = await alignModel(minerId, options);
-      if (generation === cacheGeneration.current) alignCache.current = { ...alignCache.current, [cacheKey]: result };
+      const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+      const result = await alignModel(minerId, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+      alignCache.current = { ...alignCache.current, [cacheKey]: result };
       return result;
     },
     [data],
@@ -212,120 +224,134 @@ export default function App() {
 
   // Decision mining for a model, fetched on demand and cached like alignments.
   const requestDecisions = useCallback(async (minerId: string, options: DecisionMiningOptions = {}): Promise<Decisions> => {
-    const cacheKey = `${minerId}|${JSON.stringify(options)}`;
+    const cacheKey = `${liveSource.current ?? 'offline'}|${minerId}|${JSON.stringify(options)}`;
     const cached = decideCache.current[cacheKey];
     if (cached) return cached;
-    const generation = cacheGeneration.current;
-    const result = await decideModel(minerId, options);
-    if (generation === cacheGeneration.current) decideCache.current = { ...decideCache.current, [cacheKey]: result };
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await decideModel(minerId, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    decideCache.current = { ...decideCache.current, [cacheKey]: result };
     return result;
   }, []);
 
   const requestDfg = useCallback(async (options: DfgAlignmentOptions = {}) => {
-    const key = JSON.stringify(options);
+    const key = String(liveSource.current) + '|' + JSON.stringify(options);
     if (dfgCache.current[key]) return dfgCache.current[key];
-    const generation = cacheGeneration.current;
-    const result = await alignDfg(options);
-    if (generation === cacheGeneration.current) dfgCache.current = { ...dfgCache.current, [key]: result };
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await alignDfg(options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    dfgCache.current = { ...dfgCache.current, [key]: result };
     return result;
   }, []);
   const requestEditDistance = useCallback(async (reference: File, options: EditDistanceOptions = {}) => {
-    const key = `${reference.name}|${reference.size}|${reference.lastModified}|${JSON.stringify(options)}`;
+    const key = `${liveSource.current ?? 'offline'}|${reference.name}|${reference.size}|${reference.lastModified}|${JSON.stringify(options)}`;
     if (editCache.current[key]) return editCache.current[key];
-    const generation = cacheGeneration.current;
-    const result = await alignEditDistance(reference, options);
-    if (generation === cacheGeneration.current) editCache.current = { ...editCache.current, [key]: result };
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await alignEditDistance(reference, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    editCache.current = { ...editCache.current, [key]: result };
     return result;
   }, []);
   const requestEvaluation = useCallback(async (miner: string, options: EvaluationOptions = {}) => {
-    const key = `${miner}|${evaluationQuery(options)}`;
+    const key = `${liveSource.current ?? 'offline'}|${miner}|${evaluationQuery(options)}`;
     const cached = evaluationCache.current[key];
     if (cached) return cached;
-    const generation = cacheGeneration.current;
-    const result = await evaluateModel(miner, options);
-    if (generation === cacheGeneration.current) evaluationCache.current = { ...evaluationCache.current, [key]: result };
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await evaluateModel(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    evaluationCache.current = { ...evaluationCache.current, [key]: result };
     return result;
   }, []);
   const requestPetriAnalysis = useCallback(async (options: PetriAnalysisOptions = {}): Promise<PetriAnalysisResult> => {
-    const key = petriAnalysisQuery(options);
+    const key = String(liveSource.current) + '|' + petriAnalysisQuery(options);
     const cached = petriAnalysisCache.current[key];
     if (cached) return cached;
-    const generation = cacheGeneration.current;
-    const result = await analyzePetriModel(options);
-    if (generation === cacheGeneration.current) petriAnalysisCache.current = { ...petriAnalysisCache.current, [key]: result };
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await analyzePetriModel(options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    petriAnalysisCache.current = { ...petriAnalysisCache.current, [key]: result };
     return result;
   }, []);
   const requestEmd = useCallback(async (reference: File, options: EmdOptions = {}) => {
-    const key = `${reference.name}|${reference.size}|${reference.lastModified}|${emdQuery(options)}`;
+    const key = `${liveSource.current ?? 'offline'}|${reference.name}|${reference.size}|${reference.lastModified}|${emdQuery(options)}`;
     const cached = emdCache.current[key];
     if (cached) return cached;
-    const generation = cacheGeneration.current;
-    const result = await evaluateEmd(reference, options);
-    if (generation === cacheGeneration.current) emdCache.current = { ...emdCache.current, [key]: result };
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await evaluateEmd(reference, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    emdCache.current = { ...emdCache.current, [key]: result };
     return result;
   }, []);
   const requestConceptDriftCached = useCallback(async (options: ConceptDriftOptions = {}): Promise<ConceptDriftResult> => {
-    const key = conceptDriftQuery(options);
+    const key = String(liveSource.current) + '|' + conceptDriftQuery(options);
     const cached = conceptDriftCache.current[key];
     if (cached) return cached;
-    const generation = cacheGeneration.current;
-    const result = await requestConceptDrift(options);
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await requestConceptDrift(options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
     if (generation !== cacheGeneration.current) throw new Error("analysis changed while concept-drift request was pending");
     conceptDriftCache.current = { ...conceptDriftCache.current, [key]: result };
     return result;
   }, []);
   const requestProcessTree = useCallback(async (options: ProcessTreeAlignmentOptions = {}) => {
-    const key = processTreeAlignmentQuery(options);
+    const key = String(liveSource.current) + '|' + processTreeAlignmentQuery(options);
     if (processTreeCache.current[key]) return processTreeCache.current[key];
-    const generation = cacheGeneration.current;
-    const result = await alignProcessTree(options);
-    if (generation === cacheGeneration.current) processTreeCache.current = { ...processTreeCache.current, [key]: result };
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await alignProcessTree(options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    processTreeCache.current = { ...processTreeCache.current, [key]: result };
     return result;
   }, []);
   const requestDecomposed = useCallback(async (miner: string, options: DecomposedAlignmentOptions = {}) => {
-    const key = `${miner}|${decomposedAlignmentQuery(options)}`;
+    const key = `${liveSource.current ?? 'offline'}|${miner}|${decomposedAlignmentQuery(options)}`;
     if (decomposedCache.current[key]) return decomposedCache.current[key];
-    const generation = cacheGeneration.current;
-    const result = await alignDecomposed(miner, options); if (generation === cacheGeneration.current) decomposedCache.current = { ...decomposedCache.current, [key]: result }; return result;
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await alignDecomposed(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); decomposedCache.current = { ...decomposedCache.current, [key]: result }; return result;
   }, []);
   const requestPetriAnti = useCallback(async (miner: string, options: PetriAntiAlignmentOptions = {}) => {
-    const key = `${miner}|${petriAntiAlignmentQuery(options)}`;
+    const key = `${liveSource.current ?? 'offline'}|${miner}|${petriAntiAlignmentQuery(options)}`;
     if (petriAntiCache.current[key]) return petriAntiCache.current[key];
-    const generation = cacheGeneration.current;
-    const result = await alignPetriAnti(miner, options); if (generation === cacheGeneration.current) petriAntiCache.current = { ...petriAntiCache.current, [key]: result }; return result;
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await alignPetriAnti(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); petriAntiCache.current = { ...petriAntiCache.current, [key]: result }; return result;
   }, []);
   const requestPetriMulti = useCallback(async (miner: string, options: PetriMultiAlignmentOptions = {}) => {
-    const key = `${miner}|${petriMultiAlignmentQuery(options)}`;
+    const key = `${liveSource.current ?? 'offline'}|${miner}|${petriMultiAlignmentQuery(options)}`;
     if (petriMultiCache.current[key]) return petriMultiCache.current[key];
-    const generation = cacheGeneration.current;
-    const result = await alignPetriMulti(miner, options); if (generation === cacheGeneration.current) petriMultiCache.current = { ...petriMultiCache.current, [key]: result }; return result;
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await alignPetriMulti(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); petriMultiCache.current = { ...petriMultiCache.current, [key]: result }; return result;
   }, []);
   const requestReduction = useCallback(async (traceIndex: number, options: ProcessTreeReductionOptions = {}) => {
-    const key = `${traceIndex}|${processTreeReductionQuery(options)}`;
+    const key = `${liveSource.current ?? 'offline'}|${traceIndex}|${processTreeReductionQuery(options)}`;
     if (reductionCache.current[key]) return reductionCache.current[key];
-    const generation = cacheGeneration.current;
-    const result = await reduceProcessTree(traceIndex, options); if (generation === cacheGeneration.current) reductionCache.current = { ...reductionCache.current, [key]: result }; return result;
+    const generation = cacheGeneration.current, sourceId = liveSource.current;
+    assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const result = await reduceProcessTree(traceIndex, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); reductionCache.current = { ...reductionCache.current, [key]: result }; return result;
   }, []);
 
   // Checks an uploaded PNML or BPMN model against the mined log. A new upload
   // replaces the server's cached "imported" net, so its stale alignments and
   // decisions are dropped.
   const requestModelCheck = useCallback(async (file: File, sourceId?: string, activityKey?: string, inferLegacyBoundaries?: boolean) => {
-    const generation = cacheGeneration.current;
-    const result = await checkModel(file, {sourceId,activityKey,pnmlInferLegacyBoundaries:inferLegacyBoundaries});
+    const generation = cacheGeneration.current, expectedSource = sourceId ?? liveSource.current;
+    assertMiningSourceBinding(expectedSource, liveSource.current, generation, cacheGeneration.current);
+    const result = await checkModel(file, {sourceId: expectedSource ?? undefined,activityKey,pnmlInferLegacyBoundaries:inferLegacyBoundaries});
+    assertMiningSourceBinding(expectedSource, liveSource.current, generation, cacheGeneration.current);
     if (generation !== cacheGeneration.current)
       throw new Error("The active analysis changed during model checking; choose the model again.");
     cacheGeneration.current += 1;
     alignCache.current = Object.fromEntries(
-      Object.entries(alignCache.current).filter(([key]) => !key.startsWith("imported|")),
+      Object.entries(alignCache.current).filter(([key]) => !key.includes("|imported|")),
     );
     decideCache.current = Object.fromEntries(
-      Object.entries(decideCache.current).filter(([key]) => !key.startsWith("imported|")),
+      Object.entries(decideCache.current).filter(([key]) => !key.includes("|imported|")),
     );
-    decomposedCache.current = Object.fromEntries(Object.entries(decomposedCache.current).filter(([key]) => !key.startsWith("imported|")));
-    petriAntiCache.current = Object.fromEntries(Object.entries(petriAntiCache.current).filter(([key]) => !key.startsWith("imported|")));
-    petriMultiCache.current = Object.fromEntries(Object.entries(petriMultiCache.current).filter(([key]) => !key.startsWith("imported|")));
-    evaluationCache.current = Object.fromEntries(Object.entries(evaluationCache.current).filter(([key]) => !key.startsWith("imported|")));
+    decomposedCache.current = Object.fromEntries(Object.entries(decomposedCache.current).filter(([key]) => !key.includes("|imported|")));
+    petriAntiCache.current = Object.fromEntries(Object.entries(petriAntiCache.current).filter(([key]) => !key.includes("|imported|")));
+    petriMultiCache.current = Object.fromEntries(Object.entries(petriMultiCache.current).filter(([key]) => !key.includes("|imported|")));
+    evaluationCache.current = Object.fromEntries(Object.entries(evaluationCache.current).filter(([key]) => !key.includes("|imported|")));
     petriAnalysisCache.current = {};
     return result;
   }, []);
@@ -359,13 +385,12 @@ export default function App() {
   // switched without asking the user to upload the same file again.
   const changeOcelModel = useCallback((options: OcelDiscoveryOptions) => {
     if (!ocelFile) return;
-    ocelRequest.current?.abort();
-    const controller = new AbortController();
+    const {ticket, controller} = beginSourceLoad();
     ocelRequest.current = controller;
     setMining(true);
     requestOcelDiscovery(ocelFile, options, controller.signal)
       .then((result) => {
-        if (ocelRequest.current !== controller || controller.signal.aborted) return;
+        if (ocelRequest.current !== controller || !sourceGate.current.accepts(ticket, controller.signal)) return;
         cacheGeneration.current += 1;
         setOcelResult(result);
         setError(null);
@@ -373,10 +398,10 @@ export default function App() {
       .catch((cause: Error) => {
         if (ocelRequest.current === controller && !controller.signal.aborted) setError(`Could not discover ${options.variant}: ${cause.message}`);
       })
-      .finally(() => { if (ocelRequest.current === controller) setMining(false); });
+      .finally(() => { if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; ocelRequest.current = null; setMining(false);} });
   }, [ocelFile]);
 
-  const loadFile = (file: File, xesActivityAttribute?: string, xesOptions?: CsvOptions) => {
+  const loadFile = (file: File, xesActivityAttribute?: string, xesOptions?: CsvOptions, miningOptions?: MineOptions) => {
     setShowOcelIo(false);
     setShowRelatedLogs(false);
     setShowStreaming(false);
@@ -392,93 +417,101 @@ export default function App() {
     setShowTreeAlignment(false);
     setShowPetriAntiMulti(false);
     setShowModelConversion(false);
-    ocelRequest.current?.abort();
-    ocelRequest.current = null;
-    setMining(true);
+    setShowActiveSource(false);
+    setPendingSourceFile(file);
+    const {ticket, controller} = beginSourceLoad();
+    const accepts = () => sourceRequest.current?.controller === controller && sourceGate.current.accepts(ticket, controller.signal);
     (async () => {
       // Minera JSON exports open directly; object-centric JSON is discovered
       // through the local backend, and other files are mined as event logs.
-      if (isJsonExport(file.name)) {
-        const parsed: unknown = JSON.parse(await file.text());
-        if (isMineraExport(parsed)) {
+      let options: MineOptions = {...xesOptions, delimiter: delimiterForFile(file.name), xesActivityAttribute, ...miningOptions};
+      if (isJsonExport(file.name) && options.miningInputFormat !== "table") {
+        const classified = classifyMiningJson(activeMiningSourceText(await file.arrayBuffer()));
+        if (!accepts()) return;
+        if (classified.kind === "offline") {
           setSource(null);
-          openData(parsed);
-        } else {
-          if (!isOcelJsonDocument(parsed)) {
-            throw new Error("not a supported JSON export");
-          }
-          const result = await requestOcelDiscovery(file, { variant: "ocdfg" });
+          setSourceOutcome(null);
+          setPendingSourceFile(null);
+          openData(classified.data);
+          return;
+        } else if (classified.kind === "ocel") {
+          ocelRequest.current = controller;
+          const result = await requestOcelDiscovery(file, { variant: "ocdfg" }, controller.signal);
+          if (!accepts()) return;
           cacheGeneration.current += 1;
           setData(null);
           setOcelResult(result);
           setOcelFile(file);
           setOcelDataset(file.name);
           setSource(null);
+          setSourceOutcome(null);
+          setPendingSourceFile(null);
           setFiltersActive(false);
           setError(null);
+          return;
+        } else {
+          options = {...options, ...miningSourceOptions(suggestMiningSourceForm(classified.table)), ...miningOptions, miningInputFormat: "table"};
         }
-      } else {
-        const delimiter = delimiterForFile(file.name);
-        const result = await mineCsv(file, { ...xesOptions, delimiter, xesActivityAttribute });
+      }
+        options.miningRequestId = ticket.request_id;
+        const sha256 = await miningSourceHash(file);
+        if (!accepts()) return;
+        sourceRequest.current!.posted = true;
+        const result = await mineActiveDataset(file, options, controller.signal);
+        if (!accepts()) return;
+        const descriptor = miningSourceDescriptor(file, sha256, options, result), analysis = activeDatasetAnalysis(result);
+        liveSource.current = descriptor.source_id;
+        setLiveSourceId(descriptor.source_id);
+        clearSourceCaches();
         setSource({
-          file,
-          delimiter,
+          ...descriptor,
+          delimiter: options.delimiter,
           xesActivityAttribute,
           xesOptions,
-          activities: result.activities.map((a) => a.name),
-          resources: result.resources?.resources.map((r) => r.name) ?? [],
-          lifecycles: logLifecycles(result),
-          attributes: result.event_attributes ?? [],
-          caseAttributes: result.case_attributes ?? [],
+          activities: analysis?.activities.map((a) => a.name) ?? [],
+          resources: analysis?.resources?.resources.map((r) => r.name) ?? [],
+          lifecycles: analysis ? logLifecycles(analysis) : [],
+          attributes: analysis?.event_attributes ?? [],
+          caseAttributes: analysis?.case_attributes ?? [],
         });
+        setSourceOutcome(isActiveSourceMining(result) ? result : null);
+        setPendingSourceFile(null);
         setFiltersActive(false);
-        openData(result);
-      }
+        if (analysis) openData(analysis); else {setData(null); setOcelResult(null); setOcelFile(null); setOcelDataset(null); setShowActiveSource(true); setError(null);}
     })()
       .catch((cause: Error) => {
-        setError(`Could not load ${file.name}: ${cause.message}`);
+        if (accepts()) {setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setShowActiveSource(true);}
       })
-      .finally(() => setMining(false));
+      .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; ocelRequest.current = null; setMining(false);}});
   };
 
   const loadSample = () => {
-    fetch(`${import.meta.env.BASE_URL}sample-data.json`)
-      .then((response) => response.json())
-      .then((sample) => {
-        if (!isMineraExport(sample)) throw new Error("invalid export");
-        setSource(null);
-        openData(sample);
-      })
-      .catch(() => setError("Could not load the bundled sample dataset."));
+    loadSampleFile("sample-data.json", "application/json");
   };
 
   const loadOcelSample = () => {
-    setMining(true);
-    fetch(`${import.meta.env.BASE_URL}sample-ocel.json`)
-      .then(response => { if (!response.ok) throw new Error("sample not found");return response.text(); })
-      .then(text => loadFile(new File([text],"sample-ocel.json",{type:"application/json"})))
-      .catch(() => {setError("Could not load the object-centric sample.");setMining(false);});
+    loadSampleFile("sample-ocel.json", "application/json");
   };
 
   const loadResourceSample = () => {
-    setMining(true);
-    fetch(`${import.meta.env.BASE_URL}sample-resource-log.csv`)
-      .then(response => { if (!response.ok) throw new Error("sample not found"); return response.text(); })
-      .then(text => loadFile(new File([text], "sample-resource-log.csv", {type:"text/csv"})))
-      .catch(() => { setError("Could not load the resource process sample."); setMining(false); });
+    loadSampleFile("sample-resource-log.csv", "text/csv");
   };
+  const loadSampleFile = (name: string, type: string) => {const {ticket, controller} = beginSourceLoad(); fetch(`${import.meta.env.BASE_URL}${name}`, {signal: controller.signal}).then(response => {if (!response.ok) throw new Error("sample not found"); return response.arrayBuffer();}).then(bytes => {if (sourceGate.current.accepts(ticket, controller.signal)) loadFile(new File([bytes], name, {type}));}).catch(cause => {if (sourceGate.current.accepts(ticket, controller.signal)) setError(`Could not load ${name}: ${cause instanceof Error ? cause.message : String(cause)}`);}).finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; setMining(false);}});};
 
   // Re-mines the original upload with the given filters and miner settings,
   // keeping the active tab. Always mines from source.file so nothing compounds.
   const applyFilters = (filters: FilterOptions & MinerOptions) => {
     if (!source) return;
-    setFiltersActive(hasActiveFilters(filters) || hasActiveMinerOptions(filters));
-    setMining(true);
-    mineCsv(source.file, { ...source.xesOptions, delimiter: source.delimiter, ...filters,
-      xesActivityAttribute: source.xesActivityAttribute })
+    const original = source, {ticket, controller} = beginSourceLoad(), options: MineOptions = {...original.options, ...filters, miningRequestId: ticket.request_id};
+    sourceRequest.current!.posted = true;
+    mineActiveDataset(original.file, options, controller.signal)
       .then((result) => {
-        cacheGeneration.current += 1;
-        setData(result);
+        if (!sourceGate.current.accepts(ticket, controller.signal) || sourceRequest.current?.controller !== controller) return;
+        const descriptor = miningSourceDescriptor(original.file, original.sha256, options, result), analysis = activeDatasetAnalysis(result);
+        liveSource.current = descriptor.source_id; setLiveSourceId(descriptor.source_id);
+        setSource({...original, ...descriptor}); setSourceOutcome(isActiveSourceMining(result) ? result : null);
+        setFiltersActive(hasActiveFilters(filters) || hasActiveMinerOptions(filters));
+        clearSourceCaches(); setData(analysis); if (!analysis) setShowActiveSource(true);
         // The re-mine replaced the server session, so cached on-demand
         // results belong to the previous analysis.
         alignCache.current = {};
@@ -498,10 +531,8 @@ export default function App() {
         setThreshold(1);
         setError(null);
       })
-      .catch((cause: Error) =>
-        setError(`Could not filter ${source.file.name}: ${cause.message}`),
-      )
-      .finally(() => setMining(false));
+      .catch((cause: Error) => {if (sourceGate.current.accepts(ticket, controller.signal)) setError(`Could not filter ${original.file.name}: ${cause.message}`);})
+      .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; setMining(false);}});
   };
 
   useEffect(() => {
@@ -600,21 +631,23 @@ export default function App() {
   );
 
   if (showModelConversion) return <><TopBar dataset={data?.dataset??ocelDataset??'Original model conversion'} datasetKind="independent model conversion and reduction" onOpenFile={loadFile} onHome={()=>setShowModelConversion(false)}/><main className="layout-log model-conversion-workspace"><button className="btn-ghost" onClick={()=>setShowModelConversion(false)}>Return to current workspace</button><ModelConversionWorkspace/></main></>;
-  if (showPetriAntiMulti) return <><TopBar dataset={data?.dataset??ocelDataset??'Anti/multi alignment inputs'} datasetKind="independent Petri anti/multi alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAntiMulti(false)}/><main className="layout-log petri-anti-multi-workspace"><button className="btn-ghost" onClick={()=>setShowPetriAntiMulti(false)}>Return to current workspace</button><PetriAntiMultiWorkspace file={source?.file??null}/></main></>;
-  if (showTreeAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Tree alignment inputs'} datasetKind="independent process-tree alignment" onOpenFile={loadFile} onHome={()=>setShowTreeAlignment(false)}/><main className="layout-log process-tree-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowTreeAlignment(false)}>Return to current workspace</button><ProcessTreeAlignmentWorkspace file={source?.file??null}/></main></>;
-  if (showInductiveInputs) return <><TopBar dataset={data?.dataset??ocelDataset??'Inductive inputs'} datasetKind="independent Inductive discovery" onOpenFile={loadFile} onHome={()=>setShowInductiveInputs(false)}/><main className="layout-log inductive-input-workspace"><button className="btn-ghost" onClick={()=>setShowInductiveInputs(false)}>Return to current workspace</button><InductiveInputWorkspace file={source?.file??null}/></main></>;
-  if (showGraphAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Graph alignment inputs'} datasetKind="independent graph alignment" onOpenFile={loadFile} onHome={()=>setShowGraphAlignment(false)}/><main className="layout-log graph-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowGraphAlignment(false)}>Return to current workspace</button><GraphAlignmentWorkspace file={source?.file??null}/></main></>;
-  if (showWorkflowInputs) return <><TopBar dataset={data?.dataset??ocelDataset??'Workflow inputs'} datasetKind="independent workflow discovery" onOpenFile={loadFile} onHome={()=>setShowWorkflowInputs(false)}/><main className="layout-log workflow-input-workspace"><button className="btn-ghost" onClick={()=>setShowWorkflowInputs(false)}>Return to current workspace</button><WorkflowInputWorkspace file={source?.file??null}/></main></>;
-  if (showPetriAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Alignment inputs'} datasetKind="Petri alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAlignment(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowPetriAlignment(false)}>Return to current workspace</button><PetriAlignmentWorkspace file={source?.file??null}/></main></>;
-  if (showTokenReplay) return <><TopBar dataset={data?.dataset??ocelDataset??'Replay inputs'} datasetKind="token replay" onOpenFile={loadFile} onHome={()=>setShowTokenReplay(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTokenReplay(false)}>Return to current workspace</button><TokenReplayWorkspace file={source?.file??null}/></main></>;
+  if (showPetriAntiMulti) return <><TopBar dataset={data?.dataset??ocelDataset??'Anti/multi alignment inputs'} datasetKind="independent Petri anti/multi alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAntiMulti(false)}/><main className="layout-log petri-anti-multi-workspace"><button className="btn-ghost" onClick={()=>setShowPetriAntiMulti(false)}>Return to current workspace</button><PetriAntiMultiWorkspace file={source?.file??null} source={source}/></main></>;
+  if (showTreeAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Tree alignment inputs'} datasetKind="independent process-tree alignment" onOpenFile={loadFile} onHome={()=>setShowTreeAlignment(false)}/><main className="layout-log process-tree-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowTreeAlignment(false)}>Return to current workspace</button><ProcessTreeAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
+  if (showInductiveInputs) return <><TopBar dataset={data?.dataset??ocelDataset??'Inductive inputs'} datasetKind="independent Inductive discovery" onOpenFile={loadFile} onHome={()=>setShowInductiveInputs(false)}/><main className="layout-log inductive-input-workspace"><button className="btn-ghost" onClick={()=>setShowInductiveInputs(false)}>Return to current workspace</button><InductiveInputWorkspace file={source?.file??null} source={source}/></main></>;
+  if (showGraphAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Graph alignment inputs'} datasetKind="independent graph alignment" onOpenFile={loadFile} onHome={()=>setShowGraphAlignment(false)}/><main className="layout-log graph-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowGraphAlignment(false)}>Return to current workspace</button><GraphAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
+  if (showWorkflowInputs) return <><TopBar dataset={data?.dataset??ocelDataset??'Workflow inputs'} datasetKind="independent workflow discovery" onOpenFile={loadFile} onHome={()=>setShowWorkflowInputs(false)}/><main className="layout-log workflow-input-workspace"><button className="btn-ghost" onClick={()=>setShowWorkflowInputs(false)}>Return to current workspace</button><WorkflowInputWorkspace file={source?.file??null} source={source}/></main></>;
+  if (showPetriAlignment) return <><TopBar dataset={data?.dataset??ocelDataset??'Alignment inputs'} datasetKind="Petri alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAlignment(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowPetriAlignment(false)}>Return to current workspace</button><PetriAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
+  if (showTokenReplay) return <><TopBar dataset={data?.dataset??ocelDataset??'Replay inputs'} datasetKind="token replay" onOpenFile={loadFile} onHome={()=>setShowTokenReplay(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTokenReplay(false)}>Return to current workspace</button><TokenReplayWorkspace file={source?.file??null} source={source}/></main></>;
   if (showOcelIo) return <><TopBar dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
   if (showAcquisition) return <><TopBar dataset={data?.dataset??ocelDataset??'Activity sources'} datasetKind="source acquisition" onOpenFile={loadFile} onHome={()=>setShowAcquisition(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowAcquisition(false)}>Return to current workspace</button><SourceAcquisitionWorkspace busy={mining} onOpen={loadFile}/></main></>;
 
-  if (showModelExchange) return <><TopBar dataset={data?.dataset??ocelDataset??'Model files'} datasetKind="model exchange" onOpenFile={loadFile} onHome={()=>setShowModelExchange(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowModelExchange(false)}>Return to current workspace</button><ModelExchangeWorkspace available={source!==null} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setShowModelExchange(false);setTab("conformance");}}/></main></>;
+  if (showModelExchange) return <><TopBar dataset={data?.dataset??ocelDataset??'Model files'} datasetKind="model exchange" onOpenFile={loadFile} onHome={()=>setShowModelExchange(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowModelExchange(false)}>Return to current workspace</button><ModelExchangeWorkspace available={sourceAvailable} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setShowModelExchange(false);setTab("conformance");}}/></main></>;
   if (showProcessCube) return <><TopBar dataset={data?.dataset??ocelDataset??'Process cubes'} datasetKind="process cube" onOpenFile={loadFile} onHome={()=>setShowProcessCube(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowProcessCube(false)}>Return to current workspace</button><ProcessCubeWorkspace busy={mining}/></main></>;
-  if (showTreeGeneration) return <><TopBar dataset="Generated models" datasetKind="tree generation" onOpenFile={loadFile} onHome={()=>setShowTreeGeneration(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTreeGeneration(false)}>Return to current workspace</button><TreeGenerationWorkspace onOpenLog={loadFile} sourceAvailable={source!==null} onUseModel={async file=>{const generation=cacheGeneration.current;const schema=await requestLogQuerySchema();if(generation!==cacheGeneration.current)throw new Error("The active log changed; check this model again.");setDiscoveryModelDraft({generation,file,sourceId:schema.source_id,inferLegacyBoundaries:false});setShowTreeGeneration(false);setTab("conformance");}}/></main></>;
-  if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} busy={mining} data={data??undefined} onOpen={loadFile}/></main></>;
-  if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} available={source!==null} mining={mining} dataset={data?.dataset} onOpen={loadFile}/></main></>;
+  if (showTreeGeneration) return <><TopBar dataset="Generated models" datasetKind="tree generation" onOpenFile={loadFile} onHome={()=>setShowTreeGeneration(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTreeGeneration(false)}>Return to current workspace</button><TreeGenerationWorkspace onOpenLog={loadFile} sourceAvailable={sourceAvailable} onUseModel={async file=>{const generation=cacheGeneration.current;const schema=await requestLogQuerySchema();if(generation!==cacheGeneration.current)throw new Error("The active log changed; check this model again.");setDiscoveryModelDraft({generation,file,sourceId:schema.source_id,inferLegacyBoundaries:false});setShowTreeGeneration(false);setTab("conformance");}}/></main></>;
+  if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} sourceFormat={source?.format} busy={mining} data={data??undefined} onOpen={loadFile}/></main></>;
+  if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} sourceFormat={source?.format} available={sourceAvailable} mining={mining} dataset={data?.dataset??source?.file.name} onOpen={loadFile}/></main></>;
+
+  if (showActiveSource || (!data && source)) return <><TopBar dataset={source?.file.name??pendingSourceFile?.name??"Original native source"} datasetKind="native event source" onOpenFile={loadFile} onHome={()=>{if(data||ocelResult)setShowActiveSource(false);else{cancelSourceLoad();liveSource.current=null;setLiveSourceId(null);setSource(null);setSourceOutcome(null);setPendingSourceFile(null);setShowActiveSource(false);setError(null);}}} onWorkflowInputs={()=>setShowWorkflowInputs(true)} onGraphAlignment={()=>setShowGraphAlignment(true)} onInductiveInputs={()=>setShowInductiveInputs(true)} onTreeAlignment={()=>setShowTreeAlignment(true)} onPetriAntiMulti={()=>setShowPetriAntiMulti(true)} onTokenReplay={()=>setShowTokenReplay(true)} onPetriAlignment={()=>setShowPetriAlignment(true)} onModelConversion={()=>setShowModelConversion(true)}/><main className="layout-log active-mining-source-workspace">{(data||ocelResult)&&<button className="btn-ghost" onClick={()=>setShowActiveSource(false)}>Return to current workspace</button>}{error&&<div className="error-banner" role="alert">{error}</div>}<ActiveMiningSource source={source} initialFile={pendingSourceFile} data={data} outcome={sourceOutcome} available={sourceAvailable} mining={mining} onOpen={(file,options)=>{loadFile(file,undefined,undefined,options);setShowActiveSource(true);}} onCancel={cancelSourceLoad}/>{source&&<QueryWorkspace key={cacheGeneration.current} sourceId={source.source_id} dataset={source.file.name} sourceOptions={{miningInputShape:source.shape,miningSelectors:source.selectors}} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)}/>}</main></>;
 
   if (!data && ocelResult) {
     return (
@@ -638,10 +671,10 @@ export default function App() {
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
           onModelConversion={()=>setShowModelConversion(true)}
+          onActiveSource={()=>setShowActiveSource(true)}
           onHome={() => {
-            ocelRequest.current?.abort();
-            ocelRequest.current = null;
-            setMining(false);
+            cancelSourceLoad();
+            liveSource.current = null; setLiveSourceId(null); setSourceOutcome(null); setPendingSourceFile(null);
             cacheGeneration.current += 1;
             setData(null);
             setOcelResult(null);
@@ -667,7 +700,7 @@ export default function App() {
           <span>{ocelDataset ?? "object-centric log"} · object-centric model</span>
         </footer>
         <div className={dragging ? "dropveil active" : "dropveil"}>
-          <div className="dropveil-card">Drop a Minera JSON export</div>
+          <div className="dropveil-card">Drop an event source, Minera export or OCEL file</div>
         </div>
       </>
     );
@@ -695,12 +728,13 @@ export default function App() {
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
           onModelConversion={()=>setShowModelConversion(true)}
+          onActiveSource={()=>setShowActiveSource(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
           mining={mining}
         />
         <div className={dragging ? "dropveil active" : "dropveil"}>
-          <div className="dropveil-card">Drop a Minera JSON export</div>
+          <div className="dropveil-card">Drop an event source, Minera export or OCEL file</div>
         </div>
       </>
     );
@@ -729,7 +763,9 @@ export default function App() {
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
           onModelConversion={()=>setShowModelConversion(true)}
+          onActiveSource={()=>setShowActiveSource(true)}
         onHome={() => {
+          cancelSourceLoad(); liveSource.current = null; setLiveSourceId(null); setSourceOutcome(null); setPendingSourceFile(null);
           cacheGeneration.current += 1;
           setData(null);
           setOcelResult(null);
@@ -829,7 +865,7 @@ export default function App() {
             inductivePetriLayout={inductivePetriLayout}
             heuristicPetriLayout={heuristicPetriLayout}
             powlPetriLayout={powlPetriLayout}
-            canExportPnml={source !== null}
+            canExportPnml={sourceAvailable}
             mining={mining}
             onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey});setTab("conformance");}}
           />
@@ -842,8 +878,8 @@ export default function App() {
           <Batches data={data} />
         </main>
       )}
-      {tab === "timing" && <TimingDiscovery key={cacheGeneration.current} data={data} available={source!==null} mining={mining}/>}
-      {tab === "behavior" && <BehaviorAnalysis key={cacheGeneration.current} data={data} available={source!==null} mining={mining}/>}
+      {tab === "timing" && <TimingDiscovery key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/>}
+      {tab === "behavior" && <BehaviorAnalysis key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/>}
       {tab === "conformance" && (
         <main className="layout-log">
           <Conformance
@@ -870,22 +906,22 @@ export default function App() {
       )}
       {tab === "resources" && (
         <main className="layout-log">
-          <Resources key={cacheGeneration.current} data={data} available={source !== null} mining={mining} />
+          <Resources key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} />
         </main>
       )}
       {tab === "embeddings" && (
         <main className="layout-log">
-          <EmbeddingSearch key={cacheGeneration.current} data={data} available={source !== null} mining={mining} />
+          <EmbeddingSearch key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} />
         </main>
       )}
-      {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} data={data} mining={mining} available={source!==null} onOpenFiltered={loadFile} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></main>}
-      {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenFiltered={loadFile} /></main>}
-      {tab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenReleased={loadFile} /></main>}
-      {tab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={source!==null} mining={mining} onOpenCluster={loadFile} /></main>}
-      {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={source!==null} file={source?.file??null} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey,inferLegacyBoundaries)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries});setTab("conformance");}} /></main>}
+      {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} data={data} mining={mining} available={sourceAvailable} onOpenFiltered={loadFile} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></main>}
+      {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} sourceId={source?.source_id} sourceOptions={source ? {miningInputShape:source.shape,miningSelectors:source.selectors} : undefined} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)} /></main>}
+      {tab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} onOpenReleased={loadFile} /></main>}
+      {tab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} onOpenCluster={loadFile} /></main>}
+      {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={sourceAvailable} file={source?.file??null} sourceFormat={source?.format} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey,inferLegacyBoundaries)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries});setTab("conformance");}} /></main>}
       {tab === "dfg" && (
         <main className="layout">
-          <DfgDiscovery key={cacheGeneration.current} data={data} available={source!==null} mining={mining}/>
+          <DfgDiscovery key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/>
           <ProcessMap
             layout={layout}
             threshold={threshold}
@@ -910,7 +946,7 @@ export default function App() {
         </span>
       </footer>
       <div className={dragging ? "dropveil active" : "dropveil"}>
-        <div className="dropveil-card">Drop a Minera JSON export</div>
+        <div className="dropveil-card">Drop an event source, Minera export or OCEL file</div>
       </div>
     </>
   );

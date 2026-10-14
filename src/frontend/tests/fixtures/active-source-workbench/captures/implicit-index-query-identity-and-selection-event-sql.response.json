@@ -1,0 +1,1 @@
+{"family":"LOG_QUERY","engine":"sqlite","sql":"SELECT \"__minera_event_index\" FROM dataframe ORDER BY \"__minera_event_index\"","event_index_column":"__minera_event_index","output_truncated":false,"can_filter":true,"columns":["__minera_event_index"],"rows":[[0],[1],[2],[3],[4],[5]],"selected_event_indices":[0,1,2,3,4,5],"source_id":"51"}

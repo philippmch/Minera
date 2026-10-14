@@ -1,0 +1,31 @@
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_format"
+
+table
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="mining_request_id"
+
+229e826b-d04c-4eef-b3a6-8cbfd0675f7f
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="transition_case_id_attribute"
+
+group
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="minimum_self_distance_variant"
+
+pandas
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="minimum_self_distance_case_id_key"
+
+group
+--OwnedActiveEventSourceFeature57
+Content-Disposition: form-data; name="log"; filename="owned-source-only-no-default-case.json"
+Content-Type: application/octet-stream
+
+{"columns":["group","concept:name","time:timestamp","org:resource","lifecycle:transition"],"rows":[[{"key":"group","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:00Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"group","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:01Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"group","value":"one","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"A","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:02Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}],[{"key":"group","value":"two","kind":"string","container":"scalar","null":false},{"key":"concept:name","value":"B","kind":"string","container":"scalar","null":false},{"key":"time:timestamp","value":"2026-01-01T00:00:03Z","kind":"string","container":"scalar","null":false},{"key":"org:resource","value":"alice","kind":"string","container":"scalar","null":false},{"key":"lifecycle:transition","value":"complete","kind":"string","container":"scalar","null":false}]],"dtypes":[],"categorical_dtypes":[],"index":null,"attributes":[],"metadata":{}}
+
+--OwnedActiveEventSourceFeature57--

@@ -1,0 +1,552 @@
+#pragma once
+
+// Included in the server implementation namespace. The source owns every
+// native view; publication is guarded independently of client cancellation.
+std::string active_source_safe_json(std::string_view input) {
+  constexpr char hex[] = "0123456789abcdef";
+  std::string output;
+  output.reserve(input.size());
+  for (std::size_t i = 0; i < input.size(); ++i) {
+    const auto a = static_cast<unsigned char>(input[i]);
+    if (a == 0xed && i + 2 < input.size()) {
+      const auto b = static_cast<unsigned char>(input[i + 1]);
+      const auto c = static_cast<unsigned char>(input[i + 2]);
+      if (b >= 0xa0 && b <= 0xbf && c >= 0x80 && c <= 0xbf) {
+        const auto unit = ((a & 15) << 12) | ((b & 63) << 6) | (c & 63);
+        output += "\\u";
+        for (int shift = 12; shift >= 0; shift -= 4)
+          output += hex[(unit >> shift) & 15];
+        i += 2;
+        continue;
+      }
+    }
+    output += input[i];
+  }
+  return output;
+}
+
+std::string active_source_quote(std::string_view value) {
+  return active_source_safe_json(minera::embedding_runtime::detail::escape_json(value));
+}
+
+std::string active_source_shape(minera::EventDataKind kind) {
+  switch (kind) {
+    case minera::EventDataKind::kEventLog: return "log";
+    case minera::EventDataKind::kEventStream: return "stream";
+    case minera::EventDataKind::kEventTable: return "dataframe";
+    case minera::EventDataKind::kLazyEventTable: return "lazyframe";
+  }
+  throw std::invalid_argument("invalid native source kind");
+}
+
+minera::EventDataKind active_source_kind(std::string_view name) {
+  if (name.empty() || name == "log") return minera::EventDataKind::kEventLog;
+  if (name == "stream") return minera::EventDataKind::kEventStream;
+  if (name == "dataframe") return minera::EventDataKind::kEventTable;
+  if (name == "lazyframe") return minera::EventDataKind::kLazyEventTable;
+  throw std::invalid_argument("mining_input_shape must be log, stream, dataframe or lazyframe");
+}
+
+std::string active_source_field(const httplib::Request& request, std::string_view name) {
+  const std::string key(name);
+  return request.has_file(key) ? form_field(request, key)
+      : request.has_param(key) ? request.get_param_value(key) : std::string{};
+}
+
+bool active_source_supplied(const httplib::Request& request, std::string_view name) {
+  return request.has_file(std::string(name)) || request.has_param(std::string(name));
+}
+
+template <typename Supplied>
+void overlay_active_source_selectors(minera::MineParams& p,
+    const minera::ActiveSourceSelectors& s, const Supplied& supplied) {
+  const auto set = [&](std::string_view control, std::string& target, const std::string& value) {
+    if (!supplied(control)) target = value;
+  };
+  set("alpha_case_id_attribute", p.alpha.case_id_attribute, s.case_id_key);
+  set("alpha_activity_attribute", p.alpha.activity_attribute, s.activity_key);
+  set("alpha_timestamp_attribute", p.alpha.timestamp_attribute, s.timestamp_key);
+  set("heuristic_case_id_attribute", p.heuristic.case_id_attribute, s.case_id_key);
+  set("heuristic_activity_attribute", p.heuristic.activity_attribute, s.activity_key);
+  set("heuristic_timestamp_attribute", p.heuristic.timestamp_attribute, s.timestamp_key);
+  set("inductive_case_id_key", p.inductive.case_id_key, s.case_id_key);
+  set("inductive_activity_key", p.inductive.activity_key, s.activity_key);
+  set("inductive_timestamp_key", p.inductive.timestamp_key, s.timestamp_key);
+  set("powl_case_id_key", p.powl.case_id_key, s.case_id_key);
+  set("powl_activity_key", p.powl.activity_key, s.activity_key);
+  set("powl_timestamp_key", p.powl.timestamp_key, s.timestamp_key);
+  set("token_replay_activity_attribute", p.token_replay.activity_attribute, s.activity_key);
+  set("footprints_case_id_attribute", p.footprints.case_id_attribute, s.case_id_key);
+  set("footprints_activity_attribute", p.footprints.activity_attribute, s.activity_key);
+  set("footprints_timestamp_attribute", p.footprints.timestamp_attribute, s.timestamp_key);
+  set("log_skeleton_case_id_key", p.log_skeleton.case_id_key, s.case_id_key);
+  set("log_skeleton_activity_attribute", p.log_skeleton.activity_key, s.activity_key);
+  set("declare_case_id_key", p.declare_options.case_id_key, s.case_id_key);
+  set("declare_activity_attribute", p.declare_options.activity_key, s.activity_key);
+  set("declare_conformance_case_id_key", p.declare_conformance_options.case_id_key, s.case_id_key);
+  set("declare_activity_attribute", p.declare_conformance_options.activity_key, s.activity_key);
+  set("transition_case_id_attribute", p.transition_system.case_id_key, s.case_id_key);
+  set("transition_activity_attribute", p.transition_system.activity_key, s.activity_key);
+  set("minimum_self_distance_case_id_key", p.minimum_self_distance.case_id_key, s.case_id_key);
+  set("minimum_self_distance_activity_key", p.minimum_self_distance.activity_key, s.activity_key);
+  set("correlation_case_id_attribute", p.correlation.case_id_attribute, s.case_id_key);
+  set("correlation_activity_attribute", p.correlation.activity_attribute, s.activity_key);
+  set("correlation_timestamp_attribute", p.correlation.timestamp_attribute, s.timestamp_key);
+  set("spectrum_case_id_key", p.spectrum.case_id_attribute, s.case_id_key);
+  set("spectrum_activity_key", p.spectrum.activity_attribute, s.activity_key);
+  set("spectrum_timestamp_key", p.spectrum.timestamp_attribute, s.timestamp_key);
+  set("batch_case_id_attribute", p.batch_options.case_id_attribute, s.case_id_key);
+  set("batch_activity_attribute", p.batch_options.activity_attribute, s.activity_key);
+  set("batch_timestamp_attribute", p.batch_options.timestamp_attribute, s.timestamp_key);
+  set("batch_resource_attribute", p.batch_options.resource_attribute, s.resource_key);
+  set("temporal_case_id_attribute", p.temporal_profile.case_id_attribute, s.case_id_key);
+  set("temporal_activity_attribute", p.temporal_profile.activity_attribute, s.activity_key);
+  if (!supplied("temporal_source_timestamp_attribute") && !supplied("temporal_source_completion_timestamp_attribute"))
+    p.temporal_profile.source_timestamp_attribute = s.timestamp_key;
+  if (!supplied("temporal_target_timestamp_attribute") && !supplied("temporal_target_start_timestamp_attribute"))
+    p.temporal_profile.target_timestamp_attribute = s.timestamp_key;
+  set("dfg_case_id_attribute", p.dfg_table_options.case_id_attribute, s.case_id_key);
+  set("dfg_activity_attribute", p.dfg_table_options.activity_attribute, s.activity_key);
+  set("dfg_timestamp_attribute", p.dfg_table_options.timestamp_attribute, s.timestamp_key);
+}
+
+bool cached_source_uses_bound_defaults(const MinedSession& session,
+    bool explicit_flat = false) {
+  return session.active_source && (session.active_source_native_dispatch || explicit_flat);
+}
+
+void overlay_cached_source_selectors(const httplib::Request& request,
+    const MinedSession& session, minera::MineParams& params,
+    bool explicit_flat = false) {
+  if (cached_source_uses_bound_defaults(session, explicit_flat))
+    overlay_active_source_selectors(params, session.active_source->selectors(),
+        [&](std::string_view key) {return active_source_supplied(request, key);});
+}
+
+void overlay_cached_source_selectors(const httplib::Request& request,
+    const MinedSession& session, minera::EvaluationParams& params,
+    bool explicit_flat = false) {
+  if (!cached_source_uses_bound_defaults(session, explicit_flat)) return;
+  const auto& selectors = session.active_source->selectors();
+  const auto set = [&](std::string_view name, std::string& activity, std::string& case_id) {
+    if (!active_source_supplied(request, std::string(name) + "_activity_attribute")) activity = selectors.activity_key;
+    if (!active_source_supplied(request, std::string(name) + "_case_id_attribute")) case_id = selectors.case_id_key;
+  };
+  set("evaluation", params.replay_fitness_options.activity_attribute, params.replay_fitness_options.case_id_attribute);
+  set("evaluation", params.precision_options.activity_attribute, params.precision_options.case_id_attribute);
+  set("evaluation", params.generalization_options.activity_attribute, params.generalization_options.case_id_attribute);
+  set("evaluation", params.composite_options.activity_attribute, params.composite_options.case_id_attribute);
+}
+
+void bind_imported_csv_source_selectors(const minera::CsvEventData& data,
+    const minera::CsvImportOptions& options,
+    const std::map<std::string, std::string>& literal,
+    minera::ActiveSourceSelectors& selectors) {
+  // The native importer may resolve its standard aliases while retaining the
+  // actual physical headers. Bind defaults to that source, without changing
+  // the requested importer controls or any literal selector.
+  const auto has_column = [&](std::string_view name) {
+    return std::find(data.table.columns.begin(), data.table.columns.end(), name) != data.table.columns.end();
+  };
+  const minera::Trace* first_trace = data.log.traces.empty() ? nullptr : &data.log.traces.front();
+  const minera::Event* first_event = nullptr;
+  for (const auto& trace : data.log.traces) {
+    if (!trace.events.empty()) { first_event = &trace.events.front(); break; }
+  }
+  const auto bind = [&](std::string_view key, std::string& selected,
+      std::string_view imported, std::initializer_list<std::string_view> aliases) {
+    if (literal.contains(std::string(key)) || has_column(selected)) return;
+    if (std::find(aliases.begin(), aliases.end(), selected) == aliases.end()) return;
+    if (std::find(aliases.begin(), aliases.end(), imported) != aliases.end() && has_column(imported)) {
+      selected = imported;
+      return;
+    }
+    // Header-only CSV has no role-bearing events. The same exact-first alias
+    // order as the native importer still identifies its selected column.
+    for (const auto alias : aliases) {
+      if (has_column(alias)) { selected = alias; return; }
+    }
+  };
+  if (options.allow_case_id_aliases)
+    bind("case_id_key", selectors.case_id_key,
+        first_trace ? first_trace->case_id_source_key : std::string_view{},
+        {"case_id", "case:concept:name"});
+  bind("activity_key", selectors.activity_key,
+      first_event ? first_event->activity_source_key : std::string_view{},
+      {"activity", "concept:name"});
+  bind("timestamp_key", selectors.timestamp_key,
+      first_event ? first_event->timestamp_source_key : std::string_view{},
+      {"timestamp", "time:timestamp"});
+  bind("resource_key", selectors.resource_key,
+      first_event ? first_event->resource_source_key : std::string_view{},
+      {"resource", "org:resource"});
+  bind("lifecycle_key", selectors.lifecycle_key,
+      first_event ? first_event->lifecycle_source_key : std::string_view{},
+      {"lifecycle", "lifecycle:transition"});
+}
+
+minera::ActiveEventSource prepare_active_event_source(
+    const httplib::Request& request, const std::string& bytes,
+    const std::string& dataset, minera::MineParams& params,
+    std::string* paired_csv_error = nullptr, bool allow_legacy_csv_log = false) {
+  auto format = active_source_field(request, "mining_input_format");
+  if (format.empty()) format = "auto";
+  if (format != "auto" && format != "table")
+    throw std::invalid_argument("mining_input_format must be auto or table");
+  const auto kind = active_source_kind(active_source_field(request, "mining_input_shape"));
+  const bool xes = format == "auto" && looks_like_xes(dataset, bytes);
+  minera::ActiveSourceSelectors selectors;
+  if (format != "table") {
+    if (xes) {
+      selectors = {"case:" + params.xes.case_attribute, params.xes.activity_attribute,
+          params.xes.timestamp_attribute, params.xes.resource_attribute, params.xes.lifecycle_attribute};
+    } else {
+      selectors = {params.csv.case_id_column, params.csv.activity_column,
+          params.csv.timestamp_column, params.csv.resource_column, params.csv.lifecycle_column};
+    }
+  }
+  const auto literal = active_source_supplied(request, "mining_selectors_json")
+      ? minera::parse_workflow_selector_strings_json(active_source_field(request, "mining_selectors_json"))
+      : std::map<std::string, std::string>{};
+  for (const auto& [key, value] : literal) {
+    if (key == "case_id_key") selectors.case_id_key = value;
+    else if (key == "activity_key") selectors.activity_key = value;
+    else if (key == "timestamp_key") selectors.timestamp_key = value;
+    else if (key == "resource_key") selectors.resource_key = value;
+    else if (key == "lifecycle_key") selectors.lifecycle_key = value;
+    else throw std::invalid_argument("unsupported literal mining source selector: " + key);
+  }
+  if (format != "table" && !literal.empty()) {
+    if (xes) {
+      if (literal.contains("case_id_key")) params.xes.case_attribute = selectors.case_id_key.starts_with("case:") ? selectors.case_id_key.substr(5) : selectors.case_id_key;
+      if (literal.contains("activity_key")) params.xes.activity_attribute = selectors.activity_key;
+      if (literal.contains("timestamp_key")) params.xes.timestamp_attribute = selectors.timestamp_key;
+      if (literal.contains("resource_key")) params.xes.resource_attribute = selectors.resource_key;
+      if (literal.contains("lifecycle_key")) params.xes.lifecycle_attribute = selectors.lifecycle_key;
+    } else {
+      if (literal.contains("case_id_key")) params.csv.case_id_column = selectors.case_id_key;
+      if (literal.contains("activity_key")) params.csv.activity_column = selectors.activity_key;
+      if (literal.contains("timestamp_key")) params.csv.timestamp_column = selectors.timestamp_key;
+      if (literal.contains("resource_key")) params.csv.resource_column = selectors.resource_key;
+      if (literal.contains("lifecycle_key")) params.csv.lifecycle_column = selectors.lifecycle_key;
+    }
+  }
+  if (format == "table" || kind != minera::EventDataKind::kEventLog || !literal.empty())
+    overlay_active_source_selectors(params, selectors,
+        [&](std::string_view key) {return active_source_supplied(request, key);});
+  const auto import = [&] {
+    minera::ActiveSourceFile file{dataset, format == "table" ? "table" : xes ? "xes" : "csv", bytes};
+    if (format == "table")
+      return minera::ActiveEventSource::from_table(minera::parse_event_table_json(bytes), std::move(file), selectors, kind);
+    std::istringstream input(bytes);
+    if (xes) return minera::ActiveEventSource::from_log(minera::import_xes_event_log(input, params.xes), std::move(file), selectors, kind);
+    try {
+      auto data = minera::import_csv_event_data(input, params.csv);
+      bind_imported_csv_source_selectors(data, params.csv, literal, selectors);
+      if (kind != minera::EventDataKind::kEventLog || !literal.empty())
+        overlay_active_source_selectors(params, selectors,
+            [&](std::string_view key) {return active_source_supplied(request, key);});
+      return minera::ActiveEventSource::from_csv(std::move(data), std::move(file), selectors, kind);
+    } catch (const std::exception& error) {
+      if (!allow_legacy_csv_log || kind != minera::EventDataKind::kEventLog || !params.correlation_variants.empty()) throw;
+      if (paired_csv_error) *paired_csv_error = error.what();
+      std::istringstream legacy(bytes);
+      // A valid grouped-log input can have an invalid flat-table schema.
+      // Preserve its actual native log instead of silently repairing headers.
+      return minera::ActiveEventSource::from_log(minera::import_csv_event_log(legacy, params.csv),
+          minera::ActiveSourceFile{dataset, "csv", bytes}, selectors, kind);
+    }
+  };
+  auto source = import();
+  if (params.filter.any() || (params.segment_enabled && params.segment) ||
+      (params.path_enabled && params.path) || (params.ltl_enabled && params.ltl)) {
+    std::vector<std::string> referenced{selectors.case_id_key, selectors.activity_key,
+        selectors.timestamp_key, selectors.resource_key, selectors.lifecycle_key,
+        params.filter.attribute_key, params.filter.case_attribute_key};
+    if (params.filter.numeric_attribute) referenced.push_back(params.filter.numeric_attribute->attribute_key);
+    if (params.filter.top_activities) referenced.push_back(params.filter.top_activities->attribute_key);
+    if (params.filter.relative_attribute_occurrence) referenced.push_back(params.filter.relative_attribute_occurrence->attribute_key);
+    if (params.filter.attribute_occurrence_threshold) referenced.push_back(params.filter.attribute_occurrence_threshold->attribute_key);
+    if (params.filter.attribute_value_repetition) referenced.push_back(params.filter.attribute_value_repetition->attribute_key);
+    if (params.filter.consecutive_activity_grouping) referenced.push_back(params.filter.consecutive_activity_grouping->activity_key);
+    if (params.filter.timestamp_case_grouping) {
+      referenced.push_back(params.filter.timestamp_case_grouping->activity_key);
+      referenced.push_back(params.filter.timestamp_case_grouping->timestamp_key);
+    }
+    if (params.path) {referenced.push_back(params.path->activity_attribute); referenced.push_back(params.path->timestamp_attribute);}
+    if (params.ltl) {referenced.push_back(params.ltl->attribute_key); referenced.push_back(params.ltl->resource_key);}
+    // Conservatively reserve every submitted selector string, including keys
+    // used by composed segment/path/LTL filters, outside the provenance field.
+    for (const auto& [key, value] : request.files) {referenced.push_back(key); referenced.push_back(value.content);}
+    for (const auto& [key, value] : request.params) {referenced.push_back(key); referenced.push_back(value);}
+    source = source.with_filters([&](const minera::EventLog& original) {
+      auto log = original;
+      if (params.filter.any()) log = minera::filter_event_log(log, params.filter);
+      if (params.segment_enabled && params.segment) log = minera::filter_segments(log, *params.segment);
+      if (params.path_enabled && params.path) log = minera::filter_adjacent_path(log, *params.path);
+      if (params.ltl_enabled && params.ltl) log = minera::filter_ltl_event_log(log, *params.ltl);
+      return log;
+    }, referenced);
+  }
+  return source;
+}
+
+std::string active_source_snapshot_json(const MinedSession& session) {
+  if (!session.active_source) throw std::invalid_argument("the cached session has no retained original source");
+  const auto& source = *session.active_source;
+  const auto& s = source.selectors();
+  const auto table = [](const minera::EventTable* value) {return value ? minera::serialize_event_table_input_json(*value) : "null";};
+  const auto log = [](const minera::EventLog* value) {return value ? minera::serialize_active_source_log_json(*value) : "null";};
+  std::string body = "{\"format\":" + active_source_quote(source.file().format == "table" ? "table" : "auto") +
+      ",\"detected_format\":" + active_source_quote(source.file().format) +
+      ",\"shape\":" + active_source_quote(active_source_shape(source.selected_kind())) +
+      ",\"source_id\":" + active_source_quote(std::to_string(session.query_source_id)) +
+      ",\"original_dataset\":" + active_source_quote(source.file().name) +
+      ",\"original_input_bytes\":" + std::to_string(source.file().bytes.size()) +
+      ",\"source_unchanged\":true,\"source_selectors\":{\"case_id_key\":" + active_source_quote(s.case_id_key) +
+      ",\"activity_key\":" + active_source_quote(s.activity_key) + ",\"timestamp_key\":" + active_source_quote(s.timestamp_key) +
+      ",\"resource_key\":" + active_source_quote(s.resource_key) + ",\"lifecycle_key\":" + active_source_quote(s.lifecycle_key) +
+      "},\"input_before\":" + table(source.original_table_if_available()) +
+      ",\"input_after\":" + table(source.original_table_if_available()) +
+      ",\"checked_table\":" + table(source.checked_table_if_available()) +
+      ",\"original_log\":" + log(source.original_log_if_available()) +
+      ",\"checked_log\":" + log(source.checked_log_if_available()) +
+      ",\"prepared_stream\":" + (source.checked_stream_if_available() ? minera::serialize_active_source_stream_json(*source.checked_stream_if_available()) : "null") +
+      ",\"prepared_lazy_table\":" + (source.checked_lazy_if_available() ? table(source.checked_table_if_available()) : "null") +
+      ",\"original_table_origin\":" + active_source_quote(source.original_table_origin()) +
+      ",\"paired_csv_import_error\":" + (session.paired_csv_import_error.empty() ? "null" : active_source_quote(session.paired_csv_import_error)) +
+      ",\"checked_table_origin\":" + active_source_quote(source.checked_table_origin()) +
+      ",\"checked_log_preparation_error\":" + (source.checked_log_preparation_error().empty() ? "null" : active_source_quote(source.checked_log_preparation_error())) +
+      ",\"checked_flat_projection_error\":" + (source.checked_flat_projection_error().empty() ? "null" : active_source_quote(source.checked_flat_projection_error())) +
+      ",\"source_row_ordinals\":[";
+  for (std::size_t i = 0; i < source.source_row_ordinals().size(); ++i) {if (i) body += ','; body += std::to_string(source.source_row_ordinals()[i]);}
+  body += "],\"representative_row_ordinals\":[";
+  for (std::size_t i = 0; i < source.representative_row_ordinals().size(); ++i) {
+    if (i) body += ','; body += '[';
+    const auto& rows = source.representative_row_ordinals()[i];
+    for (std::size_t j = 0; j < rows.size(); ++j) {if (j) body += ','; body += rows[j] ? std::to_string(*rows[j]) : "null";}
+    body += ']';
+  }
+  body += "],\"projection_changes\":[";
+  for (std::size_t i = 0; i < source.projection_changes().size(); ++i) {
+    if (i) body += ','; const auto& change = source.projection_changes()[i];
+    body += "{\"checked_row\":" + std::to_string(change.checked_row) + ",\"source_row\":" + std::to_string(change.source_row) +
+        ",\"column\":" + active_source_quote(change.column) + ",\"removed\":" + (change.removed ? "true" : "false") + '}';
+  }
+  return active_source_safe_json(body + "]}");
+}
+
+minera::LogQueryTable cached_source_query_table(const MinedSession& session) {
+  if (!session.active_source) return minera::log_query_table(require_prepared_log(session));
+  minera::LogQueryTable result;
+  result.table = session.active_source->checked_table();
+  result.event_index_column = "__minera_event_index";
+  const auto lower = [](std::string text) {for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); return text;};
+  while (std::any_of(result.table.columns.begin(), result.table.columns.end(), [&](const auto& column) {return lower(column) == lower(result.event_index_column);})) result.event_index_column += '_';
+  result.table.columns.push_back(result.event_index_column);
+  if (!result.table.dtypes.empty()) result.table.dtypes.push_back("int64");
+  if (!result.table.categorical_dtypes.empty()) result.table.categorical_dtypes.push_back(std::nullopt);
+  for (std::size_t i = 0; i < result.table.rows.size(); ++i) {
+    minera::EventAttribute index;
+    index.key = result.event_index_column; index.kind = minera::AttributeKind::kInt;
+    index.value = std::to_string(i); index.typed_value = static_cast<std::int64_t>(i);
+    result.table.rows[i].push_back(std::move(index));
+  }
+  result.table.validate();
+  return result;
+}
+
+std::vector<std::vector<std::size_t>> active_source_trace_table_rows(const MinedSession& session) {
+  require_prepared_log(session);
+  const auto& source = *session.active_source;
+  const auto& ordinals = source.source_row_ordinals();
+  if (ordinals.size() != source.checked_table().rows.size()) throw std::invalid_argument("checked source row provenance is unavailable");
+  std::map<std::size_t, std::vector<std::size_t>> occurrences;
+  std::map<std::size_t, std::size_t> used;
+  for (std::size_t i = 0; i < ordinals.size(); ++i) occurrences[ordinals[i]].push_back(i);
+  std::vector<std::vector<std::size_t>> result;
+  std::size_t event_count = 0;
+  for (const auto& trace : source.representative_row_ordinals()) {
+    std::vector<std::size_t> rows;
+    for (const auto& ordinal : trace) {
+      if (!ordinal || !occurrences.contains(*ordinal) || used[*ordinal] >= occurrences.at(*ordinal).size())
+        throw std::invalid_argument("prepared event provenance is unavailable");
+      rows.push_back(occurrences.at(*ordinal).at(used[*ordinal]++)); ++event_count;
+    }
+    result.push_back(std::move(rows));
+  }
+  if (event_count != session.log.event_count() || event_count != ordinals.size())
+    throw std::invalid_argument("prepared event provenance does not match checked source rows");
+  return result;
+}
+
+std::vector<std::size_t> active_source_expanded_table_indices(
+    const MinedSession& session, const std::vector<std::size_t>& indices, bool cases) {
+  if (!session.active_source) return indices;
+  const auto& source = *session.active_source;
+  const auto& table = source.checked_table();
+  std::set<std::size_t> selected;
+  for (auto i : indices) {if (i >= table.rows.size()) throw std::invalid_argument("selected source row is out of range"); selected.insert(i);}
+  if (cases) {
+    for (const auto& trace : active_source_trace_table_rows(session)) {
+      bool keep = false;
+      for (auto row : trace) keep = keep || selected.contains(row);
+      if (keep) for (auto row : trace) selected.insert(row);
+    }
+  }
+  return {selected.begin(), selected.end()};
+}
+
+std::size_t active_source_selected_row_count(const MinedSession& session,
+    const std::vector<std::size_t>& indices, bool cases) {
+  return session.active_source ? active_source_expanded_table_indices(session, indices, cases).size()
+      : minera::filter_query_events(require_prepared_log(session), indices, cases).event_count();
+}
+
+std::string active_source_table_json(const MinedSession& session,
+    const std::vector<std::size_t>& indices, bool cases) {
+  if (!session.active_source) return minera::serialize_event_table_input_json(minera::event_log_to_table(minera::filter_query_events(require_prepared_log(session), indices, cases)));
+  auto table = session.active_source->checked_table();
+  const auto selected = active_source_expanded_table_indices(session, indices, cases);
+  bool identity = selected.size() == table.rows.size();
+  for (std::size_t i = 0; identity && i < selected.size(); ++i) identity = selected[i] == i;
+  auto rows = std::move(table.rows); table.rows.clear();
+  std::vector<minera::EventTableIndexLabel> labels;
+  if (!identity && !table.index) {
+    table.index = minera::EventTableIndex{};
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+      minera::EventAttribute label{"", std::to_string(i), minera::AttributeKind::kInt};
+      label.typed_value = static_cast<std::int64_t>(i);
+      table.index->labels.push_back({std::move(label)});
+    }
+  }
+  if (!identity && table.index && table.index->kind == "RangeIndex") table.index->kind = "Index";
+  if (table.index) {labels = std::move(table.index->labels); table.index->labels.clear();}
+  for (auto index : selected) {table.rows.push_back(std::move(rows[index])); if (table.index) table.index->labels.push_back(std::move(labels[index]));}
+  return minera::serialize_event_table_input_json(table);
+}
+
+minera::EventLog select_active_source_rows(const MinedSession& session,
+    const std::vector<std::size_t>& indices, bool cases) {
+  if (!session.active_source) return minera::filter_query_events(require_prepared_log(session), indices, cases);
+  const auto selected = active_source_expanded_table_indices(session, indices, cases);
+  const std::set<std::size_t> selected_rows(selected.begin(), selected.end());
+  std::vector<std::size_t> log_indices;
+  std::size_t index = 0;
+  for (const auto& trace : active_source_trace_table_rows(session)) for (auto row : trace) {
+    if (selected_rows.contains(row)) log_indices.push_back(index);
+    ++index;
+  }
+  const auto& log = require_prepared_log(session);
+  if (index != log.event_count()) throw std::invalid_argument("prepared event provenance does not match the active log");
+  return minera::filter_query_events(log, log_indices, false);
+}
+
+std::string active_source_table_json_from_log_indices(const MinedSession& session,
+    const std::vector<std::size_t>& indices, bool cases) {
+  if (!session.active_source) return active_source_table_json(session, indices, cases);
+  std::set<std::size_t> selected(indices.begin(), indices.end());
+  std::vector<std::size_t> table_indices;
+  std::size_t index = 0;
+  for (const auto& trace : active_source_trace_table_rows(session)) for (auto row : trace) {
+    if (selected.contains(index)) table_indices.push_back(row);
+    ++index;
+  }
+  if (!selected.empty() && *selected.rbegin() >= index) throw std::invalid_argument("selected log event is out of range");
+  return active_source_table_json(session, table_indices, cases);
+}
+
+struct ActiveMiningTicket {
+  std::uint64_t generation = 0;
+  std::string id;
+  bool canceled = false;
+  bool native_source_dispatch = false;
+  std::shared_ptr<const MinedSession> previous;
+  std::shared_ptr<const ClusteringAnalysis> previous_clustering;
+  std::shared_ptr<const MinedSession> published;
+};
+std::uint64_t g_active_mining_generation = 0;
+std::map<std::string, std::shared_ptr<ActiveMiningTicket>> g_active_mining_requests;
+
+std::shared_ptr<ActiveMiningTicket> begin_active_mining(const httplib::Request& request) {
+  auto ticket = std::make_shared<ActiveMiningTicket>();
+  ticket->id = active_source_field(request, "mining_request_id");
+  if (!ticket->id.empty()) {
+    if (ticket->id.size() != 36) throw std::invalid_argument("mining_request_id must be a UUID");
+    for (std::size_t i = 0; i < ticket->id.size(); ++i) {
+      const bool dash = i == 8 || i == 13 || i == 18 || i == 23;
+      if (dash ? ticket->id[i] != '-' : !std::isxdigit(static_cast<unsigned char>(ticket->id[i])))
+        throw std::invalid_argument("mining_request_id must be a UUID");
+    }
+  }
+  std::lock_guard<std::mutex> lock(g_session_mutex);
+  const auto existing = ticket->id.empty() ? g_active_mining_requests.end() : g_active_mining_requests.find(ticket->id);
+  if (existing != g_active_mining_requests.end() && existing->second->generation != 0)
+    throw std::invalid_argument("mining request identity was already used");
+  if (existing != g_active_mining_requests.end()) ticket->canceled = existing->second->canceled;
+  ticket->generation = ++g_active_mining_generation;
+  ticket->previous = g_session; ticket->previous_clustering = g_clustering_analysis;
+  for (auto& [id, previous] : g_active_mining_requests) {
+    (void)id;
+    previous->previous.reset(); previous->previous_clustering.reset(); previous->published.reset();
+  }
+  if (!ticket->id.empty()) {
+    g_active_mining_requests[ticket->id] = ticket;
+    while (g_active_mining_requests.size() > 2048) {
+      auto oldest = std::min_element(g_active_mining_requests.begin(), g_active_mining_requests.end(), [](const auto& a, const auto& b) {return a.second->generation < b.second->generation;});
+      if (oldest->second == ticket) break;
+      g_active_mining_requests.erase(oldest);
+    }
+  }
+  return ticket;
+}
+
+void publish_active_mining(const std::shared_ptr<ActiveMiningTicket>& ticket,
+    const std::shared_ptr<MinedSession>& session) {
+  std::lock_guard<std::mutex> lock(g_session_mutex);
+  if (ticket->canceled || ticket->generation != g_active_mining_generation)
+    throw std::invalid_argument("mining request was canceled or replaced by a newer source request");
+  session->mining_request_id = ticket->id;
+  session->active_source_native_dispatch = ticket->native_source_dispatch;
+  g_session = session; g_clustering_analysis.reset(); ticket->published = session;
+}
+
+void handle_cancel_mine(const httplib::Request& request, httplib::Response& response) {
+  try {
+    const auto id = request.get_param_value("request_id");
+    if (id.size() != 36 || request.params.size() != 1 || !request.body.empty())
+      throw std::invalid_argument("cancel-mine requires a request UUID and an empty body");
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    if (!g_active_mining_requests.contains(id) && g_active_mining_requests.size() >= 2048)
+      throw std::invalid_argument("too many unknown mining request identities");
+    auto& ticket = g_active_mining_requests[id];
+    if (!ticket) {ticket = std::make_shared<ActiveMiningTicket>(); ticket->id = id;}
+    ticket->canceled = true;
+    if (ticket->published && g_session == ticket->published && ticket->generation == g_active_mining_generation) {
+      g_session = ticket->previous; g_clustering_analysis = ticket->previous_clustering;
+    }
+    response.set_content("{\"family\":\"ACTIVE_SOURCE_CANCEL\",\"request_id\":" + active_source_quote(id) + ",\"canceled\":true}", "application/json");
+  } catch (const std::exception& error) {response.status = 400; response.set_content(error_json(error.what()), "application/json");}
+}
+
+std::shared_ptr<const MinedSession> active_source_session(const httplib::Request& request) {
+  std::lock_guard<std::mutex> lock(g_session_mutex);
+  if (!g_session || !g_session->active_source) throw std::invalid_argument("no retained active source; mine an original event dataset first");
+  if (!request.has_param("source_id") || request.params.size() != 1 || request.get_param_value("source_id") != std::to_string(g_session->query_source_id))
+    throw std::invalid_argument("the active source changed; refresh its descriptor");
+  return g_session;
+}
+
+void handle_active_source(const httplib::Request& request, httplib::Response& response) {
+  try {
+    const auto session = active_source_session(request);
+    response.set_content("{\"family\":\"ACTIVE_EVENT_SOURCE\",\"source_id\":" + active_source_quote(std::to_string(session->query_source_id)) + ",\"active_source\":" + active_source_snapshot_json(*session) + '}', "application/json");
+  } catch (const std::exception& error) {response.status = 400; response.set_content(error_json(error.what()), "application/json");}
+}
+
+void handle_active_source_file(const httplib::Request& request, httplib::Response& response) {
+  try {
+    const auto session = active_source_session(request);
+    response.set_content(session->active_source->file().bytes, "application/octet-stream");
+  } catch (const std::exception& error) {response.status = 400; response.set_content(error_json(error.what()), "application/json");}
+}
