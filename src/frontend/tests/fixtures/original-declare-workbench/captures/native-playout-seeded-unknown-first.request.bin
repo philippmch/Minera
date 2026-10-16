@@ -1,0 +1,24 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+playout
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="playout_options_json"
+
+{"n_traces":2,"min_length":3,"max_length":3,"seed":18446744073709551615}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="check_generated"
+
+true
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="include_diagnostics"
+
+true
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-playout-unknown.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{"unknown":[{"first":"X","second":"unused","binary":false,"support":-7,"confidence":99}]}}
+
+--OwnedOriginalModelDeclareFeature61--

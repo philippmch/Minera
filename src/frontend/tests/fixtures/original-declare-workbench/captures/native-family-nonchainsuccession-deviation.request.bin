@@ -1,0 +1,17 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-family-nonchainsuccession.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{"nonchainsuccession":[{"first":"A","second":"B","binary":true,"support":-7,"confidence":99}]}}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="input_file"; filename="owned-word-nonchainsuccession-deviation.json"
+Content-Type: application/octet-stream
+
+["A","B"]
+
+--OwnedOriginalModelDeclareFeature61--

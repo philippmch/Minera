@@ -2595,3 +2595,14 @@ input[type="range"]::-moz-range-thumb {
 .original-decision-workspace .query-check { display: flex; align-items: center; gap: .45rem; }
 .original-decision-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .original-decision-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.original-declare-workspace { display: grid; gap: 1.1rem; }
+.original-declare-workspace .panel, .original-declare-workspace fieldset { width: 100%; min-width: 0; }
+.original-declare-workspace fieldset { border: 0; padding: 0; }
+.original-declare-workspace .filters-field { display: flex; flex-direction: column; gap: .4rem; margin-block: .8rem; min-width: 0; }
+.original-declare-workspace input:not([type=checkbox]), .original-declare-workspace select, .original-declare-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.original-declare-workspace textarea { resize: vertical; font-family: var(--font-mono); }
+.original-declare-workspace .query-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(230px,100%),1fr)); gap: .85rem; }
+.original-declare-workspace .query-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-block: .8rem; }
+.original-declare-workspace .query-check { display: flex; align-items: center; gap: .45rem; }
+.original-declare-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.original-declare-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }

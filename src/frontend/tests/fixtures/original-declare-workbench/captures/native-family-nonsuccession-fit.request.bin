@@ -1,0 +1,17 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-family-nonsuccession.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{"nonsuccession":[{"first":"A","second":"B","binary":true,"support":-7,"confidence":99}]}}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="input_file"; filename="owned-word-nonsuccession-fit.json"
+Content-Type: application/octet-stream
+
+["B","A"]
+
+--OwnedOriginalModelDeclareFeature61--

@@ -19,3 +19,5 @@ src/frontend/tests/fixtures/playout-workbench* -text -whitespace
 src/frontend/tests/fixtures/playout-workbench/** -text -whitespace
 src/frontend/tests/fixtures/original-decision-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-decision-workbench/** -text -whitespace
+src/frontend/tests/fixtures/original-declare-workbench* -text -whitespace
+src/frontend/tests/fixtures/original-declare-workbench/** -text -whitespace

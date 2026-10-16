@@ -1,0 +1,13 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="miner"
+
+inductive
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="log"; filename="owned-cache-seed.csv"
+Content-Type: application/octet-stream
+
+case_id,activity,timestamp
+cache,A,2026-01-01T00:00:00Z
+cache,B,2026-01-01T00:00:04Z
+
+--OwnedOriginalModelDeclareFeature61--

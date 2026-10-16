@@ -1,0 +1,45 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+conformance
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="check_generated"
+
+false
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-response.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{"response":[{"first":"A","second":"B","binary":true,"support":-7,"confidence":99}]}}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="input_file"; filename="owned-original-declare.xes"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0">
+  <trace>
+    <string key="concept:name" value="owned-case-0" />
+    <string key="customer" value="original" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:00Z" />
+      <string key="original" value="retained" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:01Z" />
+      <string key="original" value="retained" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="owned-case-1" />
+    <string key="customer" value="original" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:10Z" />
+      <string key="original" value="retained" />
+    </event>
+  </trace>
+</log>
+--OwnedOriginalModelDeclareFeature61--

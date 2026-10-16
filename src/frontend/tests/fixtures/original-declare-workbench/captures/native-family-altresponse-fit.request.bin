@@ -1,0 +1,17 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-family-altresponse.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{"altresponse":[{"first":"A","second":"B","binary":true,"support":-7,"confidence":99}]}}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="input_file"; filename="owned-word-altresponse-fit.json"
+Content-Type: application/octet-stream
+
+["A","B"]
+
+--OwnedOriginalModelDeclareFeature61--
