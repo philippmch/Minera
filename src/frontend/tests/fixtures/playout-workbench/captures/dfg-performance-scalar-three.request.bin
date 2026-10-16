@@ -1,0 +1,20 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+dfg_result
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"variant":"performance","traces":2,"max_events_per_trace":3}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_format"
+
+dfg_json
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-performance-scalar-three.dfg.json"
+Content-Type: application/octet-stream
+
+{"frequency":[{"source":"A","target":"B","count":1}],"start_activities":[{"activity":"A","count":1}],"end_activities":[{"activity":"B","count":1}],"performance":[{"source":"A","target":"B","statistics":{"summary":{"count":18446744073709551615,"mean":9,"median":"NaN","minimum":"-INF","maximum":"INF","standard_deviation":-0.0,"sum":-9},"raw_values":[1,2],"value":{"index":0,"value":3}}}]}
+
+--OwnedOriginalModelPlayoutFeature59--

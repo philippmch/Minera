@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0">
+  <trace>
+    <string key="concept:name" value="original-0" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:00Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-1" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-2" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:02Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-3" />
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:03Z" />
+    </event>
+  </trace>
+</log>

@@ -1,0 +1,20 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+tree_result
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"variant":"top_bottom","traces":16,"max_steps":8,"max_length":5,"min_length":1,"max_traces":8,"max_loop_occurrences":2,"seed":17,"return_set_strings":false}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-operator-loop.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B","unused","A"],"root":{"op":"LOOP","op_index":7,"activity":18446744073709551615,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]}]}}
+
+--OwnedOriginalModelPlayoutFeature59--

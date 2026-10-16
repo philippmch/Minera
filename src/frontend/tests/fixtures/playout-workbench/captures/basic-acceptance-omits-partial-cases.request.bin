@@ -1,0 +1,76 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+petri_basic_log
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"traces":2,"max_steps":1,"add_only_if_fm_is_reached":true}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-original-sequence.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="original-place-0">
+        <name>
+          <text>Original original-place-0</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="original-place-1">
+        <name>
+          <text>Original original-place-1</text>
+        </name>
+      </place>
+      <place id="original-place-2">
+        <name>
+          <text>Original original-place-2</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <transition id="original-transition-1">
+        <name>
+          <text>B</text>
+        </name>
+      </transition>
+      <arc id="original-in-0" source="original-place-0" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-in-1" source="original-place-1" target="original-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-out-0" source="original-transition-0" target="original-place-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-out-1" source="original-transition-1" target="original-place-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="original-place-2">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedOriginalModelPlayoutFeature59--

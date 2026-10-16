@@ -1,0 +1,27 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+dfg_result
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"max_variants":8,"traces":3,"max_events_per_trace":8}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_format"
+
+dfg_text
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-original-classic.dfg"
+Content-Type: application/octet-stream
+
+2
+A
+B
+1
+0x1
+1
+1x1
+0>1x1
+
+--OwnedOriginalModelPlayoutFeature59--

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original playout model</text></name>
+    <page id="page1">
+      <place id="p0">
+        <name><text>p0</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="p1">
+        <name><text>p1</text></name>
+      </place>
+      <place id="p2">
+        <name><text>p2</text></name>
+      </place>
+      <transition id="owned-transition-0">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="owned-transition-0"/>
+      </transition>
+      <transition id="owned-transition-1">
+        <name><text>A</text></name>
+      </transition>
+      <arc id="a0" source="p0" target="owned-transition-0"/>
+      <arc id="a1" source="owned-transition-0" target="p1"/>
+      <arc id="a2" source="p1" target="owned-transition-1"/>
+      <arc id="a3" source="owned-transition-1" target="p2"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="p2"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
