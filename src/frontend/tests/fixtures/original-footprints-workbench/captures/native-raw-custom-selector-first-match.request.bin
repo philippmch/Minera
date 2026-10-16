@@ -1,0 +1,26 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+diagnostics_log_model
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="diagnostics_options_json"
+
+{"case_id_key":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-original-violations-vector.json"
+Content-Type: application/octet-stream
+
+[[{"source":"A","target":"B"},{"source":"A","target":"B"}],[{"source":"","target":""}]]
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="source_file"; filename="owned-raw-custom-selector.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"attributes":[{"key":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","value":"first-value"},{"key":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","value":"second-value"}]},{"attributes":[{"key":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","value":"third-value"}]}]}
+
+--OwnedOriginalFootprintsFeature63--

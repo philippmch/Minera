@@ -1,0 +1,20 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+tree_decorations
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="tree_format"
+
+auto
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-four-violation-sets.json"
+Content-Type: application/octet-stream
+
+{"relations":[{"source":"A","target":"B"}],"start_activities":["A","A","absent"],"end_activities":["B"],"activities_always_happening":["B"]}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="tree_file"; filename="owned-paired-wtf8-tree.json"
+Content-Type: application/octet-stream
+
+{"activities":["í €í°€"],"root":{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]}}
+--OwnedOriginalFootprintsFeature63--

@@ -2688,3 +2688,10 @@ The shared multipart sender preserves literal line breaks, NUL and lone surrogat
 Open **Original LogSkeleton** for word, complete raw native Trace, original-source, EventDataView or variant-list conformance. Independent diagnostics accept an original source and full supplied conformance results without a normative model. All stored pair/frequency vectors, five native options, separate diagnostics selector and complete result fields remain available. Inspect and download original inputs, full results, requests, reports, table CSV and selected-record JSON.
 
 See [validation and boundaries](docs/feature-first-original-log-skeleton-workbench-validation.json). Browser UI verification and strict reference parity remain pending.
+
+
+### Compare original footprints and inspect complete conformance results
+
+Open **Original Footprints** for eighteen native comparison, precision/fitness, standalone diagnostic, flattening, finalization, projection, relation and tree-decoration operations. Supply original footprints/vectors, arbitrary complete results, source logs or process trees independently. All sixteen stored footprint members and thirteen native option fields remain available, including independent presence flags and optional values. Inspect and download complete raw inputs, requests, results, reports, CSV tables, selected records and native artifacts.
+
+See [validation and boundaries](docs/feature-first-original-footprints-workbench-validation.json). Browser UI verification and strict reference parity remain pending.

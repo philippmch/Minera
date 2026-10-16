@@ -1,0 +1,1 @@
+{"relations":[{"source":"A","target":"B"}],"start_activities":["A","A","absent"],"end_activities":["B"],"activities_always_happening":["B"]}

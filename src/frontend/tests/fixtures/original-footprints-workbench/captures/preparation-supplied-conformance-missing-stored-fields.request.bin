@@ -1,0 +1,10 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+finalize_extensive
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-invalid-conformance-missing-stored-fields.json"
+Content-Type: application/octet-stream
+
+{}
+--OwnedOriginalFootprintsFeature63--

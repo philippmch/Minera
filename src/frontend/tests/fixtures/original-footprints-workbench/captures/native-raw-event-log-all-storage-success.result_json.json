@@ -1,0 +1,1 @@
+[{"case_id":" outer\u0000\ud800 ","footprints_violations":1,"start_activities_violations":2,"end_activities_violations":1,"act_always_happening_violations":1,"min_length_fit":false,"is_fit":true},{"case_id":"trace-1","footprints_violations":0,"start_activities_violations":0,"end_activities_violations":0,"act_always_happening_violations":0,"min_length_fit":true,"is_fit":false}]

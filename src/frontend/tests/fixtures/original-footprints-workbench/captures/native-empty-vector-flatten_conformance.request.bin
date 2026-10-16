@@ -1,0 +1,11 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+flatten_conformance
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-empty-vector.json"
+Content-Type: application/octet-stream
+
+[]
+
+--OwnedOriginalFootprintsFeature63--

@@ -1,0 +1,25 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+diagnostics_trace_extensive
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="diagnostics_options_json"
+
+{}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-arbitrary-extensive-vector.json"
+Content-Type: application/octet-stream
+
+[{"footprints":[{"source":"unknown","target":"target"},{"source":"unknown","target":"target"}],"start_activities":["Z","Z","A"],"end_activities":["missing"],"activities_always_happening":["inactive"],"min_length_fit":false,"is_footprints_fit":true,"is_fit":false},{"footprints":[],"start_activities":[],"end_activities":[],"activities_always_happening":[],"min_length_fit":true,"is_footprints_fit":false,"is_fit":true}]
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="source_file"; filename="owned-paired-wtf8-source.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"í €í°€"},{"case_id":"second"}]}
+--OwnedOriginalFootprintsFeature63--

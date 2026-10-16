@@ -1,0 +1,17 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+tree_decorations
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-four-violation-sets.json"
+Content-Type: application/octet-stream
+
+{"relations":[{"source":"A","target":"B"}],"start_activities":["A","A","absent"],"end_activities":["B"],"activities_always_happening":["B"]}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="tree_file"; filename="owned-original-tree.tree.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B"],"root":{"op":"SEQUENCE","op_index":2,"activity":18446744073709551615,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]}]}}
+
+--OwnedOriginalFootprintsFeature63--

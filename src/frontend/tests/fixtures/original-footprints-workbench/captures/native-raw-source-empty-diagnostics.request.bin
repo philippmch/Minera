@@ -1,0 +1,26 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+diagnostics_trace_extensive
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="diagnostics_options_json"
+
+{}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-empty-raw-results.json"
+Content-Type: application/octet-stream
+
+[]
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="source_file"; filename="owned-empty-raw-log.json"
+Content-Type: application/octet-stream
+
+{}
+
+--OwnedOriginalFootprintsFeature63--

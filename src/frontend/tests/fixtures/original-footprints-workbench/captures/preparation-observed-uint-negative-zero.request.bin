@@ -1,0 +1,14 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+project
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-invalid-observed-uint-negative-zero.json"
+Content-Type: application/octet-stream
+
+{"min_trace_length":-0}
+--OwnedOriginalFootprintsFeature63--

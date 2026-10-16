@@ -1,0 +1,269 @@
+{
+  "complete": true,
+  "checkpoint_kind": "implemented feature delivery with pending browser validation",
+  "feature_group": 63,
+  "parent_head": "ff85d8f25e02a62e70fdfdc436bbcec4d7695928",
+  "backend_step_commit": "3ea69613ddf7d9b8de204105a7dfd5f6306a71aa",
+  "created_utc": "2026-10-16T13:09:25.434603+00:00",
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "retained_browser_attempt_feature": 63,
+  "retained_browser_live_feature": 62,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "Eighteen independent operations accept original normative/observed footprints, vectors, arbitrary complete conformance records, original sources and process trees. Scalar/vector comparisons, precision/fitness, standalone diagnostics, finalization, flattening, projections, relation utilities and tree decorations invoke their actual native functions without a cached mined model.",
+    "All sixteen stored Footprint members retain their independent values and presence flags, exact uint64 frequencies, size_t limits, optional null versus engaged empty collections and literal Unicode labels. Native set canonicalization and DFG duplicate-key rejection remain distinct from exact raw input bytes; false presence flags never hide stored values in inspection or exports.",
+    "All thirteen native option fields in five independent groups retain explicit supplied-member presence and native defaults. Four optional real discovery adapters consume original imported or complete raw EventLogs, preserve every public raw metadata field and validate actual scalar/vector result compatibility. Exact supplied footprints never trigger discovery.",
+    "Complete supplied extensive/violations/decoration results remain representable even when internally inconsistent. Native trace-word caching, diagnostic flag projection, checked source preparation and independent precision/fitness failures remain observable without synthesized outcomes or automatic mutation of original results.",
+    "Five independently owned input roles, applicable operation/option editors, source/tree formats, request ownership and cancellation expose complete input, native-call, error and result inspection. Raw, request, report, table CSV, selected-record JSON and all seven native artifact surfaces retain exact bytes and numeric/IEEE carriers.",
+    "Frontend request and response tests replay actual captured native envelopes. Dedicated omitted-control cases remain offline native evidence where the browser builder intentionally submits explicit defaults; request provenance is never weakened to make those forms appear identical."
+  ],
+  "boundaries": [
+    "This delivered feature does not establish full PM4Py parity or promote a strict unit. All 86 packages, 387 modules and 228 incomplete strict units remain in scope.",
+    "After the user explicitly changed settings to allow all browser access, the exact origin was retried during Feature63 while coherent Feature62/PID37476 listened at8562. Browser security policy still rejected the origin, citing a saved permission or managed policy. No workaround was attempted. Current Feature63 native HTTP/API/production assets are separate evidence; rendered layout, interaction and browser downloads remain unverified.",
+    "Native raw construction renews private scalar identity while preserving all public writable Trace/Event/attribute and EventLog metadata state. Owned lazy sources use the actual table-backed adapter, not arbitrary supplied C++ callbacks.",
+    "Parser resource bounds protect transport while serializers preserve complete native output. Native set insertion canonicalizes set-valued storage; vector order, contradictory optional/presence fields and original upload bytes remain inspectable. Client cancellation prevents stale publication and does not terminate a running native call.",
+    "The full catalogue audit is historical static availability evidence, not exhaustive input/control/result parity. Caller-supplied genetic causal matrices are next; embedding filtered logs, weighted EMD languages, original object-centric playout, native Table BOSE and all other recorded gaps and strict gates remain open.",
+    "Failed or superseded preparation, build, API, export and frontend attempts remain retained and are excluded from final successful validation counts."
+  ],
+  "validation_counts": {
+    "native_sources": 684,
+    "native_suites": 38,
+    "core_objects": 190,
+    "reused_core_objects": 189,
+    "fresh_core_objects": 1,
+    "frontend_tests": 3897,
+    "frontend_files": 112,
+    "api_calls": 271,
+    "api_checks": 18201,
+    "native_envelope_fixtures": 266,
+    "export_tests": 276,
+    "export_entries": 266,
+    "export_auxiliary_calls": 5,
+    "export_numeric_literals": 30331,
+    "export_csv_cells": 336861,
+    "export_selected_records": 80289,
+    "export_selected_numeric_literals": 165617,
+    "published_files": 1260,
+    "unrelated_files_preserved": 110,
+    "native_option_fields": 13,
+    "native_operations": 18
+  },
+  "pending_browser_checks": [
+    "All eighteen operations and applicable five-role ownership/option/source/tree controls",
+    "Standalone diagnostics and independent auxiliary metric/artifact errors; replace/reuse inputs and cancel stale requests",
+    "Complete result/export downloads and responsive rendered layout"
+  ],
+  "browser_status": {
+    "path": "build/footprints-workbench-feature-browser-status-1.json",
+    "sha256": "ba2c6b046b5336fb32456ce5d2034e6e0d2b0cf17d91f12a8155a6aad00e319e"
+  },
+  "evidence": {
+    "frontend": {
+      "path": "build/footprints-workbench-feature-frontend-final-9f6491ef-e73e-4b96-85d2-cfce8f49ea4b/validation.json",
+      "sha256": "02f1e4af88c5f7d78d7065071039d3bd64b087a8ec652d793fe54fd103defd38"
+    },
+    "exports": {
+      "path": "build/original-footprints-workbench-feature-exports-f8edeed9-3d85-49f0-b8f4-bfaa46970eff/validation.json",
+      "sha256": "ba2b862baf547fd43bcb2cb3fd8f24b5db78d3b34f5e29276c8c3a3c61ca2233"
+    },
+    "publication": {
+      "path": "build/original-footprints-workbench-feature-fixture-publication-b3c87446-2e8f-44ee-a9e3-80cd234c05f4/validation.json",
+      "sha256": "d009fa9c98af4cf3d7164ec26ba77ac9aea07cefe756ed60714b5271667e7c99"
+    },
+    "api": {
+      "path": "build/original-footprints-workbench-feature-application-975358eb5832497eaa81b377a7f7c33d/validation.json",
+      "sha256": "584bff590339075b84a14923ab3de156cf3b17891778fa9c52a2f08eb07da7ba"
+    },
+    "browser": {
+      "path": "build/footprints-workbench-feature-browser-status-1.json",
+      "sha256": "ba2c6b046b5336fb32456ce5d2034e6e0d2b0cf17d91f12a8155a6aad00e319e"
+    },
+    "focused": {
+      "path": "build/original-footprints-frontend-focused-6d5a6f075b8a41ff8fd0e95d321c7146/validation.json",
+      "sha256": "04e7357b4e60679c8e3c69229cb4fbb998028ab88b3677a0367690d07c043098"
+    },
+    "live": {
+      "path": "build/footprints-workbench-feature-live-runtime.json",
+      "sha256": "858939ccac53b62fb88a9f94ae2d830ccbe3ae8a25e864289f837df2edcccfb7"
+    },
+    "server": {
+      "path": "build/footprints-workbench-feature-live-server.json",
+      "sha256": "9c181dd336411ad1a7c0362a544c63686c680df43c5d69d7ceff72d9dc271523"
+    },
+    "backend_commit": {
+      "path": "build/footprints-workbench-feature-backend-postcommit.json",
+      "sha256": "f9a9c4413a9edce34f55dc02b7ed636cfbd2d8ff6560ea2103d9eaef51207148"
+    },
+    "cleanup": {
+      "path": "build/footprints-workbench-feature-test-cleanup.json",
+      "sha256": "f46f55e6f7daa2aaae28a7fae6ad8975cbc9647878290880c29ac396b8edfcf0"
+    },
+    "native": {
+      "path": "build/footprints-workbench-feature-native-81a320c532af4540ad769d4dc550feb2/build-manifest.json",
+      "sha256": "22c3323335767813c01bbeb72ef16b21e79ce24901c650acb2d84f59ad056172"
+    },
+    "seal": {
+      "path": "build/footprints-workbench-feature-seal-f2c994b16f7842b3a110321d15f4dfcd/validation.json",
+      "sha256": "daadb7648b243f317fb071fe9eb568bfda0de880d25c68dd72763f0361c809ae"
+    }
+  },
+  "historical_attempts_excluded_from_final_counts": [
+    {
+      "path": "build/original-footprints-workbench-feature-application-faf2bbf383e44a20b8729dbc11b979c4/validation.json",
+      "sha256": "001158a9d5b8e1a8242fb93f9d0facb149a4cd7514e0e1c476fd47bedd9e5ccb",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-frontend-focused-43dc8a0715694b1db06a488656ef3d05/validation.json",
+      "sha256": "ebec173ac7436b6d64a544cbbe5419a0612a5a978fec91e84be4d0578d59cbe8",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-feature-exports-bad0bf58-6dc3-4bce-9a2c-ea5d79dc7e73/validation.json",
+      "sha256": "1338adf1b74d790c4704341d16116e58fc0305bfe9eb1d1d20d76d09f85c381b",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-template-types-304507d1f59545e78abd4d6b8175ff57/validation.json",
+      "sha256": "c7d78614bd64bcee789efef7fb6fd9d2d297ba2cb803a61d4bb464d05c6fcbb1",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-template-types-536e661e9172424db205a08e8f2c2e56/validation.json",
+      "sha256": "b5b38f77c0602918bd34cb1611b8e3aae06a54adb882811269db010723e496f3",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-template-types-c1f719f4496746ed90db8ed4e5441700/validation.json",
+      "sha256": "52603c97d204fbd1c4b42c29395117863b4a766ab110e0d72c7206d4d6a97980",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-template-types-e626638e5e0342ff94f2ac1c52294614/validation.json",
+      "sha256": "c7e01aa3ea1bea1f43171657b354a80fa114d88ed5ca9b60fca5f41e40388902",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-feature-plan-2c0ba4fb3ccd46a1a538d920aa8e1f41/validation.json",
+      "sha256": "8d70a2ee041db51a8d9cd53eefba604ce584acbad581f8f68b3100fdd57d4e1c",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-feature-plan-6da5fe06f2924f6cb218b19f0185fb40/validation.json",
+      "sha256": "3b52f8ce932c3a2645086811e760fcfadfc9ee2ff6516c08ae9e606f90b14c54",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-feature-plan-c40249f3817f4e08a621c7e37039dfaa/validation.json",
+      "sha256": "903c8cbbf053ef63b649b48c7c033b6763122596302db2b30c416039358e7554",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-feature-plan-d062c7ecbc96464399c95576dd8c45d3/validation.json",
+      "sha256": "c3fa62e71d3b14b5edfd885fbe5ee864c81e1f70198ba8d6b41b278bb3bf6c8d",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-workbench-feature-plan-e00c549b54de4cfa993eae35f6a7ff2b/validation.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": "Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "path": "build/original-footprints-plan-amendment-a99eb23c45164c65b6a4de541272a0e8/validation.json",
+      "sha256": "492ab78979259692ecbe4b4842593858e8380cadcf773fdeee54e41cf1c705d3",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-export-template-amendment-9ad4a90d28a440b49e3a6f0c87b8611d/validation.json",
+      "sha256": "d80078612a61fa0ee0c0f59cf675ce1503c1cd4c5fc05d93d12d51730283a650",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-footprints-export-preparation-cedf75b75f11402dbc486230e343e6fa/validation.json",
+      "sha256": "8ca579fb98c42cfe0ea2161701726bff56d93aff7187cdde5b1ef4a9b79b267b",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/footprints-workbench-feature-delivery-preparation-bd09737fdde34a96aee26f8d085d0b57/validation.json",
+      "sha256": "d4ca74bdf3c84b7e0087daac9204ca3f77ccb66e6561ee0bc06ae2bd31892a70",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    }
+  ],
+  "superseded_native_builds": [
+    {
+      "path": "build/footprints-workbench-feature-native-bbdb4c9408df409680953d463e436e41/build-manifest.json",
+      "sha256": "c8c114177bbcea357935fde0017efb9a0d7dc4c9840a58b1139871c6b3cc6797",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "reason": "superseded frozen native attempt; exact snapshot and diagnostics retained without inflation of final counts"
+    }
+  ],
+  "feature_contract": {
+    "path": "build/original-footprints-workbench-contract-feature63-ffdafa35468c46d1a66705e969b979e9.json",
+    "sha256": "17c359b881e2fbd0990e4e9a9796a32727c18b41e4e81968f3e55bca55fd173d"
+  },
+  "next_feature_contract": {
+    "path": "build/original-genetic-matrix-workbench-contract-feature64-d311b89440e643a687eadaebc728f8f1.json",
+    "sha256": "39b612139c678174cf70b8061bac0b04cf8c960ac2449768e205c49f5d793ba7"
+  },
+  "helper_sha256": "379bda8038e4507aee8b8723c461157e00933c24f81e660d3a34746ce2cd93c5"
+}

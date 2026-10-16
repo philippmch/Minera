@@ -1,0 +1,27 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+fitness
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="model_file"; filename="owned-all-sixteen-literal-inactive-fields.json"
+Content-Type: application/octet-stream
+
+{"dfg":[{"source":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","target":"","count":18446744073709551615},{"source":"","target":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","count":0}],"dfg_present":false,"sequence":[{"source":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","target":""},{"source":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","target":""}],"parallel":[{"source":"","target":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "}],"atomic_interleaving":[{"source":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","target":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "}],"start_activities":[" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ",""," \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "],"end_activities":[""," \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "],"start_activities_present":false,"end_activities_present":false,"activities":["unrelated"," \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ",""," \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "],"skippable":true,"activities_always_happening":[" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ",""," \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "],"min_trace_length":18446744073709551615,"min_trace_length_present":false,"max_trace_length_without_loops":18446744073709551615,"trace":[" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ",""," \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "]}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-observed.footprint.json"
+Content-Type: application/octet-stream
+
+{"dfg":[{"source":"A","target":"B","count":5}],"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["A"],"end_activities":["B"],"min_trace_length":2,"trace":["A","B"]}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-arbitrary-extensive.json"
+Content-Type: application/octet-stream
+
+{"footprints":[{"source":"unknown","target":"target"},{"source":"unknown","target":"target"}],"start_activities":["Z","Z","A"],"end_activities":["missing"],"activities_always_happening":["inactive"],"min_length_fit":false,"is_footprints_fit":true,"is_fit":false}
+
+--OwnedOriginalFootprintsFeature63--

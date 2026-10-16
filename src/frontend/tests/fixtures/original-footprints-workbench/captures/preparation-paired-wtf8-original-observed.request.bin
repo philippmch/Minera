@@ -1,0 +1,14 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+project
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-paired-wtf8-observed.json"
+Content-Type: application/octet-stream
+
+{"activities":["í €í°€"]}
+--OwnedOriginalFootprintsFeature63--

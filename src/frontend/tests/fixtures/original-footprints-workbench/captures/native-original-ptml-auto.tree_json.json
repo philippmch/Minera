@@ -1,0 +1,1 @@
+{"activities":["A","B"],"root":{"op":"SEQUENCE","op_index":2,"activity":0,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]}]}}

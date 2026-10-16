@@ -1,0 +1,34 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+trace_extensive
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="trace_extensive_options_json"
+
+{"enable_act_always_executed":false,"case_id_attribute":""}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="include_diagnostics"
+
+false
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="include_metrics"
+
+false
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="model_file"; filename="owned-always-engaged-empty.json"
+Content-Type: application/octet-stream
+
+{"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["A"],"end_activities":["B"],"min_trace_length":2,"activities_always_happening":[]}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-observed-vector.json"
+Content-Type: application/octet-stream
+
+[{"dfg":[{"source":"A","target":"B","count":5}],"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["A"],"end_activities":["B"],"min_trace_length":2,"trace":["A","B"]},{}]
+
+--OwnedOriginalFootprintsFeature63--

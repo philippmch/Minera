@@ -4,7 +4,7 @@ The pinned catalogue contains 86 algorithm families and 387 modules. The Feature
 
 Strict parity remains 46/86 packages and 199/387 modules, with 228 incomplete coverage units. Feature delivery does not promote these strict counts.
 
-This is the frozen inventory before the original Declare workbench. Later delivery reports record completed gaps without rewriting this historical audit. Feature61 delivers original offline Declare conformance and playout; Feature62 delivers original log-skeleton conformance and standalone diagnostics. Original footprints remain the next normative-model input feature.
+This is the frozen inventory before the original Declare workbench. Later delivery reports record completed gaps without rewriting this historical audit. Feature61 delivers original offline Declare conformance and playout; Feature62 delivers original log-skeleton conformance and standalone diagnostics. Feature63 delivers eighteen original-footprints comparison, metric, diagnostic, utility and tree-decoration operations. Caller-supplied genetic causal matrices are next.
 
 ## Feature60 audit findings and later deliveries
 
@@ -21,7 +21,7 @@ This is the frozen inventory before the original Declare workbench. Later delive
 | Supply an independent typed reference event source for edit-distance alignment | Add original input/reference source controls and typed constructors for both sides with independent import/selectors; preserve native anti-alignment behavior. |
 | Expose the separate native table BOSE drift adapter | Use the already identified bounded Table BOSE contract; preserve the existing cached-log drift operation. |
 | Complete original offline Declare/skeleton models and Declare playout | Delivered in Feature61 (Declare) and Feature62 (log-skeleton). Browser verification and strict reference parity remain separate gates. |
-| Accept independent original footprints for conformance | Deliver the already identified exact original-footprints input contract with native comparison dispatch, retaining discovery separately. |
+| Accept independent original footprints for conformance | Delivered in Feature63 with all eighteen native operations, exact stored footprints/results/options and optional real discovery adapters. Browser verification and strict reference parity remain separate gates. |
 | Permit independent original logs for configured ILP/genetic discovery | Extend the original-source discovery workbench with separate ILP/genetic operations, exact native options, source/import controls and complete native results. |
 
 The remaining review also covers every selector, typed input, native option and stored result field; a mounted endpoint alone is insufficient. Existing connector acquisition, original streaming Declare, normative temporal profiles, and object-centric graph conformance are already present.

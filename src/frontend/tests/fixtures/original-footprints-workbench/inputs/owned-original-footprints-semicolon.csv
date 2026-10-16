@@ -1,0 +1,4 @@
+case_id;activity;timestamp;resource;lifecycle
+first;A;2026-01-01T00:00:00Z;r;complete
+first;B;2026-01-01T00:00:01Z;r;complete
+second;A;2026-01-01T00:00:02Z;s;start

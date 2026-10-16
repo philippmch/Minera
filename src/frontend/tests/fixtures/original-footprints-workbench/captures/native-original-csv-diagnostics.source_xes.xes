@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Original footprints source"/>
+  <trace>
+    <string key="case_id" value="first"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:00+00:00"/>
+      <string key="resource" value="r"/>
+      <string key="lifecycle" value="complete"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:01+00:00"/>
+      <string key="resource" value="r"/>
+      <string key="lifecycle" value="complete"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="second"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:02+00:00"/>
+      <string key="resource" value="s"/>
+      <string key="lifecycle" value="start"/>
+    </event>
+  </trace>
+</log>

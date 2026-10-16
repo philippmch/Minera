@@ -1,0 +1,26 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+log_model
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="log_model_options_json"
+
+{"strict":true,"case_id_attribute":" \n\r\t\u0000\ud800 "}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="model_file"; filename="owned-wrong-family-model.footprint.json"
+Content-Type: application/octet-stream
+
+{"parallel":[{"source":"A","target":"B"}]}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-observed.footprint.json"
+Content-Type: application/octet-stream
+
+{"dfg":[{"source":"A","target":"B","count":5}],"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["A"],"end_activities":["B"],"min_trace_length":2,"trace":["A","B"]}
+
+--OwnedOriginalFootprintsFeature63--

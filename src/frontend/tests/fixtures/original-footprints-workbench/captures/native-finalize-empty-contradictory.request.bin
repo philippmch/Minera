@@ -1,0 +1,11 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+finalize_extensive
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-arbitrary-empty-contradictory.json"
+Content-Type: application/octet-stream
+
+{"footprints":[],"start_activities":[],"end_activities":[],"activities_always_happening":[],"min_length_fit":true,"is_footprints_fit":false,"is_fit":true}
+
+--OwnedOriginalFootprintsFeature63--

@@ -1,0 +1,11 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+relation_activities
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-original-relations.json"
+Content-Type: application/octet-stream
+
+[{"source":"B","target":"A"},{"source":"A","target":"B"},{"source":"A","target":"B"},{"source":"","target":""}]
+
+--OwnedOriginalFootprintsFeature63--
