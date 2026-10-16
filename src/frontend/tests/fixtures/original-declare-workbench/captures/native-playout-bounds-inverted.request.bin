@@ -1,0 +1,16 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+playout
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="playout_options_json"
+
+{"n_traces":0,"min_length":2,"max_length":1}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-empty.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{}}
+
+--OwnedOriginalModelDeclareFeature61--

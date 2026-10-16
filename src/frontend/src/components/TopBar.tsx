@@ -22,10 +22,11 @@ interface TopBarProps {
   onMonteCarlo?: () => void;
   onPlayout?: () => void;
   onOriginalDecision?: () => void;
+  onOriginalDeclare?: () => void;
   onActiveSource?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onActiveSource }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onActiveSource }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -59,6 +60,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onMonteCarlo && <button className="btn-ghost" onClick={onMonteCarlo}>Original-model Monte Carlo</button>}
       {onPlayout && <button className="btn-ghost" onClick={onPlayout}>Original-model playout</button>}
       {onOriginalDecision && <button className="btn-ghost" onClick={onOriginalDecision}>Original-model decisions</button>}
+      {onOriginalDeclare && <button className="btn-ghost" onClick={onOriginalDeclare}>Original Declare</button>}
       {onActiveSource && <button className="btn-ghost" onClick={onActiveSource}>Source inputs</button>}
       <label className="btn-open">
         Open log

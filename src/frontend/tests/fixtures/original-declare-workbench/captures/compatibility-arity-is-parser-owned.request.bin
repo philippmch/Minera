@@ -1,0 +1,21 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_format"
+
+stream_compatibility
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-invalid-compatibility-arity.json"
+Content-Type: application/octet-stream
+
+{"rules":[{"template":"existence","first":"A","second":"B","binary":true,"support":-7,"confidence":99}]}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="input_file"; filename="owned-original-word.json"
+Content-Type: application/octet-stream
+
+["A","B"]
+
+--OwnedOriginalModelDeclareFeature61--

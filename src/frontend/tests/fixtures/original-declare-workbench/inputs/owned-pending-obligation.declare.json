@@ -1,0 +1,1 @@
+{"rules":{"response":[{"first":"A","second":"B","binary":true,"support":-7,"confidence":99}],"absence":[{"first":"B","second":"","binary":false,"support":-7,"confidence":99}]}}

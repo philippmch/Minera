@@ -1,0 +1,1 @@
+{"case_id":"custom","properties":[{"key":"p","value":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "}],"events":[{"activity":"ignored","attributes":[{"key":" literal task \ud800 \u6771\u4eac\u0000 ","value":"A"}]},{"activity":"ignored","attributes":[{"key":" literal task \ud800 \u6771\u4eac\u0000 ","value":"B"}]}]}

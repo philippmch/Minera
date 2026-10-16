@@ -1,0 +1,17 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-offline-false-binary.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{"response":[{"first":"A","second":"B","binary":false,"support":-7,"confidence":99}]}}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="input_file"; filename="owned-word-only-a.json"
+Content-Type: application/octet-stream
+
+["A"]
+
+--OwnedOriginalModelDeclareFeature61--

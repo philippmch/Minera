@@ -1,0 +1,22 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+conformance_trace
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="conformance_options_json"
+
+{"activity_key":" literal task \ud800 \u6771\u4eac\u0000 ","case_id_key":""}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-response.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{"response":[{"first":"A","second":"B","binary":true,"support":-7,"confidence":99}]}}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="input_file"; filename="owned-literal-trace.json"
+Content-Type: application/octet-stream
+
+{"case_id":"custom","properties":[{"key":"p","value":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "}],"events":[{"activity":"ignored","attributes":[{"key":" literal task \ud800 \u6771\u4eac\u0000 ","value":"A"}]},{"activity":"ignored","attributes":[{"key":" literal task \ud800 \u6771\u4eac\u0000 ","value":"B"}]}]}
+
+--OwnedOriginalModelDeclareFeature61--

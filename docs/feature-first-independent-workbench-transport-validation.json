@@ -1,0 +1,110 @@
+{
+  "feature": 61,
+  "complete": true,
+  "kind": "implemented functional multipart transport follow-up",
+  "created_utc": "2026-10-16T12:21:39.246847+00:00",
+  "commit": "6184bb9b87b4dc8f175ccccdaeea017ad494b503",
+  "parent_backend_commit": "a0c0069029fced4d91e415cf2fd2f2f8170ccd30",
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false,
+  "browser_ui_verified": false,
+  "foundation": "src/frontend/src/native-multipart.ts",
+  "preserved_exports": [
+    "workflowInputNativeBytes",
+    "appendMonteCarloField"
+  ],
+  "repaired_builders": [
+    {
+      "path": "src/frontend/src/workflow-input-workbench.ts",
+      "endpoint": "/api/discover-workflow-input"
+    },
+    {
+      "path": "src/frontend/src/token-replay-workbench.ts",
+      "endpoint": "/api/replay-token-workbench"
+    },
+    {
+      "path": "src/frontend/src/petri-alignment-workbench.ts",
+      "endpoint": "/api/align-petri-workbench"
+    },
+    {
+      "path": "src/frontend/src/process-tree-alignment-workbench.ts",
+      "endpoint": "/api/align-process-tree-workbench"
+    },
+    {
+      "path": "src/frontend/src/model-conversion-workbench.ts",
+      "endpoint": "/api/model-conversion-workbench"
+    },
+    {
+      "path": "src/frontend/src/inductive-input-workbench.ts",
+      "endpoint": "/api/discover-inductive-input"
+    },
+    {
+      "path": "src/frontend/src/petri-anti-multi-workbench.ts",
+      "endpoint": "/api/align-petri-anti-multi-workbench"
+    },
+    {
+      "path": "src/frontend/src/graph-alignment-workbench.ts",
+      "endpoint": "/api/align-graph-workbench"
+    }
+  ],
+  "behavior": [
+    "Eight independent input, replay, alignment and conversion request builders now share the leaf byte encoder and multipart field appender.",
+    "Literal CR, LF, CRLF, NUL, Unicode and lone surrogate halves retain their exact UTF/WTF-8 bytes. Multiline JSON retains whitespace, integer tokens and decimal spellings. Ordinary values keep their existing text-field representation.",
+    "Existing field names, casing, defaults, operation selection and original uploaded model/source bytes remain unchanged. Native algorithms continue to validate their own values.",
+    "All eight native routes already read control file-part content verbatim and account for file-part presence. No native transport implementation change was required."
+  ],
+  "validation_counts": {
+    "scoped_tests": 228,
+    "scoped_test_files": 12,
+    "strict_typescript": true,
+    "real_api_calls": 8,
+    "real_client_smoke_tests": 9,
+    "verified_wire_parts": 58,
+    "literal_native_headers_retained": 7,
+    "explicit_native_marking_retained": true,
+    "full_frontend_tests": 3386,
+    "full_frontend_test_files": 108,
+    "native_sources_unchanged": 676,
+    "assertion_enabled_native_suites": 31,
+    "unrelated_files_preserved": 110
+  },
+  "evidence": {
+    "scoped_frontend": {
+      "path": "build/independent-workbench-transport-focused-7f5996f78e404e429b92082f9daa469e/validation.json",
+      "sha256": "a3a56c3e01ab87b149a1ab532489994e7c087eb69a6a344266c46b935ca9095d"
+    },
+    "native_reader_review": {
+      "path": "build/independent-workbench-transport-control-reader-audit-feature61.json",
+      "sha256": "a8998a60f71157834918462ae43f5ca904378f98db63a2d951d54a682a27daf5"
+    },
+    "actual_node_wire_and_native_api": {
+      "path": "build/independent-workbench-transport-feature-application-a93a6ad1ae504712b407f1a22d17d5e6/validation.json",
+      "sha256": "7de36da2079a902938637a323cf2bbf05818f1612fb4782ca292f7a423c6ca2f"
+    },
+    "actual_wire_records": {
+      "path": "build/independent-workbench-transport-feature-application-a93a6ad1ae504712b407f1a22d17d5e6/transport-proof.json",
+      "sha256": "782e78d0b68b5d215f5cbb1eab3947ad138fd6a7e55f3e0640ab3105de867f69"
+    },
+    "final_frontend": {
+      "path": "build/declare-workbench-feature-frontend-final-a618c4ec-8c4a-4394-94fe-33632086afb9/validation.json",
+      "sha256": "cfb3f2e37dcc34b34f71064f830da23c1b0605a43df942e699c3a766e6ac1ddf"
+    },
+    "transport_commit": {
+      "path": "build/independent-workbench-transport-step-postcommit.json",
+      "sha256": "c9216361692a0928e620c64467c62508a92323d37cc4b6be269363b19062a744"
+    }
+  },
+  "boundaries": [
+    "Node Request MIME serialization and native HTTP behavior were verified. This evidence does not claim browser interaction, rendered layout or browser download verification.",
+    "This closes the eight-builder transport follow-up recorded after Feature60. It does not change the strict package/module catalogue or promote any parity unit."
+  ],
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "helper_sha256": "5fb914ba4e71418ae61e70a1bc2920b46a19cca377e5a87ed3d54d9fb49ebdea"
+}

@@ -1,0 +1,1 @@
+{"rules":{"existence":[{"first":"A","second":"unused","binary":true,"support":-7,"confidence":99},{"first":"A","second":"unused","binary":true,"support":-7,"confidence":99}],"unknown":[{"first":"X","second":"B","binary":false,"support":-7,"confidence":99}]}}

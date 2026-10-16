@@ -2674,3 +2674,10 @@ PNML. Preparation, native and supplemental export errors retain the available
 model/source/result context. Browser validation and strict reference parity
 remain separate gates; see
 `docs/feature-first-original-decision-workbench-validation.json`.
+
+
+### Check and simulate an original Declare model
+
+Open **Original Declare** for word, complete native Trace, original-source or EventDataView conformance, and declared-model playout. All18 family groups, exact stored model fields and all seven native option controls remain available. Inspect full deviations, generated logs and typed diagnostics; optional offline generated checks can reveal pending obligations even after prefix-safe generation. Original sources, raw inputs/results, reports, table CSV and selected-record JSON can be downloaded, and generated XES can be reopened as the active source.
+
+The shared multipart sender preserves literal line breaks, NUL and lone surrogates across all independent input workbenches. See [Declare validation](docs/feature-first-original-declare-workbench-validation.json), [transport validation](docs/feature-first-independent-workbench-transport-validation.json), and the [complete functionality inventory](docs/feature-first-functionality-status.md). Browser UI verification and strict reference parity remain pending.

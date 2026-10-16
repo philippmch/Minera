@@ -1,0 +1,17 @@
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="model_file"; filename="owned-family-existence.declare.json"
+Content-Type: application/octet-stream
+
+{"rules":{"existence":[{"first":"A","second":"unused","binary":false,"support":-7,"confidence":99}]}}
+
+--OwnedOriginalModelDeclareFeature61
+Content-Disposition: form-data; name="input_file"; filename="owned-word-existence-deviation.json"
+Content-Type: application/octet-stream
+
+[]
+
+--OwnedOriginalModelDeclareFeature61--

@@ -1,0 +1,215 @@
+{
+  "complete": true,
+  "checkpoint_kind": "implemented feature delivery with pending browser validation",
+  "feature_group": 61,
+  "parent_head": "98d41fbd2a4ee54f385cd6cfbcde98246736719c",
+  "backend_step_commit": "a0c0069029fced4d91e415cf2fd2f2f8170ccd30",
+  "transport_step_commit": "6184bb9b87b4dc8f175ccccdaeea017ad494b503",
+  "created_utc": "2026-10-16T12:23:42.568347+00:00",
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "retained_browser_attempt_feature": 61,
+  "retained_browser_live_feature": 60,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "Original caller-owned Declare models expose five operations: word, complete native Trace, actual concrete event-source overloads, EventDataView conformance, and native prefix-safe playout. Requests own their inputs and leave the cached mined session unchanged.",
+    "Exact model transport preserves map membership, unknown/empty family groups, ordered duplicate constraints, literal labels, inactive second/binary fields and signed support/confidence. All 18 known family predicates are covered. The existing streaming compatibility parser is offered explicitly and retains its narrower legacy arity rules.",
+    "The seven native option fields remain independent across conformance, diagnostics and playout. Full size_t/uint64 tokens, seed null versus zero, supplied-member provenance and literal selectors remain intact. Native semantic validation owns invalid selectors, ranges and playout arity. Inapplicable option groups are rejected explicitly.",
+    "Complete raw Trace/Event/recursive EventAttribute constructors retain first-class state/provenance, raw enum indexes, all seven typed payload alternatives and inactive stored fields. Original CSV/TSV/XES/gzip/typed-table sources expose log, stream, dataframe and lazyframe overloads with full import settings, selected views, metadata, original bytes and native preparation errors.",
+    "Full scalar/vector conformance results, complete generated EventLog and typed diagnostics remain inspectable. Optional generated offline checks and diagnostics have independent errors and actual call records. Prefix-safe Declare generation may leave pending obligations; its optional complete-word conformance records the actual fitness rather than claiming generated traces are always fit.",
+    "The application exposes independent model/source ownership, all native controls, raw model/word/Trace inputs, complete inspect/raw/request/report/CSV/selected-record/original artifacts, and reopening generated XES as the active source. Source and generated export errors remain separate from successful native results.",
+    "Eight existing independent request builders now share a leaf multipart encoder that preserves literal CR/LF/NUL and lone surrogates through actual Request serialization. Production clients for replay, Petri/process-tree/graph alignments, model conversion, inductive discovery, anti/multi alignment and workflow discovery were tested against real native routes. Legacy shared helper exports retain identity."
+  ],
+  "boundaries": [
+    "Feature delivery does not claim full PM4Py parity or promote any strict package/module. All 86 packages, 387 modules and 228 incomplete strict units remain in scope.",
+    "After the user reported enabled settings, one exact-origin browser attempt while Feature60/PID12428 served port8562 was rejected by the saved/managed-policy gate. No repeated permission request or browser workaround followed. Current Feature61 native HTTP/API/asset checks are separate; rendered UI, browser interactions, screenshots and browser downloads remain unverified.",
+    "Playout is prefix-safe, not a promise of complete-word fitness. Optional generated checks and diagnostics preserve their independent native failures. Full stored unknown/inactive fields are retained even when a particular algorithm does not consult them.",
+    "Raw constructors carry the public writable native state; private scalar identity is renewed by native construction. Arbitrary C++ lazy scanner callbacks are not a browser transport; owned lazy tables use the existing native table-backed source.",
+    "The complete static catalogue inventory is preserved in docs/feature-first-functionality-inventory-feature60.json. It identifies existing surfaces and specific gaps without establishing exhaustive input/option/result parity. Original skeleton/footprints, supplied genetic matrices, embedding filtered logs, explicit weighted EMD languages, original object-centric playout, Table BOSE and the other listed controls remain work.",
+    "Client cancellation prevents stale publication and does not claim to stop an already executing native operation. Historical failed/superseded attempts remain retained and excluded from final successful counts."
+  ],
+  "validation_counts": {
+    "native_sources": 676,
+    "native_suites": 31,
+    "core_objects": 188,
+    "reused_core_objects": 187,
+    "fresh_core_objects": 1,
+    "frontend_tests": 3386,
+    "frontend_files": 108,
+    "api_calls": 133,
+    "api_checks": 3884,
+    "native_envelope_fixtures": 128,
+    "export_tests": 138,
+    "export_entries": 128,
+    "export_auxiliary_calls": 5,
+    "export_numeric_literals": 11898,
+    "export_csv_cells": 131869,
+    "export_selected_records": 28581,
+    "export_selected_numeric_literals": 58815,
+    "published_files": 512,
+    "unrelated_files_preserved": 110,
+    "native_option_fields": 7,
+    "native_operations": 5,
+    "transport_request_builders": 8,
+    "transport_step_files": 11,
+    "transport_native_calls": 8,
+    "transport_field_byte_proofs": 58
+  },
+  "pending_browser_checks": [
+    "Original model and raw word/Trace/source inputs across all five operations",
+    "Native option editors, ownership/cancellation and auxiliary error inspection",
+    "Complete result/export downloads, generated-XES reopen and responsive rendered layout"
+  ],
+  "browser_status": {
+    "path": "build/declare-workbench-feature-browser-status-1.json",
+    "sha256": "04c7b4729a64b37cac39104d7924669ca99968df2def28f77e7a7f219d91bc16"
+  },
+  "evidence": {
+    "frontend": {
+      "path": "build/declare-workbench-feature-frontend-final-a618c4ec-8c4a-4394-94fe-33632086afb9/validation.json",
+      "sha256": "cfb3f2e37dcc34b34f71064f830da23c1b0605a43df942e699c3a766e6ac1ddf"
+    },
+    "exports": {
+      "path": "build/original-declare-workbench-feature-exports-a35aa693-5cca-4e67-8315-478018881632/validation.json",
+      "sha256": "081a1569020fe1babf9063a19e8a2e4c6bc27824d42d3258869779061aa42b01"
+    },
+    "publication": {
+      "path": "build/original-declare-workbench-feature-fixture-publication-a20a8772-b80c-442c-b6dc-9876ad26e745/validation.json",
+      "sha256": "438617b98dc80f60646a07b64b71141a186f47c529cd22e12058910922c93dbe"
+    },
+    "api": {
+      "path": "build/original-declare-workbench-feature-application-3f06e252a07e4bc3b7b0df00b3d8e0ad/validation.json",
+      "sha256": "25d267d5a700f481cd683856c147059510b4572d5a32bdc334ffdf23631eb78e"
+    },
+    "browser": {
+      "path": "build/declare-workbench-feature-browser-status-1.json",
+      "sha256": "04c7b4729a64b37cac39104d7924669ca99968df2def28f77e7a7f219d91bc16"
+    },
+    "transport": {
+      "path": "build/independent-workbench-transport-focused-7f5996f78e404e429b92082f9daa469e/validation.json",
+      "sha256": "a3a56c3e01ab87b149a1ab532489994e7c087eb69a6a344266c46b935ca9095d"
+    },
+    "transport_smoke": {
+      "path": "build/independent-workbench-transport-feature-application-a93a6ad1ae504712b407f1a22d17d5e6/validation.json",
+      "sha256": "7de36da2079a902938637a323cf2bbf05818f1612fb4782ca292f7a423c6ca2f"
+    },
+    "declare_focused": {
+      "path": "build/original-declare-workbench-frontend-focused-d9027160eabb4775b2482682d59c7d2e/validation.json",
+      "sha256": "2795ab33f68cf005ef6f3d33788b3950608929c77957dcb68a97ea33568160c8"
+    },
+    "live": {
+      "path": "build/declare-workbench-feature-live-runtime.json",
+      "sha256": "9e6f7324e9dcb65b9022dcdb7cff6cc084f87c339dc347a33c9d7350fcfc2088"
+    },
+    "server": {
+      "path": "build/declare-workbench-feature-live-server.json",
+      "sha256": "d8f406898610d0213e95b4d8d59e442f7a6e20db4a43ffccd9d32535d5c2975a"
+    },
+    "backend_commit": {
+      "path": "build/declare-workbench-feature-backend-postcommit.json",
+      "sha256": "cc55d1ca3bfaed9da2c3616e87737479726dae67e43fedd706567202c18ed656"
+    },
+    "cleanup": {
+      "path": "build/declare-workbench-feature-test-cleanup.json",
+      "sha256": "9d7b2046f866fdfe25f8103080d46f3ff401908e63d19bf520f47aa3d45298d8"
+    },
+    "transport_commit": {
+      "path": "build/independent-workbench-transport-step-postcommit.json",
+      "sha256": "c9216361692a0928e620c64467c62508a92323d37cc4b6be269363b19062a744"
+    },
+    "native": {
+      "path": "build/declare-workbench-feature-native-2f2438478ca24555968aff9b2a29c3ad/build-manifest.json",
+      "sha256": "dccbc539032993d05de58fef5e79cbfe6f9ee49c47cf4672636162e0398deda4"
+    },
+    "seal": {
+      "path": "build/declare-workbench-feature-seal-948b7a253e68491282d3035e33274c4b/validation.json",
+      "sha256": "67d9c32fca98a627a364e58cd6029ccef4727d6c43c72e64cea48739020a9d0f"
+    }
+  },
+  "historical_attempts_excluded_from_final_counts": [
+    {
+      "path": "build/original-declare-workbench-feature-application-88d8a51619294e19b6ac4a06c3257e78/validation.json",
+      "sha256": "4fd5127837e0a4d9e0eeeb849f2b57db06918ffe0596f925d83e38496af6a78f",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-declare-workbench-frontend-focused-3b8966a420fe49a49d12b12761fb21f7/validation.json",
+      "sha256": "3374db59c2a12580fe02999833f5ba05443e7cae166d3fb77543915a7234024c",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-declare-workbench-frontend-focused-53e1c9c8773942619f062a9758c81f3f/validation.json",
+      "sha256": "f9984801d7a166368e316029428cda39ac29b69470e9a1aecf31d461bf5cfc16",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-declare-workbench-feature-exports-d59209ef-399e-452e-b070-888ab8ff6203/validation.json",
+      "sha256": "b52b24739d3ad07279d0b1540939fdd0bc62ac13bb435c68a1bb791a4a5a1481",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-declare-workbench-feature-exports-e2446547-be19-4346-949c-e1c6fcd84294/validation.json",
+      "sha256": "378a4fb6cea9fb23a60cf9e515a4e0484116022aba20409ace0db7a338daeb90",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/independent-workbench-transport-feature-application-65d1382ce8b342919798a9fbd84c18ec/validation.json",
+      "sha256": "cbe6d06fe293e9bd179133b2823499fcf5d8e7cefb4df3f9230f4b6bc3adc308",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-declare-workbench-template-types-3511ad70367b451cad83d08202b1e073/validation.json",
+      "sha256": "c54945f40df34268fa6d771c9aca603e885c3693f16c450e53991046a0ad3054",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-declare-workbench-template-types-4d94ca738fdf4bfead64023a7e6dbe1d/validation.json",
+      "sha256": "e6036b478f7b621dbb4fd5d64000ef5fa1309dc70a318bffad2c097db0a376eb",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    }
+  ],
+  "superseded_native_builds": [
+    {
+      "path": "build/declare-workbench-feature-native-61176211567548d7b75fc759e0bbbe49/build-manifest.json",
+      "sha256": "363a171841fa6810abb7b43a255e23c911ddf53b308c2d19ffb176e976e30c16",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "reason": "superseded frozen native attempt; compiler or test diagnostics retained without reuse as successful evidence"
+    }
+  ],
+  "feature_contract": {
+    "path": "build/original-declare-workbench-contract-feature61.json",
+    "sha256": "d09547b70311238b62440cc79c2d4ef990e124b07e42bdeefa23c669c89a4a22"
+  },
+  "next_feature_contract": {
+    "path": "build/original-log-skeleton-workbench-contract-feature62-reviewed-1.json",
+    "sha256": "92464b3ebc6a6c3a7c21ba2500d85a03d624ca4beb4eb14a3b61516cbf658b71"
+  },
+  "helper_sha256": "d2dc94f8427c63f6ea196f1eb74b93d20166cff9197bd86487b3a11dfff29eb3"
+}
