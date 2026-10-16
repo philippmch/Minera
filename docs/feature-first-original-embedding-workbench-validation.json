@@ -1,0 +1,429 @@
+{
+  "complete": true,
+  "checkpoint_kind": "implemented feature delivery with pending browser and real host model validation",
+  "feature_group": 65,
+  "parent_head": "f0c4977888a508560732e0bf1fb211469ddbcd22",
+  "backend_step_commit": "a5882d5629a091250b2ef177a3fffe0acbbe7951",
+  "created_utc": "2026-10-16T14:04:46.553515+00:00",
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "retained_browser_attempt_feature": 65,
+  "retained_browser_live_feature": 64,
+  "real_host_model_validation_complete": false,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "An independent original embedding workbench now invokes all five selected native surfaces: filter_embeddings_top_k, to_embeddings, embedding_similarity on a supplied full EmbeddingResult, composed log-to-similarity, and embed_text. Original inputs are request-owned; no cached session or discovered replacement source is used.",
+    "Native filtering returns the actual full EventLog, including all ten metadata members and complete stored Trace/Event/attribute state. Event-level keep_cases, duplicate and empty IDs, source order, zero-k filtering versus zero-k similarity, and exact native validation remain distinct. No internal embeddings or matches are fabricated for the filter result.",
+    "All eight native value fields retain constructor defaults and supplied presence, literal string bytes, raw enum indexes, exact size_t and IEEE values. The ninth native callback member remains empty by default. A separate native_default/server integration selector can bind the actual immutable startup HTTP callback; unavailable explicit binding is an owned configuration error. HASHING remains the native provider default.",
+    "An additional actual synthetic HTTP-provider proof exercised all five operations through registry-default and explicit server bindings, verified HASHING stayed unchanged, explicit callback versus native mock priority and zero-width inference, and retained every provider request/response. Its owned8570/8571 services were stopped while the existing8562/8568 processes stayed unchanged. This establishes HTTP/callback wiring with synthetic vectors; it does not establish a real transformer model.",
+    "Caller raw logs, typed-table/import adapters and complete EmbeddingResult vectors remain separate from actual prepared logs/results. Complete ActiveEventSource snapshots retain actual source shape, all seventeen conversion options, typed origins, row ordinals, representative cells and projection changes. The native operations still consume their real EventLog signatures.",
+    "Raw target/text inputs reach native string_view byte-for-byte, including empty, NUL, malformed UTF8 and WTF8. NativeString tags and versioned byte-safe raw-log/table/stream carriers preserve every stored public string without folding paired surrogate bytes. Full source/filtered raw-log and embedding-result artifacts reopen through the owned codecs.",
+    "Original byte/SHA records, configured options, callback provenance, before/after snapshots, owned partial errors and actual native call records remain inspectable. All nine independent artifacts have authoritative bytecarriers; scalar-valid display text is optional, while actual legacy JSON/XES export failures remain separate from primary results. Reports, request/response, CSV and selected-record downloads retain full numeric and byte state.",
+    "The UI provides all five operations, exact original uploads/text and source/import controls, full option and callback-binding editors, ownership/cancellation and complete result inspection. Actual native API captures drive frontend replay and export tests; omitted-control cases remain labelled offline evidence when the browser builder submits applicable defaults."
+  ],
+  "boundaries": [
+    "This checkpoint does not establish full PM4Py parity or promote a strict unit. All 86 packages, 387 modules and 228 incomplete strict units remain in scope.",
+    "A fresh actual browser retry was made for Feature65 after the user reported changing browser settings, while the coherent Feature64 server/PID23620 listened at8562. The browser still rejected access through its security policy. Current Feature65 native HTTP/API/assets are separate evidence; rendered layout, interaction and browser downloads remain unverified.",
+    "Real host transformer/model availability and model-quality validation remain open unless a separate real-runtime proof establishes them. Hashing and the native explicit mock provider are labelled native behaviors; no model download, hidden mock substitution or fabricated callback transport is used. Unit callbacks establish member/registry/mock priority without claiming an actual host model.",
+    "The final full API corpus reused PID16544 and began with the cache retained from historical attempt2. Its first request precedes only its own cache reseed; the historical fixture ID is not a fresh-empty-service claim. The earlier root five-operation smoke and historical attempt2 first filter before its initial seed separately establish uncached execution. Historical/smoke calls and synthetic-provider calls are excluded from the main final API totals; the cache-history audit also verifies exact downloaded raw-log reopen inputs.",
+    "Source preparation may import a stream, dataframe or lazyframe before obtaining an actual checked EventLog; these are preparation adapters, not additional native embedding overloads. The full returned source and filtered logs remain authoritative even when an optional legacy export rejects otherwise stored state.",
+    "Successful legacy artifacts can contain arbitrary native bytes, literal controls or text that is not parseable JSON. artifact_originals retains those bytes; a null display with no export error is a successful byte artifact. Full owned codecs and canonical byte-safe artifacts remain the reopening surfaces.",
+    "Client cancellation prevents stale publication and does not stop an executing native call. Existing cached-log embedding operations remain available independently. The whole-catalogue inventory is historical static availability evidence, not behavioral or performance parity.",
+    "The next bounded delivery is original weighted stochastic-language EMD, preserving existing log-derived EMD and its four host callback boundaries. Original object-centric playout, Table BOSE, independent original-source ILP/genetic discovery and every other recorded gap and strict gate remain open.",
+    "Failed or superseded preparation, native build, API, export and frontend attempts remain retained and excluded from final successful counts."
+  ],
+  "validation_counts": {
+    "native_sources": 692,
+    "native_suites": 43,
+    "core_objects": 192,
+    "reused_core_objects": 191,
+    "fresh_core_objects": 1,
+    "frontend_tests": 4451,
+    "frontend_files": 116,
+    "api_calls": 367,
+    "api_checks": 25334,
+    "native_envelope_fixtures": 362,
+    "export_tests": 372,
+    "export_entries": 362,
+    "export_auxiliary_calls": 5,
+    "export_numeric_literals": 148471,
+    "export_csv_cells": 671037,
+    "export_selected_records": 154297,
+    "export_selected_numeric_literals": 956186,
+    "published_files": 1598,
+    "unrelated_files_preserved": 110,
+    "native_option_fields": 8,
+    "native_host_callback_members": 1,
+    "native_operations": 5,
+    "native_artifact_kinds": 9
+  },
+  "supplemental_validation_counts": {
+    "synthetic_bridge_api_calls": 21,
+    "synthetic_provider_requests": 31,
+    "synthetic_bridge_checks": 255,
+    "cache_history_audit_checks": 8
+  },
+  "supplemental_counts_excluded_from_main_api_counts": true,
+  "cache_history": {
+    "final_capture_started_with_existing_cache": true,
+    "seeded_by": "historical_actual_attempt2/cache-seed",
+    "first_final_request_precedes_own_seed_only": true,
+    "uncached_execution_evidence": [
+      "pre_cache_five_operation_smoke:all_five_operations",
+      "historical_actual_attempt2:first_independent_filter_before_initial_cache_seed"
+    ],
+    "chronology_source": "Root-authorized execution sequence and preserved service/capture records; no restart was performed between attempts.",
+    "historical_fixture_id_retained": "native-filter-first-without-cache",
+    "historical_fixture_id_is_not_new_empty_service_claim": true
+  },
+  "synthetic_host_http_wiring_verified": true,
+  "pending_browser_checks": [
+    "Original source/result and raw text uploads; all five operations and exact native/callback controls",
+    "Full source and filtered-log inspection, native/partial/export errors, cancellation and replacement",
+    "All original/request/response/artifact/report/CSV/selected-record downloads and responsive layout"
+  ],
+  "browser_status": {
+    "path": "build/embedding-workbench-feature-browser-status-2.json",
+    "sha256": "a8be22c06a4dc9921a53782ce4e4ab56fc0bf148283df6c0aaedee4b26157957"
+  },
+  "evidence": {
+    "frontend": {
+      "path": "build/embedding-workbench-feature-frontend-final-66b4f3c7-6252-4ddd-b32f-71b451a73aba/validation.json",
+      "sha256": "79e99af0934fe624903e8a8615ddbb4010a749da9d39a235fdbeea9cb4f2a70c"
+    },
+    "exports": {
+      "path": "build/original-embedding-workbench-feature-exports-716bdd8d-52ee-4c74-87e3-62a298288eea/validation.json",
+      "sha256": "4361c3cb1b8e747cc54e3bac7af433b0f5d361578de471f7cacc4d895540487e"
+    },
+    "publication": {
+      "path": "build/original-embedding-workbench-feature-fixture-publication-c0a83be1-4c7a-42bb-bc6f-a83d71446bb7/validation.json",
+      "sha256": "98fa37783585f77d6a667fa49377c8eb9ed3f839ae99fa1926b55e250fd7d17e"
+    },
+    "api": {
+      "path": "build/original-embedding-workbench-feature-application-e23e5475b2734b05b81dfde3753e7a20/validation.json",
+      "sha256": "4aad3e7be740b9209b29ce6eec5c47a6c6951a377e02642c3c8d039b6617ea92"
+    },
+    "browser": {
+      "path": "build/embedding-workbench-feature-browser-status-2.json",
+      "sha256": "a8be22c06a4dc9921a53782ce4e4ab56fc0bf148283df6c0aaedee4b26157957"
+    },
+    "integration": {
+      "path": "build/original-embedding-filter-frontend-integration-amendment-8e3ecb556979443fb908abd45b34a963/validation.json",
+      "sha256": "18af1c743afc5a212df39fb6d1d07ac55b8c63a110e99c9a92927072917efea7"
+    },
+    "live": {
+      "path": "build/embedding-workbench-feature-live-runtime.json",
+      "sha256": "2aac9230782f8fa129f02440f7ca0f81de01ec915aee3c6d4684c6d5e10aec05"
+    },
+    "server": {
+      "path": "build/embedding-workbench-feature-live-server.json",
+      "sha256": "ebd5316406ae0b105525309bd1cc44b67c97fc70a04a288eb4fc331dbeaa4d94"
+    },
+    "backend_commit": {
+      "path": "build/embedding-workbench-feature-backend-postcommit.json",
+      "sha256": "db98cf589bde25b6ff18bb282d0a4a90c043e61f29bcc3d1f6a017de9b39b3a0"
+    },
+    "cleanup": {
+      "path": "build/embedding-workbench-feature-test-cleanup.json",
+      "sha256": "7c9910f4609a641767950ef51e608eb915a82e49185412e3deaf3cfa884819a8"
+    },
+    "bridge": {
+      "path": "build/embedding-workbench-feature-synthetic-bridge-cf310a0ab92d4113a1085e330ff3fd99/validation.json",
+      "sha256": "b130ccb90d8522607deacf215eee8937f45d9bc07e1d44a61423fb65da4b64c0"
+    },
+    "cache_history": {
+      "path": "build/embedding-workbench-feature-cache-history-postcapture-c9b3c89c079c4a5bbd8c77e633559417/validation.json",
+      "sha256": "2b51698fadf476b758f19fbe85a300318e64007aebba5772d6b4027ab9ceacf3"
+    },
+    "integration_review": {
+      "path": "build/original-embedding-frontend-empty-import-root-review-554bdd8d796a458182345fa155f81af0/validation.json",
+      "sha256": "976c121634c63a93dba55a85aa875534ae1e7dc8c2943e009738018e1473e1ae"
+    },
+    "focused": {
+      "path": "build/original-embedding-filter-frontend-focused-1411b3b6a1464e0d878b98209b766e18/validation.json",
+      "sha256": "2e11fc051998d7a804bd969a4a5bfb417258873edf87260e5c6801e4b0f68544"
+    },
+    "types": {
+      "path": "build/original-embedding-empty-import-types-835d8e1155154235a0e2b17b5db830c5/validation.json",
+      "sha256": "00149d6f2b4a0f6b44c2bc410bdd9c7aaa6675a6ae0cc1e45ce2ff33f058b48a"
+    },
+    "native": {
+      "path": "build/embedding-workbench-feature-native-c71d38cd935749dca4c6f7d0f5476a84/build-manifest.json",
+      "sha256": "311db06cebd948abaa6c4aef96f2b62ae3ee824d3d1d282c6a0d7b8d474eb4ce"
+    },
+    "seal": {
+      "path": "build/embedding-workbench-feature-seal-2220e7bcfa534965b03ec078ac62b1f6/validation.json",
+      "sha256": "44cc513141396127d7f6f66f52dd92493978b36aa8f895be696e6408f7fbe76e"
+    }
+  },
+  "historical_attempts_excluded_from_final_counts": [
+    {
+      "path": "build/original-embedding-collector-preflight-3c092add8d374000b1d6584ba42d758e/validation.json",
+      "sha256": "44bbc8ca7160a9b56c7282a93c572e9a3ba654b281fa5daf1e9e930a37a839b7",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-export-replay-gap-79aa2535dc624ae1b79155a9c17c588f/validation.json",
+      "sha256": "9d9b18f506aa97aea96e80fd8d7fcf6be55f61d9607024065f96d631b5fed4ce",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-candidate-types-2792606dcc5f4553b28dbe2277dca939/validation.json",
+      "sha256": "89a25d8b6ce1ef21c53cbf3a9fef30c6dfd904f22058c80e8befdc2050420f3a",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-candidate-types-7b4a97d3aa9c454ba4ec66a8814bdfd7/validation.json",
+      "sha256": "0c95016c93724780108155ab6e28499f86ff741cf9c02828fabbcd919a2d001c",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-candidate-types-c4f686d37649411d865c6838198c9fc1/validation.json",
+      "sha256": "bcb99374ab8aea03a55c0a28978f3f8839b10078b83801bb1d57bee19218b4d8",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-candidate-types-d333e5c51ab14219b320e6bc320a08b9/validation.json",
+      "sha256": "a1ecd1aadb6a09d465306924b8351819ef18e55b0be081f4488c6cde83eaeea1",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-frontend-feature65-staging-9fb77131a6634532a78130f5220f37cc/preparation.json",
+      "sha256": "263973b12feed8e8ab18dc8da8440cc68ac23634079bad310f522ee7610f6e15",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-frontend-feature65-staging-e13ad11e069648f1943b9ce97f1ff43f/preparation.json",
+      "sha256": "d7f215be9e90d19b04b1f9cbe72cd96ba4c226c37a186bb2ddb4e104bf82cc06",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-frontend-integration-116804087275499b81293a7a86640d1b/validation.json",
+      "sha256": "24ecd2841c6eac2e7ad3398ea537e841e92c049d0119041200bb0453662c0b39",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-staged-focused-32cadc875c5042d5802a1b9ae6676d95/validation.json",
+      "sha256": "737fce033507042c05fe1c0132185ee4fb44cea6907de8a498f373e7658dea27",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-filter-staged-focused-fcbdf8875f384ad588d39360f585f2f5/validation.json",
+      "sha256": "2256fe404ee7efb60c5767df77a5624db7ddc7fbaa725c935aafaf128774fa0c",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-fixture-template-static-0ff87c0b25714b2781bca65b8ae7bb2d/validation.json",
+      "sha256": "768bd7e8cab405931b79686781e0afa12129bfda21c53ca8a33e58b701dd3ff2",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-frontend-empty-import-amendment-1706626b225041ba92a00a6790c8fadb/preparation.json",
+      "sha256": "89475cfee9380e1f180d37ce22f4a69ec261e04d9afa5f46ee5c16c1041d5082",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-frontend-review-0ef5cac42a024be4a9ca7466d1aaf788/validation.json",
+      "sha256": "24f365b4a07b8ec530a3d2505759ecb5b9f4b1310c68c40648ee2502e22a1e6a",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-native-feature65-compile-correction-3718d0e320894a4486d782221b3c3444/staging-manifest.json",
+      "sha256": "ed4ba20b7678b439ec2e912990cc12d890aea3ca7fa35b2920f8508b043d6bf7",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-native-feature65-staging-1f6f9918dd0c42b5b7d5c95c71954bf4/staging-manifest.json",
+      "sha256": "d7143d0bceb25e4664a92047ae631f0d1267e1d82a5ee014d08621daa0db17f3",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-native-integration-b357a386f0a54658ac4f6a3f9228e32e/validation.json",
+      "sha256": "5b1976978398423e6ef473e6ad29497b282a2f7b20d07a3cb14356ff3c3edeb5",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-native-root-review-cdb72090ca1d4837aee386487de09af0/validation.json",
+      "sha256": "4c554de8ded96e4890de7383f015e78b6384d0d48636e04747a942543d9b33a0",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-workbench-feature-application-9752671f22e7414ea70f4db85b6e0cad/validation.json",
+      "sha256": "429a994da0030404ff62a07e3f72c4c230fe29fee8fe1e314ddc374680bdf1f3",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-workbench-feature-exports-402542aa-b209-4841-baae-b8966c85b718/validation.json",
+      "sha256": "f7cf4dc3a06c44edcd2cf91483d46b1d9a7929483c2fa502f6d8260c171e801e",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-workbench-feature65-plan-1eebc4e794c747adab76e6813778448b/validation.json",
+      "sha256": "9101b501f4b5012a73c25916ff680d06efad433a0a311f02fa9b188fcf07b698",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-workbench-feature65-plan3-3bad8e1ee2e44966a1c142f21ff18e46/validation.json",
+      "sha256": "294a5ce425415c180fe7da81b37246855313adc8fb2c259c92e65bc481b60ab2",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-workbench-feature65-plan4-5aea9489f0654bcab5fa275aaff2e868/validation.json",
+      "sha256": "cab04d13d9bb42f24d7001f648daa6eb2ba7b0aa2e724439500a9fa772180c93",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-workbench-feature65-semantic-draft-481ddd0e3b4b44aaae3ca6aa7bbbc3a8/validation.json",
+      "sha256": "7e7b09966cdf69091ca891b5b2b500cffa702d571c99edd11106c1e8d22dce47",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-workbench-template-types-3b81108576ed46eb95ea94b919834c8a/validation.json",
+      "sha256": "a05b319831ced4a7ff145e653d22a21a0f2434033253a79f7c142543172f86ba",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-embedding-workbench-template-types-5fdd9a242e7e4703994ae31de30beeb7/validation.json",
+      "sha256": "4958b76ae243103d270f0debcb8c7a30f056e6605cac1bfb2130c32126e3b5d1",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/embedding-workbench-feature-delivery-preparation-392808c5dd4447adada02eb41139cce8/validation.json",
+      "sha256": "c0fb51bb2c7c1592a28a09f3cb3acddee8fe41cf2f9ac83595dca2bf34b33280",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/embedding-workbench-feature-delivery-preparation-3b7c1744105547da921624e752f215a2/validation.json",
+      "sha256": "e68023d61977af24fb77a0ac2709c4d9d76a4f2ad5131b6be27b83e35113f87a",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/embedding-workbench-feature-delivery-preparation-81e61d24629d4cce87aefab17511bc6b/validation.json",
+      "sha256": "faf31b6c1e30ea2a0740925c1a1e21f04a7f27761669150060b5cb5eaa470dff",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/embedding-workbench-feature-delivery-preparation-dface65143454d1fa199dd6d9b8257cf/validation.json",
+      "sha256": "9dabb88b3dba0038cc5fde5570a5d05ad2d0bca7f9d73bbe32c8547f388cb2c8",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    }
+  ],
+  "superseded_native_builds": [
+    {
+      "path": "build/embedding-workbench-feature-native-86399234876e4efcb2fbf08c20954c85/build-manifest.json",
+      "sha256": "afce8cc456d6a163673c79824df98b4b19e339217b03bdd8de6ae1616cf0fd8b",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "reason": "superseded frozen native attempt; source snapshot and diagnostics retained without inflating final counts"
+    }
+  ],
+  "feature_contract": {
+    "path": "build/original-embedding-filter-workbench-contract-feature65-d8a656c47bc7413ca4acafba890e617f.json",
+    "sha256": "f3fc62269d618bcf4f20bbaf1fbff825c6f4f1eafa95d4a60c8ee5aa18fb66f0"
+  },
+  "next_feature_contract": {
+    "path": "build/original-emd-workbench-contract-feature66-c92f885be7c14c188dd38d8cb75bf76b.json",
+    "sha256": "e60ef0a2011ba9e67ef03b193fd751a7af99d93b4ca008ead2625d80219765f3"
+  },
+  "helper_sha256": "ea6cb58667d8741634d874bb2a803438a58abd8a65a4897a8b83d3c49eae09f0"
+}

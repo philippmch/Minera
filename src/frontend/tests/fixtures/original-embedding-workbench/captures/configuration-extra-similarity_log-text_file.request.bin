@@ -1,0 +1,37 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+similarity_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"dimensions":1}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="top_k"
+
+0
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-ordered-basic.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"a","events":[{"case_id":"independent-0","activity":"A","input_order":18446744073709551615},{"case_id":"independent-1","activity":"B","input_order":18446744073709551614}]},{"case_id":"m","events":[{"case_id":"independent-0","activity":"B","input_order":18446744073709551615}]},{"case_id":"z","events":[{"case_id":"independent-0","activity":"A","input_order":18446744073709551615}]}],"attributes":[{"key":"source-only","value":"retained"}],"metadata":{"properties":[{"key":"context","value":"positive filter copies this"}]}}
+
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="target_file"; filename="owned-target-A.text"
+Content-Type: application/octet-stream
+
+A
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="text_file"; filename="owned-target-A.text"
+Content-Type: application/octet-stream
+
+A
+--OwnedOriginalFootprintsFeature65--

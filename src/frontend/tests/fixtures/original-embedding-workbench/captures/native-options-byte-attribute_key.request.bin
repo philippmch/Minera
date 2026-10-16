@@ -1,0 +1,23 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+to_embeddings
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"dimensions":1,"attribute_key":{"native_bytes":"hex-v1","data":"ff"}}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-wrapped-raw-byte-log.json"
+Content-Type: application/octet-stream
+
+{"native_byte_strings":"hex-v1","value":{"attributes":[{"key":"6f726967696e","value":"ff"}],"metadata":{"extensions":[{"name":"ff","prefix":"6f776e","uri":"75726e3a6f776e"}],"classifiers":[{"name":"eda080edb080","keys":["647570","647570"]}],"trace_globals":[{"key":"77696465","value":"3138343436373434303733373039353531363135","typed_value":{"index":5,"value":18446744073709551615}}],"event_globals":[{"key":"6576656e74","value":"eda080edb080"}],"properties":[{"key":"70","value":"ff"}],"globals":[{"scope":"ff","attributes":[{"key":"67","value":"eda080edb080"}]}],"compatibility_snapshot_valid":true,"compatibility_globals_snapshot":[{"scope":"eda080edb080","attributes":[{"key":"736e617073686f74","value":"ff"}]}],"compatibility_trace_globals_snapshot":[{"key":"736e617073686f742d7472616365","value":"eda080edb080"}],"compatibility_event_globals_snapshot":[{"key":"736e617073686f742d6576656e74","value":"ff"}]},"traces":[{"case_id":"ff","case_id_source_key":"eda080edb080","case_id_attribute":{"key":"63617365","value":"ff","children":[{"key":"6475706c6963617465","value":"78"},{"key":"6475706c6963617465","value":"eda080edb080"}]},"events":[{"case_id":"eda080edb080","activity":"41","input_order":18446744073709551615,"attributes":[{"key":"ff","value":"41"},{"key":"eda080edb080","value":"eda080edb080"}],"activity_attribute":{"key":"6163746976697479","value":"6c65786963616c206d69736d61746368","typed_value":{"index":2,"value":"NaN"}}}]},{"case_id":"eda080edb080","events":[{"activity":"42","attributes":[{"key":"ff","value":"42"}]}]}]}}
+
+--OwnedOriginalFootprintsFeature65--

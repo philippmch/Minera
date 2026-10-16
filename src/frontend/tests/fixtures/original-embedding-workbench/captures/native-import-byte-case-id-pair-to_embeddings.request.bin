@@ -1,0 +1,36 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+to_embeddings
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"dimensions":1}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+import
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_format"
+
+auto
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_shape"
+
+log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_selectors_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-import-byte-case-id-pair.csv"
+Content-Type: application/octet-stream
+
+case_id,activity,timestamp,literal
+í €í°€,A,2026-01-01T00:00:00Z,ordinary
+
+--OwnedOriginalFootprintsFeature65--

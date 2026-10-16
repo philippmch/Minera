@@ -4,14 +4,14 @@ The pinned catalogue contains 86 algorithm families and 387 modules. The Feature
 
 Strict parity remains 46/86 packages and 199/387 modules, with 228 incomplete coverage units. Feature delivery does not promote these strict counts.
 
-This is the frozen inventory before the original Declare workbench. Later delivery reports record completed gaps without rewriting this historical audit. Feature61 delivers original offline Declare conformance and playout; Feature62 delivers original log-skeleton conformance and standalone diagnostics. Feature63 delivers eighteen original-footprints comparison, metric, diagnostic, utility and tree-decoration operations. Feature64 delivers caller-supplied original genetic causal-matrix conversion. Independent embedding filtering/full filtered EventLogs and keep_cases are next.
+This is the frozen inventory before the original Declare workbench. Later delivery reports record completed gaps without rewriting this historical audit. Feature61 delivers original offline Declare conformance and playout; Feature62 delivers original log-skeleton conformance and standalone diagnostics. Feature63 delivers eighteen original-footprints comparison, metric, diagnostic, utility and tree-decoration operations. Feature64 delivers caller-supplied original genetic causal-matrix conversion. Feature65 delivers all five independent original embedding operations, native filtering/full filtered EventLogs and keep_cases. Original weighted stochastic-language EMD is next; real host models, browser verification and strict gates remain open.
 
 ## Feature60 audit findings and later deliveries
 
 | Missing input, operation or control | Scope |
 | --- | --- |
 | Convert a supplied genetic causal matrix without rediscovering it | Delivered in Feature64: exact original causal-matrix input and native conversion, preserving original/normalized matrices, complete PetriNet and signed markings. Matrix discovery remains separate; browser and strict reference parity remain open. |
-| Expose native top-k filtering as an EventLog operation | Add native filtering dispatch, keep_cases control, full raw returned log and XES/CSV export from the actual filtered result. |
+| Expose native top-k filtering as an EventLog operation | Delivered in Feature65: all five original native embedding operations, native top-k filtering/keep_cases, exact eight value options plus explicit host callback binding, full raw filtered logs and byte-safe artifacts. Real host models, browser checks and strict reference parity remain open. |
 | Accept the native weighted stochastic-language EMD input | Provide an exact original language-pair input in addition to existing log-derived evaluation. Do not invent a browser transport for arbitrary C++ callbacks. |
 | Play out original OCPN and object-centric causal-net models | Add exact original graph/net input, separate from the existing log-discovery operation, and retain full native model and result snapshots. |
 | Preserve caller-supplied target activity whitespace and ordering | Use an exact JSON string-array transport and leave semantic validation to the native operation; distinguish omitted/empty vector from an explicit empty string element. |

@@ -1,0 +1,1 @@
+{"family":"TO_EMBEDDINGS_SIMILARITY","variant":"cases_transformers","embedding_provider":"hashing","target":" \t\r\n ","embedding_model":"hashing-v1","dimensions":1,"top_k":1,"items":[{"id":"z","score":0}]}

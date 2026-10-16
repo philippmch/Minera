@@ -1,0 +1,1 @@
+{"family":"TO_EMBEDDINGS","variant":"events_transformers","embedding_provider":"hashing","embedding_model":"hashing-v1","attribute_key":"concept:name","dimensions":1,"items":[]}

@@ -1,0 +1,1 @@
+{"variant":"cases_transformers","provider":"hashing","embedding_model":"hashing-v1","attribute_key":"concept:name","dimensions":1,"items":[{"id":{"native_bytes":"hex-v1","data":"ff"},"values":[1.0]},{"id":{"native_bytes":"hex-v1","data":"eda080edb080"},"values":[-1.0]}]}

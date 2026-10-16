@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Original embedding source"/>
+  <trace>
+    <string key="concept:name" value="shared"/>
+    <event>
+      <string key="concept:name" value="A"/>
+    </event>
+    <event>
+      <string key="concept:name" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="shared"/>
+    <event>
+      <string key="concept:name" value="B"/>
+    </event>
+    <event>
+      <string key="concept:name" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="shared"/>
+  </trace>
+  <trace>
+    <string key="concept:name" value="other"/>
+    <event>
+      <string key="concept:name" value="B"/>
+    </event>
+  </trace>
+</log>

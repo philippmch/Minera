@@ -1,0 +1,32 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+filter
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"dimensions":1}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="top_k"
+
+1
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-duplicate-case-ids.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"same","events":[{"case_id":"independent-0","activity":"A","input_order":18446744073709551615}]},{"case_id":"same","events":[{"case_id":"independent-0","activity":"B","input_order":18446744073709551615}]},{"case_id":"other","events":[{"case_id":"independent-0","activity":"B","input_order":18446744073709551615}]}]}
+
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="target_file"; filename="owned-target-A.text"
+Content-Type: application/octet-stream
+
+A
+--OwnedOriginalFootprintsFeature65--

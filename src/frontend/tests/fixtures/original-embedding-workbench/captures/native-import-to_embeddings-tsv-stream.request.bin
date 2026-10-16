@@ -1,0 +1,42 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+to_embeddings
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+import
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_format"
+
+auto
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_shape"
+
+stream
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_selectors_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="delimiter"
+
+	
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-original.tsv"
+Content-Type: application/octet-stream
+
+case_id	activity	timestamp
+first	A	2026-01-01T00:00:00Z
+first	B	2026-01-01T00:00:04Z
+second	B	2026-01-01T00:01:00Z
+
+--OwnedOriginalFootprintsFeature65--

@@ -1,0 +1,1 @@
+{"variant":{"name":"cases_transformers","index":0},"provider":{"name":"hashing","index":0},"embedding_model":"hashing-v1","attribute_key":"concept:name","dimensions":1,"items":[{"id":"case\u0000id","values":[1.0]}]}

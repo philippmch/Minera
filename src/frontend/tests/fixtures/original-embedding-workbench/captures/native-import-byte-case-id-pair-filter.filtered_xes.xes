@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Original embedding filter result"/>
+  <trace>
+    <string key="case_id" value="í €í°€"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:00+00:00"/>
+      <string key="literal" value="ordinary"/>
+    </event>
+  </trace>
+</log>

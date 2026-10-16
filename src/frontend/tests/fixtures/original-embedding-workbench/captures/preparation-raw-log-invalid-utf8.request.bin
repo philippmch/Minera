@@ -1,0 +1,31 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+filter
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="top_k"
+
+1
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-invalid-invalid-utf8.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"ÿ"}]}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="target_file"; filename="owned-target-A.text"
+Content-Type: application/octet-stream
+
+A
+--OwnedOriginalFootprintsFeature65--

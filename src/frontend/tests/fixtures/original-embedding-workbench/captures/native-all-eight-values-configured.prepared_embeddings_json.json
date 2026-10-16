@@ -1,0 +1,1 @@
+{"variant":{"name":"events_transformers","index":1},"provider":{"name":"hashing","index":0},"embedding_model":"hashing-v2","attribute_key":"resource","dimensions":3,"items":[{"id":"0","values":[0.0,0.0,0.0]},{"id":"1","values":[0.0,0.0,0.0]},{"id":"2","values":[0.0,0.0,0.0]},{"id":"3","values":[0.0,0.0,0.0]}]}

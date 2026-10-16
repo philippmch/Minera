@@ -1,0 +1,1 @@
+{"traces":[{"case_id":"first","events":[{"activity":"A","attributes":[{"key":"id","value":"shared"}]},{"activity":"B","attributes":[{"key":"id","value":"shared"}]}]},{"case_id":"second","events":[{"activity":"B","attributes":[{"key":"id","value":"shared"}]}]}]}

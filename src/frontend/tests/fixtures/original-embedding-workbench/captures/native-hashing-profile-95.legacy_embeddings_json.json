@@ -1,0 +1,1 @@
+{"family":"TO_EMBEDDINGS","variant":"cases_transformers","embedding_provider":"hashing","embedding_model":"arbitrary literal profile","attribute_key":"concept:name","dimensions":3,"items":[{"id":"a","embedding":[0,0,0]},{"id":"m","embedding":[0,0,1]},{"id":"z","embedding":[0,0,-1]}]}

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <extension name="ÿ" prefix="own" uri="urn:own"/>
+  <global scope="ÿ">
+    <string key="g" value="í €í°€"/>
+  </global>
+  <classifier name="í €í°€" keys="dup dup"/>
+  <string key="concept:name" value="Original embedding filter result"/>
+  <string key="origin" value="ÿ"/>
+  <trace>
+    <string key="í €í°€" value="ÿ">
+      <string key="duplicate" value="í €í°€"/>
+    </string>
+    <event>
+      <string key="concept:name" value="A"/>
+      <string key="ÿ" value="A"/>
+      <string key="í €í°€" value="í €í°€"/>
+    </event>
+  </trace>
+</log>
