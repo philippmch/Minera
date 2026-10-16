@@ -1,0 +1,14 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+derive_original_log
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="normalize"
+
+false
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="source_file"; filename="owned-invalid-derive-source-7.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"events":[{"activity":"ÿ"}]}]}
+--OwnedOriginalFootprintsFeature66--

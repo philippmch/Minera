@@ -2711,3 +2711,10 @@ Open **Original embedding / filter** to filter a supplied source log, create emb
 Actual synthetic HTTP-provider tests verify registry and explicit callback wiring, provider priority and width inference; they do not validate a real transformer model. The final full API corpus began with historical cache state, while earlier preserved smoke/preseed captures separately establish uncached execution. Supplemental and historical counts stay separate from final corpus counts.
 
 See [validation and boundaries](docs/feature-first-original-embedding-workbench-validation.json). Real host model validation, browser checks and strict reference parity remain pending.
+
+
+### Original weighted-language EMD
+
+Open **Original weighted-language EMD** to evaluate independent original weighted languages, request the native scalar distance, or derive a language from a full original EventLog. Exact trace order, duplicates, weights, stored mass and byte labels remain inspectable. Four native value options and four independently nullable finite callback tables retain actual native priority and invocation diagnostics. A returned computed=false evaluation remains distinct from a scalar exception. Download originals, all eight byte-safe artifacts, request/response, reports, complete CSV and selected records; reopen an actual derived language as a pair input. Existing log-derived EMD remains available.
+
+Finite tables bind real native callback members; arbitrary C++ function bodies are not executable JSON. Browser verification and strict reference parity remain pending. See [validation and boundaries](docs/feature-first-original-emd-workbench-validation.json).

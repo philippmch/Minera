@@ -1,0 +1,25 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+evaluate_pair
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="callback_tables_json"
+
+{"distance":{"entries":[],"fallback":{"value":0.125}},"encoded_distance":{"entries":[],"fallback":{"value":0.25}},"string_distance":{"entries":[],"fallback":{"value":0.375}}}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="left_file"; filename="owned-unit-A.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["A"],"weight":1.0}],"total_mass":999}
+
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="right_file"; filename="owned-unit-B.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["B"],"weight":1.0}],"total_mass":-99}
+
+--OwnedOriginalFootprintsFeature66--

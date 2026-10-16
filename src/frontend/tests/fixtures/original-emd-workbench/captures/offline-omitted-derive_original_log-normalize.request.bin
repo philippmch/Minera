@@ -1,0 +1,11 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+derive_original_log
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="source_file"; filename="owned-derive-duplicates.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"same","events":[{"activity":"B"},{"activity":"A"}]},{"case_id":"same","events":[{"activity":"A"}]},{"case_id":"","events":[]},{"case_id":"same","events":[{"activity":"A"}]}],"attributes":[{"key":"origin","value":"kept"}],"metadata":{"properties":[{"key":"unused","value":"derive ignores me"}]}}
+
+--OwnedOriginalFootprintsFeature66--

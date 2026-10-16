@@ -1,0 +1,25 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+distance_pair
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="callback_tables_json"
+
+{"distance":{"entries":[{"left":["x"],"right":["u"],"outcome":{"value":0}},{"left":["x"],"right":["v"],"outcome":{"value":1}},{"left":["y"],"right":["u"],"outcome":{"value":1}}],"fallback":{"value":100}}}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="left_file"; filename="owned-nongreedy-left.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["x"],"weight":0.5},{"activities":["y"],"weight":0.5}],"total_mass":0}
+
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="right_file"; filename="owned-nongreedy-right.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["u"],"weight":0.5},{"activities":["v"],"weight":0.5}],"total_mass":0}
+
+--OwnedOriginalFootprintsFeature66--

@@ -1,0 +1,15 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+derive_original_log
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="normalize"
+
+true
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="source_file"; filename="owned-derive-raw-activity-not-alias.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"same","events":[{"activity":"RAW","activity_state_index":1,"activity_attribute":{"key":"concept:name","value":"ALIAS"},"attributes":[{"key":"concept:name","value":"GENERIC"}]}]}]}
+
+--OwnedOriginalFootprintsFeature66--

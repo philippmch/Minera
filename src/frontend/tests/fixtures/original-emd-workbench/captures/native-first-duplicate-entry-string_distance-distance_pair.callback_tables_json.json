@@ -1,0 +1,1 @@
+{"distance":null,"encoded_distance":null,"string_distance":{"entries":[{"left":[1],"right":[1],"outcome":{"value":0.25}},{"left":[1],"right":[1],"outcome":{"value":-100.0}}],"fallback":{"throw":"unused fallback"}},"utf8_string_distance":null}

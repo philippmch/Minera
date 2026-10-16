@@ -1,0 +1,21 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+evaluate_pair
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="left_file"; filename="owned-paired-wtf-word.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":[{"native_bytes":"hex-v1","data":"eda080edb080"}],"weight":1}],"total_mass":0}
+
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="right_file"; filename="owned-unicode-scalar-word.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["\ud800\udc00"],"weight":1}],"total_mass":0}
+
+--OwnedOriginalFootprintsFeature66--

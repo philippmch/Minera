@@ -1,0 +1,1 @@
+{"traces":[{"activities":[],"weight":1.0},{"activities":["A"],"weight":2.0},{"activities":["B","A"],"weight":1.0}],"total_mass":4.0}

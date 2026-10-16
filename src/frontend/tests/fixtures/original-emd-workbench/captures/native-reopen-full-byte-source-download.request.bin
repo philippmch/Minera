@@ -1,0 +1,14 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+derive_original_log
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="normalize"
+
+false
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="source_file"; filename="owned-reopened-byte-source.json"
+Content-Type: application/octet-stream
+
+{"native_byte_strings":"hex-v1","value":{"attributes":[{"children":[],"container_index":0,"first_class_role_index":0,"first_class_source_key":"","first_class_state_index":0,"key":"ff","kind_index":0,"null":false,"scalar_children_list":false,"scalar_wrapper":false,"typed_value":{"index":0,"value":null},"value":"eda080edb080"}],"metadata":{"extensions":[],"classifiers":[],"trace_globals":[],"event_globals":[],"properties":[],"globals":[],"compatibility_snapshot_valid":false,"compatibility_globals_snapshot":[],"compatibility_trace_globals_snapshot":[],"compatibility_event_globals_snapshot":[]},"traces":[{"case_id":"ff","case_id_state_index":0,"case_id_source_key":"","case_id_attribute":null,"attributes":[],"properties":[],"events":[{"case_id":"","activity":"ff","timestamp":"","resource":"","lifecycle":"","input_order":18446744073709551615,"attributes":[],"case_id_state_index":0,"activity_state_index":0,"timestamp_state_index":0,"resource_state_index":0,"lifecycle_state_index":0,"case_id_source_key":"","activity_source_key":"","timestamp_source_key":"","resource_source_key":"","lifecycle_source_key":"","activity_attribute":null,"timestamp_attribute":null,"resource_attribute":null,"lifecycle_attribute":null}]},{"case_id":"ff","case_id_state_index":0,"case_id_source_key":"","case_id_attribute":null,"attributes":[],"properties":[],"events":[{"case_id":"","activity":"eda080edb080","timestamp":"","resource":"","lifecycle":"","input_order":0,"attributes":[],"case_id_state_index":0,"activity_state_index":0,"timestamp_state_index":0,"resource_state_index":0,"lifecycle_state_index":0,"case_id_source_key":"","activity_source_key":"","timestamp_source_key":"","resource_source_key":"","lifecycle_source_key":"","activity_attribute":null,"timestamp_attribute":null,"resource_attribute":null,"lifecycle_attribute":null}]},{"case_id":"646966666572656e74","case_id_state_index":0,"case_id_source_key":"","case_id_attribute":null,"attributes":[],"properties":[],"events":[{"case_id":"","activity":"ff","timestamp":"","resource":"","lifecycle":"","input_order":0,"attributes":[],"case_id_state_index":0,"activity_state_index":0,"timestamp_state_index":0,"resource_state_index":0,"lifecycle_state_index":0,"case_id_source_key":"","activity_source_key":"","timestamp_source_key":"","resource_source_key":"","lifecycle_source_key":"","activity_attribute":null,"timestamp_attribute":null,"resource_attribute":null,"lifecycle_attribute":null}]}]}}
+--OwnedOriginalFootprintsFeature66--

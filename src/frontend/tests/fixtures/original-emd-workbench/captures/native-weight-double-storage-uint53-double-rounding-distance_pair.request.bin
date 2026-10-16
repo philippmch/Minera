@@ -1,0 +1,21 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+distance_pair
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="left_file"; filename="owned-finite-weight-uint53-double-rounding.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["A"],"weight":9007199254740993}],"total_mass":0}
+
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="right_file"; filename="owned-finite-right-uint53-double-rounding.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["B"],"weight":9007199254740993}],"total_mass":0}
+
+--OwnedOriginalFootprintsFeature66--

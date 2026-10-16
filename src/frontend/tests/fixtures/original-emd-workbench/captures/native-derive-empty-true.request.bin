@@ -1,0 +1,15 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+derive_original_log
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="normalize"
+
+true
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="source_file"; filename="owned-derive-empty.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[],"metadata":{"properties":[{"key":"kept","value":"empty"}]}}
+
+--OwnedOriginalFootprintsFeature66--

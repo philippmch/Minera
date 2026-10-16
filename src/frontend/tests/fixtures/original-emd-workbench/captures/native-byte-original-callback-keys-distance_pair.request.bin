@@ -1,0 +1,25 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+distance_pair
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="callback_tables_json"
+
+{"distance":{"entries":[],"fallback":{"value":0.25}}}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="left_file"; filename="owned-ff-word.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":[{"native_bytes":"hex-v1","data":"ff"}],"weight":1}],"total_mass":0}
+
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="right_file"; filename="owned-paired-wtf-word.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":[{"native_bytes":"hex-v1","data":"eda080edb080"}],"weight":1}],"total_mass":0}
+
+--OwnedOriginalFootprintsFeature66--

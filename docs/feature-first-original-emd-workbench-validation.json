@@ -1,0 +1,450 @@
+{
+  "complete": true,
+  "checkpoint_kind": "implemented feature delivery with pending browser and strict reference parity",
+  "feature_group": 66,
+  "parent_head": "308321aeb1a9999ae60138bd0ff6eb18dbb65131",
+  "backend_step_commit": "50c93e0a360f1b4b1309bb67ab15ca43e23c9ee1",
+  "created_utc": "2026-10-16T14:42:02.165385+00:00",
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "retained_browser_attempt_feature": 66,
+  "retained_browser_live_feature": 65,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "An independent original weighted-language EMD workbench exposes evaluate_emd and scalar earth_movers_distance on caller-supplied language pairs, plus derive_stochastic_language on an original full EventLog with a separate normalize flag. Existing log-derived EMD remains accessible.",
+    "Original language vectors retain ordered duplicate traces, empty words and labels, literal native bytes, exact weights and independent stored total_mass. IEEE signed zero, subnormals and NaN/INF/-INF remain inspectable; native algorithms retain responsibility for weight validation, consolidation, normalization and solver behavior.",
+    "All four native value options retain constructor defaults and supplied-member presence. Four independent nullable finite cost-table adapters bind the real distance, encoded_distance, string_distance and utf8_string_distance callback slots. Exact keys, full uint32 storage, ordered duplicates, first match, fallback and explicit throw outcomes are retained.",
+    "Native callback priority and every actual invocation are reported with slot, complete arguments, entry index, fallback/missing flags and full outcome. NativeString and versioned raw-log carriers preserve arbitrary byte storage, including malformed UTF8 and paired WTF8 bytes, without decode/re-encode substitution.",
+    "A returned six-field EmdResult with computed=false is a successful executed native evaluation. The scalar wrapper follows its own native exception path and returns no fabricated EmdResult. Parsed prefixes, configured options, callback state, original bytes/SHA and before/after snapshots survive applicable owned failures.",
+    "Eight independent artifacts have authoritative bytecarriers and actual separate export errors. A successful nontext artifact can have null display text with no export error. Original/request/response/report, complete native tables, CSV and selected-record downloads preserve full bytes and numeric tokens; derived languages reopen as original pair inputs.",
+    "The independent UI provides all three operations, original weighted-language/EventLog uploads and exact editors, all native value fields and finite callback tables, ownership/cancellation and full result/error/artifact inspection. Actual native API fixtures drive request replay and complete offline export validation."
+  ],
+  "boundaries": [
+    "This checkpoint does not establish full PM4Py parity or promote a strict package/module. All 86 families, 387 modules and 228 incomplete strict units remain in scope; strict counts remain 46/86 packages and 199/387 modules.",
+    "One fresh browser retry followed the user settings-change notice during Feature66 development while Feature65 was live. The server was listening and returned HTTP200; the browser tool rejected the call under a saved/managed access gate. Current Feature66 HTTP/API/assets are separate evidence; rendered controls, interaction and browser downloads remain unverified.",
+    "Finite declarative tables bind the four actual C++ callback slots; arbitrary C++ function bodies are not serializable JSON. These adapters require no external model and make no model-quality or general executable callback transport claim.",
+    "The native solver recomputes mass from trace weights and can ignore stored total_mass, consolidate duplicates or reject invalid weights/costs. The original constructors remain exact and no semantic caps, sorting, hidden calls, clamps or fallback algorithms are added by the UI.",
+    "Client cancellation prevents stale publication and does not stop a native call already executing. Independent raw EventLog derivation is separate from pair options; no imported or discovered substitute is fabricated.",
+    "The final proof revalidates the same actual HTTP corpus offline, correcting three owner metadata assumptions about reserved upload parts without filenames. All original responses and nine failed owner-assumption checks remain retained. Offline validation performs no new HTTP calls; the actual main corpus is counted once, separately from bounded backend smoke and failed/superseded attempts. Its initial actual GET409 before the original seed and unchanged cache snapshots remain historical observations with unchanged chronology.",
+    "Next prepare original OCPN/object-centric causal-net playout across four exact public surfaces and eighteen native options. The existing application path imports supplied OCEL and then discovers a model; original model input remains the next delivery, without a cached-session claim."
+  ],
+  "validation_counts": {
+    "native_sources": 696,
+    "native_suites": 46,
+    "core_objects": 193,
+    "reused_core_objects": 192,
+    "fresh_core_objects": 1,
+    "frontend_tests": 5010,
+    "frontend_files": 118,
+    "frontend_source_bindings": 14033,
+    "api_calls": 527,
+    "api_checks": 49217,
+    "native_envelope_fixtures": 521,
+    "export_tests": 532,
+    "export_entries": 521,
+    "export_auxiliary_calls": 6,
+    "export_numeric_literals": 15429,
+    "export_csv_cells": 305331,
+    "export_selected_records": 78370,
+    "export_selected_numeric_literals": 65681,
+    "published_files": 3120,
+    "unrelated_files_preserved": 110,
+    "native_option_fields": 4,
+    "native_host_callback_members": 4,
+    "native_operations": 3,
+    "native_artifact_kinds": 8,
+    "native_result_fields": 6
+  },
+  "supplemental_validation_counts": {
+    "bounded_backend_api_calls": 12,
+    "bounded_backend_api_checks": 919
+  },
+  "supplemental_counts_excluded_from_main_api_counts": true,
+  "initial_cache_observation": {
+    "id": "cache-state-before-first",
+    "status": 409,
+    "before_initial_seed": true,
+    "source": "actual initial HTTP capture, retained by final offline revalidation; not a new HTTP observation"
+  },
+  "pending_browser_checks": [
+    "All three original weighted-language/EventLog operations and exact four native value options",
+    "Four nullable finite callback tables, native priorities, partial failures, ownership and cancellation",
+    "All original/request/response/report/artifact/CSV/selected-record downloads and responsive layout"
+  ],
+  "browser_status": {
+    "path": "build/emd-workbench-feature-browser-status-2.json",
+    "sha256": "6830ae5f5036cbb6aaf0f8820328128871acca61ba37ab6507cfd2aa16860844"
+  },
+  "evidence": {
+    "api": {
+      "path": "build/original-emd-workbench-feature-application-revalidated-a55a3eaec0fa43d4b957be191e6ac8c8/validation.json",
+      "sha256": "f51515a0995e30857c87e375d338361daf01a123cec7783d46573a3b29fa0bab"
+    },
+    "exports": {
+      "path": "build/original-emd-workbench-feature-exports-617645f7-a977-470f-831d-1079cd88a279/validation.json",
+      "sha256": "c67e599000c1b9886b7eca927a421e5c36c6f088bab3579bc3501793699b0af4"
+    },
+    "publication": {
+      "path": "build/original-emd-workbench-feature-fixture-publication-65700807-3692-4a2d-b025-dbc11c648c53/validation.json",
+      "sha256": "ee31f07012279c5444d818c9edff92f07595ce0d47d6b74022e0707287d51f3a"
+    },
+    "frontend": {
+      "path": "build/emd-workbench-feature-frontend-final-ca86f7c9-1ba4-4248-92c4-6249266f9581/validation.json",
+      "sha256": "61056121f820bb52481caf439412d39f13702c5f13f39770d04f8e9e4b8d881e"
+    },
+    "live": {
+      "path": "build/emd-workbench-feature-live-runtime.json",
+      "sha256": "53f5d6dc1742790898d1beecd26c8b3e40c4c0688a2ab842b197564721918969"
+    },
+    "server": {
+      "path": "build/emd-workbench-feature-live-server.json",
+      "sha256": "9c6ced1a5d9d68512f00233307f43b5b45db7412c82d0e118b036520197c4efb"
+    },
+    "cleanup": {
+      "path": "build/emd-workbench-feature-test-cleanup.json",
+      "sha256": "30ffb8ea5edce97ea6e9fd89b38ef77c1ff2e86b1ad3b646225554e354a642ec"
+    },
+    "backend_commit": {
+      "path": "build/emd-workbench-feature-backend-postcommit.json",
+      "sha256": "933ce37afb3ffd1e1d9d0df61ee9d3faad005b9c20b10909f7eb8a215e5a73d3"
+    },
+    "integration": {
+      "path": "build/original-emd-frontend-integration-9ee9b62078f04eb29cdaf050399d6204/validation.json",
+      "sha256": "9b33f19b15c042b83b3d8c8b3a30d14fd4bf2d07ce21c0d8d3ca18043d451f76"
+    },
+    "browser": {
+      "path": "build/emd-workbench-feature-browser-status-2.json",
+      "sha256": "6830ae5f5036cbb6aaf0f8820328128871acca61ba37ab6507cfd2aa16860844"
+    },
+    "focused": {
+      "path": "build/original-emd-staged-focused-115e067c0e34413a9b2655c45847308f/validation.json",
+      "sha256": "54c58c41537599f60e439476cd1d26faadd65977b730379cd6e3c8f430bc09f6"
+    },
+    "types": {
+      "path": "build/original-emd-candidate-types-62c985e5d83b4f19bcc7ab78ad7a65a9/validation.json",
+      "sha256": "7f41c73d5a4d357075e36aac2351551cb1812ea766932607416515512ee83883"
+    },
+    "smoke": {
+      "path": "build/emd-workbench-feature-backend-api-smoke-1f7789289d9d4e5f8810663220ecfd8d/validation.json",
+      "sha256": "7378757b5e58355513ba914dd3a52ac4c5ddcc5c2aa8f200f28c574fa2a6c833"
+    },
+    "native": {
+      "path": "build/emd-workbench-feature-native-5579687d573c406f8ed71ba6fbc12e41/build-manifest.json",
+      "sha256": "af3cd02f91c51b54da42527fdc37efcfc318a3ab5d50b0a1120cc10047930fa7"
+    },
+    "seal": {
+      "path": "build/emd-workbench-feature-seal-1bb3d953c4674a46b11587dc9572591d/validation.json",
+      "sha256": "ef8e918c0df5814107b257cc21a2425bc86228fa356a680a964ed8c0afc41a81"
+    }
+  },
+  "historical_attempts_excluded_from_final_counts": [
+    {
+      "path": "build/original-emd-fixture-template-amendment-3-cd201906b6c4400ebe3f0438628c9f67/validation.json",
+      "sha256": "fb42b22b95aab2127f7c7bfcc165d8f248bdca5f90ca95bed0e998ad1bc5e5f4",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-fixture-template-amendment-4-3c648b3d43914c3eae466c2190771bd8/validation.json",
+      "sha256": "df2c540010ca1d5cb8979c1580279be5ff526bf7c30d7bff8d025f12db604e89",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-fixture-template-static-7570265e55c54841bcad3125c1f2ee06/validation.json",
+      "sha256": "9c551fb9c864eb023be669c9dcfe93a881ae7ccf4c0e4d39335bad654419bb4a",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-frontend-feature66-amendment-9b9e4c6e1f3b4d5da6f3dcaf758f611b/validation.json",
+      "sha256": "c6f69bc0ccfbc57242ebdae287c3580e4765f86fbdad005e4bbb7a83e04c5a52",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-frontend-feature66-staging-47beba05654c425788dbacfd42f78607/preparation.json",
+      "sha256": "e1870eda8f1ed95aa3d1e08fabcb21d169e8164c2b3ec14d3b1e4e42f659bb7e",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-frontend-review-6a2a00a47f5b4887b743ad57981596e7/validation.json",
+      "sha256": "9462fdacfb99491e2e757a8b596f275f5d25bc24768f35d08286827a0f29344c",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-native-feature66-staging-03d4521133be4f91a232610dcda84128/staging-manifest.json",
+      "sha256": "33543c7cb85ee22417c385a6db78ce8c05b4bf525c105c9de88d4fe0de9c2f4b",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-native-integration-a06c9e85f76f4216b8542df840b48c38/validation.json",
+      "sha256": "7b02b1207f09952418d86db917780667473e62d0e1520134403b61e8c7aba385",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-native-review-a385982caa53465ca019ef4610df55f2/validation.json",
+      "sha256": "c6ac5512a17f9676ef2cf8bec9e04aa04d0ad8ece3b8148de62d37cc4349f40a",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-capture-history-62f5696a3d704ed2a8ddc502b438e419/validation.json",
+      "sha256": "ed66f15d0e5f0733e5b8d6e1c8f74fb788413c6e9496e0f3c4fc989dff0e64d9",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-feature-application-16b744fcef9740ef84de05aee8e269e0/validation.json",
+      "sha256": "8ef0ceb1c3f9f382a79f78322140ff9ed4047514209a1b1419fde18ca64263f3",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-feature-exports-84ae03c0-b399-43a6-9042-4fd3e6e0ed5f/validation.json",
+      "sha256": "d4e9ab90c386259184011396503201faa5d3b2f312b71254ebb12754ab122997",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-feature-exports-9116a756-b640-48e3-b6b1-1753448ff039/validation.json",
+      "sha256": "a9b83093498ff658f21a0c2279c6c99d20e9f512cbd78f9278ebc4eb8fc4869e",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-feature66-plan-81cd8798a3a24346994ce93a2f505743/validation.json",
+      "sha256": "8c5516a432548c309c0af4670b78d22b8f8e4ba2179c998e7459f31fc7c7fbbc",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-feature66-plan2-585c548030a6483f80224559f69b7497/validation.json",
+      "sha256": "d8468e31cd60fd1cfa3bb48242b65db23e00eef24dda7c72bd3762875721d0f6",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-feature66-plan3-b9d33f30a21c4515ae53589ffbf38085/validation.json",
+      "sha256": "2387dda9acb22186f4c89cf6d69fcf9c63a99e1ffcb14be32de7deeef7e54b70",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-feature66-plan4-97a1699ef66c4fe9878f1222b35d4c1c/validation.json",
+      "sha256": "aeea3f001cfa34fe3cc7ac08e9d6fe0629d22d681c3752c6a905d665bd771835",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-template-types-00682530c934495bbb11b51bd3624561/validation.json",
+      "sha256": "f2e37f6aafb4ea2307f75258ad616a78960db3eb3c8bd458d3f1e2c72d005cb3",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-template-types-82849a15a9364fb081813cd8daca2957/validation.json",
+      "sha256": "70e167d32cb661edfb4494e05b2bad49d1ce36927a23352019dbf0fc5e414fc5",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-template-types-b2739a5675be49f2917ea654d64b2680/validation.json",
+      "sha256": "f85bc1805e2c295fef407275ffef065e425f9169b8278f20c798eb6a9534e9b7",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/original-emd-workbench-template-types-c75f303368cd4c008db5b3213b1fb4a3/validation.json",
+      "sha256": "3f926c8c71bdc93d133b63fd29acd73854deb597842b5495d6c4579b6f37c0c0",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "immutable report descriptor retained; historical descendants not recursively rehashed"
+    },
+    {
+      "path": "build/emd-workbench-feature-delivery-review-f32ab324762b43e8b7ca042f748812fe/validation.json",
+      "sha256": "f6c785eb3380dafd4ad12f32d6ca3323d8a45e710d62adbe9dfa7416f9aab0cb",
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "explicit immutable descriptor only"
+    },
+    {
+      "path": "build/emd-workbench-feature-browser-status-1.json",
+      "sha256": "e9ddf7f6e32c9b48764b918450962279bb73e801cd27bdbb9fd9a14a95163309",
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "binding_policy": "explicit immutable descriptor only"
+    }
+  ],
+  "superseded_native_builds": [],
+  "feature_contract": {
+    "path": "build/original-emd-workbench-contract-feature66-c92f885be7c14c188dd38d8cb75bf76b.json",
+    "sha256": "e60ef0a2011ba9e67ef03b193fd751a7af99d93b4ca008ead2625d80219765f3"
+  },
+  "next_feature_contract": {
+    "path": "build/original-object-centric-playout-workbench-contract-feature67-f6d0a39b898b41ac91498ab6eebc0d78.json",
+    "sha256": "c166fed9379e375319457dd9c241e4f091c01e6ded1db6de464f4b1507c2107e"
+  },
+  "helper_sha256": "afec2c451f572e9e0989b05fb6ec40cb963228a4a404e7555ab6d42cea6111d6",
+  "api_validation_execution": {
+    "mode": "offline_revalidation_of_actual_http_capture",
+    "http_calls_performed_by_this_helper": 0,
+    "actual_http_calls_reused": 527,
+    "actual_feature_http_calls_reused": 521,
+    "actual_auxiliary_http_calls_reused": 6,
+    "native_calls_reexecuted": 0,
+    "actual_http_execution_repeated": false,
+    "original_initial_cache_status": 409
+  },
+  "capture_lineage": {
+    "actual_capture_validation": {
+      "filename": "validation.json",
+      "path": "build/original-emd-workbench-feature-application-16b744fcef9740ef84de05aee8e269e0/validation.json",
+      "bytes": 17689940,
+      "sha256": "8ef0ceb1c3f9f382a79f78322140ff9ed4047514209a1b1419fde18ca64263f3"
+    },
+    "historical_failed_checks": 9,
+    "historical_failure_details": [
+      {
+        "name": "configuration-upload-as-text-left_file exact actual error phase",
+        "passed": false
+      },
+      {
+        "name": "configuration-upload-as-text-left_file all raw controls exact including duplicates",
+        "passed": false
+      },
+      {
+        "name": "configuration-upload-as-text-left_file absent owned role left_file",
+        "passed": false
+      },
+      {
+        "name": "configuration-upload-as-text-right_file exact actual error phase",
+        "passed": false
+      },
+      {
+        "name": "configuration-upload-as-text-right_file all raw controls exact including duplicates",
+        "passed": false
+      },
+      {
+        "name": "configuration-upload-as-text-right_file absent owned role right_file",
+        "passed": false
+      },
+      {
+        "name": "configuration-upload-as-text-source_file exact actual error phase",
+        "passed": false
+      },
+      {
+        "name": "configuration-upload-as-text-source_file all raw controls exact including duplicates",
+        "passed": false
+      },
+      {
+        "name": "configuration-upload-as-text-source_file absent owned role source_file",
+        "passed": false
+      }
+    ],
+    "corrected_metadata_cases": [
+      "configuration-upload-as-text-left_file",
+      "configuration-upload-as-text-right_file",
+      "configuration-upload-as-text-source_file"
+    ],
+    "actual_http_execution_repeated": false,
+    "actual_collector_recipe": {
+      "filename": "capture-original-emd-workbench-feature-1.py",
+      "path": "build/capture-original-emd-workbench-feature-1.py",
+      "bytes": 42711,
+      "sha256": "96d6b72a6125770cfdc12cd1115560a34127e40d17aabbbf913ccd0c87984219"
+    },
+    "actual_capture_recipe": {
+      "filename": "executed-recipe.py",
+      "path": "build/original-emd-workbench-feature-application-revalidated-a55a3eaec0fa43d4b957be191e6ac8c8/executed-recipe.py",
+      "bytes": 42711,
+      "sha256": "96d6b72a6125770cfdc12cd1115560a34127e40d17aabbbf913ccd0c87984219"
+    },
+    "corrected_plan": {
+      "filename": "validation.json",
+      "path": "build/original-emd-workbench-feature66-plan4-97a1699ef66c4fe9878f1222b35d4c1c/validation.json",
+      "bytes": 466716,
+      "sha256": "aeea3f001cfa34fe3cc7ac08e9d6fe0629d22d681c3752c6a905d665bd771835"
+    },
+    "protocol_clarification": {
+      "filename": "protocol-transport-clarification.json",
+      "path": "build/original-emd-workbench-feature66-plan4-97a1699ef66c4fe9878f1222b35d4c1c/protocol-transport-clarification.json",
+      "bytes": 1383,
+      "sha256": "0b59c7eadb1816c413741e2f3f94323d64f313d76edba2a87e3a36b2d3beffd8"
+    },
+    "original_capture_lineage": {
+      "reason": "Immutable65 capture/audit framework; exact66 protocol, original weighted languages, actual finite callback bindings and genuine scalar/derive calls. Initial cache state is independently probed, never inferred from a fixture ID.",
+      "checkpoint": {
+        "filename": "embedding-workbench-feature-postcommit.json",
+        "path": "build/embedding-workbench-feature-postcommit.json",
+        "bytes": 210758,
+        "sha256": "dc4071cd4323a30fe17464ab3a618d1348db0298abac8eb07bf4378a5de3d17b"
+      },
+      "pure_plan": {
+        "filename": "validation.json",
+        "path": "build/original-emd-workbench-feature66-plan3-b9d33f30a21c4515ae53589ffbf38085/validation.json",
+        "bytes": 463531,
+        "sha256": "2387dda9acb22186f4c89cf6d69fcf9c63a99e1ffcb14be32de7deeef7e54b70"
+      },
+      "initial_cache_state": "absent"
+    },
+    "original_descriptor_records_verified": 10645,
+    "cache_chronology": "Same one actual execution: initial GET /api/dfg returned 409, followed by first feature pair, then the corpus own cache seed. This offline validation performs no requests or cache mutations."
+  },
+  "actual_http_calls_counted_once": true
+}
