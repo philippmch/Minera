@@ -91,6 +91,7 @@
 #include "minera/genetic_matrix_workbench_json.hpp"
 #include "minera/embedding_workbench_json.hpp"
 #include "minera/emd_workbench_json.hpp"
+#include "minera/object_centric_playout_workbench_json.hpp"
 #include "minera/genetic_matrix_conversion.hpp"
 #include "../footprints/conformance_log_model.hpp"
 #include "../footprints/conformance_log_extensive.hpp"
@@ -4046,6 +4047,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_genetic_matrix_route.hpp"
 #include "original_embedding_route.hpp"
 #include "original_emd_route.hpp"
+#include "original_object_centric_playout_route.hpp"
 
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
@@ -10596,6 +10598,8 @@ int main(int argc, char** argv) {
   server.Post("/api/embedding-workbench", handle_original_embedding_workbench);
   server.Options("/api/emd-workbench", preflight);
   server.Post("/api/emd-workbench", handle_original_emd_workbench);
+  server.Options("/api/object-centric-playout-workbench", preflight);
+  server.Post("/api/object-centric-playout-workbench", handle_original_object_centric_playout_workbench);
   server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/discover-timing", handle_timing_discovery);
