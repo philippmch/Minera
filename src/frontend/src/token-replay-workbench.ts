@@ -1,3 +1,4 @@
+import {appendNativeMultipartField} from "./native-multipart";
 import {activeMiningSourceTables} from "./active-mining-source";
 import {isWorkflowInputTable, type WorkflowInputTable} from "./workflow-input-workbench";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
@@ -175,7 +176,7 @@ export interface TokenReplayWorkbenchRun {
 async function fileHash(file:File):Promise<string>{return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",await file.arrayBuffer())),byte=>byte.toString(16).padStart(2,"0")).join("");}
 export async function runTokenReplayWorkbench(log:File,model:File,form:TokenReplayWorkbenchForm,signal?:AbortSignal):Promise<TokenReplayWorkbenchRun>{
   const fields=tokenReplayWorkbenchFields(form,log.name);const [logHash,modelHash]=await Promise.all([fileHash(log),fileHash(model)]);
-  signal?.throwIfAborted();const body=new FormData();body.append("log",log);body.append("model",model);fields.forEach(([key,value])=>body.append(key,value));
+  signal?.throwIfAborted();const body=new FormData();body.append("log",log);body.append("model",model);fields.forEach(([key,value])=>appendNativeMultipartField(body,key,value));
   const path="/api/replay-token-workbench";const response=await fetch(path,{method:"POST",body,signal});
   const value=await readNativeResponse(response,{path,fields});
   signal?.throwIfAborted();

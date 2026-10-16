@@ -1,3 +1,4 @@
+import {appendNativeMultipartField} from "./native-multipart";
 import {diagnosticCsv, nativeObjectTables, type DiagnosticTable} from "./model-diagnostics";
 import {nativeCell, nativeJson} from "./native-json";
 import type {ModelGraph} from "./model-graph";
@@ -178,7 +179,7 @@ export function inductiveInputTables(value: InductiveInputDiscovery, fields?: Ar
 async function fileHash(file: File): Promise<string> {return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())), byte => byte.toString(16).padStart(2, "0")).join("");}
 export async function runInductiveInput(file: File, form: InductiveInputForm, signal?: AbortSignal): Promise<InductiveInputRun> {
   const fields = inductiveInputFields(form, file.name), hash = await fileHash(file); signal?.throwIfAborted();
-  const body = new FormData(); body.append("input", file); fields.forEach(([key, value]) => body.append(key, value));
+  const body = new FormData(); body.append("input", file); fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
   const path = "/api/discover-inductive-input", response = await fetch(path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
   if (!isInductiveInputDiscovery(value)) {if (!response.ok) throw new Error(object(value) && typeof value.error === "string" ? value.error : `Inductive discovery failed (${response.status}).`); throw new Error("The server did not return a valid native Inductive input discovery envelope.");}
   const expectedVariant = {log: "IM", imf: "IMF", dfg: "IMD"}[form.variant];
