@@ -159,11 +159,28 @@ struct PetriDiscoveryMarkings {
 // an empty string are distinct names, including for silent transitions.
 using PetriTransitionNameList = std::vector<std::optional<std::string>>;
 
+// Complete literal constructor state for independent original-model inputs.
+// This carrier deliberately retains inactive and semantically invalid fields;
+// the selected native consumer remains responsible for its own validation.
+struct PetriNetLiteralStorage {
+  std::size_t place_count = 0;
+  std::size_t source_storage = 0;
+  std::size_t sink_storage = 0;
+  bool has_source = false;
+  bool has_sink = false;
+  std::vector<PetriTransition> transitions;
+  std::vector<std::string> activities;
+  std::optional<PetriDiscoveryMarkings> discovery_markings;
+  std::optional<PetriTransitionNameList> transition_names;
+};
+
 // A labeled net with optional workflow boundaries and explicit discovery
 // markings. Process-tree conversion uses a single-token source/sink workflow;
 // discovery can retain markings outside the root topology instead.
 class PetriNet {
  public:
+  [[nodiscard]] static PetriNet from_literal_storage(PetriNetLiteralStorage storage);
+
   std::size_t add_place() { return place_count_++; }
 
   std::size_t add_transition(std::optional<std::size_t> activity,
@@ -479,7 +496,7 @@ void fire_petri_transition(const PetriTransition& transition,
       throw std::overflow_error("Petri firing exceeds supported token range");
     value = following <= 0 ? 0 : following;
   }
-  for (const auto place : transition.reset_inputs) marking[place] = 0;
+  for (const auto place : transition.reset_inputs) marking.at(place) = 0;
   for (std::size_t index = 0; index < transition.outputs.size(); ++index) {
     const auto place = transition.outputs[index];
     if (!transition.output_weights.empty()) {
