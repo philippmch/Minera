@@ -1,0 +1,21 @@
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="operation"
+
+conformance_trace
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="xes_variant"
+
+iterparse
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="model_file"; filename="owned-original.skeleton.json"
+Content-Type: application/octet-stream
+
+{"directly_follows":[{"source":"A","target":"B"}],"activ_freq":{"A":[1],"B":[0,1]}}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="input_file"; filename="owned-original-trace.json"
+Content-Type: application/octet-stream
+
+{"case_id":"original","events":[{"activity":"A"},{"activity":"B"}]}
+
+--OwnedOriginalLogSkeletonFeature62--

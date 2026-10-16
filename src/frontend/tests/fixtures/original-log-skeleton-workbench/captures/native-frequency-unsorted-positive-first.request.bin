@@ -1,0 +1,17 @@
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="model_file"; filename="owned-frequency-unsorted-positive-first.skeleton.json"
+Content-Type: application/octet-stream
+
+{"activ_freq":{"A":[2,0,2]}}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="input_file"; filename="owned-frequency-word-unsorted-positive-first.json"
+Content-Type: application/octet-stream
+
+[]
+
+--OwnedOriginalLogSkeletonFeature62--

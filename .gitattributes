@@ -21,3 +21,5 @@ src/frontend/tests/fixtures/original-decision-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-decision-workbench/** -text -whitespace
 src/frontend/tests/fixtures/original-declare-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-declare-workbench/** -text -whitespace
+src/frontend/tests/fixtures/original-log-skeleton-workbench* -text -whitespace
+src/frontend/tests/fixtures/original-log-skeleton-workbench/** -text -whitespace

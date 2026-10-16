@@ -1,0 +1,50 @@
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="operation"
+
+conformance_view
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="conformance_options_json"
+
+{"case_id_key":""}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="mining_input_shape"
+
+lazyframe
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="model_file"; filename="owned-original.skeleton.json"
+Content-Type: application/octet-stream
+
+{"directly_follows":[{"source":"A","target":"B"}],"activ_freq":{"A":[1],"B":[0,1]}}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="input_file"; filename="owned-original-skeleton.xes"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0">
+  <trace>
+    <string key="concept:name" value="owned-case-0" />
+    <string key="customer" value="original" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:00Z" />
+      <string key="original" value="retained" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:01Z" />
+      <string key="original" value="retained" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="owned-case-1" />
+    <string key="customer" value="original" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:10Z" />
+      <string key="original" value="retained" />
+    </event>
+  </trace>
+</log>
+--OwnedOriginalLogSkeletonFeature62--

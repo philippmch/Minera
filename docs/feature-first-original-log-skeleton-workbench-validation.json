@@ -1,0 +1,141 @@
+{
+  "complete": true,
+  "checkpoint_kind": "implemented feature delivery with pending browser validation",
+  "feature_group": 62,
+  "parent_head": "2c2b8f7bb3cf39ddb241d5b97d4ac2c20b65750b",
+  "backend_step_commit": "a65e4a3015c6486290d722526c3094c2f5a0d8a2",
+  "created_utc": "2026-10-16T12:36:43.073386+00:00",
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": false,
+  "retained_browser_attempt_feature": 61,
+  "retained_browser_live_feature": 60,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "Caller-owned original log-skeleton models expose word, complete native Trace, concrete source, EventDataView and ordered variant-list conformance. Two independent standalone diagnostics operations consume an original source plus arbitrary complete stored conformance results without requiring a normative model. No request reads or changes the cached mined session.",
+    "All five pair vectors retain original storage order, duplicates and literal source/target labels. Activity-frequency maps retain literal keys and ordered duplicate/empty/unsorted size_t vectors. Native semantic pair filtering/deduplication remains distinct from unchanged stored model bytes; absent-source pairs are not counted, and allowed.front() governs absent-activity requirements.",
+    "All five LogSkeletonOptions fields and the separate diagnostics selector preserve exact native values and supplied-member presence. considered_constraints_present is independent of the ordered family vector, including explicit empty and unknown selections. Native conformance retains its unused noise/selector behavior rather than imposing discovery validation. Word, Trace, variants and grouped/flat adapters invoke their actual public overloads.",
+    "Complete raw Trace/Event/attribute state explicitly reuses the prior full native constructor codec. Original CSV/TSV/XES/gzip/typed-table sources retain all import controls, literal selectors, actual log/stream/dataframe/lazyframe dispatch, complete views/metadata/provenance and original binary bytes. Configuration, preparation and native errors retain owned inputs after their applicable ownership boundary.",
+    "Full conformance storage retains every deviation field, size_t counters, IEEE fitness and is_fit, including inactive or mutually inconsistent fields in supplied diagnostics records. Standalone native diagnostics accept finite out-of-range fitness and contradictory result flags, preserve typed case metadata, and report count overflow/nonfinite/missing/null/group-size failures without clamping or synthesizing results.",
+    "Variant lists preserve duplicate entries, empty words and full count metadata. Native conformance ignores those counts and returns its actual ordered map keyed by activity word, overwriting duplicate keys. The returned map is transported as ordered activities/value records rather than an invented trace-count vector.",
+    "The application exposes independent model/source/results ownership and cancellation, all seven operations and native option editors, raw model/word/Trace/variants/results input, complete inspection and exact raw/request/report/table CSV/aggregate selected-record/original downloads. Optional derived typed diagnostics and model/source artifact errors remain independent of successful primary conformance."
+  ],
+  "boundaries": [
+    "This feature checkpoint does not establish complete PM4Py parity or promote a strict unit. All 86 packages, 387 modules and 228 incomplete strict units remain in scope.",
+    "Browser access settings and user authorization remain acknowledged. No new browser attempt was made under the unchanged denial. The retained Feature61 exact-origin attempt was rejected while Feature60/PID12428 listened at8562; current coherent Feature62 native HTTP/API/production assets are separate evidence. Browser interaction, rendered layout, screenshots and browser downloads remain unverified.",
+    "Private scalar identity is renewed by native raw construction; all public writable raw Trace/Event/attribute state is preserved. Owned lazy tables use the existing table-backed source, not arbitrary browser-supplied C++ scanner callbacks.",
+    "The five stored conformance fields and inactive deviation storage remain representable even when native diagnostics ignores them. Native diagnostics rejects counters beyond INT64_MAX and nonfinite fitness; the exact parser only enforces native storage bounds. Client cancellation prevents stale publication and does not claim to stop an executing native call.",
+    "The complete catalogue audit remains historical static availability evidence, not exhaustive selector/input/control/result parity. Original footprints are next; supplied genetic matrices, embedding filtered logs, weighted EMD languages, original object-centric playout, Table BOSE and every other recorded gap/strict gate remain open.",
+    "Failed and superseded attempts, if any, remain retained and excluded from final successful counts."
+  ],
+  "validation_counts": {
+    "native_sources": 680,
+    "native_suites": 33,
+    "core_objects": 189,
+    "reused_core_objects": 188,
+    "fresh_core_objects": 1,
+    "frontend_tests": 3569,
+    "frontend_files": 110,
+    "api_calls": 141,
+    "api_checks": 4450,
+    "native_envelope_fixtures": 136,
+    "export_tests": 146,
+    "export_entries": 136,
+    "export_auxiliary_calls": 5,
+    "export_numeric_literals": 19962,
+    "export_csv_cells": 180933,
+    "export_selected_records": 41371,
+    "export_selected_numeric_literals": 99077,
+    "published_files": 503,
+    "unrelated_files_preserved": 110,
+    "native_option_fields": 6,
+    "native_operations": 7
+  },
+  "pending_browser_checks": [
+    "All seven operations, independent model/source/results uploads and native-option editors",
+    "Standalone diagnostics and auxiliary error inspection, source reuse/replacement and cancellation ownership",
+    "Complete result/export downloads and responsive rendered layout"
+  ],
+  "browser_status": {
+    "path": "build/declare-workbench-feature-browser-status-1.json",
+    "sha256": "04c7b4729a64b37cac39104d7924669ca99968df2def28f77e7a7f219d91bc16"
+  },
+  "evidence": {
+    "frontend": {
+      "path": "build/log-skeleton-workbench-feature-frontend-final-059299e5-e7d1-4499-9765-ee5728ef0ec0/validation.json",
+      "sha256": "1502595ffd6f839826e25845ae6a8513e9583b123ac1cd046cda166383e55472"
+    },
+    "exports": {
+      "path": "build/original-log-skeleton-workbench-feature-exports-3962cd48-a3c5-46ad-ad26-c0ace711e9da/validation.json",
+      "sha256": "458de6ee5a75fa370200113977172289300e497d52cac6216ee832312f76ea65"
+    },
+    "publication": {
+      "path": "build/original-log-skeleton-workbench-feature-fixture-publication-82d206cf-9f1c-4048-8acf-01a7281a7257/validation.json",
+      "sha256": "b68c191d19699269a91109195958c6f01dd8e082d2967fb86ddbca5c964fdf69"
+    },
+    "api": {
+      "path": "build/original-log-skeleton-workbench-feature-application-26057606c324457daee64c675f5af47e/validation.json",
+      "sha256": "cbbcb77f5c78e74b2d9028c6ddb4d41b9d281bf659c87a554c20a6be850df8d3"
+    },
+    "browser": {
+      "path": "build/declare-workbench-feature-browser-status-1.json",
+      "sha256": "04c7b4729a64b37cac39104d7924669ca99968df2def28f77e7a7f219d91bc16"
+    },
+    "focused": {
+      "path": "build/original-log-skeleton-frontend-focused-afbaf50be4bd42e18c5024e83127a2c2/validation.json",
+      "sha256": "66766790fea72d5fa061a10bf484afa1bdde8f0f9e3297d601cbba3bb1c23109"
+    },
+    "live": {
+      "path": "build/log-skeleton-workbench-feature-live-runtime.json",
+      "sha256": "e1022d204df3da696d04a3ded1a7815955eb4fb9033b03adf6fbbbdf3d9d1322"
+    },
+    "server": {
+      "path": "build/log-skeleton-workbench-feature-live-server.json",
+      "sha256": "ce71a03fe094c1dddcd395664e8d5f39bee18f590c640146545fc117dceaf820"
+    },
+    "backend_commit": {
+      "path": "build/log-skeleton-workbench-feature-backend-postcommit.json",
+      "sha256": "9c10d7e31beabc32b382f096e5f11ac68b72cffc21644b3550b92c827ae50afb"
+    },
+    "cleanup": {
+      "path": "build/log-skeleton-workbench-feature-test-cleanup.json",
+      "sha256": "ee96f547be6d8684ba4b10a16c5c42beb453449b5c213a0a35a1efc46215ec39"
+    },
+    "native": {
+      "path": "build/log-skeleton-workbench-feature-native-cb3f57f5f7b54153ba3aa9cd4e7ffa17/build-manifest.json",
+      "sha256": "461057575d58788aa26cd05603bed073ca0118dade1549447d68f34eed46a99a"
+    },
+    "seal": {
+      "path": "build/log-skeleton-workbench-feature-seal-4243c0ba20e2488b94a3d9280eed7f66/validation.json",
+      "sha256": "8c5775204f7be86c4a871edb9412ea68669c479cecc5ad955285478247faa99f"
+    }
+  },
+  "historical_attempts_excluded_from_final_counts": [
+    {
+      "path": "build/original-log-skeleton-workbench-template-types-879ccde616d746159c9aa10722eaab20/validation.json",
+      "sha256": "17c676b191dfbd8d7a10cd9584da735f05a05cad01d855a9074158f0ba2a6179",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    }
+  ],
+  "superseded_native_builds": [],
+  "feature_contract": {
+    "path": "build/original-log-skeleton-workbench-contract-feature62-reviewed-1.json",
+    "sha256": "92464b3ebc6a6c3a7c21ba2500d85a03d624ca4beb4eb14a3b61516cbf658b71"
+  },
+  "next_feature_contract": {
+    "path": "build/original-footprints-workbench-contract-feature63-ffdafa35468c46d1a66705e969b979e9.json",
+    "sha256": "17c359b881e2fbd0990e4e9a9796a32727c18b41e4e81968f3e55bca55fd173d"
+  },
+  "helper_sha256": "eacace85fe9d0d7228c4ddf29a7df4e8e4f2beb3b21080dbf3ac3748786849d6"
+}

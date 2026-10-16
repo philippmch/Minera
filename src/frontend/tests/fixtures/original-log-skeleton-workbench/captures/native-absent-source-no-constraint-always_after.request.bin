@@ -1,0 +1,22 @@
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="conformance_options_json"
+
+{"considered_constraints":["always_after"]}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="model_file"; filename="owned-family-always_after.skeleton.json"
+Content-Type: application/octet-stream
+
+{"always_after":[{"source":"A","target":"B"},{"source":"A","target":"B"},{"source":"absent-source","target":"not-counted"}]}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="input_file"; filename="owned-absent-source-word.json"
+Content-Type: application/octet-stream
+
+["not-source"]
+
+--OwnedOriginalLogSkeletonFeature62--

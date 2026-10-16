@@ -1,0 +1,22 @@
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="conformance_options_json"
+
+{"noise_threshold":-7,"activity_key":"","case_id_key":""}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="model_file"; filename="owned-original.skeleton.json"
+Content-Type: application/octet-stream
+
+{"directly_follows":[{"source":"A","target":"B"}],"activ_freq":{"A":[1],"B":[0,1]}}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="input_file"; filename="owned-word-only-a.json"
+Content-Type: application/octet-stream
+
+["A"]
+
+--OwnedOriginalLogSkeletonFeature62--

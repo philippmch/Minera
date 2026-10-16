@@ -1,0 +1,22 @@
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="conformance_options_json"
+
+{"considered_constraints":["activ_freq"]}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="model_file"; filename="owned-family-activ_freq.skeleton.json"
+Content-Type: application/octet-stream
+
+{"activ_freq":{"A":[1]}}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="input_file"; filename="owned-word-activ_freq-deviation.json"
+Content-Type: application/octet-stream
+
+["A","A"]
+
+--OwnedOriginalLogSkeletonFeature62--

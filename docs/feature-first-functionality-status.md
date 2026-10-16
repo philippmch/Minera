@@ -4,9 +4,9 @@ The pinned catalogue contains 86 algorithm families and 387 modules. The Feature
 
 Strict parity remains 46/86 packages and 199/387 modules, with 228 incomplete coverage units. Feature delivery does not promote these strict counts.
 
-This is the frozen inventory before the original Declare workbench. Later delivery reports record completed gaps without rewriting this historical audit. The Declare workbench delivers the offline Declare and Declare playout portion of the normative-model finding; original log-skeleton and footprints models remain separate work.
+This is the frozen inventory before the original Declare workbench. Later delivery reports record completed gaps without rewriting this historical audit. Feature61 delivers original offline Declare conformance and playout; Feature62 delivers original log-skeleton conformance and standalone diagnostics. Original footprints remain the next normative-model input feature.
 
-## Remaining work identified by the audit
+## Feature60 audit findings and later deliveries
 
 | Missing input, operation or control | Scope |
 | --- | --- |
@@ -20,7 +20,7 @@ This is the frozen inventory before the original Declare workbench. Later delive
 | Expose independent DFG precision case-id and materialization-cap options | Add exact independent option transport and report configured options. Preserve omitted/null cap versus exact size_t values. |
 | Supply an independent typed reference event source for edit-distance alignment | Add original input/reference source controls and typed constructors for both sides with independent import/selectors; preserve native anti-alignment behavior. |
 | Expose the separate native table BOSE drift adapter | Use the already identified bounded Table BOSE contract; preserve the existing cached-log drift operation. |
-| Complete original offline Declare/skeleton models and Declare playout | Follow the preserved original Declare61 contract, then independent skeleton contract. Do not reuse a narrower streaming model parser as a universal native codec. |
+| Complete original offline Declare/skeleton models and Declare playout | Delivered in Feature61 (Declare) and Feature62 (log-skeleton). Browser verification and strict reference parity remain separate gates. |
 | Accept independent original footprints for conformance | Deliver the already identified exact original-footprints input contract with native comparison dispatch, retaining discovery separately. |
 | Permit independent original logs for configured ILP/genetic discovery | Extend the original-source discovery workbench with separate ILP/genetic operations, exact native options, source/import controls and complete native results. |
 
