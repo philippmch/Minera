@@ -1,0 +1,256 @@
+{
+  "complete": true,
+  "checkpoint_kind": "implemented feature delivery with pending browser validation",
+  "feature_group": 64,
+  "parent_head": "2f7a6873f3a3231cf2560e8b14cc5449874f23b5",
+  "backend_step_commit": "32503ba718af5a1fb6e5f64a2716d36e76f522a6",
+  "created_utc": "2026-10-16T13:20:47.960876+00:00",
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": false,
+  "retained_browser_attempt_feature": 63,
+  "retained_browser_live_feature": 62,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "A caller-supplied GeneticCausalMatrix now invokes convert_genetic_matrix directly through an independent workbench. Existing cached-log genetic discovery remains separate; no source log, cached model or mined replacement matrix is required or read.",
+    "All three original matrix vectors retain literal activity labels, vector order, duplicate members/partitions and even mismatched shapes until the native call. The returned normalized matrix remains a separate value: native conversion validates map lengths/indexes/nonempty partitions, sorts and deduplicates a copy, and preserves the original model before/after.",
+    "Exactly one real native variant, TO_PETRI_NET(index0), is exposed with all three exact accepted aliases. The alternative raw signed int32 selector preserves unsupported indexes for native rejection. Named and indexed forms conflict by key presence; an explicitly supplied zero never hides a conflict.",
+    "Complete conversion results include variant, normalized matrix, every public PetriNet field and signed int64 WorkflowMarkings. Raw source/sink storage and optional top-level transition names extend the established full net snapshot, preserving inactive values and engaged-empty metadata independently of derived aliases. Every arc occurrence, weight/reset/inhibitor vector, sparse discovery marking and structured name remains inspectable.",
+    "Original bytes/SHA, transactional supplied-member presence, configured options, actual native calls and owned partial errors remain available. Independent original/source/normalized/result/PNML/legacy downloads, raw response/request/report, table CSV and selected-record JSON expose exact numeric/string state and preserve primary results independently of optional exports.",
+    "The UI provides original matrix upload/text construction, the single native conversion, exact variant editors, ownership/cancellation and complete result inspection. Actual native API captures drive frontend replay/export tests; explicit omitted-control cases remain offline evidence where the browser builder submits its applicable defaults."
+  ],
+  "boundaries": [
+    "This delivered feature does not establish full PM4Py parity or promote a strict unit. All86 packages,387 modules and228 incomplete strict units remain in scope.",
+    "No new browser attempt was made under the unchanged saved-permission/managed-policy denial. The retained actual Feature63 attempt occurred after the user changed settings while Feature62/PID37476 listened at8562. Current coherent Feature64 native HTTP/API/production assets remain separate evidence; rendered layout, browser interaction and browser downloads remain unverified.",
+    "The API accepts an original matrix rather than arbitrary supplied conversion results or host PetriNet objects. Converter-generated markings are signed native0/1 and its optional names/discovery metadata have their actual defaults. Arbitrary signed marking extremes, inactive metadata and optional legacy-export rejection are native codec test coverage, not invented injectable API controls.",
+    "The equivalent inline aliases convert_genetic_matrix_to_petri_net and to_petri_net share the one canonical conversion surface; they do not create additional native variants. The native legacy JSON writer is a narrower optional artifact, while full result JSON and exact original bytes remain authoritative inspection/download carriers.",
+    "Transport parser resource bounds remain separate from native semantic validation; no genetic-mining population/generation/activity limit is imposed on a supplied matrix. Client cancellation prevents stale result publication and does not stop an executing native call.",
+    "The whole-catalogue inventory remains historical static availability evidence. Independent embedding filtering/full filtered EventLogs and keep_cases are next; weighted EMD languages, original object-centric playout, Table BOSE, independent original-source ILP/genetic discovery and all other recorded gaps and strict gates remain open.",
+    "Failed or superseded preparation, build, API, export and frontend attempts remain retained and excluded from final successful counts."
+  ],
+  "validation_counts": {
+    "native_sources": 688,
+    "native_suites": 40,
+    "core_objects": 191,
+    "reused_core_objects": 190,
+    "fresh_core_objects": 1,
+    "frontend_tests": 4043,
+    "frontend_files": 114,
+    "api_calls": 123,
+    "api_checks": 4933,
+    "native_envelope_fixtures": 118,
+    "export_tests": 128,
+    "export_entries": 118,
+    "export_auxiliary_calls": 5,
+    "export_numeric_literals": 1723,
+    "export_csv_cells": 38142,
+    "export_selected_records": 9507,
+    "export_selected_numeric_literals": 8296,
+    "published_files": 481,
+    "unrelated_files_preserved": 110,
+    "native_option_fields": 1,
+    "native_operations": 1,
+    "transport_variant_keys": 2,
+    "native_matrix_members": 3
+  },
+  "pending_browser_checks": [
+    "Original matrix upload/text construction and variant-name/index presence editors",
+    "Independent source versus normalized/result inspection; native errors, cancellation and input replacement",
+    "All raw/request/report/CSV/selected-record/original/PNML/legacy downloads and responsive layout"
+  ],
+  "browser_status": {
+    "path": "build/footprints-workbench-feature-browser-status-1.json",
+    "sha256": "ba2c6b046b5336fb32456ce5d2034e6e0d2b0cf17d91f12a8155a6aad00e319e"
+  },
+  "evidence": {
+    "frontend": {
+      "path": "build/genetic-matrix-workbench-feature-frontend-final-e078a3f1-3071-413a-8aa9-9a4aa0da164b/validation.json",
+      "sha256": "5808fb2ba0472edf173eded9486cd2ce180d1b207b34ddf064321f9de1514a76"
+    },
+    "exports": {
+      "path": "build/original-genetic-matrix-workbench-feature-exports-7e4a82e2-3725-453c-b4e2-561525b1b103/validation.json",
+      "sha256": "e3761f842ccd2c71a49e2f51892a0f07c8ea3e6d04ca60c8b7b3f3f716199a1f"
+    },
+    "publication": {
+      "path": "build/original-genetic-matrix-workbench-feature-fixture-publication-a5e5af64-9596-41ab-9fb7-867a9ff08150/validation.json",
+      "sha256": "1c7f81cf5fdc150b099926fbbd37ba8cd8a6688542d290874482d6828ae2a306"
+    },
+    "api": {
+      "path": "build/original-genetic-matrix-workbench-feature-application-29f4280503b04479b620b9d4d7d86aba/validation.json",
+      "sha256": "bf17ee9e49c52f08da105c7d42e7d4d9fdf1c144f6652b87db172f4399d8543c"
+    },
+    "browser": {
+      "path": "build/footprints-workbench-feature-browser-status-1.json",
+      "sha256": "ba2c6b046b5336fb32456ce5d2034e6e0d2b0cf17d91f12a8155a6aad00e319e"
+    },
+    "focused": {
+      "path": "build/original-genetic-matrix-frontend-focused-90066833ea2a4ddcb17106bdeab3e12d/validation.json",
+      "sha256": "15b88dfab44263933a9d7d761cfe31d78e45de49c832e2510c9c45e3e556b80b"
+    },
+    "live": {
+      "path": "build/genetic-matrix-workbench-feature-live-runtime.json",
+      "sha256": "92e2459bb81b402c5a9fdfe83673a71ca94e3d53b9ea84a55748d1735280848f"
+    },
+    "server": {
+      "path": "build/genetic-matrix-workbench-feature-live-server.json",
+      "sha256": "78884535853cf333464fc8e97d584a2c73f522c3ff4dc1fdea510f5255fd3bb6"
+    },
+    "backend_commit": {
+      "path": "build/genetic-matrix-workbench-feature-backend-postcommit.json",
+      "sha256": "90ba884f9bad62be123c7327e29c759d9074b372e65539a8a886be14c96b5c54"
+    },
+    "cleanup": {
+      "path": "build/genetic-matrix-workbench-feature-test-cleanup.json",
+      "sha256": "07a271db71c7b556df87948fbf25ec098d87badba6eafb8195dd456e17780cb0"
+    },
+    "native": {
+      "path": "build/genetic-matrix-workbench-feature-native-fb8f41a3fc69448497e84665af642210/build-manifest.json",
+      "sha256": "5d2e0d6780bc18de7bb44d0675b88ef0c54bf42a239759e2a462aafd89e5f030"
+    },
+    "seal": {
+      "path": "build/genetic-matrix-workbench-feature-seal-24b0f7a23ea84a53adaa6b65022b3870/validation.json",
+      "sha256": "846819528e80d69b9ebf44a23a1a9e24b5cad4e6db9b820a7f302d3683f11f8d"
+    }
+  },
+  "historical_attempts_excluded_from_final_counts": [
+    {
+      "path": "build/original-genetic-matrix-api-recipe-preparation-60da90daec634ca9ad3ec166dba3ff07/validation.json",
+      "sha256": "ba45f486006a9a51fb064000e77296073c47774c857a9f3aab1939681cc1afe2",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-candidate-types-0c2bb2d0b1e34994b152b7b7bc620ef4/validation.json",
+      "sha256": "648a13cac15df20089ed0a252807eac6a82acf2f09ed1cb6a6480f08a18589fe",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-candidate-types-d5d98fefb5164e878a9a768bcc79252c/validation.json",
+      "sha256": "0f60b6b2086925576bfd17a62b3c9be0426593d32340cb9c163f1546014effba",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-export-recipe-preparation-d036e3e09cba4dc3aa9475960b2f79cc/validation.json",
+      "sha256": "07f434ba214b57a15512296afc18fe908c701eec90a1d7709b3ee14959cc0eb8",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-frontend-feature64-staging-c9f2bb6289da43fb9f7e2f5f5717f6da/preparation.json",
+      "sha256": "45dfc19cf8e2bde5b4b45fabc58669e742ced5d18786eda238f49902db52e96d",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-frontend-integration-34cac3db302142b48c330f5d20995f50/validation.json",
+      "sha256": "09480e0b36a3a5347a2a79a11a134391cd784603a4d64066ce33f6fad7bd78eb",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-native-feature64-staging-a429c270cee743f18e5c9d0fd4f550f3/staging-manifest.json",
+      "sha256": "e23493afb565b49f5b01ee6156b93af80ef5771361ad1f4c43c579fb3bdee8ca",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-native-integration-a110bda483894c40b7d4d9391a4c1bbc/validation.json",
+      "sha256": "de59c70e0e6eee66686db4f2a90160f814cfdb579cda571b86c60baae2a026c5",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-staged-focused-65d5bdb7ffef45fc8be09d9230fc32ed/validation.json",
+      "sha256": "37e06fc934cedb97b03184879f92f1b86f017bc06d59c18da6e5a6741386f48e",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-staged-focused-b8b3792a328b4fb9b8e1f552bb9d68f8/validation.json",
+      "sha256": "f86e539df6686a105bcb1f158e0ad2ddb1d43c8845f2c8ec4921cd3d2b67cdcd",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-workbench-feature64-plan-37673a89776d4a2db8f9e2293b391fe6/preparation-failure.json",
+      "sha256": "e46f8da5e4bca62f9d00cfb69ee7f9cecac07bf125c019448f781e566b5dfb9e",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-workbench-feature64-plan2-06270f6f94574aa8a4571dfbfad83595/validation.json",
+      "sha256": "4003b13649405e7f4b84e261213136bcf87164127067c0995d4a608d05b1f544",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/original-genetic-matrix-workbench-template-types-8eb7b9fc994247e5a0961dd7034dad94/validation.json",
+      "sha256": "46a2ab26be6e3ed84325f967d0ce60beb6939a78d4d25b8004903bada2b6dc2e",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/genetic-matrix-workbench-feature-delivery-preparation-05851dca5e394c8b991509602fea453b/validation.json",
+      "sha256": "23c6782e1dbb45fa5af3d80331c103f8c66ab0372807aa9cdd3cf5299010e7c9",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    },
+    {
+      "path": "build/genetic-matrix-workbench-feature-delivery-preparation-37590313acec40e9b09385c324c24c94/validation.json",
+      "sha256": "569f0235510328051aee4d9c02fa864beb83df68aaabd8856093960a6b878222",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "historical_or_preparation_evidence": true,
+      "validation_parse_error": null
+    }
+  ],
+  "superseded_native_builds": [],
+  "feature_contract": {
+    "path": "build/original-genetic-matrix-workbench-contract-feature64-d311b89440e643a687eadaebc728f8f1.json",
+    "sha256": "39b612139c678174cf70b8061bac0b04cf8c960ac2449768e205c49f5d793ba7"
+  },
+  "next_feature_contract": {
+    "path": "build/original-embedding-filter-workbench-contract-feature65-d8a656c47bc7413ca4acafba890e617f.json",
+    "sha256": "f3fc62269d618bcf4f20bbaf1fbff825c6f4f1eafa95d4a60c8ee5aa18fb66f0"
+  },
+  "helper_sha256": "cecf58a3ceb8971d3d97d92281cf340669ce5ecbb3e94ecfa263481396bff5f6"
+}

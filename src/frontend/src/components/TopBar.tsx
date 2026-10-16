@@ -25,10 +25,11 @@ interface TopBarProps {
   onOriginalDeclare?: () => void;
   onOriginalLogSkeleton?: () => void;
   onOriginalFootprints?: () => void;
+  onOriginalGeneticMatrix?: () => void;
   onActiveSource?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onActiveSource }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onActiveSource }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -65,6 +66,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onOriginalDeclare && <button className="btn-ghost" onClick={onOriginalDeclare}>Original Declare</button>}
       {onOriginalLogSkeleton && <button className="btn-ghost" onClick={onOriginalLogSkeleton}>Original LogSkeleton</button>}
       {onOriginalFootprints && <button className="btn-ghost" onClick={onOriginalFootprints}>Original Footprints</button>}
+      {onOriginalGeneticMatrix && <button className="btn-ghost" onClick={onOriginalGeneticMatrix}>Original genetic matrix</button>}
       {onActiveSource && <button className="btn-ghost" onClick={onActiveSource}>Source inputs</button>}
       <label className="btn-open">
         Open log

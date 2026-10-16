@@ -1,0 +1,19 @@
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="operation"
+
+convert
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="model_format"
+
+exact
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="model_file"; filename="owned-semantic-uint32-max-still-exact.matrix.json"
+Content-Type: application/octet-stream
+
+{"activities":["A"],"input_map":[[[4294967295]]],"output_map":[[]]}
+
+--OwnedOriginalFootprintsFeature64--

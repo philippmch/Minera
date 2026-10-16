@@ -1,0 +1,1 @@
+{"family":"GENETIC_MATRIX_CONVERSION","variant":"TO_PETRI_NET","matrix":{"activities":[],"input_map":[],"output_map":[]},"net":{"place_count":2,"source":0,"sink":1,"activities":[],"transitions":[]},"markings":{"initial":[1,0],"final":[0,1]}}

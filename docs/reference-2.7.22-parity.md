@@ -13547,3 +13547,12 @@ Eighteen independent operations expose caller-owned normative/observed footprint
 Validation: 684 native bindings, 190 core objects (189 reused/1 fresh), 38 assertion-enabled suites; 271 API calls/18201 checks/266 scenarios; 276 export tests/336861 CSV cells/80289 selected records; 3897 full frontend tests across 112 files plus strict TypeScript and isolated production build. 1260 portable files preserve raw bytes. Backend step pushed as 3ea69613. See `docs/feature-first-original-footprints-workbench-validation.json`.
 
 After the user changed browser settings, a new exact-origin attempt still received a saved-permission/managed-policy denial while Feature62/PID37476 listened. Current Feature63 HTTP/API/assets remain separate evidence; browser UI remains unverified. Strict counts remain86 packages/387 modules/46 complete packages/199 complete modules/228 incomplete units. Caller-supplied genetic causal matrices are next; full catalogue parity remains the objective.
+
+
+### Feature-first checkpoint64: original genetic causal-matrix conversion
+
+An independent caller-supplied matrix now reaches the actual native converter without cached-log rediscovery. All three original vectors retain order/duplicates/literal labels until native normalization of a separate copy; one real TO_PETRI_NET variant supports its three exact aliases and alternative signed-int32 index with presence conflicts. Complete variant/matrix/PetriNet/signed WorkflowMarkings, inactive boundary/name storage, original bytes/SHA, owned partial errors and five guarded native artifacts remain available through full inspection and downloads.
+
+Validation: 688 native bindings, 191 core objects (190 reused/1 fresh), 40 assertion-enabled suites; 123 API calls/4933 checks/118 scenarios; 128 export tests/38142 CSV cells/9507 selected records; 4043 full frontend tests across 114 files plus strict TypeScript and isolated production build. 481 portable files preserve raw bytes. Backend step pushed as 32503ba7. See `docs/feature-first-original-genetic-matrix-workbench-validation.json`.
+
+No new browser attempt under the unchanged denial; retained actual63/live62 rejection remains distinct from current64 HTTP/API/assets. Strict counts remain86 packages/387 modules/46 complete packages/199 complete modules/228 incomplete units. Next deliver independent embedding filtering/full filtered EventLogs/keep_cases. Full catalogue parity remains the objective.

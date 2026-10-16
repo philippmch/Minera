@@ -2630,3 +2630,15 @@ input[type="range"]::-moz-range-thumb {
 .original-footprints-workspace .query-check { display: flex; align-items: center; gap: .45rem; }
 .original-footprints-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .original-footprints-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+.original-genetic-matrix-workspace { display: grid; gap: 1.1rem; }
+.original-genetic-matrix-workspace .panel, .original-genetic-matrix-workspace fieldset { width: 100%; min-width: 0; }
+.original-genetic-matrix-workspace fieldset { border: 0; padding: 0; }
+.original-genetic-matrix-workspace .filters-field { display: flex; flex-direction: column; gap: .4rem; margin-block: .8rem; min-width: 0; }
+.original-genetic-matrix-workspace input:not([type=checkbox]), .original-genetic-matrix-workspace select, .original-genetic-matrix-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.original-genetic-matrix-workspace textarea { resize: vertical; font-family: var(--font-mono); }
+.original-genetic-matrix-workspace .query-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(230px,100%),1fr)); gap: .85rem; }
+.original-genetic-matrix-workspace .query-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-block: .8rem; }
+.original-genetic-matrix-workspace .query-check { display: flex; align-items: center; gap: .45rem; }
+.original-genetic-matrix-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.original-genetic-matrix-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }

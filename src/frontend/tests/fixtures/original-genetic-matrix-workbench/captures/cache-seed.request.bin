@@ -1,0 +1,13 @@
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="miner"
+
+inductive
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="log"; filename="owned-cache-seed.csv"
+Content-Type: application/octet-stream
+
+case_id,activity,timestamp
+cache,CacheStart,2026-01-01T00:00:00Z
+cache,CacheEnd,2026-01-01T00:00:04Z
+
+--OwnedOriginalFootprintsFeature64--

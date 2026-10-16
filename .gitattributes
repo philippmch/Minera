@@ -25,3 +25,5 @@ src/frontend/tests/fixtures/original-log-skeleton-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-log-skeleton-workbench/** -text -whitespace
 src/frontend/tests/fixtures/original-footprints-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-footprints-workbench/** -text -whitespace
+src/frontend/tests/fixtures/original-genetic-matrix-workbench* -text -whitespace
+src/frontend/tests/fixtures/original-genetic-matrix-workbench/** -text -whitespace
