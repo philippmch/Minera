@@ -20,10 +20,11 @@ interface LandingProps {
   onTreeAlignment?: () => void;
   onPetriAntiMulti?: () => void;
   onModelConversion?: () => void;
+  onMonteCarlo?: () => void;
   onActiveSource?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onActiveSource }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onActiveSource }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -82,6 +83,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onTreeAlignment && <button className="landing-sample reveal" disabled={mining} onClick={onTreeAlignment}>Align original traces against a process-tree model</button>}
         {onPetriAntiMulti && <button className="landing-sample reveal" disabled={mining} onClick={onPetriAntiMulti}>Compare original traces with an independent PNML model</button>}
         {onModelConversion && <button className="landing-sample reveal" disabled={mining} onClick={onModelConversion}>Convert or reduce an original process model</button>}
+        {onMonteCarlo && <button className="landing-sample reveal" disabled={mining} onClick={onMonteCarlo}>Simulate an original PNML model with Monte Carlo</button>}
         {onActiveSource && <button className="landing-sample reveal" disabled={mining} onClick={onActiveSource}>Open and inspect a native mining source</button>}
 
         <div className="landing-steps reveal">

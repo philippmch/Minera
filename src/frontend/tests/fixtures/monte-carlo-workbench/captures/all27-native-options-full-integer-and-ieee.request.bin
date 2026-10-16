@@ -1,0 +1,56 @@
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="operation"
+
+simulate_net
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="options_json"
+
+{"simulations":3,"case_arrival_ratio":null,"case_arrival_seconds":2,"activity_key":" original task \ud800\u0000 ","timestamp_key":" original stamp \udfff\u0000 ","initial_marking":[1,0],"final_marking":[0,1],"max_steps":3,"seed":18446744073709551615,"start":-1,"default_duration_seconds":-0.0,"transition_weights":[-7],"transition_durations":[{"distribution":"deterministic","value_seconds":5,"secondary_seconds":-2,"tertiary_seconds":-3}],"resources_per_place":{"0":0,"1":3},"default_resources_per_place":0,"enable_diagnostics":false,"stop_at_final":false,"force_distribution":"normal","stochastic_map":{"transitions":[]},"token_replay_variant":"backwards","diagnostic_interval":18446744073709551615,"small_scale_factor":5e-324,"max_thread_execution_time":5e-324,"place_names":["unused invalid names \ud800"],"transition_names":["unused id\u0000"],"initial_marking_keys":[true,false],"final_marking_keys":[false,true]}
+
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="model_file"; filename="owned-original-linear.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-monte-carlo-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="owned-source">
+        <name>
+          <text>Original owned-source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="owned-sink">
+        <name>
+          <text>Original owned-sink</text>
+        </name>
+      </place>
+      <transition id="owned-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <arc id="owned-in" source="owned-source" target="owned-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="owned-out" source="owned-transition-0" target="owned-sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="owned-sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedMonteCarloFeature58--

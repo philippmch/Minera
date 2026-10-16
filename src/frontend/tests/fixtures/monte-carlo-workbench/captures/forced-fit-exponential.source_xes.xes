@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Original Monte Carlo fitting source"/>
+  <trace>
+    <string key="case_id" value="first"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:00+00:00"/>
+      <string key="resource" value="alice"/>
+      <string key="lifecycle" value="complete"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:02+00:00"/>
+      <string key="resource" value="alice"/>
+      <string key="lifecycle" value="complete"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="second"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:20+00:00"/>
+      <string key="resource" value="bob"/>
+      <string key="lifecycle" value="complete"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:24+00:00"/>
+      <string key="resource" value="bob"/>
+      <string key="lifecycle" value="complete"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="third"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:40+00:00"/>
+      <string key="resource" value="carol"/>
+      <string key="lifecycle" value="complete"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:46+00:00"/>
+      <string key="resource" value="carol"/>
+      <string key="lifecycle" value="complete"/>
+    </event>
+  </trace>
+</log>

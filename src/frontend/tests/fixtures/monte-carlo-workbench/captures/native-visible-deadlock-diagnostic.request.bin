@@ -1,0 +1,65 @@
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="operation"
+
+simulate_net
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="options_json"
+
+{"simulations":2,"max_steps":8}
+
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="pnml_require_workflow_boundaries"
+
+false
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="model_file"; filename="owned-visible-deadlock.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-monte-carlo-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="source">
+        <name>
+          <text>Original source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="middle">
+        <name>
+          <text>Original middle</text>
+        </name>
+      </place>
+      <place id="sink">
+        <name>
+          <text>Original sink</text>
+        </name>
+      </place>
+      <transition id="owned-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <arc id="in" source="source" target="owned-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="out" source="owned-transition-0" target="middle">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedMonteCarloFeature58--

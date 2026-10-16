@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original Monte Carlo model</text></name>
+    <page id="page1">
+      <place id="original-place-0">
+        <name><text>original-place-0</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="original-place-1">
+        <name><text>original-place-1</text></name>
+      </place>
+      <place id="original-place-2">
+        <name><text>original-place-2</text></name>
+      </place>
+      <transition id="original-transition-0">
+        <name><text>A</text></name>
+      </transition>
+      <transition id="original-transition-1">
+        <name><text>B</text></name>
+      </transition>
+      <arc id="original-in-0" source="original-place-0" target="original-transition-0"/>
+      <arc id="original-in-1" source="original-place-1" target="original-transition-1"/>
+      <arc id="original-out-0" source="original-transition-0" target="original-place-1"/>
+      <arc id="original-out-1" source="original-transition-1" target="original-place-2"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="original-place-2"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

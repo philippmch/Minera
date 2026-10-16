@@ -19,10 +19,11 @@ interface TopBarProps {
   onTreeAlignment?: () => void;
   onPetriAntiMulti?: () => void;
   onModelConversion?: () => void;
+  onMonteCarlo?: () => void;
   onActiveSource?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onActiveSource }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onActiveSource }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -53,6 +54,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onTreeAlignment && <button className="btn-ghost" onClick={onTreeAlignment}>Tree alignment</button>}
       {onPetriAntiMulti && <button className="btn-ghost" onClick={onPetriAntiMulti}>Anti/multi alignment</button>}
       {onModelConversion && <button className="btn-ghost" onClick={onModelConversion}>Convert models</button>}
+      {onMonteCarlo && <button className="btn-ghost" onClick={onMonteCarlo}>Original-model Monte Carlo</button>}
       {onActiveSource && <button className="btn-ghost" onClick={onActiveSource}>Source inputs</button>}
       <label className="btn-open">
         Open log

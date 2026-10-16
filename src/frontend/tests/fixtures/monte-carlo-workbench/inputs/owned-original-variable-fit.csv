@@ -1,0 +1,7 @@
+case_id,activity,timestamp,resource,lifecycle
+first,A,2026-01-01T00:00:00Z,alice,complete
+first,B,2026-01-01T00:00:02Z,alice,complete
+second,A,2026-01-01T00:00:20Z,bob,complete
+second,B,2026-01-01T00:00:24Z,bob,complete
+third,A,2026-01-01T00:00:40Z,carol,complete
+third,B,2026-01-01T00:00:46Z,carol,complete

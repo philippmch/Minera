@@ -2585,3 +2585,28 @@ See [validation and boundaries](docs/feature-first-model-conversion-validation.j
 
 
 The workspace now accepts full native typed tables as active inputs in log, stream, dataframe and lazyframe shapes. Original sources, native preparation failures, provenance and per-consumer outcomes remain inspectable; source-only inputs support event SQL and original/JSON/report/CSV downloads. Seven independent discovery/alignment workbenches can reuse the original typed file. Validation and remaining browser/parity boundaries are recorded in `docs/feature-first-active-source-validation.json`.
+
+### Simulate an original PNML model with Monte Carlo
+
+Open **Original-model Monte Carlo** from the landing page or workspace toolbar.
+Upload a PNML model to simulate it directly, optionally supply an original
+CSV/TSV/XES/gzip XES or typed table for log-informed simulation, fit options only,
+or fit and then simulate. These requests own their inputs and preserve the cached
+mining session. The true net-only call retains its native defaults; it is distinct
+from fitting an empty log.
+
+All 27 native options are editable as JSON or individual fields, including
+markings and key membership, transition duration laws and weights, stochastic
+maps, resources, replay direction, attribute names and exact integer seeds.
+Omitted markings, names and maps can use the original PNML values; explicit empty
+values and null maps retain their native meaning. Five PNML import controls and
+the original source import and literal selector controls are available separately.
+
+Inspect the full generated native log, fitted options when requested, every
+diagnostic and all place/transition resource intervals. Download original bytes,
+the exact request, complete native JSON/report, every table and selected record,
+and the same-run PNML/XES artifacts; generated XES can reopen as an active source.
+Native errors retain the imported model and any available prepared source or
+fitted options. The compatibility execution-time setting is not a wall-clock
+timeout. Browser verification and strict reference parity remain separate gates;
+see `docs/feature-first-monte-carlo-workbench-validation.json`.
