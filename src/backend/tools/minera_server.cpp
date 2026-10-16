@@ -83,6 +83,8 @@
 #include "minera/model_conversion_workbench_json.hpp"
 #include "minera/active_event_source.hpp"
 #include "minera/monte_carlo_workbench_json.hpp"
+#include "minera/playout_workbench_json.hpp"
+#include "minera/dfg_playout_input_json.hpp"
 #include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
@@ -4021,6 +4023,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "petri_anti_multi_route.hpp"
 #include "model_conversion_route.hpp"
 #include "monte_carlo_route.hpp"
+#include "playout_route.hpp"
 
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
@@ -10560,6 +10563,7 @@ int main(int argc, char** argv) {
   server.Post("/api/align-petri-anti-multi-workbench", handle_petri_anti_multi_workbench);
   server.Post("/api/model-conversion-workbench", handle_model_conversion_workbench);
   server.Post("/api/monte-carlo-workbench", handle_monte_carlo_workbench);
+  server.Post("/api/playout-workbench", handle_playout_workbench);
   server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/discover-timing", handle_timing_discovery);
