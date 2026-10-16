@@ -2560,3 +2560,14 @@ input[type="range"]::-moz-range-thumb {
 .active-mining-source-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .active-mining-source-workspace .query-check { display: flex; gap: .45rem; align-items: center; }
 .active-mining-source-workspace .query-check input { width: auto; }
+.monte-carlo-workspace { display: grid; gap: 1.1rem; }
+.monte-carlo-workspace .panel, .monte-carlo-workspace fieldset { width: 100%; min-width: 0; }
+.monte-carlo-workspace fieldset { border: 0; padding: 0; }
+.monte-carlo-workspace .filters-field { display: flex; flex-direction: column; gap: .4rem; margin-block: .8rem; min-width: 0; }
+.monte-carlo-workspace input:not([type=checkbox]), .monte-carlo-workspace select, .monte-carlo-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.monte-carlo-workspace textarea { resize: vertical; font-family: var(--font-mono); }
+.monte-carlo-workspace .query-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(230px,100%),1fr)); gap: .85rem; }
+.monte-carlo-workspace .query-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-block: .8rem; }
+.monte-carlo-workspace .query-check { display: flex; align-items: center; gap: .45rem; }
+.monte-carlo-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.monte-carlo-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }

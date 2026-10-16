@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Monte Carlo generated log"/>
+  <trace>
+    <string key="concept:name" value="case_1"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-01-12T13:46:41+00:00"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case_2"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-01-12T13:47:41+00:00"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case_3"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-01-12T13:48:41+00:00"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case_4"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-01-12T13:49:41+00:00"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case_5"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-01-12T13:50:41+00:00"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case_6"/>
+    <event>
+      <string key="concept:name" value="B"/>
+      <date key="time:timestamp" value="1970-01-12T13:51:41+00:00"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case_7"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-01-12T13:52:41+00:00"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="case_8"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-01-12T13:53:41+00:00"/>
+    </event>
+  </trace>
+</log>

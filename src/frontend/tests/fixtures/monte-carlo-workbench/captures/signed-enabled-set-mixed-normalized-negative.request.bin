@@ -1,0 +1,71 @@
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="operation"
+
+simulate_net
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="options_json"
+
+{"simulations":8,"max_steps":1,"transition_weights":[-1,2],"transition_durations":[{"distribution":"deterministic","value_seconds":1,"secondary_seconds":0,"tertiary_seconds":0},{"distribution":"deterministic","value_seconds":1,"secondary_seconds":0,"tertiary_seconds":0}]}
+
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="model_file"; filename="owned-net-choice.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="source">
+        <name>
+          <text>Original source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="sink">
+        <name>
+          <text>Original sink</text>
+        </name>
+      </place>
+      <transition id="original-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <transition id="original-transition-1">
+        <name>
+          <text>B</text>
+        </name>
+      </transition>
+      <arc id="a-in" source="source" target="original-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a-out" source="original-transition-0" target="sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="b-in" source="source" target="original-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="b-out" source="original-transition-1" target="sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedMonteCarloFeature58--

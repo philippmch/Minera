@@ -13,3 +13,5 @@ src/frontend/tests/fixtures/model-conversion-workbench* -text -whitespace
 src/frontend/tests/fixtures/model-conversion-workbench/** -text -whitespace
 src/frontend/tests/fixtures/active-source-workbench* -text -whitespace
 src/frontend/tests/fixtures/active-source-workbench/** -text -whitespace
+src/frontend/tests/fixtures/monte-carlo-workbench* -text -whitespace
+src/frontend/tests/fixtures/monte-carlo-workbench/** -text -whitespace

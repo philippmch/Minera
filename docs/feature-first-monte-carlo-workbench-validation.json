@@ -1,0 +1,146 @@
+{
+  "complete": true,
+  "checkpoint_kind": "implemented feature delivery with pending browser validation",
+  "feature_group": 58,
+  "parent_head": "0c14be3561077287b08f2ee7c4eaff812838222e",
+  "backend_step_commit": "6efc0c9737c2f6bd944563c52a1cbea68861e30e",
+  "created_utc": "2026-10-16T11:05:55.597287+00:00",
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "browser_validation_complete": false,
+  "browser_attempted_while_feature57_served": true,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "Independent original PNML uploads expose four separate public workflows: native net-only Monte Carlo, native EventLog-informed Monte Carlo, public fitting only, and public fitting followed by one net-only call. The net-only path is distinct from an empty-log fit; requested and actual public call outcomes remain inspectable without reading or changing the cached mined session.",
+    "All 27 native options retain exact supplied-member presence, full integer domains, IEEE values, enum names and raw indexes, every duration-law parameter, sparse resources and optional stochastic-map records. Omitted document markings, marking-key membership, model names and stochastic maps are applied separately from explicit empty vectors or null maps; marking conversion checks uint32 range while retaining the complete original PNML document on failure.",
+    "Five PNML import controls and all native CSV/XES import controls are available. Original CSV/TSV/XES/gzip XES and complete typed-table sources retain literal selectors, original and checked tables, full original/prepared native logs, actual preparation errors and exact original bytes. Compressed source bytes use an explicit reversible hex carrier. Current-source reuse retains its original file and import settings.",
+    "Complete submitted/configured options, actual fitted options when returned, all four stored result fields, the full generated native log, all 12 diagnostic fields and every ordered place/transition interval tree remain available, including native errors and partial fitting outcomes. Internal fitting in the direct EventLog overload is not reported as separately observed fitted options.",
+    "The application exposes independent operation/model/source ownership, generation/cancellation guards, all 27 raw and named option editors, import controls and complete inspection. Original model/source bytes, exact requests, raw native JSON, reports, all table CSVs, selected native records and same-run PNML/source-XES/generated-XES downloads retain native values and exact integer tokens. Generated XES can reopen in the active workspace.",
+    "Own-source native suites, 125 dedicated API calls, complete captured-response export verification, portable byte-identical fixtures and the final full frontend/production build validate this feature delivery. All strict catalogue units and remaining reference defaults, types, ordering, errors, Unicode, solver, marking, concurrency and performance gates remain open."
+  ],
+  "boundaries": [
+    "This checkpoint delivers native functionality and application entry points. It does not establish complete PM4Py parity or promote any package/module. The complete catalogue remains 86 packages, 387 modules, 46 complete packages, 199 complete modules and 228 incomplete strict units.",
+    "The local server had no listener on port8562 and was restored with the validated Feature57 binary and assets. A fresh exact-origin browser attempt still returned a saved permission or managed-policy rejection after the user stated all settings were enabled. That attempt loaded no UI. The later coherent Feature58 native HTTP/API/production-asset checks are separate; browser interaction, rendered layouts, screenshots and actual browser downloads remain pending.",
+    "Monte Carlo fitting uses the actual native activity/timestamp option selectors. Default CSV imports expose activity/timestamp source attributes and may reject canonical concept:name/time:timestamp fitting selectors; the controls and help retain this native distinction rather than silently rewriting submitted options. The native custom first-class timestamp arrival-inference behavior is retained.",
+    "Native diagnostic_interval, small_scale_factor and max_thread_execution_time are compatibility settings; the latter does not impose a wall-clock timeout. Cancellation prevents stale client publication and does not claim to stop an already executing native call.",
+    "Two failed API fixture assumptions and the superseded focused frontend attempts remain recorded and excluded from final validation counts. A pre-capture native build was superseded to correct binary gzip source transport. Executed recipes and prior artifact bytes were preserved.",
+    "Original-model Petri, DFG and process-tree playout, native Table BOSE delivery, independent normative decision inputs, the remaining whole-catalogue feature audit and all strict behavioral gates remain outside this checkpoint."
+  ],
+  "validation_counts": {
+    "native_sources": 661,
+    "native_suites": 19,
+    "core_objects": 184,
+    "reused_core_objects": 183,
+    "fresh_core_objects": 1,
+    "frontend_tests": 2930,
+    "frontend_files": 101,
+    "api_calls": 125,
+    "api_checks": 2577,
+    "native_envelope_fixtures": 120,
+    "export_tests": 130,
+    "export_entries": 120,
+    "export_auxiliary_calls": 5,
+    "export_numeric_literals": 13199,
+    "export_csv_cells": 134570,
+    "export_selected_records": 32366,
+    "published_files": 444,
+    "unrelated_files_preserved": 110
+  },
+  "pending_browser_checks": [
+    "Original PNML and source uploads, all four operations and native error inspection",
+    "Source reuse, replacement, cancellation and generated-log reopening",
+    "Downloads, screenshots and responsive inspection"
+  ],
+  "browser_status": {
+    "path": "build/monte-carlo-workbench-feature-browser-status-b06f03acac9e4f04880736a1410b44a4.json",
+    "sha256": "f221083b9865ead52e61310f53ddf7de2ec507d83b9c228c42b93d5add1b8d65"
+  },
+  "evidence": {
+    "frontend": {
+      "path": "build/monte-carlo-workbench-feature-frontend-final-b75a014c-3f07-4188-b7ab-bee3610c9291/validation.json",
+      "sha256": "9e4ca5bc2c7da5e869abbd5f3dc2a0ad2c931575b1807881bfea70e9f3094326"
+    },
+    "exports": {
+      "path": "build/monte-carlo-feature-exports-5b0b7540-51c0-4e7a-95d1-d7d979937b24/validation.json",
+      "sha256": "2d0118cd5b926ce9935d6853c43a7827720dd52cc0248fd3fbc9450046a7c0e9"
+    },
+    "publication": {
+      "path": "build/monte-carlo-feature-fixture-publication-f7b9ad45-a914-4057-b092-d4bbc1904156/validation.json",
+      "sha256": "fb378264bd69e53bd1456ff57fd4bc8391a288c0d54067734bc56f1f3b9f7cc7"
+    },
+    "api": {
+      "path": "build/monte-carlo-workbench-feature-application-c144ebf1577547938a4c16d9d8cb8641/validation.json",
+      "sha256": "67bb26776f3eaf3763000c71d37b62490a7730df9256ccb4907b579c3e3b5f50"
+    },
+    "live": {
+      "path": "build/monte-carlo-workbench-feature-live-runtime.json",
+      "sha256": "5d56939ecea8b01fd6b0aed578579de66464c36fa0c3640282dbf311dd844f4d"
+    },
+    "server": {
+      "path": "build/monte-carlo-workbench-feature-live-server.json",
+      "sha256": "1a52e3f19ccd39ef20231dc516e3271d5828432f482e7db8d2a62a93694b0a12"
+    },
+    "backend_commit": {
+      "path": "build/monte-carlo-workbench-feature-backend-postcommit.json",
+      "sha256": "af57a2aa519a274b97c2cae6137b843eecd94e7f68e86fb23a8fd5908b26215e"
+    },
+    "native": {
+      "path": "build/monte-carlo-workbench-feature-native-30f5a17a615e404591a7e166ae98caf3/build-manifest.json",
+      "sha256": "7c59059ebd5e3d26518ededb3a29c08228344b0899545cd8fc300e681ede57cc"
+    },
+    "seal": {
+      "path": "build/monte-carlo-workbench-feature-seal-f5b1d478691e488e9d4ff581e62d6288/validation.json",
+      "sha256": "88c0a5198f44db15f0fc6694ba216b78b248c02a57a1376acc3f115753d9128d"
+    }
+  },
+  "historical_attempts_excluded_from_final_counts": [
+    {
+      "path": "build/monte-carlo-workbench-feature-application-aea11fc05f974b66874dc5e7da8cf854/validation.json",
+      "sha256": "b1c469afa3eb8a837ebf7cd6bec0d11594020c0bf5758bb182bf878c0f9130e1",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/monte-carlo-workbench-feature-application-f794e00628c542a0bf74a763859dc6d8/validation.json",
+      "sha256": "74715071abcf3e3f81bef3722bdbf3f4fd5339409aa3b67d690d72e4cde62764",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/monte-carlo-feature-focused-85cfb0e7-96d4-4673-874e-dd028c63c609/validation.json",
+      "sha256": "c5c433decc7144e17bd5ace327e61ee1ae5782037a768a35715594a3c3603f59",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/monte-carlo-feature-focused-912bce0a-a5cb-4dae-a8f9-860c5a28617c/validation.json",
+      "sha256": "c1a829a175a67040ccc051a52cda007e29eb33aaa3204bab52c03efd19677e9b",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/monte-carlo-feature-focused-f550fa71-a13a-4424-b405-8919fa459c0d/validation.json",
+      "sha256": "b30f1d843dee957695d62530034179b2f874c51bf3217eed4494b7dcd7cddd1e",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    }
+  ],
+  "next_feature_contract": {
+    "path": "build/original-model-playout-contract-feature59.json",
+    "sha256": "4f409770d2d4cb38649a9654b5f5ca144989359b891f6435c5187438ca88ac98"
+  },
+  "helper_sha256": "e63c0416ec8159a2bb83788f5a2b1fdaf818c6967ba85873da24a1cfff95ab66"
+}

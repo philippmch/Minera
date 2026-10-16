@@ -1,0 +1,68 @@
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="operation"
+
+simulate_net
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="options_json"
+
+{"simulations":2,"max_steps":8,"activity_key":"activity","timestamp_key":"timestamp"}
+
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="model_file"; filename="owned-original-linear.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-monte-carlo-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="owned-source">
+        <name>
+          <text>Original owned-source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="owned-sink">
+        <name>
+          <text>Original owned-sink</text>
+        </name>
+      </place>
+      <transition id="owned-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <arc id="owned-in" source="owned-source" target="owned-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="owned-out" source="owned-transition-0" target="owned-sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="owned-sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedMonteCarloFeature58
+Content-Disposition: form-data; name="log"; filename="owned-original-fit.csv"
+Content-Type: application/octet-stream
+
+case_id,activity,timestamp,resource,lifecycle
+first,A,2026-01-01T00:00:00Z,alice,complete
+first,B,2026-01-01T00:00:04Z,alice,complete
+second,A,2026-01-01T00:00:20Z,bob,complete
+second,B,2026-01-01T00:00:24Z,bob,complete
+third,A,2026-01-01T00:00:40Z,carol,complete
+third,B,2026-01-01T00:00:44Z,carol,complete
+
+--OwnedMonteCarloFeature58--
