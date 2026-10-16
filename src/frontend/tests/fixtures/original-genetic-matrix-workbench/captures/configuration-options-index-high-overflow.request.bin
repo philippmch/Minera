@@ -1,0 +1,19 @@
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="operation"
+
+convert
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="model_format"
+
+exact
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="options_json"
+
+{"variant_index": 2147483648}
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="model_file"; filename="owned-sequence.matrix.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B"],"input_map":[[],[[0]]],"output_map":[[[1]],[]]}
+
+--OwnedOriginalFootprintsFeature64--

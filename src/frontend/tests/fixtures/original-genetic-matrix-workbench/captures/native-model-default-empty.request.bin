@@ -1,0 +1,19 @@
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="operation"
+
+convert
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="model_format"
+
+exact
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature64
+Content-Disposition: form-data; name="model_file"; filename="owned-default-empty.matrix.json"
+Content-Type: application/octet-stream
+
+{}
+
+--OwnedOriginalFootprintsFeature64--

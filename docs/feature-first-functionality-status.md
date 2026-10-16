@@ -4,13 +4,13 @@ The pinned catalogue contains 86 algorithm families and 387 modules. The Feature
 
 Strict parity remains 46/86 packages and 199/387 modules, with 228 incomplete coverage units. Feature delivery does not promote these strict counts.
 
-This is the frozen inventory before the original Declare workbench. Later delivery reports record completed gaps without rewriting this historical audit. Feature61 delivers original offline Declare conformance and playout; Feature62 delivers original log-skeleton conformance and standalone diagnostics. Feature63 delivers eighteen original-footprints comparison, metric, diagnostic, utility and tree-decoration operations. Caller-supplied genetic causal matrices are next.
+This is the frozen inventory before the original Declare workbench. Later delivery reports record completed gaps without rewriting this historical audit. Feature61 delivers original offline Declare conformance and playout; Feature62 delivers original log-skeleton conformance and standalone diagnostics. Feature63 delivers eighteen original-footprints comparison, metric, diagnostic, utility and tree-decoration operations. Feature64 delivers caller-supplied original genetic causal-matrix conversion. Independent embedding filtering/full filtered EventLogs and keep_cases are next.
 
 ## Feature60 audit findings and later deliveries
 
 | Missing input, operation or control | Scope |
 | --- | --- |
-| Convert a supplied genetic causal matrix without rediscovering it | Add exact causal-matrix input and native conversion dispatch; keep matrix discovery as a separate existing operation. Preserve matrix, net and markings. |
+| Convert a supplied genetic causal matrix without rediscovering it | Delivered in Feature64: exact original causal-matrix input and native conversion, preserving original/normalized matrices, complete PetriNet and signed markings. Matrix discovery remains separate; browser and strict reference parity remain open. |
 | Expose native top-k filtering as an EventLog operation | Add native filtering dispatch, keep_cases control, full raw returned log and XES/CSV export from the actual filtered result. |
 | Accept the native weighted stochastic-language EMD input | Provide an exact original language-pair input in addition to existing log-derived evaluation. Do not invent a browser transport for arbitrary C++ callbacks. |
 | Play out original OCPN and object-centric causal-net models | Add exact original graph/net input, separate from the existing log-discovery operation, and retain full native model and result snapshots. |

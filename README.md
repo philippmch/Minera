@@ -2695,3 +2695,10 @@ See [validation and boundaries](docs/feature-first-original-log-skeleton-workben
 Open **Original Footprints** for eighteen native comparison, precision/fitness, standalone diagnostic, flattening, finalization, projection, relation and tree-decoration operations. Supply original footprints/vectors, arbitrary complete results, source logs or process trees independently. All sixteen stored footprint members and thirteen native option fields remain available, including independent presence flags and optional values. Inspect and download complete raw inputs, requests, results, reports, CSV tables, selected records and native artifacts.
 
 See [validation and boundaries](docs/feature-first-original-footprints-workbench-validation.json). Browser UI verification and strict reference parity remain pending.
+
+
+### Convert an original genetic causal matrix
+
+Open **Original Genetic Matrix** to convert a supplied matrix directly to an executable Petri net. Original activity/input/output vectors remain independent from the native normalized result. The one TO_PETRI_NET variant accepts its three exact native names or an alternative signed enum index. Inspect complete net storage and signed workflow markings, preserve original bytes and partial errors, and download canonical matrices, full results, PNML, native legacy JSON, reports, CSV and selected records.
+
+See [validation and boundaries](docs/feature-first-original-genetic-matrix-workbench-validation.json). Independent original-log genetic discovery, browser verification and strict reference parity remain pending.
