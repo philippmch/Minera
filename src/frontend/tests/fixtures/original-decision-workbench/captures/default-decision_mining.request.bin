@@ -1,0 +1,378 @@
+--OwnedOriginalModelDecisionFeature60
+Content-Disposition: form-data; name="operation"
+
+decision_mining
+--OwnedOriginalModelDecisionFeature60
+Content-Disposition: form-data; name="options_json"
+
+{}
+
+--OwnedOriginalModelDecisionFeature60
+Content-Disposition: form-data; name="model_file"; filename="owned-original-decision-choice.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-monte-carlo-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="p0">
+        <name>
+          <text>Original p0</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="choice">
+        <name>
+          <text>Original choice</text>
+        </name>
+      </place>
+      <place id="p2">
+        <name>
+          <text>Original p2</text>
+        </name>
+      </place>
+      <transition id="owned-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <transition id="owned-transition-1">
+        <name>
+          <text>B</text>
+        </name>
+      </transition>
+      <transition id="owned-transition-2">
+        <name>
+          <text>C</text>
+        </name>
+      </transition>
+      <arc id="a0" source="p0" target="owned-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a1" source="owned-transition-0" target="choice">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a2" source="choice" target="owned-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a3" source="owned-transition-1" target="p2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a4" source="choice" target="owned-transition-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a5" source="owned-transition-2" target="p2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="p2">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedOriginalModelDecisionFeature60
+Content-Disposition: form-data; name="log"; filename="owned-original-decision.xes"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0">
+  <trace>
+    <string key="concept:name" value="original-case-0" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:00Z" />
+      <string key="amount" value="10" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-1" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:02Z" />
+      <string key="amount" value="11" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:03Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-2" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:04Z" />
+      <string key="amount" value="12" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:05Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-3" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:06Z" />
+      <string key="amount" value="13" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:07Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-4" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:08Z" />
+      <string key="amount" value="14" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:09Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-5" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:10Z" />
+      <string key="amount" value="15" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:11Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-6" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:12Z" />
+      <string key="amount" value="16" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:13Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-7" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:14Z" />
+      <string key="amount" value="17" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:15Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-8" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:16Z" />
+      <string key="amount" value="18" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:17Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-9" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:18Z" />
+      <string key="amount" value="19" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:19Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-10" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:20Z" />
+      <string key="amount" value="20" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:21Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-11" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:22Z" />
+      <string key="amount" value="21" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:23Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-12" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:24Z" />
+      <string key="amount" value="102" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:25Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-13" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:26Z" />
+      <string key="amount" value="103" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:27Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-14" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:28Z" />
+      <string key="amount" value="104" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:29Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-15" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:30Z" />
+      <string key="amount" value="105" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:31Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-16" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:32Z" />
+      <string key="amount" value="106" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:33Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-17" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:34Z" />
+      <string key="amount" value="107" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:35Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-18" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:36Z" />
+      <string key="amount" value="108" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:37Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-19" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:38Z" />
+      <string key="amount" value="109" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:39Z" />
+    </event>
+  </trace>
+</log>
+--OwnedOriginalModelDecisionFeature60--
