@@ -1,0 +1,1 @@
+{"traces":[{"case_id":"same","events":[{"activity":"B"},{"activity":"A"}]},{"case_id":"same","events":[{"activity":"A"}]},{"case_id":"","events":[]},{"case_id":"same","events":[{"activity":"A"}]}],"attributes":[{"key":"origin","value":"kept"}],"metadata":{"properties":[{"key":"unused","value":"derive ignores me"}]}}

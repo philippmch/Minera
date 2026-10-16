@@ -28,10 +28,11 @@ interface LandingProps {
   onOriginalFootprints?: () => void;
   onOriginalGeneticMatrix?: () => void;
   onOriginalEmbeddingFilter?: () => void;
+  onOriginalEmd?: () => void;
   onActiveSource?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onActiveSource }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onActiveSource }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -98,6 +99,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onOriginalFootprints && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalFootprints}>Compare original Footprints or use independent diagnostics and projections</button>}
         {onOriginalGeneticMatrix && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalGeneticMatrix}>Convert an original genetic causal matrix to a Petri net</button>}
         {onOriginalEmbeddingFilter && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalEmbeddingFilter}>Filter or embed original logs and literal text</button>}
+        {onOriginalEmd && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalEmd}>Compare original weighted stochastic languages</button>}
         {onActiveSource && <button className="landing-sample reveal" disabled={mining} onClick={onActiveSource}>Open and inspect a native mining source</button>}
 
         <div className="landing-steps reveal">

@@ -1,0 +1,21 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+distance_pair
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="left_file"; filename="owned-stored-total-6.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["A"],"weight":1.0}],"total_mass":"-INF"}
+
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="right_file"; filename="owned-unit-B.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["B"],"weight":1.0}],"total_mass":-99}
+
+--OwnedOriginalFootprintsFeature66--

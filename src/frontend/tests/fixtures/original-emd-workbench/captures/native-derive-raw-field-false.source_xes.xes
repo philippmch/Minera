@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Original EMD source"/>
+  <trace>
+    <string key="concept:name" value="same"/>
+    <event>
+      <string key="concept:name" value="RAW"/>
+      <string key="concept:name" value="GENERIC"/>
+    </event>
+  </trace>
+</log>

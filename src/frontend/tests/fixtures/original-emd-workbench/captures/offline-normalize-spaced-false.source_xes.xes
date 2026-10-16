@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Original EMD source"/>
+  <string key="origin" value="kept"/>
+  <trace>
+    <string key="concept:name" value="same"/>
+    <event>
+      <string key="concept:name" value="B"/>
+    </event>
+    <event>
+      <string key="concept:name" value="A"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="same"/>
+    <event>
+      <string key="concept:name" value="A"/>
+    </event>
+  </trace>
+  <trace>
+  </trace>
+  <trace>
+    <string key="concept:name" value="same"/>
+    <event>
+      <string key="concept:name" value="A"/>
+    </event>
+  </trace>
+</log>

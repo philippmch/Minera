@@ -1,0 +1,21 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+evaluate_pair
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="options_json"
+
+{"normalize_masses":false,"strict_equal_mass":true,"variant":1,"use_fast_emd":true}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="left_file"; filename="owned-mass-two.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["A"],"weight":2.0}],"total_mass":1.0}
+
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="right_file"; filename="owned-unit-B.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"activities":["B"],"weight":1.0}],"total_mass":-99}
+
+--OwnedOriginalFootprintsFeature66--

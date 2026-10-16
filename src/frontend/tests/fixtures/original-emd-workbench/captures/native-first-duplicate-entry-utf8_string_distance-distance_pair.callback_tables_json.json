@@ -1,0 +1,1 @@
+{"distance":null,"encoded_distance":null,"string_distance":null,"utf8_string_distance":{"entries":[{"left":"\u0001","right":"\u0001","outcome":{"value":0.25}},{"left":"\u0001","right":"\u0001","outcome":{"value":-100.0}}],"fallback":{"throw":"unused fallback"}}}

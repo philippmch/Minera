@@ -1,0 +1,21 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+distance_pair
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="left_file"; filename="owned-object-defaults.language.json"
+Content-Type: application/octet-stream
+
+{}
+
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="right_file"; filename="owned-empty.language.json"
+Content-Type: application/octet-stream
+
+{"traces":[],"total_mass":"NaN"}
+
+--OwnedOriginalFootprintsFeature66--

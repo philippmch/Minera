@@ -1,0 +1,1 @@
+{"distance":{"entries":[{"left":["x"],"right":["u"],"outcome":{"value":0.0}},{"left":["x"],"right":["v"],"outcome":{"value":1.0}},{"left":["y"],"right":["u"],"outcome":{"value":1.0}}],"fallback":{"value":100.0}},"encoded_distance":null,"string_distance":null,"utf8_string_distance":null}

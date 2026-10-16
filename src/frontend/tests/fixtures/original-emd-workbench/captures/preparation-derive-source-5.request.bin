@@ -1,0 +1,14 @@
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="operation"
+
+derive_original_log
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="normalize"
+
+false
+--OwnedOriginalFootprintsFeature66
+Content-Disposition: form-data; name="source_file"; filename="owned-invalid-derive-source-5.json"
+Content-Type: application/octet-stream
+
+{"native_byte_strings":"hex-v0","value":{}}
+--OwnedOriginalFootprintsFeature66--
