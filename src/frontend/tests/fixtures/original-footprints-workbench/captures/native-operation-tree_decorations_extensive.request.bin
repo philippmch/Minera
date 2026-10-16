@@ -1,0 +1,21 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+tree_decorations_extensive
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="tree_format"
+
+auto
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-arbitrary-extensive.json"
+Content-Type: application/octet-stream
+
+{"footprints":[{"source":"unknown","target":"target"},{"source":"unknown","target":"target"}],"start_activities":["Z","Z","A"],"end_activities":["missing"],"activities_always_happening":["inactive"],"min_length_fit":false,"is_footprints_fit":true,"is_fit":false}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="tree_file"; filename="owned-original-tree.tree.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B"],"root":{"op":"SEQUENCE","op_index":2,"activity":18446744073709551615,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]}]}}
+
+--OwnedOriginalFootprintsFeature63--

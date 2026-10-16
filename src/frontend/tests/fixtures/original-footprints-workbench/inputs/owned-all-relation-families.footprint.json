@@ -1,0 +1,1 @@
+{"sequence":[{"source":"A","target":"B"},{"source":"A","target":"B"}],"parallel":[{"source":"A","target":"B"},{"source":"B","target":"A"}],"atomic_interleaving":[{"source":"C","target":"D"},{"source":"C","target":"D"}]}

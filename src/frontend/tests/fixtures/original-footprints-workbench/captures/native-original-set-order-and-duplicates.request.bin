@@ -1,0 +1,15 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+project
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-all-relation-families.footprint.json"
+Content-Type: application/octet-stream
+
+{"sequence":[{"source":"A","target":"B"},{"source":"A","target":"B"}],"parallel":[{"source":"A","target":"B"},{"source":"B","target":"A"}],"atomic_interleaving":[{"source":"C","target":"D"},{"source":"C","target":"D"}]}
+
+--OwnedOriginalFootprintsFeature63--

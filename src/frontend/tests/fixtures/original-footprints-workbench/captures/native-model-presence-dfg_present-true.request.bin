@@ -1,0 +1,25 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+log_extensive
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="include_metrics"
+
+false
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="model_file"; filename="owned-model-dfg_presentTrue.json"
+Content-Type: application/octet-stream
+
+{"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["A"],"end_activities":["B"],"min_trace_length":2,"activities_always_happening":["A","B"],"dfg_present":true}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-observed-dfg_presentTrue.json"
+Content-Type: application/octet-stream
+
+{"dfg":[{"source":"A","target":"B","count":5}],"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["outside"],"end_activities":["outside"],"min_trace_length":0,"trace":["A","B"],"dfg_present":true}
+
+--OwnedOriginalFootprintsFeature63--

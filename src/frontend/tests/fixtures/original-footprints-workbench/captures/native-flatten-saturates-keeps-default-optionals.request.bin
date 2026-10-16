@@ -1,0 +1,15 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+flatten
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-saturating-footprints.json"
+Content-Type: application/octet-stream
+
+[{"dfg":[{"source":"A","target":"B","count":18446744073709551615}],"sequence":[{"source":"A","target":"B"}],"trace":["keep-raw"],"min_trace_length":18446744073709551615,"min_trace_length_present":false,"skippable":true},{"dfg":[{"source":"A","target":"B","count":9}],"parallel":[{"source":"A","target":"B"}],"trace":[],"activities_always_happening":[]}]
+
+--OwnedOriginalFootprintsFeature63--

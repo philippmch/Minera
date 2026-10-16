@@ -1,0 +1,26 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+diagnostics_log_model
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="diagnostics_options_json"
+
+{}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-original-violations-vector.json"
+Content-Type: application/octet-stream
+
+[[{"source":"A","target":"B"},{"source":"A","target":"B"}],[{"source":"","target":""}]]
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="source_file"; filename="owned-raw-case-repeated-intrinsic-ids.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"same","case_id_state_index":1},{"case_id":"same","case_id_state_index":1}]}
+
+--OwnedOriginalFootprintsFeature63--

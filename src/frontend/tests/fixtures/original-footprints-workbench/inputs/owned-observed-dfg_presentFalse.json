@@ -1,0 +1,1 @@
+{"dfg":[{"source":"A","target":"B","count":5}],"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["outside"],"end_activities":["outside"],"min_trace_length":0,"trace":["A","B"],"dfg_present":false}

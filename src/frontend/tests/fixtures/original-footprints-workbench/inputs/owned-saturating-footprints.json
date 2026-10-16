@@ -1,0 +1,1 @@
+[{"dfg":[{"source":"A","target":"B","count":18446744073709551615}],"sequence":[{"source":"A","target":"B"}],"trace":["keep-raw"],"min_trace_length":18446744073709551615,"min_trace_length_present":false,"skippable":true},{"dfg":[{"source":"A","target":"B","count":9}],"parallel":[{"source":"A","target":"B"}],"trace":[],"activities_always_happening":[]}]

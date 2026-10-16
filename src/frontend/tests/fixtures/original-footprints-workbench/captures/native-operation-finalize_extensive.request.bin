@@ -1,0 +1,11 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+finalize_extensive
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-arbitrary-extensive.json"
+Content-Type: application/octet-stream
+
+{"footprints":[{"source":"unknown","target":"target"},{"source":"unknown","target":"target"}],"start_activities":["Z","Z","A"],"end_activities":["missing"],"activities_always_happening":["inactive"],"min_length_fit":false,"is_footprints_fit":true,"is_fit":false}
+
+--OwnedOriginalFootprintsFeature63--

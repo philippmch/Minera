@@ -1,0 +1,1 @@
+{"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["A"],"end_activities":["B"],"min_trace_length":2,"activities_always_happening":["A","B"],"min_trace_length_present":false}

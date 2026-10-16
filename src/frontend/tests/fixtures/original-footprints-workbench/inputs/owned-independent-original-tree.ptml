@@ -1,0 +1,1 @@
+<?xml version="1.0"?><ptml><processTree id="owned" name="original" root="n0"><sequence id="n0" name=""/><manualTask id="n1" name="A"/><manualTask id="n2" name="B"/><manualTask id="n3" name="A"/><parentsNode id="e0" sourceId="n0" targetId="n1"/><parentsNode id="e1" sourceId="n0" targetId="n2"/><parentsNode id="e2" sourceId="n0" targetId="n3"/></processTree></ptml>

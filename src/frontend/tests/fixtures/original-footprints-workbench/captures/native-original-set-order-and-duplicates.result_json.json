@@ -1,0 +1,1 @@
+{"relations":[{"source":"A","target":"B"},{"source":"B","target":"A"},{"source":"C","target":"D"}],"activities":["A","B","C","D"],"start_activities":[],"end_activities":[]}

@@ -1,0 +1,27 @@
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="operation"
+
+fitness_traces
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_mode"
+
+exact
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="model_file"; filename="owned-normative.footprint.json"
+Content-Type: application/octet-stream
+
+{"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["A"],"end_activities":["B"],"min_trace_length":2,"activities_always_happening":["A","B"]}
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="observed_file"; filename="owned-observed-vector.json"
+Content-Type: application/octet-stream
+
+[{"dfg":[{"source":"A","target":"B","count":5}],"sequence":[{"source":"A","target":"B"}],"activities":["A","B"],"start_activities":["A"],"end_activities":["B"],"min_trace_length":2,"trace":["A","B"]},{}]
+
+--OwnedOriginalFootprintsFeature63
+Content-Disposition: form-data; name="conformance_file"; filename="owned-one-extensive-vector.json"
+Content-Type: application/octet-stream
+
+[{"footprints":[{"source":"unknown","target":"target"},{"source":"unknown","target":"target"}],"start_activities":["Z","Z","A"],"end_activities":["missing"],"activities_always_happening":["inactive"],"min_length_fit":false,"is_footprints_fit":true,"is_fit":false}]
+
+--OwnedOriginalFootprintsFeature63--
