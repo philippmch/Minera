@@ -88,6 +88,8 @@
 #include "minera/declare_workbench_json.hpp"
 #include "minera/log_skeleton_workbench_json.hpp"
 #include "minera/footprints_workbench_json.hpp"
+#include "minera/genetic_matrix_workbench_json.hpp"
+#include "minera/genetic_matrix_conversion.hpp"
 #include "../footprints/conformance_log_model.hpp"
 #include "../footprints/conformance_log_extensive.hpp"
 #include "../footprints/conformance_trace_extensive.hpp"
@@ -4037,6 +4039,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_declare_route.hpp"
 #include "original_log_skeleton_route.hpp"
 #include "original_footprints_route.hpp"
+#include "original_genetic_matrix_route.hpp"
 
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
@@ -10581,6 +10584,7 @@ int main(int argc, char** argv) {
   server.Post("/api/declare-workbench", handle_original_declare_workbench);
   server.Post("/api/log-skeleton-workbench", handle_original_log_skeleton_workbench);
   server.Post("/api/footprints-workbench", handle_original_footprints_workbench);
+  server.Post("/api/genetic-matrix-workbench", handle_original_genetic_matrix_workbench);
   server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/discover-timing", handle_timing_discovery);
