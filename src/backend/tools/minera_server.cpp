@@ -92,6 +92,7 @@
 #include "minera/embedding_workbench_json.hpp"
 #include "minera/emd_workbench_json.hpp"
 #include "minera/object_centric_playout_workbench_json.hpp"
+#include "minera/literal_controls_json.hpp"
 #include "minera/genetic_matrix_conversion.hpp"
 #include "../footprints/conformance_log_model.hpp"
 #include "../footprints/conformance_log_extensive.hpp"
@@ -4049,11 +4050,14 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_emd_route.hpp"
 #include "original_object_centric_playout_route.hpp"
 
+bool handle_literal_controls_request(const httplib::Request&, httplib::Response&, std::string_view);
+
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
 // not accept uploads or perform any implicit re-importing.
 void handle_ilp_mine(const httplib::Request& request,
                      httplib::Response& response) {
+  if (handle_literal_controls_request(request, response, "ilp")) return;
   try {
     std::shared_ptr<const MinedSession> session;
     {
@@ -6434,8 +6438,11 @@ std::string transformation_json(const MinedSession& session,
   return body;
 }
 
+#include "literal_controls_route.hpp"
+
 void handle_log_to_target(const httplib::Request& request,
                           httplib::Response& response) {
+  if (handle_literal_controls_request(request, response, "target")) return;
   try {
     std::shared_ptr<const MinedSession> session;
     {
@@ -6480,6 +6487,7 @@ void handle_log_to_target(const httplib::Request& request,
 
 void handle_log_to_features(const httplib::Request& request,
                             httplib::Response& response) {
+  if (handle_literal_controls_request(request, response, "features")) return;
   try {
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
@@ -9658,6 +9666,7 @@ void handle_dfg_import(const httplib::Request& request,
 
 void handle_dfg_precision(const httplib::Request& request,
                           httplib::Response& response) {
+  if (handle_literal_controls_request(request, response, "dfg_precision")) return;
   std::shared_ptr<const MinedSession> session;
   {
     std::lock_guard<std::mutex> lock(g_session_mutex);
