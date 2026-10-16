@@ -1,0 +1,20 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+dfg_result
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"variant":"performance","traces":2,"max_events_per_trace":3}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_format"
+
+dfg_json
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-declared-literal-wtf.dfg.json"
+Content-Type: application/octet-stream
+
+{"frequency":[{"source":"  \u6771\u4eac\ud800\u0000","target":"\ud83d\ude00\nB","count":1}],"start_activities":[{"activity":"  \u6771\u4eac\ud800\u0000","count":1}],"end_activities":[{"activity":"\ud83d\ude00\nB","count":1}],"performance":[]}
+
+--OwnedOriginalModelPlayoutFeature59--

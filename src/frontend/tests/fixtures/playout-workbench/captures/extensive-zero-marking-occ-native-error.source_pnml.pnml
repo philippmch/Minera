@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>Original playout model</text></name>
+    <page id="page1">
+      <place id="owned-source">
+        <name><text>owned-source</text></name>
+        <initialMarking><text>1</text></initialMarking>
+      </place>
+      <place id="owned-sink">
+        <name><text>owned-sink</text></name>
+      </place>
+      <transition id="owned-transition-0">
+        <name><text>A</text></name>
+      </transition>
+      <transition id="owned-transition-1">
+        <name><text>B</text></name>
+      </transition>
+      <arc id="a0" source="owned-source" target="owned-transition-0"/>
+      <arc id="a1" source="owned-transition-0" target="owned-source"/>
+      <arc id="a2" source="owned-source" target="owned-transition-1"/>
+      <arc id="a3" source="owned-transition-1" target="owned-sink"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="owned-sink"><text>1</text></place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>

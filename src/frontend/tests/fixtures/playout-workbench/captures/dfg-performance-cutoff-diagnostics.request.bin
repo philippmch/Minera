@@ -1,0 +1,20 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+dfg_result
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"variant":"performance","traces":3,"max_events_per_trace":2}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_format"
+
+dfg_json
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-declared-loop-no-end.dfg.json"
+Content-Type: application/octet-stream
+
+{"frequency":[{"source":"A","target":"A","count":1}],"start_activities":[{"activity":"A","count":1}],"end_activities":[],"performance":[]}
+
+--OwnedOriginalModelPlayoutFeature59--

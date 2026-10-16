@@ -632,7 +632,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_independent_original_model_playout_workbench_available",
       "package": "algo.simulation.playout.dfg",
       "parity_status": "complete",
       "selectors": [
@@ -657,7 +657,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_independent_original_model_playout_workbench_available",
       "package": "algo.simulation.playout.petri_net",
       "parity_status": "complete",
       "selectors": [
@@ -667,7 +667,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "native_independent_original_model_playout_workbench_available",
       "package": "algo.simulation.playout.process_tree",
       "parity_status": "complete",
       "selectors": [
@@ -2919,6 +2919,47 @@
       ],
       "validation": "docs/feature-first-monte-carlo-workbench-validation.json",
       "browser_validation_complete": false
+    },
+    {
+      "id": "native_independent_original_model_playout_workbench",
+      "state": "original_pnml_declared_dfg_original_tree_all_native_playout_operations_and_complete_results_available",
+      "families": [
+        "algo.simulation.playout.petri_net",
+        "algo.simulation.playout.dfg",
+        "algo.simulation.playout.process_tree"
+      ],
+      "supporting_native_surfaces": [
+        "PlayoutOptions",
+        "StochasticPlayoutOptions",
+        "ExtensivePlayoutOptions",
+        "DfgPlayoutOptions",
+        "ProcessTreePlayoutOptions",
+        "PlayoutVisitedResult",
+        "DfgPlayoutResult",
+        "ProcessTreePlayoutResult",
+        "DfgPlayoutInput",
+        "PnmlDocument",
+        "ActiveEventSource"
+      ],
+      "entry_points": [
+        "include/minera/playout_workbench_json.hpp",
+        "include/minera/dfg_playout_input_json.hpp",
+        "src/backend/playout_workbench_json.cpp",
+        "src/backend/dfg_playout_input_json.cpp",
+        "src/backend/tools/playout_route.hpp",
+        "src/frontend/src/playout-workbench.ts",
+        "src/frontend/src/components/PlayoutWorkspace.tsx"
+      ],
+      "added": [
+        "Independent original-model playout exposes 13 exact public operations: Petri basic, stochastic and extensive logs or visited paths; stochastic log-informed log/visited overloads; fitted transition weights; declared DFG result or log; and original process-tree result or log. Requests own their original PNML, declared DFG JSON/classic text, or PTML/complete constructor-tree JSON and do not read or change the cached mined session.",
+        "All 69 fields in the five native option structs retain supplied-member presence, native defaults, exact size_t/uint64/uint32 tokens, IEEE double tags, negative zero, raw enum indexes, optional occurrence bounds and literal strings. DFG max_steps remains an independent stored compatibility field rather than replacing max_events_per_trace. Native semantic errors remain observable.",
+        "Five PNML import controls preserve the full original document. Only omitted marking vectors receive checked uint32 PNML defaults; explicit empty vectors retain native source/sink semantics. Declared DFG frequency/start/end maps preserve zero entries and full uint64 counts, with null/engaged-empty performance maps and complete summary/raw/value-variant state. Constructor trees preserve every node field and latent index before native validation.",
+        "Original CSV/TSV/XES/gzip XES/complete typed-table fitting sources expose full CSV/XES import controls and literal selectors. Original/checked tables, full original/prepared native logs, preparation errors and exact bytes are retained; compressed bytes use reversible hex transport. Source-log overloads execute directly, while fitted_weights is populated only when the public fit-weights call actually returns.",
+        "Complete native results preserve every stored field: full raw logs, all visited element kinds/raw indexes/markings/transition indexes including inactive payloads, visitation bounds, DFG variant counts and completeness diagnostics, and tree trace_strings/truncated. Visited and log operations execute separately because exhaustive visited paths can differ from deduplicated visible-word logs. Process-tree return_set_strings is accepted only for extensive playout.",
+        "The independent application exposes model/source ownership and cancellation guards, 13 operation choices, all native options and import settings, full inspection, exact raw/request/report/CSV/selected-record downloads, original model/source files, guarded same-run PNML/PTML/DFG/source-XES/generated-XES exports and generated-log reopening. Native successful results survive supplemental export failure. Own native suites, dedicated API captures, full captured-response export verification, byte-identical portable fixtures, and the final full frontend/production build support this delivery."
+      ],
+      "validation": "docs/feature-first-playout-workbench-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -2936,7 +2977,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. Independent Inductive discovery now exposes original event adapters, compact exact weighted variants and declared DFG constructor inputs with complete native preparation/tree/options/net/export inspection. Independent process-tree alignment now exposes original PTML/full constructor models, original checked logs/traces/tables/word-to-EventLog conversion, every native option/result field and independent model exports. Independent PNML anti/multi alignment now exposes original supplied models and checked inputs, exact full native options/results/metadata and exports. Independent POWL model conversions and original-PNML reduction now expose all five public converters and complete native reduction controls/results. The next confirmed input-surface gaps from the bounded whole-catalogue audit are complete native typed tables as active sources, independently supplied-model Monte Carlo including net-only execution, and original-model Petri/DFG/process-tree playout with native controls. Continue feature-first review across the whole catalogue; the whole feature audit remains incomplete and every strict parity gate remains open. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence. Feature57 now delivers owned complete typed active sources and actual native shape dispatch, with source-only queries and seven independent workbench reuse paths. Continue with independent original-model Monte Carlo and original-model Petri, DFG and process-tree playout; native Table BOSE and strict behavioral gates remain open. Feature58 now delivers independent original-model Monte Carlo with true net-only execution, public fitting and complete native options/results. Next deliver original-model Petri/DFG/process-tree playout from the prepared own-source contract; continue the full catalogue and every strict gate."
+      "next_action": "Continue feature-first review of remaining conformance controls/input adapters, algorithms, transformations, simulations, conversions and I/O. Model quality now exposes all four native cached-log input shapes, case/activity projection, caps, supplied PNML marking preservation and complete source/input/metric diagnostics. Preserve the complete catalogue and every strict default/type/error/ordering/Unicode/solver/marking/concurrency/performance gate. Independent original-input token replay now exposes both native directions, four shapes, full forward results, declared empty CSV defaults and complete diagnostics; continue review of the remaining replay/alignment controls and input contracts. Independent original-input Petri alignment now exposes six native variants, four shapes, costs, markings and complete diagnostics. Organizational roles/profiles/group diagnostics/attribute networks now have complete native app controls; their remaining browser scenarios are explicitly tracked in the validation record. Independent Alpha/Heuristic discovery now accepts original event shapes, complete typed tables, direct CLASSIC graphs and mutable PLUSPLUS pandas, with full native snapshots. Continue feature-first review of the whole catalogue; independent DFG/decomposed alignment now has supplied models, original checked logs/typed tables/trace words, full native options and complete projection/export inspection. Continue read-only feature-first review across the whole catalogue. Independent Inductive discovery now exposes original event adapters, compact exact weighted variants and declared DFG constructor inputs with complete native preparation/tree/options/net/export inspection. Independent process-tree alignment now exposes original PTML/full constructor models, original checked logs/traces/tables/word-to-EventLog conversion, every native option/result field and independent model exports. Independent PNML anti/multi alignment now exposes original supplied models and checked inputs, exact full native options/results/metadata and exports. Independent POWL model conversions and original-PNML reduction now expose all five public converters and complete native reduction controls/results. The next confirmed input-surface gaps from the bounded whole-catalogue audit are complete native typed tables as active sources, independently supplied-model Monte Carlo including net-only execution, and original-model Petri/DFG/process-tree playout with native controls. Continue feature-first review across the whole catalogue; the whole feature audit remains incomplete and every strict parity gate remains open. Existing native algorithms and cached controls remain delivered; partial parity statuses do not imply their absence. Feature57 now delivers owned complete typed active sources and actual native shape dispatch, with source-only queries and seven independent workbench reuse paths. Continue with independent original-model Monte Carlo and original-model Petri, DFG and process-tree playout; native Table BOSE and strict behavioral gates remain open. Feature58 now delivers independent original-model Monte Carlo with true net-only execution, public fitting and complete native options/results. Next deliver original-model Petri/DFG/process-tree playout from the prepared own-source contract; continue the full catalogue and every strict gate. Feature59 now delivers all independent original-model Petri/DFG/process-tree playout operations, exact native options and complete results. Next deliver independent original-PNML decision mining/tables/guarded nets from the bounded Feature60 audit; continue the complete catalogue and all strict gates."
     }
   ],
   "feature_status_meaning": {
@@ -2965,7 +3006,8 @@
     "native_independent_inductive_input_discovery_available": "Independent Inductive IM/IMF/IMD event shapes, compact exact weighted variants, declared native DFG inputs and complete tree/options/prepared-source/net/inspection/downloads have own-source validation. Browser verification and strict reference parity remain separate gates.",
     "native_independent_process_tree_alignment_available": "Independent original PTML/full-constructor process-tree models and checked original logs/traces/tables/explicit word-to-EventLog conversion expose all four existing native variants, complete options/results/diagnostics/models and inspection/downloads with own-source validation. Browser verification and strict reference parity remain separate gates.",
     "native_independent_petri_anti_multi_alignment_available": "Independent supplied PNML and original checked logs/traces/tables/explicit word-to-EventLog conversion expose both existing native anti/multi discounted searches, all actual options/results/markings/import controls and complete native PNML/net metadata with own-source inspection/download validation. Browser verification and strict reference parity remain separate gates.",
-    "native_independent_monte_carlo_workbench_available": "Independent supplied PNML net-only/log-informed simulation and public fitting expose complete native options, original sources, full stored results and exact inspection/downloads. Own native/API/export/frontend validation exists; browser verification and all strict reference parity gates remain separate."
+    "native_independent_monte_carlo_workbench_available": "Independent supplied PNML net-only/log-informed simulation and public fitting expose complete native options, original sources, full stored results and exact inspection/downloads. Own native/API/export/frontend validation exists; browser verification and all strict reference parity gates remain separate.",
+    "native_independent_original_model_playout_workbench_available": "Independent original PNML basic/stochastic/extensive, declared DFG classic/performance, and original process-tree basic/extensive/top-bottom playout expose complete options, actual native logs/results/visited paths and exact inspection/downloads. Native/API/export/frontend checks exist; browser and strict reference parity remain separate."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

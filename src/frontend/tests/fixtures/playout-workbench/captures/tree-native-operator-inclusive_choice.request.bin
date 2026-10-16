@@ -1,0 +1,20 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+tree_result
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"variant":"extensive","max_length":4,"min_length":0,"max_traces":12,"return_set_strings":true}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-operator-inclusive_choice.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B","unused","A"],"root":{"op":"INCLUSIVE_CHOICE","op_index":4,"activity":18446744073709551615,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]}]}}
+
+--OwnedOriginalModelPlayoutFeature59--

@@ -1,0 +1,20 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+dfg_result
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"variant":"performance","max_variants":4,"min_weighted_probability":0.75,"max_occurrences_per_activity":3,"interrupt_when_dfg_complete":true,"add_trace_if_takes_new_edges":true,"max_execution_time_ms":0,"return_variants":true,"return_only_if_complete":false,"min_variant_occurrences":1,"traces":2,"case_arrival_rate":2,"seed":18446744073709551615,"max_events_per_trace":3,"start_time":"1970-01-01T00:00:00Z","activity_key":" task \ud800\u0000 ","timestamp_key":" stamp \udfff\u0000 ","case_id_key":" case \u6771\u4eac\u0000 ","artificial_start_activity":"\u25b6","artificial_end_activity":"\u25b6","max_steps":18446744073709551615}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_format"
+
+dfg_json
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-declared-performance.dfg.json"
+Content-Type: application/octet-stream
+
+{"frequency":[{"source":"A","target":"B","count":1}],"start_activities":[{"activity":"A","count":1}],"end_activities":[{"activity":"B","count":1}],"performance":[{"source":"A","target":"B","statistics":{"summary":{"count":18446744073709551615,"mean":9,"median":"NaN","minimum":"-INF","maximum":"INF","standard_deviation":-0.0,"sum":-9},"raw_values":[1,2],"value":{"index":0,"value":5}}}]}
+
+--OwnedOriginalModelPlayoutFeature59--

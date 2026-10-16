@@ -1,0 +1,71 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+petri_extensive_log
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"max_length":2,"max_traces":8,"max_states":100,"max_marking_occ":null}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-playout-loop.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-monte-carlo-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="owned-source">
+        <name>
+          <text>Original owned-source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="owned-sink">
+        <name>
+          <text>Original owned-sink</text>
+        </name>
+      </place>
+      <transition id="owned-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <transition id="owned-transition-1">
+        <name>
+          <text>B</text>
+        </name>
+      </transition>
+      <arc id="a0" source="owned-source" target="owned-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a1" source="owned-transition-0" target="owned-source">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a2" source="owned-source" target="owned-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a3" source="owned-transition-1" target="owned-sink">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="owned-sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedOriginalModelPlayoutFeature59--

@@ -1,0 +1,5 @@
+case_id,activity,timestamp,resource,lifecycle
+a,A,2026-01-01T00:00:00Z,r1,complete
+b,A,2026-01-01T00:00:01Z,r2,complete
+c,A,2026-01-01T00:00:02Z,r3,complete
+d,B,2026-01-01T00:00:03Z,r4,complete

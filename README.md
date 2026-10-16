@@ -2610,3 +2610,36 @@ Native errors retain the imported model and any available prepared source or
 fitted options. The compatibility execution-time setting is not a wall-clock
 timeout. Browser verification and strict reference parity remain separate gates;
 see `docs/feature-first-monte-carlo-workbench-validation.json`.
+
+### Play out original Petri nets, DFGs and process trees
+
+Open **Original-model playout** from the landing page or workspace toolbar.
+Upload PNML for basic, stochastic or extensive Petri playout, a declared DFG JSON
+or classic `.dfg` file, or an original PTML/full constructor tree. The workbench
+exposes 13 separate native operations and all 69 fields across their five option
+types. Log-only and visited-element operations remain separate public calls;
+extensive visited search can retain paths that ordinary log enumeration merges.
+
+Stochastic Petri playout can fit from an independent original CSV/TSV/XES/gzip XES
+or typed-table source, or return fitted weights without generating a log.
+Explicit nonempty weights retain native precedence. Omitted Petri markings use
+the imported document; explicit empty vectors keep native source/sink defaults.
+Original source reuse, five PNML import controls and literal source selectors are
+available without changing the cached mining session.
+
+Declared DFGs retain exact edge/boundary counts and optional full performance
+records, including null versus empty maps. Performance scalar/vector/summary
+selection determines the mean of native exponential timing draws; case arrival
+spacing remains deterministic. The stored DFG `max_steps` compatibility field
+does not replace `max_events_per_trace`, and a zero execution-time limit remains
+zero. Tree playout exposes basic, extensive and top-bottom strategies;
+`return_set_strings` requires extensive mode. Native defaults remain unchanged.
+
+Inspect all original models, supplied/configured options, full generated logs,
+visited markings/transitions, variant counts, word sets and actual native
+diagnostics or errors. Download original bytes, exact requests, raw JSON,
+reports, every table/selected record and the available same-run PNML/PTML/DFG/XES
+artifacts. Generated XES can reopen as an active source. Supplemental export
+failures retain the original model and native result. Browser validation and
+strict reference parity remain separate gates; see
+`docs/feature-first-playout-workbench-validation.json`.

@@ -1,0 +1,10 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+petri_basic_log
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"traces":2,"max_steps":8}
+
+--OwnedOriginalModelPlayoutFeature59--

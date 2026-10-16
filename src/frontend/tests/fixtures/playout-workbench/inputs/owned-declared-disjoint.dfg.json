@@ -1,0 +1,1 @@
+{"frequency":[{"source":"A","target":"B","count":1},{"source":"X","target":"Y","count":1}],"start_activities":[{"activity":"A","count":1}],"end_activities":[{"activity":"B","count":1}],"performance":null}

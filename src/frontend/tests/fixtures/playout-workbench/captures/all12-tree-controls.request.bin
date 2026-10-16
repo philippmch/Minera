@@ -1,0 +1,20 @@
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="operation"
+
+tree_result
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="options_json"
+
+{"variant":"extensive","traces":2,"max_steps":3,"seed":18446744073709551615,"max_length":3,"min_length":0,"max_traces":4,"max_loop_occurrences":2,"start":-1,"case_interval":2,"event_interval":3,"return_set_strings":true}
+
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_format"
+
+tree_json
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="model_file"; filename="owned-original-sequence.tree.json"
+Content-Type: application/octet-stream
+
+{"activities":["A","B"],"root":{"op":"SEQUENCE","op_index":2,"activity":0,"children":[{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]},{"op":"ACTIVITY","op_index":0,"activity":1,"children":[]}]}}
+
+--OwnedOriginalModelPlayoutFeature59--
