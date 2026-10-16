@@ -24,10 +24,11 @@ interface LandingProps {
   onPlayout?: () => void;
   onOriginalDecision?: () => void;
   onOriginalDeclare?: () => void;
+  onOriginalLogSkeleton?: () => void;
   onActiveSource?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onActiveSource }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onActiveSource }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -90,6 +91,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onPlayout && <button className="landing-sample reveal" disabled={mining} onClick={onPlayout}>Generate a log from an original Petri, DFG or tree model</button>}
         {onOriginalDecision && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalDecision}>Learn decisions from an original PNML model and event source</button>}
         {onOriginalDeclare && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalDeclare}>Check or play out an original Declare model</button>}
+        {onOriginalLogSkeleton && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalLogSkeleton}>Check an original LogSkeleton model or diagnose supplied results</button>}
         {onActiveSource && <button className="landing-sample reveal" disabled={mining} onClick={onActiveSource}>Open and inspect a native mining source</button>}
 
         <div className="landing-steps reveal">

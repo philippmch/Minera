@@ -1,0 +1,1 @@
+{"equivalence":[],"always_after":[],"always_before":[],"never_together":[{"source":"A","target":"B"},{"source":"A","target":"B"},{"source":"absent-source","target":"not-counted"}],"directly_follows":[],"activ_freq":{}}

@@ -68,6 +68,7 @@ import { MonteCarloWorkspace } from "./components/MonteCarloWorkspace";
 import { PlayoutWorkspace } from "./components/PlayoutWorkspace";
 import { OriginalDecisionWorkspace } from "./components/OriginalDecisionWorkspace";
 import { OriginalDeclareWorkspace } from "./components/OriginalDeclareWorkspace";
+import { OriginalLogSkeletonWorkspace } from "./components/OriginalLogSkeletonWorkspace";
 import {ActiveMiningSource} from "./components/ActiveMiningSource";
 import {activeDatasetAnalysis, activeMiningSourceText, assertMiningSourceBinding, cancelMiningRequest, classifyMiningJson, isActiveSourceMining, miningSourceDescriptor, miningSourceHash, miningSourceOptions, MiningSourceRequestGate, suggestMiningSourceForm, type ActiveMiningSourceDescriptor, type ActiveSourceMining} from "./active-mining-source";
 import { requestLogQuerySchema } from "./log-query";
@@ -146,6 +147,7 @@ export default function App() {
   const [showPlayout, setShowPlayout] = useState(false);
   const [showOriginalDecision, setShowOriginalDecision] = useState(false);
   const [showOriginalDeclare, setShowOriginalDeclare] = useState(false);
+  const [showOriginalLogSkeleton, setShowOriginalLogSkeleton] = useState(false);
   const [showActiveSource, setShowActiveSource] = useState(false);
   const [pendingSourceFile, setPendingSourceFile] = useState<File | null>(null);
   const [sourceOutcome, setSourceOutcome] = useState<ActiveSourceMining | null>(null);
@@ -429,6 +431,7 @@ export default function App() {
     setShowPlayout(false);
     setShowOriginalDecision(false);
     setShowOriginalDeclare(false);
+    setShowOriginalLogSkeleton(false);
     setShowActiveSource(false);
     setPendingSourceFile(file);
     const {ticket, controller} = beginSourceLoad();
@@ -642,6 +645,7 @@ export default function App() {
     [data, selectedVariant],
   );
 
+  if (showOriginalLogSkeleton) return <><TopBar dataset={data?.dataset??ocelDataset??'Original LogSkeleton model'} datasetKind="independent original-model LogSkeleton conformance and diagnostics" onOpenFile={loadFile} onHome={()=>setShowOriginalLogSkeleton(false)}/><main className="layout-log original-log-skeleton-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalLogSkeleton(false)}>Return to current workspace</button><OriginalLogSkeletonWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
   if (showOriginalDeclare) return <><TopBar dataset={data?.dataset??ocelDataset??'Original Declare model'} datasetKind="independent original-model Declare conformance and playout" onOpenFile={loadFile} onHome={()=>setShowOriginalDeclare(false)}/><main className="layout-log original-declare-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalDeclare(false)}>Return to current workspace</button><OriginalDeclareWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
   if (showOriginalDecision) return <><TopBar dataset={data?.dataset??ocelDataset??'Original-model decisions'} datasetKind="independent original-PNML decision mining" onOpenFile={loadFile} onHome={()=>setShowOriginalDecision(false)}/><main className="layout-log original-decision-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalDecision(false)}>Return to current workspace</button><OriginalDecisionWorkspace file={source?.file??null} source={source}/></main></>;
   if (showPlayout) return <><TopBar dataset={data?.dataset??ocelDataset??'Original-model playout'} datasetKind="independent model playout and stochastic fitting" onOpenFile={loadFile} onHome={()=>setShowPlayout(false)}/><main className="layout-log playout-workspace"><button className="btn-ghost" onClick={()=>setShowPlayout(false)}>Return to current workspace</button><PlayoutWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
@@ -663,7 +667,7 @@ export default function App() {
   if (showStreaming) return <><TopBar dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} sourceFormat={source?.format} busy={mining} data={data??undefined} onOpen={loadFile}/></main></>;
   if (showRelatedLogs) return <><TopBar dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} sourceFormat={source?.format} available={sourceAvailable} mining={mining} dataset={data?.dataset??source?.file.name} onOpen={loadFile}/></main></>;
 
-  if (showActiveSource || (!data && source)) return <><TopBar dataset={source?.file.name??pendingSourceFile?.name??"Original native source"} datasetKind="native event source" onOpenFile={loadFile} onHome={()=>{if(data||ocelResult)setShowActiveSource(false);else{cancelSourceLoad();liveSource.current=null;setLiveSourceId(null);setSource(null);setSourceOutcome(null);setPendingSourceFile(null);setShowActiveSource(false);setError(null);}}} onWorkflowInputs={()=>setShowWorkflowInputs(true)} onGraphAlignment={()=>setShowGraphAlignment(true)} onInductiveInputs={()=>setShowInductiveInputs(true)} onTreeAlignment={()=>setShowTreeAlignment(true)} onPetriAntiMulti={()=>setShowPetriAntiMulti(true)} onTokenReplay={()=>setShowTokenReplay(true)} onPetriAlignment={()=>setShowPetriAlignment(true)} onModelConversion={()=>setShowModelConversion(true)} onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)}/><main className="layout-log active-mining-source-workspace">{(data||ocelResult)&&<button className="btn-ghost" onClick={()=>setShowActiveSource(false)}>Return to current workspace</button>}{error&&<div className="error-banner" role="alert">{error}</div>}<ActiveMiningSource source={source} initialFile={pendingSourceFile} data={data} outcome={sourceOutcome} available={sourceAvailable} mining={mining} onOpen={(file,options)=>{loadFile(file,undefined,undefined,options);setShowActiveSource(true);}} onCancel={cancelSourceLoad}/>{source&&<QueryWorkspace key={cacheGeneration.current} sourceId={source.source_id} dataset={source.file.name} sourceOptions={{miningInputShape:source.shape,miningSelectors:source.selectors}} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)}/>}</main></>;
+  if (showActiveSource || (!data && source)) return <><TopBar dataset={source?.file.name??pendingSourceFile?.name??"Original native source"} datasetKind="native event source" onOpenFile={loadFile} onHome={()=>{if(data||ocelResult)setShowActiveSource(false);else{cancelSourceLoad();liveSource.current=null;setLiveSourceId(null);setSource(null);setSourceOutcome(null);setPendingSourceFile(null);setShowActiveSource(false);setError(null);}}} onWorkflowInputs={()=>setShowWorkflowInputs(true)} onGraphAlignment={()=>setShowGraphAlignment(true)} onInductiveInputs={()=>setShowInductiveInputs(true)} onTreeAlignment={()=>setShowTreeAlignment(true)} onPetriAntiMulti={()=>setShowPetriAntiMulti(true)} onTokenReplay={()=>setShowTokenReplay(true)} onPetriAlignment={()=>setShowPetriAlignment(true)} onModelConversion={()=>setShowModelConversion(true)} onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)}/><main className="layout-log active-mining-source-workspace">{(data||ocelResult)&&<button className="btn-ghost" onClick={()=>setShowActiveSource(false)}>Return to current workspace</button>}{error&&<div className="error-banner" role="alert">{error}</div>}<ActiveMiningSource source={source} initialFile={pendingSourceFile} data={data} outcome={sourceOutcome} available={sourceAvailable} mining={mining} onOpen={(file,options)=>{loadFile(file,undefined,undefined,options);setShowActiveSource(true);}} onCancel={cancelSourceLoad}/>{source&&<QueryWorkspace key={cacheGeneration.current} sourceId={source.source_id} dataset={source.file.name} sourceOptions={{miningInputShape:source.shape,miningSelectors:source.selectors}} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)}/>}</main></>;
 
   if (!data && ocelResult) {
     return (
@@ -687,7 +691,7 @@ export default function App() {
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
           onModelConversion={()=>setShowModelConversion(true)}
-          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)}
+          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)}
           onActiveSource={()=>setShowActiveSource(true)}
           onHome={() => {
             cancelSourceLoad();
@@ -745,7 +749,7 @@ export default function App() {
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
           onModelConversion={()=>setShowModelConversion(true)}
-          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)}
+          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)}
           onActiveSource={()=>setShowActiveSource(true)}
           onImportOcel={()=>setShowOcelIo(true)}
           error={error}
@@ -781,7 +785,7 @@ export default function App() {
           onTreeAlignment={()=>setShowTreeAlignment(true)}
           onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
           onModelConversion={()=>setShowModelConversion(true)}
-          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)}
+          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)}
           onActiveSource={()=>setShowActiveSource(true)}
         onHome={() => {
           cancelSourceLoad(); liveSource.current = null; setLiveSourceId(null); setSourceOutcome(null); setPendingSourceFile(null);

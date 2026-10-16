@@ -1,0 +1,22 @@
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="conformance_options_json"
+
+{"considered_constraints":["directly_follows"]}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="model_file"; filename="owned-family-directly_follows.skeleton.json"
+Content-Type: application/octet-stream
+
+{"directly_follows":[{"source":"A","target":"B"},{"source":"A","target":"B"},{"source":"absent-source","target":"not-counted"}]}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="input_file"; filename="owned-word-directly_follows-fit.json"
+Content-Type: application/octet-stream
+
+["A","B"]
+
+--OwnedOriginalLogSkeletonFeature62--

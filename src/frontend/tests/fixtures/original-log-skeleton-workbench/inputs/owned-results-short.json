@@ -1,0 +1,1 @@
+[{"deviations":[{"constraint":" unknown \ud800 ","relation":{"source":"inactive\u0000\u6771\u4eac","target":" retained\udfff "},"activity":"inactive\n","observed_frequency":18446744073709551615,"allowed_frequencies":[2,0,2,18446744073709551615]}],"no_dev_total":7,"no_constr_total":2,"dev_fitness":-0.0,"is_fit":true}]

@@ -1,0 +1,22 @@
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="operation"
+
+conformance_word
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="conformance_options_json"
+
+{"considered_constraints":["directly_follows"]}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="model_file"; filename="owned-literal-pair-and-frequency.skeleton.json"
+Content-Type: application/octet-stream
+
+{"directly_follows":[{"source":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","target":" retained "},{"source":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","target":" retained "},{"source":"","target":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "}],"activ_freq":{"":[]," \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ":[2,0,2,18446744073709551615]}}
+
+--OwnedOriginalLogSkeletonFeature62
+Content-Disposition: form-data; name="input_file"; filename="owned-literal-word.json"
+Content-Type: application/octet-stream
+
+[" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "]
+
+--OwnedOriginalLogSkeletonFeature62--
