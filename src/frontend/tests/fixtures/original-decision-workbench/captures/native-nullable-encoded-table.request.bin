@@ -1,0 +1,121 @@
+--OwnedOriginalModelDecisionFeature60
+Content-Disposition: form-data; name="operation"
+
+decision_tables
+--OwnedOriginalModelDecisionFeature60
+Content-Disposition: form-data; name="options_json"
+
+{"mining":{"min_split":2,"min_leaf":1},"attributes":["amount"],"lookback":1}
+
+--OwnedOriginalModelDecisionFeature60
+Content-Disposition: form-data; name="model_file"; filename="owned-original-decision-choice.pnml"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<pnml>
+  <net id="original-monte-carlo-net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <page id="original-page">
+      <place id="p0">
+        <name>
+          <text>Original p0</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="choice">
+        <name>
+          <text>Original choice</text>
+        </name>
+      </place>
+      <place id="p2">
+        <name>
+          <text>Original p2</text>
+        </name>
+      </place>
+      <transition id="owned-transition-0">
+        <name>
+          <text>A</text>
+        </name>
+      </transition>
+      <transition id="owned-transition-1">
+        <name>
+          <text>B</text>
+        </name>
+      </transition>
+      <transition id="owned-transition-2">
+        <name>
+          <text>C</text>
+        </name>
+      </transition>
+      <arc id="a0" source="p0" target="owned-transition-0">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a1" source="owned-transition-0" target="choice">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a2" source="choice" target="owned-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a3" source="owned-transition-1" target="p2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a4" source="choice" target="owned-transition-2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="a5" source="owned-transition-2" target="p2">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="p2">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>
+--OwnedOriginalModelDecisionFeature60
+Content-Disposition: form-data; name="log"; filename="owned-native-nullable-decision.xes"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0">
+  <trace>
+    <string key="concept:name" value="nullable-case-0" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:00Z" />
+      <string key="amount" value="10" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="nullable-case-1" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:02Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:03Z" />
+    </event>
+  </trace>
+</log>
+--OwnedOriginalModelDecisionFeature60--

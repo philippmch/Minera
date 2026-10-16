@@ -2643,3 +2643,34 @@ artifacts. Generated XES can reopen as an active source. Supplemental export
 failures retain the original model and native result. Browser validation and
 strict reference parity remain separate gates; see
 `docs/feature-first-playout-workbench-validation.json`.
+
+### Mine decisions from an original PNML model
+
+Open **Original-model decisions** and supply PNML plus an original CSV, TSV,
+XES, gzip XES or complete typed-table source. Run decision mining, encoded
+decision tables or guarded data-Petri results independently of the cached
+mining session. All native options are exposed, including nested mining
+settings and the separate table attribute and case-attribute controls.
+Literal attribute names and lists retain whitespace, commas and empty members;
+the selected native operation determines which values are valid.
+Shared multipart transport also preserves literal line breaks in import names
+and option text for decision, Monte Carlo and playout requests.
+
+Inspect full decision points and flat tree nodes, replay/alignment counts,
+encoded classes and nullable feature rows, the returned workflow net and every
+ordered guard/read/write-variable record. Native tree diagnostics use the latest
+values seen before a choice; table history retains preceding event snapshots.
+Disabling decision diagnostics preserves the other returned guard/table data.
+
+PNML import settings and the complete original document remain inspectable.
+The native decision APIs accept the imported net and use its workflow boundary
+defaults; they do not accept arbitrary PNML marking token counts as replay
+options. Learned guards are separate result records. A structural result PNML
+does not enforce learned guards.
+
+Download original bytes, exact requests, full raw JSON, reports, every table and
+selected record, plus available same-run source PNML/XES and structural result
+PNML. Preparation, native and supplemental export errors retain the available
+model/source/result context. Browser validation and strict reference parity
+remain separate gates; see
+`docs/feature-first-original-decision-workbench-validation.json`.

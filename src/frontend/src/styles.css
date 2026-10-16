@@ -2583,3 +2583,15 @@ input[type="range"]::-moz-range-thumb {
 .playout-workspace .query-check { display: flex; align-items: center; gap: .45rem; }
 .playout-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .playout-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+.original-decision-workspace { display: grid; gap: 1.1rem; }
+.original-decision-workspace .panel, .original-decision-workspace fieldset { width: 100%; min-width: 0; }
+.original-decision-workspace fieldset { border: 0; padding: 0; }
+.original-decision-workspace .filters-field { display: flex; flex-direction: column; gap: .4rem; margin-block: .8rem; min-width: 0; }
+.original-decision-workspace input:not([type=checkbox]), .original-decision-workspace select, .original-decision-workspace textarea { width: 100%; min-width: 0; max-width: 100%; }
+.original-decision-workspace textarea { resize: vertical; font-family: var(--font-mono); }
+.original-decision-workspace .query-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(230px,100%),1fr)); gap: .85rem; }
+.original-decision-workspace .query-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-block: .8rem; }
+.original-decision-workspace .query-check { display: flex; align-items: center; gap: .45rem; }
+.original-decision-workspace pre { max-height: 36rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.original-decision-inspection td { max-width: 480px; overflow-wrap: anywhere; white-space: pre-wrap; }

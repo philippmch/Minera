@@ -1,0 +1,175 @@
+{
+  "complete": true,
+  "checkpoint_kind": "implemented feature delivery with pending browser validation",
+  "feature_group": 60,
+  "parent_head": "f949e23a260a09737f3f62f220485ef8823fc246",
+  "backend_step_commit": "7fe12ca7b5d9fa244f566c3ce42cdc0435ab63a2",
+  "created_utc": "2026-10-16T11:52:20.689807+00:00",
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": false,
+  "retained_browser_attempt_feature": 59,
+  "retained_browser_live_feature": 58,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "Independent original PNML and original event sources expose three exact public calls: decision mining, encoded decision tables, and guarded data Petri nets. Each request owns its source/model and invokes its declared native operation without reading or changing the cached mined session or synthesizing a miner identifier.",
+    "All native option structs retain 32 expanded option leaves: nine mining controls, twelve table controls including their independent nested mining options, and eleven guarded-net controls including nested decision options. Exact size_t tokens, IEEE doubles, negative zero, literal strings and ordered duplicate attribute lists survive; supplied-member provenance includes actual dotted nested paths. Native semantic validation owns its depth/lookback/gain/attribute constraints.",
+    "The encoded table outer include_trace_attributes default false remains distinct from nested mining default true. Outer attributes and nested mining attributes remain independent. Empty outer attribute names, missing optional feature cells, pre-choice context and bounded history retain their actual native behavior. No trimming, comma splitting, deduplication or cross-copying of the option scopes changes the request.",
+    "Complete results retain every stored decision counter, point, branch, flat node, child sentinel and inactive split field, plus ordered table classes/feature names/rows, exact targets and null/IEEE feature cells. Guarded outputs retain the full returned native net and a separate ordered guarded_transitions vector with full guard/read/write state. Disabling decision diagnostics clears native decision_points while preserving counters, tables, guards and the unchanged copied model.",
+    "Five PNML import controls preserve original document IDs, marking counts/keys, arcs and optional stochastic metadata. Decision APIs accept PetriNet and use native workflow boundaries; arbitrary PNML marking counts are provenance and are not injected as an invented replay policy. Original CSV/TSV/XES/gzip XES/typed-table sources retain all import controls, literal selectors, original/prepared views, full metadata, exact bytes and actual preparation errors. Binary source bytes use reversible hex transport.",
+    "The application provides independent model/source ownership and cancellation guards, all three operations, complete raw and named option editors, full inspection, exact original/source/request/raw/report/CSV/selected-record downloads and independently guarded source PNML/XES and structural result PNML exports. Learned guard expressions remain in the complete result; a structural PNML export does not evaluate them. Native suites, API captures, complete export verification, byte-identical portable fixtures and the final full frontend/production build support this delivery.",
+    "Shared multipart transport for Monte Carlo, playout and original-model decisions now sends CR/LF-bearing control values as exact byte file parts, alongside the existing lone-surrogate carrier. Actual Request serialization tests preserve literal import names and multiline options without browser FormData newline normalization. The native routes already accept these control file parts."
+  ],
+  "boundaries": [
+    "This is a feature delivery checkpoint, not complete PM4Py parity. No package/module is promoted: 86 packages, 387 modules, 46 complete packages, 199 complete modules and 228 incomplete strict units remain.",
+    "Browser settings and the explicit user authorization remain acknowledged. No new browser attempt was made under the unchanged saved/managed-policy denial. The retained Feature59 attempt loaded no UI while Feature58/PID31412 served HTTP200. Later coherent Feature60 native HTTP/API/production-asset checks are separate; browser interaction, rendered layouts, screenshots and actual browser downloads remain pending.",
+    "Decision replay/alignment uses the actual native PetriNet workflow-boundary behavior. Original arbitrary PNML marking counts remain document provenance. Reachability/alignment failures remain failures with their native counters, not fabricated observations or guards. Structural exports do not execute learned data guards.",
+    "Cancellation prevents stale client publication and does not claim to stop an already executing native call. Stored typed source metadata remains complete while native decision feature extraction and numeric/category inference follow the existing native semantics.",
+    "Eight older independent request builders still append direct FormData string values and need byte-carrier transport review for literal CR/LF and lone-surrogate controls. This checkpoint repairs the shared Monte Carlo/playout/original-decision sender; remaining builders are tracked in build/independent-workbench-transport-followup-feature60.json.",
+    "Historical attempts, if any, remain sealed and excluded from final validation counts. Original Declare offline conformance/playout is the next audited input feature. Original normative log-skeleton/footprints inputs, native Table BOSE app dispatch, the remaining complete-catalogue feature audit and all strict behavioral gates remain open. Existing original streaming Declare and normative temporal-profile support are acknowledged."
+  ],
+  "validation_counts": {
+    "native_sources": 672,
+    "native_suites": 27,
+    "core_objects": 187,
+    "reused_core_objects": 186,
+    "fresh_core_objects": 1,
+    "frontend_tests": 3205,
+    "frontend_files": 105,
+    "api_calls": 78,
+    "api_checks": 2045,
+    "native_envelope_fixtures": 73,
+    "export_tests": 83,
+    "export_entries": 73,
+    "export_auxiliary_calls": 5,
+    "export_numeric_literals": 145417,
+    "export_csv_cells": 181134,
+    "export_selected_records": 40611,
+    "export_selected_numeric_literals": 729463,
+    "published_files": 313,
+    "unrelated_files_preserved": 110,
+    "expanded_option_leaves": 32
+  },
+  "pending_browser_checks": [
+    "Original PNML and source uploads, all three native decision operations and native error inspection",
+    "Independent nested options, source reuse/replacement and cancellation ownership",
+    "Complete result/export downloads, responsive layouts and screenshots"
+  ],
+  "browser_status": {
+    "path": "build/playout-workbench-feature-browser-status-a376c9f130644a438d238af905c4ef64.json",
+    "sha256": "eadb192a390c36c13f7ebbbaf4e758f5d5030939a1140435a5e9f26fad2186c6"
+  },
+  "evidence": {
+    "frontend": {
+      "path": "build/decision-workbench-feature-frontend-final-c0c8df0e-ea80-4fbd-a1a9-2bc6b8efd303/validation.json",
+      "sha256": "8013df4a4a1eaef668e52fbcc2bca6073a3e6df4e6bafa6b74fbaad17b5adff9"
+    },
+    "exports": {
+      "path": "build/original-decision-workbench-feature-exports-ca8b5c07-c979-4534-905c-de945c16243e/validation.json",
+      "sha256": "c280077eef15c314de85b4d5c64092773c66831576e97f12a67f363e77183164"
+    },
+    "publication": {
+      "path": "build/original-decision-workbench-feature-fixture-publication-001f3c72-0e1f-427b-948f-e8f747c9c3bd/validation.json",
+      "sha256": "2e667e3578823224de0685dfe6bcb10242655a38e4b63dbe3d61f591297abc15"
+    },
+    "api": {
+      "path": "build/original-decision-workbench-feature-application-8fa48d9a5593453a919b955feeb34649/validation.json",
+      "sha256": "c4a2811aa464616d2d2ae18d1472a43fff84805de2b64262615ae4aa2780fd31"
+    },
+    "browser": {
+      "path": "build/playout-workbench-feature-browser-status-a376c9f130644a438d238af905c4ef64.json",
+      "sha256": "eadb192a390c36c13f7ebbbaf4e758f5d5030939a1140435a5e9f26fad2186c6"
+    },
+    "live": {
+      "path": "build/decision-workbench-feature-live-runtime.json",
+      "sha256": "ef6177cbd506997ab1bc4e342b9955483e6f1546034c003e659f9b3ffec0617d"
+    },
+    "server": {
+      "path": "build/decision-workbench-feature-live-server.json",
+      "sha256": "38dc0a7c7b903e7b5c9bb3d9a796492f13ccae6344c65d66de091dd21e3ca5c3"
+    },
+    "backend_commit": {
+      "path": "build/decision-workbench-feature-backend-postcommit.json",
+      "sha256": "c85abb67420e1f48f1f2ce0083e7b54c47859dbf1eeff7662f9f26070e7a52f6"
+    },
+    "cleanup": {
+      "path": "build/decision-workbench-feature-test-cleanup.json",
+      "sha256": "3a21ddcb71fda257ec4cd5ff9a600059a841353505f2a273528422e97d933761"
+    },
+    "transport": {
+      "path": "build/original-decision-workbench-frontend-focused-48270dd52fdc43f98a977054b344b604/validation.json",
+      "sha256": "e466dbd13b829f0921450ce68506066a72b130b24cd652aa2c7ab42ce06658e6"
+    },
+    "native": {
+      "path": "build/decision-workbench-feature-native-cd836300860d4033ae4f1db35af69ff5/build-manifest.json",
+      "sha256": "e8287ce0368e165ac810ce3c22d859603f711a2069fd5af09abf2b9be3c06e32"
+    },
+    "seal": {
+      "path": "build/decision-workbench-feature-seal-6d2f2ebf14b04a1a9cbe3ebc453763fa/validation.json",
+      "sha256": "833643a39bfdddbfcafc6d8cf3923dffa34ac52aef72728abe8b159d7f0661de"
+    }
+  },
+  "historical_attempts_excluded_from_final_counts": [
+    {
+      "path": "build/original-decision-workbench-feature-application-1cf7652c7c4d46a0807bc874c7b6b411/validation.json",
+      "sha256": "0ac238427eb59a9ad206165b17dc70eac8793a90943509ea24d206f823f404cb",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-decision-workbench-frontend-focused-0e614977dca5409484b18622126611e4/validation.json",
+      "sha256": "403bb8f5af19f1fda4f70a5b2c44a5de1af467bbb0464092906feabe68c3355f",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-decision-workbench-frontend-focused-916338f0ad0849f98b68284b039c2749/validation.json",
+      "sha256": "8c9aa0ccc77dd62981caca5253f09a0ef6e29d79f702716348e4643c0b03c046",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-decision-workbench-frontend-focused-ddbb301b42a0434ab5da554bf7a488b0/validation.json",
+      "sha256": "d6e963993d407892fbbd4ba482014a011d6aa62f2b53add046825a153d9c9d90",
+      "complete": false,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-decision-workbench-feature-exports-9ac81834-2d4b-474a-9ce2-d6f3a74252d4/validation.json",
+      "sha256": "56413208d8e7d2d50fe922808dec23d7b14adfafd18c47969a0135f5fe29436d",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    },
+    {
+      "path": "build/original-decision-workbench-feature-exports-bf7e44f6-43a6-484d-9358-4cf4d6aef6e7/validation.json",
+      "sha256": "6dd6c758bf2257aec1925b1d3f3debec937b256adbc1966e512a901e50c73539",
+      "complete": true,
+      "included_in_final_validation_counts": false,
+      "superseded_by_final_capture_or_frontend_proof": true
+    }
+  ],
+  "superseded_native_builds": [],
+  "feature_contract": {
+    "path": "build/original-model-decision-contract-feature60-02e14fe612b945a18a752b9fb663bff9.json",
+    "sha256": "96ab6e203036b3032b95af1726ab270e63ee95c7720ef9206f5a8bdf61c76075"
+  },
+  "next_feature_contract": {
+    "path": "build/original-declare-workbench-contract-feature61.json",
+    "sha256": "d09547b70311238b62440cc79c2d4ef990e124b07e42bdeefa23c669c89a4a22"
+  },
+  "helper_sha256": "a0fcf1d85315654660d22095ec6436fa7bdb9f799a45a506edb262f570db5432"
+}

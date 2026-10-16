@@ -1,0 +1,403 @@
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0">
+  <trace>
+    <string key="concept:name" value="original-case-0" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:00Z" />
+      <string key="amount" value="10" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:01Z" />
+      <string key="amount" value="20" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:02Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-1" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:02Z" />
+      <string key="amount" value="11" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:03Z" />
+      <string key="amount" value="21" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:04Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-2" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:04Z" />
+      <string key="amount" value="12" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:05Z" />
+      <string key="amount" value="22" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:06Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-3" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:06Z" />
+      <string key="amount" value="13" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:07Z" />
+      <string key="amount" value="23" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:08Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-4" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:08Z" />
+      <string key="amount" value="14" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:09Z" />
+      <string key="amount" value="24" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:10Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-5" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:10Z" />
+      <string key="amount" value="15" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:11Z" />
+      <string key="amount" value="25" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:12Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-6" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:12Z" />
+      <string key="amount" value="16" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:13Z" />
+      <string key="amount" value="26" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:14Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-7" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:14Z" />
+      <string key="amount" value="17" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:15Z" />
+      <string key="amount" value="27" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:16Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-8" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:16Z" />
+      <string key="amount" value="18" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:17Z" />
+      <string key="amount" value="28" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:18Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-9" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:18Z" />
+      <string key="amount" value="19" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:19Z" />
+      <string key="amount" value="29" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:20Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-10" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:20Z" />
+      <string key="amount" value="20" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:21Z" />
+      <string key="amount" value="30" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:22Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-11" />
+    <string key="customer" value="retail" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:22Z" />
+      <string key="amount" value="21" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:23Z" />
+      <string key="amount" value="31" />
+      <string key="region" value="north" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:24Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-12" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:24Z" />
+      <string key="amount" value="102" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:25Z" />
+      <string key="amount" value="112" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:26Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-13" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:26Z" />
+      <string key="amount" value="103" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:27Z" />
+      <string key="amount" value="113" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:28Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-14" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:28Z" />
+      <string key="amount" value="104" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:29Z" />
+      <string key="amount" value="114" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:30Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-15" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:30Z" />
+      <string key="amount" value="105" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:31Z" />
+      <string key="amount" value="115" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:32Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-16" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:32Z" />
+      <string key="amount" value="106" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:33Z" />
+      <string key="amount" value="116" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:34Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-17" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:34Z" />
+      <string key="amount" value="107" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:35Z" />
+      <string key="amount" value="117" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:36Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-18" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:36Z" />
+      <string key="amount" value="108" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:37Z" />
+      <string key="amount" value="118" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:38Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-19" />
+    <string key="customer" value="enterprise" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:38Z" />
+      <string key="amount" value="109" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="D" />
+      <date key="time:timestamp" value="2026-01-01T00:00:39Z" />
+      <string key="amount" value="119" />
+      <string key="region" value="south" />
+    </event>
+    <event>
+      <string key="concept:name" value="C" />
+      <date key="time:timestamp" value="2026-01-01T00:00:40Z" />
+    </event>
+  </trace>
+</log>

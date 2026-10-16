@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+  <string key="concept:name" value="Original decision source"/>
+  <trace>
+    <string key="concept:name" value="original-case-0"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:00+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="10"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:01+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-1"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:02+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="11"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:03+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-2"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:04+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="12"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:05+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-3"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:06+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="13"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:07+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-4"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:08+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="14"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:09+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-5"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:10+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="15"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:11+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-6"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:12+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="16"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:13+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-7"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:14+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="17"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:15+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-8"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:16+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="18"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:17+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-9"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:18+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="19"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:19+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-10"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:20+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="20"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:21+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-11"/>
+    <string key="customer" value="retail"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:22+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="21"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:23+00:00"/>
+      <string key="stage" value="B"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-12"/>
+    <string key="customer" value="enterprise"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:24+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="102"/>
+      <string key="region" value="south"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:25+00:00"/>
+      <string key="stage" value="C"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-13"/>
+    <string key="customer" value="enterprise"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:26+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="103"/>
+      <string key="region" value="south"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:27+00:00"/>
+      <string key="stage" value="C"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-14"/>
+    <string key="customer" value="enterprise"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:28+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="104"/>
+      <string key="region" value="south"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:29+00:00"/>
+      <string key="stage" value="C"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-15"/>
+    <string key="customer" value="enterprise"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:30+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="105"/>
+      <string key="region" value="south"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:31+00:00"/>
+      <string key="stage" value="C"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-16"/>
+    <string key="customer" value="enterprise"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:32+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="106"/>
+      <string key="region" value="south"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:33+00:00"/>
+      <string key="stage" value="C"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-17"/>
+    <string key="customer" value="enterprise"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:34+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="107"/>
+      <string key="region" value="south"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:35+00:00"/>
+      <string key="stage" value="C"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-18"/>
+    <string key="customer" value="enterprise"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:36+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="108"/>
+      <string key="region" value="south"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:37+00:00"/>
+      <string key="stage" value="C"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="original-case-19"/>
+    <string key="customer" value="enterprise"/>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:38+00:00"/>
+      <string key="stage" value="A"/>
+      <string key="amount" value="109"/>
+      <string key="region" value="south"/>
+    </event>
+    <event>
+      <string key="concept:name" value="recorded"/>
+      <date key="time:timestamp" value="2026-01-01T00:00:39+00:00"/>
+      <string key="stage" value="C"/>
+    </event>
+  </trace>
+</log>
