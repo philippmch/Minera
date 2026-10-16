@@ -1,3 +1,5 @@
+import {appendNativeMultipartField, nativeStringBytes as workflowInputNativeBytes} from "./native-multipart";
+export {workflowInputNativeBytes};
 import type { MineraExport, LogConversionTableCell } from "./types";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import { nativeResponseJson, nativeResponseRequest, readNativeResponse } from "./native-response";
@@ -265,7 +267,7 @@ async function fileHash(file: File): Promise<string> {
 export async function runWorkflowInput(file: File, form: WorkflowInputForm, signal?: AbortSignal): Promise<WorkflowInputRun> {
   const fields = workflowInputFields(form, file.name), submitted = Object.fromEntries(fields), hash = await fileHash(file);
   signal?.throwIfAborted();
-  const body = new FormData(); body.append("input", file); fields.forEach(([key, value]) => body.append(key, value));
+  const body = new FormData(); body.append("input", file); fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
   const path = "/api/discover-workflow-input", response = await fetch(path, {method: "POST", body, signal});
   const value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
   if (!isWorkflowInputDiscovery(value)) {
@@ -295,22 +297,6 @@ export function workflowInputAllTablesCsv(run: WorkflowInputRun): string {
     table.rows.forEach((row, row_index) => table.columns.forEach((column, column_index) => rows.push([table.id, table.title, row_index, column_index, column, row[column_index]])));
   }
   return diagnosticCsv({id: "all_tables", title: "Every complete native discovery table", columns: ["table_id", "table_title", "row_index", "column_index", "column", "value"], rows});
-}
-/** Encode native strings without File/Blob's USVString replacement of lone UTF-16 surrogates. */
-export function workflowInputNativeBytes(text: string): Uint8Array<ArrayBuffer> {
-  const bytes = new Uint8Array(text.length * 3); let position = 0;
-  for (let i = 0; i < text.length; ++i) {
-    let code = text.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) {
-      const low = text.charCodeAt(i + 1);
-      if (low >= 0xdc00 && low <= 0xdfff) {code = 0x10000 + ((code - 0xd800) << 10) + low - 0xdc00; ++i;}
-    }
-    if (code < 0x80) bytes[position++] = code;
-    else if (code < 0x800) {bytes[position++] = 0xc0 | code >> 6; bytes[position++] = 0x80 | code & 0x3f;}
-    else if (code < 0x10000) {bytes[position++] = 0xe0 | code >> 12; bytes[position++] = 0x80 | code >> 6 & 0x3f; bytes[position++] = 0x80 | code & 0x3f;}
-    else {bytes[position++] = 0xf0 | code >> 18; bytes[position++] = 0x80 | code >> 12 & 0x3f; bytes[position++] = 0x80 | code >> 6 & 0x3f; bytes[position++] = 0x80 | code & 0x3f;}
-  }
-  return bytes.subarray(0, position);
 }
 export function workflowInputModelFile(run: WorkflowInputRun, format: "pnml" | "bpmn" | "ptml"): File {
   const raw = run.value[format]; if (raw === null) throw new Error(run.value[`${format}_error`] ?? `This native run did not return ${format.toUpperCase()}.`);

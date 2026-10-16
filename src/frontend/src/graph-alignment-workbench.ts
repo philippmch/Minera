@@ -1,3 +1,4 @@
+import {appendNativeMultipartField} from "./native-multipart";
 import { diagnosticCsv, nativeObjectTables, type DiagnosticTable } from "./model-diagnostics";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import {nativeResponseJson, nativeResponseRequest, readNativeResponse} from "./native-response";
@@ -228,7 +229,7 @@ export function graphAlignmentTables(value: GraphAlignmentWorkbench, fields?: Ar
 async function fileHash(file: File): Promise<string> {return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())), byte => byte.toString(16).padStart(2, "0")).join("");}
 export async function runGraphAlignmentWorkbench(input: File, model: File, form: GraphAlignmentForm, signal?: AbortSignal): Promise<GraphAlignmentRun> {
   const fields = graphAlignmentFields(form, input.name), [input_sha256, model_sha256] = await Promise.all([fileHash(input), fileHash(model)]); signal?.throwIfAborted();
-  const body = new FormData(); body.append("input_file", input); body.append("model_file", model); fields.forEach(([key, value]) => body.append(key, value));
+  const body = new FormData(); body.append("input_file", input); body.append("model_file", model); fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
   const path = "/api/align-graph-workbench", response = await fetch(path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
   if (!isGraphAlignmentWorkbench(value)) {if (!response.ok) throw new Error(object(value) && typeof value.error === "string" ? value.error : `Graph alignment failed (${response.status}).`); throw new Error("The server did not return a valid native graph alignment envelope.");}
   if (value.mode !== form.mode || value.input_shape !== form.inputShape || value.input_context.format !== form.inputFormat || value.model_context.format !== form.modelFormat || value.input_context.dataset !== input.name || value.model_context.dataset !== model.name || unsigned(value.input_context, "original_input_bytes") !== BigInt(input.size) || unsigned(value.model_context, "original_input_bytes") !== BigInt(model.size)) throw new Error("The alignment response does not match the submitted input, model and alignment mode.");

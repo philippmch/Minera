@@ -1,3 +1,4 @@
+import {appendNativeMultipartField} from "./native-multipart";
 import {activeMiningSourceTables} from "./active-mining-source";
 import {isWorkflowInputTable, type WorkflowInputTable} from "./workflow-input-workbench";
 import type { Alignments, AlignmentVariant } from "./types";
@@ -220,7 +221,7 @@ export async function runPetriAlignmentWorkbench(log: File, model: File, form: P
   const [logHash, modelHash] = await Promise.all([fileHash(log), fileHash(model)]);
   signal?.throwIfAborted();
   const body = new FormData(); body.append("log", log); body.append("model", model);
-  fields.forEach(([key, value]) => body.append(key, value));
+  fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
   const path = "/api/align-petri-workbench";
   const response = await fetch(path, {method: "POST", body, signal});
   const value = await readNativeResponse(response, {path, fields});
