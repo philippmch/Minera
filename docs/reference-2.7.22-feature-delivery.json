@@ -641,7 +641,7 @@
       ]
     },
     {
-      "feature_delivery_status": "ocel_execution_workflow_available",
+      "feature_delivery_status": "original_object_centric_playout_workbench_available",
       "package": "algo.simulation.playout.oc_causal_net",
       "parity_status": "partial",
       "selectors": [
@@ -649,7 +649,7 @@
       ]
     },
     {
-      "feature_delivery_status": "ocel_execution_workflow_available",
+      "feature_delivery_status": "original_object_centric_playout_workbench_available",
       "package": "algo.simulation.playout.ocpn",
       "parity_status": "partial",
       "selectors": [
@@ -3220,6 +3220,44 @@
       ],
       "validation": "docs/feature-first-original-emd-workbench-validation.json",
       "browser_validation_complete": false
+    },
+    {
+      "id": "native_independent_original_object_centric_playout_workbench",
+      "state": "original_object_centric_playout_workbench_available",
+      "families": [
+        "algo.simulation.playout.ocpn",
+        "algo.simulation.playout.oc_causal_net"
+      ],
+      "supporting_native_surfaces": [
+        "OcpnGraph",
+        "OcCausalNet",
+        "OcpnPlayoutOptions",
+        "OcpnPlayoutResult",
+        "Ocel",
+        "PetriNetLiteralStorage",
+        "PetriNet::from_literal_storage",
+        "ocpn_extensive_playout_result",
+        "ocpn_extensive_playout",
+        "oc_causal_net_extensive_playout_result",
+        "oc_causal_net_extensive_playout"
+      ],
+      "entry_points": [
+        "include/minera/object_centric_playout_workbench_json.hpp",
+        "src/backend/object_centric_playout_workbench_json.cpp",
+        "src/backend/tools/original_object_centric_playout_route.hpp",
+        "src/frontend/src/original-object-centric-playout-workbench.ts",
+        "src/frontend/src/components/OriginalObjectCentricPlayoutWorkspace.tsx"
+      ],
+      "added": [
+        "Four independent public native calls accept caller-owned exact OCPN or object-centric causal-net models: ocpn_result, ocpn_log, causal_result and causal_log. The existing supplied-OCEL import/discovery operation remains available.",
+        "All18 native options preserve constructor defaults, exact supplied-member presence, native byte strings and full integer/IEEE values. Binding modes, seeded caps, per-activity paths, markings, reachability and original transition witnesses retain actual native behavior.",
+        "Full9-field OcpnGraph,3-field OcCausalNet,10-field raw OCEL,7-field OcpnPlayoutResult and all9 literal Petri storage members remain inspectable. Inactive annotations, disabled replay diagnostics, signed arbitrary arc magnitudes, optional names/markings and unknown stored enums remain literal.",
+        "The route invokes exactly the selected primary operation once and independently records actual native export calls. All8 artifacts retain authoritative bytes/SHA, optional display text and separate real export errors; partial native failures retain owned original/model/options state.",
+        "The workbench provides exact model/options editors, all4 operations, full tables/report/CSV/selected records, request/response and authoritative artifact downloads/reopening, with cancellation and replacement guards. Actual runtime cases drive compact portable frontend regression fixtures.",
+        "The native reset firing write now uses marking.at(place), producing actual out_of_range only when an invalid reset endpoint is reached. Unused marker-causal projections stay literal. No route semantic normalization, arbitrary caps, cached model substitution or discovery replaces original model execution."
+      ],
+      "validation": "docs/feature-first-original-object-centric-playout-workbench-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -3274,7 +3312,8 @@
     "native_independent_original_footprints_workbench_available": "Independent original footprints comparison, metrics, standalone diagnostics and native utilities/tree decorations with exact full stored inputs/results/options, original sources and complete inspection/downloads. Native/API/export/frontend validated; browser and strict reference parity remain separate.",
     "configured_genetic_discovery_and_original_matrix_conversion_available": "Existing configured cached-log genetic discovery plus independent caller-supplied causal-matrix conversion with exact native vectors/variant/full net/signed markings and complete inspection/downloads. Independent original-log genetic discovery, browser checks and strict reference parity remain separate unfinished work.",
     "original_embedding_filter_workbench_available": "Existing cached-log embedding operations plus five independent original-input native operations, full filtering/keep_cases and exact source/result/options/byte-safe artifacts. Actual synthetic HTTP callback wiring is validated separately; real host transformer models, browser checks and strict reference parity remain unfinished gates.",
-    "original_weighted_language_emd_workbench_available": "Existing log-derived EMD plus three independent original weighted-language/EventLog operations, exact four native value options, four real finite table callback slots, full native results and byte-safe artifacts. Browser verification and strict reference parity remain separate unfinished gates."
+    "original_weighted_language_emd_workbench_available": "Existing log-derived EMD plus three independent original weighted-language/EventLog operations, exact four native value options, four real finite table callback slots, full native results and byte-safe artifacts. Browser verification and strict reference parity remain separate unfinished gates.",
+    "original_object_centric_playout_workbench_available": "Original OCPN/object-centric causal-net model inputs, four actual native result/log operations,18 exact native options, full stored state and8 byte-safe artifacts. Browser and strict reference parity remain pending."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

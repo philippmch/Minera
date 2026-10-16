@@ -1,0 +1,302 @@
+{
+  "complete": true,
+  "feature_group": 67,
+  "checkpoint_kind": "implemented feature delivery with browser and strict parity pending",
+  "created_utc": "2026-10-16T15:19:04.929679+00:00",
+  "parent_head": "52543fb75ead07b6b5fde8fe09323936c6357df4",
+  "backend_step_commit": "83edcaf562e148d06756dc1bdc15b7a44164fb84",
+  "ui_step_commit_pending": true,
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false,
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": false,
+  "retained_browser_attempt_feature": 66,
+  "retained_browser_live_feature": 65,
+  "delivered": [
+    "Four independent public native calls accept caller-owned exact OCPN or object-centric causal-net models: ocpn_result, ocpn_log, causal_result and causal_log. The existing supplied-OCEL import/discovery operation remains available.",
+    "All18 native options preserve constructor defaults, exact supplied-member presence, native byte strings and full integer/IEEE values. Binding modes, seeded caps, per-activity paths, markings, reachability and original transition witnesses retain actual native behavior.",
+    "Full9-field OcpnGraph,3-field OcCausalNet,10-field raw OCEL,7-field OcpnPlayoutResult and all9 literal Petri storage members remain inspectable. Inactive annotations, disabled replay diagnostics, signed arbitrary arc magnitudes, optional names/markings and unknown stored enums remain literal.",
+    "The route invokes exactly the selected primary operation once and independently records actual native export calls. All8 artifacts retain authoritative bytes/SHA, optional display text and separate real export errors; partial native failures retain owned original/model/options state.",
+    "The workbench provides exact model/options editors, all4 operations, full tables/report/CSV/selected records, request/response and authoritative artifact downloads/reopening, with cancellation and replacement guards. Actual runtime cases drive compact portable frontend regression fixtures.",
+    "The native reset firing write now uses marking.at(place), producing actual out_of_range only when an invalid reset endpoint is reached. Unused marker-causal projections stay literal. No route semantic normalization, arbitrary caps, cached model substitution or discovery replaces original model execution."
+  ],
+  "boundaries": [
+    "Full PM4Py parity remains unfinished. All86 families/387 modules/228 incomplete units remain in scope; strict counts stay46/86 packages and199/387 modules. No strict catalogue status or selector is promoted.",
+    "No Feature67 browser call or retry was made. The retained actual denial belongs to Feature66/live65. Current Feature67 assets/native API HTTP validation is separate; rendered controls, interactions and browser downloads remain unverified.",
+    "Final API evidence composes146 physical calls as135 original+3 partial prefix+8 continuation exactly once. Offline revalidation performs zero HTTP/native calls and verifies133 cases. All19 historical failed assertions,5 failed setup expectations and the partial collector JSON decode fault remain explicit. Successful supplemental seed/cache observations repair the missing cached coverage without relabelling old failed statuses.",
+    "Native APIs and actual exporters own semantic validation and active/inactive field behavior. Client cancellation prevents stale publication but does not terminate a native call already running. The UI does not claim strict reference parity from native functional fixtures.",
+    "Feature68 is prepared only: exact target-activity literals, independent feature attribute vectors, explicit ILP boundary/causal-relation values, and DFG precision case-id/materialization-cap controls. No Feature68 runtime validation is claimed."
+  ],
+  "validation_counts": {
+    "native_sources": 701,
+    "native_suites": 54,
+    "fresh_core_objects": 195,
+    "reused_parent_core_objects": 0,
+    "frontend_tests": 5171,
+    "frontend_test_files": 120,
+    "frontend_source_bindings": 14039,
+    "actual_api_calls": 146,
+    "feature_cases": 133,
+    "offline_api_checks": 22711,
+    "offline_http_calls": 0,
+    "artifact_files": 756,
+    "actual_primary_entries": 102,
+    "export_tests": 134,
+    "published_files": 3,
+    "native_operations": 4,
+    "native_option_fields": 18,
+    "native_artifact_kinds": 8,
+    "native_stored_fields": {
+      "OcpnGraph": 9,
+      "OcCausalNet": 3,
+      "Ocel": 10,
+      "OcpnPlayoutResult": 7,
+      "PetriNet": 9
+    },
+    "historical_failed_assertions_retained": 19,
+    "historical_failed_setup_checks_retained": 5,
+    "unrelated_files_preserved": 110
+  },
+  "capture_lineage": {
+    "original135_actual_calls_retained": true,
+    "original_actual_request_response_artifact_bytes_unchanged": true,
+    "original_initial_409_chronology_retained": true,
+    "five_failed_cache_setup_expectations_not_relabelled": true,
+    "seven_original_feature_assertions_corrected_from_own_source": true,
+    "cache_coverage_recovered_by_new_successful_supplement_only": true,
+    "active_caps_covered_by_new_absent_group_inputs": true
+  },
+  "api_validation_execution": {
+    "actual_http_calls_by_this_revalidator": 0,
+    "native_calls_by_this_revalidator": 0,
+    "mode": "offline recheck of existing actual responses and exact evidence composition",
+    "historical_actual_http_calls": 135,
+    "supplement_actual_http_calls": 11,
+    "actual_prefix_calls": 3,
+    "actual_continuation_calls": 8,
+    "actual_http_calls_counted_once": 146
+  },
+  "actual_http_calls_counted_once": 146,
+  "historical_all19_failed_assertions": [
+    {
+      "name": "cache-seed actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 400,
+        "expected": 200
+      }
+    },
+    {
+      "name": "cache-schema-before actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 400,
+        "expected": 200
+      }
+    },
+    {
+      "name": "cache-model-before actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 409,
+        "expected": 200
+      }
+    },
+    {
+      "name": "causal-activity-cap-0-0 independently expected reachability",
+      "passed": false
+    },
+    {
+      "name": "causal-activity-cap-0-0 independently expected sequences count",
+      "passed": false
+    },
+    {
+      "name": "causal-activity-cap-1-0 independently expected reachability",
+      "passed": false
+    },
+    {
+      "name": "causal-activity-cap-1-0 independently expected sequences count",
+      "passed": false
+    },
+    {
+      "name": "causal-activity-cap-1.5-0 independently expected reachability",
+      "passed": false
+    },
+    {
+      "name": "causal-activity-cap-1.5-1 independently expected reachability",
+      "passed": false
+    },
+    {
+      "name": "causal-distinct-keys-enable-completion independently expected native event count",
+      "passed": false
+    },
+    {
+      "name": "cache-schema-after actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 400,
+        "expected": 200
+      }
+    },
+    {
+      "name": "cache-model-after actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 409,
+        "expected": 200
+      }
+    },
+    {
+      "name": "supp-active-causal-activity-cap-0-0 independently expected native event count",
+      "passed": false
+    },
+    {
+      "name": "supp-active-causal-activity-cap-0-0 only bounded actual A/B terminal paths",
+      "passed": false
+    },
+    {
+      "name": "supp-active-causal-activity-cap-0-0 zero cap retains both native activities",
+      "passed": false
+    },
+    {
+      "name": "supp-active-causal-activity-cap-1-0 independently expected native event count",
+      "passed": false
+    },
+    {
+      "name": "supp-active-causal-activity-cap-1-0 only bounded actual A/B terminal paths",
+      "passed": false
+    },
+    {
+      "name": "supp-active-causal-activity-cap-1.5-0 only bounded actual A/B terminal paths",
+      "passed": false
+    },
+    {
+      "name": "supp-active-causal-activity-cap-1.5-1 only bounded actual A/B terminal paths",
+      "passed": false
+    }
+  ],
+  "historical_failed_setup_expectations": [
+    {
+      "name": "cache-seed actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 400,
+        "expected": 200
+      }
+    },
+    {
+      "name": "cache-schema-before actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 400,
+        "expected": 200
+      }
+    },
+    {
+      "name": "cache-model-before actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 409,
+        "expected": 200
+      }
+    },
+    {
+      "name": "cache-schema-after actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 400,
+        "expected": 200
+      }
+    },
+    {
+      "name": "cache-model-after actual HTTP status",
+      "passed": false,
+      "details": {
+        "actual": 409,
+        "expected": 200
+      }
+    }
+  ],
+  "historical_partial_collector_fault": {
+    "exception": "JSONDecodeError('Extra data: line 2 column 1 (char 2)')",
+    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-original-object-centric-playout-supplement-1.py\", line 65, in main\n    _,entry,before=call('supp-cache-model-before','/api/dfg');check('real mined cache exists before all7 supplemental original calls',entry['response']['status']==200,fatal=True)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-original-object-centric-playout-supplement-1.py\", line 54, in call\n    entry['response']={**rec(write(out/'captures'/(identifier+'.response.json'),raw)),'status':actual_status};check(identifier+' actual HTTP status',actual_status==status,{'expected':status,'actual':actual_status});save();return m.parsed(raw),entry,raw\n                                                                                                                                                                                                                                     ^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\original-object-centric-playout-feature-application-5eea620f07e244728ec7b6252e43b9f1\\executed-recipe.py\", line 20, in parsed\n    def parsed(data):return json.loads(data.decode('utf-8'),parse_float=Decimal,parse_int=lambda x:Decimal('-0')if x=='-0'else int(x))\n                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\__init__.py\", line 359, in loads\n    return cls(**kw).decode(s)\n           ^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\decoder.py\", line 340, in decode\n    raise JSONDecodeError(\"Extra data\", s, end)\njson.decoder.JSONDecodeError: Extra data: line 2 column 1 (char 2)\n"
+  },
+  "next_feature_contract": {
+    "path": "build/original-literal-controls-contract-feature68-5f846ea6c04d4243a9948ab9909a7678.json",
+    "bytes": 56752,
+    "sha256": "f1975efb3c105b80c50c157e4cc484b0992668f5a372e5aef12ac6c9aaad176f"
+  },
+  "evidence": {
+    "native": {
+      "path": "build/ocp67-resume-2500c455aef34d61ada890a412cbd237/build-manifest.json",
+      "bytes": 519684,
+      "sha256": "a3a6f22487007c5bd2f7847da6bc50fd3a2c64eed255d18f838fc252ea395c35"
+    },
+    "api": {
+      "path": "build/original-object-centric-playout-feature-application-composite-9579aade8a81437c82d02da3d014a347/validation.json",
+      "bytes": 7414984,
+      "sha256": "c5a4ee0722c1bb8ed894cccf7f925b26b54ad02a70e15316627af5ead95ca624"
+    },
+    "backend_commit": {
+      "path": "build/object-centric-playout-workbench-feature-backend-postcommit.json",
+      "bytes": 2350,
+      "sha256": "ea9cb8400cc78e8d728e925c9e67cff60b3d7bd1d6f4ddee7fd2baa3c40ee6f0"
+    },
+    "integration": {
+      "path": "build/original-object-centric-playout-frontend-integration-ffe834caca4e4d1aa98b014922a85226/validation.json",
+      "bytes": 40496,
+      "sha256": "08fb99522367fbfa952ce2c64024c88e26f36bd1ea1e59439e38f5368eda2078"
+    },
+    "baseline": {
+      "path": "build/oc-playout-workbench-feature-baseline.json",
+      "bytes": 18170,
+      "sha256": "3b614b53a80e0ffc1395e7a9abde27152b6fbdadb5d04777a2aba7baf8b07944"
+    },
+    "browser": {
+      "path": "build/emd-workbench-feature-browser-status-2.json",
+      "bytes": 2002,
+      "sha256": "6830ae5f5036cbb6aaf0f8820328128871acca61ba37ab6507cfd2aa16860844"
+    },
+    "next_contract": {
+      "path": "build/original-literal-controls-contract-feature68-5f846ea6c04d4243a9948ab9909a7678.json",
+      "bytes": 56752,
+      "sha256": "f1975efb3c105b80c50c157e4cc484b0992668f5a372e5aef12ac6c9aaad176f"
+    },
+    "frontend": {
+      "path": "build/oc-playout-workbench-feature-frontend-final-3d53806a-cf5d-41d5-ac3e-e2bbcee95bd0/validation.json",
+      "bytes": 2668947,
+      "sha256": "3d0ed4af165bdd3c7aa3638d896193174d3bf2969a509ca6dc7e3e881b36356b"
+    },
+    "publication": {
+      "path": "build/original-object-centric-playout-compact-fixture-publication-00fec5dad85b417a85ce10a9cd85ccb2/validation.json",
+      "bytes": 263641,
+      "sha256": "e06a0f41d61710272f277e30ed800454e255ac897021400f3310d96ce2bcd003"
+    },
+    "exports": {
+      "path": "build/original-object-centric-playout-compact-fixture-validation-37b2a067d4914f55a60c9cb4bdcaeb33/validation.json",
+      "bytes": 39661,
+      "sha256": "97be21066a64a2797fc802880c4d044cacad27c2d2e2517a3a27f5e15ee85162"
+    },
+    "server": {
+      "path": "build/oc-playout-workbench-feature-live-server.json",
+      "bytes": 2058,
+      "sha256": "cc3d3696e21adc34bdcefc09da399775e9ae9b225b97c5935b06ad63d5b976c5"
+    },
+    "live": {
+      "path": "build/oc-playout-workbench-feature-live-runtime.json",
+      "bytes": 2496,
+      "sha256": "bd912e6467a961c4c136a5d2cd30f3830eadbd1545fd1fe18cf3e3f31ec01a90"
+    }
+  },
+  "helper_sha256": "c68f7618acc5733fcbabc477cf109358ce18e22657251bd9e64ccc329fac3b33"
+}

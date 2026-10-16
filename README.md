@@ -2718,3 +2718,10 @@ See [validation and boundaries](docs/feature-first-original-embedding-workbench-
 Open **Original weighted-language EMD** to evaluate independent original weighted languages, request the native scalar distance, or derive a language from a full original EventLog. Exact trace order, duplicates, weights, stored mass and byte labels remain inspectable. Four native value options and four independently nullable finite callback tables retain actual native priority and invocation diagnostics. A returned computed=false evaluation remains distinct from a scalar exception. Download originals, all eight byte-safe artifacts, request/response, reports, complete CSV and selected records; reopen an actual derived language as a pair input. Existing log-derived EMD remains available.
 
 Finite tables bind real native callback members; arbitrary C++ function bodies are not executable JSON. Browser verification and strict reference parity remain pending. See [validation and boundaries](docs/feature-first-original-emd-workbench-validation.json).
+
+
+### Original object-centric playout
+
+Open **Original object-centric playout** to run original OCPN or object-centric causal-net models through four native result/log operations. Exact model/options editors preserve all18 native option fields, complete model/result state, arbitrary native byte labels and literal Petri storage. Inspect actual native calls, binding/seeded path behavior, partial failures and all8 authoritative artifacts; download full reports, CSV and selected records or reopen exact artifacts. Existing OCEL import/discovery remains available.
+
+Browser verification and strict reference parity remain pending. See [validation and boundaries](docs/feature-first-original-object-centric-playout-workbench-validation.json).
