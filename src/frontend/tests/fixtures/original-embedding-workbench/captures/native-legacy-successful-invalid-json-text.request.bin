@@ -1,0 +1,23 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+to_embeddings
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"dimensions":1}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-legacy-literal-controls.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"case\u0000id","events":[{"activity":"A"}]}]}
+
+--OwnedOriginalFootprintsFeature65--

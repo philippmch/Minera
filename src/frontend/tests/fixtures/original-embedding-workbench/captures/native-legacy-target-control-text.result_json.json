@@ -1,0 +1,1 @@
+{"embeddings":{"variant":{"name":"cases_transformers","index":0},"provider":{"name":"hashing","index":0},"embedding_model":"hashing-v1","attribute_key":"concept:name","dimensions":1,"items":[{"id":"a","values":[0.0]},{"id":"m","values":[-1.0]},{"id":"z","values":[1.0]}]},"matches":[{"id":"z","score":1.0}]}

@@ -1,0 +1,22 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+to_embeddings
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-import-all-storage.raw-log.json"
+Content-Type: application/octet-stream
+
+{"attributes":[{"key":"log","value":"raw"}],"metadata":{"extensions":[{"name":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 ","prefix":" x ","uri":"urn:owned"}],"classifiers":[{"name":"original","keys":["","concept:name","concept:name"]}],"trace_globals":[{"key":"retained","typed_value":{"index":5,"value":18446744073709551615}}],"event_globals":[{"key":"event","value":"unaltered"}],"properties":[{"key":"p","value":" \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "}],"globals":[{"scope":" arbitrary scope ","attributes":[{"key":"g","value":"original"}]}],"compatibility_snapshot_valid":true,"compatibility_globals_snapshot":[{"scope":"snapshot-only","attributes":[{"key":"s","value":"different"}]}],"compatibility_trace_globals_snapshot":[{"key":"snapshot-trace","value":"retained"}],"compatibility_event_globals_snapshot":[{"key":"snapshot-event","value":"retained"}]},"traces":[{"case_id":" outer\u0000\ud800 ","case_id_state_index":1,"case_id_source_key":" retained source ","case_id_attribute":{"key":"id","value":"projection mismatch","kind_index":-8,"container_index":-9,"null":false,"scalar_wrapper":true,"scalar_children_list":true,"first_class_role_index":-10,"first_class_state_index":-11,"first_class_source_key":"role-none-but-retained","typed_value":{"index":5,"value":18446744073709551615},"children":[{"key":"dup","typed_value":{"index":1,"value":-9223372036854775808}},{"key":"dup","typed_value":{"index":1,"value":9223372036854775807}}]},"attributes":[{"key":"none","typed_value":{"index":0,"value":null}},{"key":"signed","typed_value":{"index":1,"value":9007199254740993}},{"key":"nan","typed_value":{"index":2,"value":"NaN"}},{"key":"negativezero","typed_value":{"index":2,"value":-0.0}},{"key":"subnormal","typed_value":{"index":2,"value":4.9406564584124654e-324}},{"key":"infinity","typed_value":{"index":2,"value":"-INF"}},{"key":"bool","typed_value":{"index":3,"value":false}},{"key":"date","typed_value":{"index":4,"value":{"value":"raw instant\udfff","resolution_index":-2147483648,"timezone":""}}},{"key":"na","kind_index":0,"typed_value":{"index":6,"value":"NA"}}],"properties":[{"key":"p","value":" a,b ","children":[{"key":"","value":"child"}]}],"events":[{"case_id":"independent","activity":"A","timestamp":"not normalized","resource":"who","lifecycle":"phase","input_order":18446744073709551615,"attributes":[{"key":"x","value":"native string"}],"case_id_state_index":-7,"activity_state_index":2,"timestamp_state_index":1,"resource_state_index":2147483647,"lifecycle_state_index":-2147483648,"case_id_source_key":"case-source","activity_source_key":"act-source","timestamp_source_key":"time-source","resource_source_key":"resource-source","lifecycle_source_key":"life-source","activity_attribute":{"key":"selected","typed_value":{"index":5,"value":18446744073709551615}},"timestamp_attribute":{"typed_value":{"index":4,"value":{"value":"date","resolution_index":1,"timezone":null}}},"resource_attribute":{"typed_value":{"index":3,"value":true}},"lifecycle_attribute":{"value":"opaque"}},{"activity":"B"}]},{"events":[]}]}
+--OwnedOriginalFootprintsFeature65--

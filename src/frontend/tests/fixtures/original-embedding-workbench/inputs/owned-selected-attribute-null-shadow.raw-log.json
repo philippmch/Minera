@@ -1,0 +1,1 @@
+{"traces":[{"case_id":"selected","events":[{"activity":"B","attributes":[{"key":"literal,key","value":"A","null":true},{"key":"literal,key","value":"A"}]}]},{"case_id":"other","events":[{"activity":"A","attributes":[{"key":"literal,key","value":"B"}]}]}]}

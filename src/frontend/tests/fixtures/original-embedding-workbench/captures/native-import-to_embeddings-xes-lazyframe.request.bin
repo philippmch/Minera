@@ -1,0 +1,57 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+to_embeddings
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+import
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_format"
+
+auto
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_shape"
+
+lazyframe
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_selectors_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-import-xes.xes"
+Content-Type: application/octet-stream
+
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0">
+  <string key="owned-log-property" value="preserved" />
+  <trace>
+    <string key="concept:name" value="first" />
+    <string key="customer" value="owned-first" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:00Z" />
+    </event>
+    <event>
+      <string key="concept:name" value="B" />
+      <date key="time:timestamp" value="2026-01-01T00:00:01Z" />
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="second" />
+    <string key="customer" value="owned-second" />
+    <event>
+      <string key="concept:name" value="A" />
+      <date key="time:timestamp" value="2026-01-01T00:00:02Z" />
+    </event>
+  </trace>
+</log>
+--OwnedOriginalFootprintsFeature65--

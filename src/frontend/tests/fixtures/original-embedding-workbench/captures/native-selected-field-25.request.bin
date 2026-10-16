@@ -1,0 +1,23 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+to_embeddings
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"attribute_key":"org:resource","dimensions":1}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-literal-selectors.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"literal","events":[{"activity":"B","timestamp":"A","resource":"A","attributes":[{"key":" text,key;\n\u0000\ud800 ","value":"A"}]}]}]}
+
+--OwnedOriginalFootprintsFeature65--

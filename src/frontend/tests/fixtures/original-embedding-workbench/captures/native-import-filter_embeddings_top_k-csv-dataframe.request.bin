@@ -1,0 +1,47 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+filter
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="top_k"
+
+1
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+import
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_format"
+
+auto
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_shape"
+
+dataframe
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_selectors_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-import-csv.csv"
+Content-Type: application/octet-stream
+
+case_id,activity,timestamp,resource,lifecycle
+first,A,2026-01-01T00:00:00Z,r,complete
+first,B,2026-01-01T00:00:01Z,r,complete
+second,A,2026-01-01T00:00:02Z,s,start
+
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="target_file"; filename="owned-target-A.text"
+Content-Type: application/octet-stream
+
+A
+--OwnedOriginalFootprintsFeature65--

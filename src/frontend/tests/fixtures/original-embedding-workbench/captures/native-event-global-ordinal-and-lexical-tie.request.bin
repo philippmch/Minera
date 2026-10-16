@@ -1,0 +1,32 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+similarity_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"variant":"events_transformers","dimensions":1,"event_id_key":"id"}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="top_k"
+
+2
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+raw_log
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-global-ordinals.raw-log.json"
+Content-Type: application/octet-stream
+
+{"traces":[{"case_id":"first","events":[{"activity":"A","input_order":18446744073709551615,"attributes":[{"key":"id","null":true,"value":"ignored"}]},{"activity":"A","input_order":18446744073709551614,"attributes":[{"key":"id","value":""}]},{"activity":"A","input_order":18446744073709551613,"attributes":[]},{"activity":"A","input_order":18446744073709551612,"attributes":[]},{"activity":"A","input_order":18446744073709551611,"attributes":[]},{"activity":"A","input_order":18446744073709551610,"attributes":[]}]},{"case_id":"second","events":[{"activity":"A","input_order":42},{"activity":"A","input_order":41},{"activity":"A","input_order":40},{"activity":"A","input_order":39},{"activity":"A","input_order":38}]}]}
+
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="target_file"; filename="owned-empty.text"
+Content-Type: application/octet-stream
+
+
+--OwnedOriginalFootprintsFeature65--

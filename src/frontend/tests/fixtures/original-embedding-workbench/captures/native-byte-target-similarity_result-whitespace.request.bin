@@ -1,0 +1,29 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+similarity_result
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"dimensions":1}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="top_k"
+
+1
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="embedding_result_file"; filename="owned-simple-supplied.embedding-result.json"
+Content-Type: application/octet-stream
+
+{"variant":{"name":"cases_transformers","index":0},"provider":{"name":"hashing","index":0},"embedding_model":"hashing-v1","attribute_key":"concept:name","dimensions":1,"items":[{"id":"first","values":[1.0]},{"id":"second","values":[-1.0]}]}
+
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="target_file"; filename="owned-whitespace.text"
+Content-Type: application/octet-stream
+
+ 	
+ 
+--OwnedOriginalFootprintsFeature65--

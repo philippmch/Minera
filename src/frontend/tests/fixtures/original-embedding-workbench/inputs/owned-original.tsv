@@ -1,0 +1,4 @@
+case_id	activity	timestamp
+first	A	2026-01-01T00:00:00Z
+first	B	2026-01-01T00:00:04Z
+second	B	2026-01-01T00:01:00Z

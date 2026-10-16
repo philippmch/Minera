@@ -1,0 +1,35 @@
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="operation"
+
+to_embeddings
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="options_json"
+
+{"dimensions":1}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="transformer_binding"
+
+native_default
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_format"
+
+import
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_format"
+
+table
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_input_shape"
+
+lazyframe
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="mining_selectors_json"
+
+{}
+--OwnedOriginalFootprintsFeature65
+Content-Disposition: form-data; name="source_file"; filename="owned-byte-table-raw-v1.json"
+Content-Type: application/octet-stream
+
+{"native_byte_strings":"hex-v1","native_schema":"event-table-raw-v1","value":{"columns":["636173653a636f6e636570743a6e616d65","636f6e636570743a6e616d65","74696d653a74696d657374616d70","ff"],"rows":[[{"key":"636173653a636f6e636570743a6e616d65","value":"ff"},{"key":"636f6e636570743a6e616d65","value":"41"},{"key":"74696d653a74696d657374616d70","value":"323032362d30312d30315430303a30303a30305a"},{"key":"ff","value":"eda080edb080","typed_value":{"index":5,"value":18446744073709551615}}]],"attributes":[{"key":"7461626c652d6f726967696e","value":"ff"}],"metadata":{"extensions":[{"name":"ff","prefix":"6f776e","uri":"75726e3a6f776e"}],"classifiers":[{"name":"eda080edb080","keys":["647570","647570"]}],"trace_globals":[{"key":"77696465","value":"3138343436373434303733373039353531363135","typed_value":{"index":5,"value":18446744073709551615}}],"event_globals":[{"key":"6576656e74","value":"eda080edb080"}],"properties":[{"key":"70","value":"ff"}],"globals":[{"scope":"ff","attributes":[{"key":"67","value":"eda080edb080"}]}],"compatibility_snapshot_valid":true,"compatibility_globals_snapshot":[{"scope":"eda080edb080","attributes":[{"key":"736e617073686f74","value":"ff"}]}],"compatibility_trace_globals_snapshot":[{"key":"736e617073686f742d7472616365","value":"eda080edb080"}],"compatibility_event_globals_snapshot":[{"key":"736e617073686f742d6576656e74","value":"ff"}]},"dtypes":["737472","737472","737472","63617465676f7279"],"index":{"kind":"4d756c7469496e646578","dtype":"6f626a656374","names":["ff",null],"labels":[{"index":1,"value":[{"index":0,"value":{"key":"69","value":"2d39323233333732303336383534373735383038","typed_value":{"index":1,"value":-9223372036854775808}}},{"index":0,"value":{"key":"6a","value":"eda080edb080"}}]}]},"categorical_dtypes":[null,null,null,{"categories_dtype":"6f626a656374","categories":[{"key":"ff","value":"eda080edb080"}],"ordered":true}]}}
+
+--OwnedOriginalFootprintsFeature65--

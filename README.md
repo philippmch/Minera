@@ -2702,3 +2702,12 @@ See [validation and boundaries](docs/feature-first-original-footprints-workbench
 Open **Original Genetic Matrix** to convert a supplied matrix directly to an executable Petri net. Original activity/input/output vectors remain independent from the native normalized result. The one TO_PETRI_NET variant accepts its three exact native names or an alternative signed enum index. Inspect complete net storage and signed workflow markings, preserve original bytes and partial errors, and download canonical matrices, full results, PNML, native legacy JSON, reports, CSV and selected records.
 
 See [validation and boundaries](docs/feature-first-original-genetic-matrix-workbench-validation.json). Independent original-log genetic discovery, browser verification and strict reference parity remain pending.
+
+
+### Work with original embeddings and native filtering
+
+Open **Original embedding / filter** to filter a supplied source log, create embeddings, rank a supplied embedding result or original log, or embed raw text. Preserve all native options and inspect complete filtered logs, source preparation and full result vectors. Keep_cases, zero-k behaviors and duplicate IDs follow the native operations. Byte-safe original/canonical artifacts, independent XES/legacy exports, raw request/response, reports, CSV and selected records retain exact state. The optional server binding uses an existing actual host callback; HASHING remains the native default.
+
+Actual synthetic HTTP-provider tests verify registry and explicit callback wiring, provider priority and width inference; they do not validate a real transformer model. The final full API corpus began with historical cache state, while earlier preserved smoke/preseed captures separately establish uncached execution. Supplemental and historical counts stay separate from final corpus counts.
+
+See [validation and boundaries](docs/feature-first-original-embedding-workbench-validation.json). Real host model validation, browser checks and strict reference parity remain pending.

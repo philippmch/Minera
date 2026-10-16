@@ -1,0 +1,1 @@
+{"family":"TO_EMBEDDINGS_SIMILARITY","variant":"cases_transformers","embedding_provider":"hashing","target":"A","embedding_model":"hashing-v1","dimensions":64,"top_k":1,"items":[{"id":"second","score":1}]}
