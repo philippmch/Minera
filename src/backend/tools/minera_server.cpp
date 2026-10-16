@@ -89,6 +89,7 @@
 #include "minera/log_skeleton_workbench_json.hpp"
 #include "minera/footprints_workbench_json.hpp"
 #include "minera/genetic_matrix_workbench_json.hpp"
+#include "minera/embedding_workbench_json.hpp"
 #include "minera/genetic_matrix_conversion.hpp"
 #include "../footprints/conformance_log_model.hpp"
 #include "../footprints/conformance_log_extensive.hpp"
@@ -507,6 +508,8 @@ struct ClusteringAnalysis {
 std::atomic<std::uint64_t> g_clustering_sequence{0};
 std::shared_ptr<const ClusteringAnalysis> g_clustering_analysis;
 bool g_embedding_runtime_enabled = false;
+// Assigned only during startup; request-owned options receive a callback copy.
+minera::EmbeddingProviderCallback g_embedding_explicit_runtime;
 std::string g_llm_runtime_url;
 std::string g_query_runtime_url;
 std::set<std::string> g_llm_origins;
@@ -4040,6 +4043,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_log_skeleton_route.hpp"
 #include "original_footprints_route.hpp"
 #include "original_genetic_matrix_route.hpp"
+#include "original_embedding_route.hpp"
 
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
@@ -10316,9 +10320,11 @@ int main(int argc, char** argv) {
   }
 
   try {
-    if (!embedding_runtime_url.empty())
-      minera::set_default_embedding_provider(
-          minera::embedding_runtime::make_http_provider(embedding_runtime_url));
+    if (!embedding_runtime_url.empty()) {
+      auto callback = minera::embedding_runtime::make_http_provider(embedding_runtime_url);
+      minera::set_default_embedding_provider(callback);
+      g_embedding_explicit_runtime = std::move(callback);
+    }
     g_embedding_runtime_enabled = !embedding_runtime_url.empty();
     if (!g_llm_runtime_url.empty()) minera::llm_runtime::validate_url(g_llm_runtime_url);
     if (!g_query_runtime_url.empty()) minera::llm_runtime::validate_url(g_query_runtime_url);
@@ -10585,6 +10591,7 @@ int main(int argc, char** argv) {
   server.Post("/api/log-skeleton-workbench", handle_original_log_skeleton_workbench);
   server.Post("/api/footprints-workbench", handle_original_footprints_workbench);
   server.Post("/api/genetic-matrix-workbench", handle_original_genetic_matrix_workbench);
+  server.Post("/api/embedding-workbench", handle_original_embedding_workbench);
   server.Post("/api/discover-constraints", handle_constraint_discovery);
   server.Post("/api/discover-graph", handle_graph_discovery);
   server.Post("/api/discover-timing", handle_timing_discovery);
