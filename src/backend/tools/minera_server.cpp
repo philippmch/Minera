@@ -97,6 +97,7 @@
 #include "minera/bose_workbench_json.hpp"
 #include "minera/discovery_workbench_json.hpp"
 #include "minera/petri_analysis_workbench_json.hpp"
+#include "minera/root_cause_workbench_json.hpp"
 #include "minera/genetic_matrix_conversion.hpp"
 #include "../footprints/conformance_log_model.hpp"
 #include "../footprints/conformance_log_extensive.hpp"
@@ -4055,6 +4056,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_bose_route.hpp"
 #include "original_discovery_route.hpp"
 #include "original_petri_analysis_route.hpp"
+#include "original_root_cause_route.hpp"
 #include "original_emd_route.hpp"
 #include "original_object_centric_playout_route.hpp"
 
@@ -10630,6 +10632,8 @@ int main(int argc, char** argv) {
   server.Post("/api/discovery-workbench", handle_original_discovery_workbench);
   server.Options("/api/petri-analysis-workbench", preflight);
   server.Post("/api/petri-analysis-workbench", handle_original_petri_analysis_workbench);
+  server.Options("/api/root-cause-workbench", preflight);
+  server.Post("/api/root-cause-workbench", handle_original_root_cause_workbench);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);
