@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MineraExport, PetriAnalysisFamily, PetriAnalysisOptions, PetriAnalysisResult } from "../types";
 import { evaluationModelIds } from "../app-logic";
 import { nativeResponseJson } from "../native-response";
+import { OriginalPetriAnalysisWorkspace } from "./OriginalPetriAnalysisWorkspace";
 
 interface Props {
   data: MineraExport;
@@ -35,6 +36,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest, onIn
   const [splits, setSplits] = useState("");
   const [maxK, setMaxK] = useState("5");
   const [maxStates, setMaxStates] = useState("200000");
+  const [invariantSearchLimit, setInvariantSearchLimit] = useState("100000");
   const [fullBootstrap, setFullBootstrap] = useState(true);
   const [diagnostics, setDiagnostics] = useState(true);
   const [returnAsapWhenUnsound, setReturnAsapWhenUnsound] = useState(false);
@@ -45,7 +47,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest, onIn
   const dataIdentity = useRef({data,id:0});
   if(dataIdentity.current.data!==data)dataIdentity.current={data,id:dataIdentity.current.id+1};
   const selectionKey = JSON.stringify([dataIdentity.current.id,models,miner,family,traceIndex,initial,final,transitionCosts,
-    modelCosts,syncCosts,logCosts,splits,maxK,maxStates,fullBootstrap,diagnostics,returnAsapWhenUnsound,conversion]);
+    modelCosts,syncCosts,logCosts,splits,maxK,maxStates,invariantSearchLimit,fullBootstrap,diagnostics,returnAsapWhenUnsound,conversion]);
   const selectionRef = useRef(selectionKey); selectionRef.current=selectionKey;
   const sequence = useRef(0);
   useEffect(()=>{ sequence.current+=1;setLoading(false);setError(null); },[selectionKey]);
@@ -78,6 +80,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest, onIn
         split_indices: list(splits, true),
         max_k: Number(maxK || 0),
         max_states: Number(maxStates || 1),
+        invariant_search_limit: Number(invariantSearchLimit || 0),
         full_bootstrap: fullBootstrap,
         diagnostics,
         return_asap_when_unsound: returnAsapWhenUnsound,
@@ -91,7 +94,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest, onIn
     }
   };
 
-  return <section className="panel petri-analysis-panel">
+  return <><section className="panel petri-analysis-panel">
     <div className="panel-head"><h2>Petri analysis</h2><span className="panel-meta">State equation · workflow structure · soundness</span></div>
     <div className="align-settings-grid">
       <label>Model<select value={miner} onChange={(event) => setMiner(event.target.value)} disabled={models.length === 0}>{models.map((id) => <option value={id} key={id}>{id}</option>)}</select></label>
@@ -112,6 +115,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest, onIn
         <label>Full bootstrap<select value={String(fullBootstrap)} onChange={(event) => setFullBootstrap(event.target.value === "true")}><option value="true">On</option><option value="false">Off</option></select></label>
       </>}
       {(family === "extended_marking_equation" || family === "soundness" || family === "woflan" || family === "marking_equation") && <label>State limit<input type="number" min={1} value={maxStates} onChange={(event) => setMaxStates(event.target.value)} /></label>}
+      {(family === "soundness" || family === "woflan") && <label>Invariant search limit<input type="number" min={0} value={invariantSearchLimit} onChange={(event) => setInvariantSearchLimit(event.target.value)} /></label>}
       {(family === "soundness" || family === "woflan") && <label>Diagnostics<select value={String(diagnostics)} onChange={(event) => setDiagnostics(event.target.value === "true")}><option value="true">On</option><option value="false">Off</option></select></label>}
       {(family === "soundness" || family === "woflan") && <label>Return early<select value={String(returnAsapWhenUnsound)} onChange={(event) => setReturnAsapWhenUnsound(event.target.value === "true")}><option value="false">Off</option><option value="true">On</option></select></label>}
     </div>
@@ -143,5 +147,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest, onIn
       {lockingScenarios && <div>Locking scenarios: {lockingScenarios.length}</div>}
     </div>}
     {result && <><details><summary>Native Petri diagnostics JSON</summary><pre className="analysis-json">{nativeResponseJson(result)}</pre></details>{onInspect&&<button type="button" className="btn-ghost" onClick={()=>onInspect(result,miner)}>Inspect and save Petri diagnostics</button>}</>}
-  </section>;
+  </section>
+    <OriginalPetriAnalysisWorkspace key={family} initialOperation={family === "marking_equation" ? "solve_marking_equation" : family === "extended_marking_equation" ? "solve_extended_marking_equation" : family === "workflow_net" ? "check_workflow_net" : "analyze_soundness"}/>
+  </>;
 }

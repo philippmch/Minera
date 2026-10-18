@@ -2732,3 +2732,12 @@ Browser verification and strict reference parity remain pending. See [validation
 Open a prediction-target or feature transformation panel, **ILP Miner**, or the supplied-DFG precision section, then expand **Exact native controls**. Supply each selected control as exact JSON text or its original file bytes. Feature vectors have independent checkboxes; ILP/DFG options also expose every native member and supplied presence. Refresh the existing cached source when requested, then inspect complete configured options, native results, actual export bytes and failures. Download the original controls/DFG, native result, report, CSV or selected records.
 
 The eleven optional controls preserve native literal values and constructor defaults. Browser checks and strict reference parity remain pending. See [validation and boundaries](docs/feature-first-literal-controls-validation.json).
+
+
+### Analyze an original Petri net with a direct trace
+
+Open **Original Petri analysis** before mining, or launch it beside the existing Petri analysis controls. Supply a complete literal Petri-net JSON file or text, then choose default markings, marking equation, extended marking equation, workflow check, workflow bool or soundness analysis. Extended marking equations take a direct NativeString trace array; other functions do not take a trace.
+
+Use the selected exact options editor to retain omitted versus supplied members, native defaults, negative markings, integer budgets and nonfinite/signed-zero costs. Soundness accepts its soundness/Woflan variant and independent invariant_search_limit budget. Inspect every stored result field and entered/returned/computed/exhausted status; download raw responses, source/result/trace/options artifacts, reports, complete CSV and selected records, or reopen exact inputs. Existing cached analysis and PNML workflows remain available.
+
+Browser rendering and strict reference parity remain pending. NativeFloat64 NaN values use canonical quiet-NaN semantics; payload/sign/signalling-bit identity is not claimed. See [validation and boundaries](docs/feature-first-original-petri-analysis-workbench-validation.json).
