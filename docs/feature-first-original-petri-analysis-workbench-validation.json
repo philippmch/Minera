@@ -1,0 +1,512 @@
+{
+  "complete": true,
+  "feature_group": 73,
+  "prepared_only": false,
+  "checkpoint_kind": "implemented independent original Petri analysis; browser and strict parity pending",
+  "completed_utc": "2026-10-18T20:53:51.877564+00:00",
+  "feature_baseline_head": "809e45d6edeb49b0901ab4e0db47b699818e3190",
+  "backend_step_commit": "4e49f7408324e5e0ade02225bea78111afa003b0",
+  "ui_step_commit": null,
+  "ui_step_commit_pending": true,
+  "ui_step_commit_note": "Verified externally after the containing UI commit is created, avoiding self-reference.",
+  "ui_delivery_pending": false,
+  "reference_version": "2.7.22",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "All six original public Petri-analysis functions accept an independent complete nine-field literal Petri net. Extended marking equations accept an ordered direct NativeString trace word, including empty words, duplicate/empty labels and arbitrary native bytes. Existing cached analysis workflows and CLI dispatch remain available.",
+    "All twenty native option members across the 4/9/7-field structs retain exact defaults, supplied presence, signed markings, size_t budgets, NativeFloat64 vectors and both soundness variants. The existing cached soundness/Woflan panel exposes invariant_search_limit independently from max_states.",
+    "Complete WorkflowMarkings, MarkingEquationResult, ExtendedMarkingEquationResult, WorkflowNetResult and SoundnessResult preserve all 2/14/13/9/52 fields, plus the actual bool helper result. Native entered/returned flags remain distinct from computed, feasibility, validity, status, exhaustion and result.error.",
+    "The owned physical multipart envelope retains input/control/trace bytes, physical filename presence, part order and query origin. Before/after net, trace and selected options remain request-owned; canonical source/result/options/trace artifacts survive independently of optional legacy exporter failures.",
+    "A standalone pre-mining Original Petri analysis workspace and adjacent cached-analysis launch expose complete tables, CSV, selected records, raw responses, reports, original requests and exact reusable artifacts. Native/API/portable/full frontend/strict build/live proofs are bound below; rendered browser behavior and every strict gate remain open."
+  ],
+  "operations": [
+    {
+      "operation": "default_workflow_markings",
+      "public_call": "default_workflow_markings(net)",
+      "options_type": null,
+      "result_type": "WorkflowMarkings",
+      "trace_required": false,
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "solve_marking_equation",
+      "public_call": "solve_marking_equation(net, options)",
+      "options_type": "MarkingEquationOptions",
+      "result_type": "MarkingEquationResult",
+      "trace_required": false,
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "solve_extended_marking_equation",
+      "public_call": "solve_extended_marking_equation(trace, net, options)",
+      "options_type": "ExtendedMarkingEquationOptions",
+      "result_type": "ExtendedMarkingEquationResult",
+      "trace_required": true,
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "check_workflow_net",
+      "public_call": "check_workflow_net(net)",
+      "options_type": null,
+      "result_type": "WorkflowNetResult",
+      "trace_required": false,
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "is_workflow_net",
+      "public_call": "is_workflow_net(net)",
+      "options_type": null,
+      "result_type": "bool",
+      "trace_required": false,
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "analyze_soundness",
+      "public_call": "analyze_soundness(net, options)",
+      "options_type": "SoundnessOptions",
+      "result_type": "SoundnessResult",
+      "trace_required": false,
+      "exactly_one_selected_public_call": true
+    }
+  ],
+  "option_member_counts": {
+    "MarkingEquationOptions": 4,
+    "ExtendedMarkingEquationOptions": 9,
+    "SoundnessOptions": 7
+  },
+  "result_member_counts": {
+    "WorkflowMarkings": 2,
+    "MarkingEquationResult": 14,
+    "ExtendedMarkingEquationResult": 13,
+    "WorkflowNetResult": 9,
+    "SoundnessResult": 52
+  },
+  "bool_result": {
+    "type": "bool",
+    "value": "actual bool returned by is_workflow_net"
+  },
+  "validation_counts": {
+    "native_sources": 721,
+    "native_suites_aggregate": 59,
+    "actual_passing_suite_invocations": 5,
+    "retained_parent_suites": 58,
+    "current_attempt_executed_suites": 1,
+    "reused_parent_core_objects": 199,
+    "fresh_feature_core_objects": 1,
+    "feature_library_core_objects": 200,
+    "actual_api_calls": 132,
+    "selected_feature_cases": 130,
+    "historical_api_false_checks_retained": 0,
+    "cached_seed_attempts": 1,
+    "successful_cached_seeds": 1,
+    "independence_repeat_calls": 1,
+    "focused_frontend_tests": 81,
+    "focused_frontend_files": 1,
+    "portable_export_tests": 131,
+    "portable_fixture_files": 3,
+    "frontend_tests": 6053,
+    "frontend_test_files": 131,
+    "frontend_source_bindings": 14072,
+    "served_asset_count": 7,
+    "live_smoke_post_calls": 2,
+    "unrelated_files_preserved": 110
+  },
+  "test_accounting": {
+    "parent_validation": {
+      "path": "build/matrix-byte-feature-frontend-final-a2175a72fccf4e6bba044e78fa7210b8/validation.json",
+      "bytes": 2766708,
+      "sha256": "2e70d375627ac483bb9c34554abf471d1b7db1f7cbc489ac390d6be1b096e754"
+    },
+    "parent_results": {
+      "path": "build/matrix-byte-feature-frontend-final-a2175a72fccf4e6bba044e78fa7210b8/vitest-results.json",
+      "bytes": 2477553,
+      "sha256": "b52f8a7e1ba90c784424c8fd418f23f53ff1109c5e0244b29ddb72ac0ed6a218"
+    },
+    "focused_validation": {
+      "path": "build/petri-analysis73-staged-focused-1-c13f1f1ddf114adea3247cf6f712f4e7/validation.json",
+      "bytes": 48050,
+      "sha256": "2c618e0ee73f50e8966f2db9eb3d427db7a44c4c1c87c136a612612452f338a1"
+    },
+    "focused_results": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-analysis73-staged-focused-1-c13f1f1ddf114adea3247cf6f712f4e7\\vitest-results.json",
+      "sha256": "a43914785ab5a4cb781f6c4f22aa1b36c415ce6908e39dcded684af9d314279f",
+      "bytes": 33692
+    },
+    "fixture_validation": {
+      "path": "build/petri-analysis73-compact-fixture-validation-b5cb85c5aba44b0bbf3f641bc9231409/validation.json",
+      "bytes": 42880,
+      "sha256": "6e4b9956a088ccb250e389808500a61e3dacd03be40cbfe408482f6ea807f24e"
+    },
+    "parent_tests": 5841,
+    "parent_files": 129,
+    "replaced_files": [],
+    "replaced_parent_tests": 0,
+    "replacement_current_tests": 81,
+    "new_authored_tests": 81,
+    "new_authored_files": 1,
+    "new_portable_tests": 131,
+    "new_portable_files": 1,
+    "expected_current_tests": 6053,
+    "expected_current_files": 131,
+    "derived_from_actual_completed_reports": true,
+    "single_current_full_invocation_required": true,
+    "calculation": "parent plus one new authored suite plus one new portable suite"
+  },
+  "native_test_lineage": {
+    "parent_manifest": {
+      "path": "build/matrix-byte72r-8e439115b483498c/build-manifest.json",
+      "bytes": 353436,
+      "sha256": "a831468df1479e716e2c603206440643fd464a87facae5870840231fa70f5600"
+    },
+    "current_passing_targets": 59,
+    "current_contributing_invocations": 5,
+    "retained_parent_targets": 58,
+    "current_attempt_executed_targets": 1,
+    "single_combined_run_claimed": false,
+    "historical_native_build_attempts": [
+      {
+        "manifest": {
+          "path": "build/petri73-cd53b1ae0a9548069300bd05530055ef/build-manifest.json",
+          "bytes": 321158,
+          "sha256": "ab45ebe8657924ed9b9a522692a7cd640a0237c86c0ca57774a58f8ea273660c"
+        },
+        "failed_ctest_stdout": {
+          "path": "build/petri73-cd53b1ae0a9548069300bd05530055ef/command-3.stdout.txt",
+          "bytes": 716,
+          "sha256": "f2d9f5fadf68fbdd31bf22487837eff183b46cc920749263d4f498d8520cc6e8"
+        },
+        "failed_ctest_stderr": {
+          "path": "build/petri73-cd53b1ae0a9548069300bd05530055ef/command-3.stderr.txt",
+          "bytes": 27,
+          "sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4"
+        },
+        "failed_ctest_run_log": {
+          "path": "build/petri73-cd53b1ae0a9548069300bd05530055ef/targeted-ctest/Testing/Temporary/LastTest.log",
+          "bytes": 1242,
+          "sha256": "fc7e7719afb7143ae1d90a440e54ba899795e8d59f108b466e7df74c62cb37f3"
+        },
+        "outcome": "Configure/core/server/driver compiled successfully; sole new CTest failed incorrect NUL-containing exception.what expectation at line251. Entire failed namespace retained."
+      }
+    ],
+    "completed_prefix_seal": {
+      "path": "build/petri-analysis73-completed-prefix-seal-20261018.json",
+      "bytes": 240414,
+      "sha256": "f8a683bfa2fd23fd1cc6a2ced163a508a75fcc0eb835ed2c7b6dd1ac670a863b"
+    },
+    "test_only_correction": {
+      "path": "build/petri-analysis73-native-test-correction-20261018/staging-manifest.json",
+      "bytes": 2654,
+      "sha256": "9ec2f731b58b8e39009db849a436393a4a4148623fada807f1b72d0087d7b6ae"
+    }
+  },
+  "api_attempt_lineage": {
+    "actual_capture_validations": [
+      {
+        "path": "build/petri-analysis73-api-actual-20261018-1/validation.json",
+        "bytes": 3009132,
+        "sha256": "9c74720c4646a464b075451bfc57ebfd1231283fe761cf3d80ec8cd7de5e3b21"
+      }
+    ],
+    "physical_calls_retained": 132,
+    "selected_feature_count": 130,
+    "historical_false_checks": [],
+    "collector_faults": {},
+    "seed_attempt_physical_indices": [
+      131
+    ],
+    "repeat_physical_indices": [
+      132
+    ],
+    "independence": {
+      "baseline_physical_call_index": 1,
+      "seed_physical_call_index": 131,
+      "repeat_physical_call_index": 132,
+      "byte_identity": true,
+      "valid_cached_seed": true,
+      "actual_cached_source_id": "1",
+      "request_body_mime_path_stored_not_reconstructed": true
+    },
+    "all_selected_before_seed": true
+  },
+  "frontend_candidate_lineage": {
+    "expected_parent_head": "809e45d6edeb49b0901ab4e0db47b699818e3190",
+    "previous_candidate": {
+      "path": "build/petri-analysis73-frontend-control-ownership-amendment-20261018/staging-manifest.json",
+      "bytes": 49091,
+      "sha256": "8276c94f86625df0be7e8a0451c98103d440ec7191691c7258c52acfd50660a5"
+    },
+    "historical_staged_strict": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-analysis73-staged-types-1-5588ca3462424cf8869b2523ee8ac019\\validation.json",
+      "bytes": 71923,
+      "sha256": "c1aff0b121d95b71ad39487fb87c3abbd7ee4a1af4ce023299578e636bfca055"
+    },
+    "historical_staged_focused": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-analysis73-staged-focused-1-34faba8652a24dcabdf291cf7159bab9\\validation.json",
+      "bytes": 48211,
+      "sha256": "29a9f03fe441ad63d247321b0c8add1f6d96455446f671609ab94cbf6b610e6b"
+    },
+    "control_ownership_amendment": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\petri-analysis73-frontend-control-ownership-amendment-20261018\\control-ownership-amendment.json",
+      "bytes": 4996,
+      "sha256": "695af18c05539148d21ee6e9ce78d328c7b637163928392ec4910aec75dec641"
+    },
+    "changed_destinations_from_previous_candidate": [
+      "src/frontend/src/original-petri-analysis-workbench.ts",
+      "src/frontend/tests/original-petri-analysis-workbench.test.ts"
+    ],
+    "previous_actual_strict": {
+      "path": "build/petri-analysis73-staged-types-1-2a9b525e4dea479ea280460f26e16e53/validation.json",
+      "bytes": 72067,
+      "sha256": "60ddb9914be5715efa571902fded131c38d7889aa59a4deb4ade62981c90125d"
+    },
+    "previous_actual_focused": {
+      "path": "build/petri-analysis73-staged-focused-1-bd9ddcd90be0404bb1e290681579e176/validation.json",
+      "bytes": 48355,
+      "sha256": "a429e42b03969152662d5a85e0d090042097aa9e2afbffa215959b8ebd171032"
+    },
+    "filename_presence_amendment": {
+      "reason": "Native multipart role ownership is by model_file/trace_file name and accepts absent filename attributes.",
+      "guard": "Require each applicable named role; retain exact file flag equals filename attribute presence and original bytes.",
+      "regression_cases_added": 6,
+      "previous_passing_tests_retained": 75,
+      "builder_controls_and_files_changed": false,
+      "production_writes": false,
+      "actual_capture_plan_still_binds_unchanged_predecessor_builder": true
+    }
+  },
+  "delivery_proofs": {
+    "backend_commit": {
+      "path": "build/petri-analysis-feature73-backend-postcommit.json",
+      "bytes": 5288,
+      "sha256": "73f89dcf8a78f93298fd0edfe5c3abde3d69df4d88b6934014ae090ff761a196"
+    },
+    "native_build": {
+      "path": "build/petri73r-b56ec5d20d2a43af/build-manifest.json",
+      "bytes": 341109,
+      "sha256": "5638528c9400294c10a9e42e6ddde64b2b9fbfb254757b1b2ef0684315fd7afd"
+    },
+    "api_capture": {
+      "path": "build/petri-analysis73-api-actual-20261018-1/validation.json",
+      "bytes": 3009132,
+      "sha256": "9c74720c4646a464b075451bfc57ebfd1231283fe761cf3d80ec8cd7de5e3b21"
+    },
+    "frontend_integration": {
+      "path": "build/petri-analysis73-frontend-integration-01cd6533fc2b471f87665cfe5a46c7f9/validation.json",
+      "bytes": 44203,
+      "sha256": "b98ed2fa9c1696396277acbe078f04e1cf25b7c7212adea6bbed5417d8345750"
+    },
+    "portable_fixture_publication": {
+      "path": "build/petri-analysis73-compact-fixture-publication-3c5c5a896135496888cb5f6c7549b20e/validation.json",
+      "bytes": 141105,
+      "sha256": "8cb90d202ff2cabe75c747b3b6958e25a8b640e0acb629b2db8b2d8690e9f1c9"
+    },
+    "full_frontend_validation": {
+      "path": "build/petri-analysis-feature-frontend-final-430c16ddc2b6430a9a207a8d7ad45b16/validation.json",
+      "bytes": 2767160,
+      "sha256": "fa3f10c8efb65d37b1448127d64feb80351c7f85c2ff8c8aa6c7b1e876bcb96e"
+    },
+    "live_activation_validation": {
+      "path": "build/petri-analysis-feature73-live-runtime.json",
+      "bytes": 18763,
+      "sha256": "7b77c0b5500b1b9296acb63727d17a022cb9d27db91f91351893514f62d0fae3"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/petri-analysis-feature73-test-cleanup.json",
+      "bytes": 5156,
+      "sha256": "05f32dc6aaad798248f96f9470e65cb2915103c2a6db995a9b07ec4193b36114"
+    },
+    "frontend_candidate": {
+      "path": "build/petri-analysis73-frontend-filename-presence-amendment-20261018/staging-manifest.json",
+      "bytes": 49767,
+      "sha256": "329e5671a34ef0d19421a44fb07765f2d110b7d254696201a9bf23c3ec3e7017"
+    },
+    "frontend_strict_staging": {
+      "path": "build/petri-analysis73-staged-types-1-ff9092d2149641b0aeda6a80f014097e/validation.json",
+      "bytes": 71762,
+      "sha256": "aa69d087d69c16ecf976b3e6a6e293b2ea13dd78360e0051f29dc3e7ee275c97"
+    },
+    "frontend_focused_staging": {
+      "path": "build/petri-analysis73-staged-focused-1-c13f1f1ddf114adea3247cf6f712f4e7/validation.json",
+      "bytes": 48050,
+      "sha256": "2c618e0ee73f50e8966f2db9eb3d427db7a44c4c1c87c136a612612452f338a1"
+    },
+    "portable_fixture_validation": {
+      "path": "build/petri-analysis73-compact-fixture-validation-b5cb85c5aba44b0bbf3f641bc9231409/validation.json",
+      "bytes": 42880,
+      "sha256": "6e4b9956a088ccb250e389808500a61e3dacd03be40cbfe408482f6ea807f24e"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/petri-analysis73-compact-fixture-types-22644c58cfca44029d1d7ce3a3f072fb/validation.json",
+      "bytes": 69181,
+      "sha256": "54f94aca5eaf40927ec5728c888afff6726f619325da481dfa06fae14a2f8c6f"
+    },
+    "accepted_protocol": {
+      "path": "build/petri-analysis73-protocol-prepared-20261018-2/protocol.json",
+      "bytes": 34190,
+      "sha256": "4a4796f6a1b60bb927522994809ed92cad6ed95d44c263516befd49c6709d0f9"
+    },
+    "accepted_contract": {
+      "path": "build/petri-analysis73-protocol-prepared-20261018-2/contract.json",
+      "bytes": 4578,
+      "sha256": "491ed1e5764ef33ff81e55f6eafb16f16a084159b052346657a1c92fff622810"
+    },
+    "preserved_feature72_postcommit": {
+      "path": "build/matrix-byte-feature72-postcommit.json",
+      "bytes": 27279,
+      "sha256": "02177368e01c1d8bd55c24359624dc93119f5688abbfc306307196e1d1945175"
+    },
+    "preserved_feature72_delivery": {
+      "path": "docs/feature-first-original-genetic-matrix-byte-validation.json",
+      "bytes": 38096,
+      "sha256": "f49b0bacf96aebdea8eab9b1a3d125332499376d694596206b2aaefbb55d412d"
+    }
+  },
+  "evidence": {
+    "backend_commit": {
+      "path": "build/petri-analysis-feature73-backend-postcommit.json",
+      "bytes": 5288,
+      "sha256": "73f89dcf8a78f93298fd0edfe5c3abde3d69df4d88b6934014ae090ff761a196"
+    },
+    "native_build": {
+      "path": "build/petri73r-b56ec5d20d2a43af/build-manifest.json",
+      "bytes": 341109,
+      "sha256": "5638528c9400294c10a9e42e6ddde64b2b9fbfb254757b1b2ef0684315fd7afd"
+    },
+    "api_capture": {
+      "path": "build/petri-analysis73-api-actual-20261018-1/validation.json",
+      "bytes": 3009132,
+      "sha256": "9c74720c4646a464b075451bfc57ebfd1231283fe761cf3d80ec8cd7de5e3b21"
+    },
+    "frontend_integration": {
+      "path": "build/petri-analysis73-frontend-integration-01cd6533fc2b471f87665cfe5a46c7f9/validation.json",
+      "bytes": 44203,
+      "sha256": "b98ed2fa9c1696396277acbe078f04e1cf25b7c7212adea6bbed5417d8345750"
+    },
+    "portable_fixture_publication": {
+      "path": "build/petri-analysis73-compact-fixture-publication-3c5c5a896135496888cb5f6c7549b20e/validation.json",
+      "bytes": 141105,
+      "sha256": "8cb90d202ff2cabe75c747b3b6958e25a8b640e0acb629b2db8b2d8690e9f1c9"
+    },
+    "full_frontend_validation": {
+      "path": "build/petri-analysis-feature-frontend-final-430c16ddc2b6430a9a207a8d7ad45b16/validation.json",
+      "bytes": 2767160,
+      "sha256": "fa3f10c8efb65d37b1448127d64feb80351c7f85c2ff8c8aa6c7b1e876bcb96e"
+    },
+    "live_activation_validation": {
+      "path": "build/petri-analysis-feature73-live-runtime.json",
+      "bytes": 18763,
+      "sha256": "7b77c0b5500b1b9296acb63727d17a022cb9d27db91f91351893514f62d0fae3"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/petri-analysis-feature73-test-cleanup.json",
+      "bytes": 5156,
+      "sha256": "05f32dc6aaad798248f96f9470e65cb2915103c2a6db995a9b07ec4193b36114"
+    },
+    "frontend_candidate": {
+      "path": "build/petri-analysis73-frontend-filename-presence-amendment-20261018/staging-manifest.json",
+      "bytes": 49767,
+      "sha256": "329e5671a34ef0d19421a44fb07765f2d110b7d254696201a9bf23c3ec3e7017"
+    },
+    "frontend_strict_staging": {
+      "path": "build/petri-analysis73-staged-types-1-ff9092d2149641b0aeda6a80f014097e/validation.json",
+      "bytes": 71762,
+      "sha256": "aa69d087d69c16ecf976b3e6a6e293b2ea13dd78360e0051f29dc3e7ee275c97"
+    },
+    "frontend_focused_staging": {
+      "path": "build/petri-analysis73-staged-focused-1-c13f1f1ddf114adea3247cf6f712f4e7/validation.json",
+      "bytes": 48050,
+      "sha256": "2c618e0ee73f50e8966f2db9eb3d427db7a44c4c1c87c136a612612452f338a1"
+    },
+    "portable_fixture_validation": {
+      "path": "build/petri-analysis73-compact-fixture-validation-b5cb85c5aba44b0bbf3f641bc9231409/validation.json",
+      "bytes": 42880,
+      "sha256": "6e4b9956a088ccb250e389808500a61e3dacd03be40cbfe408482f6ea807f24e"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/petri-analysis73-compact-fixture-types-22644c58cfca44029d1d7ce3a3f072fb/validation.json",
+      "bytes": 69181,
+      "sha256": "54f94aca5eaf40927ec5728c888afff6726f619325da481dfa06fae14a2f8c6f"
+    },
+    "accepted_protocol": {
+      "path": "build/petri-analysis73-protocol-prepared-20261018-2/protocol.json",
+      "bytes": 34190,
+      "sha256": "4a4796f6a1b60bb927522994809ed92cad6ed95d44c263516befd49c6709d0f9"
+    },
+    "accepted_contract": {
+      "path": "build/petri-analysis73-protocol-prepared-20261018-2/contract.json",
+      "bytes": 4578,
+      "sha256": "491ed1e5764ef33ff81e55f6eafb16f16a084159b052346657a1c92fff622810"
+    },
+    "preserved_feature72_postcommit": {
+      "path": "build/matrix-byte-feature72-postcommit.json",
+      "bytes": 27279,
+      "sha256": "02177368e01c1d8bd55c24359624dc93119f5688abbfc306307196e1d1945175"
+    },
+    "preserved_feature72_delivery": {
+      "path": "docs/feature-first-original-genetic-matrix-byte-validation.json",
+      "bytes": 38096,
+      "sha256": "f49b0bacf96aebdea8eab9b1a3d125332499376d694596206b2aaefbb55d412d"
+    }
+  },
+  "historical_additional_attempts": [
+    {
+      "path": "build/petri73-cd53b1ae0a9548069300bd05530055ef/build-manifest.json",
+      "bytes": 321158,
+      "sha256": "ab45ebe8657924ed9b9a522692a7cd640a0237c86c0ca57774a58f8ea273660c"
+    },
+    {
+      "path": "build/petri-analysis73-native-test-correction-20261018/staging-manifest.json",
+      "bytes": 2654,
+      "sha256": "9ec2f731b58b8e39009db849a436393a4a4148623fada807f1b72d0087d7b6ae"
+    }
+  ],
+  "previous_feature_delivery_preserved": {
+    "path": "docs/feature-first-original-genetic-matrix-byte-validation.json",
+    "bytes": 38096,
+    "sha256": "f49b0bacf96aebdea8eab9b1a3d125332499376d694596206b2aaefbb55d412d"
+  },
+  "previous_feature_postcommit_preserved": {
+    "path": "build/matrix-byte-feature72-postcommit.json",
+    "bytes": 27279,
+    "sha256": "02177368e01c1d8bd55c24359624dc93119f5688abbfc306307196e1d1945175"
+  },
+  "browser_evidence": {
+    "path": "build/discovery-feature71-browser-status-1.json",
+    "bytes": 775,
+    "sha256": "21a0478e7f73e336308fc605a377ad9e58bdceb431805adea7bb202d39b32470"
+  },
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": false,
+  "latest_actual_browser_attempt_feature": 71,
+  "latest_actual_browser_attempt_served_feature": 70,
+  "boundaries": [
+    "Rendered browser controls, interactions and downloads remain unverified. No Feature 73 browser retry is made; the retained actual Feature 71 origin-policy denial occurred while Feature 70 served. Native/API/assets evidence does not verify rendering.",
+    "The existing NativeFloat64 codec preserves finite binary64 values, signed zero and semantic NaN/INF/-INF values. It canonicalizes NaN payload, sign and signalling state to quiet NaN; raw IEEE NaN bit identity remains a named strict gate.",
+    "Existing request-parser limits of 32 MiB input, depth 64 and one million values remain separate transport limits. This checkpoint does not claim all-size input parity or apply those input caps to serialized output.",
+    "Optional validating legacy export is separate from complete canonical storage. A native returned false/computed=false/unknown/exhausted or result.error is an actual result, while thrown configuration/preparation/native errors retain their reached prefix.",
+    "Other model hosts and PNML interchange retain their own formats, metadata and validation domains. This complete literal-Petri/direct-trace workflow does not add or claim a new lossless PNML importer.",
+    "All 86 families and 387 modules remain in scope, with 46 complete packages, 199 complete modules and 228 incomplete strict units. Defaults, numeric/type/Unicode/ordering/error/solver/concurrency/performance behavior and every strict reference gate remain open."
+  ],
+  "separate_remaining_gaps": [
+    "Rendered browser controls, interactions and downloads remain unverified. No Feature 73 browser retry is made; the retained actual Feature 71 origin-policy denial occurred while Feature 70 served. Native/API/assets evidence does not verify rendering.",
+    "The existing NativeFloat64 codec preserves finite binary64 values, signed zero and semantic NaN/INF/-INF values. It canonicalizes NaN payload, sign and signalling state to quiet NaN; raw IEEE NaN bit identity remains a named strict gate.",
+    "Existing request-parser limits of 32 MiB input, depth 64 and one million values remain separate transport limits. This checkpoint does not claim all-size input parity or apply those input caps to serialized output.",
+    "Optional validating legacy export is separate from complete canonical storage. A native returned false/computed=false/unknown/exhausted or result.error is an actual result, while thrown configuration/preparation/native errors retain their reached prefix.",
+    "Other model hosts and PNML interchange retain their own formats, metadata and validation domains. This complete literal-Petri/direct-trace workflow does not add or claim a new lossless PNML importer.",
+    "All 86 families and 387 modules remain in scope, with 46 complete packages, 199 complete modules and 228 incomplete strict units. Defaults, numeric/type/Unicode/ordering/error/solver/concurrency/performance behavior and every strict reference gate remain open."
+  ],
+  "next_feature_contract": {
+    "path": "build/post73-feature-availability-audit-20261018/confirmed-root-cause-input-contract.json",
+    "bytes": 10244,
+    "sha256": "d2ab7f439e1e23538876089c583d1867a226ab032894dbb8b4a30e88005f3f89"
+  },
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false
+}
