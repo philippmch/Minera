@@ -2725,3 +2725,10 @@ Finite tables bind real native callback members; arbitrary C++ function bodies a
 Open **Original object-centric playout** to run original OCPN or object-centric causal-net models through four native result/log operations. Exact model/options editors preserve all18 native option fields, complete model/result state, arbitrary native byte labels and literal Petri storage. Inspect actual native calls, binding/seeded path behavior, partial failures and all8 authoritative artifacts; download full reports, CSV and selected records or reopen exact artifacts. Existing OCEL import/discovery remains available.
 
 Browser verification and strict reference parity remain pending. See [validation and boundaries](docs/feature-first-original-object-centric-playout-workbench-validation.json).
+
+
+### Exact native controls
+
+Open a prediction-target or feature transformation panel, **ILP Miner**, or the supplied-DFG precision section, then expand **Exact native controls**. Supply each selected control as exact JSON text or its original file bytes. Feature vectors have independent checkboxes; ILP/DFG options also expose every native member and supplied presence. Refresh the existing cached source when requested, then inspect complete configured options, native results, actual export bytes and failures. Download the original controls/DFG, native result, report, CSV or selected records.
+
+The eleven optional controls preserve native literal values and constructor defaults. Browser checks and strict reference parity remain pending. See [validation and boundaries](docs/feature-first-literal-controls-validation.json).

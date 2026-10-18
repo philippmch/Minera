@@ -324,7 +324,7 @@
       ]
     },
     {
-      "feature_delivery_status": "configured_discovery_workflow_available",
+      "feature_delivery_status": "exact_literal_controls_available",
       "package": "algo.discovery.ilp",
       "parity_status": "partial",
       "selectors": [
@@ -491,7 +491,7 @@
       ]
     },
     {
-      "feature_delivery_status": "native_proof_exists",
+      "feature_delivery_status": "exact_literal_controls_available",
       "package": "algo.evaluation.precision.dfg",
       "parity_status": "complete",
       "selectors": [
@@ -686,7 +686,7 @@
       ]
     },
     {
-      "feature_delivery_status": "transformation_workflow_available",
+      "feature_delivery_status": "exact_literal_controls_available",
       "package": "algo.transformation.log_to_features",
       "parity_status": "partial",
       "selectors": [
@@ -704,7 +704,7 @@
       ]
     },
     {
-      "feature_delivery_status": "transformation_workflow_available",
+      "feature_delivery_status": "exact_literal_controls_available",
       "package": "algo.transformation.log_to_target",
       "parity_status": "complete",
       "selectors": [
@@ -3258,6 +3258,43 @@
       ],
       "validation": "docs/feature-first-original-object-centric-playout-workbench-validation.json",
       "browser_validation_complete": false
+    },
+    {
+      "id": "native_exact_literal_controls",
+      "state": "exact_literal_controls_available",
+      "families": [
+        "algo.transformation.log_to_target",
+        "algo.transformation.log_to_features",
+        "algo.discovery.ilp",
+        "algo.evaluation.precision.dfg"
+      ],
+      "supporting_native_surfaces": [
+        "LogToTargetOptions",
+        "LogToFeaturesOptions",
+        "ILPMinerOptions",
+        "DfgPrecisionOptions",
+        "log_to_target",
+        "log_to_features",
+        "mine_ilp",
+        "evaluate_dfg_precision"
+      ],
+      "entry_points": [
+        "include/minera/literal_controls_json.hpp",
+        "src/backend/literal_controls_json.cpp",
+        "src/backend/tools/literal_controls_route.hpp",
+        "src/frontend/src/literal-controls.ts",
+        "src/frontend/src/components/LiteralControlsPanel.tsx"
+      ],
+      "added": [
+        "Eleven opt-in exact JSON controls expose target activities, eight independent feature vectors, all seven ILP options and all three supplied-DFG precision options across four existing endpoint groups. All seven existing URLs remain mounted, including the ILP compatibility alias.",
+        "Exact controls retain native byte strings, whitespace, empty values, ordering, duplicates, full size_t integers and IEEE values. Omission, explicit empty arrays, empty string elements, null caps and zero caps remain distinct. Native operations own semantic validation.",
+        "The audit retains only successfully parsed controls and complete supplied-member sets, including a successful feature-vector prefix after a later parse failure. Full configured target/features/ILP/DFG options expose all 6/56/7/3 stored fields and six real feature-vector presence flags.",
+        "Actual selected EventDataView and cached source identities remain explicit. DFG precision preserves its original supplied bytes and native constructor defaults without cached selector overlay. Opt-in ILP accepts native integer limits; legacy requests keep their existing cap and parsing behavior.",
+        "Complete native results remain successful when independent legacy presentation or optional source export fails. Actual legacy/source bytes, native exporter exceptions and transport display errors remain separate. Raw controls, original uploads, full native tables, reports, CSV and selected records can be inspected and downloaded.",
+        "The existing prediction-target/feature transformation panels, ILP Miner and supplied-DFG precision section expose Exact native controls. Cancellation and source/replacement guards preserve actual request ownership. Compact portable fixtures retain every selected response and every physical request, including the malformed historical transport attempt."
+      ],
+      "validation": "docs/feature-first-literal-controls-validation.json",
+      "browser_validation_complete": false
     }
   ],
   "execution_priority": [
@@ -3313,7 +3350,8 @@
     "configured_genetic_discovery_and_original_matrix_conversion_available": "Existing configured cached-log genetic discovery plus independent caller-supplied causal-matrix conversion with exact native vectors/variant/full net/signed markings and complete inspection/downloads. Independent original-log genetic discovery, browser checks and strict reference parity remain separate unfinished work.",
     "original_embedding_filter_workbench_available": "Existing cached-log embedding operations plus five independent original-input native operations, full filtering/keep_cases and exact source/result/options/byte-safe artifacts. Actual synthetic HTTP callback wiring is validated separately; real host transformer models, browser checks and strict reference parity remain unfinished gates.",
     "original_weighted_language_emd_workbench_available": "Existing log-derived EMD plus three independent original weighted-language/EventLog operations, exact four native value options, four real finite table callback slots, full native results and byte-safe artifacts. Browser verification and strict reference parity remain separate unfinished gates.",
-    "original_object_centric_playout_workbench_available": "Original OCPN/object-centric causal-net model inputs, four actual native result/log operations,18 exact native options, full stored state and8 byte-safe artifacts. Browser and strict reference parity remain pending."
+    "original_object_centric_playout_workbench_available": "Original OCPN/object-centric causal-net model inputs, four actual native result/log operations,18 exact native options, full stored state and8 byte-safe artifacts. Browser and strict reference parity remain pending.",
+    "exact_literal_controls_available": "Eleven opt-in exact JSON controls across target, feature, ILP and supplied-DFG precision operations, preserving literal values/presence, complete native options/results and actual export bytes. Browser and strict reference parity remain pending."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

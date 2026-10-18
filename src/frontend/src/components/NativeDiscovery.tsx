@@ -1,3 +1,4 @@
+import {LiteralControlsPanel} from "./LiteralControlsPanel";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type MineraExport } from "../types";
 import { requestLogQuerySchema,downloadQueryBlob,type LogQuerySchema } from "../log-query";
@@ -42,5 +43,6 @@ export function NativeDiscovery({family,data,available,mining,onUseModel}:{famil
         <details><summary>Native model data</summary><pre>{JSON.stringify(model.result,null,2)}</pre></details>
       </section>
     </>}
+    {family==="ilp"&&<LiteralControlsPanel group="ilp" sourceId={schema?.source_id} available={available} mining={mining}/>}
   </>;
 }
