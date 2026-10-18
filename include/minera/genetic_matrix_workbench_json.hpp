@@ -13,6 +13,8 @@ struct GeneticMatrixWorkbenchOptions {
   GeneticMatrixConversionVariant variant = GeneticMatrixConversionVariant::kToPetriNet;
 };
 
+// Activity values accept scalar JSON strings or exact NativeString hex-v1 tags.
+// Writers preserve old quoted text only when its native-byte roundtrip is exact.
 // These parsers preserve constructor storage. Semantic matrix validation and
 // normalization belong exclusively to convert_genetic_matrix. Presence sets
 // update only after the entire carrier parses successfully.
@@ -24,8 +26,10 @@ struct GeneticMatrixWorkbenchOptions {
     const GeneticCausalMatrix& matrix);
 [[nodiscard]] std::string serialize_genetic_matrix_workbench_options_json(
     const GeneticMatrixWorkbenchOptions& options);
-// Complete executable-net getter storage, including inactive boundary values
-// and null-versus-engaged-empty transition name metadata.
+// Complete native net storage, including inactive boundary values and optional
+// transition-name state. Previously lossless valid rich getter JSON is unchanged.
+// Otherwise the full nine-field PetriNetLiteralStorage carrier is authoritative;
+// it preserves arbitrary byte labels and public literal state without validation.
 [[nodiscard]] std::string serialize_genetic_matrix_workbench_net_json(const PetriNet& net);
 [[nodiscard]] std::string serialize_genetic_matrix_workbench_markings_json(
     const WorkflowMarkings& markings);
