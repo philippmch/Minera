@@ -1,0 +1,818 @@
+{
+  "complete": true,
+  "feature_group": 75,
+  "prepared_only": false,
+  "checkpoint_kind": "implemented independent original TVQ/PRIPEL workbench; browser and strict parity pending",
+  "completed_utc": "2026-10-18T22:01:41.751749+00:00",
+  "feature_baseline_head": "765524492b495b2539a8017f119683eb7a655ef3",
+  "backend_step_commit": "e624187f065176cf33e839819137b456025e6718",
+  "ui_step_commit": null,
+  "ui_step_commit_pending": true,
+  "ui_step_commit_note": "Verified externally after the containing UI commit is created, avoiding self-reference.",
+  "ui_delivery_pending": false,
+  "reference_version": "2.7.22",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "All eight original public TVQ and PRIPEL callables are available before mining with independent editable complete raw source/query inputs and the direct PripelDiagnostics::to_json member. Existing cached anonymization workflows remain available.",
+    "All eight TraceVariantQueryOptions and six PripelOptions members retain native defaults and explicit supplied-member presence, including canonical enum reopening, exact uint64/size_t values, ordered byte-string blocklists and secure_random. Complete raw EventLog, Trace, Event and metadata storage uses the existing public raw-log codec without an XES roundtrip.",
+    "Complete three-field TVQ results, two-field PRIPEL results, twelve-field TVQ diagnostics and eleven-field PRIPEL diagnostics remain inspectable. The full ordered uint64 frequency map remains independent of capped emitted logs. Direct diagnostics text retains actual NativeString bytes without parsing them as JSON.",
+    "All twelve artifact slots retain canonical source/query/diagnostics before and after fragments, configured options, complete typed result, released log, result diagnostics, raw native text and optional actual XES bytes. Compatible source/query/released logs and configured options reopen as actual Files; only eleven-field PRIPEL result diagnostics reopen as diagnostics input.",
+    "Physical multipart requests retain control/upload ownership, bytes, order, query origin and absent versus empty filenames. One selected public native call owns validation and randomness; optional XES export errors remain distinct from canonical results. Secure output checks are structural and returned seeds remain configured seeds.",
+    "The standalone Original anonymization workspace exposes full tables, CSV, selected records, raw responses, reports, original requests and exact artifact downloads. Native/API/portable/full frontend/strict build/live proofs are complete and bound below. The retained collector fault is completed by one missing-repeat call without replay. Browser rendering and every strict parity gate remain open."
+  ],
+  "operations": [
+    {
+      "operation": "anonymize_trace_variant_query",
+      "public_call": "anonymize_trace_variant_query(source, options)",
+      "input_type": "EventLog",
+      "required_roles": [
+        "source_file"
+      ],
+      "options_type": "TraceVariantQueryOptions",
+      "result_type": "TraceVariantQueryResult"
+    },
+    {
+      "operation": "query_trace_variants",
+      "public_call": "query_trace_variants(source, options)",
+      "input_type": "EventLog",
+      "required_roles": [
+        "source_file"
+      ],
+      "options_type": "TraceVariantQueryOptions",
+      "result_type": "TraceVariantQueryResult"
+    },
+    {
+      "operation": "discover_trace_variant_query",
+      "public_call": "discover_trace_variant_query(source, options)",
+      "input_type": "EventLog",
+      "required_roles": [
+        "source_file"
+      ],
+      "options_type": "TraceVariantQueryOptions",
+      "result_type": "TraceVariantQueryResult"
+    },
+    {
+      "operation": "anonymize_trace_variants",
+      "public_call": "anonymize_trace_variants(source, options)",
+      "input_type": "EventLog",
+      "required_roles": [
+        "source_file"
+      ],
+      "options_type": "TraceVariantQueryOptions",
+      "result_type": "TraceVariantQueryResult"
+    },
+    {
+      "operation": "anonymize_pripel",
+      "public_call": "anonymize_pripel(source, released_query, options)",
+      "input_type": "PripelInputPair",
+      "required_roles": [
+        "source_file",
+        "query_file"
+      ],
+      "options_type": "PripelOptions",
+      "result_type": "PripelResult"
+    },
+    {
+      "operation": "pripel_anonymize",
+      "public_call": "pripel_anonymize(source, released_query, options)",
+      "input_type": "PripelInputPair",
+      "required_roles": [
+        "source_file",
+        "query_file"
+      ],
+      "options_type": "PripelOptions",
+      "result_type": "PripelResult"
+    },
+    {
+      "operation": "anonymize_pripel_log",
+      "public_call": "anonymize_pripel_log(source, released_query, options)",
+      "input_type": "PripelInputPair",
+      "required_roles": [
+        "source_file",
+        "query_file"
+      ],
+      "options_type": "PripelOptions",
+      "result_type": "PripelResult"
+    },
+    {
+      "operation": "pripel_diagnostics_to_json",
+      "public_call": "diagnostics.to_json()",
+      "input_type": "PripelDiagnostics",
+      "required_roles": [
+        "diagnostics_file"
+      ],
+      "options_type": null,
+      "result_type": "std::string"
+    }
+  ],
+  "option_member_counts": {
+    "TraceVariantQueryOptions": 8,
+    "PripelOptions": 6
+  },
+  "result_member_counts": {
+    "TraceVariantQueryResult": 3,
+    "PripelResult": 2
+  },
+  "diagnostic_member_counts": {
+    "TraceVariantQueryDiagnostics": 12,
+    "PripelDiagnostics": 11
+  },
+  "artifact_slots": 12,
+  "reference_family_mapping": "Independent original-input TVQ and PRIPEL availability attaches to the two retained anonymization families. Existing cached workflows remain available; no strict parity status, selector or catalogue scope is promoted.",
+  "families": [
+    "algo.anonymization.trace_variant_query",
+    "algo.anonymization.pripel"
+  ],
+  "validation_counts": {
+    "native_sources": 729,
+    "native_suites_aggregate": 61,
+    "actual_passing_suite_invocations": 7,
+    "retained_parent_suites": 60,
+    "current_attempt_executed_suites": 1,
+    "reused_parent_core_objects": 201,
+    "fresh_feature_core_objects": 1,
+    "feature_library_core_objects": 202,
+    "actual_api_calls": 209,
+    "selected_feature_cases": 207,
+    "historical_api_false_checks_retained": 0,
+    "historical_collector_faults_retained": 1,
+    "current_collector_faults": 0,
+    "retained_original_physical_calls": 208,
+    "missing_repeat_continuation_http_calls": 1,
+    "selected_calls_replayed": 0,
+    "seed_calls_replayed": 0,
+    "adaptive_artifact_reuploads": 9,
+    "api_full_guard_events": 4,
+    "cached_seed_attempts": 1,
+    "successful_cached_seeds": 1,
+    "independence_repeat_calls": 1,
+    "focused_frontend_tests": 80,
+    "focused_frontend_files": 1,
+    "portable_export_tests": 208,
+    "portable_fixture_files": 3,
+    "frontend_tests": 6605,
+    "frontend_test_files": 135,
+    "frontend_source_bindings": 14084,
+    "served_asset_count": 7,
+    "live_smoke_post_calls": 2,
+    "unrelated_files_preserved": 110
+  },
+  "test_accounting": {
+    "parent_validation": {
+      "path": "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/validation.json",
+      "bytes": 2768512,
+      "sha256": "854de20dc4c0ed4a88c48cdbd569fc13e2b1874a4c4f390dcfa7205ded1dcd35"
+    },
+    "parent_results": {
+      "path": "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/vitest-results.json",
+      "bytes": 2637209,
+      "sha256": "7571ff53bcc4cadccc3f305ac72f8f30236c863f7418f82c2ffc03a73c563fe5"
+    },
+    "focused_validation": {
+      "path": "build/anonymization75-staged-focused-1-b92128ad05d24447981899252cfacf78/validation.json",
+      "bytes": 47962,
+      "sha256": "fa822a906fafe86e4bafda5ffa9a7cb9efc84af9a2b66d3ded6d9f17ea816a45"
+    },
+    "focused_results": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\anonymization75-staged-focused-1-b92128ad05d24447981899252cfacf78\\vitest-results.json",
+      "sha256": "914b9bad9ab2d1c252b66b739710b747236057fc2275cf2ab055ec0a8e0b0631",
+      "bytes": 32970
+    },
+    "fixture_validation": {
+      "path": "build/anonymization75-compact-fixture-validation-1b32c841015d4a6683905de56b6e9ae6/validation.json",
+      "bytes": 144238,
+      "sha256": "595387bdced13b3b8c3a1c1987a4f178c03d2a28527fb8c6fb0e082dcbdca42a"
+    },
+    "parent_tests": 6317,
+    "parent_files": 133,
+    "replaced_files": [],
+    "replaced_parent_tests": 0,
+    "replacement_current_tests": 80,
+    "new_authored_tests": 80,
+    "new_authored_files": 1,
+    "new_portable_tests": 208,
+    "new_portable_files": 1,
+    "expected_current_tests": 6605,
+    "expected_current_files": 135,
+    "derived_from_actual_completed_reports": true,
+    "single_current_full_invocation_required": true,
+    "calculation": "parent plus one new authored suite plus one new portable suite"
+  },
+  "native_test_lineage": {
+    "parent_manifest": {
+      "path": "build/rootcause74r-d845f1f05a124bae/build-manifest.json",
+      "bytes": 351281,
+      "sha256": "12ecbbb759bf0e565fdcd9779c2d31b4393e9ad3e601a75d47b6397c46e4cbb7"
+    },
+    "current_passing_targets": 61,
+    "current_contributing_invocations": 7,
+    "retained_parent_targets": 60,
+    "current_attempt_executed_targets": 1,
+    "single_combined_run_claimed": false,
+    "historical_native_build_attempts": [],
+    "test_only_correction": null,
+    "first_attempt_succeeded": true
+  },
+  "api_attempt_lineage": {
+    "actual_capture_validations": [
+      {
+        "path": "build/anonymization75-api-actual-20261018-1/validation.json",
+        "bytes": 2542368,
+        "sha256": "958b776f3afea2c5daff1d341b6978a4f984753e9cc192819476683e74ffee8d"
+      }
+    ],
+    "physical_calls_retained": 209,
+    "selected_feature_count": 207,
+    "historical_false_checks": [],
+    "collector_faults": {
+      "historical_collector_faults": [
+        {
+          "source_validation": {
+            "path": "build/anonymization75-api-actual-20261018-1/validation.json",
+            "bytes": 2542368,
+            "sha256": "958b776f3afea2c5daff1d341b6978a4f984753e9cc192819476683e74ffee8d"
+          },
+          "type": "TypeError",
+          "message": "'dict' object is not callable",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\anonymization75-api-collector-prepared-5-20261018\\capture.py\", line 944, in main\n    field = native(part['field'])\n            ^^^^^^^^^^^^^^^^^^^^^\nTypeError: 'dict' object is not callable\n",
+          "utc": "2026-10-18T21:47:28.625231+00:00",
+          "physical_attempts_retained": 208,
+          "retry_performed": false
+        }
+      ],
+      "current_collector_faults": []
+    },
+    "original_capture": {
+      "path": "build/anonymization75-api-actual-20261018-1/validation.json",
+      "bytes": 2542368,
+      "sha256": "958b776f3afea2c5daff1d341b6978a4f984753e9cc192819476683e74ffee8d"
+    },
+    "original_capture_complete": false,
+    "missing_repeat_continuation": {
+      "path": "build/anonymization75-api-continuation-20261018-1/validation.json",
+      "bytes": 2567350,
+      "sha256": "3ca88aedd02cd46488d396b678f4e1047c4075e1fdbb563b0d0731eb6f629f88"
+    },
+    "continuation_helper": {
+      "path": "build/complete-anonymization75-pending-repeat-1.py",
+      "bytes": 11092,
+      "sha256": "d0e10566397f44ded37165f9d1c883d5208eee63284475a544a5c0d8e728a771"
+    },
+    "actual_capture_helper": {
+      "path": "build/anonymization75-api-collector-prepared-5-20261018/capture.py",
+      "bytes": 63765,
+      "sha256": "cc1b3c112f663a1bb5efc31dc11dacafbc14567f1c76fbb5bb6c9a3ab478f8e6"
+    },
+    "executed_capture_helper": {
+      "path": "build/anonymization75-api-actual-20261018-1/executed-collector.py",
+      "bytes": 63765,
+      "sha256": "cc1b3c112f663a1bb5efc31dc11dacafbc14567f1c76fbb5bb6c9a3ab478f8e6"
+    },
+    "retained_parent_cases_exact": true,
+    "retained_parent_physical_calls": 208,
+    "new_http_calls_for_missing_repeat": 1,
+    "selected_calls_replayed": 0,
+    "seed_calls_replayed": 0,
+    "correction": "Only use the original module native() function outside main, where the old local manifest variable shadowed that function. No request, expectation, product or captured prefix change.",
+    "guard_policy": "Three original full guards retained, including terminal after-fault guard; exact epoch rechecked before the sole unsent repeat, one full guard after it. Four actual full guard events. No per-request whole-tree hashing.",
+    "full_guard_events": [
+      {
+        "name": "before_first_corpus_send",
+        "started_utc": "2026-10-18T21:46:45.460508+00:00",
+        "complete": true,
+        "finished_utc": "2026-10-18T21:46:48.426184+00:00"
+      },
+      {
+        "name": "after_selected_before_seed",
+        "started_utc": "2026-10-18T21:47:25.074071+00:00",
+        "complete": true,
+        "finished_utc": "2026-10-18T21:47:28.302683+00:00"
+      },
+      {
+        "name": "after_fault_instead_of_remaining_boundary",
+        "started_utc": "2026-10-18T21:47:28.625231+00:00",
+        "complete": true,
+        "finished_utc": "2026-10-18T21:47:31.825325+00:00"
+      },
+      {
+        "name": "after_pending_final_repeat",
+        "started_utc": "2026-10-18T21:49:08.668247+00:00",
+        "complete": true,
+        "finished_utc": "2026-10-18T21:49:11.620552+00:00"
+      }
+    ],
+    "guard_before": {
+      "process": {
+        "ProcessId": 23568,
+        "ExecutablePath": "C:\\Users\\pmoch\\Documents\\Minera\\build\\anonym75-87cef393868344e29594845eb4d81fe7\\native-build\\product-targets\\Release\\minera_server.exe",
+        "CommandLine": "\"C:\\Users\\pmoch\\Documents\\Minera\\build\\anonym75-87cef393868344e29594845eb4d81fe7\\native-build\\product-targets\\Release\\minera_server.exe\" --port 8575 --frontend \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f\\dist\" ",
+        "CreationDate": "/Date(1792359825460)/"
+      },
+      "listeners": [
+        {
+          "LocalAddress": "127.0.0.1",
+          "LocalPort": 8575,
+          "OwningProcess": 23568
+        }
+      ],
+      "protected_user_server": {
+        "process": {
+          "ProcessId": 5296,
+          "ExecutablePath": "C:\\Users\\pmoch\\Documents\\Minera\\build\\rootcause74-bb102c36722e45e380c639ff3ee1bc92\\native-build\\product-targets\\Release\\minera_server.exe",
+          "CommandLine": "\"C:\\Users\\pmoch\\Documents\\Minera\\build\\rootcause74-bb102c36722e45e380c639ff3ee1bc92\\native-build\\product-targets\\Release\\minera_server.exe\" --port 8562 --frontend \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f\\dist\" ",
+          "CreationDate": "/Date(1792358699237)/"
+        },
+        "listeners": [
+          {
+            "LocalAddress": "127.0.0.1",
+            "LocalPort": 8562,
+            "OwningProcess": 5296
+          }
+        ]
+      },
+      "native_source_count": 729,
+      "frontend_context_count": 330,
+      "source_bindings_sha256": "7dde2fa13b237edd4995130b85174b557b6f14e3526e745ea9316907cc216656",
+      "frontend_bindings": {
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/html2canvas.esm-DXEQVQnt.js": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-b2_WPvF4.css": "1bcc68f50069d8b8d947369bbf0312379e95664b0eee33068b25a994545c8f02",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-DhFoTEO4.js": "a20f5709cd553405c0a3626f73c18fc3b44b282192ad403f4eddab9be7c60372",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/index.html": "f02a7d690ee8ca7e4142a80aa921aa7401236402068408712327a76925d68a14",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+      },
+      "protected_frontend_bindings": {
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/html2canvas.esm-DXEQVQnt.js": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-b2_WPvF4.css": "1bcc68f50069d8b8d947369bbf0312379e95664b0eee33068b25a994545c8f02",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-DhFoTEO4.js": "a20f5709cd553405c0a3626f73c18fc3b44b282192ad403f4eddab9be7c60372",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/index.html": "f02a7d690ee8ca7e4142a80aa921aa7401236402068408712327a76925d68a14",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+      },
+      "unrelated_preserved": 110,
+      "journal_prefix_preserved": true,
+      "journal_sha256": "9949325ebfda3c01ac13ba2fb92ddadeb41fc84c515063ee2ed71af0db6897ce",
+      "service_epoch": "feature75-test-a42b78e12b3c49978656b1960bcdc259",
+      "native_manifest_sha256": "ac5f051bc7818c9225f5fc430faa69fd28be1603e3c97d0a10d8f2271df968df"
+    },
+    "guard_before_seed": {
+      "process": {
+        "ProcessId": 23568,
+        "ExecutablePath": "C:\\Users\\pmoch\\Documents\\Minera\\build\\anonym75-87cef393868344e29594845eb4d81fe7\\native-build\\product-targets\\Release\\minera_server.exe",
+        "CommandLine": "\"C:\\Users\\pmoch\\Documents\\Minera\\build\\anonym75-87cef393868344e29594845eb4d81fe7\\native-build\\product-targets\\Release\\minera_server.exe\" --port 8575 --frontend \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f\\dist\" ",
+        "CreationDate": "/Date(1792359825460)/"
+      },
+      "listeners": [
+        {
+          "LocalAddress": "127.0.0.1",
+          "LocalPort": 8575,
+          "OwningProcess": 23568
+        }
+      ],
+      "protected_user_server": {
+        "process": {
+          "ProcessId": 5296,
+          "ExecutablePath": "C:\\Users\\pmoch\\Documents\\Minera\\build\\rootcause74-bb102c36722e45e380c639ff3ee1bc92\\native-build\\product-targets\\Release\\minera_server.exe",
+          "CommandLine": "\"C:\\Users\\pmoch\\Documents\\Minera\\build\\rootcause74-bb102c36722e45e380c639ff3ee1bc92\\native-build\\product-targets\\Release\\minera_server.exe\" --port 8562 --frontend \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f\\dist\" ",
+          "CreationDate": "/Date(1792358699237)/"
+        },
+        "listeners": [
+          {
+            "LocalAddress": "127.0.0.1",
+            "LocalPort": 8562,
+            "OwningProcess": 5296
+          }
+        ]
+      },
+      "native_source_count": 729,
+      "frontend_context_count": 330,
+      "source_bindings_sha256": "7dde2fa13b237edd4995130b85174b557b6f14e3526e745ea9316907cc216656",
+      "frontend_bindings": {
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/html2canvas.esm-DXEQVQnt.js": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-b2_WPvF4.css": "1bcc68f50069d8b8d947369bbf0312379e95664b0eee33068b25a994545c8f02",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-DhFoTEO4.js": "a20f5709cd553405c0a3626f73c18fc3b44b282192ad403f4eddab9be7c60372",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/index.html": "f02a7d690ee8ca7e4142a80aa921aa7401236402068408712327a76925d68a14",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+      },
+      "protected_frontend_bindings": {
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/html2canvas.esm-DXEQVQnt.js": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-b2_WPvF4.css": "1bcc68f50069d8b8d947369bbf0312379e95664b0eee33068b25a994545c8f02",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-DhFoTEO4.js": "a20f5709cd553405c0a3626f73c18fc3b44b282192ad403f4eddab9be7c60372",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/index.html": "f02a7d690ee8ca7e4142a80aa921aa7401236402068408712327a76925d68a14",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+      },
+      "unrelated_preserved": 110,
+      "journal_prefix_preserved": true,
+      "journal_sha256": "9949325ebfda3c01ac13ba2fb92ddadeb41fc84c515063ee2ed71af0db6897ce",
+      "service_epoch": "feature75-test-a42b78e12b3c49978656b1960bcdc259",
+      "native_manifest_sha256": "ac5f051bc7818c9225f5fc430faa69fd28be1603e3c97d0a10d8f2271df968df"
+    },
+    "guard_after_fault": {
+      "process": {
+        "ProcessId": 23568,
+        "ExecutablePath": "C:\\Users\\pmoch\\Documents\\Minera\\build\\anonym75-87cef393868344e29594845eb4d81fe7\\native-build\\product-targets\\Release\\minera_server.exe",
+        "CommandLine": "\"C:\\Users\\pmoch\\Documents\\Minera\\build\\anonym75-87cef393868344e29594845eb4d81fe7\\native-build\\product-targets\\Release\\minera_server.exe\" --port 8575 --frontend \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f\\dist\" ",
+        "CreationDate": "/Date(1792359825460)/"
+      },
+      "listeners": [
+        {
+          "LocalAddress": "127.0.0.1",
+          "LocalPort": 8575,
+          "OwningProcess": 23568
+        }
+      ],
+      "protected_user_server": {
+        "process": {
+          "ProcessId": 5296,
+          "ExecutablePath": "C:\\Users\\pmoch\\Documents\\Minera\\build\\rootcause74-bb102c36722e45e380c639ff3ee1bc92\\native-build\\product-targets\\Release\\minera_server.exe",
+          "CommandLine": "\"C:\\Users\\pmoch\\Documents\\Minera\\build\\rootcause74-bb102c36722e45e380c639ff3ee1bc92\\native-build\\product-targets\\Release\\minera_server.exe\" --port 8562 --frontend \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f\\dist\" ",
+          "CreationDate": "/Date(1792358699237)/"
+        },
+        "listeners": [
+          {
+            "LocalAddress": "127.0.0.1",
+            "LocalPort": 8562,
+            "OwningProcess": 5296
+          }
+        ]
+      },
+      "native_source_count": 729,
+      "frontend_context_count": 330,
+      "source_bindings_sha256": "7dde2fa13b237edd4995130b85174b557b6f14e3526e745ea9316907cc216656",
+      "frontend_bindings": {
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/html2canvas.esm-DXEQVQnt.js": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-b2_WPvF4.css": "1bcc68f50069d8b8d947369bbf0312379e95664b0eee33068b25a994545c8f02",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-DhFoTEO4.js": "a20f5709cd553405c0a3626f73c18fc3b44b282192ad403f4eddab9be7c60372",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/index.html": "f02a7d690ee8ca7e4142a80aa921aa7401236402068408712327a76925d68a14",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+      },
+      "protected_frontend_bindings": {
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/html2canvas.esm-DXEQVQnt.js": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-b2_WPvF4.css": "1bcc68f50069d8b8d947369bbf0312379e95664b0eee33068b25a994545c8f02",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-DhFoTEO4.js": "a20f5709cd553405c0a3626f73c18fc3b44b282192ad403f4eddab9be7c60372",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/index.html": "f02a7d690ee8ca7e4142a80aa921aa7401236402068408712327a76925d68a14",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+      },
+      "unrelated_preserved": 110,
+      "journal_prefix_preserved": true,
+      "journal_sha256": "9949325ebfda3c01ac13ba2fb92ddadeb41fc84c515063ee2ed71af0db6897ce",
+      "service_epoch": "feature75-test-a42b78e12b3c49978656b1960bcdc259",
+      "native_manifest_sha256": "ac5f051bc7818c9225f5fc430faa69fd28be1603e3c97d0a10d8f2271df968df"
+    },
+    "guard_after": {
+      "process": {
+        "ProcessId": 23568,
+        "ExecutablePath": "C:\\Users\\pmoch\\Documents\\Minera\\build\\anonym75-87cef393868344e29594845eb4d81fe7\\native-build\\product-targets\\Release\\minera_server.exe",
+        "CommandLine": "\"C:\\Users\\pmoch\\Documents\\Minera\\build\\anonym75-87cef393868344e29594845eb4d81fe7\\native-build\\product-targets\\Release\\minera_server.exe\" --port 8575 --frontend \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f\\dist\" ",
+        "CreationDate": "/Date(1792359825460)/"
+      },
+      "listeners": [
+        {
+          "LocalAddress": "127.0.0.1",
+          "LocalPort": 8575,
+          "OwningProcess": 23568
+        }
+      ],
+      "protected_user_server": {
+        "process": {
+          "ProcessId": 5296,
+          "ExecutablePath": "C:\\Users\\pmoch\\Documents\\Minera\\build\\rootcause74-bb102c36722e45e380c639ff3ee1bc92\\native-build\\product-targets\\Release\\minera_server.exe",
+          "CommandLine": "\"C:\\Users\\pmoch\\Documents\\Minera\\build\\rootcause74-bb102c36722e45e380c639ff3ee1bc92\\native-build\\product-targets\\Release\\minera_server.exe\" --port 8562 --frontend \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f\\dist\" ",
+          "CreationDate": "/Date(1792358699237)/"
+        },
+        "listeners": [
+          {
+            "LocalAddress": "127.0.0.1",
+            "LocalPort": 8562,
+            "OwningProcess": 5296
+          }
+        ]
+      },
+      "native_source_count": 729,
+      "frontend_context_count": 330,
+      "source_bindings_sha256": "7dde2fa13b237edd4995130b85174b557b6f14e3526e745ea9316907cc216656",
+      "frontend_bindings": {
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/html2canvas.esm-DXEQVQnt.js": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-b2_WPvF4.css": "1bcc68f50069d8b8d947369bbf0312379e95664b0eee33068b25a994545c8f02",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-DhFoTEO4.js": "a20f5709cd553405c0a3626f73c18fc3b44b282192ad403f4eddab9be7c60372",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/index.html": "f02a7d690ee8ca7e4142a80aa921aa7401236402068408712327a76925d68a14",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+      },
+      "protected_frontend_bindings": {
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/html2canvas.esm-DXEQVQnt.js": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-b2_WPvF4.css": "1bcc68f50069d8b8d947369bbf0312379e95664b0eee33068b25a994545c8f02",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/assets/index-DhFoTEO4.js": "a20f5709cd553405c0a3626f73c18fc3b44b282192ad403f4eddab9be7c60372",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/index.html": "f02a7d690ee8ca7e4142a80aa921aa7401236402068408712327a76925d68a14",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-data.json": "d911832de3f7155d85d244497b1d8aa111907c709c6cde4a475c9875565ba1a9",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-ocel.json": "04c6d560119bf12cd308cdbfca493c565bcfe88b89d394893dfa85a5f7535585",
+        "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/dist/sample-resource-log.csv": "798f83a034201539d375a44e442aa340cb9af20caf5927362b898c27c0970621"
+      },
+      "unrelated_preserved": 110,
+      "journal_prefix_preserved": true,
+      "journal_sha256": "9949325ebfda3c01ac13ba2fb92ddadeb41fc84c515063ee2ed71af0db6897ce",
+      "service_epoch": "feature75-test-a42b78e12b3c49978656b1960bcdc259",
+      "native_manifest_sha256": "ac5f051bc7818c9225f5fc430faa69fd28be1603e3c97d0a10d8f2271df968df"
+    },
+    "seed_attempt_physical_indices": [
+      208
+    ],
+    "repeat_physical_indices": [
+      209
+    ],
+    "independence": {
+      "baseline_physical_call_index": 1,
+      "seed_physical_call_index": 208,
+      "repeat_physical_call_index": 209,
+      "byte_identity": true,
+      "valid_cached_seed": true,
+      "actual_cached_source_id": "1",
+      "request_body_mime_path_stored_not_reconstructed": true
+    },
+    "all_selected_before_seed": true
+  },
+  "frontend_candidate_lineage": {
+    "expected_parent_head": "765524492b495b2539a8017f119683eb7a655ef3"
+  },
+  "delivery_proofs": {
+    "backend_commit": {
+      "path": "build/anonymization-feature75-backend-postcommit.json",
+      "bytes": 3954,
+      "sha256": "8c16bacb41b063da755b902e29218d99ad3e9a3f997891a7479234ad5ffcffc3"
+    },
+    "native_build": {
+      "path": "build/anonym75-87cef393868344e29594845eb4d81fe7/build-manifest.json",
+      "bytes": 351858,
+      "sha256": "ac5f051bc7818c9225f5fc430faa69fd28be1603e3c97d0a10d8f2271df968df"
+    },
+    "api_capture": {
+      "path": "build/anonymization75-api-continuation-20261018-1/validation.json",
+      "bytes": 2567350,
+      "sha256": "3ca88aedd02cd46488d396b678f4e1047c4075e1fdbb563b0d0731eb6f629f88"
+    },
+    "frontend_integration": {
+      "path": "build/anonymization75-frontend-integration-9bb1b6b93258497887292ad937658262/validation.json",
+      "bytes": 45137,
+      "sha256": "417bdc0a869ca810fe9fc22275a183195ae8e1eeda6bce5e135edc0428fc3047"
+    },
+    "portable_fixture_publication": {
+      "path": "build/anonymization75-compact-fixture-publication-52bc61d2f109400d87de0506e761d013/validation.json",
+      "bytes": 364567,
+      "sha256": "27d90458f3d180777a3badffda1e215583ccc45f3b20d0d109ca1a8ce5d1565d"
+    },
+    "full_frontend_validation": {
+      "path": "build/anonymization-feature-frontend-final-2210b1ee3c0147c89e86561119e2b5a6/validation.json",
+      "bytes": 2769898,
+      "sha256": "0fa460aa6d8d52f3a496d953bec8346c85a61b4e43c536ce8ba7ffd1db2d9471"
+    },
+    "live_activation_validation": {
+      "path": "build/anonymization-feature75-live-runtime.json",
+      "bytes": 22988,
+      "sha256": "22aa73df6a04545d006383259b7e28e40e6996c60b846f4fbf195b6a3ef155d8"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/anonymization-feature75-test-cleanup.json",
+      "bytes": 6335,
+      "sha256": "305a2533cecbab5500a51348c45fc190e32e7f97d4bf33747093616f5a02a59a"
+    },
+    "frontend_candidate": {
+      "path": "build/anonymization75-frontend-candidate-20261018/staging-manifest.json",
+      "bytes": 88776,
+      "sha256": "d276ed5624874d6dd022dc3bc3c3f442c658b9ff35343a4838e7e6ea919c5e4b"
+    },
+    "frontend_strict_staging": {
+      "path": "build/anonymization75-staged-types-1-705307368abd4a149fc50b8470dea6f3/validation.json",
+      "bytes": 72701,
+      "sha256": "0da95e26f7f7510710128fe15919bd0b89964bb28c79d43542b1212e148e046d"
+    },
+    "frontend_focused_staging": {
+      "path": "build/anonymization75-staged-focused-1-b92128ad05d24447981899252cfacf78/validation.json",
+      "bytes": 47962,
+      "sha256": "fa822a906fafe86e4bafda5ffa9a7cb9efc84af9a2b66d3ded6d9f17ea816a45"
+    },
+    "portable_fixture_validation": {
+      "path": "build/anonymization75-compact-fixture-validation-1b32c841015d4a6683905de56b6e9ae6/validation.json",
+      "bytes": 144238,
+      "sha256": "595387bdced13b3b8c3a1c1987a4f178c03d2a28527fb8c6fb0e082dcbdca42a"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/anonymization75-compact-fixture-types-29e5001c15cf4871bb7a98f01c29b415/validation.json",
+      "bytes": 171226,
+      "sha256": "53e1405a40c9ec7405f3117c3517037abb6c85244abbdb1e0bfeddb91aef3fbe"
+    },
+    "accepted_protocol": {
+      "path": "build/anonymization75-protocol-prepared-2-20261018/protocol.json",
+      "bytes": 20315,
+      "sha256": "196c4b6cc6dfce9398f928079f12884d185743884ac30b915bd4231dfd91947b"
+    },
+    "accepted_contract": {
+      "path": "build/anonymization75-protocol-prepared-2-20261018/contract.json",
+      "bytes": 3601,
+      "sha256": "402f3639fc159cdd3aba8b5e24f7265cda758d1fee366f635e78aa78d376ff38"
+    },
+    "preserved_feature74_postcommit": {
+      "path": "build/root-cause-feature74-postcommit.json",
+      "bytes": 26703,
+      "sha256": "6f696ba301470c7e5fc17b6038a21c7a77136b84d7a751603c07538abbc247f0"
+    },
+    "preserved_feature74_delivery": {
+      "path": "docs/feature-first-original-root-cause-workbench-validation.json",
+      "bytes": 35824,
+      "sha256": "05ea0b1706636e405fd6f548cdab44dfbec87a0d4eba085632eed946af4acb0e"
+    },
+    "original_api_capture": {
+      "path": "build/anonymization75-api-actual-20261018-1/validation.json",
+      "bytes": 2542368,
+      "sha256": "958b776f3afea2c5daff1d341b6978a4f984753e9cc192819476683e74ffee8d"
+    },
+    "missing_repeat_continuation": {
+      "path": "build/anonymization75-api-continuation-20261018-1/validation.json",
+      "bytes": 2567350,
+      "sha256": "3ca88aedd02cd46488d396b678f4e1047c4075e1fdbb563b0d0731eb6f629f88"
+    },
+    "continuation_helper": {
+      "path": "build/complete-anonymization75-pending-repeat-1.py",
+      "bytes": 11092,
+      "sha256": "d0e10566397f44ded37165f9d1c883d5208eee63284475a544a5c0d8e728a771"
+    },
+    "actual_capture_helper": {
+      "path": "build/anonymization75-api-collector-prepared-5-20261018/capture.py",
+      "bytes": 63765,
+      "sha256": "cc1b3c112f663a1bb5efc31dc11dacafbc14567f1c76fbb5bb6c9a3ab478f8e6"
+    }
+  },
+  "evidence": {
+    "backend_commit": {
+      "path": "build/anonymization-feature75-backend-postcommit.json",
+      "bytes": 3954,
+      "sha256": "8c16bacb41b063da755b902e29218d99ad3e9a3f997891a7479234ad5ffcffc3"
+    },
+    "native_build": {
+      "path": "build/anonym75-87cef393868344e29594845eb4d81fe7/build-manifest.json",
+      "bytes": 351858,
+      "sha256": "ac5f051bc7818c9225f5fc430faa69fd28be1603e3c97d0a10d8f2271df968df"
+    },
+    "api_capture": {
+      "path": "build/anonymization75-api-continuation-20261018-1/validation.json",
+      "bytes": 2567350,
+      "sha256": "3ca88aedd02cd46488d396b678f4e1047c4075e1fdbb563b0d0731eb6f629f88"
+    },
+    "frontend_integration": {
+      "path": "build/anonymization75-frontend-integration-9bb1b6b93258497887292ad937658262/validation.json",
+      "bytes": 45137,
+      "sha256": "417bdc0a869ca810fe9fc22275a183195ae8e1eeda6bce5e135edc0428fc3047"
+    },
+    "portable_fixture_publication": {
+      "path": "build/anonymization75-compact-fixture-publication-52bc61d2f109400d87de0506e761d013/validation.json",
+      "bytes": 364567,
+      "sha256": "27d90458f3d180777a3badffda1e215583ccc45f3b20d0d109ca1a8ce5d1565d"
+    },
+    "full_frontend_validation": {
+      "path": "build/anonymization-feature-frontend-final-2210b1ee3c0147c89e86561119e2b5a6/validation.json",
+      "bytes": 2769898,
+      "sha256": "0fa460aa6d8d52f3a496d953bec8346c85a61b4e43c536ce8ba7ffd1db2d9471"
+    },
+    "live_activation_validation": {
+      "path": "build/anonymization-feature75-live-runtime.json",
+      "bytes": 22988,
+      "sha256": "22aa73df6a04545d006383259b7e28e40e6996c60b846f4fbf195b6a3ef155d8"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/anonymization-feature75-test-cleanup.json",
+      "bytes": 6335,
+      "sha256": "305a2533cecbab5500a51348c45fc190e32e7f97d4bf33747093616f5a02a59a"
+    },
+    "frontend_candidate": {
+      "path": "build/anonymization75-frontend-candidate-20261018/staging-manifest.json",
+      "bytes": 88776,
+      "sha256": "d276ed5624874d6dd022dc3bc3c3f442c658b9ff35343a4838e7e6ea919c5e4b"
+    },
+    "frontend_strict_staging": {
+      "path": "build/anonymization75-staged-types-1-705307368abd4a149fc50b8470dea6f3/validation.json",
+      "bytes": 72701,
+      "sha256": "0da95e26f7f7510710128fe15919bd0b89964bb28c79d43542b1212e148e046d"
+    },
+    "frontend_focused_staging": {
+      "path": "build/anonymization75-staged-focused-1-b92128ad05d24447981899252cfacf78/validation.json",
+      "bytes": 47962,
+      "sha256": "fa822a906fafe86e4bafda5ffa9a7cb9efc84af9a2b66d3ded6d9f17ea816a45"
+    },
+    "portable_fixture_validation": {
+      "path": "build/anonymization75-compact-fixture-validation-1b32c841015d4a6683905de56b6e9ae6/validation.json",
+      "bytes": 144238,
+      "sha256": "595387bdced13b3b8c3a1c1987a4f178c03d2a28527fb8c6fb0e082dcbdca42a"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/anonymization75-compact-fixture-types-29e5001c15cf4871bb7a98f01c29b415/validation.json",
+      "bytes": 171226,
+      "sha256": "53e1405a40c9ec7405f3117c3517037abb6c85244abbdb1e0bfeddb91aef3fbe"
+    },
+    "accepted_protocol": {
+      "path": "build/anonymization75-protocol-prepared-2-20261018/protocol.json",
+      "bytes": 20315,
+      "sha256": "196c4b6cc6dfce9398f928079f12884d185743884ac30b915bd4231dfd91947b"
+    },
+    "accepted_contract": {
+      "path": "build/anonymization75-protocol-prepared-2-20261018/contract.json",
+      "bytes": 3601,
+      "sha256": "402f3639fc159cdd3aba8b5e24f7265cda758d1fee366f635e78aa78d376ff38"
+    },
+    "preserved_feature74_postcommit": {
+      "path": "build/root-cause-feature74-postcommit.json",
+      "bytes": 26703,
+      "sha256": "6f696ba301470c7e5fc17b6038a21c7a77136b84d7a751603c07538abbc247f0"
+    },
+    "preserved_feature74_delivery": {
+      "path": "docs/feature-first-original-root-cause-workbench-validation.json",
+      "bytes": 35824,
+      "sha256": "05ea0b1706636e405fd6f548cdab44dfbec87a0d4eba085632eed946af4acb0e"
+    },
+    "original_api_capture": {
+      "path": "build/anonymization75-api-actual-20261018-1/validation.json",
+      "bytes": 2542368,
+      "sha256": "958b776f3afea2c5daff1d341b6978a4f984753e9cc192819476683e74ffee8d"
+    },
+    "missing_repeat_continuation": {
+      "path": "build/anonymization75-api-continuation-20261018-1/validation.json",
+      "bytes": 2567350,
+      "sha256": "3ca88aedd02cd46488d396b678f4e1047c4075e1fdbb563b0d0731eb6f629f88"
+    },
+    "continuation_helper": {
+      "path": "build/complete-anonymization75-pending-repeat-1.py",
+      "bytes": 11092,
+      "sha256": "d0e10566397f44ded37165f9d1c883d5208eee63284475a544a5c0d8e728a771"
+    },
+    "actual_capture_helper": {
+      "path": "build/anonymization75-api-collector-prepared-5-20261018/capture.py",
+      "bytes": 63765,
+      "sha256": "cc1b3c112f663a1bb5efc31dc11dacafbc14567f1c76fbb5bb6c9a3ab478f8e6"
+    }
+  },
+  "historical_additional_attempts": [],
+  "previous_feature_delivery_preserved": {
+    "path": "docs/feature-first-original-root-cause-workbench-validation.json",
+    "bytes": 35824,
+    "sha256": "05ea0b1706636e405fd6f548cdab44dfbec87a0d4eba085632eed946af4acb0e"
+  },
+  "previous_feature_postcommit_preserved": {
+    "path": "build/root-cause-feature74-postcommit.json",
+    "bytes": 26703,
+    "sha256": "6f696ba301470c7e5fc17b6038a21c7a77136b84d7a751603c07538abbc247f0"
+  },
+  "browser_evidence": {
+    "path": "build/anonymization75-browser-retry-20261018.json",
+    "bytes": 1422,
+    "sha256": "2b9f16250e8b76fd6bc27f9bdbc4eeaf6b8112d35808112977cf61d89497ded0"
+  },
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "browser_actions_executed_here": 0,
+  "latest_actual_browser_attempt_feature": 75,
+  "latest_actual_browser_attempt_served_feature": 74,
+  "parent_browser_evidence_preserved": {
+    "path": "build/discovery-feature71-browser-status-1.json",
+    "bytes": 775,
+    "sha256": "21a0478e7f73e336308fc605a377ad9e58bdceb431805adea7bb202d39b32470"
+  },
+  "boundaries": [
+    "Rendered browser controls, interactions and downloads remain unverified. The actual Feature 75 retry after renewed settings authorization was denied by saved or managed origin policy while Feature 74 served on 8562. No browser workaround or new retry is performed by this recorder. Native/API/assets evidence does not verify rendering.",
+    "NativeFloat64 preserves finite binary64 values, signed zero and semantic NaN/INF/-INF values. The existing codec canonicalizes NaN payload, sign and signalling state; raw NaN bits and caller decimal lexeme identity remain separate strict gates.",
+    "Existing request-parser limits of 32 MiB input, depth 64 and one million values remain separate transport limits. No new output cap or all-size strict parity claim is introduced. Standard httplib MIME, filename-presence, query and part-order behavior remains independently bounded.",
+    "Native secure_random uses operating-system draws for individual choices. The returned diagnostics seed remains the configured seed and is not an entropy identity or replay seed. Secure outputs are checked structurally; deterministic byte identity applies only to the recorded secure_random=false request.",
+    "Canonical source/query snapshots retain complete input storage. Native anonymization constructs released logs and may rebuild or omit source metadata. The complete frequency map remains independent of capped emitted logs; no source/result equality or inferred reconciliation is claimed.",
+    "Actual native error order, empty/default-prefix behavior, size_t arithmetic and optional XES failures remain intact. PripelDiagnostics::to_json returns actual NativeString bytes, which can be invalid JSON or UTF-8; canonical artifacts and raw native text remain separate.",
+    "The original collector stopped after 208 successful physical responses because a local Python name shadowed a helper. Its fault and full prefix remain immutable. A continuation sent only the missing final repeat, without replaying selected cases, the cached seed or restarting either service. This was a collector correction, with no product or case-expectation change.",
+    "All 86 families and 387 modules remain in scope, with 46 complete packages, 199 complete modules and 228 incomplete strict units. Privacy/noise/assignment/default/type/error/order/concurrency/performance and every remaining input/model-host or strict reference gate stay open. No privacy guarantee or full parity is claimed."
+  ],
+  "separate_remaining_gaps": [
+    "Rendered browser controls, interactions and downloads remain unverified. The actual Feature 75 retry after renewed settings authorization was denied by saved or managed origin policy while Feature 74 served on 8562. No browser workaround or new retry is performed by this recorder. Native/API/assets evidence does not verify rendering.",
+    "NativeFloat64 preserves finite binary64 values, signed zero and semantic NaN/INF/-INF values. The existing codec canonicalizes NaN payload, sign and signalling state; raw NaN bits and caller decimal lexeme identity remain separate strict gates.",
+    "Existing request-parser limits of 32 MiB input, depth 64 and one million values remain separate transport limits. No new output cap or all-size strict parity claim is introduced. Standard httplib MIME, filename-presence, query and part-order behavior remains independently bounded.",
+    "Native secure_random uses operating-system draws for individual choices. The returned diagnostics seed remains the configured seed and is not an entropy identity or replay seed. Secure outputs are checked structurally; deterministic byte identity applies only to the recorded secure_random=false request.",
+    "Canonical source/query snapshots retain complete input storage. Native anonymization constructs released logs and may rebuild or omit source metadata. The complete frequency map remains independent of capped emitted logs; no source/result equality or inferred reconciliation is claimed.",
+    "Actual native error order, empty/default-prefix behavior, size_t arithmetic and optional XES failures remain intact. PripelDiagnostics::to_json returns actual NativeString bytes, which can be invalid JSON or UTF-8; canonical artifacts and raw native text remain separate.",
+    "The original collector stopped after 208 successful physical responses because a local Python name shadowed a helper. Its fault and full prefix remain immutable. A continuation sent only the missing final repeat, without replaying selected cases, the cached seed or restarting either service. This was a collector correction, with no product or case-expectation change.",
+    "All 86 families and 387 modules remain in scope, with 46 complete packages, 199 complete modules and 228 incomplete strict units. Privacy/noise/assignment/default/type/error/order/concurrency/performance and every remaining input/model-host or strict reference gate stay open. No privacy guarantee or full parity is claimed."
+  ],
+  "next_feature_contract": null,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false
+}
