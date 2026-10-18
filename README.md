@@ -2741,3 +2741,12 @@ Open **Original Petri analysis** before mining, or launch it beside the existing
 Use the selected exact options editor to retain omitted versus supplied members, native defaults, negative markings, integer budgets and nonfinite/signed-zero costs. Soundness accepts its soundness/Woflan variant and independent invariant_search_limit budget. Inspect every stored result field and entered/returned/computed/exhausted status; download raw responses, source/result/trace/options artifacts, reports, complete CSV and selected records, or reopen exact inputs. Existing cached analysis and PNML workflows remain available.
 
 Browser rendering and strict reference parity remain pending. NativeFloat64 NaN values use canonical quiet-NaN semantics; payload/sign/signalling-bit identity is not claimed. See [validation and boundaries](docs/feature-first-original-petri-analysis-workbench-validation.json).
+
+
+### Explore original root cause with editable cohorts
+
+Open **Original root cause** before mining. Edit fitting and problem cohorts directly, including ordered Event contexts and exact source positions, or load a complete typed carrier. Choose ordinary log/representation/model fitting or the shared-context factory, materialization and shared log/representation operations. The shared arena editor preserves declared IDs, aliases, null handles, cycles and unused records for native validation. Existing replay-derived diagnostics remain available.
+
+Select string and numeric attributes, the multiplier bool and the model problem class with omitted versus supplied arguments visible. Inspect every representation, model and tree field, including normal empty optional models. Download canonical source/result/arguments artifacts, raw responses, reports, CSV and selected records. Reopen compatible factory/log/Event results directly, reuse configured arguments as a File, or select actual arena contexts and source positions for a new shared cohort. Native errors and optional XES export errors remain visible.
+
+NativeFloat64 retains finite binary64 values, signed zero and semantic NaN/INF/-INF values; raw NaN payload/sign/signalling bits and caller decimal lexeme identity are not claimed. Graph aliases are request-local. Invalid UTF-8 categorical values retain the native rejection. Browser rendering and strict reference parity remain pending. See [validation and boundaries](docs/feature-first-original-root-cause-workbench-validation.json).
