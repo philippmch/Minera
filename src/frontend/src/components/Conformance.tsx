@@ -1,3 +1,4 @@
+import {LiteralControlsPanel} from "./LiteralControlsPanel";
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   type Alignments as AlignmentsResult,
@@ -394,6 +395,7 @@ export function Conformance({
       <StochasticPetriPlayoutPanel key={`stochastic-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
       <SimulationWorkspace key={`simulation-workspace-${analysisId}-${importedGeneration}`} dataset={data.dataset} models={evaluationModelIds(data,Boolean(currentImported || data.conformance?.imported))} live={!!onRequestDecisions} onOpenLog={onOpenSimulation} onOpenUnderlying={onCheckModel?(file,sourceId)=>void uploadModel(file,sourceId):undefined} />
       <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
+      <LiteralControlsPanel group="dfg_precision" available={Boolean(onRequestDfg)} configurationIdentity={data} />
       <PetriUsageComparisonPanel />
       <ConceptDriftPanel key={`concept-drift-${analysisId}`} onRequest={onRequestConceptDrift} />
     </div>

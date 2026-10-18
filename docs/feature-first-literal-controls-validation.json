@@ -1,0 +1,580 @@
+{
+  "complete": true,
+  "feature_group": 68,
+  "created_utc": "2026-10-18T18:04:50.398293+00:00",
+  "checkpoint_kind": "implemented feature delivery with browser and strict parity pending",
+  "parent_head": "92fe1af0d420a5de02e35cc77ef836dda7b34521",
+  "backend_step_commit": "6ee116999ddf764ae88407764d0955b4b86ee754",
+  "ui_step_commit_pending": true,
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false,
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "browser_attempt_feature": 68,
+  "browser_attempt_listener_pid": 10468,
+  "browser_outcome": "tool_policy_denied",
+  "retained_browser_attempt_feature": 66,
+  "retained_browser_live_feature": 65,
+  "delivered": [
+    "Eleven opt-in exact JSON controls expose target activities, eight independent feature vectors, all seven ILP options and all three supplied-DFG precision options across four existing endpoint groups. All seven existing URLs remain mounted, including the ILP compatibility alias.",
+    "Exact controls retain native byte strings, whitespace, empty values, ordering, duplicates, full size_t integers and IEEE values. Omission, explicit empty arrays, empty string elements, null caps and zero caps remain distinct. Native operations own semantic validation.",
+    "The audit retains only successfully parsed controls and complete supplied-member sets, including a successful feature-vector prefix after a later parse failure. Full configured target/features/ILP/DFG options expose all 6/56/7/3 stored fields and six real feature-vector presence flags.",
+    "Actual selected EventDataView and cached source identities remain explicit. DFG precision preserves its original supplied bytes and native constructor defaults without cached selector overlay. Opt-in ILP accepts native integer limits; legacy requests keep their existing cap and parsing behavior.",
+    "Complete native results remain successful when independent legacy presentation or optional source export fails. Actual legacy/source bytes, native exporter exceptions and transport display errors remain separate. Raw controls, original uploads, full native tables, reports, CSV and selected records can be inspected and downloaded.",
+    "The existing prediction-target/feature transformation panels, ILP Miner and supplied-DFG precision section expose Exact native controls. Cancellation and source/replacement guards preserve actual request ownership. Compact portable fixtures retain every selected response and every physical request, including the malformed historical transport attempt."
+  ],
+  "boundaries": [
+    "Full PM4Py parity remains unfinished. All 86 families, 387 modules and 228 incomplete units remain in scope; strict counts remain 46 complete packages and 199 complete modules. No strict catalogue status or selector is promoted.",
+    "The user authorized browser access. The actual Feature68 browser attempt was rejected by the tool policy while the local listener PID10468 independently returned HTTP200. No workaround was attempted. The earlier Feature66/live65 rejection is also retained as history. Current asset/native API HTTP checks are separate; rendered controls, interactions and browser downloads remain unverified.",
+    "Final API evidence counts every physical attempt once. The two historical false assertions, original JSON decode fault and empty HTTP400 malformed transport response remain explicit. CSV numeric-looking attributes remain strings; a separate typed-numeric source demonstrates the numeric effect without rewriting old captured bytes.",
+    "These are opt-in transports for existing native algorithms. Exact controls do not add arbitrary runtime C++ payload construction. Client cancellation prevents stale UI publication but does not terminate an already running native operation.",
+    "Feature69 is prepared only: independent original source/reference event inputs for edit-distance alignment, with exact typed constructors, options and complete native results. No Feature69 runtime validation is claimed."
+  ],
+  "validation_counts": {
+    "native_sources": 705,
+    "native_suites": 55,
+    "reused_parent_core_objects": 195,
+    "fresh_core_objects": 1,
+    "frontend_tests": 5271,
+    "frontend_test_files": 122,
+    "frontend_source_bindings": 14045,
+    "actual_api_calls": 88,
+    "feature_cases": 75,
+    "auxiliary_api_calls": 12,
+    "retained_failed_transport_attempts": 1,
+    "source_sessions": 4,
+    "offline_api_checks": 2014,
+    "offline_http_calls": 0,
+    "artifact_files": 35,
+    "export_tests": 76,
+    "published_files": 3,
+    "endpoint_groups": 4,
+    "actual_route_aliases": 7,
+    "new_exact_controls": 11,
+    "affected_native_values": 19,
+    "configured_option_fields": {
+      "target": 6,
+      "features": 56,
+      "ilp": 7,
+      "dfg_precision": 3
+    },
+    "historical_failed_checks_retained": 2,
+    "historical_collector_faults_retained": 1,
+    "live_smoke_post_calls_excluded_from_dedicated_corpus": 2,
+    "unrelated_files_preserved": 110
+  },
+  "retained_history": {
+    "historical_failed_checks": [
+      {
+        "source": {
+          "path": "build/literal-controls-feature68-application-5ce4cadbfb364b719e675760d28ed5d9/validation.json",
+          "filename": "validation.json",
+          "bytes": 135470,
+          "sha256": "6e0a907a36d1e738451413533ac2b8ecee3a217d8f5ba088bc26061e1f1acda5"
+        },
+        "check": {
+          "name": "target-legacy-baseline actual HTTP status",
+          "passed": false,
+          "details": {
+            "actual": 400,
+            "expected": 200
+          }
+        }
+      },
+      {
+        "source": {
+          "path": "build/literal-controls-feature68-continuation-7f2e5be362c34d6aa40c42403e8cc241/validation.json",
+          "bytes": 999334,
+          "sha256": "82ed5076e5a2db8ab8a4e07a3bb37906fc9d7d519f787f944fa8fe2d410cc7ad"
+        },
+        "check": {
+          "name": "features-numeric-event source-derived actual event_rows",
+          "passed": false
+        }
+      }
+    ],
+    "historical_collector_faults": [
+      {
+        "source": {
+          "path": "build/literal-controls-feature68-application-5ce4cadbfb364b719e675760d28ed5d9/validation.json",
+          "filename": "validation.json",
+          "bytes": 135470,
+          "sha256": "6e0a907a36d1e738451413533ac2b8ecee3a217d8f5ba088bc26061e1f1acda5"
+        },
+        "fault": {
+          "exception": "JSONDecodeError('Expecting value: line 1 column 1 (char 0)')",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-literal-controls-feature68-api-2.py\", line 223, in main\n    case=cases[action['case']];query=[(k,current['id']if value=='$CURRENT'else value)for k,value in case['query']];rawbody=files[case['raw_body_file']]if'raw_body_file'in case else None;value,entry,_=call(case['id'],case['route'],query=query,parts=case['parts'],status=case['status'],raw_body=rawbody,content_type=case.get('content_type'));observations[case['id']]=value;entry.update(family='literal_controls',group=case['group'],mode=case['mode'],expected_phase=case['phase'],coverage_tags=case['coverage'],expected=case['expect'],exports={})\n                                                                                                                                                                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-literal-controls-feature68-api-2.py\", line 202, in call\n    entry['response']={**rec(write(out/'captures'/(identifier+'.response.json'),raw)),'status':actual};save();check(identifier+' actual HTTP status',actual==status,{'actual':actual,'expected':status});return parse(raw),entry,raw\n                                                                                                                                                                                                                ^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-literal-controls-feature68-api-2.py\", line 23, in parse\n    def parse(b):return json.loads(b.decode('utf8'),parse_float=Decimal,parse_int=lambda x:Decimal('-0')if x=='-0'else int(x),parse_constant=lambda x:(_ for _ in()).throw(ValueError('non-JSON constant '+x)))\n                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\__init__.py\", line 359, in loads\n    return cls(**kw).decode(s)\n           ^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\decoder.py\", line 337, in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\decoder.py\", line 355, in raw_decode\n    raise JSONDecodeError(\"Expecting value\", s, err.value) from None\njson.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)\n"
+        }
+      }
+    ],
+    "retained_failed_transport_attempt": {
+      "id": "target-legacy-baseline",
+      "method": "POST",
+      "path": "/api/transform-target?target_activities=B%2CA",
+      "query_controls": [
+        {
+          "name": "target_activities",
+          "data_hex": "422c41",
+          "bytes": 3,
+          "sha256": "ca39fc076a59c4e41f5fc6fa97ff76a8d758da796f2701364c2eb014416561d0"
+        }
+      ],
+      "headers": {
+        "Content-Type": "multipart/form-data; boundary=OwnedLiteralControlsFeature68"
+      },
+      "multipart_parts": [],
+      "prepared_multipart_parts": [],
+      "multipart_physical_override": false,
+      "request_body": {
+        "path": "build/literal-controls-feature68-application-5ce4cadbfb364b719e675760d28ed5d9/captures/target-legacy-baseline.request.bin",
+        "filename": "target-legacy-baseline.request.bin",
+        "bytes": 35,
+        "sha256": "628844549c4443f191128b5919b6cc10d83ee93d95e42b00340605978db99d54"
+      },
+      "expected_status": 200,
+      "response_headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Keep-Alive": "timeout=5, max=100",
+        "Content-Length": "0"
+      },
+      "response": {
+        "path": "build/literal-controls-feature68-application-5ce4cadbfb364b719e675760d28ed5d9/captures/target-legacy-baseline.response.json",
+        "filename": "target-legacy-baseline.response.json",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "status": 400
+      },
+      "physical_attempt_id": "prefix:7:target-legacy-baseline"
+    },
+    "expectation_delta": [
+      {
+        "path": [
+          "cases",
+          18,
+          "expect",
+          "event_rows",
+          0,
+          0,
+          0
+        ],
+        "before": 2.5,
+        "after": 0.0
+      },
+      {
+        "path": [
+          "cases",
+          18,
+          "expect",
+          "event_rows",
+          0,
+          1,
+          0
+        ],
+        "before": 3.5,
+        "after": 0.0
+      }
+    ],
+    "actual_source_captures": [
+      {
+        "path": "build/literal-controls-feature68-application-5ce4cadbfb364b719e675760d28ed5d9/validation.json",
+        "filename": "validation.json",
+        "bytes": 135470,
+        "sha256": "6e0a907a36d1e738451413533ac2b8ecee3a217d8f5ba088bc26061e1f1acda5"
+      },
+      {
+        "path": "build/literal-controls-feature68-continuation-7f2e5be362c34d6aa40c42403e8cc241/validation.json",
+        "bytes": 999334,
+        "sha256": "82ed5076e5a2db8ab8a4e07a3bb37906fc9d7d519f787f944fa8fe2d410cc7ad"
+      },
+      {
+        "path": "build/literal-controls-feature68-numeric-supplement-d52e7b4dfb6f4401bf26cf1c75f8bfa6/validation.json",
+        "filename": "validation.json",
+        "bytes": 34749,
+        "sha256": "e65f4be6b5abf0c8db115e06cd1af1b7c6dd46cfd82576b5a76b2a24c4ec3756"
+      }
+    ],
+    "source_snapshots": {
+      "csv": {
+        "before": {
+          "path": "build/literal-controls-feature68-application-5ce4cadbfb364b719e675760d28ed5d9/captures/source-before-csv.response.json",
+          "filename": "source-before-csv.response.json",
+          "bytes": 30405,
+          "sha256": "8c2233195939ee9abf20e2755b2798b647822e5b3a129a95fa1437d77022be6e",
+          "status": 200
+        },
+        "source_id": "1",
+        "after": {
+          "path": "build/literal-controls-feature68-continuation-7f2e5be362c34d6aa40c42403e8cc241/captures/source-after-csv.response.json",
+          "filename": "source-after-csv.response.json",
+          "bytes": 30405,
+          "sha256": "8c2233195939ee9abf20e2755b2798b647822e5b3a129a95fa1437d77022be6e",
+          "status": 200
+        },
+        "service_epoch": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610"
+      },
+      "typed-dataframe": {
+        "before": {
+          "path": "build/literal-controls-feature68-continuation-7f2e5be362c34d6aa40c42403e8cc241/captures/source-before-typed-dataframe.response.json",
+          "filename": "source-before-typed-dataframe.response.json",
+          "bytes": 46586,
+          "sha256": "527360a917d3b7d1ceeec6d5960bc49c01c649c788b8e75f8672ce5ba45942e1",
+          "status": 200
+        },
+        "source_id": "2",
+        "after": {
+          "path": "build/literal-controls-feature68-continuation-7f2e5be362c34d6aa40c42403e8cc241/captures/source-after-typed-dataframe.response.json",
+          "filename": "source-after-typed-dataframe.response.json",
+          "bytes": 46586,
+          "sha256": "527360a917d3b7d1ceeec6d5960bc49c01c649c788b8e75f8672ce5ba45942e1",
+          "status": 200
+        },
+        "service_epoch": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610"
+      },
+      "typed-lazyframe": {
+        "before": {
+          "path": "build/literal-controls-feature68-continuation-7f2e5be362c34d6aa40c42403e8cc241/captures/source-before-typed-lazyframe.response.json",
+          "filename": "source-before-typed-lazyframe.response.json",
+          "bytes": 46586,
+          "sha256": "de5332231daaf7ceeb59034340170ab18f7f7cc09945b982a7057857134843be",
+          "status": 200
+        },
+        "source_id": "3",
+        "after": {
+          "path": "build/literal-controls-feature68-continuation-7f2e5be362c34d6aa40c42403e8cc241/captures/source-after-typed-lazyframe.response.json",
+          "filename": "source-after-typed-lazyframe.response.json",
+          "bytes": 46586,
+          "sha256": "de5332231daaf7ceeb59034340170ab18f7f7cc09945b982a7057857134843be",
+          "status": 200
+        },
+        "service_epoch": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610"
+      },
+      "typed-numeric-dataframe": {
+        "before": {
+          "path": "build/literal-controls-feature68-numeric-supplement-d52e7b4dfb6f4401bf26cf1c75f8bfa6/captures/source-before-typed-numeric-dataframe.response.json",
+          "filename": "source-before-typed-numeric-dataframe.response.json",
+          "bytes": 46574,
+          "sha256": "a3c213395f13e4b0070346f0bbd5a49f2b151581d24efbb0a55e432dda73ffb3",
+          "status": 200
+        },
+        "source_id": "1",
+        "service_epoch": "feature68-recovered-c45267884c8c4146bbf1baf32b72d0cd",
+        "after": {
+          "path": "build/literal-controls-feature68-numeric-supplement-d52e7b4dfb6f4401bf26cf1c75f8bfa6/captures/source-after-typed-numeric-dataframe.response.json",
+          "filename": "source-after-typed-numeric-dataframe.response.json",
+          "bytes": 46574,
+          "sha256": "a3c213395f13e4b0070346f0bbd5a49f2b151581d24efbb0a55e432dda73ffb3",
+          "status": 200
+        }
+      }
+    },
+    "service_epochs": {
+      "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610": {
+        "historical": true,
+        "pid": 40524,
+        "server_record": {
+          "path": "build/literal-controls-feature68-continuation-7f2e5be362c34d6aa40c42403e8cc241/server-record.json",
+          "filename": "server-record.json",
+          "bytes": 2245,
+          "sha256": "ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610"
+        }
+      },
+      "feature68-recovered-c45267884c8c4146bbf1baf32b72d0cd": {
+        "historical": false,
+        "pid": 13512,
+        "server_record": {
+          "path": "build/literal-controls-feature68-numeric-supplement-d52e7b4dfb6f4401bf26cf1c75f8bfa6/server-record.json",
+          "filename": "server-record.json",
+          "bytes": 2653,
+          "sha256": "bd4bedbac9bdf7ea04a345aeb763bc5ca59ee1d1250acb7719efb7e9a8074a5a"
+        }
+      }
+    },
+    "source_session_identities": [
+      {
+        "service_epoch": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+        "source_id": "1"
+      },
+      {
+        "service_epoch": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+        "source_id": "2"
+      },
+      {
+        "service_epoch": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+        "source_id": "3"
+      },
+      {
+        "service_epoch": "feature68-recovered-c45267884c8c4146bbf1baf32b72d0cd",
+        "source_id": "1"
+      }
+    ],
+    "call_service_epochs": {
+      "prefix:1:no-source-target": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "prefix:2:no-source-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "prefix:3:no-source-ilp": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "prefix:4:no-source-dfg_precision": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "prefix:5:seed-csv": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "prefix:6:source-before-csv": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "prefix:7:target-legacy-baseline": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-legacy-baseline": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-exact-ordered": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-whitespace-commas-bytes": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-explicit-empty-infers": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-native-empty-element": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-native-duplicate": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-exact-next-time": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-next-time-inapplicable-list": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-padding": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-source-wrapper": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:target-nonscalar-wrapper-attempt": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-alias-log-to-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-alias-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-alias-transform-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-numeric-event": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-trace-explicit-empty": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-calendar-ignored-empty-name": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-fixed-empty-name-native-error": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-all-eight-literal-vectors": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-event-schema-native-bytes": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-mixed-exact-legacy": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-legacy-plural-precedence": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-prefix-retained": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-no-partial-vector": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-legacy-failure-before-exact": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:features-flag-overrides": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-legacy-baseline": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-native-defaults": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-existing-compatibility-alias": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-empty-boundaries-full-limit": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-source-pnml": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-native-literal-relation-error": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-native-nan-alpha": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-native-zero-limit": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:ilp-legacy-server-cap": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-legacy-baseline": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-native-cap-omitted": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-native-cap-null": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-native-cap-fullsize": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-native-cap-zero": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-native-empty-selector": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-malformed-model": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-raw-body-query-exact": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:legacy-wrong-group-file-target": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:legacy-wrong-group-file-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:legacy-wrong-group-file-ilp": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:legacy-wrong-group-file-dfg_precision": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:legacy-wrong-group-query-target": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:exact-conflict-target": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:exact-conflict-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:exact-conflict-ilp": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:exact-conflict-dfg_precision": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:active-cross-group-control-rejected": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:duplicate-exact-query-plus-file": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:transport-target-empty": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:transport-target-malformed-ff": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:transport-target-wrong-element": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:transport-struct-ilp": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:transport-struct-dfg_precision": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:source-identity-fails-before-exact": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:dfg-rejects-source-id": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:source-after-csv": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:seed-typed-dataframe": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:source-before-typed-dataframe": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:typed-source-target-prepared-log": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:typed-source-features-prepared-log": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:typed-source-ilp-prepared-log": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:typed-dfg-native-defaults-independent": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:typed-dfg-explicit-native-selectors": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:typed-dfg-legacy-bound-selectors": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:typed-dfg-zero-cap": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:source-after-typed-dataframe": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:seed-typed-lazyframe": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:source-before-typed-lazyframe": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:lazy-dfg-explicit-native-selectors": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:lazy-dfg-zero-cap": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "continuation:source-after-typed-lazyframe": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "supplement:seed-typed-numeric-dataframe": "feature68-recovered-c45267884c8c4146bbf1baf32b72d0cd",
+      "supplement:source-before-typed-numeric-dataframe": "feature68-recovered-c45267884c8c4146bbf1baf32b72d0cd",
+      "supplement:features-numeric-event-typed-float": "feature68-recovered-c45267884c8c4146bbf1baf32b72d0cd",
+      "supplement:source-after-typed-numeric-dataframe": "feature68-recovered-c45267884c8c4146bbf1baf32b72d0cd"
+    },
+    "selected_entry_service_epochs": {
+      "no-source-target": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "no-source-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "no-source-ilp": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "no-source-dfg_precision": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-legacy-baseline": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-exact-ordered": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-whitespace-commas-bytes": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-explicit-empty-infers": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-native-empty-element": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-native-duplicate": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-exact-next-time": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-next-time-inapplicable-list": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-padding": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-source-wrapper": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "target-nonscalar-wrapper-attempt": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-alias-log-to-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-alias-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-alias-transform-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-numeric-event": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-trace-explicit-empty": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-calendar-ignored-empty-name": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-fixed-empty-name-native-error": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-all-eight-literal-vectors": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-event-schema-native-bytes": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-mixed-exact-legacy": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-legacy-plural-precedence": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-prefix-retained": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-no-partial-vector": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-legacy-failure-before-exact": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-flag-overrides": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-legacy-baseline": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-native-defaults": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-existing-compatibility-alias": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-empty-boundaries-full-limit": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-source-pnml": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-native-literal-relation-error": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-native-nan-alpha": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-native-zero-limit": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "ilp-legacy-server-cap": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-legacy-baseline": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-native-cap-omitted": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-native-cap-null": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-native-cap-fullsize": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-native-cap-zero": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-native-empty-selector": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-malformed-model": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-raw-body-query-exact": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "legacy-wrong-group-file-target": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "legacy-wrong-group-file-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "legacy-wrong-group-file-ilp": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "legacy-wrong-group-file-dfg_precision": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "legacy-wrong-group-query-target": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "exact-conflict-target": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "exact-conflict-features": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "exact-conflict-ilp": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "exact-conflict-dfg_precision": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "active-cross-group-control-rejected": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "duplicate-exact-query-plus-file": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "transport-target-empty": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "transport-target-malformed-ff": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "transport-target-wrong-element": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "transport-struct-ilp": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "transport-struct-dfg_precision": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "source-identity-fails-before-exact": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "dfg-rejects-source-id": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "typed-source-target-prepared-log": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "typed-source-features-prepared-log": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "typed-source-ilp-prepared-log": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "typed-dfg-native-defaults-independent": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "typed-dfg-explicit-native-selectors": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "typed-dfg-legacy-bound-selectors": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "typed-dfg-zero-cap": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "lazy-dfg-explicit-native-selectors": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "lazy-dfg-zero-cap": "feature68-historical-ea7dc44e6dc173ee1c6b4fd4bb43eca064d2167835a624974419d2cff00e0610",
+      "features-numeric-event-typed-float": "feature68-recovered-c45267884c8c4146bbf1baf32b72d0cd"
+    }
+  },
+  "actual_http_calls_counted_once": 88,
+  "offline_http_calls": 0,
+  "supplemental_numeric_demonstration_complete": true,
+  "protocol_alias_clarification": "Protocol lists six canonical URLs; existing /api/mine-ilp compatibility alias is also exercised, giving seven mounted URLs. No new endpoint is implied.",
+  "historical_native_build_attempts": [
+    {
+      "manifest": {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\lc68-354ecc0b6a744658be35cd4a42b796eb\\build-manifest.json",
+        "sha256": "615b74b1cec8f408c002aa1c4334eda5787cf64ea85d3f96d853dc2a07e203e8",
+        "bytes": 363715
+      },
+      "outcome": "TERMINAL54pass/1testfailure; configure0/allnativecompile0; retained and excluded as complete proof"
+    }
+  ],
+  "test_only_temporal_fixture_correction": {
+    "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\lc68-test-correction-1981727c66f4492eba2aa0ff8446ca8b\\staging-manifest.json",
+    "sha256": "40c9125401d868ea09bfed14263538ac6b72c18bcd5cf84ea73fc791184625b5",
+    "bytes": 2584
+  },
+  "evidence": {
+    "native": {
+      "path": "build/lc68r-0c65a5363df3429a89b7f97babf23934/build-manifest.json",
+      "bytes": 565693,
+      "sha256": "6c24ad7a118cf0493b893d6bf2aa259ca83977fd730d8565fcd26473ce05f058"
+    },
+    "backend_commit": {
+      "path": "build/literal-controls-feature-backend-postcommit.json",
+      "bytes": 2576,
+      "sha256": "a6ecf8ecf54d943b321e847a8b136755fb5ea3e4919f75994215df2d0c1d9077"
+    },
+    "integration": {
+      "path": "build/literal-controls-frontend-integration-181d64f3da52452d8dd9f88073c66ed0/validation.json",
+      "bytes": 79188,
+      "sha256": "50c9e4dbbe0643dcfe2d610fbb26f4f2278916cc7014a34241803474de2767bc"
+    },
+    "baseline": {
+      "path": "build/literal-controls-feature-baseline.json",
+      "bytes": 18187,
+      "sha256": "fe848c06c6011f81c92ccc890c597920492dabaa0d7b1dfaa462840145560e42"
+    },
+    "browser": {
+      "path": "build/literal-controls-feature68-browser-status-1.json",
+      "bytes": 720,
+      "sha256": "e60b153a422d0dc29f908c9dca8dfeb7116f27f968a081517d52536e757d4f8f"
+    },
+    "historical_browser": {
+      "path": "build/emd-workbench-feature-browser-status-2.json",
+      "bytes": 2002,
+      "sha256": "6830ae5f5036cbb6aaf0f8820328128871acca61ba37ab6507cfd2aa16860844"
+    },
+    "next_contract": {
+      "path": "build/original-edit-distance-workbench-contract-feature69-3f08453bcc0f437599d6782c7fbbc1b6/contract.json",
+      "bytes": 56517,
+      "sha256": "bccc337c800f68c48d59243d2c5319b51c6b7b50633dc7d262bbf7dbdb2a7b15"
+    },
+    "api": {
+      "path": "build/literal-controls-feature68-offline-composite-1a0028729d8e4d7eb92683ddb0da7ef2/validation.json",
+      "bytes": 864942,
+      "sha256": "1369bef59636f42d1095d2f4557a918ff817accc46c5836350ff89dff6982ab0"
+    },
+    "frontend": {
+      "path": "build/literal-controls-feature-frontend-final-f8f82ba87b754e939f8ffa1c5b934eef/validation.json",
+      "bytes": 2660189,
+      "sha256": "83057d949f1a121cb50c1936a77caf1094140166a08e311bb9e3684826d0c090"
+    },
+    "publication": {
+      "path": "build/literal-controls-compact-fixture-publication-af0772b537384a178cc4fed1c7711752/validation.json",
+      "bytes": 87054,
+      "sha256": "7eeba654fb8f937e44d3a49bd02799380cdde8f497c283bb517f3f0008862270"
+    },
+    "exports": {
+      "path": "build/literal-controls-compact-fixture-validation-d08c6a4b61bd4889895a4adcb852cd0b/validation.json",
+      "bytes": 40324,
+      "sha256": "d15b16f06834826a78e615bd45306ce357196e89b1497ab18e697fd6037d6292"
+    },
+    "server": {
+      "path": "build/literal-controls-feature-live-server.json",
+      "bytes": 2199,
+      "sha256": "f9f494a2202ae0942147a31a6e8c2ea9a9cc6ef3ed5d05783e4bf3a0a970fe16"
+    },
+    "live": {
+      "path": "build/literal-controls-feature-live-runtime.json",
+      "bytes": 7721,
+      "sha256": "5120b0497e5d2cf7972b8df873bf7e3692e2b9561924b16efd19c3490f3d82fb"
+    }
+  },
+  "helper_sha256": "c811a95e49321bf9e77406c6b602ba8bf20f0328add041c941e4ddd5fa8ebdd3",
+  "runtime_library": {
+    "path": "build/literal_controls_delivery_68_2.py",
+    "bytes": 13154,
+    "sha256": "c6ad5857c49d58f45154139d7b0df7d136491c168332d6d01ba5b2f5baaff638"
+  }
+}

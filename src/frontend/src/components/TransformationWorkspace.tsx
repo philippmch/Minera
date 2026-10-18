@@ -1,3 +1,5 @@
+import {LiteralControlsPanel} from "./LiteralControlsPanel";
+import {logToFeaturesQuery, logToTargetQuery} from "../api";
 import { useEffect,useMemo,useRef,useState } from "react";
 import { type MineraExport } from "../types";
 import { cubeFeatureFile } from "../process-cube-workspace";
@@ -19,6 +21,10 @@ export function TransformationWorkspace({data,available,mining,onOpenTransformed
   const isLabel=run?.result.family==="LABEL_SPLITTING";const eventCount=run?.cases.reduce((sum,trace)=>sum+trace.event_count,0)??0;
   const download=(operation:"report"|"data"|"csv"|"xes")=>{if(!run)return;try{const blob=operation==="report"?new Blob([run.report_json],{type:"application/json"}):operation==="data"?new Blob([run.data_json],{type:"application/json"}):operation==="csv"?transformationCsv(run):transformedXes(run);downloadQueryBlob(blob,`minera-transformation-${operation}.${operation==="report"||operation==="data"?"json":operation}`);}catch(cause){setError(cause instanceof Error?cause.message:String(cause));}};
   const open=()=>{if(!run||!run.complete_activity_field||!run.activity_attribute||!eventCount||disabled)return;onOpenTransformed(new File([transformedXes(run)],"minera-transformed-log.xes",{type:"application/xml"}),run.activity_attribute);};
+  const literalFields=(selected:string[]):Array<[string,string]>=>{
+    if(method==="features"){const lists={...features.lists};for(const [key]of FEATURE_LISTS)if(selected.includes(`features_${key}_json`))lists[key]={mode:"native",text:lists[key].text};return [...new URLSearchParams(logToFeaturesQuery(featureOptions({...features,lists})))];}
+    return [...new URLSearchParams(logToTargetQuery(targetOptions({...targets,activities:selected.includes("target_activities_json")?{mode:"native",text:targets.activities.text}:targets.activities})))];
+  };
   return <>
     <section className="panel transformation-workspace"><div className="panel-head"><h2>Transform the log</h2><span className="panel-meta">{data.dataset}</span></div><p className="query-intro">Extract event, case or temporal feature matrices, generate prediction targets, or split activity labels by their surrounding context.</p>{!available&&<p className="model-empty">Open a CSV or XES log to transform it. Saved analysis JSON does not provide an active transformation source.</p>}<div className="query-setup"><button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Refresh transformation source</button>{schema&&<p>Source: {schema.case_count} cases · {schema.event_count} events</p>}</div>
       <fieldset className="query-fields" disabled={disabled}><label className="filters-field"><span>Transformation method</span><select value={method} onChange={event=>{setMethod(event.target.value as TransformationMethod);setRun(null);setError(null);}}><option value="features">Feature matrices</option><option value="targets">Prediction targets</option><option value="labels">Contextual label splitting</option></select></label>
@@ -43,5 +49,6 @@ export function TransformationWorkspace({data,available,mining,onOpenTransformed
       <details><summary>Source cases and empty traces</summary><p>{run.cases.length} source cases · {run.cases.filter(trace=>!trace.event_count).length} empty traces · {eventCount} events</p><pre>{JSON.stringify(run.cases,null,2)}</pre></details>
       {onUseCube&&run.result.family==="LOG_TO_FEATURES"&&run.result.variant==="trace_based"&&<div className="query-actions"><button className="btn-open" disabled={disabled} onClick={()=>{try{onUseCube(cubeFeatureFile(run));}catch(cause){setError(cause instanceof Error?cause.message:String(cause));}}}>Explore case features as a process cube</button></div>}
     </section>}
+    {method!=="labels"&&<LiteralControlsPanel key={method} group={method==="targets"?"target":"features"} sourceId={schema?.source_id} available={available} mining={mining} configurationIdentity={method==="targets"?targets:features} legacyFields={literalFields}/>}
   </>;
 }
