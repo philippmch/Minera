@@ -29,11 +29,12 @@ interface TopBarProps {
   onOriginalEmbeddingFilter?: () => void;
   onOriginalEmd?: () => void;
   onOriginalEditDistance?: () => void;
+  onOriginalBose?: () => void;
   onOriginalOcPlayout?: () => void;
   onActiveSource?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalOcPlayout, onActiveSource }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalOcPlayout, onActiveSource }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -74,6 +75,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onOriginalEmbeddingFilter && <button className="btn-ghost" onClick={onOriginalEmbeddingFilter}>Original embedding / filter</button>}
       {onOriginalEmd && <button className="btn-ghost" onClick={onOriginalEmd}>Original weighted-language EMD</button>}
       {onOriginalEditDistance && <button className="btn-ghost" onClick={onOriginalEditDistance}>Original edit distance</button>}
+      {onOriginalBose && <button className="btn-ghost" onClick={onOriginalBose}>Original BOSE workbench</button>}
       {onOriginalOcPlayout && <button className="btn-ghost" onClick={onOriginalOcPlayout}>Original object-centric playout</button>}
       {onActiveSource && <button className="btn-ghost" onClick={onActiveSource}>Source inputs</button>}
       <label className="btn-open">

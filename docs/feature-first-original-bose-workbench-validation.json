@@ -1,0 +1,347 @@
+{
+  "complete": true,
+  "feature_group": 70,
+  "created_utc": "2026-10-18T18:48:25.587530+00:00",
+  "checkpoint_kind": "implemented feature delivery with browser and strict parity pending",
+  "parent_head": "6afaeba965cf51cb127a683e0e2281cc227e8734",
+  "backend_step_commit": "6afaeba965cf51cb127a683e0e2281cc227e8734",
+  "ui_step_commit": null,
+  "ui_step_commit_pending": true,
+  "ui_delivery_pending": false,
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false,
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "browser_attempt_feature": 70,
+  "browser_outcome": "saved_or_managed_origin_policy_denied; actual attempt served69; Feature70 UI unverified",
+  "prior_browser_evidence": {
+    "path": "build/edit-distance-feature69-browser-status-1.json",
+    "bytes": 623,
+    "sha256": "a1e63eabd68297efadb2298ce33aba691c7fe803bf252e01b25ddb1c3ed06414"
+  },
+  "boundaries": [
+    "Local native/API/portable/live delivery proofs are complete. There are 5570 current frontend checks across full-suite and focused recovery evidence, with a fresh strict TypeScript/Vite build. The UI commit identity is recorded by the external postcommit checkpoint. Full strict parity and rendered browser verification remain open.",
+    "Full PM4Py parity remains unfinished: 86 families/387 modules/46 complete packages/199 complete modules/228 incomplete units. No strict parity status or selector changes; original Feature 60 family classifications remain historical.",
+    "The native BOSE algorithms already existed. This feature exposes their original-input public signatures and stored results. Signed table/trace semantics and unsigned log validation are distinct; threshold 1.1 is valid for signed paths but correctly rejected by the unsigned detector.",
+    "The JSON host owns finite lazy rows and cannot construct arbitrary executable scanner functions. Scalar identity comes from actual public copies within one request; no private identity IDs or cross-request registry is exposed. Private seeded RNG state remains unavailable, while caller state is real public stream serialization.",
+    "Native evidence aggregates 57 currently passing assertion suites across 3 actual invocations: retained 55 parent suites, retained corrected edit-distance suite and the fresh corrected BOSE suite. No single combined57-suite invocation is claimed. Both earlier BOSE fixture failures remain preserved: JSON property order, then unsigned threshold range.",
+    "The first staged strict frontend attempt failed with TS2552; its proof is retained. The amended export passed 55 focused tests. The initial complete frontend invocation passed 5570 checks/126 files, then strict TypeScript failed TS2367 in two test-only constructor comparisons. Both erased {constructor: unknown} assertions were corrected; portable manifest/record bytes and 14056 other source files remain unchanged. Current evidence retains 5479 unaffected checks/125 files and the final 91 corrected fixture checks/1 file across two passing invocations, followed by a fresh strict TypeScript/Vite build. No single combined invocation of all final current tests is claimed. The initial full pass/build failure is retained. The first scoped portable fixture run retained 67 passes/24 failures because its test expected 625 MT19937 words; MSVC emits 624 state words without a cursor. The test-only successor checks 624 bounded words and exact returned-state reuse. All failed proof files remain immutable; no native behavior or captured HTTP response was changed to satisfy that assertion.",
+    "The actual Feature 70 browser retry was denied by the saved or managed origin policy despite the user enabling all settings. That attempt served Feature 69 on PID 26040. Feature 70 rendered controls, interactions and browser downloads remain unverified; native/API/export checks are independent evidence.",
+    "The actual corpus retains 92 physical calls and 90 selected feature cases, one cache seed and one byte-identical repeat. Ten historical false checks remain retained across two wrong fixtures. The corrected typed-NA fixture uses the required outer<NA> token and was captured once as call 92. The signed-negative-window fixture was corrected offline to retain its native dimension error and unchanged caller RNG. Both actual RNG-state continuations and all physical multipart metadata remain bound; no corpus replay was performed.",
+    "Client cancellation prevents stale UI publication but does not terminate a native operation already running. Next bounded feature work is independent original-log ILP and genetic discovery; the whole catalogue and strict gates remain active."
+  ],
+  "validation_counts": {
+    "native_sources": 713,
+    "native_suites_aggregate": 57,
+    "actual_passing_suite_invocations": 3,
+    "retained_parent_passing_suites": 56,
+    "fresh_corrected_bose_suite": 1,
+    "reused_parent_core_objects": 197,
+    "fresh_feature_core_objects": 1,
+    "feature_library_core_objects": 198,
+    "native_operations": 18,
+    "public_declarations": 25,
+    "caller_rng_overloads": 7,
+    "signed_table_option_fields": 9,
+    "signed_trace_option_fields": 6,
+    "unsigned_log_option_fields": 11,
+    "csv_import_option_fields": 10,
+    "xes_import_option_fields": 21,
+    "preparation_option_fields": 17,
+    "focused_frontend_tests": 55,
+    "actual_api_calls": 92,
+    "selected_feature_cases": 90,
+    "frontend_tests": 5570,
+    "frontend_test_files": 126,
+    "portable_export_tests": 91,
+    "portable_fixture_files": 3,
+    "served_asset_count": 7,
+    "live_smoke_http_calls": 2,
+    "historical_api_false_checks_retained": 10,
+    "cached_mining_seed_attempts": 1,
+    "independence_repeat_calls": 1,
+    "offline_http_calls": 0,
+    "frontend_source_bindings": 14057,
+    "fresh_live_post_calls_excluded_from_dedicated_corpus": 2,
+    "physical_multipart_parts": 353,
+    "authoritative_artifacts": 606,
+    "portable_bundle_bytes": 5783973,
+    "adaptive_api_calls": 2,
+    "unrelated_files_to_preserve": 110,
+    "frontend_actual_passing_test_invocations": 2,
+    "frontend_retained_tests": 5479,
+    "frontend_retained_test_files": 125,
+    "frontend_corrected_fixture_tests": 91,
+    "frontend_corrected_fixture_files": 1,
+    "unchanged_frontend_sources_after_type_recovery": 14056
+  },
+  "evidence": {
+    "native_build": {
+      "path": "build/bose70r-53a6749ffba3/build-manifest.json",
+      "bytes": 318364,
+      "sha256": "0706a0e78642a371fd03eafc2ac2d61d9d70809d77c3b3c9e6796615a320425d"
+    },
+    "frontend_candidate": {
+      "path": "build/bose70-frontend-export-amendment-20261018/staging-manifest.json",
+      "bytes": 45139,
+      "sha256": "32b196ed481d483110df764f520032cc25eba791483972a8219a412de9211a79"
+    },
+    "frontend_focused_staging": {
+      "path": "build/bose70-staged-focused-1-deaee24b28974f6f8c866aed58176cc4/validation.json",
+      "bytes": 46813,
+      "sha256": "cfd366f44af265f51dfe75d69b15d46256f46d06bce5a8b08488359a6fafb2fa"
+    },
+    "frontend_strict_staging": {
+      "path": "build/bose70-staged-types-1-233fb1ff4c3a4a2cab621dd2241fc938/validation.json",
+      "bytes": 43418,
+      "sha256": "67eb0f2aa312bbd6974288998f0146cbdda5ae71549e72056e075106a1c61458"
+    },
+    "historical_frontend_strict_failure": {
+      "path": "build/bose70-staged-types-1-d7b6515755654fa4b3fc12f448523c36/validation.json",
+      "bytes": 43633,
+      "sha256": "84840f7420426aae8323d4aa109c11726a523a280d6005db7812554e48fc2f63"
+    },
+    "api_corpus_preparation": {
+      "path": "build/bose70-api-corpus-final-prepared-20261018/staging-manifest.json",
+      "bytes": 2351,
+      "sha256": "68745e3009be893881fac1b213c861bfa7458b4b9f27e47a6bc7eff3dcf7462d"
+    },
+    "protocol": {
+      "path": "build/bose70-native-rng-amendment-20261018/protocol.json",
+      "bytes": 15442,
+      "sha256": "f9d81a13622e6cdd127d453a4c6db8b0efc23d4597c6a3880556584acd0fa10d"
+    },
+    "api_capture": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70-api-actual-20261018-1\\validation.json",
+      "bytes": 1641072,
+      "sha256": "7d8cc7809b4eab83afd7d6aa8d5f753ab9f35d97b3aa57a308c0113ce7eaa67f"
+    },
+    "api_offline_composite": {
+      "path": "build/bose70-api-offline-composite-20261018-1/validation.json",
+      "bytes": 5015235,
+      "sha256": "155df458977387915815564692550d0fbb4e8f33b1cceb97a60a4185072a95fb"
+    },
+    "frontend_integration": {
+      "path": "build/bose-feature70-frontend-integration-249edd74c8a8402baf28c26a2eb964cd/validation.json",
+      "bytes": 40879,
+      "sha256": "bc5bafd4afae2a667d84c47e53d8c3a7b764802d01ff4bbb35316e0b6bd24059"
+    },
+    "full_frontend_validation": {
+      "path": "build/bose-feature-frontend-recovery-02fd571b9e3743b2ac99c6afe8dde25f/validation.json",
+      "bytes": 2768946,
+      "sha256": "5443bbc4e2d30f399dab5e39ccec74e6ddf5c46180e1f22f1e762e95fa4eae77"
+    },
+    "portable_fixture_validation": {
+      "path": "build/bose70-compact-fixture-validation-821013dc49904c65a6e38398cc00aa29/validation.json",
+      "bytes": 43110,
+      "sha256": "d5324e8428fbf97e2161a4f67f213cea7e5c562f0553e1f0e1eb6e69149c5f23"
+    },
+    "portable_fixture_publication": {
+      "path": "build/bose70-compact-fixture-publication-e769e9c389ca48058865abb3ed1c5267/validation.json",
+      "bytes": 176258,
+      "sha256": "ecacd28f4dfb7dbc35d7c78e97a578be002f08d789646b684101115ba2290331"
+    },
+    "live_activation_validation": {
+      "path": "build/bose-feature70-live-runtime.json",
+      "bytes": 18458,
+      "sha256": "3dbb5155213ca9136f03faa1a5e6dfeafb862a5530c1f1d78748b3753404bf27"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/bose-feature70-test-cleanup.json",
+      "bytes": 4348,
+      "sha256": "1221f673acc6e5cbb0f6dd1f76a46b0392e9ef2210b5d89387f60debf16c50d2"
+    },
+    "backend_commit": {
+      "path": "build/bose-feature70-backend-postcommit.json",
+      "bytes": 1153,
+      "sha256": "2cc5e39d205ec8f9a9f38f9f9ee9551874f8aa582303484969cbbb4e0743fac4"
+    },
+    "ui_commit": {
+      "recorded_by": "external postcommit checkpoint",
+      "reason": "Avoid a self-referential commit hash."
+    },
+    "browser_attempt": {
+      "path": "build/bose-feature70-browser-status-1.json",
+      "bytes": 751,
+      "sha256": "117928f8ab36c0e8b1baca218b339cb8376eacdbccae549441ce77dd8348856b"
+    },
+    "historical_full_frontend_validation": {
+      "path": "build/bose-feature-frontend-final-bfebae10aab74c7a9e86fa55deca9ea0/validation.json",
+      "bytes": 2759842,
+      "sha256": "5363f7c285e6589eec6d723eb48d1b32bb41db010f72bf891f7e445dedc3f4b8"
+    },
+    "api_source_captures": [
+      {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70-api-actual-20261018-1\\validation.json",
+        "bytes": 1641072,
+        "sha256": "7d8cc7809b4eab83afd7d6aa8d5f753ab9f35d97b3aa57a308c0113ce7eaa67f"
+      },
+      {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70-api-supplement-actual-20261018-1\\validation.json",
+        "bytes": 21002,
+        "sha256": "ad6cd86bdab0e9775db8fb6ca1fa4a855b3ea877b6f36928840966c2dc639431"
+      }
+    ],
+    "api_supplement": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70-api-supplement-actual-20261018-1\\validation.json",
+      "bytes": 21002,
+      "sha256": "ad6cd86bdab0e9775db8fb6ca1fa4a855b3ea877b6f36928840966c2dc639431"
+    }
+  },
+  "historical_native_attempts": [
+    {
+      "manifest": {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70-26e18a12f33a4e4cb3318a877147921c\\build-manifest.json",
+        "sha256": "d64c795f795bb59f1c09029205d0ce397a3431f44fd0e7df85633e6967dee9a0",
+        "bytes": 305556
+      },
+      "outcome": "Configure0/allnativecompile0; new70suite failed JSON property-order fixture; no old suites replayed. Original namespace immutable."
+    },
+    {
+      "manifest": {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70r-dd5f24269af3\\build-manifest.json",
+        "sha256": "b7e377ef2383730a2119c2a7159d6049beffafca7514f2644adb3dc633126247",
+        "bytes": 309393
+      },
+      "outcome": "Configure0/testcompile0; new70suite failed unsigned detect_log threshold1.1 fixture; actual native [0,1] rejection retained. No old suites replayed. Namespace immutable."
+    }
+  ],
+  "required_before_publication": [],
+  "completed_utc": "2026-10-18T19:11:19.858552+00:00",
+  "feature_baseline_head": "3319eead90bd696e7bebf30c4ada2053f1fcc1a6",
+  "ui_step_commit_note": "The containing UI commit identity is verified in the external postcommit checkpoint; embedding its own hash would be circular.",
+  "delivered": [
+    "Eighteen operations expose all 25 actual public BOSE declarations: signed EventTable/EventLog adapters and dispatcher overloads, activities, full-Trace string features/follows, typed helpers, splitting, supplied matrices and both direct detectors, plus the existing unsigned EventLog detector.",
+    "Original raw logs, streams, complete typed tables and finite lazy rows or CSV/XES/gzip imports own their source independently. Literal import/selectors and explicit preparation retain original and selected kinds; the requested signature receives the actual kind. Direct detect_traces consumes NativeString[][], while string feature helpers consume full Trace[] and follows consumes one full Trace.",
+    "All 9 signed table options, 6 signed trace options, 11 unsigned log options and every helper argument retain native defaults, supplied-member presence, signed slicing, full uint64 seeds, byte strings, whitespace, IEEE values and reached native errors. Selected case-start timestamps remain distinct from the native contiguous standard-case projection, dtype/category ordering and physical row/index storage.",
+    "All 7 caller-engine overloads use actual public std::mt19937 seed32, seed_seq_words or state_text construction. Exact before/after states, inactive provided seed values, early no-advance failures and late native RNG advancement remain inspectable. Private seeded engines expose no fabricated state; helpers without a seed use truthful not_applicable diagnostics.",
+    "Full stored table/trace/typed/log results, regenerated table indexes, raw and cumulative EventLogs, features, change points, timestamps and p-values remain inspectable. Typed numeric aliases, null/NA/container semantics and intentional NaN aliases use actual public copies and observed identity classes. Raw MIME/body bytes, physical filename presence, original uploads, successful parse prefixes and independent artifact bytes/errors remain retained.",
+    "The standalone and conformance workspaces provide operation-specific original editors/uploads, literal option/parameter/RNG controls, request replacement guards, complete reports/tables/CSV/selected records, original-byte downloads and reusable returned native inputs. There are 5570 current frontend checks across full-suite and focused recovery evidence: 5479 retained checks/125 files plus 91 corrected fixture checks/1 file across two passing invocations. The fresh strict TypeScript/Vite build, portable export, served assets and two byte-identical live smoke responses are verified. Rendered browser controls and downloads remain unverified."
+  ],
+  "browser_attempt_served_feature": 69,
+  "browser_evidence": {
+    "path": "build/bose-feature70-browser-status-1.json",
+    "bytes": 751,
+    "sha256": "117928f8ab36c0e8b1baca218b339cb8376eacdbccae549441ce77dd8348856b"
+  },
+  "delivery_proofs": {
+    "native_build": {
+      "path": "build/bose70r-53a6749ffba3/build-manifest.json",
+      "bytes": 318364,
+      "sha256": "0706a0e78642a371fd03eafc2ac2d61d9d70809d77c3b3c9e6796615a320425d"
+    },
+    "api_offline_composite": {
+      "path": "build/bose70-api-offline-composite-20261018-1/validation.json",
+      "bytes": 5015235,
+      "sha256": "155df458977387915815564692550d0fbb4e8f33b1cceb97a60a4185072a95fb"
+    },
+    "frontend_integration": {
+      "path": "build/bose-feature70-frontend-integration-249edd74c8a8402baf28c26a2eb964cd/validation.json",
+      "bytes": 40879,
+      "sha256": "bc5bafd4afae2a667d84c47e53d8c3a7b764802d01ff4bbb35316e0b6bd24059"
+    },
+    "full_frontend_validation": {
+      "path": "build/bose-feature-frontend-recovery-02fd571b9e3743b2ac99c6afe8dde25f/validation.json",
+      "bytes": 2768946,
+      "sha256": "5443bbc4e2d30f399dab5e39ccec74e6ddf5c46180e1f22f1e762e95fa4eae77"
+    },
+    "portable_fixture_validation": {
+      "path": "build/bose70-compact-fixture-validation-821013dc49904c65a6e38398cc00aa29/validation.json",
+      "bytes": 43110,
+      "sha256": "d5324e8428fbf97e2161a4f67f213cea7e5c562f0553e1f0e1eb6e69149c5f23"
+    },
+    "portable_fixture_publication": {
+      "path": "build/bose70-compact-fixture-publication-e769e9c389ca48058865abb3ed1c5267/validation.json",
+      "bytes": 176258,
+      "sha256": "ecacd28f4dfb7dbc35d7c78e97a578be002f08d789646b684101115ba2290331"
+    },
+    "live_activation_validation": {
+      "path": "build/bose-feature70-live-runtime.json",
+      "bytes": 18458,
+      "sha256": "3dbb5155213ca9136f03faa1a5e6dfeafb862a5530c1f1d78748b3753404bf27"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/bose-feature70-test-cleanup.json",
+      "bytes": 4348,
+      "sha256": "1221f673acc6e5cbb0f6dd1f76a46b0392e9ef2210b5d89387f60debf16c50d2"
+    },
+    "backend_commit": {
+      "path": "build/bose-feature70-backend-postcommit.json",
+      "bytes": 1153,
+      "sha256": "2cc5e39d205ec8f9a9f38f9f9ee9551874f8aa582303484969cbbb4e0743fac4"
+    },
+    "browser_attempt": {
+      "path": "build/bose-feature70-browser-status-1.json",
+      "bytes": 751,
+      "sha256": "117928f8ab36c0e8b1baca218b339cb8376eacdbccae549441ce77dd8348856b"
+    },
+    "historical_full_frontend_validation": {
+      "path": "build/bose-feature-frontend-final-bfebae10aab74c7a9e86fa55deca9ea0/validation.json",
+      "bytes": 2759842,
+      "sha256": "5363f7c285e6589eec6d723eb48d1b32bb41db010f72bf891f7e445dedc3f4b8"
+    }
+  },
+  "historical_portable_fixture_attempts": [
+    {
+      "validation": {
+        "path": "build/bose70-compact-fixture-validation-d0ac80b26613466b85fa316c9f15ed44/validation.json",
+        "bytes": 41296,
+        "sha256": "5c8d8fe020ec6c36fa338a7633ceba498b39a9ef1588374202106dab928188ad"
+      },
+      "passed_tests": 67,
+      "failed_tests": 24,
+      "returncode": 1
+    }
+  ],
+  "frontend_test_lineage": {
+    "initial_full_validation": {
+      "path": "build/bose-feature-frontend-final-bfebae10aab74c7a9e86fa55deca9ea0/validation.json",
+      "bytes": 2759842,
+      "sha256": "5363f7c285e6589eec6d723eb48d1b32bb41db010f72bf891f7e445dedc3f4b8"
+    },
+    "retained_tests": 5479,
+    "retained_files": 125,
+    "corrected_fixture_tests": 91,
+    "corrected_fixture_files": 1,
+    "current_tests": 5570,
+    "current_files": 126,
+    "actual_passing_invocations": 2,
+    "single_current_full_invocation": false,
+    "test_names_equal": true,
+    "fixture_case_ids_equal": true,
+    "fixture_case_ids_sha256": "cfa16c7daa3a012f89dfd7717c9677be1987645c335dd31a833219f11b1df291",
+    "portable_fixture_paths": [
+      "src/frontend/tests/fixtures/original-bose-workbench-manifest.json",
+      "src/frontend/tests/fixtures/original-bose-workbench-records.json",
+      "src/frontend/tests/original-bose-workbench-fixtures.test.ts"
+    ],
+    "portable_delta_paths": [
+      "src/frontend/tests/original-bose-workbench-fixtures.test.ts"
+    ],
+    "portable_unchanged_paths": [
+      "src/frontend/tests/fixtures/original-bose-workbench-manifest.json",
+      "src/frontend/tests/fixtures/original-bose-workbench-records.json"
+    ],
+    "unchanged_frontend_source_count": 14056,
+    "retained_dependencies_unchanged": true,
+    "retained_test_names_sha256": "3a1cdb38fb7b3f29543c98c6d0a3f4c4661c617a0d2a9058d7296b34bc4574a6",
+    "corrected_fixture_names_sha256": "8b534c21d7c7f9a76aa9b1f38e8ff1cb47021c23840a25056aa8b0bd3216f65f"
+  },
+  "historical_full_frontend_attempt": {
+    "path": "build/bose-feature-frontend-final-bfebae10aab74c7a9e86fa55deca9ea0/validation.json",
+    "bytes": 2759842,
+    "sha256": "5363f7c285e6589eec6d723eb48d1b32bb41db010f72bf891f7e445dedc3f4b8"
+  },
+  "pending_delivery_proofs": {},
+  "application_gate": "All required local runtime delivery proofs completed before application."
+}
