@@ -36,3 +36,4 @@ src/frontend/tests/fixtures/literal-controls* -text -whitespace
 src/frontend/tests/fixtures/original-edit-distance-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-bose-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-discovery-workbench* -text -whitespace
+src/frontend/tests/fixtures/original-genetic-matrix-byte-fidelity* -text -whitespace
