@@ -1,3 +1,4 @@
+import {OriginalBoseWorkspace} from "./OriginalBoseWorkspace";
 import {OriginalEditDistanceWorkspace} from "./OriginalEditDistanceWorkspace";
 import {LiteralControlsPanel} from "./LiteralControlsPanel";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -399,6 +400,7 @@ export function Conformance({
       <LiteralControlsPanel group="dfg_precision" available={Boolean(onRequestDfg)} configurationIdentity={data} />
       <PetriUsageComparisonPanel />
       <ConceptDriftPanel key={`concept-drift-${analysisId}`} onRequest={onRequestConceptDrift} />
+      <OriginalBoseWorkspace />
     </div>
   );
 }

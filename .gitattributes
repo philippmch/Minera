@@ -34,3 +34,4 @@ src/frontend/tests/fixtures/original-emd-workbench/** -text -whitespace
 src/frontend/tests/fixtures/original-object-centric-playout-workbench* -text -whitespace
 src/frontend/tests/fixtures/literal-controls* -text -whitespace
 src/frontend/tests/fixtures/original-edit-distance-workbench* -text -whitespace
+src/frontend/tests/fixtures/original-bose-workbench* -text -whitespace
