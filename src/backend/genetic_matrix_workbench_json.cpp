@@ -1,6 +1,8 @@
 #include "minera/genetic_matrix_workbench_json.hpp"
 #include "minera/graph_alignment_workbench_json.hpp"
 #include "minera/workflow_input_result_json.hpp"
+#include "minera/object_centric_playout_workbench_json.hpp"
+#include <optional>
 
 #include <algorithm>
 #include <charconv>
@@ -318,6 +320,50 @@ std::int32_t signed_index(const Json& value) {
   return result;
 }
 
+// Preserve the previous wire spelling exactly when its parser restores the
+// same native bytes. Adjacent high/low WTF8 surrogates are not such a spelling:
+// two escaped code units would combine into a different four-byte scalar.
+std::optional<std::string> compatible_quoted(const std::string& value) {
+  try {
+    auto out = output(); quoted(out, value); auto encoded = out.str();
+    if (Parser(encoded, true, false).parse().string() == value) return encoded;
+  } catch (const std::invalid_argument&) { /* Use the exact byte constructor. */ }
+  return std::nullopt;
+}
+std::string native_string(const Json& value) {
+  if (const auto* scalar = std::get_if<std::string>(&value.value)) return *scalar;
+  const auto& object = value.object(); allowed_fields(object, {"native_bytes", "data"});
+  const auto* version = field(object, "native_bytes"); const auto* data = field(object, "data");
+  if (!version || !data || version->string() != "hex-v1") invalid("invalid native byte string version");
+  const auto& hex = data->string(); if (hex.size() % 2) invalid("odd hex byte string length");
+  const auto digit = [](char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; };
+  std::string result; result.reserve(hex.size() / 2);
+  for (std::size_t i = 0; i < hex.size(); i += 2) { const auto a = digit(hex[i]), b = digit(hex[i + 1]); if (a < 0 || b < 0) invalid("invalid hex byte string"); result += static_cast<char>((a << 4) | b); }
+  return result;
+}
+void native_string_json(std::ostream& out, const std::string& value) {
+  if (const auto scalar = compatible_quoted(value)) { out << *scalar; return; }
+  constexpr char digits[] = "0123456789abcdef";
+  out << "{\"native_bytes\":\"hex-v1\",\"data\":\"";
+  for (const unsigned char byte : value) out << digits[byte >> 4] << digits[byte & 15];
+  out << "\"}";
+}
+bool structured_strings_compatible(const HeuristicStructuredValue& value) {
+  return std::visit([](const auto& item) -> bool {
+    using T = std::decay_t<decltype(item)>;
+    if constexpr (std::is_same_v<T, std::string>) return compatible_quoted(item).has_value();
+    else if constexpr (std::is_same_v<T, HeuristicStructuredValue::Array>) { for (const auto& child : item) if (!structured_strings_compatible(child)) return false; return true; }
+    else if constexpr (std::is_same_v<T, HeuristicStructuredValue::Object>) { for (const auto& [key, child] : item) if (!compatible_quoted(key) || !structured_strings_compatible(child)) return false; return true; }
+    else return true;
+  }, value.value);
+}
+bool net_strings_compatible(const PetriNet& net) {
+  for (const auto& name : net.activities()) if (!compatible_quoted(name)) return false;
+  if (net.transition_names()) for (const auto& name : *net.transition_names()) if (name && !compatible_quoted(*name)) return false;
+  if (net.discovery_markings()) for (const auto& place : net.discovery_markings()->detached_places) if (!structured_strings_compatible(place.name)) return false;
+  return true;
+}
+
 GeneticMatrixMap matrix_map(const Json& json) {
   return vector_value<std::vector<GeneticMatrixPartition>>(json, [](const Json& groups) {
     return vector_value<GeneticMatrixPartition>(groups, [](const Json& members) {
@@ -330,7 +376,7 @@ GeneticMatrixMap matrix_map(const Json& json) {
 
 void matrix_json(std::ostream& out, const GeneticCausalMatrix& matrix) {
   out << "{\"activities\":";
-  array_json(out, matrix.activities, quoted);
+  array_json(out, matrix.activities, native_string_json);
   const auto maps = [&](const GeneticMatrixMap& map) {
     array_json(out, map, [](std::ostream& outer, const std::vector<GeneticMatrixPartition>& groups) {
       array_json(outer, groups, [](std::ostream& inner, const GeneticMatrixPartition& members) {
@@ -356,7 +402,7 @@ GeneticCausalMatrix parse_genetic_matrix_workbench_model_json(
   allowed_fields(object, {"activities", "input_map", "output_map"});
   GeneticCausalMatrix result;
   if (const auto* value = field(object, "activities"))
-    result.activities = vector_value<std::string>(*value, [](const Json& v) { return v.string(); });
+    result.activities = vector_value<std::string>(*value, native_string);
   if (const auto* value = field(object, "input_map")) result.input_map = matrix_map(*value);
   if (const auto* value = field(object, "output_map")) result.output_map = matrix_map(*value);
   supplied_members(object, supplied);
@@ -387,21 +433,29 @@ std::string serialize_genetic_matrix_workbench_options_json(const GeneticMatrixW
 }
 
 std::string serialize_genetic_matrix_workbench_net_json(const PetriNet& net) {
-  // Existing serializer retains all transition arcs/weights and sparse marking
-  // namespaces. Append the three getter carriers its renderer does not expose.
-  auto result = workflow_input_petri_json(net);
-  result.pop_back();
-  result += ",\"source_storage\":" + std::to_string(net.source()) +
-      ",\"sink_storage\":" + std::to_string(net.sink()) + ",\"transition_names\":";
-  if (!net.transition_names()) result += "null";
-  else {
-    auto out = output();
-    array_json(out, *net.transition_names(), [](std::ostream& target, const auto& name) {
-      if (name) quoted(target, *name); else target << "null";
-    });
-    result += out.str();
+  if (net_strings_compatible(net)) {
+    try {
+      // Existing serializer retains all transition arcs/weights and sparse marking
+      // namespaces. Append the three getter carriers its renderer does not expose.
+      auto result = workflow_input_petri_json(net);
+      result.pop_back();
+      result += ",\"source_storage\":" + std::to_string(net.source()) +
+          ",\"sink_storage\":" + std::to_string(net.sink()) + ",\"transition_names\":";
+      if (!net.transition_names()) result += "null";
+      else {
+        auto out = output();
+        array_json(out, *net.transition_names(), [](std::ostream& target, const auto& name) {
+          if (name) quoted(target, *name); else target << "null";
+        });
+        result += out.str();
+      }
+      return result + '}';
+    } catch (const std::invalid_argument&) {
+      // The rich getter view validates topology/dimensions/sparse identities.
+      // Public literal storage can faithfully contain values outside that view.
+    }
   }
-  return result + '}';
+  return serialize_oc_playout_workbench_petri_net_json(net);
 }
 
 std::string serialize_genetic_matrix_workbench_markings_json(const WorkflowMarkings& markings) {

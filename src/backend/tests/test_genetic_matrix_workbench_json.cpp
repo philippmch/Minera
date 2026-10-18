@@ -2,6 +2,7 @@
 #include "minera/genetic_matrix_workbench_json.hpp"
 #include "minera/pnml.hpp"
 #include "minera/workflow_input_result_json.hpp"
+#include "minera/object_centric_playout_workbench_json.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -216,6 +217,100 @@ void all_public_net_storage_and_signed_markings_are_complete() {
   rejects([&]{(void)genetic_matrix_conversion_json(arbitrary);});
 }
 
+
+void all_native_byte_domains_and_old_wire_compatibility() {
+  const std::string high="\xed\xa0\x80", low="\xed\xb0\x80", pair=high+low, scalar="\xf0\x90\x80\x80";
+  GeneticCausalMatrix matrix;
+  matrix.activities={"", "ordinary", std::string("A\0B",3), high, low, pair, scalar,
+      std::string("\xff\0",2),std::string("\xc0\x80",2),std::string("\xf0\x9f",2),high+"x"+low};
+  matrix.input_map.resize(matrix.activities.size()); matrix.output_map.resize(matrix.activities.size());
+  matrix.input_map[1]={{0,0},{0},{}}; // Literal storage, not converter-valid groups.
+  const auto before=matrix;
+  const auto encoded=serialize_genetic_matrix_workbench_model_json(matrix);
+  const auto restored=parse_genetic_matrix_workbench_model_json(encoded);
+  assert(restored.activities==matrix.activities && restored.input_map==matrix.input_map && restored.output_map==matrix.output_map);
+  assert(matrix.activities==before.activities && matrix.input_map==before.input_map);
+  assert(restored.activities[5]==pair&&restored.activities[6]==scalar&&restored.activities[5]!=restored.activities[6]);
+  contains(encoded,R"({"native_bytes":"hex-v1","data":"eda080edb080"})");
+  contains(encoded,R"("\ud800")"); contains(encoded,R"("\udc00")"); contains(encoded,scalar);
+  contains(encoded,R"({"native_bytes":"hex-v1","data":"ff00"})");
+  contains(encoded,R"("A\u0000B")");
+  const auto old=parse_genetic_matrix_workbench_model_json(R"({"activities":["ordinary","\ud800","\udc00","\u0000"],"input_map":[],"output_map":[]})");
+  const std::string expected_old=R"({"activities":["ordinary","\ud800","\udc00","\u0000"],"input_map":[],"output_map":[]})";
+  assert(serialize_genetic_matrix_workbench_model_json(old)==expected_old);
+  // Valid byte-tag input can expand beyond the request JSON limit when its
+  // canonical scalar escapes controls. Serialization has no request-size cap.
+  { GeneticCausalMatrix expanded;expanded.activities={std::string(6u*1024u*1024u,'\0')};const auto output=serialize_genetic_matrix_workbench_model_json(expanded);assert(output.size()>32u*1024u*1024u);assert(output.starts_with("{\"activities\":[\"\\u0000"));assert(output.find("native_bytes")==std::string::npos); }
+  // Every octet, not only a selected malformed-UTF8 example, is reversible.
+  for(unsigned byte=0;byte<256;++byte){GeneticCausalMatrix one;one.activities={std::string(1,static_cast<char>(byte))};const auto text=serialize_genetic_matrix_workbench_model_json(one);assert(parse_genetic_matrix_workbench_model_json(text).activities==one.activities);}
+  std::set<std::string> supplied;
+  const auto hex=parse_genetic_matrix_workbench_model_json(R"({"activities":[{"native_bytes":"hex-v1","data":"41"},{"native_bytes":"hex-v1","data":"FF00"},{"native_bytes":"hex-v1","data":""}],"output_map":[[],[],[]]})",&supplied);
+  assert(hex.activities==std::vector<std::string>({"A",std::string("\xff\0",2),""}));
+  assert(supplied==std::set<std::string>({"activities","output_map"}));
+  contains(serialize_genetic_matrix_workbench_model_json(hex),R"("activities":["A",{"native_bytes":"hex-v1","data":"ff00"},""])");
+  for(const auto* bad:{R"({"activities":[{}]})",R"({"activities":[{"native_bytes":"hex-v2","data":"ff"}]})",R"({"activities":[{"native_bytes":"hex-v1"}]})",R"({"activities":[{"data":"ff"}]})",R"({"activities":[{"native_bytes":"hex-v1","data":"f"}]})",R"({"activities":[{"native_bytes":"hex-v1","data":"gg"}]})",R"({"activities":[{"native_bytes":"hex-v1","data":null}]})",R"({"activities":[{"native_bytes":"hex-v1","data":"ff","extra":0}]})",R"({"activities":[{"native_bytes":"hex-v1","data":"ff","d\u0061ta":"00"}]})"}){
+    supplied={"sentinel"}; rejects([&]{(void)parse_genetic_matrix_workbench_model_json(bad,&supplied);});assert(supplied==std::set<std::string>{"sentinel"});
+  }
+  // Actual conversion keeps byte labels and distinct scalar/WTF8 owners. Its
+  // semantic normalization is independent from constructor serialization.
+  auto executable=matrix;executable.input_map.assign(matrix.activities.size(),{});executable.output_map.assign(matrix.activities.size(),{});
+  const auto converted=convert_genetic_matrix(executable);
+  assert(converted.matrix.activities==executable.activities&&converted.net.activities()==executable.activities);
+  const auto net_json=serialize_genetic_matrix_workbench_net_json(converted.net);
+  contains(net_json,"\"activities\":");assert(net_json.find("activity_names")==std::string::npos);
+  const auto net_copy=parse_oc_playout_workbench_petri_net_json(net_json);
+  assert(net_copy.activities()==converted.net.activities());
+}
+
+void full_literal_net_byte_fields_and_inactive_boundaries() {
+  const std::string bytes("\xff\0",2), pair="\xed\xa0\x80\xed\xb0\x80";
+  // Existing inactive getter storage already survives. Prove nonzero maxima
+  // while retaining the ordinary rich getter view and its null presentation.
+  PetriNetLiteralStorage inactive;inactive.source_storage=std::numeric_limits<std::size_t>::max();inactive.sink_storage=std::numeric_limits<std::size_t>::max()-1;
+  auto net=PetriNet::from_literal_storage(inactive);
+  auto encoded=serialize_genetic_matrix_workbench_net_json(net);
+  contains(encoded,R"("has_source":false,"has_sink":false,"source":null,"sink":null)");
+  contains(encoded,R"("source_storage":18446744073709551615,"sink_storage":18446744073709551614)");
+  auto exact=serialize_oc_playout_workbench_petri_net_json(net);auto copy=parse_oc_playout_workbench_petri_net_json(exact);
+  assert(!copy.has_source()&&!copy.has_sink()&&copy.source()==inactive.source_storage&&copy.sink()==inactive.sink_storage);
+  inactive.has_source=true;inactive.has_sink=true;net=PetriNet::from_literal_storage(inactive);
+  encoded=serialize_genetic_matrix_workbench_net_json(net);assert(encoded==serialize_oc_playout_workbench_petri_net_json(net));
+  copy=parse_oc_playout_workbench_petri_net_json(encoded);assert(copy.has_source()&&copy.has_sink()&&copy.source()==inactive.source_storage);
+  const auto roundtrip=[](const PetriNet& value){const auto json=serialize_genetic_matrix_workbench_net_json(value);assert(json.find("activity_names")==std::string::npos);assert(json==serialize_oc_playout_workbench_petri_net_json(value));const auto parsed=parse_oc_playout_workbench_petri_net_json(json);assert(serialize_oc_playout_workbench_petri_net_json(parsed)==serialize_oc_playout_workbench_petri_net_json(value));return parsed;};
+  // Each native string location alone must trigger the lossless literal view.
+  auto named=convert_genetic_matrix(sequence()).net;named.set_transition_names({bytes,std::nullopt});auto named_copy=roundtrip(named);assert(named_copy.transition_names()->at(0)==bytes);
+  auto keyed=convert_genetic_matrix(sequence()).net;
+  PetriDiscoveryMarkings keyed_marking;keyed_marking.detached_places={{7,HeuristicStructuredValue{HeuristicStructuredValue::Object{{bytes,HeuristicStructuredValue{std::string("ordinary")}}}}}};
+  keyed_marking.initial={{{PetriMarkingPlaceKind::kDetached,7},0}};keyed.set_discovery_markings(keyed_marking);auto keyed_copy=roundtrip(keyed);
+  assert(std::get<HeuristicStructuredValue::Object>(keyed_copy.discovery_markings()->detached_places[0].name.value).begin()->first==bytes);
+  auto valued=convert_genetic_matrix(sequence()).net;keyed_marking.detached_places[0].name=HeuristicStructuredValue{HeuristicStructuredValue::Array{HeuristicStructuredValue{pair}}};valued.set_discovery_markings(keyed_marking);auto valued_copy=roundtrip(valued);
+  assert(std::get<std::string>(std::get<HeuristicStructuredValue::Array>(valued_copy.discovery_markings()->detached_places[0].name.value)[0].value)==pair);
+  // The literal constructor permits inactive, inconsistent and unknown stored
+  // fields. A complete serializer must preserve all of them without invoking
+  // workflow/export validators or manufacturing an executable replacement.
+  PetriNetLiteralStorage state;state.place_count=3;state.source_storage=std::numeric_limits<std::size_t>::max();state.sink_storage=2;state.has_source=false;state.has_sink=true;state.activities={bytes,pair,""};
+  PetriTransition transition;transition.activity=std::numeric_limits<std::size_t>::max();transition.inputs={0,0,std::numeric_limits<std::size_t>::max()};transition.outputs={99};transition.reset_inputs={2,2};transition.inhibitor_inputs={1};
+  const TokenInteger huge("1234567890123456789012345678901234567890");
+  transition.input_weights={{-huge,true}};transition.output_weights={{0,false},{huge,true}};transition.reset_weights={{huge,false},{0,true}};transition.inhibitor_weights={{-huge,false}};state.transitions={transition};
+  state.transition_names=PetriTransitionNameList{std::nullopt,bytes,std::string("")};
+  HeuristicStructuredValue::Object nested{{bytes,HeuristicStructuredValue{HeuristicStructuredValue::Array{HeuristicStructuredValue{bytes},HeuristicStructuredValue{pair},HeuristicStructuredValue{std::numeric_limits<std::int64_t>::min()},HeuristicStructuredValue{std::numeric_limits<std::uint64_t>::max()},HeuristicStructuredValue{-0.0},HeuristicStructuredValue{std::numeric_limits<double>::infinity()},HeuristicStructuredValue{-std::numeric_limits<double>::infinity()},HeuristicStructuredValue{std::numeric_limits<double>::quiet_NaN()}}}}};
+  PetriDiscoveryMarkings sparse;sparse.detached_places={{7,HeuristicStructuredValue{nested}},{7,HeuristicStructuredValue{std::string("duplicate identity")}}};
+  const auto unknown=static_cast<PetriMarkingPlaceKind>(-2147483647-1);
+  sparse.initial={{{unknown,std::numeric_limits<std::size_t>::max()},-huge},{{PetriMarkingPlaceKind::kRoot,99},0},{{PetriMarkingPlaceKind::kRoot,99},huge}};
+  sparse.final={{{PetriMarkingPlaceKind::kDetached,8},huge}};state.discovery_markings=sparse;
+  const auto arbitrary=PetriNet::from_literal_storage(state);copy=roundtrip(arbitrary);
+  assert(copy.source()==state.source_storage&&!copy.has_source()&&copy.sink()==2&&copy.has_sink());
+  assert(copy.activities()==state.activities&&copy.transition_names()==state.transition_names);
+  assert(copy.transitions().front().inputs==transition.inputs&&copy.transitions().front().input_weights.front().magnitude==-huge);
+  assert(copy.discovery_markings()->initial[0].place.kind==unknown&&copy.discovery_markings()->initial.size()==3&&copy.discovery_markings()->detached_places.size()==2);
+  // Full-result serialization preserves arbitrary variant/matrix/marking
+  // fields too; this is a direct public codec check, never a fake HTTP upload.
+  GeneticMatrixConversionResult result;result.variant=static_cast<GeneticMatrixConversionVariant>(-2147483647-1);result.net=arbitrary;result.matrix.activities={bytes,pair};result.matrix.input_map={{{std::numeric_limits<std::size_t>::max(),0,0}}};result.matrix.output_map={};result.markings={{std::numeric_limits<std::int64_t>::min(),-1,0},{std::numeric_limits<std::int64_t>::max()}};
+  const auto full=serialize_genetic_matrix_workbench_result_json(result);
+  contains(full,"\"net\":"+serialize_oc_playout_workbench_petri_net_json(arbitrary));contains(full,"\"matrix\":"+serialize_genetic_matrix_workbench_model_json(result.matrix));contains(full,R"("variant":{"name":null,"index":-2147483648})");contains(full,R"("markings":{"initial":[-9223372036854775808,-1,0],"final":[9223372036854775807]})");
+  rejects([&]{(void)genetic_matrix_conversion_json(result);});
+}
+
 template<class Action> void run(const char* name,Action action) {
   std::cerr << "[genetic_matrix_workbench_json] " << name << std::endl;
   try { action(); }
@@ -230,4 +325,6 @@ int main() {
   run("XOR AND loop and disconnected executable languages",alternative_groups_and_independent_groups_have_different_languages);
   run("native semantic validation remains native",native_errors_are_not_input_codec_semantic_constraints);
   run("full Petri getters signed marking and IEEE nested metadata",all_public_net_storage_and_signed_markings_are_complete);
+  run("all native byte domains and old wire compatibility",all_native_byte_domains_and_old_wire_compatibility);
+  run("literal net byte fields inactive maxima and invalid storage",full_literal_net_byte_fields_and_inactive_boundaries);
 }
