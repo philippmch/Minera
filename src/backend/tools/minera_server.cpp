@@ -93,6 +93,7 @@
 #include "minera/emd_workbench_json.hpp"
 #include "minera/object_centric_playout_workbench_json.hpp"
 #include "minera/literal_controls_json.hpp"
+#include "minera/edit_distance_workbench_json.hpp"
 #include "minera/genetic_matrix_conversion.hpp"
 #include "../footprints/conformance_log_model.hpp"
 #include "../footprints/conformance_log_extensive.hpp"
@@ -4047,6 +4048,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_footprints_route.hpp"
 #include "original_genetic_matrix_route.hpp"
 #include "original_embedding_route.hpp"
+#include "original_edit_distance_route.hpp"
 #include "original_emd_route.hpp"
 #include "original_object_centric_playout_route.hpp"
 
@@ -10615,6 +10617,8 @@ int main(int argc, char** argv) {
   server.Post("/api/analyze-behavior", handle_behavior_analysis);
   server.Post("/api/discover-dfg", handle_dfg_discovery);
   server.Post("/api/evaluate-replay-results", handle_precomputed_replay_fitness);
+  server.Options("/api/edit-distance-workbench", preflight);
+  server.Post("/api/edit-distance-workbench", handle_original_edit_distance_workbench);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);
