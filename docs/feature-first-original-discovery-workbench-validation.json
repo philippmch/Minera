@@ -1,0 +1,558 @@
+{
+  "complete": true,
+  "feature_group": 71,
+  "created_utc": "2026-10-18T19:22:51.884714+00:00",
+  "checkpoint_kind": "implemented feature delivery with browser, converter interop and strict parity pending",
+  "feature_baseline_head": "86866925a8750e7d77feeb80c46275573f8c764b",
+  "backend_step_commit": "317cba5ea09712b4725f1849f94499fa3e7d4a0c",
+  "ui_step_commit": null,
+  "ui_step_commit_pending": true,
+  "ui_delivery_pending": false,
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false,
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "latest_actual_browser_attempt_feature": 71,
+  "latest_actual_browser_attempt_served_feature": 70,
+  "browser_outcome": "Actual Feature 71 retry denied by saved or managed origin policy while Feature 70 served; rendered Feature 71 UI unverified.",
+  "browser_evidence": {
+    "path": "build/discovery-feature71-browser-status-1.json",
+    "bytes": 775,
+    "sha256": "21a0478e7f73e336308fc605a377ad9e58bdceb431805adea7bb202d39b32470"
+  },
+  "boundaries": [
+    "Local native/API/portable/full frontend/build/live delivery proofs are complete. All failed attempts remain retained. The UI commit identity is recorded externally; browser verification, converter byte fidelity and full reference solver/performance parity remain open.",
+    "The full scope remains 86 families, 387 modules, 46 complete packages, 199 complete modules and 228 incomplete units. No strict parity status or selector is promoted. Native bounded algorithms do not establish reference solver or performance parity.",
+    "Native evidence currently aggregates 58 passing assertion suites across four actual passing invocations: 57 retained parent suites and one fresh corrected discovery suite. The first discovery fixture incorrectly supplied inspection-only legacy_view/snapshot fields to the raw-stream constructor; its actual failure remains preserved, and only the test fixture was corrected.",
+    "The first staged strict attempt retained TS2322 ArrayBuffer/Blob typing and TS2769 React prop-inference errors. A test-only amendment passed strict compilation, then the first focused run retained 39 passes and one failed test-message assertion. The final test-only ownership assertion amendment passed a real strict compiler Program with zero diagnostics and all 40 focused checks. All seven product files stayed byte-identical across these amendments; both historical failures remain retained.",
+    "Every successful call through these five current mining entrypoints returns computed=true. The full diagnostics bool remains encoded and guarded; no actual computed=false capture is invented. Native exceptions and real exhausted=true results remain distinct.",
+    "Canonical genetic matrix activity labels and complete raw results retain arbitrary NativeString bytes. The older supplied-matrix converter cannot represent arbitrary invalid UTF-8 labels; only its exact supported domain has an explicit handoff. Full raw downloads remain available for every label, and converter byte-host fidelity is queued as a real unfinished gap.",
+    "Both public miners require EventLog; original stream/table/lazy sources need explicit caller-selected preparation. Lazy input is a finite request-owned host rather than arbitrary executable scanner transport. Genetic uses its private seeded engine; there is no caller RNG overload or engine-state transport.",
+    "After the user reported another settings change, the actual Feature 71 browser retry was denied by a saved or managed origin policy while Feature 70 served. The exact denial is retained with the prior Feature 70 attempt. Rendered Feature 71 controls, interactions and browser downloads remain unverified; native/API/portable checks provide independent evidence and do not constitute browser verification.",
+    "Client cancellation guards publication and does not terminate a native call already running. Optional exporter failure remains distinct from a successful native return. No cached source, selectors or registry entry substitutes the original input or registers the discovered model as a side effect."
+  ],
+  "validation_counts": {
+    "native_sources": 717,
+    "native_suites_aggregate": 58,
+    "actual_passing_suite_invocations": 4,
+    "retained_parent_passing_suites": 57,
+    "fresh_corrected_discovery_suite": 1,
+    "reused_parent_core_objects": 198,
+    "fresh_feature_core_objects": 1,
+    "feature_library_core_objects": 199,
+    "native_operations": 5,
+    "public_declarations": 5,
+    "inline_aliases": 3,
+    "native_option_fields": 19,
+    "ilp_option_fields": 7,
+    "genetic_option_fields": 12,
+    "ilp_result_fields": 3,
+    "genetic_result_fields": 4,
+    "ilp_diagnostic_fields": 6,
+    "genetic_diagnostic_fields": 9,
+    "csv_import_option_fields": 10,
+    "xes_import_option_fields": 21,
+    "preparation_option_fields": 17,
+    "selectors": 5,
+    "staged_strict_diagnostics": 0,
+    "focused_frontend_tests": 40,
+    "actual_api_calls": 100,
+    "selected_feature_cases": 95,
+    "historical_api_false_checks_retained": 8,
+    "frontend_tests": 5706,
+    "frontend_test_files": 128,
+    "frontend_source_bindings": 14063,
+    "portable_export_tests": 96,
+    "portable_fixture_files": 3,
+    "served_asset_count": 7,
+    "live_smoke_http_calls": 2,
+    "historical_api_collector_faults_retained": 2,
+    "fresh_live_post_calls_excluded_from_dedicated_corpus": 2,
+    "physical_multipart_parts": 450,
+    "authoritative_artifacts": 755,
+    "portable_bundle_bytes": 5902622,
+    "unrelated_files_to_preserve": 110,
+    "cached_mining_seed_attempts": 2,
+    "independence_repeat_calls": 1,
+    "valid_cached_mining_seeds": 1,
+    "failed_cached_mining_seed_attempts": 1
+  },
+  "actual_computed_false_capture_claimed": false,
+  "remaining_interoperability_gap": "Repair byte fidelity in the older supplied genetic-matrix converter: accept every canonical NativeString label without coercion, retain complete partition maps and then validate exact native conversion. The current discovery handoff is explicitly limited to labels the existing converter represents exactly; arbitrary byte labels remain fully retained in canonical result/matrix downloads. Continue the complete catalogue and all strict parity gates.",
+  "evidence": {
+    "baseline": {
+      "path": "build/discovery-feature71-baseline.json",
+      "bytes": 57806,
+      "sha256": "1dd2ed1b21d9cd0f91eaf56c31f6e926565a2c70f962e676ff9ca33fdd7dce93"
+    },
+    "protocol": {
+      "path": "build/discovery71-native-candidate-20261018/protocol-amended.json",
+      "bytes": 17914,
+      "sha256": "d9ef92453acf060d04c1b67515d8e5127f3658aff706fde36a82165706f1398a"
+    },
+    "native_build": {
+      "path": "build/discovery71r-91f3e25e63f2/build-manifest.json",
+      "bytes": 323883,
+      "sha256": "00be8c95b52a3aa44973650abd29955e7c98399eb227b6b1a5a15745dd354928"
+    },
+    "frontend_candidate": {
+      "path": "build/discovery71-frontend-ownership-test-amendment-20261018/staging-manifest.json",
+      "bytes": 48882,
+      "sha256": "60ce07e440ab4b0670bd9163efb1e018a04359e27ac080f0f0975bdaae8bff9f"
+    },
+    "frontend_strict_staging": {
+      "path": "build/discovery71-staged-types-1-604a8d9bc37241cd9e3af5a3e0b72fc7/validation.json",
+      "bytes": 71570,
+      "sha256": "c0212ff8a278a439db702567da17fc991a28d210253dc08e4bdf091a41f647ea"
+    },
+    "historical_frontend_strict_failure": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\discovery71-staged-types-1-752158736da34dc2b58e8901ff3dfc8d\\validation.json",
+      "bytes": 72491,
+      "sha256": "2b8f2c9fc686cd763f3c5a78068c8478e431f6bd07c574930ff60725a45cc686"
+    },
+    "frontend_type_amendment": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\discovery71-frontend-type-amendment-20261018\\type-amendment.json",
+      "bytes": 1536,
+      "sha256": "4ca8bf18a28afb9e5d3f6a5c200082b47ec4c7945229905fcc1696d894a1c442"
+    },
+    "frontend_focused_staging": {
+      "path": "build/discovery71-staged-focused-1-8b9e4615cd5c402bb60759f58c8ad1ff/validation.json",
+      "bytes": 48490,
+      "sha256": "9f676730d287cee9e331ad5410f6e9fff7b7b44d0120cafc5fafa019a318f24f"
+    },
+    "api_capture": {
+      "path": "build/discovery71-api-offline-composite-20261018-2/validation.json",
+      "bytes": 5610643,
+      "sha256": "f015b59a382aa72853bb89610513178d393cee865585ade2939252ebc2d62f52"
+    },
+    "api_offline_composite": {
+      "path": "build/discovery71-api-offline-composite-20261018-2/validation.json",
+      "bytes": 5610643,
+      "sha256": "f015b59a382aa72853bb89610513178d393cee865585ade2939252ebc2d62f52"
+    },
+    "frontend_integration": {
+      "path": "build/discovery-feature71-frontend-integration-778ceead5c014982b90b279d2d20ff8f/validation.json",
+      "bytes": 43747,
+      "sha256": "90c8f6bae62768c3d597eb8e2d6c123ac811e3924fba873aca262d5b8507209f"
+    },
+    "portable_fixture_validation": {
+      "path": "build/discovery71-compact-fixture-validation-0a4686cb848f4dc5b42b0bf20dc942b9/validation.json",
+      "bytes": 43424,
+      "sha256": "11963f9804e507fc22388b465ac288201dce6f59f7960e38a16dfb0c5aecf4b5"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/discovery71-compact-fixture-types-1d03e4c811e5435daa041400bdef4e0e/validation.json",
+      "bytes": 67938,
+      "sha256": "1e6ff848a97ca4648ad5d90d65cb98d37b5de6aefee5fa76192ff6db80805db6"
+    },
+    "portable_fixture_publication": {
+      "path": "build/discovery71-compact-fixture-publication-c5590941a9384a9d8180dbc391e5ea55/validation.json",
+      "bytes": 197894,
+      "sha256": "bcc6a002da397b703e83dbe5d0845f5279602e86fe74cd65c02194de2187ff1e"
+    },
+    "full_frontend_validation": {
+      "path": "build/discovery-feature-frontend-final-cf56835d8b5545f39aecab187d57ee11/validation.json",
+      "bytes": 2763417,
+      "sha256": "cdf49887caa3fd54b1cb5b883f863c7bfbf6b9b6dcbb261d3c7046255dcb8741"
+    },
+    "live_activation_validation": {
+      "path": "build/discovery-feature71-live-runtime.json",
+      "bytes": 18621,
+      "sha256": "9526f1775bfb4be68fef1b82f680cc42be1e901cc04684c288a12b717709edaf"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/discovery-feature71-test-cleanup.json",
+      "bytes": 4394,
+      "sha256": "e8f8f934ef1290aec459a863582850aceccb809ed35721f926e5af801fa8ac48"
+    },
+    "backend_commit": {
+      "path": "build/discovery-feature71-backend-postcommit.json",
+      "bytes": 1669,
+      "sha256": "73231f0e1f0f568c4303f8f38aa5b4341765b3247e139aeec3042cc1749f5a55"
+    },
+    "ui_commit": {
+      "recorded_by": "external postcommit checkpoint",
+      "reason": "Avoid a self-referential commit hash."
+    },
+    "historical_strict_failure": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\discovery71-staged-types-1-752158736da34dc2b58e8901ff3dfc8d\\validation.json",
+      "bytes": 72491,
+      "sha256": "2b8f2c9fc686cd763f3c5a78068c8478e431f6bd07c574930ff60725a45cc686"
+    },
+    "historical_passing_strict": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\discovery71-staged-types-1-59bd5900522d499c932a73845eab47b7\\validation.json",
+      "bytes": 71480,
+      "sha256": "c9c4c40b7ef8bb656ad1190d6c97ebd2b68f79e23957fed4d1453cb913b2ac56"
+    },
+    "historical_focused_failure": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\discovery71-staged-focused-1-83293afa5042422ab228d584bb778c6a\\validation.json",
+      "bytes": 48414,
+      "sha256": "881c2508b16716c2526cc667e91c5265a6a6ca95cd64597c7a4ec17af786869e"
+    },
+    "type_amendment": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\discovery71-frontend-type-amendment-20261018\\type-amendment.json",
+      "bytes": 1536,
+      "sha256": "4ca8bf18a28afb9e5d3f6a5c200082b47ec4c7945229905fcc1696d894a1c442"
+    },
+    "ownership_test_amendment": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\discovery71-frontend-ownership-test-amendment-20261018\\ownership-test-amendment.json",
+      "bytes": 1547,
+      "sha256": "7d15a8e5d67f4263725086e2ea63787af2799f5c900c6f9cf210de50151761e3"
+    },
+    "api_source_captures": [
+      {
+        "path": "build/discovery71-api-actual-20261018-1/validation.json",
+        "bytes": 2572381,
+        "sha256": "e28d81f98594063c283ba0ad2b1e90ae75794dfa930bc77f6e2e686482f4072a"
+      },
+      {
+        "path": "build/discovery71-api-continuation-actual-20261018-1/validation.json",
+        "bytes": 164487,
+        "sha256": "79deba86001d2088ff633d14f5eeb7e3b93f73d49b9ddca36df2907ca67a7522"
+      },
+      {
+        "path": "build/discovery71-api-seed-supplement-actual-20261018-1/validation.json",
+        "bytes": 53682,
+        "sha256": "8e40f1e701e806fb8ba291b72cc1ab1ec71c5740c74e0b671f505fdde329f338"
+      }
+    ],
+    "historical_api_collector_faults": [
+      {
+        "capture": {
+          "path": "build/discovery71-api-actual-20261018-1/validation.json",
+          "bytes": 2572381,
+          "sha256": "e28d81f98594063c283ba0ad2b1e90ae75794dfa930bc77f6e2e686482f4072a"
+        },
+        "collector_fault": {
+          "type": "TypeError",
+          "message": "not a valid non-string sequence or mapping object",
+          "physical_calls_completed": 87,
+          "physical_attempts_retained": 87,
+          "no_retry": true
+        }
+      },
+      {
+        "capture": {
+          "path": "build/discovery71-api-continuation-actual-20261018-1/validation.json",
+          "bytes": 164487,
+          "sha256": "79deba86001d2088ff633d14f5eeb7e3b93f73d49b9ddca36df2907ca67a7522"
+        },
+        "collector_fault": {
+          "type": "ValueError",
+          "message": "Cached seed failed; no misleading repeat",
+          "physical_calls_completed_here": 11,
+          "no_retry": true
+        }
+      }
+    ]
+  },
+  "historical_native_attempts": [
+    {
+      "manifest": {
+        "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\discovery71-30242c1fea7048869353a654144690d2\\build-manifest.json",
+        "sha256": "a87867cc2360548dd6a8a3660ce3e6e2af929c2ec17ff1537e8e1ed33aa26f0e",
+        "bytes": 310318
+      },
+      "outcome": "Configure0/core+server+testcompile0; new71suite failed raw_stream fixture containing inspection legacy_view/snapshot; actual constructor rejection retained. No old suites replayed. Namespace immutable."
+    }
+  ],
+  "required_before_publication": [],
+  "completed_utc": "2026-10-18T19:40:09.891387+00:00",
+  "parent_head": "317cba5ea09712b4725f1849f94499fa3e7d4a0c",
+  "ui_step_commit_note": "The containing UI commit identity is verified externally after creation to avoid a self-reference.",
+  "delivered": [
+    "All five public original-EventLog discovery entrypoints are exposed independently: mine_ilp and discover_ilp_miner, plus mine_genetic, discover_genetic_miner and discover_genetic. The three aliases retain their actual public signatures; no duplicate algorithm or cached mining substitution is introduced.",
+    "All 7 ILP and 12 genetic option fields retain native defaults, exact supplied-member presence, full size_t/uint64 integer tokens, finite and nonfinite binary64 values, literal NativeString selectors/boundaries and ordered duplicate causal pairs. Native limits and reached validation remain authoritative; the old convenience-route ILP cap is not copied into the exact host.",
+    "The request owns full original logs, streams, typed tables or finite lazy rows and CSV/XES/gzip imports. All 10 CSV, 21 XES, 17 preparation options and five selectors remain independent. Both miners require an actual EventLog; an original non-log source receives a truthful kind error unless the caller explicitly prepares it to a log.",
+    "Complete ILPMinerResult net/markings/diagnostics and GeneticMinerResult matrix/net/markings/diagnostics preserve all 3/4 stored fields, 6/9 diagnostic fields, complete nine-field Petri storage and signed WorkflowMarkings. Native entry, return, errors, each independent exporter and original/source/result artifact bytes remain inspectable without session registration.",
+    "The canonical genetic result and matrix.json retain every NativeString activity byte and every ordered partition group. The older supplied-matrix converter accepts scalar JSON strings only, so handoff is explicit and restricted to its exact representable domain. Arbitrary byte labels keep complete raw downloads and a truthful unsupported-reuse message; repairing that converter remains a queued gap.",
+    "The standalone and native-discovery panels provide original editors/uploads, all operations/options/import controls, request replacement/cancellation guards, complete diagnostics/results/tables/CSV/reports and exact original/artifact downloads. Prepared logs can be reused. Model and matrix handoff is explicit and retains the documented older-converter byte-domain limit. Native/API/portable/full frontend/build/live checks passed; rendered browser verification remains open."
+  ],
+  "delivery_proofs": {
+    "native_build": {
+      "path": "build/discovery71r-91f3e25e63f2/build-manifest.json",
+      "bytes": 323883,
+      "sha256": "00be8c95b52a3aa44973650abd29955e7c98399eb227b6b1a5a15745dd354928"
+    },
+    "api_offline_composite": {
+      "path": "build/discovery71-api-offline-composite-20261018-2/validation.json",
+      "bytes": 5610643,
+      "sha256": "f015b59a382aa72853bb89610513178d393cee865585ade2939252ebc2d62f52"
+    },
+    "frontend_integration": {
+      "path": "build/discovery-feature71-frontend-integration-778ceead5c014982b90b279d2d20ff8f/validation.json",
+      "bytes": 43747,
+      "sha256": "90c8f6bae62768c3d597eb8e2d6c123ac811e3924fba873aca262d5b8507209f"
+    },
+    "frontend_candidate": {
+      "path": "build/discovery71-frontend-ownership-test-amendment-20261018/staging-manifest.json",
+      "bytes": 48882,
+      "sha256": "60ce07e440ab4b0670bd9163efb1e018a04359e27ac080f0f0975bdaae8bff9f"
+    },
+    "frontend_strict_staging": {
+      "path": "build/discovery71-staged-types-1-604a8d9bc37241cd9e3af5a3e0b72fc7/validation.json",
+      "bytes": 71570,
+      "sha256": "c0212ff8a278a439db702567da17fc991a28d210253dc08e4bdf091a41f647ea"
+    },
+    "frontend_focused_staging": {
+      "path": "build/discovery71-staged-focused-1-8b9e4615cd5c402bb60759f58c8ad1ff/validation.json",
+      "bytes": 48490,
+      "sha256": "9f676730d287cee9e331ad5410f6e9fff7b7b44d0120cafc5fafa019a318f24f"
+    },
+    "portable_fixture_validation": {
+      "path": "build/discovery71-compact-fixture-validation-0a4686cb848f4dc5b42b0bf20dc942b9/validation.json",
+      "bytes": 43424,
+      "sha256": "11963f9804e507fc22388b465ac288201dce6f59f7960e38a16dfb0c5aecf4b5"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/discovery71-compact-fixture-types-1d03e4c811e5435daa041400bdef4e0e/validation.json",
+      "bytes": 67938,
+      "sha256": "1e6ff848a97ca4648ad5d90d65cb98d37b5de6aefee5fa76192ff6db80805db6"
+    },
+    "portable_fixture_publication": {
+      "path": "build/discovery71-compact-fixture-publication-c5590941a9384a9d8180dbc391e5ea55/validation.json",
+      "bytes": 197894,
+      "sha256": "bcc6a002da397b703e83dbe5d0845f5279602e86fe74cd65c02194de2187ff1e"
+    },
+    "full_frontend_validation": {
+      "path": "build/discovery-feature-frontend-final-cf56835d8b5545f39aecab187d57ee11/validation.json",
+      "bytes": 2763417,
+      "sha256": "cdf49887caa3fd54b1cb5b883f863c7bfbf6b9b6dcbb261d3c7046255dcb8741"
+    },
+    "live_activation_validation": {
+      "path": "build/discovery-feature71-live-runtime.json",
+      "bytes": 18621,
+      "sha256": "9526f1775bfb4be68fef1b82f680cc42be1e901cc04684c288a12b717709edaf"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/discovery-feature71-test-cleanup.json",
+      "bytes": 4394,
+      "sha256": "e8f8f934ef1290aec459a863582850aceccb809ed35721f926e5af801fa8ac48"
+    },
+    "backend_commit": {
+      "path": "build/discovery-feature71-backend-postcommit.json",
+      "bytes": 1669,
+      "sha256": "73231f0e1f0f568c4303f8f38aa5b4341765b3247e139aeec3042cc1749f5a55"
+    }
+  },
+  "prior_browser_evidence": {
+    "path": "build/bose-feature70-browser-status-1.json",
+    "bytes": 751,
+    "sha256": "117928f8ab36c0e8b1baca218b339cb8376eacdbccae549441ce77dd8348856b"
+  },
+  "historical_additional_attempts": [
+    {
+      "path": "build/discovery71-staged-types-1-752158736da34dc2b58e8901ff3dfc8d/validation.json",
+      "bytes": 72491,
+      "sha256": "2b8f2c9fc686cd763f3c5a78068c8478e431f6bd07c574930ff60725a45cc686"
+    },
+    {
+      "path": "build/discovery71-staged-focused-1-83293afa5042422ab228d584bb778c6a/validation.json",
+      "bytes": 48414,
+      "sha256": "881c2508b16716c2526cc667e91c5265a6a6ca95cd64597c7a4ec17af786869e"
+    },
+    {
+      "path": "build/discovery71-compact-fixture-types-37581831cd1146898991b2bcfa1bd366/validation.json",
+      "bytes": 67937,
+      "sha256": "ee5d7b5144056c84299fba936a0be441ba6712dd46b168a0ec9888bfeb96663e"
+    },
+    {
+      "path": "build/discovery71-compact-fixture-validation-fd1e70bb58ef477a937d5f70adced505/validation.json",
+      "bytes": 42126,
+      "sha256": "f29641031b58d791cd539c22c50235681018d1e282f2d5a15707d98717177eb9"
+    }
+  ],
+  "api_attempt_lineage": {
+    "actual_capture_validations": [
+      {
+        "path": "build/discovery71-api-actual-20261018-1/validation.json",
+        "bytes": 2572381,
+        "sha256": "e28d81f98594063c283ba0ad2b1e90ae75794dfa930bc77f6e2e686482f4072a"
+      },
+      {
+        "path": "build/discovery71-api-continuation-actual-20261018-1/validation.json",
+        "bytes": 164487,
+        "sha256": "79deba86001d2088ff633d14f5eeb7e3b93f73d49b9ddca36df2907ca67a7522"
+      },
+      {
+        "path": "build/discovery71-api-seed-supplement-actual-20261018-1/validation.json",
+        "bytes": 53682,
+        "sha256": "8e40f1e701e806fb8ba291b72cc1ab1ec71c5740c74e0b671f505fdde329f338"
+      }
+    ],
+    "cached_seed_physical_indices": [
+      98,
+      99
+    ],
+    "successful_cached_seed_physical_indices": [
+      99
+    ],
+    "independence_repeat_physical_indices": [
+      100
+    ],
+    "historical_collector_faults": [
+      {
+        "capture": {
+          "path": "build/discovery71-api-actual-20261018-1/validation.json",
+          "bytes": 2572381,
+          "sha256": "e28d81f98594063c283ba0ad2b1e90ae75794dfa930bc77f6e2e686482f4072a"
+        },
+        "collector_fault": {
+          "type": "TypeError",
+          "message": "not a valid non-string sequence or mapping object",
+          "physical_calls_completed": 87,
+          "physical_attempts_retained": 87,
+          "no_retry": true
+        }
+      },
+      {
+        "capture": {
+          "path": "build/discovery71-api-continuation-actual-20261018-1/validation.json",
+          "bytes": 164487,
+          "sha256": "79deba86001d2088ff633d14f5eeb7e3b93f73d49b9ddca36df2907ca67a7522"
+        },
+        "collector_fault": {
+          "type": "ValueError",
+          "message": "Cached seed failed; no misleading repeat",
+          "physical_calls_completed_here": 11,
+          "no_retry": true
+        }
+      }
+    ],
+    "corrected_expectations": [
+      {
+        "original_id": "csv-all17-explicit-conversion-members",
+        "replacement_id": "corrected-csv-all17-explicit-conversion-members",
+        "original_physical_call_index": 36,
+        "replacement_physical_call_index": 96,
+        "change": "add source_import_options_json with three exact existing CSV column names",
+        "original_attempt_retained": true
+      },
+      {
+        "original_id": "auto-csv-sniff",
+        "replacement_id": "corrected-auto-csv-sniff",
+        "original_physical_call_index": 37,
+        "replacement_physical_call_index": 97,
+        "change": "add source_import_options_json with three exact existing CSV column names",
+        "original_attempt_retained": true
+      }
+    ],
+    "selected_feature_physical_indices": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97
+    ],
+    "auxiliary_physical_indices": [
+      98,
+      99,
+      100
+    ],
+    "physical_calls_counted_once": 100,
+    "selected_feature_count": 95,
+    "historical_false_checks_retained": 8,
+    "replayed_completed_prefix": false
+  },
+  "pending_delivery_proofs": {}
+}

@@ -1,3 +1,4 @@
+import {OriginalDiscoveryWorkspace} from "./OriginalDiscoveryWorkspace";
 import {LiteralControlsPanel} from "./LiteralControlsPanel";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type MineraExport } from "../types";
@@ -44,5 +45,6 @@ export function NativeDiscovery({family,data,available,mining,onUseModel}:{famil
       </section>
     </>}
     {family==="ilp"&&<LiteralControlsPanel group="ilp" sourceId={schema?.source_id} available={available} mining={mining}/>}
+    <OriginalDiscoveryWorkspace key={family} initialOperation={family==="ilp"?"mine_ilp":"mine_genetic"}/>
   </>;
 }

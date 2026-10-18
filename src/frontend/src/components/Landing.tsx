@@ -31,11 +31,12 @@ interface LandingProps {
   onOriginalEmd?: () => void;
   onOriginalEditDistance?: () => void;
   onOriginalBose?: () => void;
+  onOriginalDiscovery?: () => void;
   onOriginalOcPlayout?: () => void;
   onActiveSource?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalOcPlayout, onActiveSource }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalOcPlayout, onActiveSource }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -105,6 +106,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onOriginalEmd && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalEmd}>Compare original weighted stochastic languages</button>}
         {onOriginalEditDistance && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalEditDistance}>Align or project independent original event inputs</button>}
         {onOriginalBose && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalBose}>Inspect original BOSE drift, helpers and caller RNG</button>}
+        {onOriginalDiscovery && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalDiscovery}>Inspect original ILP and genetic discovery</button>}
         {onOriginalOcPlayout && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalOcPlayout}>Original object-centric playout</button>}
         {onActiveSource && <button className="landing-sample reveal" disabled={mining} onClick={onActiveSource}>Open and inspect a native mining source</button>}
 
