@@ -1,0 +1,198 @@
+{
+  "complete": true,
+  "feature_group": 69,
+  "created_utc": "2026-10-18T18:30:20.053359+00:00",
+  "checkpoint_kind": "implemented feature delivery with browser and strict parity pending",
+  "parent_head": "102b12fe2c2e35c95d10011c7078c611d22b2bd8",
+  "backend_step_commit": "f78378109bce0514a8e5019e15630b2cbc7a55f6",
+  "ui_step_commit_pending": true,
+  "ui_delivery_pending": false,
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false,
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": true,
+  "browser_attempt_feature": 69,
+  "browser_attempt_served_feature": 68,
+  "browser_attempt_listener_pid": 22832,
+  "browser_outcome": "rejected_by_browser_security_policy",
+  "browser_evidence": {
+    "path": "build/edit-distance-feature69-browser-status-1.json",
+    "bytes": 623,
+    "sha256": "a1e63eabd68297efadb2298ce33aba691c7fe803bf252e01b25ddb1c3ed06414"
+  },
+  "delivered": [
+    "Thirteen concrete public operations accept independent original source/reference EventLogs or EventDataViews, direct string/typed traces, supplied string/typed variants, and supplied full string/typed alignments. All eleven inline aliases preserve their actual overloads; the two-argument projection remains a separate operation without options_json.",
+    "Source and reference own separate raw log/stream/table/finite-lazy constructors or CSV/XES/gzip imports, selectors and explicit preparation. All ten CSV, twenty-one XES and seventeen conversion fields are exposed independently per role. Original shape performs no conversion; EventLog signatures require an actual or explicitly prepared log. No cached source, rediscovery or selector overlay substitutes either argument.",
+    "All six native edit options retain defaults and exact supplied-member presence, unknown signed enum indexes, full uint64 deviation costs, literal selectors, anti-alignment and reached validation. Whole-log and direct tie rules, duplicate target indexes, source order, negative fitness, zero/max cost errors and inactive provided metrics remain actual native behavior.",
+    "Full raw EventLog/Trace/Event/EventAttribute/metadata and table/index/category storage, all ten alignment fields, six string-move fields, three typed-move fields and complete real cache-handle payloads remain inspectable. Typed None stays separate from a gap, numeric aliases retain source-first representatives, and intentional NaN identity uses ordered actual public copy assignment with observed before/after equivalence classes.",
+    "Direct ordered mapping/cache duplicates, first forward/cache match, last reverse mapping, typed dictionary normalization and independent list/set encodings reach the native helper. Disabled cache, empty cache, existing null pointer, engaged empty any and actual finite string/int64/uint64/double/bool/EditDistanceTraceResult/EditDistanceTypedTraceResult shared handles remain distinct. Actual empty-cache mutation and returned handle identity are retained.",
+    "Original bytes, filenames, complete raw multipart/MIME carriers, successful parse prefixes, configured options, preparation calls, before/after constructors, native result and independent legacy JSON/XES bytes/errors remain available. Physical filename absence differs from an explicitly empty filename even without Content-Type; malformed/zero-body multipart errors retain the captured transport.",
+    "The standalone and conformance workbench provide exact editors/uploads, all operations/aliases and option members, independent role controls, cancellation and replacement guards, complete request/response/report/table CSV/selected-record/original/artifact downloads. Actual projected logs and complete alignment results can be reused as original inputs. Full frontend, portable export, served assets and two byte-identical live smoke responses are verified."
+  ],
+  "boundaries": [
+    "Full PM4Py parity remains unfinished. All 86 families, 387 modules and 228 incomplete units remain in scope; strict counts remain 46 complete packages and 199 complete modules. Feature delivery does not change a strict status or selector.",
+    "An actual Feature69 browser-origin attempt on 2026-10-18 was rejected by a saved permission or managed policy despite the user enabling all browser settings and the existing Feature68 listener PID22832 independently returning HTTP200 at127.0.0.1:8562. No workaround was attempted. Feature69 rendered controls, interactions and browser downloads remain unverified; native/API/assets and offline exports are separate evidence.",
+    "The JSON host constructs only the listed finite real std::any payload types. Arbitrary caller-defined C++ payload constructors and executable lazy scanners remain unavailable. Scalar identities are copied only within one request using actual public copy assignment; no private identity IDs, cross-request pointer registry or direct-call sequence is exposed.",
+    "The finite LazyEventTable adapter owns rows and preserves actual valid/count state. Default invalid native construction is allowed only for native default stored metadata; other invalid construction requests retain the actual public constructor error. This does not represent arbitrary scanner behavior.",
+    "All 101 physical API calls remain counted once:95 original including the failed UUID seed, then exactly six supplemental calls. The98 selected feature entries retain four original invalid-input rejections and four valid replacement demonstrations. Both seed attempts and the exact baseline independence repeat remain separate; all30 historical false checks and the collector gate fault remain explicit.",
+    "The three original CSV fixtures requested an all-whitespace activity column and correctly failed native importer validation. The original typed-byte fixture supplied one hexadecimal nibble and correctly failed native byte decoding; byte A requires stored hex41. Rich child expectations omitted native default fields and were corrected offline. Captured requests, statuses, response bytes and historic failures were not rewritten or replayed.",
+    "A successful unrelated cached mining seed followed by the exact first request body and MIME produced a byte-identical full independent response. Client cancellation prevents stale UI publication but does not terminate an already running native operation. Own-source functional/API evidence does not establish strict reference parity.",
+    "Next confirmed feature work is the separate native Table BOSE drift adapter, followed by independent original-log ILP and genetic discovery. Existing cached operations remain available; the full catalogue and every strict behavioral gate remain active."
+  ],
+  "validation_counts": {
+    "native_sources": 709,
+    "native_suites": 56,
+    "reused_parent_core_objects": 196,
+    "fresh_core_objects": 1,
+    "actual_api_calls": 101,
+    "feature_cases": 98,
+    "cached_mining_seed_attempts": 2,
+    "independence_repeat_calls": 1,
+    "historical_failed_assertions_retained": 30,
+    "offline_http_calls": 0,
+    "native_operations": 13,
+    "inline_alias_overloads": 11,
+    "native_option_fields": 6,
+    "csv_import_option_fields": 10,
+    "xes_import_option_fields": 21,
+    "preparation_option_fields": 17,
+    "focused_frontend_tests": 54,
+    "unrelated_files_to_preserve": 110,
+    "frontend_tests": 5424,
+    "frontend_test_files": 124,
+    "frontend_source_bindings": 14051,
+    "portable_export_tests": 99,
+    "portable_fixture_files": 3,
+    "served_asset_count": 7,
+    "live_smoke_http_calls": 2,
+    "physical_multipart_parts": 506,
+    "authoritative_artifacts": 716,
+    "portable_bundle_bytes": 3450870,
+    "fresh_live_post_calls_excluded_from_dedicated_corpus": 2
+  },
+  "evidence": {
+    "native_build": {
+      "path": "build/ed69r-2cf723069e72/build-manifest.json",
+      "bytes": 314107,
+      "sha256": "bbf3a0d2162980fbf723a5830e4842e168547c6cc701dd92f315340165ab2adb"
+    },
+    "api_composite": {
+      "path": "build/ed69-api-offline-composite-20261018-1/validation.json",
+      "bytes": 1908247,
+      "sha256": "bdaf23f4f530dac3f85ec92144b7629bbdf01df0c73b74cd07ca2d28f97e807c"
+    },
+    "frontend_candidate": {
+      "path": "build/ed69-frontend-defaults-amendment-20261018/staging-manifest.json",
+      "bytes": 54105,
+      "sha256": "0ec1435f7361fc36539b134fc52d85e297d23c563a12709c22e79c152b0fd772"
+    },
+    "frontend_strict_staging": {
+      "path": "build/ed69-staged-types-1-7fb103eec6a04bdc82ccbdf4f7ac850d/validation.json",
+      "bytes": 42957,
+      "sha256": "61f5af9143cb3dc0321b3d9df109ca43cc9c56e1475b5e578e38623698971b78"
+    },
+    "frontend_focused_staging": {
+      "path": "build/ed69-staged-focused-1-e3ecc0e3faee4e339d69e923711b4c7d/validation.json",
+      "bytes": 46273,
+      "sha256": "9c3b9287bb1fe9c80db45caba7b36a33396b08c3b66663626014a8e5691d1f28"
+    },
+    "frontend_integration": {
+      "path": "build/edit-distance-feature69-frontend-integration-35eeceaf0ec3443ebc498aa188a36520/validation.json",
+      "bytes": 40394,
+      "sha256": "de1a627336d3e2621da04eaa237d9a357e38879056c5efc37b04a62fdd97e3c8"
+    },
+    "full_frontend_validation": {
+      "path": "build/edit-distance-feature-frontend-final-a647e19f27ba4ae7afc773156f333d7b/validation.json",
+      "bytes": 2760185,
+      "sha256": "d2b87f7966ac69e37e6e679b0e83c71f009380958f7de551aa74ade903b10ce7"
+    },
+    "portable_fixture_validation": {
+      "path": "build/edit-distance69-compact-fixture-validation-0dea9e3625684cd3a9eec13dffcabf30/validation.json",
+      "bytes": 40892,
+      "sha256": "4f31201f932b52e4356937dc95ffbed3c800964643b66a6c50720627b4c2ec7a"
+    },
+    "portable_fixture_publication": {
+      "path": "build/edit-distance69-compact-fixture-publication-924d837a65564ca28f282b8b277ee17c/validation.json",
+      "bytes": 192479,
+      "sha256": "78050654cb82643a7f0fa12341392696fa30cf1f595c2c40806b37f5e4e875a0"
+    },
+    "live_activation_validation": {
+      "path": "build/edit-distance-feature69-live-runtime.json",
+      "bytes": 10728,
+      "sha256": "6617e2be31a826779e5dd8b271439cd6d57c6eae7acff43dbbea720c2374c08c"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/edit-distance-feature69-test-cleanup.json",
+      "bytes": 3212,
+      "sha256": "2d32728132c036b4d9ce4d0692570a0ae5901cd0993ab6639017bd341b3a26f1"
+    },
+    "frontend_recipe_logging_amendment_preserved": {
+      "path": "build/edit-distance-feature-frontend-final-a647e19f27ba4ae7afc773156f333d7b/helper-restoration.json",
+      "bytes": 720,
+      "sha256": "c08a5df65d40f1babe4f6d446f74993db7d92ef4d5b68849db44687b7a1b0692"
+    }
+  },
+  "capture_lineage": {
+    "physical_prefix_calls": 95,
+    "physical_supplement_calls": 6,
+    "original94cases_not_replayed": true,
+    "historical_false_checks_retained": 30,
+    "four_bad_input_cases_remain_actual_native_rejections": true,
+    "rich_child_defaults_corrected_offline": true,
+    "historical_bad_UUID_seed_retained": true,
+    "successful_valid_UUID_seed_separate": true,
+    "baseline_request_body_mime_and_full_response_bytes_identical": true,
+    "collector_gate_fault_retained": {
+      "type": "ValueError",
+      "message": "Unrelated cache seed failed; baseline repeat not valid",
+      "evidence": "Executed collector has this explicit gate immediately after failed seed; persisted95calls end at failedseed, no repeat entry. Reported by root execution.",
+      "repeat_not_executed": true
+    }
+  },
+  "pending_delivery_proofs": {},
+  "application_gate": "All required local delivery proofs completed before application.",
+  "delivery_proofs": {
+    "full_frontend_validation": {
+      "path": "build/edit-distance-feature-frontend-final-a647e19f27ba4ae7afc773156f333d7b/validation.json",
+      "bytes": 2760185,
+      "sha256": "d2b87f7966ac69e37e6e679b0e83c71f009380958f7de551aa74ade903b10ce7"
+    },
+    "portable_fixture_validation": {
+      "path": "build/edit-distance69-compact-fixture-validation-0dea9e3625684cd3a9eec13dffcabf30/validation.json",
+      "bytes": 40892,
+      "sha256": "4f31201f932b52e4356937dc95ffbed3c800964643b66a6c50720627b4c2ec7a"
+    },
+    "portable_fixture_publication": {
+      "path": "build/edit-distance69-compact-fixture-publication-924d837a65564ca28f282b8b277ee17c/validation.json",
+      "bytes": 192479,
+      "sha256": "78050654cb82643a7f0fa12341392696fa30cf1f595c2c40806b37f5e4e875a0"
+    },
+    "live_activation_validation": {
+      "path": "build/edit-distance-feature69-live-runtime.json",
+      "bytes": 10728,
+      "sha256": "6617e2be31a826779e5dd8b271439cd6d57c6eae7acff43dbbea720c2374c08c"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/edit-distance-feature69-test-cleanup.json",
+      "bytes": 3212,
+      "sha256": "2d32728132c036b4d9ce4d0692570a0ae5901cd0993ab6639017bd341b3a26f1"
+    },
+    "frontend_tests": 5424,
+    "frontend_test_files": 124,
+    "frontend_source_bindings": 14051,
+    "portable_export_tests": 99,
+    "portable_fixture_files": 3,
+    "served_asset_count": 7,
+    "live_smoke_http_calls": 2
+  }
+}
