@@ -1,0 +1,730 @@
+{
+  "complete": true,
+  "feature_group": 74,
+  "prepared_only": false,
+  "checkpoint_kind": "implemented independent original root-cause native extension; browser and strict parity pending",
+  "completed_utc": "2026-10-18T21:27:09.267294+00:00",
+  "feature_baseline_head": "77d1bd63f4f74d359da344379ff86b5bc1bf6009",
+  "backend_step_commit": "c86d26b9bd0e18f1c233745ecce7dea46cadc8a5",
+  "ui_step_commit": null,
+  "ui_step_commit_pending": true,
+  "ui_step_commit_note": "Verified externally after the containing UI commit is created, avoiding self-reference.",
+  "ui_delivery_pending": false,
+  "reference_version": "2.7.22",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "delivered": [
+    "All eight original public root-cause functions are available before mining with editable ordinary cohorts, complete Event carriers and an editable request-local shared arena. Existing replay-derived diagnostics remain available.",
+    "All three RootCauseOptions members, the independent log-builder multiplier bool and custom problem_class retain native defaults and supplied-member presence. Ordered duplicate cohorts, exact source positions, seven NativeAttributeValue arms, byte strings, signed zero and semantic nonfinite values use the existing public raw-log codec.",
+    "Complete four-field RootCauseRepresentation, optional eight-field RootCauseModel and seven-field tree nodes remain inspectable, including normal nullopt results and full data. Shared graph snapshots retain all nine native value fields and six context fields plus host IDs, null handles, cycles, aliases and unused arena records.",
+    "Canonical before/after input, arguments and typed result artifacts preserve their actual source correspondence. Factory results, shared logs and materialized Events reopen only in compatible public operations; explicit shared-cohort reuse retains the actual arena and selected context/source positions. Arguments reopen as a real File control with complete canonical defaults.",
+    "Physical multipart requests retain control/upload ownership, bytes, part order, query origin and filename presence. Native errors and optional EventLog XES exceptions remain distinct from canonical results; invalid UTF-8 category rejection follows the original algorithm.",
+    "The standalone Original root-cause workspace exposes complete tables, CSV, selected records, raw responses, reports, original requests and exact artifact downloads. Completed native/API/portable/full frontend/strict build/live proofs are bound below. This native extension preserves all existing reference-package statuses; browser rendering and every strict parity gate remain open."
+  ],
+  "operations": [
+    {
+      "operation": "make_shared_root_cause_context",
+      "public_call": "make_shared_root_cause_context(event)",
+      "input_type": "Event",
+      "arguments_type": null,
+      "result_type": "RootCauseSharedContext",
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "materialize_root_cause_context",
+      "public_call": "materialize_root_cause_context(context)",
+      "input_type": "RootCauseSharedContext",
+      "arguments_type": null,
+      "result_type": "Event",
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "build_shared_root_cause_log",
+      "public_call": "build_shared_root_cause_log(fit, problem, enable_multiplier)",
+      "input_type": "RootCauseSharedCohorts",
+      "arguments_type": "MultiplierArguments",
+      "result_type": "RootCauseSharedLog",
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "materialize_root_cause_log",
+      "public_call": "materialize_root_cause_log(log)",
+      "input_type": "RootCauseSharedLog",
+      "arguments_type": null,
+      "result_type": "EventLog",
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "build_shared_root_cause_representation",
+      "public_call": "build_shared_root_cause_representation(fit, problem, options)",
+      "input_type": "RootCauseSharedCohorts",
+      "arguments_type": "RepresentationArguments",
+      "result_type": "RootCauseRepresentation",
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "build_root_cause_log",
+      "public_call": "build_root_cause_log(fit, problem, enable_multiplier)",
+      "input_type": "RootCauseCohorts",
+      "arguments_type": "MultiplierArguments",
+      "result_type": "EventLog",
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "build_root_cause_representation",
+      "public_call": "build_root_cause_representation(fit, problem, options)",
+      "input_type": "RootCauseCohorts",
+      "arguments_type": "RepresentationArguments",
+      "result_type": "RootCauseRepresentation",
+      "exactly_one_selected_public_call": true
+    },
+    {
+      "operation": "fit_root_cause_model",
+      "public_call": "fit_root_cause_model(fit, problem, options, problem_class)",
+      "input_type": "RootCauseCohorts",
+      "arguments_type": "FitArguments",
+      "result_type": "std::optional<RootCauseModel>",
+      "exactly_one_selected_public_call": true
+    }
+  ],
+  "option_member_counts": {
+    "RootCauseOptions": 3
+  },
+  "argument_member_counts": {
+    "MultiplierArguments": 1,
+    "RepresentationArguments": 1,
+    "FitArguments": 2
+  },
+  "result_member_counts": {
+    "RootCauseRepresentation": 4,
+    "RootCauseModel": 8,
+    "RootCauseTreeNode": 7
+  },
+  "shared_native_member_counts": {
+    "RootCauseSharedValue": 9,
+    "RootCauseSharedContext": 6
+  },
+  "reference_family_mapping": "Native root-cause extension; no root_cause reference package exists in the retained 86-family catalogue. All existing catalogue family statuses are preserved.",
+  "families": [],
+  "validation_counts": {
+    "native_sources": 725,
+    "native_suites_aggregate": 60,
+    "actual_passing_suite_invocations": 6,
+    "retained_parent_suites": 59,
+    "current_attempt_executed_suites": 1,
+    "reused_parent_core_objects": 200,
+    "fresh_feature_core_objects": 1,
+    "feature_library_core_objects": 201,
+    "actual_api_calls": 196,
+    "selected_feature_cases": 194,
+    "historical_api_false_checks_retained": 7,
+    "historical_api_validation_exceptions_retained": 1,
+    "adaptive_artifact_reuploads": 7,
+    "api_full_guard_events": 3,
+    "offline_audit_new_http_calls": 0,
+    "cached_seed_attempts": 1,
+    "successful_cached_seeds": 1,
+    "independence_repeat_calls": 1,
+    "focused_frontend_tests": 69,
+    "focused_frontend_files": 1,
+    "portable_export_tests": 195,
+    "portable_fixture_files": 3,
+    "frontend_tests": 6317,
+    "frontend_test_files": 133,
+    "frontend_source_bindings": 14078,
+    "served_asset_count": 7,
+    "live_smoke_post_calls": 2,
+    "unrelated_files_preserved": 110
+  },
+  "test_accounting": {
+    "parent_validation": {
+      "path": "build/petri-analysis-feature-frontend-final-430c16ddc2b6430a9a207a8d7ad45b16/validation.json",
+      "bytes": 2767160,
+      "sha256": "fa3f10c8efb65d37b1448127d64feb80351c7f85c2ff8c8aa6c7b1e876bcb96e"
+    },
+    "parent_results": {
+      "path": "build/petri-analysis-feature-frontend-final-430c16ddc2b6430a9a207a8d7ad45b16/vitest-results.json",
+      "bytes": 2551169,
+      "sha256": "7b8d25517fa867b4051eec4a61d3ba2c2205c273de7fa71291f0dd1bd19dcd0a"
+    },
+    "focused_validation": {
+      "path": "build/root-cause74-staged-focused-1-6515d6d2ca594e7e9491bf8822354784/validation.json",
+      "bytes": 47413,
+      "sha256": "24ef4418d81c128c69efeeca69ee7dec4071ec2105a07d8f7f43f72cd3bdc821"
+    },
+    "focused_results": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause74-staged-focused-1-6515d6d2ca594e7e9491bf8822354784\\vitest-results.json",
+      "sha256": "7abb23ce94f10c0a5aaccf53e521470b1f476b6e39842baf8199cbe9321c4db9",
+      "bytes": 26775
+    },
+    "fixture_validation": {
+      "path": "build/root-cause74-compact-fixture-validation-e19bd3402a0e4804acd9df0b9d6ecd7c/validation.json",
+      "bytes": 43367,
+      "sha256": "7961b8ba2967754431177f06617017887bc90a12a77f4fb133603511e648f787"
+    },
+    "parent_tests": 6053,
+    "parent_files": 131,
+    "replaced_files": [],
+    "replaced_parent_tests": 0,
+    "replacement_current_tests": 69,
+    "new_authored_tests": 69,
+    "new_authored_files": 1,
+    "new_portable_tests": 195,
+    "new_portable_files": 1,
+    "expected_current_tests": 6317,
+    "expected_current_files": 133,
+    "derived_from_actual_completed_reports": true,
+    "single_current_full_invocation_required": true,
+    "calculation": "parent plus one new authored suite plus one new portable suite"
+  },
+  "native_test_lineage": {
+    "parent_manifest": {
+      "path": "build/petri73r-b56ec5d20d2a43af/build-manifest.json",
+      "bytes": 341109,
+      "sha256": "5638528c9400294c10a9e42e6ddde64b2b9fbfb254757b1b2ef0684315fd7afd"
+    },
+    "current_passing_targets": 60,
+    "current_contributing_invocations": 6,
+    "retained_parent_targets": 59,
+    "current_attempt_executed_targets": 1,
+    "single_combined_run_claimed": false,
+    "historical_native_build_attempts": [
+      {
+        "manifest": {
+          "path": "build/rootcause74-bb102c36722e45e380c639ff3ee1bc92/build-manifest.json",
+          "bytes": 325790,
+          "sha256": "ae4cadefdae074c4e9564f243e94091c9717f6b0d50b4abe6f113430d1f91c67"
+        },
+        "failed_driver_compile_stdout": {
+          "path": "build/rootcause74-bb102c36722e45e380c639ff3ee1bc92/command-2.stdout.txt",
+          "bytes": 2442,
+          "sha256": "7742628fa486000adfb3fb25ace202fb40286bfd4bfed4f7f9b3659478baf4eb"
+        },
+        "failed_driver_compile_stderr": {
+          "path": "build/rootcause74-bb102c36722e45e380c639ff3ee1bc92/command-2.stderr.txt",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "no_ctest_executed": true,
+        "outcome": "Configure/core/server compiled successfully; new driver compile failed only Event operator== comparisons. No CTest was executed. Entire failed namespace retained."
+      }
+    ],
+    "completed_prefix_seal": {
+      "path": "build/root-cause74-completed-prefix-seal-20261018.json",
+      "bytes": 242207,
+      "sha256": "f66b0ac05182f77e8f6119805ad218c48b257b3db2101d0a5998837e2ada9553"
+    },
+    "test_only_correction": {
+      "path": "build/root-cause74-native-test-correction-20261018/staging-manifest.json",
+      "bytes": 3083,
+      "sha256": "0857d379765eea28453af30638938c3d37f452414b7c25d42ea908d130a33b60"
+    },
+    "test_correction_integration": {
+      "path": "build/root-cause74-native-test-correction-integration.json",
+      "bytes": 169400,
+      "sha256": "d52544bcff6df6390eb8a652fa7084af903f84cba047faff870346d6938d3c61"
+    }
+  },
+  "api_attempt_lineage": {
+    "actual_capture_validations": [
+      {
+        "path": "build/root-cause74-api-actual-20261018-1/validation.json",
+        "bytes": 2528242,
+        "sha256": "dc918bddba1c9f3385cde6f1b6b49e77dbd4ce49c80f9b27eb0d00bfbdd1b12a"
+      }
+    ],
+    "physical_calls_retained": 196,
+    "selected_feature_count": 194,
+    "historical_false_checks": [
+      {
+        "physical_call_index": 19,
+        "id": "byte-selector-and-category",
+        "check": {
+          "check": "source-backed HTTP status",
+          "passed": false,
+          "failure": {
+            "type": "AssertionError",
+            "message": "Predicate returned false"
+          }
+        }
+      },
+      {
+        "physical_call_index": 19,
+        "id": "byte-selector-and-category",
+        "check": {
+          "check": "source-backed actual native_returned",
+          "passed": false,
+          "failure": {
+            "type": "AssertionError",
+            "message": "Predicate returned false"
+          }
+        }
+      },
+      {
+        "physical_call_index": 19,
+        "id": "byte-selector-and-category",
+        "check": {
+          "check": "source-backed actual executed",
+          "passed": false,
+          "failure": {
+            "type": "AssertionError",
+            "message": "Predicate returned false"
+          }
+        }
+      },
+      {
+        "physical_call_index": 19,
+        "id": "byte-selector-and-category",
+        "check": {
+          "check": "source-backed error phase",
+          "passed": false,
+          "failure": {
+            "type": "AssertionError",
+            "message": "Predicate returned false"
+          }
+        }
+      },
+      {
+        "physical_call_index": 19,
+        "id": "byte-selector-and-category",
+        "check": {
+          "check": "exact public result carrier type",
+          "passed": false,
+          "failure": {
+            "type": "AssertionError",
+            "message": "Predicate returned false"
+          }
+        }
+      },
+      {
+        "physical_call_index": 19,
+        "id": "byte-selector-and-category",
+        "check": {
+          "check": "full native result fields/scalars/graph references/optional state",
+          "passed": false,
+          "failure": {
+            "type": "AssertionError",
+            "message": ""
+          }
+        }
+      },
+      {
+        "physical_call_index": 19,
+        "id": "byte-selector-and-category",
+        "check": {
+          "check": "complete collector validation reached",
+          "passed": false,
+          "failure": {
+            "type": "TypeError",
+            "message": "'NoneType' object is not subscriptable",
+            "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause74-api-collector-prepared-20261018\\capture.py\", line 904, in send\n    else: validate_response(row, doc, case, body, parts, query, content or {}, protocol, schema, captured, directory)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause74-api-collector-prepared-20261018\\capture.py\", line 707, in validate_response\n    if value['result']['type'] in ('RootCauseSharedContext', 'RootCauseSharedLog') and before is not None and type(before['value']) is dict and 'graph' in before['value']:\n       ~~~~~~~~~~~~~~~^^^^^^^^\nTypeError: 'NoneType' object is not subscriptable\n"
+          }
+        }
+      }
+    ],
+    "historical_validation_exceptions": [
+      {
+        "id": "byte-selector-and-category",
+        "physical_call_index": 19,
+        "validation_exception": {
+          "type": "TypeError",
+          "message": "'NoneType' object is not subscriptable",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause74-api-collector-prepared-20261018\\capture.py\", line 904, in send\n    else: validate_response(row, doc, case, body, parts, query, content or {}, protocol, schema, captured, directory)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\root-cause74-api-collector-prepared-20261018\\capture.py\", line 707, in validate_response\n    if value['result']['type'] in ('RootCauseSharedContext', 'RootCauseSharedLog') and before is not None and type(before['value']) is dict and 'graph' in before['value']:\n       ~~~~~~~~~~~~~~~^^^^^^^^\nTypeError: 'NoneType' object is not subscriptable\n"
+        }
+      }
+    ],
+    "collector_faults": {},
+    "offline_audit": {
+      "path": "build/root-cause74-api-offline-audit-20261018-1/validation.json",
+      "bytes": 10736821,
+      "sha256": "9bfd0d1eefbe0a810f219e5dec1eba75ca5f38e3cde138f13359443caf12e93e"
+    },
+    "original_capture": {
+      "path": "build/root-cause74-api-actual-20261018-1/validation.json",
+      "bytes": 2528242,
+      "sha256": "dc918bddba1c9f3385cde6f1b6b49e77dbd4ce49c80f9b27eb0d00bfbdd1b12a"
+    },
+    "expected_amendment": {
+      "path": "build/root-cause74-api-offline-audit-prepared-20261018/expected-amendment.json",
+      "bytes": 3587,
+      "sha256": "d954ddfa23b154e82dba41ffb7e0979a1a5a807593dd41f313aac3ea074885e3"
+    },
+    "amended_cases_definition": {
+      "path": "build/root-cause74-api-offline-audit-prepared-20261018/amended-cases.json",
+      "bytes": 101418,
+      "sha256": "c7d6860f13858653f440c48a9ebdd7f06c528cb7958d7a889c7a2f71229b5c85"
+    },
+    "new_http_calls_for_offline_correction": 0,
+    "audit_false_checks": [],
+    "audit_faults": [],
+    "recovered_actual_artifacts": [
+      {
+        "physical_call_index": 19,
+        "name": "source_input_json",
+        "path": "build/root-cause74-api-offline-audit-20261018-1/019-byte-selector-and-category/artifact-source_input_json.bin",
+        "bytes": 1322,
+        "sha256": "9561f84a596c3a5b7ba7d2f27b6c18f87d7d7ccbb2d662206e7cfea3438b21e3",
+        "source_response": {
+          "path": "build/root-cause74-api-actual-20261018-1/019-byte-selector-and-category/response.body",
+          "bytes": 9211,
+          "sha256": "f23e8b95096192a1383a955ae71fd63933e031fe8adfbb4628adaeae2a5f456f"
+        }
+      },
+      {
+        "physical_call_index": 19,
+        "name": "after_input_json",
+        "path": "build/root-cause74-api-offline-audit-20261018-1/019-byte-selector-and-category/artifact-after_input_json.bin",
+        "bytes": 1322,
+        "sha256": "9561f84a596c3a5b7ba7d2f27b6c18f87d7d7ccbb2d662206e7cfea3438b21e3",
+        "source_response": {
+          "path": "build/root-cause74-api-actual-20261018-1/019-byte-selector-and-category/response.body",
+          "bytes": 9211,
+          "sha256": "f23e8b95096192a1383a955ae71fd63933e031fe8adfbb4628adaeae2a5f456f"
+        }
+      },
+      {
+        "physical_call_index": 19,
+        "name": "configured_arguments_json",
+        "path": "build/root-cause74-api-offline-audit-20261018-1/019-byte-selector-and-category/artifact-configured_arguments_json.bin",
+        "bytes": 133,
+        "sha256": "327fba559fbf19b4b6e07ddb8428d1f6a7a7f2cbe4e685ddd5817feafb733952",
+        "source_response": {
+          "path": "build/root-cause74-api-actual-20261018-1/019-byte-selector-and-category/response.body",
+          "bytes": 9211,
+          "sha256": "f23e8b95096192a1383a955ae71fd63933e031fe8adfbb4628adaeae2a5f456f"
+        }
+      }
+    ],
+    "guard_policy": "Full guards before corpus, before seed and after all; each call has fsynced raw intent/request/response. No full per-call tree hashing.",
+    "full_guard_events": [
+      {
+        "name": "before_first_corpus_send",
+        "started_utc": "2026-10-18T21:12:47.212689+00:00",
+        "complete": true,
+        "finished_utc": "2026-10-18T21:12:50.566641+00:00"
+      },
+      {
+        "name": "after_selected_before_seed",
+        "started_utc": "2026-10-18T21:13:23.015418+00:00",
+        "complete": true,
+        "finished_utc": "2026-10-18T21:13:26.666687+00:00"
+      },
+      {
+        "name": "after_all_calls",
+        "started_utc": "2026-10-18T21:13:27.336276+00:00",
+        "complete": true,
+        "finished_utc": "2026-10-18T21:13:31.019626+00:00"
+      }
+    ],
+    "seed_attempt_physical_indices": [
+      195
+    ],
+    "repeat_physical_indices": [
+      196
+    ],
+    "independence": {
+      "baseline_physical_call_index": 1,
+      "seed_physical_call_index": 195,
+      "repeat_physical_call_index": 196,
+      "byte_identity": true,
+      "valid_cached_seed": true,
+      "actual_cached_source_id": "1",
+      "request_body_mime_path_stored_not_reconstructed": true
+    },
+    "all_selected_before_seed": true
+  },
+  "frontend_candidate_lineage": {
+    "expected_parent_head": "77d1bd63f4f74d359da344379ff86b5bc1bf6009",
+    "previous_candidate": {
+      "path": "build/root-cause74-frontend-candidate-20261018/staging-manifest.json",
+      "bytes": 47358,
+      "sha256": "14d13e1257e5f90b9b53b4d1041d2dd5a1e41e4225f6d296809385c75ea5751f"
+    },
+    "historical_staged_strict": {
+      "path": "build/root-cause74-staged-types-1-e2c3b4fd2c18437b9e0d4c4d36c2a834/validation.json",
+      "bytes": 72263,
+      "sha256": "208fea00463bf11033c5f42431d0f6a34237e777d48195032a047b58eb1b84e1"
+    },
+    "changed_destinations_from_previous_candidate": [
+      "src/frontend/tests/original-root-cause-workbench.test.ts"
+    ],
+    "test_type_amendment": {
+      "only_authored_test_changed": true,
+      "product_paths_byte_identical": 5,
+      "actual_failed_diagnostics": [
+        "TS2345 line37 nullable filename passed to string argument",
+        "TS6133 line57 unused run binding"
+      ],
+      "correction": "Narrow nullable synthetic upload filename explicitly; remove unused test-only saved run binding. No tested request/response, product helper or ownership behavior change.",
+      "compiler_executed_here": false,
+      "tests_executed_here": false
+    }
+  },
+  "delivery_proofs": {
+    "backend_commit": {
+      "path": "build/root-cause-feature74-backend-postcommit.json",
+      "bytes": 4887,
+      "sha256": "77ea23b0763393f4c91769792a4944d3deb746182f0484b305e691fe92707b55"
+    },
+    "native_build": {
+      "path": "build/rootcause74r-d845f1f05a124bae/build-manifest.json",
+      "bytes": 351281,
+      "sha256": "12ecbbb759bf0e565fdcd9779c2d31b4393e9ad3e601a75d47b6397c46e4cbb7"
+    },
+    "api_capture": {
+      "path": "build/root-cause74-api-offline-audit-20261018-1/validation.json",
+      "bytes": 10736821,
+      "sha256": "9bfd0d1eefbe0a810f219e5dec1eba75ca5f38e3cde138f13359443caf12e93e"
+    },
+    "frontend_integration": {
+      "path": "build/root-cause74-frontend-integration-e0e7bf2daebb4ff9bc0d0906acf6cb2d/validation.json",
+      "bytes": 44572,
+      "sha256": "b1c982292b809f789f9b1f6ec00f27a2aed15c82d97034bcf54dcfdc16e06f30"
+    },
+    "portable_fixture_publication": {
+      "path": "build/root-cause74-compact-fixture-publication-98d0764a188743aa86293033983f1462/validation.json",
+      "bytes": 193693,
+      "sha256": "76042bc783b965360b308f548a287c0a3ac521c4e4239beeeb5c74e58b81f355"
+    },
+    "full_frontend_validation": {
+      "path": "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/validation.json",
+      "bytes": 2768512,
+      "sha256": "854de20dc4c0ed4a88c48cdbd569fc13e2b1874a4c4f390dcfa7205ded1dcd35"
+    },
+    "live_activation_validation": {
+      "path": "build/root-cause-feature74-live-runtime.json",
+      "bytes": 18618,
+      "sha256": "c4db970b5d8d4e85e869d08bd64d07685946a0d0aeccee2460f56124c8ed4570"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/root-cause-feature74-test-cleanup.json",
+      "bytes": 5156,
+      "sha256": "c5eba8e4ccde6dd3c42b460b1198ffe3234589eacee6e8166f930572e2b60034"
+    },
+    "frontend_candidate": {
+      "path": "build/root-cause74-frontend-test-types-amendment-20261018/staging-manifest.json",
+      "bytes": 48518,
+      "sha256": "5c5b40617631541a3bc2cd926d3b1f6927f25393776415466a8328acb02d3abb"
+    },
+    "frontend_strict_staging": {
+      "path": "build/root-cause74-staged-types-1-b4f87dcc7ff943e8b81ea268ede3b893/validation.json",
+      "bytes": 71804,
+      "sha256": "2b7a2ba4dcf5466a58d7382d8adb02ef057d61478af06bb3bb060c413af4037e"
+    },
+    "frontend_focused_staging": {
+      "path": "build/root-cause74-staged-focused-1-6515d6d2ca594e7e9491bf8822354784/validation.json",
+      "bytes": 47413,
+      "sha256": "24ef4418d81c128c69efeeca69ee7dec4071ec2105a07d8f7f43f72cd3bdc821"
+    },
+    "portable_fixture_validation": {
+      "path": "build/root-cause74-compact-fixture-validation-e19bd3402a0e4804acd9df0b9d6ecd7c/validation.json",
+      "bytes": 43367,
+      "sha256": "7961b8ba2967754431177f06617017887bc90a12a77f4fb133603511e648f787"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/root-cause74-compact-fixture-types-cdffdc6cd10b42a6882db71860f8104e/validation.json",
+      "bytes": 70078,
+      "sha256": "5435ae21a53ca1247b671e86108c7c5e9125e5b938a9be105a391c9823e43eed"
+    },
+    "accepted_protocol": {
+      "path": "build/root-cause74-protocol-prepared-20261018/protocol.json",
+      "bytes": 34057,
+      "sha256": "66d5af66ebb27ed680d6c980d46e0ac12ba622f5699cbc82dfd81d92f739ffde"
+    },
+    "accepted_contract": {
+      "path": "build/root-cause74-protocol-prepared-20261018/contract.json",
+      "bytes": 3679,
+      "sha256": "bac6c89256551adec51ff756c74355caee86d38df3d68dece1941104bd823922"
+    },
+    "preserved_feature73_postcommit": {
+      "path": "build/petri-analysis-feature73-postcommit.json",
+      "bytes": 17811,
+      "sha256": "09bb0b91490f74dd56e742a8289eda5d857549f0b3cc54fcd564e937e728cb91"
+    },
+    "preserved_feature73_delivery": {
+      "path": "docs/feature-first-original-petri-analysis-workbench-validation.json",
+      "bytes": 25311,
+      "sha256": "92f0788ec93484cb15b62d9005d6c6514c6d7db9667b01995977d48d4db5c8c5"
+    },
+    "original_api_capture": {
+      "path": "build/root-cause74-api-actual-20261018-1/validation.json",
+      "bytes": 2528242,
+      "sha256": "dc918bddba1c9f3385cde6f1b6b49e77dbd4ce49c80f9b27eb0d00bfbdd1b12a"
+    },
+    "offline_expected_amendment": {
+      "path": "build/root-cause74-api-offline-audit-prepared-20261018/expected-amendment.json",
+      "bytes": 3587,
+      "sha256": "d954ddfa23b154e82dba41ffb7e0979a1a5a807593dd41f313aac3ea074885e3"
+    },
+    "amended_api_cases": {
+      "path": "build/root-cause74-api-offline-audit-prepared-20261018/amended-cases.json",
+      "bytes": 101418,
+      "sha256": "c7d6860f13858653f440c48a9ebdd7f06c528cb7958d7a889c7a2f71229b5c85"
+    }
+  },
+  "evidence": {
+    "backend_commit": {
+      "path": "build/root-cause-feature74-backend-postcommit.json",
+      "bytes": 4887,
+      "sha256": "77ea23b0763393f4c91769792a4944d3deb746182f0484b305e691fe92707b55"
+    },
+    "native_build": {
+      "path": "build/rootcause74r-d845f1f05a124bae/build-manifest.json",
+      "bytes": 351281,
+      "sha256": "12ecbbb759bf0e565fdcd9779c2d31b4393e9ad3e601a75d47b6397c46e4cbb7"
+    },
+    "api_capture": {
+      "path": "build/root-cause74-api-offline-audit-20261018-1/validation.json",
+      "bytes": 10736821,
+      "sha256": "9bfd0d1eefbe0a810f219e5dec1eba75ca5f38e3cde138f13359443caf12e93e"
+    },
+    "frontend_integration": {
+      "path": "build/root-cause74-frontend-integration-e0e7bf2daebb4ff9bc0d0906acf6cb2d/validation.json",
+      "bytes": 44572,
+      "sha256": "b1c982292b809f789f9b1f6ec00f27a2aed15c82d97034bcf54dcfdc16e06f30"
+    },
+    "portable_fixture_publication": {
+      "path": "build/root-cause74-compact-fixture-publication-98d0764a188743aa86293033983f1462/validation.json",
+      "bytes": 193693,
+      "sha256": "76042bc783b965360b308f548a287c0a3ac521c4e4239beeeb5c74e58b81f355"
+    },
+    "full_frontend_validation": {
+      "path": "build/root-cause-feature-frontend-final-e0e9dab391534027999b95a9bae9e89f/validation.json",
+      "bytes": 2768512,
+      "sha256": "854de20dc4c0ed4a88c48cdbd569fc13e2b1874a4c4f390dcfa7205ded1dcd35"
+    },
+    "live_activation_validation": {
+      "path": "build/root-cause-feature74-live-runtime.json",
+      "bytes": 18618,
+      "sha256": "c4db970b5d8d4e85e869d08bd64d07685946a0d0aeccee2460f56124c8ed4570"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/root-cause-feature74-test-cleanup.json",
+      "bytes": 5156,
+      "sha256": "c5eba8e4ccde6dd3c42b460b1198ffe3234589eacee6e8166f930572e2b60034"
+    },
+    "frontend_candidate": {
+      "path": "build/root-cause74-frontend-test-types-amendment-20261018/staging-manifest.json",
+      "bytes": 48518,
+      "sha256": "5c5b40617631541a3bc2cd926d3b1f6927f25393776415466a8328acb02d3abb"
+    },
+    "frontend_strict_staging": {
+      "path": "build/root-cause74-staged-types-1-b4f87dcc7ff943e8b81ea268ede3b893/validation.json",
+      "bytes": 71804,
+      "sha256": "2b7a2ba4dcf5466a58d7382d8adb02ef057d61478af06bb3bb060c413af4037e"
+    },
+    "frontend_focused_staging": {
+      "path": "build/root-cause74-staged-focused-1-6515d6d2ca594e7e9491bf8822354784/validation.json",
+      "bytes": 47413,
+      "sha256": "24ef4418d81c128c69efeeca69ee7dec4071ec2105a07d8f7f43f72cd3bdc821"
+    },
+    "portable_fixture_validation": {
+      "path": "build/root-cause74-compact-fixture-validation-e19bd3402a0e4804acd9df0b9d6ecd7c/validation.json",
+      "bytes": 43367,
+      "sha256": "7961b8ba2967754431177f06617017887bc90a12a77f4fb133603511e648f787"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/root-cause74-compact-fixture-types-cdffdc6cd10b42a6882db71860f8104e/validation.json",
+      "bytes": 70078,
+      "sha256": "5435ae21a53ca1247b671e86108c7c5e9125e5b938a9be105a391c9823e43eed"
+    },
+    "accepted_protocol": {
+      "path": "build/root-cause74-protocol-prepared-20261018/protocol.json",
+      "bytes": 34057,
+      "sha256": "66d5af66ebb27ed680d6c980d46e0ac12ba622f5699cbc82dfd81d92f739ffde"
+    },
+    "accepted_contract": {
+      "path": "build/root-cause74-protocol-prepared-20261018/contract.json",
+      "bytes": 3679,
+      "sha256": "bac6c89256551adec51ff756c74355caee86d38df3d68dece1941104bd823922"
+    },
+    "preserved_feature73_postcommit": {
+      "path": "build/petri-analysis-feature73-postcommit.json",
+      "bytes": 17811,
+      "sha256": "09bb0b91490f74dd56e742a8289eda5d857549f0b3cc54fcd564e937e728cb91"
+    },
+    "preserved_feature73_delivery": {
+      "path": "docs/feature-first-original-petri-analysis-workbench-validation.json",
+      "bytes": 25311,
+      "sha256": "92f0788ec93484cb15b62d9005d6c6514c6d7db9667b01995977d48d4db5c8c5"
+    },
+    "original_api_capture": {
+      "path": "build/root-cause74-api-actual-20261018-1/validation.json",
+      "bytes": 2528242,
+      "sha256": "dc918bddba1c9f3385cde6f1b6b49e77dbd4ce49c80f9b27eb0d00bfbdd1b12a"
+    },
+    "offline_expected_amendment": {
+      "path": "build/root-cause74-api-offline-audit-prepared-20261018/expected-amendment.json",
+      "bytes": 3587,
+      "sha256": "d954ddfa23b154e82dba41ffb7e0979a1a5a807593dd41f313aac3ea074885e3"
+    },
+    "amended_api_cases": {
+      "path": "build/root-cause74-api-offline-audit-prepared-20261018/amended-cases.json",
+      "bytes": 101418,
+      "sha256": "c7d6860f13858653f440c48a9ebdd7f06c528cb7958d7a889c7a2f71229b5c85"
+    }
+  },
+  "historical_additional_attempts": [
+    {
+      "path": "build/root-cause74-staged-types-1-e2c3b4fd2c18437b9e0d4c4d36c2a834/validation.json",
+      "bytes": 72263,
+      "sha256": "208fea00463bf11033c5f42431d0f6a34237e777d48195032a047b58eb1b84e1"
+    },
+    {
+      "path": "build/root-cause74-native-candidate-20261018/staging-manifest.json",
+      "bytes": 255866,
+      "sha256": "37dcc172417f6b1595da788b08f44754b4bd66b03562386fce1f1be882699d73"
+    },
+    {
+      "path": "build/root-cause74-frontend-candidate-20261018/staging-manifest.json",
+      "bytes": 47358,
+      "sha256": "14d13e1257e5f90b9b53b4d1041d2dd5a1e41e4225f6d296809385c75ea5751f"
+    }
+  ],
+  "previous_feature_delivery_preserved": {
+    "path": "docs/feature-first-original-petri-analysis-workbench-validation.json",
+    "bytes": 25311,
+    "sha256": "92f0788ec93484cb15b62d9005d6c6514c6d7db9667b01995977d48d4db5c8c5"
+  },
+  "previous_feature_postcommit_preserved": {
+    "path": "build/petri-analysis-feature73-postcommit.json",
+    "bytes": 17811,
+    "sha256": "09bb0b91490f74dd56e742a8289eda5d857549f0b3cc54fcd564e937e728cb91"
+  },
+  "browser_evidence": {
+    "path": "build/discovery-feature71-browser-status-1.json",
+    "bytes": 775,
+    "sha256": "21a0478e7f73e336308fc605a377ad9e58bdceb431805adea7bb202d39b32470"
+  },
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": false,
+  "latest_actual_browser_attempt_feature": 71,
+  "latest_actual_browser_attempt_served_feature": 70,
+  "boundaries": [
+    "Rendered browser controls, interactions and downloads remain unverified. No Feature 74 browser retry is made; the retained actual Feature 71 origin-policy denial occurred while Feature 70 served. Native/API/assets evidence does not verify rendering.",
+    "NativeFloat64 preserves finite binary64 values, signed zero and semantic NaN/INF/-INF values. NaN payload, sign and signalling-state identity are canonicalized by the existing codec and remain a named strict gate; caller decimal lexemes and raw NaN bits are not claimed.",
+    "Existing request-parser limits of 32 MiB input, depth 64 and one million values remain separate transport limits. No new output cap or all-size strict parity claim is introduced. Standard httplib MIME, filename-presence and part-order behavior remains independently bounded.",
+    "Shared graph IDs reconstruct actual request-local aliases, null handles and cycles. They do not carry native pointer identity across requests. Hidden scalar-object identity remains separate from complete public NativeAttributeValue storage.",
+    "Native category validation rejects invalid UTF-8; missing/null selected values, empty balancing cohorts and graph materialization follow their actual native error order. The original API case expectation error and validation exception are retained with the offline correction; no product change or HTTP replay is claimed.",
+    "Classifier fitting retains its private random_device-seeded MT19937 and native tie behavior. No caller RNG control, deterministic tied tree or cross-run classifier byte identity is promised. Optional XES errors and invalid UTF-8 exporter output remain separate from canonical results.",
+    "All 86 families and 387 modules remain in scope, with 46 complete packages, 199 complete modules and 228 incomplete strict units. Every remaining input/model-host, defaults, numeric/type/Unicode/ordering/error/concurrency/performance and strict reference gate stays open."
+  ],
+  "separate_remaining_gaps": [
+    "Rendered browser controls, interactions and downloads remain unverified. No Feature 74 browser retry is made; the retained actual Feature 71 origin-policy denial occurred while Feature 70 served. Native/API/assets evidence does not verify rendering.",
+    "NativeFloat64 preserves finite binary64 values, signed zero and semantic NaN/INF/-INF values. NaN payload, sign and signalling-state identity are canonicalized by the existing codec and remain a named strict gate; caller decimal lexemes and raw NaN bits are not claimed.",
+    "Existing request-parser limits of 32 MiB input, depth 64 and one million values remain separate transport limits. No new output cap or all-size strict parity claim is introduced. Standard httplib MIME, filename-presence and part-order behavior remains independently bounded.",
+    "Shared graph IDs reconstruct actual request-local aliases, null handles and cycles. They do not carry native pointer identity across requests. Hidden scalar-object identity remains separate from complete public NativeAttributeValue storage.",
+    "Native category validation rejects invalid UTF-8; missing/null selected values, empty balancing cohorts and graph materialization follow their actual native error order. The original API case expectation error and validation exception are retained with the offline correction; no product change or HTTP replay is claimed.",
+    "Classifier fitting retains its private random_device-seeded MT19937 and native tie behavior. No caller RNG control, deterministic tied tree or cross-run classifier byte identity is promised. Optional XES errors and invalid UTF-8 exporter output remain separate from canonical results.",
+    "All 86 families and 387 modules remain in scope, with 46 complete packages, 199 complete modules and 228 incomplete strict units. Every remaining input/model-host, defaults, numeric/type/Unicode/ordering/error/concurrency/performance and strict reference gate stays open."
+  ],
+  "next_feature_contract": null,
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false
+}

@@ -38,3 +38,4 @@ src/frontend/tests/fixtures/original-bose-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-discovery-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-genetic-matrix-byte-fidelity* -text -whitespace
 src/frontend/tests/fixtures/original-petri-analysis-workbench* -text -whitespace
+src/frontend/tests/fixtures/original-root-cause-workbench* -text -whitespace
