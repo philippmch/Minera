@@ -1,0 +1,756 @@
+{
+  "complete": true,
+  "feature_group": 72,
+  "prepared_only": false,
+  "created_utc": "2026-10-18T20:02:18.661844+00:00",
+  "checkpoint_kind": "implemented byte-host repair; browser and strict parity pending",
+  "feature_baseline_head": "3da7aa724436b6599dcdc3014e0f27588a8d60ed",
+  "backend_step_commit": "d5fea1ee1ac8b9bcca5acfcb77fa9909aae07045",
+  "ui_step_commit": null,
+  "ui_step_commit_pending": true,
+  "ui_delivery_pending": false,
+  "reference_version": "2.7.22",
+  "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "full_parity": false,
+  "catalogue_promoted": false,
+  "goal_complete": false,
+  "boundaries": [
+    "Local delivery proofs are complete. This checkpoint repairs the identified converter byte host; it does not complete the whole catalogue. No Feature 72 browser retry occurred; the retained Feature 71 denial served Feature 70, and native/API evidence does not establish rendered browser behavior.",
+    "The supplied-matrix parser still has its explicit 32 MiB input, depth 64 and one-million-value transport limits; this byte-host repair does not remove or establish full reference parity for those limits.",
+    "The matrix route retains the existing standard httplib multipart adapter. Raw MIME/header bytes, physical filename presence and exact wire-part order are separate transport gates; no ContentReader parity is claimed here.",
+    "Other standalone Petri/model hosts retain their own accepted formats, byte domains, input roles and validation limits. A literal constructor download does not prove every unrelated host can reopen all such storage.",
+    "Rendered browser controls, interactions and downloads remain unverified. No Feature 72 browser attempt is made; the latest actual denial is Feature 71 while Feature 70 served, separately retained from native/API evidence.",
+    "The full catalogue remains 86 families and 387 modules, with 46 complete packages, 199 complete modules and 228 incomplete strict units. Defaults, type/Unicode/ordering/error/solver/concurrency/performance behavior and all strict reference gates remain open; feature delivery does not promote strict statuses or selectors.",
+    "Next bounded input-surface work is the confirmed independent original-Petri-analysis contract: all six public functions and twenty option fields, both soundness variants, direct trace-word input and invariant_search_limit. The existing five-family cached analysis UI is already available; it is preserved rather than described as absent."
+  ],
+  "separate_remaining_gaps": [
+    "Preexisting matrix host limits of 32 MiB input, depth 64 and one million entries remain separate gates; this byte repair does not claim to remove them.",
+    "The standard httplib adapter does not establish raw MIME framing, physical filename-attribute presence or original multipart part-order parity.",
+    "Full literal Petri constructors and byte artifacts do not establish lossless reopening through every other PNML/rich-only model host.",
+    "Rendered browser controls/downloads and full reference algorithm, solver, performance and strict behavioral parity remain open."
+  ],
+  "repaired_gap": "Every NativeString matrix activity label can be supplied to the existing converter with complete canonical literal/result/artifact storage. Historical Feature64/71 snapshots and meanings remain unchanged.",
+  "legacy_scalar_artifact_constants_preserved": [
+    "source_matrix_json",
+    "normalized_matrix_json",
+    "result_json",
+    "result_pnml",
+    "legacy_json"
+  ],
+  "authoritative_byte_artifacts": [
+    "source_matrix_json",
+    "normalized_matrix_json",
+    "result_json",
+    "result_pnml",
+    "legacy_json",
+    "net_constructor_json",
+    "markings_json"
+  ],
+  "validation_counts": {
+    "native_sources": 717,
+    "native_suites_aggregate": 58,
+    "retained_unaffected_native_suites": 56,
+    "current_affected_native_suites": 2,
+    "actual_passing_suite_invocations": 4,
+    "staged_strict_diagnostics": 0,
+    "focused_frontend_tests": 208,
+    "focused_frontend_test_files": 3,
+    "actual_api_calls": 82,
+    "selected_feature_cases": 80,
+    "historical_api_false_checks_retained": 0,
+    "frontend_tests": 5841,
+    "frontend_test_files": 129,
+    "portable_export_tests": 81,
+    "served_asset_count": 7,
+    "live_smoke_http_calls": 2,
+    "retained_unaffected_suites": 56,
+    "affected_suites_run": 2,
+    "reused_parent_core_objects": 198,
+    "fresh_feature_core_objects": 1,
+    "feature_library_core_objects": 199,
+    "focused_frontend_files": 3,
+    "historical_api_collector_faults_retained": 0,
+    "cached_mining_seed_attempts": 1,
+    "valid_cached_mining_seeds": 1,
+    "independence_repeat_calls": 1,
+    "adaptive_carrier_reuploads": 3,
+    "frontend_source_bindings": 14066,
+    "replaced_parent_test_count": 154,
+    "replacement_current_test_count": 208,
+    "portable_fixture_files": 3,
+    "fresh_live_post_calls_excluded_from_dedicated_corpus": 2,
+    "unrelated_files_to_preserve": 110,
+    "physical_multipart_parts": 268,
+    "authoritative_artifacts": 217,
+    "portable_bundle_bytes": 1891875
+  },
+  "browser_validation_complete": false,
+  "browser_retried_for_this_feature": false,
+  "latest_actual_browser_attempt_feature": 71,
+  "latest_actual_browser_attempt_served_feature": 70,
+  "browser_outcome": "No Feature 72 attempt. The retained actual Feature 71 saved/managed origin-policy denial occurred while Feature 70 served; native/API/assets evidence does not verify browser rendering.",
+  "browser_evidence": {
+    "path": "build/discovery-feature71-browser-status-1.json",
+    "bytes": 775,
+    "sha256": "21a0478e7f73e336308fc605a377ad9e58bdceb431805adea7bb202d39b32470"
+  },
+  "evidence": {
+    "baseline": {
+      "path": "build/matrix-byte-feature72-baseline.json",
+      "bytes": 59654,
+      "sha256": "38e0e2ab78e22de6f7c4ef54f12428ccd70f67dc2b13e3b3c50b6cf1dc70ed69"
+    },
+    "contract": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\genetic-matrix-byte-fidelity-followup-20261018\\contract.json",
+      "bytes": 14109,
+      "sha256": "48e11b1ed84e8f67697d6e7f2460cce6c4b04ff30b4429c1fa70dfd213bab4d4"
+    },
+    "protocol": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\matrix-byte72-native-candidate-20261018\\protocol.json",
+      "bytes": 7443,
+      "sha256": "06729366cea7f9d011909a0675043a913b850362feff81aa728c7ac4e257f4dc"
+    },
+    "native_build": {
+      "path": "build/matrix-byte72r-8e439115b483498c/build-manifest.json",
+      "bytes": 353436,
+      "sha256": "a831468df1479e716e2c603206440643fd464a87facae5870840231fa70f5600"
+    },
+    "frontend_candidate": {
+      "path": "build/matrix-byte72-frontend-holder-correction-20261018/staging-manifest.json",
+      "bytes": 48781,
+      "sha256": "a52420436bb67530b9755ac8fabec3d5398396cbcf07a409dc55b21c7eb6ee22"
+    },
+    "frontend_strict_staging": {
+      "path": "build/matrix-byte72-staged-types-1-fe5604a5752d42b4844a1db5f1c1334a/validation.json",
+      "bytes": 72713,
+      "sha256": "500d7f622d4b21b2abc423eee71ea2b3f76609dedabd4a5e427141d8580bfcdd"
+    },
+    "frontend_focused_staging": {
+      "path": "build/matrix-byte72-staged-focused-2-0501841da4d84898a12ecf46e0d77781/validation.json",
+      "bytes": 49090,
+      "sha256": "f907df7e431db3737dbb17f24409db79d2c5d03bf9f02a81a62ee200e324df95"
+    },
+    "historical_frontend_focused_failure": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\matrix-byte72-staged-focused-2-84e182a2a3aa4637a58c98735433c5ab\\validation.json",
+      "bytes": 49075,
+      "sha256": "34d850d88480d9f21aa2b8281a03aae375200c3da90473b3315983c988a8041c"
+    },
+    "frontend_numeric_holder_correction": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\matrix-byte72-frontend-holder-correction-20261018\\holder-correction.json",
+      "bytes": 1691,
+      "sha256": "562e221e7071ed64bc2a7bd771035a147eda01c2cd9fb3007ddebe9d63f0d0d1"
+    },
+    "api_capture": {
+      "path": "build/matrix-byte72-api-ui-handoff-composite-20261018-1/validation.json",
+      "bytes": 1346638,
+      "sha256": "a06c5c9c5fe369ef78d8c1776217ca7945e4f66f5bb0d8c176b7d6947c36bfcb"
+    },
+    "api_initial_capture": {
+      "path": "build/matrix-byte72-api-actual-20261018-1/validation.json",
+      "bytes": 1326598,
+      "sha256": "a22fa2a9a39a0a3464d353c381541f21a475229cc414a87997d795ef91615ab6"
+    },
+    "api_ui_handoff_supplement": {
+      "path": "build/matrix-byte72-ui-handoff-supplement-actual-20261018-1/validation.json",
+      "bytes": 33141,
+      "sha256": "3041feb5a90f2812307e08b0911fa37474b6a4bd4c5e77d052e2e39358bcb3a4"
+    },
+    "frontend_integration": {
+      "path": "build/matrix-byte-feature72-frontend-integration-9fe85d8724154dd7a241593b2dbd6cc4/validation.json",
+      "bytes": 43876,
+      "sha256": "3a85129e7074aa731464c2158ba01a51841bf42b47ffd3fb1f3d766e2667c9e9"
+    },
+    "backend_commit": {
+      "path": "build/matrix-byte-feature72-backend-postcommit.json",
+      "bytes": 3641,
+      "sha256": "db4c3bedb842729c61e49bfe137f8db7fa88e669da9cf99d1f41292ca753a79e"
+    },
+    "historical_feature64_validation": {
+      "path": "docs/feature-first-original-genetic-matrix-workbench-validation.json",
+      "bytes": 15366,
+      "sha256": "c85423620944335ca8a1560398e85dd70e14822dcefc2841718dfe736a34efbb"
+    },
+    "historical_feature71_validation": {
+      "path": "docs/feature-first-original-discovery-workbench-validation.json",
+      "bytes": 25348,
+      "sha256": "648a270caf0fbd403ab616d24994c5e1c91ab21b35d1356614e9d19161d4d9d4"
+    },
+    "next_confirmed_input_contract": {
+      "path": "build/post72-feature-availability-audit-20261018/confirmed-petri-analysis-input-contract.json",
+      "bytes": 10740,
+      "sha256": "412ab9e21fabcd3c8a58af1c2ba2167e98d070b12e8322d2feddbab583bc8e63"
+    },
+    "portable_fixture_validation": {
+      "path": "build/matrix-byte72-compact-fixture-validation-503a8d6102c44d85a46729ae95ea2f71/validation.json",
+      "bytes": 42310,
+      "sha256": "6d52f7ce0e8c57556f342dc4bd7bb115c574a2c4de68461ac02c8589f26122ac"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/matrix-byte72-compact-fixture-types-82684398291d4ca185b841c2a8877fa1/validation.json",
+      "bytes": 68226,
+      "sha256": "6455c7e75a9c8f8bf8b90617015b0a42202a064d553eb47068b28ada0ad20fde"
+    },
+    "portable_fixture_publication": {
+      "path": "build/matrix-byte72-compact-fixture-publication-46d1350c562d4140a708ae7539c298f7/validation.json",
+      "bytes": 104449,
+      "sha256": "00b252d66730a084b185e8683a5350ccc8ccbe3e2133257800c79f3f3277c922"
+    },
+    "full_frontend_validation": {
+      "path": "build/matrix-byte-feature-frontend-final-a2175a72fccf4e6bba044e78fa7210b8/validation.json",
+      "bytes": 2766708,
+      "sha256": "2e70d375627ac483bb9c34554abf471d1b7db1f7cbc489ac390d6be1b096e754"
+    },
+    "live_activation_validation": {
+      "path": "build/matrix-byte-feature72-live-runtime.json",
+      "bytes": 16295,
+      "sha256": "5878ec394e595fe6a7a0ec41925691cd0a757792922b9344d0ecbc0c195dc433"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/matrix-byte-feature72-test-cleanup.json",
+      "bytes": 4418,
+      "sha256": "eb46becb0842cdd5f4d1aa99c43b6262c2dc77065edd0b4b4b41e4efc03eedbf"
+    },
+    "ui_commit": {
+      "recorded_by": "external postcommit checkpoint",
+      "reason": "Avoid a self-referential commit hash."
+    },
+    "api_source_captures": [
+      {
+        "path": "build/matrix-byte72-api-actual-20261018-1/validation.json",
+        "bytes": 1326598,
+        "sha256": "a22fa2a9a39a0a3464d353c381541f21a475229cc414a87997d795ef91615ab6"
+      },
+      {
+        "path": "build/matrix-byte72-ui-handoff-supplement-actual-20261018-1/validation.json",
+        "bytes": 33141,
+        "sha256": "3041feb5a90f2812307e08b0911fa37474b6a4bd4c5e77d052e2e39358bcb3a4"
+      }
+    ],
+    "backend_api_prefix": {
+      "path": "build/matrix-byte72-api-actual-20261018-1/validation.json",
+      "bytes": 1326598,
+      "sha256": "a22fa2a9a39a0a3464d353c381541f21a475229cc414a87997d795ef91615ab6"
+    },
+    "ui_builder_handoff_supplement": {
+      "path": "build/matrix-byte72-ui-handoff-supplement-actual-20261018-1/validation.json",
+      "bytes": 33141,
+      "sha256": "3041feb5a90f2812307e08b0911fa37474b6a4bd4c5e77d052e2e39358bcb3a4"
+    },
+    "historical_api_collector_faults": [],
+    "historical_passing_strict": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\matrix-byte72-staged-types-1-6fcc587f09d545de8b9f4011799f689f\\validation.json",
+      "bytes": 72696,
+      "sha256": "40c1c59abdb68f84c3a992894224a71064b142474c02386aa01113d8f5fe65ba"
+    },
+    "historical_focused_failure": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\matrix-byte72-staged-focused-2-84e182a2a3aa4637a58c98735433c5ab\\validation.json",
+      "bytes": 49075,
+      "sha256": "34d850d88480d9f21aa2b8281a03aae375200c3da90473b3315983c988a8041c"
+    },
+    "scope_amendment": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\matrix-byte-feature72-frontend-scope-amendment.json",
+      "bytes": 900,
+      "sha256": "1cd2a8bc7da3579d6d8032f85093073ce8af040231a28b5b86a35a035ec0ea76"
+    },
+    "holder_correction": {
+      "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\matrix-byte72-frontend-holder-correction-20261018\\holder-correction.json",
+      "bytes": 1691,
+      "sha256": "562e221e7071ed64bc2a7bd771035a147eda01c2cd9fb3007ddebe9d63f0d0d1"
+    }
+  },
+  "historical_native_attempts": [
+    {
+      "manifest": {
+        "path": "build/matrix-byte72-02aa506d555945179e5c96db4de1edc1/build-manifest.json",
+        "bytes": 311042,
+        "sha256": "7d913480432b5aa1df2916cc205d41f34731169fc55e55b52f6704b0e0ce956e"
+      },
+      "outcome": "Configure0; one core source and server compiled/linked successfully; matrix-driver compile failed MSVC C3850 inside assert raw-string fixture. No CTest was executed. Entire namespace retained immutable."
+    }
+  ],
+  "historical_native_preflight_failure": {
+    "path": "build/matrix-byte-feature72-build-preflight-1.json",
+    "bytes": 850,
+    "sha256": "aea347050a661d2ac775af7b5f19217288eef85dded68f2dfc7e7e07a8739dc0"
+  },
+  "historical_native_test_correction": {
+    "path": "build/matrix-byte72-native-test-correction-20261018/staging-manifest.json",
+    "bytes": 2329,
+    "sha256": "526b4ee35f843f145b37bcbef83f00da8805b8ec0a0506acc66323d7b1381964"
+  },
+  "superseded_native_evidence_retained": true,
+  "native_accounting": "58 current targets = 56 unaffected retained + 2 affected (matrix and relinked discovery) against updated library, across four current contributing invocations. Prior superseded memberships and the actual MSVC C3850 test-driver compile failure remain explicit historical evidence; no single fresh full suite is claimed.",
+  "pending_delivery_proofs": {},
+  "required_before_publication": [],
+  "next_bounded_feature": {
+    "contract": {
+      "path": "build/post72-feature-availability-audit-20261018/confirmed-petri-analysis-input-contract.json",
+      "bytes": 10740,
+      "sha256": "412ab9e21fabcd3c8a58af1c2ba2167e98d070b12e8322d2feddbab583bc8e63"
+    },
+    "scope": "One independent original Petri-analysis workbench covering all six public petri_analysis.hpp functions, all 20 option members across three structs, both soundness variants, complete results and direct trace-word input. Preserve existing cached analysis workflows and CLI paths.",
+    "implementation_authorized_by_this_scaffold": false,
+    "preserved_existing_surface": "Existing five-family analysis UI remains available."
+  },
+  "completed_utc": "2026-10-18T20:09:57.010462+00:00",
+  "parent_head": "d5fea1ee1ac8b9bcca5acfcb77fa9909aae07045",
+  "ui_step_commit_note": "The containing UI commit identity is verified externally after creation to avoid a self-reference.",
+  "delivered": [
+    "The existing independent supplied-matrix converter accepts every NativeString activity label, preserving raw bytes, embedded NUL, invalid UTF-8 and the distinction between six-byte adjacent WTF8 surrogates and a four-byte Unicode scalar. Scalar inputs and prior lossless output bytes remain compatible; exact byte tags are used when scalar JSON cannot round-trip native bytes.",
+    "All ordered activities/input_map/output_map storage, exact full-size_t indexes, original/before/after ownership and native normalized copies remain separate. The same single native convert operation and variant controls remain authoritative; no extra native algorithm or cached model is introduced.",
+    "The compatibility rich getter net remains available for its lossless domain. Complete nine-field literal Petri storage is the canonical fallback, including all nine transition members, inactive source/sink storage, arbitrary signed arc magnitudes, duplicate endpoints, optional names and sparse/root/detached discovery markings. Signed WorkflowMarkings remain exact.",
+    "Seven authoritative byte artifacts expose source matrix, normalized matrix, result, PNML, legacy JSON, literal net constructor and signed markings. The original five scalar artifact constants and old offline envelopes remain readable. Optional exporter bytes remain downloadable even when non-UTF8 or XML-invalid; unavailable display text is not relabelled as an exporter exception.",
+    "The discovery-to-converter handoff now supplies the actual complete byte-label matrix without coercion. Exact source/normalized downloads can be reuploaded; complete tables, CSV, selected records, reports, original input/control bytes and result artifacts retain numeric holders and byte metadata. Cancellation/replacement guards protect publication of stale requests.",
+    "The existing converter and discovery handoff accept every canonical NativeString matrix label. The UI inspects compatible rich nets or complete literal nets, retains exact numeric holders and offers all seven authoritative byte artifacts independently of the historical five scalar export fields. Native/API/portable/full frontend/build/live checks passed. Browser rendering and the named remaining transport/model-host/strict gates stay open."
+  ],
+  "delivery_proofs": {
+    "native_build": {
+      "path": "build/matrix-byte72r-8e439115b483498c/build-manifest.json",
+      "bytes": 353436,
+      "sha256": "a831468df1479e716e2c603206440643fd464a87facae5870840231fa70f5600"
+    },
+    "api_capture": {
+      "path": "build/matrix-byte72-api-ui-handoff-composite-20261018-1/validation.json",
+      "bytes": 1346638,
+      "sha256": "a06c5c9c5fe369ef78d8c1776217ca7945e4f66f5bb0d8c176b7d6947c36bfcb"
+    },
+    "frontend_integration": {
+      "path": "build/matrix-byte-feature72-frontend-integration-9fe85d8724154dd7a241593b2dbd6cc4/validation.json",
+      "bytes": 43876,
+      "sha256": "3a85129e7074aa731464c2158ba01a51841bf42b47ffd3fb1f3d766e2667c9e9"
+    },
+    "frontend_candidate": {
+      "path": "build/matrix-byte72-frontend-holder-correction-20261018/staging-manifest.json",
+      "bytes": 48781,
+      "sha256": "a52420436bb67530b9755ac8fabec3d5398396cbcf07a409dc55b21c7eb6ee22"
+    },
+    "frontend_strict_staging": {
+      "path": "build/matrix-byte72-staged-types-1-fe5604a5752d42b4844a1db5f1c1334a/validation.json",
+      "bytes": 72713,
+      "sha256": "500d7f622d4b21b2abc423eee71ea2b3f76609dedabd4a5e427141d8580bfcdd"
+    },
+    "frontend_focused_staging": {
+      "path": "build/matrix-byte72-staged-focused-2-0501841da4d84898a12ecf46e0d77781/validation.json",
+      "bytes": 49090,
+      "sha256": "f907df7e431db3737dbb17f24409db79d2c5d03bf9f02a81a62ee200e324df95"
+    },
+    "portable_fixture_publication": {
+      "path": "build/matrix-byte72-compact-fixture-publication-46d1350c562d4140a708ae7539c298f7/validation.json",
+      "bytes": 104449,
+      "sha256": "00b252d66730a084b185e8683a5350ccc8ccbe3e2133257800c79f3f3277c922"
+    },
+    "portable_fixture_validation": {
+      "path": "build/matrix-byte72-compact-fixture-validation-503a8d6102c44d85a46729ae95ea2f71/validation.json",
+      "bytes": 42310,
+      "sha256": "6d52f7ce0e8c57556f342dc4bd7bb115c574a2c4de68461ac02c8589f26122ac"
+    },
+    "portable_fixture_strict_staging": {
+      "path": "build/matrix-byte72-compact-fixture-types-82684398291d4ca185b841c2a8877fa1/validation.json",
+      "bytes": 68226,
+      "sha256": "6455c7e75a9c8f8bf8b90617015b0a42202a064d553eb47068b28ada0ad20fde"
+    },
+    "full_frontend_validation": {
+      "path": "build/matrix-byte-feature-frontend-final-a2175a72fccf4e6bba044e78fa7210b8/validation.json",
+      "bytes": 2766708,
+      "sha256": "2e70d375627ac483bb9c34554abf471d1b7db1f7cbc489ac390d6be1b096e754"
+    },
+    "live_activation_validation": {
+      "path": "build/matrix-byte-feature72-live-runtime.json",
+      "bytes": 16295,
+      "sha256": "5878ec394e595fe6a7a0ec41925691cd0a757792922b9344d0ecbc0c195dc433"
+    },
+    "test_service_cleanup_validation": {
+      "path": "build/matrix-byte-feature72-test-cleanup.json",
+      "bytes": 4418,
+      "sha256": "eb46becb0842cdd5f4d1aa99c43b6262c2dc77065edd0b4b4b41e4efc03eedbf"
+    },
+    "backend_commit": {
+      "path": "build/matrix-byte-feature72-backend-postcommit.json",
+      "bytes": 3641,
+      "sha256": "db4c3bedb842729c61e49bfe137f8db7fa88e669da9cf99d1f41292ca753a79e"
+    }
+  },
+  "test_accounting": {
+    "parent_validation": {
+      "path": "build/discovery-feature-frontend-final-cf56835d8b5545f39aecab187d57ee11/validation.json",
+      "bytes": 2763417,
+      "sha256": "cdf49887caa3fd54b1cb5b883f863c7bfbf6b9b6dcbb261d3c7046255dcb8741"
+    },
+    "parent_results": {
+      "path": "build/discovery-feature-frontend-final-cf56835d8b5545f39aecab187d57ee11/vitest-results.json",
+      "bytes": 2433224,
+      "sha256": "90faa01c4c5b9c6cfd7a3205c87098f2c01e8a4689a13e2271de6845e624ddfe"
+    },
+    "focused_validation": {
+      "path": "build/matrix-byte72-staged-focused-2-0501841da4d84898a12ecf46e0d77781/validation.json",
+      "bytes": 49090,
+      "sha256": "f907df7e431db3737dbb17f24409db79d2c5d03bf9f02a81a62ee200e324df95"
+    },
+    "focused_results": {
+      "path": "build/matrix-byte72-staged-focused-2-0501841da4d84898a12ecf46e0d77781/vitest-results.json",
+      "bytes": 81806,
+      "sha256": "2750841bad6f5c2443f6d4a98915c69dc744ac94d77735b4582a5161cf5e4e2d"
+    },
+    "fixture_validation": {
+      "path": "build/matrix-byte72-compact-fixture-validation-503a8d6102c44d85a46729ae95ea2f71/validation.json",
+      "bytes": 42310,
+      "sha256": "6d52f7ce0e8c57556f342dc4bd7bb115c574a2c4de68461ac02c8589f26122ac"
+    },
+    "replaced_files": [
+      {
+        "path": "src/frontend/tests/original-discovery-workbench-fixtures.test.ts",
+        "parent_tests": 96,
+        "current_tests": 96,
+        "parent_test_names_sha256": "17a17600a8941c9976dae09dba6014c354b18e7e3fa9d594ff8aad2fcc5a02d2",
+        "current_test_names_sha256": "17a17600a8941c9976dae09dba6014c354b18e7e3fa9d594ff8aad2fcc5a02d2"
+      },
+      {
+        "path": "src/frontend/tests/original-discovery-workbench.test.ts",
+        "parent_tests": 40,
+        "current_tests": 48,
+        "parent_test_names_sha256": "c73c70897dcf12f1e89784101410eb3d68c2889b96f563d6d8f66be8462c3b09",
+        "current_test_names_sha256": "da79089c0e8c58bbd0057cb3fc2818bfa086ffa7693ad4f83e303d4f7f0f9a5f"
+      },
+      {
+        "path": "src/frontend/tests/original-genetic-matrix-workbench.test.ts",
+        "parent_tests": 18,
+        "current_tests": 64,
+        "parent_test_names_sha256": "839cac1ef56df38be210106e866ca21f298c49e7e93c97ab4588099c3fb1a404",
+        "current_test_names_sha256": "4583ac5fb018da16f1928050ac730f96e7cd4c85b7ddd2d23ea4caf4899a5b77"
+      }
+    ],
+    "parent_tests": 5706,
+    "parent_files": 128,
+    "replaced_parent_tests": 154,
+    "replacement_current_tests": 208,
+    "new_portable_tests": 81,
+    "expected_current_tests": 5841,
+    "expected_current_files": 129,
+    "calculation": "parent minus three replaced file counts plus current replacements plus new portable file",
+    "single_current_full_invocation_required": true
+  },
+  "native_test_lineage": {
+    "native_manifest": {
+      "path": "build/matrix-byte72r-8e439115b483498c/build-manifest.json",
+      "bytes": 353436,
+      "sha256": "a831468df1479e716e2c603206440643fd464a87facae5870840231fa70f5600"
+    },
+    "current_passing_targets": 58,
+    "retained_unaffected_targets": 56,
+    "affected_targets_run": 2,
+    "current_contributing_invocations": 4,
+    "single_combined_run_claimed": false,
+    "superseded_historical_invocations_preserved": true,
+    "current_invocation_evidence": [
+      {
+        "kind": "retained_original_parent_passes",
+        "historical_total": 56,
+        "retained_passing_count": 55,
+        "excluded_failed_target": "minera_edit_distance_workbench_json_tests",
+        "passing_targets": [
+          "minera_core_tests",
+          "minera_request_params_tests",
+          "minera_powl_tests",
+          "minera_powl_conversion_tests",
+          "minera_petri_net_reduction_tests",
+          "minera_model_conversion_workbench_json_tests",
+          "minera_petri_anti_multi_workbench_json_tests",
+          "minera_process_tree_alignment_workbench_json_tests",
+          "minera_workflow_input_result_json_tests",
+          "minera_inductive_input_json_tests",
+          "minera_graph_alignment_workbench_json_tests",
+          "minera_log_conversion_tests",
+          "minera_active_event_source_tests",
+          "minera_event_data_tests",
+          "minera_alpha_event_data_tests",
+          "minera_token_replay_event_data_tests",
+          "minera_log_query_tests",
+          "minera_monte_carlo_tests",
+          "minera_monte_carlo_workbench_json_tests",
+          "minera_playout_tests",
+          "minera_dfg_playout_tests",
+          "minera_process_tree_playout_tests",
+          "minera_playout_workbench_json_tests",
+          "minera_dfg_playout_input_json_tests",
+          "minera_decision_table_tests",
+          "minera_data_petri_net_tests",
+          "minera_decision_workbench_json_tests",
+          "minera_declare_tests",
+          "minera_declare_variants_tests",
+          "minera_declare_streaming_io_tests",
+          "minera_declare_workbench_json_tests",
+          "minera_log_skeleton_tests",
+          "minera_log_skeleton_workbench_json_tests",
+          "minera_footprints_tests",
+          "minera_footprints_models_tests",
+          "minera_footprints_discovery_parity_contracts_tests",
+          "minera_footprints_conformance_parity_contracts_tests",
+          "minera_footprints_workbench_json_tests",
+          "minera_genetic_matrix_conversion_tests",
+          "minera_genetic_matrix_workbench_json_tests",
+          "minera_embeddings_tests",
+          "minera_embedding_runtime_tests",
+          "minera_embedding_workbench_json_tests",
+          "minera_evaluation_tests",
+          "minera_evaluation_parity_contracts_tests",
+          "minera_emd_workbench_json_tests",
+          "minera_ocel_playout_tests",
+          "minera_oc_causal_net_tests",
+          "minera_object_centric_playout_workbench_json_tests",
+          "minera_petri_extended_arcs_tests",
+          "minera_petri_net_conversion_tests",
+          "minera_petri_analysis_tests",
+          "minera_petri_usage_comparison_tests",
+          "minera_stochastic_petri_tests",
+          "minera_literal_controls_json_tests"
+        ],
+        "stdout": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\ed69-e84f3cf755364f208b5a8ce9ab721d69\\command-2.stdout.txt",
+          "sha256": "fc49b539b8814167c1b5a358afab81c6b984b68b6508260bf2cc118c99685ed7",
+          "bytes": 32432
+        },
+        "run_log": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\ed69-e84f3cf755364f208b5a8ce9ab721d69\\unified-ctest\\Testing\\Temporary\\LastTest.log",
+          "sha256": "abebe7f01290fee42b6c0c6a3ad6ec22f896eef243aa0955caaecf18d64f171a",
+          "bytes": 72246
+        },
+        "registration": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\ed69-e84f3cf755364f208b5a8ce9ab721d69\\unified-ctest\\CTestTestfile.cmake",
+          "sha256": "d9b860606d10ee8f634c85acfe3bc22681fd25d2ec5264452dc4efc00ee6fc75",
+          "bytes": 21291
+        },
+        "retained_current_targets": [
+          "minera_core_tests",
+          "minera_request_params_tests",
+          "minera_powl_tests",
+          "minera_powl_conversion_tests",
+          "minera_petri_net_reduction_tests",
+          "minera_model_conversion_workbench_json_tests",
+          "minera_petri_anti_multi_workbench_json_tests",
+          "minera_process_tree_alignment_workbench_json_tests",
+          "minera_workflow_input_result_json_tests",
+          "minera_inductive_input_json_tests",
+          "minera_graph_alignment_workbench_json_tests",
+          "minera_log_conversion_tests",
+          "minera_active_event_source_tests",
+          "minera_event_data_tests",
+          "minera_alpha_event_data_tests",
+          "minera_token_replay_event_data_tests",
+          "minera_log_query_tests",
+          "minera_monte_carlo_tests",
+          "minera_monte_carlo_workbench_json_tests",
+          "minera_playout_tests",
+          "minera_dfg_playout_tests",
+          "minera_process_tree_playout_tests",
+          "minera_playout_workbench_json_tests",
+          "minera_dfg_playout_input_json_tests",
+          "minera_decision_table_tests",
+          "minera_data_petri_net_tests",
+          "minera_decision_workbench_json_tests",
+          "minera_declare_tests",
+          "minera_declare_variants_tests",
+          "minera_declare_streaming_io_tests",
+          "minera_declare_workbench_json_tests",
+          "minera_log_skeleton_tests",
+          "minera_log_skeleton_workbench_json_tests",
+          "minera_footprints_tests",
+          "minera_footprints_models_tests",
+          "minera_footprints_discovery_parity_contracts_tests",
+          "minera_footprints_conformance_parity_contracts_tests",
+          "minera_footprints_workbench_json_tests",
+          "minera_genetic_matrix_conversion_tests",
+          "minera_embeddings_tests",
+          "minera_embedding_runtime_tests",
+          "minera_embedding_workbench_json_tests",
+          "minera_evaluation_tests",
+          "minera_evaluation_parity_contracts_tests",
+          "minera_emd_workbench_json_tests",
+          "minera_ocel_playout_tests",
+          "minera_oc_causal_net_tests",
+          "minera_object_centric_playout_workbench_json_tests",
+          "minera_petri_extended_arcs_tests",
+          "minera_petri_net_conversion_tests",
+          "minera_petri_analysis_tests",
+          "minera_petri_usage_comparison_tests",
+          "minera_stochastic_petri_tests",
+          "minera_literal_controls_json_tests"
+        ],
+        "superseded_current_targets": [
+          "minera_genetic_matrix_workbench_json_tests"
+        ]
+      },
+      {
+        "kind": "corrected_suite_only",
+        "summary": "100% tests passed, 0 tests failed out of 1",
+        "passing_targets": [
+          "minera_edit_distance_workbench_json_tests"
+        ],
+        "stdout": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\ed69r-2cf723069e72\\command-2.stdout.txt",
+          "sha256": "18f7392578b89156a7de67eb0ac19affd61343fd8bb814bfe6e6b56cecb4f87d",
+          "bytes": 301
+        },
+        "run_log": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\ed69r-2cf723069e72\\targeted-ctest\\Testing\\Temporary\\LastTest.log",
+          "sha256": "7a2effbc9415c10d6aaea46596ed21ef82ccfbd9230904fd227d8e9cde1bfca6",
+          "bytes": 981
+        },
+        "registration": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\ed69r-2cf723069e72\\targeted-ctest\\CTestTestfile.cmake",
+          "sha256": "43d4688cb3a0b0777b2a91aff2f7bf682710c84f1dad0c2d342f3b600bae85eb",
+          "bytes": 370
+        },
+        "retained_current_targets": [
+          "minera_edit_distance_workbench_json_tests"
+        ],
+        "superseded_current_targets": []
+      },
+      {
+        "kind": "corrected_bose_suite_only",
+        "summary": "100% tests passed, 0 tests failed out of 1",
+        "passing_targets": [
+          "minera_bose_workbench_json_tests"
+        ],
+        "stdout": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70r-53a6749ffba3\\command-2.stdout.txt",
+          "sha256": "825b0196b5d21ed92a959d35886710365a7ab2f4770b5d0d4d1cc0e8843973bb",
+          "bytes": 285
+        },
+        "run_log": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70r-53a6749ffba3\\targeted-ctest\\Testing\\Temporary\\LastTest.log",
+          "sha256": "39da84f596635707eacb61521b36711854f59768665967c1ff933035c28fee3e",
+          "bytes": 983
+        },
+        "registration": {
+          "path": "C:\\Users\\pmoch\\Documents\\Minera\\build\\bose70r-53a6749ffba3\\targeted-ctest\\CTestTestfile.cmake",
+          "sha256": "7f8976bd359a6614a93bc627939b2baef37df7bb5884008121b5a8bba15c204d",
+          "bytes": 347
+        },
+        "retained_current_targets": [
+          "minera_bose_workbench_json_tests"
+        ],
+        "superseded_current_targets": []
+      },
+      {
+        "kind": "corrected_matrix_and_relinked_discovery_only",
+        "summary": "100% tests passed, 0 tests failed out of 2",
+        "passing_targets": [
+          "minera_genetic_matrix_workbench_json_tests",
+          "minera_discovery_workbench_json_tests"
+        ],
+        "retained_current_targets": [
+          "minera_genetic_matrix_workbench_json_tests",
+          "minera_discovery_workbench_json_tests"
+        ],
+        "stdout": {
+          "path": "build/matrix-byte72r-8e439115b483498c/command-2.stdout.txt",
+          "bytes": 448,
+          "sha256": "3b9249a834b5b53f8c2a703b0168b7660646fe32023501261c20d21a10babf07"
+        },
+        "run_log": {
+          "path": "build/matrix-byte72r-8e439115b483498c/targeted-ctest/Testing/Temporary/LastTest.log",
+          "bytes": 2548,
+          "sha256": "b34ed071a2e5d3c6afa5f8cea90234156fbb38560c78a0e0e855db8be79d1543"
+        },
+        "registration": {
+          "path": "build/matrix-byte72r-8e439115b483498c/targeted-ctest/CTestTestfile.cmake",
+          "bytes": 779,
+          "sha256": "f02b766ff1e906cb94df9c1c50e20265da56eb6acbb5ab40dc3e76230e8677bf"
+        }
+      }
+    ]
+  },
+  "api_attempt_lineage": {
+    "actual_capture_validations": [
+      {
+        "path": "build/matrix-byte72-api-actual-20261018-1/validation.json",
+        "bytes": 1326598,
+        "sha256": "a22fa2a9a39a0a3464d353c381541f21a475229cc414a87997d795ef91615ab6"
+      },
+      {
+        "path": "build/matrix-byte72-ui-handoff-supplement-actual-20261018-1/validation.json",
+        "bytes": 33141,
+        "sha256": "3041feb5a90f2812307e08b0911fa37474b6a4bd4c5e77d052e2e39358bcb3a4"
+      }
+    ],
+    "historical_collector_faults": [],
+    "prefix_api_proof": {
+      "path": "build/matrix-byte72-api-actual-20261018-1/validation.json",
+      "bytes": 1326598,
+      "sha256": "a22fa2a9a39a0a3464d353c381541f21a475229cc414a87997d795ef91615ab6"
+    },
+    "supplement_validation": {
+      "path": "build/matrix-byte72-ui-handoff-supplement-actual-20261018-1/validation.json",
+      "bytes": 33141,
+      "sha256": "3041feb5a90f2812307e08b0911fa37474b6a4bd4c5e77d052e2e39358bcb3a4"
+    },
+    "prefix_physical_records_preserved_exactly": true,
+    "sole_extension_case_id": "actual71-ui-handoff-explicit-options",
+    "post_independence_feature_indices": [
+      82
+    ],
+    "all_selected_before_seed": false,
+    "corrected_expectations": [],
+    "physical_calls_counted_once": 82,
+    "selected_feature_count": 80,
+    "historical_false_checks_retained": 0,
+    "cached_seed_physical_indices": [
+      80
+    ],
+    "successful_cached_seed_physical_indices": [
+      80
+    ],
+    "independence_repeat_physical_indices": [
+      81
+    ],
+    "adaptive_carrier_reuploads": [
+      {
+        "kind": "actual_artifact_download_reupload",
+        "source_case": "actual71-discovery-byte-matrix-handoff",
+        "source_response_sha256": "af32d13047439c9a600abded96b2df06beee8529deaea13eced4f87fe04ee7e3",
+        "artifact_key": "source_matrix_json",
+        "artifact_bytes": 97,
+        "artifact_sha256": "adcc9703a41e0ae7d3061d306b8e2272428b5fca7dd7f6bf7f5cfd2710e247be",
+        "request_model_sha256": "adcc9703a41e0ae7d3061d306b8e2272428b5fca7dd7f6bf7f5cfd2710e247be"
+      },
+      {
+        "kind": "actual_artifact_download_reupload",
+        "source_case": "actual71-discovery-byte-matrix-handoff",
+        "source_response_sha256": "af32d13047439c9a600abded96b2df06beee8529deaea13eced4f87fe04ee7e3",
+        "artifact_key": "normalized_matrix_json",
+        "artifact_bytes": 97,
+        "artifact_sha256": "adcc9703a41e0ae7d3061d306b8e2272428b5fca7dd7f6bf7f5cfd2710e247be",
+        "request_model_sha256": "adcc9703a41e0ae7d3061d306b8e2272428b5fca7dd7f6bf7f5cfd2710e247be"
+      },
+      {
+        "kind": "actual_artifact_download_reupload",
+        "source_case": "native-normalization-separate-owner",
+        "source_response_sha256": "7cf7154e5a4b3179e1f93b555f06035370f71834d3e17d58e773da25e23319e7",
+        "artifact_key": "normalized_matrix_json",
+        "artifact_bytes": 92,
+        "artifact_sha256": "57528a5759d2bdfc1fd1f3d8e3b72030dc96f49920fc0e333bae9ae67dcd4b81",
+        "request_model_sha256": "57528a5759d2bdfc1fd1f3d8e3b72030dc96f49920fc0e333bae9ae67dcd4b81"
+      }
+    ]
+  },
+  "historical_additional_attempts": [
+    {
+      "path": "build/matrix-byte-feature72-build-preflight-1.json",
+      "bytes": 850,
+      "sha256": "aea347050a661d2ac775af7b5f19217288eef85dded68f2dfc7e7e07a8739dc0"
+    }
+  ],
+  "byte_interoperability_gap_closed": true,
+  "next_feature_contract": {
+    "path": "build/post72-feature-availability-audit-20261018/confirmed-petri-analysis-input-contract.json",
+    "bytes": 10740,
+    "sha256": "412ab9e21fabcd3c8a58af1c2ba2167e98d070b12e8322d2feddbab583bc8e63"
+  }
+}

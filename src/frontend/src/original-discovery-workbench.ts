@@ -6,6 +6,7 @@ import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString, isOriginalEmbeddingFilterRawLog, originalEmbeddingFilterStringBytes, originalEmbeddingFilterStringText, type OriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
 import {ORIGINAL_EDIT_DISTANCE_FORMATS, ORIGINAL_EDIT_DISTANCE_SHAPES, ORIGINAL_EDIT_DISTANCE_SOURCE_CONTROLS, defaultOriginalEditDistanceControl, isOriginalEditDistanceBytes, originalEditDistanceDefaultText, originalEditDistanceFileName, originalEditDistanceOriginalBytes, originalEditDistanceWireFilename, type OriginalEditDistanceBytes, type OriginalEditDistanceCall, type OriginalEditDistanceControl, type OriginalEditDistanceError, type OriginalEditDistanceRequestOriginal, type OriginalEditDistanceSource, type OriginalEditDistanceSourceContext} from "./original-edit-distance-workbench";
 import {isOriginalOcPlayoutNativeType} from "./original-object-centric-playout-workbench";
+import {isOriginalGeneticMatrix} from "./original-genetic-matrix-workbench";
 
 export {OriginalEditDistanceRequestGate as OriginalDiscoveryRequestGate} from "./original-edit-distance-workbench";
 export type OriginalDiscoveryControl = OriginalEditDistanceControl;
@@ -106,8 +107,8 @@ export function originalDiscoveryRequestFile(run: OriginalDiscoveryRun, index: n
 export const originalDiscoveryReport = (run: OriginalDiscoveryRun): string => nativeJson({family: "ORIGINAL_DISCOVERY_WORKBENCH_REPORT", http_status: run.http_status, request: run.request, native_response: run.value}, 2);
 export type OriginalDiscoveryModelPart = "matrix" | "net" | "markings";
 export function originalDiscoveryModelFile(run: OriginalDiscoveryRun, part: OriginalDiscoveryModelPart): File {if (!run.value.returned || !object(run.value.native_result) || !Object.hasOwn(run.value.native_result, part)) throw new Error(`No actual ${part} was returned.`); return new File([nativeStringBytes(nativeJson(run.value.native_result[part]))], `minera-discovery-${run.request.operation}-${part}.json`, {type: "application/json"});}
-/** The older converter accepts scalar JSON strings, not arbitrary native byte tags. */
-export function originalDiscoveryMatrixHandoff(run: OriginalDiscoveryRun): File {const matrix = object(run.value.native_result) && run.value.native_result.matrix; if (!run.value.returned || !isOriginalDiscoveryMatrix(matrix)) throw new Error("No actual genetic matrix was returned."); if (!(matrix.activities as unknown[]).every(activity => typeof activity === "string")) throw new Error("The supplied-matrix converter cannot accept native byte-tag labels. Download the complete matrix constructor; no labels were coerced or dropped."); return originalDiscoveryModelFile(run, "matrix");}
+/** The supplied-matrix destination accepts the same complete NativeString/vector constructor domain. */
+export function originalDiscoveryMatrixHandoff(run: OriginalDiscoveryRun): File {const matrix = object(run.value.native_result) && run.value.native_result.matrix; if (!run.value.returned || !isOriginalDiscoveryMatrix(matrix) || !isOriginalGeneticMatrix(matrix)) throw new Error("No complete actual genetic matrix was returned."); return originalDiscoveryModelFile(run, "matrix");}
 export interface OriginalDiscoveryReusable {label: string; operation: OriginalDiscoveryOperation; format: "raw_log"; file: File;}
 export function originalDiscoveryReusableResults(run: OriginalDiscoveryRun): OriginalDiscoveryReusable[] {
  const entries: OriginalDiscoveryReusable[] = [], seen = new Set<string>();
