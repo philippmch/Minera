@@ -2774,3 +2774,9 @@ Browser rendering and strict reference parity remain pending. Feature76 retains 
 Upload a complete EventLog for hierarchical or profile clustering, compute exact trace groups, or supply a complete stored result to either native serializer. All 22 native options are editable. Inspect complete results, download exact canonical artifacts, and export selected traces with full metadata and source-position provenance. The existing cached clustering tools remain available.
 
 See [validation and boundaries](docs/feature-first-original-clustering-workbench-validation.json).
+
+### Explore organizational analysis with independent inputs
+
+Upload a complete EventLog for social networks, roles, resource profiles, network analysis or local diagnostics. All 49 native options are editable. You can also supply full stored results to the native serializers or use the metric-name helpers. Inspect complete results and download exact source, options, groups and result artifacts. A separate roles-to-local-diagnostics action produces editable groups, source and options Files bound to the actual role response and selectors. Existing cached organizational tools remain available.
+
+See [validation and boundaries](docs/feature-first-original-organizational-workbench-validation.json).
