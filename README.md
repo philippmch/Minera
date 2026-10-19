@@ -1,5 +1,7 @@
 # Minera
 
+Current functionality: Feature84 adds native EventTable JSON to Related logs. Supply base, incoming and relation tables without a cached log. Typed keys, duplicate relations, native indices, categories and complete metadata remain available; literal selectors preserve their bytes. Canonical results stay separate from fallible log and export projections. Validation passed 16 selected/18 dedicated physical requests, 4 actual File handoffs and 9150 frontend tests in 150 files. 23 total POSTs include File followups and live smokes. 6 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified. See [validation](docs/feature-first-typed-relations-validation.json).
+
 Minera is an early C++ process mining core built to explore process-mining
 workflows with native performance.
 

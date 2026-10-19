@@ -3899,6 +3899,21 @@
       "validation": "docs/feature-first-saved-structures-validation.json",
       "browser_validation_complete": false,
       "added": "2026-10-19"
+    },
+    {
+      "id": "typed_three_table_case_relations",
+      "state": "native_typed_three_table_merge_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [
+        "algo.merging.case_relations"
+      ],
+      "operations": [
+        "merge_case_relations"
+      ],
+      "validation": "docs/feature-first-typed-relations-validation.json",
+      "browser_validation_complete": false,
+      "added": "2026-10-19"
     }
   ],
   "execution_priority": [
@@ -3916,7 +3931,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Current source audit as of a18be59ffbf4e8c6d1f8418da642b0fc09950e7a traces principal workflows for all 86 families; this does not prove full feature or strict parity. Nine concrete audited extension groups: analysis-G1: Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics. [open_source_proven_extension]; analysis-G2: Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult. [open_source_proven_extension]; analysis-G3: Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs. [open_source_proven_extension]; discovery-G1: Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata. [open_source_proven_extension]; discovery-G2: Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names. [open_source_proven_extension]; discovery-G3: Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected. [open_source_proven_extension]; transformations-G1: Convert a saved or edited TrieModel without rediscovery. [delivered_feature83]; transformations-G2: Query saved intervals while preserving caller order and match indices. [delivered_feature83]; transformations-G3: Build native bounded prompts from separately supplied assumptions/context. [open_source_proven_extension]. Choose the next open source-proven input/control/result extension. Preserve all remaining browser, exact-default/type/error/order/Unicode/marking/solver/concurrency/performance gates and strict 46/86 packages,199/387 modules,228 incomplete units. Historical delivery chronology and prior reports remain evidence; earlier next-feature statements are not the current plan."
+      "next_action": "Current source audit as of a18be59ffbf4e8c6d1f8418da642b0fc09950e7a traces principal workflows for all 86 families; this does not prove full feature or strict parity. Nine concrete audited extension groups: analysis-G1: Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics. [open_source_proven_extension]; analysis-G2: Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult. [open_source_proven_extension]; analysis-G3: Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs. [open_source_proven_extension]; discovery-G1: Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata. [delivered_feature84]; discovery-G2: Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names. [open_source_proven_extension]; discovery-G3: Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected. [open_source_proven_extension]; transformations-G1: Convert a saved or edited TrieModel without rediscovery. [delivered_feature83]; transformations-G2: Query saved intervals while preserving caller order and match indices. [delivered_feature83]; transformations-G3: Build native bounded prompts from separately supplied assumptions/context. [open_source_proven_extension]. Choose the next open source-proven input/control/result extension. Preserve all remaining browser, exact-default/type/error/order/Unicode/marking/solver/concurrency/performance gates and strict 46/86 packages,199/387 modules,228 incomplete units. Historical delivery chronology and prior reports remain evidence; earlier next-feature statements are not the current plan."
     }
   ],
   "feature_status_meaning": {
