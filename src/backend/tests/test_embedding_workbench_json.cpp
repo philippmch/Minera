@@ -1,5 +1,9 @@
 #undef NDEBUG
 #include "minera/embedding_workbench_json.hpp"
+#include "minera/active_event_source.hpp"
+#include "minera/dataframe_format_json.hpp"
+#include "minera/log_conversion.hpp"
+#include "minera/xes_export.hpp"
 #include "minera/footprints_workbench_json.hpp"
 #include "minera/declare_workbench_json.hpp"
 #include <algorithm>
@@ -123,9 +127,63 @@ void complete_byte_safe_log_result_table_and_reopen(){
  assert(serialize_embedding_workbench_raw_log_json(full_log())==serialize_footprints_workbench_raw_log_json(full_log()));
 }
 
+
+// Feature82: compare full transport state explicitly. Native metadata equality
+// intentionally ignores these synchronization baselines, including when they
+// affect a subsequent native XES export.
+std::string metadata82(const EventDataMetadata& value){EventLog holder;holder.metadata=value;return serialize_embedding_workbench_raw_log_json(holder);}
+void assert_metadata82(const EventDataMetadata& actual,const EventDataMetadata& expected){
+ assert(actual.compatibility_snapshot_valid==expected.compatibility_snapshot_valid);
+ assert(actual.compatibility_globals_snapshot.size()==expected.compatibility_globals_snapshot.size());
+ assert(actual.compatibility_trace_globals_snapshot.size()==expected.compatibility_trace_globals_snapshot.size());
+ assert(actual.compatibility_event_globals_snapshot.size()==expected.compatibility_event_globals_snapshot.size());
+ assert(metadata82(actual)==metadata82(expected));
+}
+EventDataMetadata private_metadata82(int mode){
+ EventDataMetadata m;EventAttribute scalar{"retained","literal"};
+ if(mode==0||mode==4)m.compatibility_snapshot_valid=true;
+ if(mode==1||mode==4)m.compatibility_globals_snapshot={{"baseline",{scalar}}};
+ if(mode==2||mode==4)m.compatibility_trace_globals_snapshot={scalar};
+ if(mode==3||mode==4)m.compatibility_event_globals_snapshot={scalar};
+ if(mode==4){
+  const auto bytes=std::string("byte")+static_cast<char>(0)+static_cast<char>(255);
+  EventAttribute rich{bytes,bytes};EventAttribute integer{"integer","lexical"};integer.typed_value=std::numeric_limits<std::int64_t>::min();EventAttribute wide{"wide","lexical"};wide.typed_value=std::numeric_limits<std::uint64_t>::max();EventAttribute nan{"nan","lexical"};nan.typed_value=std::numeric_limits<double>::quiet_NaN();EventAttribute minuszero{"minuszero","lexical"};minuszero.typed_value=-0.0;rich.children={integer,wide,nan,minuszero};
+  m.extensions={{bytes,bytes,bytes}};m.classifiers={{bytes,{bytes,"",bytes}}};m.trace_globals={rich};m.event_globals={rich};m.properties={rich};m.globals={{bytes,{rich}}};
+  m.compatibility_globals_snapshot={{bytes,{rich}}};m.compatibility_trace_globals_snapshot={rich};m.compatibility_event_globals_snapshot={rich};
+ }
+ return m;
+}
+std::string empty_scanner_error82(const EventDataMetadata& metadata){
+ try{(void)LazyEventTable(std::vector<std::string>{},LazyEventTable::Scanner{},std::vector<EventAttribute>{},metadata,std::nullopt);}catch(const std::invalid_argument& error){return error.what();}
+ assert(false);return {};
+}
+
+void shared_table_private_metadata82(){
+ RegistryScope registry;
+ const auto base=parse_embedding_workbench_table_json(R"({"columns":["case:concept:name","concept:name","time:timestamp"],"rows":[[{"value":"c"},{"value":"A"},{"value":"2024-01-01T00:00:00Z"}]]})");
+ const auto legacy=serialize_event_table_input_json(base);assert(serialize_embedding_workbench_table_json(base)==legacy);assert(legacy.find("native_schema")==std::string::npos);
+ for(int mode=0;mode<5;++mode){
+  auto table=base;table.metadata=private_metadata82(mode);const auto state=serialize_embedding_workbench_table_json(table);contains(state,"\"native_schema\":\"event-table-raw-v1\"");
+  const auto reopened=parse_embedding_workbench_table_json(state);assert_metadata82(reopened.metadata,table.metadata);assert(reopened.columns==table.columns&&reopened.rows.size()==table.rows.size());
+  assert(serialize_embedding_workbench_table_json(reopened)==state);assert(metadata82(table.metadata)==metadata82(reopened.metadata));
+  auto active=ActiveEventSource::from_table(reopened,ActiveSourceFile{"owned.json","table",state},{},EventDataKind::kEventLog);
+  assert_metadata82(active.original_table().metadata,table.metadata);assert_metadata82(active.checked_table().metadata,table.metadata);const auto native_prepared=event_data_to_event_log(EventDataView(active.checked_table()),active.preparation_options());assert_metadata82(active.checked_log().metadata,native_prepared.metadata);
+  EmbeddingOptions options;options.dimensions=8;const auto native=to_embeddings(active.checked_log(),options);const auto direct=to_embeddings(event_data_to_event_log(EventDataView(table)),options);assert(serialize_embedding_workbench_result_json(native)==serialize_embedding_workbench_result_json(direct));
+  assert_metadata82(parse_embedding_workbench_table_json(serialize_embedding_workbench_table_json(active.original_table())).metadata,table.metadata);
+ }
+ // Native equality alone cannot detect the private-state loss.
+ auto only_private=base;only_private.metadata.compatibility_snapshot_valid=true;assert(only_private.metadata==base.metadata);assert(metadata82(only_private.metadata)!=metadata82(base.metadata));
+ // A direct document-order edit is authoritative when the native snapshot is
+ // present. Losing it changes the later actual native XES result.
+ auto synchronized=base;synchronized.metadata.globals={{"trace",{{"key","doc-authoritative"}}}};synchronized.metadata.trace_globals={{"key","projection-edit"}};
+ synchronized.metadata.compatibility_snapshot_valid=true;synchronized.metadata.compatibility_globals_snapshot={{"trace",{{"key","old-baseline"}}}};synchronized.metadata.compatibility_trace_globals_snapshot={{"key","old-baseline"}};
+ EventLog before;before.metadata=synchronized.metadata;const auto expected=serialize_xes(before);assert(expected.find("doc-authoritative")!=std::string::npos&&expected.find("projection-edit")==std::string::npos);
+ EventLog after;after.metadata=parse_embedding_workbench_table_json(serialize_embedding_workbench_table_json(synchronized)).metadata;assert(serialize_xes(after)==expected);
+ auto lost=before;lost.metadata.compatibility_snapshot_valid=false;lost.metadata.compatibility_globals_snapshot.clear();lost.metadata.compatibility_trace_globals_snapshot.clear();lost.metadata.compatibility_event_globals_snapshot.clear();assert(lost.metadata==before.metadata);assert(serialize_xes(lost)!=expected);
+}
 template<class Call>void run(const char* section,Call call){std::cerr<<"[embedding_workbench_json] "<<section<<std::endl;try{call();}catch(const std::exception& error){std::cerr<<section<<": "<<error.what()<<std::endl;throw;}}
 }  // namespace
-int main(){
+int main(){shared_table_private_metadata82();
  run("all8 option defaults storage and transactional presence",all_option_defaults_storage_and_presence);
  run("full arbitrary vectors matches and result IEEE storage",full_results_scores_and_ieee_have_no_presentation_restrictions);
  run("complete FF pairedWTF date metadata table and artifact reopen",complete_byte_safe_log_result_table_and_reopen);

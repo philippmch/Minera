@@ -121,5 +121,58 @@ void multipart_filename_presence_order_and_binary_bytes(){
  rejects([&]{(void)parse_edit_distance_workbench_multipart(type,"--Wrong--\r\n");});rejects([&]{(void)parse_edit_distance_workbench_multipart("multipart/form-data; boundary=a; boundary=b","--a--\r\n");});
 }
 
+// Feature82: compare full transport state explicitly. Native metadata equality
+// intentionally ignores these synchronization baselines, including when they
+// affect a subsequent native XES export.
+std::string metadata82(const EventDataMetadata& value){EventLog holder;holder.metadata=value;return serialize_embedding_workbench_raw_log_json(holder);}
+void assert_metadata82(const EventDataMetadata& actual,const EventDataMetadata& expected){
+ assert(actual.compatibility_snapshot_valid==expected.compatibility_snapshot_valid);
+ assert(actual.compatibility_globals_snapshot.size()==expected.compatibility_globals_snapshot.size());
+ assert(actual.compatibility_trace_globals_snapshot.size()==expected.compatibility_trace_globals_snapshot.size());
+ assert(actual.compatibility_event_globals_snapshot.size()==expected.compatibility_event_globals_snapshot.size());
+ assert(metadata82(actual)==metadata82(expected));
 }
-int main(){multipart_filename_presence_order_and_binary_bytes();option_storage_and_transactionality();full_result_constructor_roundtrips();all_whole_overloads_and_eleven_inline_aliases();all_projection_signatures_and_supplied_results();finite_cache_payload_identity_and_actual_short_circuit();original_typed_nan_copy_identity();independent_mixed_original_shapes_and_lazy_boundaries();independent_importers_prefix_errors_and_original_bytes();ambiguous_unknown_and_ordered_copy_errors();std::cout<<"edit-distance workbench native contract sections passed\n";}
+EventDataMetadata private_metadata82(int mode){
+ EventDataMetadata m;EventAttribute scalar{"retained","literal"};
+ if(mode==0||mode==4)m.compatibility_snapshot_valid=true;
+ if(mode==1||mode==4)m.compatibility_globals_snapshot={{"baseline",{scalar}}};
+ if(mode==2||mode==4)m.compatibility_trace_globals_snapshot={scalar};
+ if(mode==3||mode==4)m.compatibility_event_globals_snapshot={scalar};
+ if(mode==4){
+  const auto bytes=std::string("byte")+static_cast<char>(0)+static_cast<char>(255);
+  EventAttribute rich{bytes,bytes};EventAttribute integer{"integer","lexical"};integer.typed_value=std::numeric_limits<std::int64_t>::min();EventAttribute wide{"wide","lexical"};wide.typed_value=std::numeric_limits<std::uint64_t>::max();EventAttribute nan{"nan","lexical"};nan.typed_value=std::numeric_limits<double>::quiet_NaN();EventAttribute minuszero{"minuszero","lexical"};minuszero.typed_value=-0.0;rich.children={integer,wide,nan,minuszero};
+  m.extensions={{bytes,bytes,bytes}};m.classifiers={{bytes,{bytes,"",bytes}}};m.trace_globals={rich};m.event_globals={rich};m.properties={rich};m.globals={{bytes,{rich}}};
+  m.compatibility_globals_snapshot={{bytes,{rich}}};m.compatibility_trace_globals_snapshot={rich};m.compatibility_event_globals_snapshot={rich};
+ }
+ return m;
+}
+std::string empty_scanner_error82(const EventDataMetadata& metadata){
+ try{(void)LazyEventTable(std::vector<std::string>{},LazyEventTable::Scanner{},std::vector<EventAttribute>{},metadata,std::nullopt);}catch(const std::invalid_argument& error){return error.what();}
+ assert(false);return {};
+}
+
+std::string artifact_text82(std::string_view envelope,std::string_view wanted){
+ const auto values=member(envelope,"artifacts");std::size_t i=1;while(values[i]!=']'){
+  const auto end=end_value(values,i);const auto item=std::string_view(values).substr(i,end-i);
+  if(member(item,"name")==serialize_embedding_workbench_string_json(wanted)){
+   assert(member(item,"encoding")=="\"utf8\"");return parse_embedding_workbench_result_json("{\"embedding_model\":"+member(item,"data")+'}').embedding_model;
+  }
+  i=end;if(values[i]==',')++i;
+ }
+ assert(false);return {};
+}
+
+void shared_table_private_metadata82(){
+ const auto base=event_log_to_table(log());
+ for(int mode=0;mode<5;++mode){
+  auto table=base;table.metadata=private_metadata82(mode);const auto raw_table=serialize_embedding_workbench_table_json(table);auto p=whole("align_typed_view",log(),log());p[1]=field("source_format","raw_table");p[3]=file("source_file",raw_table);
+  auto response=okay(p);for(const auto* key:{"inputs_before_copies","inputs_after_copies","inputs_after_native"})assert_metadata82(parse_embedding_workbench_table_json(member(member(response.json,key),"source")).metadata,table.metadata);
+  assert(artifact_text82(response.json,"inputs_after_native.json")==member(response.json,"inputs_after_native"));assert_metadata82(parse_embedding_workbench_table_json(artifact_text82(response.json,"source_constructor.json")).metadata,table.metadata);
+  p[1]=field("source_format","raw_lazy");p[3]=file("source_file","{\"table\":"+raw_table+",\"valid\":true,\"row_count\":"+std::to_string(table.rows.size())+'}');response=okay(p);assert_metadata82(parse_embedding_workbench_table_json(member(member(member(response.json,"inputs_after_native"),"source"),"table")).metadata,table.metadata);
+  EventTable dormant;dormant.metadata=private_metadata82(mode);p[3]=file("source_file","{\"table\":"+serialize_embedding_workbench_table_json(dormant)+",\"valid\":false,\"row_count\":null}");response=execute_edit_distance_workbench(p);assert(response.status==400&&member(response.json,"executed")=="false");assert(member(member(response.json,"error"),"message")==serialize_embedding_workbench_string_json(empty_scanner_error82(dormant.metadata)));
+ }
+ auto p=whole("align_typed_view",log(),log());p[1]=field("source_format","raw_lazy");p[3]=file("source_file",R"({"table":{"columns":[],"rows":[]},"valid":false,"row_count":null})");const auto invalid=execute_edit_distance_workbench(p);assert(invalid.status==400&&member(invalid.json,"executed")=="true");
+}
+
+}
+int main(){shared_table_private_metadata82();multipart_filename_presence_order_and_binary_bytes();option_storage_and_transactionality();full_result_constructor_roundtrips();all_whole_overloads_and_eleven_inline_aliases();all_projection_signatures_and_supplied_results();finite_cache_payload_identity_and_actual_short_circuit();original_typed_nan_copy_identity();independent_mixed_original_shapes_and_lazy_boundaries();independent_importers_prefix_errors_and_original_bytes();ambiguous_unknown_and_ordered_copy_errors();std::cout<<"edit-distance workbench native contract sections passed\n";}
