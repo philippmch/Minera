@@ -101,6 +101,7 @@
 #include "minera/anonymization_workbench_json.hpp"
 #include "minera/quality_workbench_json.hpp"
 #include "minera/clustering_workbench_json.hpp"
+#include "minera/organizational_workbench_json.hpp"
 #include "minera/genetic_matrix_conversion.hpp"
 #include "../footprints/conformance_log_model.hpp"
 #include "../footprints/conformance_log_extensive.hpp"
@@ -4063,6 +4064,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_anonymization_route.hpp"
 #include "original_quality_route.hpp"
 #include "original_clustering_route.hpp"
+#include "original_organizational_route.hpp"
 #include "original_emd_route.hpp"
 #include "original_object_centric_playout_route.hpp"
 
@@ -10646,6 +10648,8 @@ int main(int argc, char** argv) {
   server.Post("/api/quality-workbench", handle_original_quality_workbench);
   server.Options("/api/clustering-workbench", preflight);
   server.Post("/api/clustering-workbench", handle_original_clustering_workbench);
+  server.Options("/api/organizational-workbench", preflight);
+  server.Post("/api/organizational-workbench", handle_original_organizational_workbench);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);
