@@ -1,4 +1,5 @@
 #include "case_relations_input.hpp"
+#include "case_relations_typed_input.hpp"
 // Local application server: serves the built frontend and mines uploaded
 // CSV event logs with the native core via POST /api/mine.
 
@@ -3285,7 +3286,7 @@ void handle_ocel_conformance(const httplib::Request& request,
   }
 }
 
-// Checks the most recently mined log against a user-supplied model — a PNML
+// Checks the most recently mined log against a user-supplied model â€” a PNML
 // workflow net, a BPMN 2.0 process, or a PTML process tree, told apart by the
 // document's root element (multipart field `model`, or the raw body). The imported net joins
 // the cached session under the id "imported", so POST /api/align?miner=imported
@@ -6975,6 +6976,8 @@ void handle_interval_tree(const httplib::Request& request,
 
 void handle_case_relations(const httplib::Request& request,
                            httplib::Response& response) {
+  const bool typed = request.has_param("merge_input_format") &&
+      request.get_param_value("merge_input_format") == "event_table_json";
   try {
     if (!request.is_multipart_form_data() ||
         !request.has_file("base_log") ||
@@ -6986,11 +6989,39 @@ void handle_case_relations(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "merge_variant", "merge_timestamp_key", "merge_case_id_key",
         "merge_left_suffix", "merge_right_suffix", "merge_left_column",
-        "merge_right_column", "include_open_log", "include_format_table"};
+        "merge_right_column", "include_open_log", "include_format_table",
+        "merge_input_format", "merge_timestamp_key_json", "merge_case_id_key_json",
+        "merge_left_suffix_json", "merge_right_suffix_json",
+        "merge_left_column_json", "merge_right_column_json"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
         throw std::invalid_argument("unknown merge parameter: " + key);
+    }
+    if (request.has_param("merge_input_format") &&
+        request.get_param_value("merge_input_format") != "auto" && !typed)
+      throw std::invalid_argument("merge_input_format: expected auto or event_table_json");
+    if (!typed) for (const auto* name : {"merge_timestamp_key_json", "merge_case_id_key_json",
+        "merge_left_suffix_json", "merge_right_suffix_json", "merge_left_column_json",
+        "merge_right_column_json"})
+      if (request.has_param(name))
+        throw std::invalid_argument("JSON merge selectors require merge_input_format=event_table_json");
+    if (typed) {
+      const auto lookup = [&](std::string_view key) {
+        return request.get_param_value(std::string(key));
+      };
+      const auto present = [&](std::string_view key) {
+        return request.has_param(std::string(key));
+      };
+      const auto options = minera::tools::typed_case_relations_options(lookup, present);
+      const auto payload = minera::tools::execute_typed_case_relations_json(
+          request.get_file_value("base_log").content,
+          request.get_file_value("incoming_log").content,
+          request.get_file_value("case_relations").content, options,
+          ocel_query_bool(request, "include_format_table", false),
+          ocel_query_bool(request, "include_open_log", false));
+      response.set_content(payload, "application/json");
+      return;
     }
     const auto& base_file = request.get_file_value("base_log");
     const auto& incoming_file = request.get_file_value("incoming_log");
@@ -7100,7 +7131,10 @@ void handle_case_relations(const httplib::Request& request,
     }
   } catch (const std::exception& error) {
     response.status = 400;
-    response.set_content(error_json(error.what()), "application/json");
+    response.set_content(typed
+        ? "{\"family\":\"MERGE_CASE_RELATIONS\",\"input_format\":\"event_table_json\",\"error\":" +
+            minera::serialize_embedding_workbench_string_json(error.what()) + '}'
+        : error_json(error.what()), "application/json");
   }
 }
 
@@ -9283,8 +9317,8 @@ void handle_playout(const httplib::Request& request,
                        "application/xml");
 }
 
-// Exports the most recently mined event log — after any server-side filtering
-// applied at mine time — as standard XES.
+// Exports the most recently mined event log â€” after any server-side filtering
+// applied at mine time â€” as standard XES.
 void handle_xes(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
   {
@@ -10735,7 +10769,7 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "minera " << minera::version_major << '.' << minera::version_minor
-            << '.' << minera::version_patch << " — listening on http://localhost:"
+            << '.' << minera::version_patch << " â€” listening on http://localhost:"
             << port << '\n';
   if (!has_frontend) {
     std::cout << "note: frontend directory not found (" << frontend_dir.string()
