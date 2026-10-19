@@ -1,0 +1,556 @@
+{
+  "complete": true,
+  "feature": 80,
+  "feature_available": true,
+  "features_delivered": 80,
+  "backend_commit": "42d5f3f9fdbd1df63323d345efeb0c9e329a396f",
+  "ui_commit_verification_required": true,
+  "ui_commit_identity_note": "Containing UI commit verified externally after commit; no self-referential identity embedded.",
+  "baseline": {
+    "path": "build/timing-feature80-baseline.json",
+    "bytes": 2814364,
+    "sha256": "ae5c82a9f51ca9dc675c5581528ac83c67a1066ad0b79c460af26c2e8417d049"
+  },
+  "accepted_protocol": {
+    "path": "build/feature80-protocol-prepared-3-20261019/protocol.json",
+    "bytes": 71144,
+    "sha256": "8f2628b5e01a2e93bee341440cf0a51c7b3fd984d5ac19dfcfb726b5e2e6f24b"
+  },
+  "accepted_contract": {
+    "path": "build/feature80-protocol-prepared-3-20261019/contract.json",
+    "bytes": 1643,
+    "sha256": "5d3d061bda466c5c5530cd63c78ec28175dc68e243f2fb71d3e3f7f2abded381"
+  },
+  "independent_protocol_review": {
+    "path": "build/feature80-protocol-independent-review-20261019/review-3.json",
+    "bytes": 32554,
+    "sha256": "2c0afc239ee0e855fdbde8912095bbee01b11e1d53bd25255dd23be3b66455d9"
+  },
+  "collector_independent_review": {
+    "path": "build/feature80-api-independent-review-20261019/collector-review-2.json",
+    "bytes": 5234,
+    "sha256": "34e34d5f7f4b9f36db61722522a894933cc7cd1372e43b10ad36c88a12e49840"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/build-manifest.json",
+      "bytes": 353776,
+      "sha256": "9b9b898a3aa723ba7fddf42aad38f75bd6bc9f92c37c2726f6dd5abc2df07bad"
+    },
+    "api": {
+      "path": "build/feature80-api-offline-corrected-20261019-1/validation.json",
+      "bytes": 6969732,
+      "sha256": "a86bbdbf8e3585ae72cc01b8f8bc1a8384709fc2ec8f70a22404355e95c7ea81"
+    },
+    "frontend": {
+      "path": "build/timing80-frontend-final-44650891470e4979921bc776a22631ba/validation.json",
+      "bytes": 2749230,
+      "sha256": "68c875b7fe14861cb30ed04ece135039359a88eb55470266896efd7bd9d2bf1e"
+    },
+    "live": {
+      "path": "build/timing-feature80-live-runtime.json",
+      "bytes": 5560924,
+      "sha256": "b05d1063e265c8080a8dc130d0caaddc1a2f28d8377566865b9836f53be2d073"
+    },
+    "cleanup": {
+      "path": "build/timing-feature80-test-cleanup.json",
+      "bytes": 3629,
+      "sha256": "03df26b5f27fbabbfd5b961844c991b524f0fdac891985ea4bde866bf6c3e535"
+    },
+    "backend": {
+      "path": "build/timing-feature80-backend-postcommit.json",
+      "bytes": 2432,
+      "sha256": "fbf732c9ec7393ce08886870f30f3499ac26250c444dd23bcbc41aa1fbe4cba1"
+    },
+    "integration": {
+      "path": "build/timing80-frontend-integration-1.json",
+      "bytes": 46454,
+      "sha256": "20f696fbd4681ad43ca9c15d6808a19691061991008e4de782d32f62e1e832db"
+    },
+    "portable": {
+      "path": "build/timing80-compact-fixture-publication-ceb3c9b512ac4e709962d5504a0a1dd2/validation.json",
+      "bytes": 220903,
+      "sha256": "322f896b06e9a893486b06da9051421d32d54904be4cc1b931464db0b90579af"
+    }
+  },
+  "counts": {
+    "native_source_bindings": 749,
+    "contributing_native_suites": 66,
+    "contributing_native_test_invocations": 11,
+    "current_native_suites_executed": 2,
+    "reused_core_objects": 205,
+    "fresh_core_objects": 2,
+    "feature_core_objects": 207,
+    "selected_api_cases": 147,
+    "actual_api_calls": 149,
+    "native_artifact_File_handoffs": 10,
+    "portable_historical_validation_attempts": 1,
+    "historical_api_false_checks": 6,
+    "current_api_false_checks": 0,
+    "frontend_tests": 8752,
+    "frontend_test_files": 145,
+    "frontend_source_bindings": 14114,
+    "focused_tests": 188,
+    "portable_tests": 148,
+    "served_asset_count": 7,
+    "separate_live_smoke_post_calls": 2
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "families": [
+    "algo.discovery.performance_spectrum",
+    "algo.discovery.batches"
+  ],
+  "public_callables": 24,
+  "operation_names": [
+    "compute_performance_spectrum",
+    "discover_performance_spectrum_log",
+    "discover_performance_spectrum_dataframe",
+    "discover_performance_spectrum_dataframe_disconnected",
+    "discover_performance_spectrum_log_disconnected",
+    "discover_performance_spectrum_lazyframe",
+    "discover_performance_spectrum_lazyframe_disconnected",
+    "discover_performance_spectrum",
+    "discover_batches",
+    "BatchLogDiscovery::apply",
+    "BatchPandasDiscovery::apply",
+    "BatchPolarsDiscovery::apply",
+    "serialize_active_source_spectrum_json",
+    "serialize_active_source_batches_json",
+    "LogBatchDiscovery::apply",
+    "PandasBatchDiscovery::apply",
+    "PolarsBatchDiscovery::apply"
+  ],
+  "declared_call_forms": 46,
+  "canonical_dispatch_slots": 58,
+  "class_alias_expressions": 6,
+  "actual_call_forms": 64,
+  "native_option_fields": 15,
+  "public_record_types": 8,
+  "public_record_fields": 43,
+  "artifact_slots": 10,
+  "response_fields": 22,
+  "browser_ui_verified": false,
+  "full_parity": false,
+  "goal_complete": false,
+  "previous_feature_postcommit": {
+    "path": "build/temporal-feature79-postcommit.json",
+    "bytes": 4742,
+    "sha256": "333753e277823175c24cb0048c65681b1937521e59d258d14d1d04822b72fa66"
+  },
+  "previous_feature_validation_unchanged": {
+    "path": "docs/feature-first-original-temporal-workbench-validation.json",
+    "bytes": 923870,
+    "sha256": "b86e2412b00d45228a8d2498c52acfe112735d0bd501c0966339b4d81e8234d3"
+  },
+  "latest_actual_browser_denial": {
+    "path": "build/temporal79-browser-permission-retry-20261019.json",
+    "bytes": 858,
+    "sha256": "3bbfd90b1432ecec118ebc46f1cfef04035ec16ce8499dca99f6c4995fa64dfb"
+  },
+  "browser_evidence": {
+    "historical_only": true,
+    "denial_feature": 79,
+    "served_feature": 78,
+    "outcome": "rejected_before_navigation",
+    "Feature80_browser_actions": 0,
+    "Feature80_UI_verified": false
+  },
+  "closed_prior_transport_issues": [
+    {
+      "feature": 79,
+      "id": "named-source-kind-explicit-empty",
+      "original_status_retained_as_history": true,
+      "actual_regressions": [
+        {
+          "id": "regression79-source-kind-omitted",
+          "physical_call_index": 146,
+          "request": {
+            "path": "build/feature80-api-actual-20261019-1/146-regression79-source-kind-omitted/request.body",
+            "bytes": 635,
+            "sha256": "6f885dee84419f8863cb2fd2d09ef859d98bfc9b25083556a103f1c25ab5a5cb"
+          },
+          "response": {
+            "path": "build/feature80-api-actual-20261019-1/146-regression79-source-kind-omitted/response.body",
+            "bytes": 10854,
+            "sha256": "3341b3b7445b69ddde6891b609c511d75c03d5be5a7ca0360af373eb66263875"
+          },
+          "status": 200
+        },
+        {
+          "id": "regression79-source-kind-empty",
+          "physical_call_index": 147,
+          "request": {
+            "path": "build/feature80-api-actual-20261019-1/147-regression79-source-kind-empty/request.body",
+            "bytes": 734,
+            "sha256": "f37411008826f0ae27ddf677b3fea41c32e625fee04c28a943ba693cc478c247"
+          },
+          "response": {
+            "path": "build/feature80-api-actual-20261019-1/147-regression79-source-kind-empty/response.body",
+            "bytes": 3222,
+            "sha256": "f477d28e720579d0e57db831e3d7b7fc8936af668816bb8b6bd094fbd8cc341d"
+          },
+          "status": 400
+        }
+      ],
+      "native_validation": {
+        "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/build-manifest.json",
+        "bytes": 353776,
+        "sha256": "9b9b898a3aa723ba7fddf42aad38f75bd6bc9f92c37c2726f6dd5abc2df07bad"
+      }
+    }
+  ],
+  "remaining_followons": [
+    "Independent original EventLog time analysis.",
+    "Older shared-workbench table metadata carrier issue.",
+    "All remaining catalogue, strict behavior, browser, performance and concurrency gates."
+  ],
+  "older_table_metadata_followon": {
+    "path": "build/quality76-table-metadata-followon-audit-20261019/audit.json",
+    "bytes": 90140,
+    "sha256": "c2a59b47e0926331d3962d0408692a77f950d4d9af020aefc70d95466b6238dc"
+  },
+  "baseline_attempt_history": [
+    {
+      "helper": {
+        "path": "build/freeze-timing80-baseline-1.py",
+        "bytes": 3540,
+        "sha256": "e6f07bd7e5caf9320955f83034f1aa9e0fb21314f9254db76fb7b059bb12c692"
+      },
+      "exit_code": 1,
+      "reason": "Incorrect baseline health endpoint /api/health returned non-200; existing app serves / as health smoke. No product mutation or service action occurred."
+    }
+  ],
+  "frontend_attempt_history": [
+    {
+      "proof": {
+        "path": "build/timing80-staged-types-1-5158462fb89c4addb7b1e0f517def152/validation.json",
+        "bytes": 77503,
+        "sha256": "67aee36f8ac41a2adb7b94fb41f137044348c7876bf34d31cf775c7007cef132"
+      },
+      "complete": true,
+      "kind": "Actual strict/noUnused TypeScript Program over all frozen virtual files and complete existing project roots and production dependency context",
+      "compiler_program_created": true,
+      "diagnostic_count": 0,
+      "steps": []
+    },
+    {
+      "proof": {
+        "path": "build/timing80-staged-focused-1-598556f4ccfb4d5b9e8c5a089cd29dea/validation.json",
+        "bytes": 50729,
+        "sha256": "0360138099f6ff93e2304512e5753c2299bbac925f4860dd195c7ba85f4dcf9c"
+      },
+      "complete": false,
+      "kind": "focused_test_steps",
+      "compiler_program_created": false,
+      "diagnostic_count": 0,
+      "steps": [
+        {
+          "name": "Isolated authored independent timing suite",
+          "exit_code": 1,
+          "total_tests": 188,
+          "passed_tests": 187,
+          "failed_tests": 1
+        }
+      ]
+    }
+  ],
+  "frontend_fixture_correction": {
+    "kind": "synthetic_formdata_wire_filename_presence",
+    "passed_strict": {
+      "path": "C:/Users/pmoch/Documents/Minera/build/timing80-staged-types-1-5158462fb89c4addb7b1e0f517def152/validation.json",
+      "bytes": 77503,
+      "sha256": "67aee36f8ac41a2adb7b94fb41f137044348c7876bf34d31cf775c7007cef132"
+    },
+    "failed_focused": {
+      "path": "C:/Users/pmoch/Documents/Minera/build/timing80-staged-focused-1-598556f4ccfb4d5b9e8c5a089cd29dea/validation.json",
+      "bytes": 50729,
+      "sha256": "0360138099f6ff93e2304512e5753c2299bbac925f4860dd195c7ba85f4dcf9c"
+    },
+    "historical_failed_tests": 1,
+    "historical_passed_tests": 187,
+    "source_evidence": "Actual product uses originalEditDistanceWireFilename at src/frontend/src/original-edit-distance-workbench.ts:103; fixture previously equated File.name with a filename attribute. Independent complete FormData serialization now supplies mock native filename presence.",
+    "changed_paths": [
+      "src/frontend/tests/original-timing-workbench.test.ts"
+    ],
+    "other_five_files_byte_identical": true,
+    "product_logic_changed": false,
+    "ownership_checks_weakened": false,
+    "local_empty_name_bytes_MIME_retained": true,
+    "compiler_tests_HTTP_executed_by_worker": false
+  },
+  "api_attempt_lineage": {
+    "original_validation": {
+      "path": "build/feature80-api-actual-20261019-1/validation.json",
+      "bytes": 3064509,
+      "sha256": "b643786c7a461f27302fa129bfb1492d7fafb0647bfa07f8db0a5e022b98582c"
+    },
+    "current_offline_validation": {
+      "path": "build/feature80-api-offline-corrected-20261019-1/validation.json",
+      "bytes": 6969732,
+      "sha256": "a86bbdbf8e3585ae72cc01b8f8bc1a8384709fc2ec8f70a22404355e95c7ea81"
+    },
+    "source_bound_validator_amendment": {
+      "path": "build/feature80-api-validator-amendment-20261019-1/amendment.json",
+      "bytes": 15064,
+      "sha256": "60106febb62a0d49d401d7ee51b8baa50c5c7b7c88bce841d04edba42ee84eb6"
+    },
+    "independent_validator_review": {
+      "path": "build/feature80-api-independent-review-20261019/validator-amendment-review-1.json",
+      "bytes": 4100,
+      "sha256": "2a08b9060038ad68d191809f56aae0d8f4276e1f10f913c5358e8960a9d92ed7"
+    },
+    "historical_false_checks": [
+      {
+        "id": "serializer-spectrum-complete",
+        "physical_call_index": 103,
+        "check": "all native serializer JSON fields, order, enum indices and full scalar storage",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "serializer-batches-complete",
+        "physical_call_index": 104,
+        "check": "all native serializer JSON fields, order, enum indices and full scalar storage",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "duplicate-operation",
+        "physical_call_index": 117,
+        "check": "selected operation/call form",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": "Predicate returned false"
+        }
+      },
+      {
+        "id": "query-body-duplicate",
+        "physical_call_index": 121,
+        "check": "selected operation/call form",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": "Predicate returned false"
+        }
+      },
+      {
+        "id": "actualFile-result_input_json",
+        "physical_call_index": 141,
+        "check": "all native serializer JSON fields, order, enum indices and full scalar storage",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "actualFile-result_after_json",
+        "physical_call_index": 142,
+        "check": "all native serializer JSON fields, order, enum indices and full scalar storage",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      }
+    ],
+    "new_http_calls": 0,
+    "selected_calls_replayed": 0,
+    "original_chronology_unchanged": true
+  },
+  "native_attempt_lineage": {
+    "parent_manifest": {
+      "path": "build/temporal79-driver-correction-da570a7ebe5b4b76b540eed1d0d53882/build-manifest.json",
+      "bytes": 377029,
+      "sha256": "20616672f0d333a7cf7f447829e97ab09be8cf473e704d22889538b1a73dbbf8"
+    },
+    "current_commands": [
+      {
+        "exit_code": 0,
+        "stdout": {
+          "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/command-0.stdout.txt",
+          "bytes": 933,
+          "sha256": "3c0e6d2c5e0288527242bbbd8e4ae5a732b3096b9c8dbdd1c77112f47b73be72"
+        },
+        "stderr": {
+          "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/command-0.stderr.txt",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "exit_code": 0,
+        "stdout": {
+          "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/command-1.stdout.txt",
+          "bytes": 761,
+          "sha256": "98ff1f172c5b357278e91d77a281565745a3dd092ad765fdb6b3ea914bf84a12"
+        },
+        "stderr": {
+          "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/command-1.stderr.txt",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "exit_code": 0,
+        "stdout": {
+          "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/command-2.stdout.txt",
+          "bytes": 1624,
+          "sha256": "9a9a0da572695fb8ec3654a4fa023b667e667d2d7b4e6d6e75933bf1aaa846c5"
+        },
+        "stderr": {
+          "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/command-2.stderr.txt",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "exit_code": 0,
+        "stdout": {
+          "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/command-3.stdout.txt",
+          "bytes": 437,
+          "sha256": "abc2c00af8c9806809adfc160ba2ff0fef91f95702ad44a91799db8847215e21"
+        },
+        "stderr": {
+          "path": "build/timing80-472c1255e80e4cbda7101efbd9336457/command-3.stderr.txt",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "historical_native_build_attempts": [],
+    "current_executed_suite_count": 2
+  },
+  "preexecution_corrections": {
+    "protocol_predecessors": [
+      {
+        "path": "build/feature80-protocol-prepared-1-20261019/protocol.json",
+        "bytes": 71519,
+        "sha256": "11a0621ef2521cbae9d6f032a4ca8ee7ec9ebbf15a561037f65ff4a8210f964f"
+      },
+      {
+        "path": "build/feature80-protocol-prepared-2-20261019/protocol.json",
+        "bytes": 73801,
+        "sha256": "80a81beeb215c140de7e470325ccbe17bfb17a2b24aa142690b66f1a2c89efe0"
+      }
+    ],
+    "accepted_protocol": {
+      "path": "build/feature80-protocol-prepared-3-20261019/protocol.json",
+      "bytes": 71144,
+      "sha256": "8f2628b5e01a2e93bee341440cf0a51c7b3fd984d5ac19dfcfb726b5e2e6f24b"
+    },
+    "source_review": {
+      "path": "build/feature80-protocol-independent-review-20261019/review-3.json",
+      "bytes": 32554,
+      "sha256": "2c0afc239ee0e855fdbde8912095bbee01b11e1d53bd25255dd23be3b66455d9"
+    },
+    "bank_predecessor": {
+      "path": "build/feature80-api-prepared-1-20261019/CASE-BANK-FROZEN.json",
+      "bytes": 1835,
+      "sha256": "9069f74b409ad1eba6e3620ea183606987edf4893995ee1079731f6eb6ecd091"
+    },
+    "accepted_bank": {
+      "path": "build/feature80-api-prepared-2-20261019/CASE-BANK-FROZEN.json",
+      "bytes": 2880,
+      "sha256": "89aaa9dee89b5076a2b327a72bc1133f58dbf151e073a1e6ca44db24db98fc45"
+    },
+    "runtime_failures": false,
+    "note": "Schema reference path/base and two source-derived bank expectations were corrected before HTTP. These are preparation corrections, distinct from the actual baseline wrong-endpoint/non200 script attempt, authored187/188 fixture result and six captured validator false checks."
+  },
+  "docs_tool_attempt_history": [
+    {
+      "failure_record": {
+        "path": "build/timing80-docs-recipe-attempt-2-failure-20261019.json",
+        "bytes": 653,
+        "sha256": "ab52b1c86cc9dc7ffe2c86dcc055c51f02e5961bc9b8377533061674b986acb9"
+      },
+      "failed_recipe": {
+        "path": "build/prepare-timing80-docs-2.py",
+        "bytes": 24680,
+        "sha256": "7d7f6ea98da8076c269fcf85c84e2bcb9e90f36ecb5f4850492feab60215d8f3"
+      },
+      "observed_by": "root actual execution",
+      "stage": "frontend_attempt_history_read",
+      "error_type": "KeyError",
+      "error_message": "steps",
+      "candidate_emitted": false,
+      "production_writes": false,
+      "native_or_UI_test_failure": false,
+      "correction": "Compilerproof histories have kind/compiler_program_created/diagnostics rather than focused steps; preserve both shapes."
+    }
+  ],
+  "portable_attempt_history": {
+    "correction": {
+      "path": "build/timing80-portable-fixture-correction-1-20261019.json",
+      "bytes": 5041,
+      "sha256": "67e77e2ed0d373f3ac13bf4f46a5750923e8a80caaf5dfe1f23f581c4d37c4d6"
+    },
+    "validation_attempts": [
+      {
+        "stage": "strict_types",
+        "complete": false,
+        "validation": {
+          "path": "build/timing80-compact-fixture-types-181a28f4b62d418b8edba179207393f3/validation.json",
+          "bytes": 92586,
+          "sha256": "f16cbdc2a84ba38038102fce674f8f8a2b6355ff9bf5882af4540d048c4933bb"
+        },
+        "prepared_proof": {
+          "path": "build/timing80-compact-fixture-publication-a56d21a8a95a4829920511db5a03e7f4/validation.json",
+          "bytes": 218267,
+          "sha256": "19c7b5deffbfb2d8a2233b496510184e528073bfbc72c92d2c5c72be127d480b"
+        },
+        "diagnostics": [
+          {
+            "code": 6196,
+            "path": "src/frontend/tests/original-timing-workbench-fixtures.test.ts",
+            "line": 23,
+            "message": "'FileDescriptor' is declared but never used."
+          },
+          {
+            "code": 2345,
+            "path": "src/frontend/tests/original-timing-workbench-fixtures.test.ts",
+            "line": 90,
+            "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+          }
+        ],
+        "fixture_tests_executed": false
+      }
+    ],
+    "publisher_preparation_attempts": [
+      {
+        "stage": "prepare_bundle",
+        "complete": true,
+        "validation": {
+          "path": "build/timing80-compact-fixture-publication-a56d21a8a95a4829920511db5a03e7f4/validation.json",
+          "bytes": 218267,
+          "sha256": "19c7b5deffbfb2d8a2233b496510184e528073bfbc72c92d2c5c72be127d480b"
+        }
+      }
+    ]
+  },
+  "open_host_transport_issues": [],
+  "boundaries": [
+    "Feature availability preserves all86packages/387modules and every existing selector/strict status;46packages/199modules remain complete and228units incomplete. Full parity is not achieved.",
+    "All prior79delivered entries and the historical79validation report remain unchanged. Its open selector note is historical; Feature80 owns the actual fix and runtime closure.",
+    "Browser rendering, controls, responsive behavior and browser downloads remain unverified. No Feature80 browser call occurred; latest actual denial is historicalFeature79 while78served.",
+    "Native by-value activities/options caller snapshots are complete and unchanged; forced local component variants are observed in returned result. No hidden serializer or second discovery call repairs storage.",
+    "Native serializer raw output remains authoritative. The saved-output field assertion applies to this bank successful scalarUTF8/NUL constructors; no universal JSON inverse for pairedWTF8surrogate escapes is claimed. Native nonfinite structuredfloat wrappers differ intentionally from canonical storedfloat tags.",
+    "Finite Lazy backing payload, static native getters and actual scan callbacks remain separate; inspection introduces no scan. The older shared table writer metadata carrier gap remains open.",
+    "All original149HTTP requests/responses,10actualUIFile products,3guards and cache-independence chronology remain unchanged. Two checker causes account for6originalfalsechecks; complete saved-byte revalidation sent0HTTP and invoked0UIhelpers.",
+    "The first portable strict fixture check failed on an unused type and missing object narrowing in its authored template. Its correction/actual revalidation history is retained separately from the earlier187/188UI fixture failure. Neither changes native product behavior or replays HTTP.",
+    "Current native command outcomes are bound separately from inherited suite lineage; contributing suites are not mislabeled as a single fresh all-suite run."
+  ]
+}

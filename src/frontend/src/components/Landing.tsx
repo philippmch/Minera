@@ -39,11 +39,12 @@ interface LandingProps {
   onOriginalClustering?: () => void;
   onOriginalOrganizational?: () => void;
   onOriginalTemporal?: () => void;
+  onOriginalTiming?: () => void;
   onOriginalOcPlayout?: () => void;
   onActiveSource?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalClustering, onOriginalOrganizational, onOriginalTemporal, onOriginalOcPlayout, onActiveSource }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalClustering, onOriginalOrganizational, onOriginalTemporal, onOriginalTiming, onOriginalOcPlayout, onActiveSource }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -120,6 +121,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onOriginalClustering && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalClustering}>Cluster independent original logs and inspect full stored results</button>}
         {onOriginalOrganizational && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalOrganizational}>Inspect original social networks, roles, profiles and local diagnostics before mining</button>}
         {onOriginalTemporal && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalTemporal}>Inspect complete original temporal sources, profiles and native helpers before mining</button>}
+        {onOriginalTiming && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalTiming}>Inspect original performance spectra and batches with independent inputs</button>}
         {onOriginalQuality && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalQuality}>Evaluate independent original sources and models</button>}
         {onOriginalOcPlayout && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalOcPlayout}>Original object-centric playout</button>}
         {onActiveSource && <button className="landing-sample reveal" disabled={mining} onClick={onActiveSource}>Open and inspect a native mining source</button>}

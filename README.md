@@ -2786,3 +2786,9 @@ See [validation and boundaries](docs/feature-first-original-organizational-workb
 Upload complete log, stream, table or finite lazy inputs, including concrete EventDataView forms, and edit all 11 temporal options. Discover full profiles, check conformance, call the raw text parser or four native serializers, and use stddev, distance and find directly with independently supplied storage. Inspect complete profiles/deviations, source snapshots, actual lazy scans and pointer observations. Download all 18 exact native artifacts or explicitly select a full deviation fragment for a separate distance call. Full profile artifacts preserve stored counts; moment-parser text is a separate format boundary. Existing cached temporal tools remain available.
 
 See [validation and boundaries](docs/feature-first-original-temporal-workbench-validation.json).
+
+### Explore timing with independent inputs
+
+Upload a complete log, stream, table or finite lazy source for performance spectrum wherever the native overload supports it. Supply an exact JSON activity vector, including literal commas, whitespace, duplicates and empty labels. Batches accepts its own log, table and finite lazy inputs. Edit every native option, inspect complete results, and download reusable source, activities, options and result Files. You can also supply complete stored results directly to either native serializer. Existing cached timing tools remain available.
+
+See [validation and boundaries](docs/feature-first-original-timing-workbench-validation.json).
