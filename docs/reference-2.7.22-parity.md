@@ -13709,3 +13709,10 @@ See `docs/feature-first-shared-table-metadata-validation.json`. Backend step 1c5
 Feature83 adds a standalone Saved structures workspace without a cached log. It converts supplied TrieModels to Petri nets and queries saved interval vectors while preserving caller order, duplicate entries and native indices. Existing structural downloads and reports can be reopened; original bytes, complete native constructors/results, serializer output and PNML exports stay separate. Both file pickers allow selecting the same file again. Validation passed 24 selected cases across 30 physical requests, 9140 frontend tests in 150 files, native targeted suites, portable fixtures, strict TypeScript/Vite and live checks. 7 handoffs used product File helpers; 2 retained raw native downloads. The source audit traces principal workflows for all 86 families, with seven audited extensions open; this does not establish full feature parity. Strict scope remains 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
 
 Validation: docs/feature-first-saved-structures-validation.json. Full parity and the goal remain incomplete.
+
+
+## Feature84 - typed three-table case-relation merge
+
+Feature84 adds native EventTable JSON to Related logs. Supply base, incoming and relation tables without a cached log. Typed keys, duplicate relations, native indices, categories and complete metadata remain available; literal selectors preserve their bytes. Canonical results stay separate from fallible log and export projections. Validation passed 16 selected/18 dedicated physical requests, 4 actual File handoffs and 9150 frontend tests in 150 files. 23 total POSTs include File followups and live smokes. 6 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
+
+Validation: docs/feature-first-typed-relations-validation.json.

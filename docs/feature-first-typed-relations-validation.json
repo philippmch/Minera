@@ -1,0 +1,360 @@
+{
+  "complete": true,
+  "feature": 84,
+  "features_delivered": 84,
+  "parent_head": "dcf1d4fb1d01892b0929a3f0419a9d7072773599",
+  "feature_baseline_head": "a7394fc40aeb9b9834dd16bff72282c1efe34380",
+  "baseline": {
+    "path": "build/typed-relations-feature84-baseline.json",
+    "bytes": 2819996,
+    "sha256": "b2ddeaef5cc9477100cf02efd7619dd756988e26a98eaba10bdd4bcb52cfbab0"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature84-76b7a51951894c32bf43c2b255c9cd91/build-manifest.json",
+      "bytes": 375089,
+      "sha256": "48492d184c1e83ba5e660dbf07656724167a7bfdb99b34b373359e070c7308ac"
+    },
+    "api": {
+      "path": "build/typed-relations84-api-actual-1/validation.json",
+      "bytes": 131979,
+      "sha256": "d7a877d3250b7dd4a6e553fa0d6706f30a9fde4d09cfd342df1330463875d961"
+    },
+    "frontend": {
+      "path": "build/typed-relations84-frontend-f06685e280c344f4a2a99151dcc2836c/validation.json",
+      "bytes": 2752157,
+      "sha256": "86acc8139c6f8842cbe544be9c24ab0cff35b9995ab5baf5ea771dc47c4650a9"
+    },
+    "file_bridge": {
+      "path": "build/typed-relations84-file-validation.json",
+      "bytes": 10733,
+      "sha256": "36352c06ebb5cab691a3d0b2440a5f00971d473b451bb2e1f0081ff8bf085bee"
+    },
+    "source_audit": {
+      "path": "build/feature84-source-audit/audit.json",
+      "bytes": 10275,
+      "sha256": "fdf447bc5ac364e8147620988193e0be9dc6a0829e799dae7a991c3459b40879"
+    },
+    "backend": {
+      "path": "build/typed-relations-feature84-backend-postcommit.json",
+      "bytes": 3764,
+      "sha256": "8b7bf1a380049deffbbd0e8b21593db3abc9ac61672a06125d6959d3e835ddcb"
+    },
+    "live": {
+      "path": "build/typed-relations-feature84-live-runtime.json",
+      "bytes": 12949,
+      "sha256": "49088d781b74f37b920f6cc9a6be14dc72242dfe9fa45293c72e0c7387764c05"
+    },
+    "cleanup": {
+      "path": "build/typed-relations-feature84-test-cleanup.json",
+      "bytes": 4748,
+      "sha256": "486bce4ed1c7c26c86db3b09f9ce633a9bb9337cb0c16f24af723b7c165342c5"
+    },
+    "source_review": {
+      "path": "build/feature84-installed-source-review-2/review.json",
+      "bytes": 4126,
+      "sha256": "3ef5021cf97c75cb7f5096777844ffad7a7315b22a38ec8ad8b4e7806e624077"
+    }
+  },
+  "previous_delivery_report": {
+    "path": "docs/feature-first-saved-structures-validation.json",
+    "bytes": 20460,
+    "sha256": "f85031decdb1d324ccd0f6cdc8ff8921d58b77e75f17855a9fe97c318f6305c5"
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_API_cases": 16,
+    "physical_HTTP_calls": 18,
+    "dedicated_API_corpus_POSTs": 18,
+    "actual_File_handoffs": 4,
+    "raw_constructor_File_arguments": 3,
+    "File_followup_POSTs": 3,
+    "test_service_POSTs": 21,
+    "live_smoke_POSTs": 2,
+    "total_feature_POSTs": 23,
+    "bootstrap_mock_fetches": 1,
+    "bootstrap_HTTP_calls": 0,
+    "frontend_tests": 9150,
+    "frontend_files": 150,
+    "native_contributing_suites": 72,
+    "native_retained_suites": 71,
+    "native_freshly_executed_suites": 1,
+    "native_reused_core_objects": 209,
+    "native_fresh_core_objects": 0,
+    "compiled_core_sources": 0,
+    "compiled_server_sources": 1,
+    "remaining_audited_extensions": 6
+  },
+  "native_test_accounting": {
+    "retained_parent_suites": 71,
+    "freshly_executed_suites": 1,
+    "aggregate_current_passing_suites": 72,
+    "contributing_ctest_invocation_count": 14,
+    "retained_evidence": {
+      "path": "build/native-feature83-ae2dbf2dce0d4be2a5efa88b310e80db/build-manifest.json",
+      "bytes": 372633,
+      "sha256": "801e8bcc0d7d4bcd9dae3116e4498b9bce5f34f252c516dadbfab0bd0b1460d1"
+    },
+    "actual_current_evidence": {
+      "path": "build/native-feature84-76b7a51951894c32bf43c2b255c9cd91/build-manifest.json",
+      "bytes": 375089,
+      "sha256": "48492d184c1e83ba5e660dbf07656724167a7bfdb99b34b373359e070c7308ac"
+    }
+  },
+  "frontend_test_accounting": {
+    "actual_fresh_full_suite": {
+      "total_tests": 9150,
+      "passed_tests": 9150,
+      "passed_files": 150
+    },
+    "retained_parent_inventory": {
+      "total_tests": 9140,
+      "passed_tests": 9140,
+      "passed_files": 150
+    },
+    "net_test_inventory_delta": 10,
+    "new_tests_alone_are_not_the_full_suite": true,
+    "actual_current_evidence": {
+      "path": "build/typed-relations84-frontend-f06685e280c344f4a2a99151dcc2836c/validation.json",
+      "bytes": 2752157,
+      "sha256": "86acc8139c6f8842cbe544be9c24ab0cff35b9995ab5baf5ea771dc47c4650a9"
+    }
+  },
+  "input_and_result_semantics": [
+    "Three caller-supplied EventTables use the shared ordinary/raw constructor parser; no CSV inference or cached log.",
+    "Typed numeric versus text keys, duplicate relations, missing/present-null cells, native index/categories/dtypes and all ten metadata fields remain native values.",
+    "Six literal selectors have mutually exclusive plain/NativeString JSON controls; native merge owns semantic validation.",
+    "Full raw table input_before/input_after and result are distinct from safe complete projected_log and optional format_table/XES exports.",
+    "Secondary projection/export errors preserve the primary native merged table; canonical downloads can be reused as table inputs."
+  ],
+  "HTTP_accounting": {
+    "selected_cases": 16,
+    "dedicated_API_corpus_POSTs": 18,
+    "File_followup_POSTs": 3,
+    "total_test_service_POSTs": 21,
+    "live_smoke_POSTs": 2,
+    "total_feature_POSTs": 23,
+    "bootstrap_mock_fetches": 1,
+    "bootstrap_HTTP_calls": 0,
+    "actual_product_export_Files": 4,
+    "raw_constructor_File_arguments": 3,
+    "live_smokes_and_File_followups_excluded_from_dedicated_corpus": true,
+    "saved_originals_and_bodies": {
+      "path": "build/typed-relations84-api-actual-1/validation.json",
+      "bytes": 131979,
+      "sha256": "d7a877d3250b7dd4a6e553fa0d6706f30a9fde4d09cfd342df1330463875d961"
+    },
+    "actual_helpers_and_File_bytes": {
+      "path": "build/typed-relations84-file-validation.json",
+      "bytes": 10733,
+      "sha256": "36352c06ebb5cab691a3d0b2440a5f00971d473b451bb2e1f0081ff8bf085bee"
+    }
+  },
+  "frontend_correction_history": {
+    "current_integration": {
+      "path": "build/typed-relations84-frontend-integration-2.json",
+      "bytes": 2660080,
+      "sha256": "496f71aed6d14f2c90dd262c7b3fdc9ef384d0e6a75c515e0ea940b07e8d266c"
+    },
+    "current_candidate": {
+      "path": "build/feature84-frontend-candidate-3/staging-manifest.json",
+      "bytes": 50685,
+      "sha256": "1290c2f404b64e0da74adc337333b3203926b759b800cdf25d6be6b3238cfebe"
+    },
+    "current_final_full_frontend_validation": {
+      "path": "build/typed-relations84-frontend-f06685e280c344f4a2a99151dcc2836c/validation.json",
+      "bytes": 2752157,
+      "sha256": "86acc8139c6f8842cbe544be9c24ab0cff35b9995ab5baf5ea771dc47c4650a9"
+    },
+    "current_final_full_frontend_test_accounting": {
+      "total_tests": 9150,
+      "passed_tests": 9150,
+      "passed_files": 150
+    },
+    "final_source_review": {
+      "path": "build/feature84-installed-source-review-2/review.json",
+      "bytes": 4126,
+      "sha256": "3ef5021cf97c75cb7f5096777844ffad7a7315b22a38ec8ad8b4e7806e624077"
+    },
+    "previous_integration": {
+      "path": "build/typed-relations84-frontend-integration-1.json",
+      "bytes": 2659353,
+      "sha256": "664f841e9f36b34c7b2c57a85769f0cee48f349ea7e26ff90cc34a308fd25760"
+    },
+    "prior_full_frontend_validation": {
+      "path": "build/typed-relations84-frontend-3d09748a8d124b6ebdf7d55da41d91c0/validation.json",
+      "bytes": 2752146,
+      "sha256": "9e8e24bf33f321768f75c72c0798e185815a74791ad937220e956953242d2ef3"
+    },
+    "prior_full_frontend_test_accounting": {
+      "total_tests": 9149,
+      "passed_tests": 9149,
+      "passed_files": 150
+    },
+    "prior_full_pass_is_historical_evidence_for_superseded_source": true,
+    "prior_source_review": {
+      "path": "build/feature84-installed-source-review-1/review.json",
+      "bytes": 5478,
+      "sha256": "fcb7de669026a44a2c64014e01e143426be6e1f9b3b86aa8c6271c69de895636"
+    },
+    "preexecution_correction_history": {
+      "predecessor": {
+        "path": "build/feature84-frontend-candidate/staging-manifest.json",
+        "bytes": 49654,
+        "sha256": "da89f3430a879ae2e15fb00293f0b622fda8176bcad8af6660bc2747e7d40e80"
+      },
+      "accepted_candidate": {
+        "path": "build/feature84-frontend-candidate-2/staging-manifest.json",
+        "bytes": 50128,
+        "sha256": "ed05fb9ac2411b8569ce4dae1aca12aa2bb8abf8f3542b6082bad002833b3d7b"
+      },
+      "description": "Unsupported raw7 FORMAT path and mock-success assertion were removed before any test/runtime execution; this is source-review preparation correction, not a failed runtime test."
+    },
+    "resolved_findings": [
+      {
+        "id": "typed-json-selector-format-handoff",
+        "resolution": "relatedFormattingSelectors reads actual typed result.options.case_id_key and timestamp_key, using fatal UTF8 decode on their original native bytes. relatedMergedFormatForm supplies those values to component formatMerged. Plain query fallback applies to legacy results only.",
+        "evidence": [
+          {
+            "path": "src/frontend/src/related-logs.ts",
+            "lines": [
+              128,
+              139
+            ]
+          },
+          {
+            "path": "src/frontend/src/components/RelatedLogsWorkspace.tsx",
+            "lines": [
+              13,
+              18,
+              22
+            ]
+          },
+          {
+            "path": "src/frontend/tests/related-logs.test.ts",
+            "lines": [
+              57,
+              57
+            ]
+          }
+        ],
+        "unsafe_native_bytes": "Return null and disable only formatter handoff; original full raw table download/reuse remains available.",
+        "regression_source": "One added source test covers actual custom_case/when options through JSON/byte storage, invalid UTF8 rejection, and legacy defaults. Test execution belongs to root."
+      }
+    ]
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "delivered_feature84"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "open_source_proven_extension"
+    }
+  ],
+  "source_availability_audit": {
+    "path": "build/feature84-source-audit/audit.json",
+    "bytes": 10275,
+    "sha256": "fdf447bc5ac364e8147620988193e0be9dc6a0829e799dae7a991c3459b40879"
+  },
+  "proof_history": {
+    "native": {
+      "fields": [],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    },
+    "api": {
+      "fields": [],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    },
+    "frontend": {
+      "fields": [],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    },
+    "file_bridge": {
+      "fields": [],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    },
+    "source_audit": {
+      "fields": [],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    },
+    "backend": {
+      "fields": [],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    },
+    "live": {
+      "fields": [],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    },
+    "cleanup": {
+      "fields": [],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    },
+    "source_review": {
+      "fields": [
+        "preserved_history"
+      ],
+      "historical_false_checks": 0,
+      "current_collector_faults": 0
+    }
+  },
+  "journal_policy": "Preserve the complete inherited working prefix; stage only parent HEAD journal plus the owned Feature84 suffix.",
+  "browser_ui_verified": false,
+  "browser_evidence": "The latest Feature84 browser retry was denied before connection despite the user enabling browser access. No rendered-browser validation is claimed.",
+  "browser_retry": null,
+  "full_parity": false,
+  "goal_complete": false,
+  "claim_boundary": "Typed table input availability does not establish strict behavior/default/error/order/Unicode/solver/concurrency/performance parity."
+}
