@@ -3809,6 +3809,55 @@
         }
       ],
       "added": "2026-10-19"
+    },
+    {
+      "id": "native_independent_original_time_analysis_workbench",
+      "state": "native_independent_original_time_analysis_workbench_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [],
+      "native_adjunct_groups": [
+        "passed_time",
+        "service_time",
+        "cycle_time",
+        "case_arrival",
+        "case_statistics"
+      ],
+      "catalogue_mapping": "No exact existing algo.* family mapping; all catalogue entries retained unchanged.",
+      "native_operations": 21,
+      "operation_names": [
+        "discover_passed_time",
+        "passed_time",
+        "passed_time_variant_name",
+        "discover_service_time",
+        "service_time",
+        "service_time_aggregation_name",
+        "discover_cycle_time",
+        "cycle_time",
+        "compute_cycle_time",
+        "discover_case_arrival",
+        "case_arrival",
+        "get_case_arrival_average",
+        "get_case_dispersion_average",
+        "discover_case_statistics",
+        "case_statistics",
+        "case_statistics_sort_name",
+        "passed_time_json",
+        "service_time_json",
+        "cycle_time_json",
+        "case_arrival_json",
+        "case_statistics_json"
+      ],
+      "native_public_declarations": 21,
+      "actual_call_forms": 32,
+      "native_option_fields": 27,
+      "public_record_types": 13,
+      "public_record_fields": 53,
+      "artifact_slots": 9,
+      "response_fields": 22,
+      "validation": "docs/feature-first-original-time-analysis-workbench-validation.json",
+      "browser_validation_complete": false,
+      "added": "2026-10-19"
     }
   ],
   "execution_priority": [
@@ -3878,7 +3927,8 @@
     "native_independent_original_organizational_workbench_available": "Independent original EventLog SNA, roles, resource profiles, network analysis and local diagnostics expose every own public callable, complete native options/results and exact byte artifacts. Explicit role-to-local groups Files retain source and selector provenance. Availability does not promote strict parity.",
     "native_connector_acquisition_workflows_available": "All nine existing connector families have native acquisition workflows and application entry points: browser-history databases, GitHub issue/timeline acquisition, Windows XML/EVTX/event channels, Camunda/SAP CSV and SQLite/ODBC history, and Outlook mailbox/default/shared-calendar acquisition. Existing deliveries29-33 provide these workflows; this label reconciliation adds no feature or strict parity promotion. Real provider/profile availability, credentials and platform permissions, driver/schema/type/default/error fidelity, cancellation, durability and performance remain separate gates.",
     "native_independent_original_temporal_workbench_available": "Independent original temporal discovery/conformance exposes all public log, stream, table, finite lazy and view forms, literal timestamp/business-hour/zeta options, complete stored profiles/deviations, raw text parser, four native serializers and member helpers. Eighteen exact native artifacts are distinct from explicit client-derived deviation Files. Availability does not promote strict parity.",
-    "native_independent_original_timing_workbench_available": "Independent original performance spectrum and batches expose every declared source/default/alias expression, literal activities, complete options/results and exact native artifacts. Availability does not promote strict parity."
+    "native_independent_original_timing_workbench_available": "Independent original performance spectrum and batches expose every declared source/default/alias expression, literal activities, complete options/results and exact native artifacts. Availability does not promote strict parity.",
+    "native_independent_original_time_analysis_workbench_available": "Independent original finite EventLog time analysis exposes all21actual public callables, full options/results and exact native output artifacts. This adjunct availability adds no strict catalogue promotion."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

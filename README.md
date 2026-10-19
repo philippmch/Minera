@@ -2792,3 +2792,9 @@ See [validation and boundaries](docs/feature-first-original-temporal-workbench-v
 Upload a complete log, stream, table or finite lazy source for performance spectrum wherever the native overload supports it. Supply an exact JSON activity vector, including literal commas, whitespace, duplicates and empty labels. Batches accepts its own log, table and finite lazy inputs. Edit every native option, inspect complete results, and download reusable source, activities, options and result Files. You can also supply complete stored results directly to either native serializer. Existing cached timing tools remain available.
 
 See [validation and boundaries](docs/feature-first-original-timing-workbench-validation.json).
+
+### Explore time analysis with an independent log
+
+Upload a complete EventLog for passed time, service time, cycle time, case arrival or case statistics. Edit every native option, choose an explicit or omitted default argument where the public function supports it, and inspect complete results. Supplied stored results can be sent directly to the five native serializers; three enum name helpers are also available. Download canonical inputs and results separately from exact native output bytes. Existing cached workflows remain available.
+
+See [validation and boundaries](docs/feature-first-original-time-analysis-workbench-validation.json).

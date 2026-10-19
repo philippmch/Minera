@@ -45,3 +45,4 @@ src/frontend/tests/fixtures/original-clustering-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-organizational-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-temporal-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-timing-workbench* -text -whitespace
+src/frontend/tests/fixtures/original-time-analysis-workbench* -text -whitespace
