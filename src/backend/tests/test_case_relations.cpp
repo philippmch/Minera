@@ -1,6 +1,7 @@
 #undef NDEBUG
 
 #include "minera/case_relations.hpp"
+#include "../tools/case_relations_typed_input.hpp"
 #include "minera/json_export.hpp"
 #include "case_relations_dtype_reference_cases.hpp"
 #include "case_relations_index_reference_cases.hpp"
@@ -10,6 +11,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 
@@ -841,12 +843,149 @@ void categorical_state_null_cells_sort_last() {
   assert(merged.rows[2][2] && merged.rows[2][2]->value == "case-missing");
 }
 
+
+
+EventAttribute signed_table_cell(const std::string& key, std::int64_t value) {
+  EventAttribute cell{key, std::to_string(value), AttributeKind::kInt};
+  cell.typed_value = value;
+  return cell;
+}
+
+void typed_table_route_retains_native_join_types_and_complete_storage() {
+  const auto text = [](const std::string& key, const std::string& value) {
+    return EventAttribute{key, value, AttributeKind::kString};
+  };
+  EventTable base{{"case_id", "time:timestamp", "activity"},
+      {{text("case_id", "B"), signed_table_cell("time:timestamp", 0), text("activity", "base")}}};
+  EventTable incoming{{"case_id", "time:timestamp", "activity"},
+      {{signed_table_cell("case_id", 7), signed_table_cell("time:timestamp", 1), text("activity", "numeric")},
+       {text("case_id", "7"), signed_table_cell("time:timestamp", 2), text("activity", "string")}}};
+  EventAttribute note{"note", "true", AttributeKind::kBoolean};
+  note.typed_value = true;
+  EventTable relations{{"case_id_LEFT", "case_id_RIGHT", "note"},
+      {{text("case_id_LEFT", "B"), signed_table_cell("case_id_RIGHT", 7), note},
+       {text("case_id_LEFT", "B"), signed_table_cell("case_id_RIGHT", 7), note}}};
+  base.index = EventTableIndex{"Index", "object", {std::string("source-name")},
+      {EventTableIndexLabel{text("index", "base-index")}}};
+  const std::string bytes("x\0\xff", 3);
+  base.attributes = {text(bytes, bytes)};
+  base.metadata.extensions = {{bytes, "p", bytes}};
+  base.metadata.classifiers = {{bytes, {"activity", bytes}}};
+  base.metadata.trace_globals = {text("trace", bytes)};
+  base.metadata.event_globals = {text("event", bytes)};
+  base.metadata.properties = {text("property", bytes)};
+  base.metadata.globals = {{"trace", base.metadata.trace_globals}, {"event", base.metadata.event_globals}};
+  base.metadata.compatibility_snapshot_valid = true;
+  base.metadata.compatibility_globals_snapshot = {{"trace", {text("old-global", bytes)}}};
+  base.metadata.compatibility_trace_globals_snapshot = {text("old-trace", bytes)};
+  base.metadata.compatibility_event_globals_snapshot = {text("old-event", bytes)};
+  const auto encode = serialize_quality_workbench_table_json;
+  const auto base_json = encode(base), incoming_json = encode(incoming), relations_json = encode(relations);
+  const auto decoded = parse_embedding_workbench_table_json(base_json);
+  assert(decoded.attributes == base.attributes && decoded.metadata == base.metadata);
+  assert(decoded.metadata.compatibility_snapshot_valid);
+  assert(decoded.metadata.compatibility_globals_snapshot == base.metadata.compatibility_globals_snapshot);
+  assert(decoded.metadata.compatibility_trace_globals_snapshot == base.metadata.compatibility_trace_globals_snapshot);
+  assert(decoded.metadata.compatibility_event_globals_snapshot == base.metadata.compatibility_event_globals_snapshot);
+  assert(encode(decoded) == base_json);
+  const auto typed_incoming = parse_embedding_workbench_table_json(incoming_json);
+  assert(std::holds_alternative<std::int64_t>(typed_incoming.rows[0][0]->typed_value));
+  assert(typed_incoming.rows[1][0]->kind == AttributeKind::kString);
+  const auto merged = merge_case_relations(base, incoming, relations);
+  assert(merged.rows.size() == 3 && merged.rows[0][2]->value == "base");
+  assert(merged.rows[1][2]->value == "numeric" && merged.rows[2][2]->value == "numeric");
+  assert(merged.rows[1][merged.column_index("note")]->typed_value == NativeAttributeValue{true});
+  assert(merged.index && merged.index->dtype == "object");
+  assert(merged.index->names == std::vector<std::optional<std::string>>{std::nullopt});
+  assert(std::get<EventAttribute>(merged.index->labels[0].value).value == "base-index");
+  assert(std::get<EventAttribute>(merged.index->labels[1].value).typed_value == NativeAttributeValue{std::int64_t{0}});
+  assert(std::get<EventAttribute>(merged.index->labels[2].value).typed_value == NativeAttributeValue{std::int64_t{1}});
+  assert(merged.attributes == base.attributes && merged.metadata == base.metadata);
+  assert(merged.metadata.compatibility_snapshot_valid == base.metadata.compatibility_snapshot_valid);
+  assert(merged.metadata.compatibility_globals_snapshot == base.metadata.compatibility_globals_snapshot);
+  assert(merged.metadata.compatibility_trace_globals_snapshot == base.metadata.compatibility_trace_globals_snapshot);
+  assert(merged.metadata.compatibility_event_globals_snapshot == base.metadata.compatibility_event_globals_snapshot);
+  const auto body = tools::execute_typed_case_relations_json(base_json, incoming_json, relations_json, {}, true, true);
+  assert(!literal_controls_transport_error(body));
+  assert(body.find("\"table\":" + encode(merged)) != std::string::npos);
+  const auto snapshot = tools::typed_case_relations_snapshot(base, incoming, relations);
+  assert(body.find("\"input_before\":" + snapshot) != std::string::npos);
+  assert(body.find("\"input_after\":" + snapshot) != std::string::npos);
+  assert(body.find("\"projected_log\":") != std::string::npos);
+  assert(body.find("\"format_table\":") != std::string::npos && body.find("\"open_log\":") != std::string::npos);
+  assert(encode(base) == base_json && encode(incoming) == incoming_json && encode(relations) == relations_json);
+}
+
+void typed_table_options_are_literal_and_conflicts_rejected() {
+  std::map<std::string, std::string> fields;
+  const FieldLookup lookup = [&](std::string_view name) {
+    const auto found = fields.find(std::string(name));
+    return found == fields.end() ? std::string{} : found->second;
+  };
+  const FieldPresence present = [&](std::string_view name) { return fields.contains(std::string(name)); };
+  const auto defaults = tools::typed_case_relations_options(lookup, present);
+  assert(defaults.case_id_key == "case_id" && defaults.timestamp_key == "time:timestamp");
+  const std::string exact(" \0\xff ", 4);
+  fields["merge_timestamp_key_json"] = serialize_embedding_workbench_string_json(exact);
+  fields["merge_case_id_key"] = " case ";
+  fields["merge_left_suffix"] = "";
+  fields["merge_right_suffix"] = "\t";
+  fields["merge_left_column"] = "lhs";
+  fields["merge_right_column_json"] = "\"rhs\"";
+  const auto options = tools::typed_case_relations_options(lookup, present);
+  assert(options.timestamp_key == exact && options.case_id_key == " case ");
+  assert(options.left_suffix.empty() && options.right_suffix == "\t");
+  assert(options.relation_left_column == "lhs" && options.relation_right_column == "rhs");
+  assert(!literal_controls_transport_error(tools::typed_case_relations_options_json(options)));
+  const auto rejected = [&] {
+    try { (void)tools::typed_case_relations_options(lookup, present); return false; }
+    catch (const std::invalid_argument&) { return true; }
+  };
+  fields["merge_timestamp_key"] = exact;
+  assert(rejected());
+  fields.erase("merge_timestamp_key");
+  fields["merge_timestamp_key_json"] = "1";
+  assert(rejected());
+  fields["merge_timestamp_key_json"] = "\"one\",\"two\"";
+  assert(rejected());
+  fields.erase("merge_timestamp_key_json");
+  fields["merge_case_id_key"] = "";
+  assert(tools::typed_case_relations_options(lookup, present).case_id_key.empty());
+  fields["merge_variant"] = "other";
+  assert(rejected());
+}
+
+void typed_table_route_accepts_ordinary_json_and_preserves_native_errors() {
+  const std::string base = R"({"columns":["case_id","time:timestamp"],"rows":[[{"value":"B"},{"kind":"int","value":"0","typed_value":0,"integer_storage":"int64"}]]})";
+  const std::string incoming = R"({"columns":["case_id","time:timestamp"],"rows":[]})";
+  const std::string relations = R"({"columns":["case_id_LEFT","case_id_RIGHT"],"rows":[]})";
+  const auto body = tools::execute_typed_case_relations_json(base, incoming, relations, {});
+  assert(!literal_controls_transport_error(body));
+  assert(body.find("\"native_schema\":\"event-table-raw-v1\"") != std::string::npos);
+  assert(body.find("\"format_table\":") == std::string::npos && body.find("\"open_log\":") == std::string::npos);
+  bool rejected = false;
+  try { (void)tools::execute_typed_case_relations_json("{}", incoming, relations, {}); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+  CaseRelationsOptions invalid;
+  invalid.timestamp_key = "";
+  std::string native_error, route_error;
+  try { (void)merge_case_relations(parse_embedding_workbench_table_json(base), parse_embedding_workbench_table_json(incoming), parse_embedding_workbench_table_json(relations), invalid); }
+  catch (const std::invalid_argument& error) { native_error = error.what(); }
+  try { (void)tools::execute_typed_case_relations_json(base, incoming, relations, invalid); }
+  catch (const std::invalid_argument& error) { route_error = error.what(); }
+  assert(!native_error.empty() && route_error == native_error);
+}
+
 }  // namespace
 
 int main() try {
 #ifdef _WIN32
   _set_error_mode(_OUT_TO_STDERR);
 #endif
+  typed_table_route_retains_native_join_types_and_complete_storage();
+  typed_table_options_are_literal_and_conflicts_rejected();
+  typed_table_route_accepts_ordinary_json_and_preserves_native_errors();
   check_public_case_relations_reference_cases();
   check_public_case_relations_dtype_reference_cases();
   check_public_case_relations_index_reference_cases();
