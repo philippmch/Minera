@@ -1,0 +1,117 @@
+{
+  "complete": true,
+  "feature": 77,
+  "feature_available": true,
+  "features_delivered": 77,
+  "backend_commit": "b34b970b0de2bbc53fc82086344be65083956210",
+  "baseline": {
+    "path": "build/clustering-feature77-baseline.json",
+    "bytes": 292974,
+    "sha256": "04c62ec6863310832909a8d0c8765c3d3774aae1d6fc4a037814be525d2f5fd1"
+  },
+  "proofs": {
+    "native-manifest": {
+      "path": "build/clustering77-7f5f12b798494d728fdc13e88c15b95b/build-manifest.json",
+      "bytes": 362062,
+      "sha256": "32dff086c9796d3dae1c4dd782bb90271c6db8afb67881e6a9b242c6cd1f43d8"
+    },
+    "api-proof": {
+      "path": "build/clustering77-api-actual-20261019-1/validation.json",
+      "bytes": 2034596,
+      "sha256": "ba692adef9dff577eddb0b775789eac7f6e26ae9ee632a47e1ec8421e27f7573"
+    },
+    "backend-proof": {
+      "path": "build/clustering-feature77-backend-postcommit.json",
+      "bytes": 2098,
+      "sha256": "f42f25f449385683a85f8ce42c4efead6d921a66774a7985b99a5595e0535b86"
+    },
+    "integration": {
+      "path": "build/clustering77-frontend-integration-80dc472047384da6a7d4d1ce689d7af3/validation.json",
+      "bytes": 46635,
+      "sha256": "a17d0fb20f9448c87020bd1fe7b6f3e971c87e0559d035b23ce9676b178288c0"
+    },
+    "published-proof": {
+      "path": "build/clustering77-compact-fixture-publication-b923d485f04f4660aa7eb490bc7ae7f2/validation.json",
+      "bytes": 316919,
+      "sha256": "d440f30663d6f00c0e011929bb69489e697fdb2c9f7673bf12670e3489895660"
+    },
+    "frontend-validation": {
+      "path": "build/clustering-feature-frontend-final-11c91b13e9cc4268a02d728593f1839f/validation.json",
+      "bytes": 2771246,
+      "sha256": "728281fc1518d54b3b02e3ea4fb9f2fb6349d4c9536d774c00949ec6be8f78de"
+    },
+    "live-runtime": {
+      "path": "build/clustering-feature77-live-runtime.json",
+      "bytes": 16316,
+      "sha256": "fbaf5be60eab28a03b094b7e322e4fa23d194ac696b429b150939bed6202bcb3"
+    },
+    "cleanup-proof": {
+      "path": "build/clustering-feature77-test-cleanup.json",
+      "bytes": 7043,
+      "sha256": "ec38cd04dcd18edbda450501a8d7c7fa8c444b0e139700b08e2f5cefaab1c6c8"
+    }
+  },
+  "counts": {
+    "native_sources": 737,
+    "native_suites": 63,
+    "contributing_native_test_invocations": 9,
+    "reused_core_objects": 203,
+    "fresh_core_objects": 1,
+    "selected_api_cases": 193,
+    "actual_api_calls": 195,
+    "native_artifact_File_handoffs": 10,
+    "client_subset_File_handoffs": 2,
+    "historical_api_false_checks": 0,
+    "frontend_tests": 7395,
+    "frontend_test_files": 139,
+    "frontend_source_bindings": 14096,
+    "portable_tests": 194,
+    "focused_tests": 121,
+    "portable_historical_false_checks": 3
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "browser_ui_verified": false,
+  "full_parity": false,
+  "goal_complete": false,
+  "boundaries": [
+    "Browser rendering, controls, responsive inspection and browser downloads remain unverified. No new browser attempt is claimed for Feature77; the historical Feature76 policy denial remains recorded.",
+    "Availability does not establish complete reference parity. Strict catalogue statuses and counts are unchanged.",
+    "NativeFloat64 semantic values and signed zero are preserved; raw NaN payload/sign/signalling bits and original decimal lexemes remain separate gates.",
+    "Native serializer text can contain invalid UTF-8 and deliberately omits profile centroids; full stored result downloads retain centroids and raw native output is separately byte-preserved.",
+    "The two actual source-subset File handovers are client-derived and tested separately from ten native artifact handovers. Four source-bound workflows were planned; only two were exercised by these API File cases.",
+    "The older shared-workbench table metadata carrier issue remains open; Feature77 does not repair that implementation."
+  ],
+  "older_table_metadata_followon": {
+    "path": "build/quality76-table-metadata-followon-audit-20261019/audit.json",
+    "bytes": 90140,
+    "sha256": "c2a59b47e0926331d3962d0408692a77f950d4d9af020aefc70d95466b6238dc"
+  },
+  "latest_actual_browser_denial": {
+    "path": "build/quality76-browser-permission-retry-20261019.json",
+    "bytes": 558,
+    "sha256": "57745a543b357c58a2c632034455e8f174c0d4eaa9f6b23390d841b1f29d648f"
+  },
+  "portable_correction": {
+    "path": "build/clustering77-portable-fixture-correction-2-20261019.json",
+    "bytes": 6362,
+    "sha256": "51d5726d84344f507403be688829957fcbc84dcae38439b4392b29a07f8ef611"
+  },
+  "portable_validation_attempts": [
+    {
+      "path": "build/clustering77-compact-fixture-types-856d5fe5a1ee4d149ac070ceb35cbec3/validation.json",
+      "bytes": 173991,
+      "sha256": "573bbede6b38e691a638d193218cb0a5773f893ebb5db08a24d70d7baa197c02"
+    },
+    {
+      "path": "build/clustering77-compact-fixture-validation-bbeb82955a16446c8c71c836e3f0640f/validation.json",
+      "bytes": 146224,
+      "sha256": "5ec813c57c589967191ead639fa0bf142c2bd0d84f22573c5a9a628981bc7c4c"
+    }
+  ]
+}
