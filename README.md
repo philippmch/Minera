@@ -2804,3 +2804,8 @@ See [validation and boundaries](docs/feature-first-original-time-analysis-workbe
 Table snapshots and reusable constructor artifacts across embedding, edit distance, BOSE and discovery preserve the full native metadata needed by later operations and exports. Existing scalar/default files retain their previous output. Ordinary JSON and XES interchange formats remain unchanged.
 
 See [validation and boundaries](docs/feature-first-shared-table-metadata-validation.json).
+
+
+## Saved structural inputs
+
+Feature83 adds a standalone Saved structures workspace without a cached log. It converts supplied TrieModels to Petri nets and queries saved interval vectors while preserving caller order, duplicate entries and native indices. Existing structural downloads and reports can be reopened; original bytes, complete native constructors/results, serializer output and PNML exports stay separate. Both file pickers allow selecting the same file again. Validation passed 24 selected cases across 30 physical requests, 9140 frontend tests in 150 files, native targeted suites, portable fixtures, strict TypeScript/Vite and live checks. 7 handoffs used product File helpers; 2 retained raw native downloads. The source audit traces principal workflows for all 86 families, with seven audited extensions open; this does not establish full feature parity. Strict scope remains 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified. See [validation](docs/feature-first-saved-structures-validation.json).

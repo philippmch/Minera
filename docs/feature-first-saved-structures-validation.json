@@ -1,0 +1,441 @@
+{
+  "complete": true,
+  "feature": 83,
+  "features_delivered": 83,
+  "proofs": {
+    "native": {
+      "path": "build/native-feature83-ae2dbf2dce0d4be2a5efa88b310e80db/build-manifest.json",
+      "bytes": 372633,
+      "sha256": "801e8bcc0d7d4bcd9dae3116e4498b9bce5f34f252c516dadbfab0bd0b1460d1"
+    },
+    "api": {
+      "path": "build/saved-structures83-api-continuation-actual-2/validation.json",
+      "bytes": 303271,
+      "sha256": "9523c5a09fe47d7e944049cd91e8e2483078de16ad8cbd75f5734f5b6f631e01"
+    },
+    "frontend": {
+      "path": "build/saved-structures83-frontend-a7b600e5d1e34a3185072b6447244ff1/validation.json",
+      "bytes": 2752854,
+      "sha256": "4037b1744ff7be4ee913bec4a7320a80f8af5fc1f3ee9a7dd7707ea6f3efc2f0"
+    },
+    "live": {
+      "path": "build/saved-structures-feature83-live-runtime.json",
+      "bytes": 5567672,
+      "sha256": "2a453e3485aca0687b30465c20cf15b9467adad346cd5231d7ca2e86502f5c20"
+    },
+    "cleanup": {
+      "path": "build/saved-structures-feature83-test-cleanup.json",
+      "bytes": 3731,
+      "sha256": "134f3484e9db8e280f508d7f250fd7ae12f9c750cf2740f6544b993b036f8307"
+    },
+    "backend": {
+      "path": "build/saved-structures-feature83-backend-postcommit.json",
+      "bytes": 4979,
+      "sha256": "91def0ef7003bb237673f1d2129ec3735cafb29bf5d7ffc3803deea142f90740"
+    },
+    "integration": {
+      "path": "build/saved-structures83-file-reselection-integration-1.json",
+      "bytes": 2755213,
+      "sha256": "c8f46596a9b006b02f306b7a0b5a42a374c8dc5e2e8a63c5aee691a1c48cdefd"
+    },
+    "portable": {
+      "path": "build/feature83-portable-publication-1/validation.json",
+      "bytes": 3202,
+      "sha256": "06be7508464c189d238e21b90dd7621e06a79e812d1a7aab8c2c418785189d1f"
+    }
+  },
+  "baseline": {
+    "path": "build/saved-structures-feature83-baseline.json",
+    "bytes": 2818240,
+    "sha256": "40a0bbaf8021f4a4f3be4c393e38233b41ca73c39cd09261c9abfd73a47eaed8"
+  },
+  "protocol": {
+    "path": "build/feature83-saved-structures-contract-1/protocol.json",
+    "bytes": 10853,
+    "sha256": "18391b4e84cce84fcc35389e80e0bc53afc4d84373c5bc29fe35a41ddebcf8f4"
+  },
+  "root_acceptance_amendment": {
+    "path": "build/feature83-saved-structures-acceptance-1/acceptance-amendment.json",
+    "bytes": 1691,
+    "sha256": "d750593f41570d11e4d4257061c6c06fcab8af3e2e659fc25906031794ee63ee"
+  },
+  "source_availability_audit": {
+    "path": "build/feature83-whole-catalogue-current-audit.json",
+    "bytes": 285227,
+    "sha256": "8fecb28063ab767b89031dd9b103953492ff980d46f31927a0187a46289aa5d8"
+  },
+  "audit_as_of_head": "a18be59ffbf4e8c6d1f8418da642b0fc09950e7a",
+  "all86_principal_workflows_source_available": true,
+  "all_feature_completion_proven": false,
+  "full_parity": false,
+  "goal_complete": false,
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_cases": 24,
+    "physical_http_calls": 30,
+    "actual_UI_File_handoffs": 7,
+    "actual_File_argument_handoffs": 9,
+    "raw_native_response_File_downloads": 2,
+    "frontend_tests": 9140,
+    "frontend_files": 150,
+    "native_contributing_suites": 71,
+    "native_targeted_suites": 4,
+    "served_assets": 7,
+    "live_smoke_POSTs": 2
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "open_source_proven_extension"
+    }
+  ],
+  "browser_ui_verified": false,
+  "browser_evidence": "The actual Feature83 retry was denied by saved browser policy before navigation despite explicit user authorization, while Feature82 listener51160 served. Local HTTP returned200; rendered validation remains unverified.",
+  "browser_retry": {
+    "path": "build/feature83-browser-permission-retry-20261019.json",
+    "bytes": 593,
+    "sha256": "c0274de1059ea2006a88e850e434c382da20d96ad0a77a3d350c3335c12f5655"
+  },
+  "API_capture_history": {
+    "original_failure": {
+      "path": "build/saved-structures83-api-actual-1/validation.json",
+      "bytes": 102851,
+      "sha256": "d5976fcf73c2dde11b1656fcccd9098513f84666e81285c9db2eef9a979ff8d4"
+    },
+    "parent_validation": {
+      "path": "build/saved-structures83-api-continuation-actual-1/validation.json",
+      "bytes": 141481,
+      "sha256": "4eee3fdf530e89acb189991d2b4f88556c0adb189fb647b58de5656474e0ca21"
+    },
+    "attempts": [
+      {
+        "validation": {
+          "path": "build/saved-structures83-api-actual-1/validation.json",
+          "bytes": 102851,
+          "sha256": "d5976fcf73c2dde11b1656fcccd9098513f84666e81285c9db2eef9a979ff8d4"
+        },
+        "physical_calls_retained": 11,
+        "retained_prior_physical_calls": 0,
+        "new_http_calls_executed_here": 11,
+        "full_guard_events": 1,
+        "faults": [
+          {
+            "type": "TypeError",
+            "message": "not a valid non-string sequence or mapping object",
+            "retry_performed": false
+          }
+        ]
+      },
+      {
+        "validation": {
+          "path": "build/saved-structures83-api-continuation-actual-1/validation.json",
+          "bytes": 141481,
+          "sha256": "4eee3fdf530e89acb189991d2b4f88556c0adb189fb647b58de5656474e0ca21"
+        },
+        "physical_calls_retained": 15,
+        "retained_prior_physical_calls": 11,
+        "new_http_calls_executed_here": 4,
+        "full_guard_events": 2,
+        "faults": [
+          {
+            "type": "AssertionError",
+            "message": "file-16-original-file-reupload",
+            "retry_performed": false
+          }
+        ]
+      }
+    ],
+    "accepted_validation": {
+      "path": "build/saved-structures83-api-continuation-actual-2/validation.json",
+      "bytes": 303271,
+      "sha256": "9523c5a09fe47d7e944049cd91e8e2483078de16ad8cbd75f5734f5b6f631e01"
+    },
+    "retained_prior_physical_calls": 15,
+    "new_http_calls_executed_here": 15,
+    "total_physical_calls": 30,
+    "total_guard_events": 5,
+    "historical_guard_events": 2,
+    "current_attempt_guard_events": 3,
+    "historical_faults": [
+      {
+        "type": "TypeError",
+        "message": "not a valid non-string sequence or mapping object",
+        "retry_performed": false
+      },
+      {
+        "type": "AssertionError",
+        "message": "file-16-original-file-reupload",
+        "retry_performed": false
+      }
+    ],
+    "automatic_HTTP_retries": 0,
+    "completed_corpus_cases_replayed_for_recovery": 0,
+    "planned_first_request_independence_repeat_retained": true,
+    "accepted_ui_bridge": {
+      "path": "build/feature83-ui-file-bridge-actual-2/validation.json",
+      "bytes": 6941,
+      "sha256": "f1a2c937006046e74e7aea54806ffee0560cbaed0f54e6e60c80ca47038048a8"
+    },
+    "initial_ui_bridge": {
+      "path": "build/feature83-ui-file-bridge-actual-1/validation.json",
+      "bytes": 5625,
+      "sha256": "35bb079bca13bc1dcf8bc859c00cbaf7ea16841d9c3bd0e03ca51df013455802"
+    },
+    "bridge_recovery": {
+      "historical_capture_failure": {
+        "path": "build/saved-structures83-api-continuation-actual-1/validation.json",
+        "bytes": 141481,
+        "sha256": "4eee3fdf530e89acb189991d2b4f88556c0adb189fb647b58de5656474e0ca21"
+      },
+      "historical_bridge_execution_failure": {
+        "attempt": {
+          "path": "build/saved-structures83-api-continuation-actual-1/file-16-original-file-reupload.attempt.json",
+          "bytes": 977,
+          "sha256": "9984835a83e3f61459902b4da55c16b86a19ef2b45c03d666ced8e7ab444c330"
+        },
+        "stderr": {
+          "path": "build/saved-structures83-api-continuation-actual-1/file-16-original-file-reupload.stderr",
+          "bytes": 818,
+          "sha256": "4cd4c1c9d031212d10a2551ac69b2fb905eb74b11b6236435b594559a3aa6568"
+        }
+      }
+    }
+  },
+  "SDK_witness_history": {
+    "accepted": {
+      "path": "build/feature83-native-sdk-witness-recovery-actual-2d114386dd624fa7a5c8ca97bd752473/validation.json",
+      "bytes": 4836,
+      "sha256": "76efd032f3328c83d9e4e8c161240bc09208ba8729e634b450ab33d476587d54"
+    },
+    "original_post_configure_validator_failure": {
+      "path": "build/feature83-native-sdk-witness-actual-ebdda39cb2234df9ab34083b725ac1b7/validation.json",
+      "bytes": 3181,
+      "sha256": "d6da336175f2c77515d3a4ede7f0934ec6064b08904f7bc141f265e2c5a00d95"
+    },
+    "configure_replayed": false
+  },
+  "UI_proof_writer_history": {
+    "failure": {
+      "path": "build/saved-structures83-six-ui-proof-writer-failure.json",
+      "bytes": 1156,
+      "sha256": "0b9f8f731bb1bf772026c9f53d09f9cd80cc7656413c1bedb25d122069b93d97"
+    },
+    "initial_integration": {
+      "path": "build/saved-structures83-six-ui-integration-1.json",
+      "bytes": 2868,
+      "sha256": "bb98db6a20f14d3e28ff269e68ca411faed5223f8782ea77bd92ecccbf0841c0"
+    },
+    "phase": "proof write after six copies and post-copy guards",
+    "source_copy_replayed": false
+  },
+  "UI_followup_history": {
+    "amendment": {
+      "path": "build/saved-structures83-file-reselection-amendment/amendment.json",
+      "bytes": 1335,
+      "sha256": "2d98e0cd5126cf25762d2daca5e0ba61950d53a54b910d40ee283f17c5961874"
+    },
+    "prior_integration": {
+      "path": "build/saved-structures83-frontend-final-integration-7ba2451c891144bbbad1414a77b328c1/validation.json",
+      "bytes": 2754482,
+      "sha256": "98c24f2af3346ec745b9bc24503f07a212fe6cca1bcce7a45ff676b475fef8f3"
+    },
+    "prior_frontend_validation": {
+      "path": "build/saved-structures83-frontend-4974649668d942d6b0c988783b0e5781/validation.json",
+      "bytes": 2752883,
+      "sha256": "32f7aca085eda29b17eeb8ff5f391549d7d3745efb075eee0639b8bc8d5b4d54"
+    },
+    "current_integration": {
+      "path": "build/saved-structures83-file-reselection-integration-1.json",
+      "bytes": 2755213,
+      "sha256": "c8f46596a9b006b02f306b7a0b5a42a374c8dc5e2e8a63c5aee691a1c48cdefd"
+    },
+    "current_frontend_validation": {
+      "path": "build/saved-structures83-frontend-a7b600e5d1e34a3185072b6447244ff1/validation.json",
+      "bytes": 2752854,
+      "sha256": "4037b1744ff7be4ee913bec4a7320a80f8af5fc1f3ee9a7dd7707ea6f3efc2f0"
+    },
+    "before": {
+      "path": "build/saved-structures83-file-reselection-amendment/before.tsx",
+      "bytes": 11730,
+      "sha256": "5fe366c35ddb85e4babb92734270ad6c58f599059abaa1006ec60f9781e4c337"
+    },
+    "after": {
+      "path": "build/saved-structures83-file-reselection-amendment/after.tsx",
+      "bytes": 11780,
+      "sha256": "7b09930c443bb09e90e9a9dac0ac19b4367f85d618f279868565ec24f707867c"
+    },
+    "change": "Clear both DOM file fields after capturing the selected File; preserve the File object and bytes.",
+    "full_frontend_revalidated": true
+  },
+  "portable_template_history": {
+    "correction": {
+      "path": "build/feature83-portable-prepared-2/correction.json",
+      "bytes": 802,
+      "sha256": "07e64150b0aaa79be02e5562de6d7def7462d83cff3d366dcd589e34badd48c8"
+    },
+    "validation_attempts": [
+      {
+        "path": "build/saved-structures83-portable-types-1-ad1b8657fcf84b009475883f07f5b158/validation.json",
+        "bytes": 98836,
+        "sha256": "ec3e72b556f3e2849d49998501336e6b85a4dfa1b51a1a6856a7ef26f16fdb9d"
+      }
+    ],
+    "strict_diagnostic_count": 4,
+    "Vitest_executions_before_correction": 0,
+    "failed_fixture_tests_before_correction": 0
+  },
+  "proof_history_lineage": {
+    "native": {
+      "current_attempt_executed_test_suites": 4,
+      "current_attempt_compiled_core_sources": 1,
+      "current_attempt_compiled_server_sources": 1
+    },
+    "api": {
+      "original_failure": {
+        "path": "build/saved-structures83-api-actual-1/validation.json",
+        "bytes": 102851,
+        "sha256": "d5976fcf73c2dde11b1656fcccd9098513f84666e81285c9db2eef9a979ff8d4"
+      },
+      "current_attempt_full_guard_events": 3,
+      "continuation_history": [
+        {
+          "path": "build/saved-structures83-api-actual-1/validation.json",
+          "bytes": 102851,
+          "sha256": "d5976fcf73c2dde11b1656fcccd9098513f84666e81285c9db2eef9a979ff8d4"
+        },
+        {
+          "path": "build/saved-structures83-api-continuation-actual-1/validation.json",
+          "bytes": 141481,
+          "sha256": "4eee3fdf530e89acb189991d2b4f88556c0adb189fb647b58de5656474e0ca21"
+        }
+      ],
+      "retained_prior_physical_calls": 15
+    },
+    "frontend": {},
+    "live": {
+      "post_attempts": [
+        {
+          "path": "build/savedStructures83-live-runtime-a15b5a808e474e76a59b1e5af949f468/01-terminal-root-sdk.attempt.json",
+          "bytes": 306,
+          "sha256": "60066cb3ffb19f8756a798f549ccb23101b96e4d087b75f598384c6153bf7fe5"
+        },
+        {
+          "path": "build/savedStructures83-live-runtime-a15b5a808e474e76a59b1e5af949f468/02-ordered-point-sdk.attempt.json",
+          "bytes": 306,
+          "sha256": "0edaf4d4d392a0eb12a148e28b76c8eb21c1f6c77539e2ec881da4e1d26afac9"
+        }
+      ],
+      "prior_stop_attempted": true,
+      "stopped_owned_prior_pid": 51160
+    },
+    "cleanup": {},
+    "backend": {},
+    "integration": {
+      "prior_integration": {
+        "path": "build/saved-structures83-frontend-final-integration-7ba2451c891144bbbad1414a77b328c1/validation.json",
+        "bytes": 2754482,
+        "sha256": "98c24f2af3346ec745b9bc24503f07a212fe6cca1bcce7a45ff676b475fef8f3"
+      },
+      "prior_frontend_validation": {
+        "path": "build/saved-structures83-frontend-4974649668d942d6b0c988783b0e5781/validation.json",
+        "bytes": 2752883,
+        "sha256": "32f7aca085eda29b17eeb8ff5f391549d7d3745efb075eee0639b8bc8d5b4d54"
+      }
+    },
+    "portable": {
+      "portable_correction": {
+        "path": "build/feature83-portable-prepared-2/correction.json",
+        "bytes": 802,
+        "sha256": "07e64150b0aaa79be02e5562de6d7def7462d83cff3d366dcd589e34badd48c8"
+      },
+      "portable_validation_attempts": [
+        {
+          "path": "build/saved-structures83-portable-types-1-ad1b8657fcf84b009475883f07f5b158/validation.json",
+          "bytes": 98836,
+          "sha256": "ec3e72b556f3e2849d49998501336e6b85a4dfa1b51a1a6856a7ef26f16fdb9d"
+        }
+      ]
+    }
+  },
+  "native_and_API_failure_history": {
+    "native_first_attempt_succeeded": true,
+    "API_historical_false_checks": [],
+    "API_collector_faults": [],
+    "API_first_full_capture_succeeded": false,
+    "API_historical_collector_faults": [
+      {
+        "type": "TypeError",
+        "message": "not a valid non-string sequence or mapping object",
+        "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\urllib\\parse.py\", line 969, in urlencode\n    raise TypeError\nTypeError\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature83-api-prepared-3\\capture.py\", line 93, in main\n    parts=copy.deepcopy(case['parts']);handoff=adaptive(case,parts)if'adaptive'in case else None;mime,body=frame(parts,len(rows)+1);query=case['query'];path='/api/structural-inputs'+('?' + urllib.parse.urlencode(query)if query else'');send(case['id'],'entry','POST',path,mime,body,parts,query,case,handoff)\n                                                                                                                                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\urllib\\parse.py\", line 975, in urlencode\n    raise TypeError(\"not a valid non-string sequence \"\nTypeError: not a valid non-string sequence or mapping object\n",
+        "retry_performed": false
+      },
+      {
+        "type": "AssertionError",
+        "message": "file-16-original-file-reupload",
+        "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature83-api-continuation-prepared-1\\resume.py\", line 95, in main\n    parts=copy.deepcopy(case['parts']);handoff=adaptive(case,parts)if'adaptive'in case else None;mime,body=frame(parts,len(rows)+1);query=case['query'];path='/api/structural-inputs'+('?' + urllib.parse.urlencode([tuple(x)for x in query])if query else'');send(case['id'],'entry','POST',path,mime,body,parts,query,case,handoff)\n                                               ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature83-api-continuation-prepared-1\\resume.py\", line 77, in adaptive\n    command=run(argv,'file-'+case['id']);h=read(folder/'handoff.json');assert h['complete']and h['actual_file_download']and h['produced_by_actual_ui_helpers']==(not(d['kind']=='legacy'and d['legacy_kind']=='result'))and h['kind']==d['kind']and h['response_sha256']==parent['response']['sha256'];f=local(h['file_bytes']['path']);assert len(f.read_bytes())==h['file_bytes']['bytes']and sha(f.read_bytes())==h['file_bytes']['sha256']\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature83-api-continuation-prepared-1\\resume.py\", line 48, in run\n    attempt.update(stdout=desc(stdout),stderr=desc(stderr));write(out/(label+'.attempt.json'),attempt);assert attempt['exit_code']==0,label;return attempt\n                                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: file-16-original-file-reupload\n",
+        "retry_performed": false
+      }
+    ]
+  },
+  "SDK_witness": {
+    "path": "build/feature83-native-sdk-witness-recovery-actual-2d114386dd624fa7a5c8ca97bd752473/validation.json",
+    "bytes": 4836,
+    "sha256": "76efd032f3328c83d9e4e8c161240bc09208ba8729e634b450ab33d476587d54"
+  },
+  "semantics": [
+    "Supplied TrieModel conversion independent of cached log, including root terminal and full stored fields",
+    "Supplied ordered interval vector query with duplicate/order/index preservation and complete point/range options",
+    "Original legacy data/report Files, canonical constructors and full native results retained separately",
+    "Opaque actual native serializer/PNML exports have separate errors; successful primary storage is not erased",
+    "Standalone SavedStructuralWorkspace is accessible through App/TopBar without active source",
+    "Input and options file pickers retain the captured File while clearing the DOM value, allowing the same File to be selected again"
+  ],
+  "claim_boundary": "Source availability and delivered native input domains are not full behavioral/parameter/ordering/Unicode/solver/concurrency/performance parity; strict counts stay unchanged."
+}

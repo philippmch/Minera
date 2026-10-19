@@ -1,0 +1,92 @@
+{
+  "portable_correction": {
+    "path": "build/feature83-portable-prepared-2/correction.json",
+    "bytes": 802,
+    "sha256": "07e64150b0aaa79be02e5562de6d7def7462d83cff3d366dcd589e34badd48c8"
+  },
+  "portable_validation_attempts": [
+    {
+      "path": "build/saved-structures83-portable-types-1-ad1b8657fcf84b009475883f07f5b158/validation.json",
+      "bytes": 98836,
+      "sha256": "ec3e72b556f3e2849d49998501336e6b85a4dfa1b51a1a6856a7ef26f16fdb9d"
+    }
+  ],
+  "feature": 83,
+  "complete": true,
+  "runtime_replay": false,
+  "actual_api_proof": {
+    "path": "build/saved-structures83-api-continuation-actual-2/validation.json",
+    "bytes": 303271,
+    "sha256": "9523c5a09fe47d7e944049cd91e8e2483078de16ad8cbd75f5734f5b6f631e01"
+  },
+  "counts": {
+    "entries": 24,
+    "actual_http_calls": 30,
+    "expected_fixture_tests": 25,
+    "actual_File_argument_handoffs": 9,
+    "actual_UI_argument_File_handoffs": 7,
+    "raw_native_response_File_downloads": 2,
+    "native_artifact_File_handoffs": 3,
+    "historical_false_checks": 0,
+    "full_guard_events": 5
+  },
+  "native_manifest": {
+    "path": "build/native-feature83-ae2dbf2dce0d4be2a5efa88b310e80db/build-manifest.json",
+    "bytes": 372633,
+    "sha256": "801e8bcc0d7d4bcd9dae3116e4498b9bce5f34f252c516dadbfab0bd0b1460d1"
+  },
+  "sdk_witness": {
+    "path": "build/feature83-native-sdk-witness-recovery-actual-2d114386dd624fa7a5c8ca97bd752473/validation.json",
+    "bytes": 4836,
+    "sha256": "76efd032f3328c83d9e4e8c161240bc09208ba8729e634b450ab33d476587d54"
+  },
+  "parent_validation": {
+    "path": "build/saved-structures83-api-continuation-actual-1/validation.json",
+    "bytes": 141481,
+    "sha256": "4eee3fdf530e89acb189991d2b4f88556c0adb189fb647b58de5656474e0ca21"
+  },
+  "historical_collector_faults": [
+    {
+      "type": "TypeError",
+      "message": "not a valid non-string sequence or mapping object",
+      "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\urllib\\parse.py\", line 969, in urlencode\n    raise TypeError\nTypeError\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature83-api-prepared-3\\capture.py\", line 93, in main\n    parts=copy.deepcopy(case['parts']);handoff=adaptive(case,parts)if'adaptive'in case else None;mime,body=frame(parts,len(rows)+1);query=case['query'];path='/api/structural-inputs'+('?' + urllib.parse.urlencode(query)if query else'');send(case['id'],'entry','POST',path,mime,body,parts,query,case,handoff)\n                                                                                                                                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\urllib\\parse.py\", line 975, in urlencode\n    raise TypeError(\"not a valid non-string sequence \"\nTypeError: not a valid non-string sequence or mapping object\n",
+      "retry_performed": false
+    },
+    {
+      "type": "AssertionError",
+      "message": "file-16-original-file-reupload",
+      "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature83-api-continuation-prepared-1\\resume.py\", line 95, in main\n    parts=copy.deepcopy(case['parts']);handoff=adaptive(case,parts)if'adaptive'in case else None;mime,body=frame(parts,len(rows)+1);query=case['query'];path='/api/structural-inputs'+('?' + urllib.parse.urlencode([tuple(x)for x in query])if query else'');send(case['id'],'entry','POST',path,mime,body,parts,query,case,handoff)\n                                               ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature83-api-continuation-prepared-1\\resume.py\", line 77, in adaptive\n    command=run(argv,'file-'+case['id']);h=read(folder/'handoff.json');assert h['complete']and h['actual_file_download']and h['produced_by_actual_ui_helpers']==(not(d['kind']=='legacy'and d['legacy_kind']=='result'))and h['kind']==d['kind']and h['response_sha256']==parent['response']['sha256'];f=local(h['file_bytes']['path']);assert len(f.read_bytes())==h['file_bytes']['bytes']and sha(f.read_bytes())==h['file_bytes']['sha256']\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature83-api-continuation-prepared-1\\resume.py\", line 48, in run\n    attempt.update(stdout=desc(stdout),stderr=desc(stderr));write(out/(label+'.attempt.json'),attempt);assert attempt['exit_code']==0,label;return attempt\n                                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: file-16-original-file-reupload\n",
+      "retry_performed": false
+    }
+  ],
+  "selection": [
+    "01-terminal-root-sdk",
+    "02-ordered-point-sdk",
+    "03-ordered-range-sdk",
+    "04-ordered-default",
+    "05-default-trie-text-part",
+    "06-nonfinite-native",
+    "07-invalid-range-native",
+    "08-duplicate-native-labels",
+    "09-malformed-input",
+    "10-duplicate-json-field",
+    "11-unknown-operation",
+    "12-query-body-duplicate",
+    "13-default-rejects-options",
+    "14-explicit-incompatible-format",
+    "15-byte-label-opaque-native",
+    "16-original-file-reupload",
+    "17-constructor-file-reupload",
+    "18-query-result-file-reupload",
+    "19-options-file-reupload",
+    "20-real-legacy-trie",
+    "21-real-legacy-interval",
+    "22-real-legacy-discovery-download",
+    "23-real-legacy-conversion-download",
+    "24-real-legacy-conversion-report"
+  ],
+  "boundaries": [
+    "Exact saved response/client guard/File tests; no native algorithm implementation or HTTP replay.",
+    "Native output and PNML remain opaque bytes. Raw native GET File downloads are separate from product-helper File handoffs."
+  ]
+}

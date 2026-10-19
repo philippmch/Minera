@@ -1,5 +1,9 @@
 # Functionality inventory
 
+Current audited status: Feature83 adds a standalone Saved structures workspace without a cached log. It converts supplied TrieModels to Petri nets and queries saved interval vectors while preserving caller order, duplicate entries and native indices. Existing structural downloads and reports can be reopened; original bytes, complete native constructors/results, serializer output and PNML exports stay separate. Both file pickers allow selecting the same file again. Validation passed 24 selected cases across 30 physical requests, 9140 frontend tests in 150 files, native targeted suites, portable fixtures, strict TypeScript/Vite and live checks. 7 handoffs used product File helpers; 2 retained raw native downloads. The source audit traces principal workflows for all 86 families, with seven audited extensions open; this does not establish full feature parity. Strict scope remains 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
+
+The following inventory and delivery notes retain their historical chronology; earlier next-feature statements are historical.
+
 The pinned catalogue contains 86 algorithm families and 387 modules. The Feature60 source audit found existing application surfaces for 71 families and specific missing inputs, operations or controls in 15 families. Those figures describe static availability, not full behavior or parameter coverage.
 
 Strict parity remains 46/86 packages and 199/387 modules, with 228 incomplete coverage units. Feature delivery does not promote these strict counts.
