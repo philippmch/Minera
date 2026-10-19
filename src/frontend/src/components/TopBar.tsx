@@ -36,11 +36,12 @@ interface TopBarProps {
   onOriginalAnonymization?: () => void;
   onOriginalQuality?: () => void;
   onOriginalClustering?: () => void;
+  onOriginalOrganizational?: () => void;
   onOriginalOcPlayout?: () => void;
   onActiveSource?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalClustering, onOriginalOcPlayout, onActiveSource }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalClustering, onOriginalOrganizational, onOriginalOcPlayout, onActiveSource }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -87,6 +88,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onOriginalRootCause && <button className="btn-ghost" onClick={onOriginalRootCause}>Original root cause</button>}
       {onOriginalAnonymization && <button className="btn-ghost" onClick={onOriginalAnonymization}>Original anonymization</button>}
       {onOriginalClustering && <button className="btn-ghost" onClick={onOriginalClustering}>Original clustering</button>}
+      {onOriginalOrganizational && <button className="btn-ghost" onClick={onOriginalOrganizational}>Original organizational</button>}
       {onOriginalQuality && <button className="btn-ghost" onClick={onOriginalQuality}>Original model quality</button>}
       {onOriginalOcPlayout && <button className="btn-ghost" onClick={onOriginalOcPlayout}>Original object-centric playout</button>}
       {onActiveSource && <button className="btn-ghost" onClick={onActiveSource}>Source inputs</button>}
