@@ -221,4 +221,15 @@ void transport_and_artifacts(){Fixture data(full_log());const auto profile=disco
  for(const auto malformed:{std::string("{\"entries\":[{\"count\":18446744073709551616}]}"),std::string("{\"entries\":[{\"count\":1.0}]}"),std::string("{\"entries\":[{\"source\":{\"native_bytes\":\"hex-v1\",\"data\":\"f\"}}]}"),std::string("{\"entries\":[{\"mean_seconds\":1e999}]}")}){Parts original{{"operation","","temporal_profile_json",false},{"profile_file","",malformed,true}};host_error(execute_temporal_workbench(original),"input_error");}
 }
 } // namespace
-int main(){all_forms();stored_domains();option_domains();transport_and_artifacts();assert(observed.size()>=45);return 0;}
+
+void named_source_presence_contract(){
+ using namespace minera;
+ const std::string log="{\"traces\":[]}";
+ const std::vector<DiscoveryWorkbenchPart> omitted={{"operation","","discover_temporal_profile_log",false},{"source_file","",log,false}};
+ assert(execute_temporal_workbench(omitted).status==200);
+ auto explicit_empty=omitted;explicit_empty.push_back({"source_kind","","",false});
+ auto response=execute_temporal_workbench(explicit_empty);assert(response.status==400&&response.json.find("\"native_entered\":false")!=std::string::npos);
+ response=execute_temporal_workbench(omitted,{{"source_kind","","",false}});assert(response.status==400&&response.json.find("\"native_entered\":false")!=std::string::npos);
+}
+int main(){
+ named_source_presence_contract();all_forms();stored_domains();option_domains();transport_and_artifacts();assert(observed.size()>=45);return 0;}
