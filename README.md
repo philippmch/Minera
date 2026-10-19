@@ -2780,3 +2780,9 @@ See [validation and boundaries](docs/feature-first-original-clustering-workbench
 Upload a complete EventLog for social networks, roles, resource profiles, network analysis or local diagnostics. All 49 native options are editable. You can also supply full stored results to the native serializers or use the metric-name helpers. Inspect complete results and download exact source, options, groups and result artifacts. A separate roles-to-local-diagnostics action produces editable groups, source and options Files bound to the actual role response and selectors. Existing cached organizational tools remain available.
 
 See [validation and boundaries](docs/feature-first-original-organizational-workbench-validation.json).
+
+### Explore temporal analysis with independent inputs
+
+Upload complete log, stream, table or finite lazy inputs, including concrete EventDataView forms, and edit all 11 temporal options. Discover full profiles, check conformance, call the raw text parser or four native serializers, and use stddev, distance and find directly with independently supplied storage. Inspect complete profiles/deviations, source snapshots, actual lazy scans and pointer observations. Download all 18 exact native artifacts or explicitly select a full deviation fragment for a separate distance call. Full profile artifacts preserve stored counts; moment-parser text is a separate format boundary. Existing cached temporal tools remain available.
+
+See [validation and boundaries](docs/feature-first-original-temporal-workbench-validation.json).
