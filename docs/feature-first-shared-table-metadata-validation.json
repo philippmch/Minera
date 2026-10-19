@@ -1,0 +1,1003 @@
+{
+  "complete": true,
+  "feature": 82,
+  "feature_available": true,
+  "features_delivered": 82,
+  "backend_commit": "1c5d7cdfb5637d14bff8755bf1414b560236cc1f",
+  "ui_commit_verification_required": true,
+  "ui_commit_identity_note": "Containing fixture/docs commit verified externally after commit.",
+  "baseline": {
+    "path": "build/table-metadata-feature82-baseline.json",
+    "bytes": 2817627,
+    "sha256": "683bdb5d0b50d485af48ad0af685a41c57c3b73e703d19e4b0302d1d254abcf4"
+  },
+  "accepted_protocol": {
+    "path": "build/feature82-protocol-prepared-1-20261019/protocol.json",
+    "bytes": 7689,
+    "sha256": "866b3fcf21294613ea9b3de51aaf2b713422a829749811391fd9e967f811eccc"
+  },
+  "accepted_contract": {
+    "path": "build/feature82-protocol-prepared-1-20261019/contract.json",
+    "bytes": 1446,
+    "sha256": "72916d655471ff903e68a3ece8c15ed469dc171d7f6aa266f6832ad38dc39dc5"
+  },
+  "independent_protocol_review": {
+    "path": "build/feature82-protocol-independent-review-20261019/review-1.json",
+    "bytes": 7006,
+    "sha256": "99480d2ba4d37abd40689ff17c5871b151de10cd0f284ba8e7b64c3f9a9f0d53"
+  },
+  "root_protocol_acceptance": {
+    "path": "build/table-metadata82-root-protocol-acceptance-20261019.json",
+    "bytes": 1162,
+    "sha256": "c56698553827075a94e4dd7a3543ec9e186de078902bc6e144655afc29f9ef06"
+  },
+  "collector_independent_review": {
+    "path": "build/feature82-api-independent-review-20261019/collector-review-2.json",
+    "bytes": 7287,
+    "sha256": "92083c6ed40c6943e73dccf3f5d24f7761c6796e925c00ba827286eba2ad37e9"
+  },
+  "offline_validator_independent_review": {
+    "path": "build/feature82-api-independent-review-20261019/offline-amendment-review-1.json",
+    "bytes": 5126,
+    "sha256": "e7b586a440b98df2fb10d4a21fe63b294aa0db232aae5a327964d8d7c801bb87"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature82-driver-final2-recovery-4e7fe375ef0647b19e4e1b99372ac427/build-manifest.json",
+      "bytes": 375125,
+      "sha256": "5975fb493a0020fa20c785bd86da010dbab59f4a1016cf7796710a886c393906"
+    },
+    "api": {
+      "path": "build/table-metadata82-api-offline-corrected-20261019-1/validation.json",
+      "bytes": 1454456,
+      "sha256": "5f0dd53c2f16b62ef073fb7b653c78777ac50ce527ec84e3144581ec55adbf02"
+    },
+    "frontend": {
+      "path": "build/table-metadata82-frontend-final-c93d720883bd4b718d00bb714dde0f78/validation.json",
+      "bytes": 2750509,
+      "sha256": "cb9f330f62c17edbf7a4ca979d9fff771d8f82fe2ef8712fdc230a9614d966b4"
+    },
+    "live": {
+      "path": "build/table-metadata-feature82-live-runtime.json",
+      "bytes": 5565403,
+      "sha256": "217217a32913d24205405eb09d90a06aa1adb2659d27a205da0339940f71ea15"
+    },
+    "cleanup": {
+      "path": "build/table-metadata-feature82-test-cleanup.json",
+      "bytes": 3729,
+      "sha256": "66f443e02004ababaa85b631801222b40a1ba20569554efaa714662ca36929c7"
+    },
+    "backend": {
+      "path": "build/table-metadata-feature82-backend-postcommit.json",
+      "bytes": 4797,
+      "sha256": "37300eb7d5ec4bef4c6afdd995646c58965d0e06e50968697d42571ffa0882f0"
+    },
+    "integration": {
+      "path": "build/table-metadata82-frontend-context-integration-1.json",
+      "bytes": 45145,
+      "sha256": "897c133d47c7376451122f41b371c03fbef2eb035b93f4b366dce8a516ac6553"
+    },
+    "portable": {
+      "path": "build/feature82-compact-fixture-publication-6379622a1fd34903b7d0f18ad2c20dfa/validation.json",
+      "bytes": 125162,
+      "sha256": "e64d7ca1e0005b92dfa4fd1a654bcad59fc8a1bc248f563535294fa587be4e42"
+    }
+  },
+  "counts": {
+    "native_source_bindings": 753,
+    "contributing_native_suites": 67,
+    "contributing_native_test_invocations": 12,
+    "current_native_suites_executed": 2,
+    "retained_feature_native_suites": 2,
+    "feature_native_suites_executed": 4,
+    "feature_native_ctest_count": 2,
+    "reused_core_objects": 207,
+    "fresh_core_objects": 1,
+    "feature_core_objects": 208,
+    "selected_api_cases": 33,
+    "actual_api_calls": 35,
+    "native_artifact_File_handoffs": 4,
+    "total_UI_argument_File_handoffs": 4,
+    "prepatch_physical_calls": 10,
+    "prepatch_selected_cases": 8,
+    "prepatch_observed_loss_routes": 4,
+    "prepatch_historical_false_checks": 4,
+    "current_api_false_checks": 0,
+    "historical_api_false_checks": 33,
+    "frontend_tests": 9078,
+    "frontend_test_files": 148,
+    "frontend_source_bindings": 14123,
+    "authored_UI_files_changed": 0,
+    "portable_tests": 34,
+    "served_asset_count": 7,
+    "separate_live_smoke_post_calls": 2
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "families": [],
+  "affected_existing_routes": [
+    "/api/embedding-workbench",
+    "/api/edit-distance-workbench",
+    "/api/bose-workbench",
+    "/api/discovery-workbench"
+  ],
+  "new_public_declarations": 0,
+  "new_routes": 0,
+  "authored_UI_files_changed": 0,
+  "metadata_fields": 10,
+  "private_transport_fields": 4,
+  "standard_interchange_metadata_fields": 6,
+  "browser_ui_verified": false,
+  "full_parity": false,
+  "goal_complete": false,
+  "previous_feature_postcommit": {
+    "path": "build/time-analysis-feature81-postcommit.json",
+    "bytes": 5045,
+    "sha256": "9092e485a598a369b0dd50fa2fbf47855fa386e4abca02364b148b59be224262"
+  },
+  "previous_feature_validation_unchanged": {
+    "path": "docs/feature-first-original-time-analysis-workbench-validation.json",
+    "bytes": 12693,
+    "sha256": "bada5cef326f3237c54b7b12dd24d8756365db6711de125e19528e33ad10bdb9"
+  },
+  "latest_actual_browser_denial": {
+    "path": "build/table-metadata82-browser-policy-retry-20261019.json",
+    "bytes": 654,
+    "sha256": "91b3fd4060e497d6ab76b64b08e30e39831478e84196ba74338dbe516fe3d142"
+  },
+  "browser_evidence": {
+    "historical_only": false,
+    "denial_feature": 82,
+    "served_feature": 81,
+    "Feature82_browser_actions": 1,
+    "navigation_completed": false,
+    "Feature82_UI_verified": false,
+    "parent_denial": {
+      "path": "build/time-analysis81-browser-permission-retry-20261019.json",
+      "bytes": 503,
+      "sha256": "c065f01e6b9f16a12204a772f47943764993eb527bad45cc9a4b8688a7e89a7d"
+    }
+  },
+  "closed_followons": [
+    {
+      "id": "shared-table-private-metadata-transport",
+      "origin_feature": 76,
+      "closed_by_feature": 82,
+      "original_audit": {
+        "path": "build/quality76-table-metadata-followon-audit-20261019/audit.json",
+        "bytes": 90140,
+        "sha256": "c2a59b47e0926331d3962d0408692a77f950d4d9af020aefc70d95466b6238dc"
+      },
+      "fresh_audit": {
+        "path": "build/shared-table-metadata-next-selection-20261019-2/audit.json",
+        "bytes": 157449,
+        "sha256": "38bb7f9b8682fcc8b64fcd281a6e8be01d4663f3f4953a2cfed4d8387e34ae7e"
+      },
+      "prepatch_validation": {
+        "path": "build/feature82-prepatch-combined-actual-20261019-1.json",
+        "bytes": 149617,
+        "sha256": "9c0b3b5942841ad367644f9a8896786ee0483db505c13f66c7d713ecd93bd7f5"
+      },
+      "native_validation": {
+        "path": "build/native-feature82-driver-final2-recovery-4e7fe375ef0647b19e4e1b99372ac427/build-manifest.json",
+        "bytes": 375125,
+        "sha256": "5975fb493a0020fa20c785bd86da010dbab59f4a1016cf7796710a886c393906"
+      },
+      "API_validation": {
+        "path": "build/table-metadata82-api-offline-corrected-20261019-1/validation.json",
+        "bytes": 1454456,
+        "sha256": "5f0dd53c2f16b62ef073fb7b653c78777ac50ce527ec84e3144581ec55adbf02"
+      }
+    }
+  ],
+  "remaining_followons": [
+    "Continue every remaining catalogue input, control and result gap plus strict behavior, browser, performance and concurrency validation."
+  ],
+  "prepatch_attempt_lineage": {
+    "combined_validation": {
+      "path": "build/feature82-prepatch-combined-actual-20261019-1.json",
+      "bytes": 149617,
+      "sha256": "9c0b3b5942841ad367644f9a8896786ee0483db505c13f66c7d713ecd93bd7f5"
+    },
+    "parent_validation": {
+      "path": "build/feature82-prepatch-actual-20261019-1/validation.json",
+      "bytes": 33007,
+      "sha256": "68fa8dcd7dd4422f8626077f386acd926c7d3d05542be985e765d9b3de98d897"
+    },
+    "supplement_validation": {
+      "path": "build/feature82-prepatch-supplement-actual-20261019-2/validation.json",
+      "bytes": 13786,
+      "sha256": "5bb7aa3021369b91d40d796405c39059c17024eb7d38715dec66395aa980c67b"
+    },
+    "historical_false_checks": [
+      {
+        "id": "01-embedding-legacy",
+        "physical_call_index": 1,
+        "check": "actual existing handler returned normal200",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "01-embedding-legacy",
+        "physical_call_index": 1,
+        "check": "complete prepatch observation reached",
+        "passed": false,
+        "failure": {
+          "type": "TypeError",
+          "message": "'NoneType' object is not subscriptable",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-feature82-prepatch-1.py\", line 46, in main\n    table=pointer(value,path);metadata=table['metadata'];observation={'pointer':path,'raw_schema':table.get('native_schema'),'metadata_keys':list(metadata),'private_present':{k:k in metadata for k in ('compatibility_snapshot_valid','compatibility_globals_snapshot','compatibility_trace_globals_snapshot','compatibility_event_globals_snapshot')},'reopened_private_defaults':case['expected_prepatch']['private_native_reopened_values']};row['snapshot_observations'].append(observation)\n          ^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-feature82-prepatch-1.py\", line 17, in pointer\n    for key in p.split('/')[1:]:v=v[key.replace('~1','/').replace('~0','~')]\n                                  ~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: 'NoneType' object is not subscriptable\n"
+        }
+      },
+      {
+        "id": "05-embedding-nondefault",
+        "physical_call_index": 5,
+        "check": "actual existing handler returned normal200",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "05-embedding-nondefault",
+        "physical_call_index": 5,
+        "check": "complete prepatch observation reached",
+        "passed": false,
+        "failure": {
+          "type": "TypeError",
+          "message": "'NoneType' object is not subscriptable",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-feature82-prepatch-1.py\", line 46, in main\n    table=pointer(value,path);metadata=table['metadata'];observation={'pointer':path,'raw_schema':table.get('native_schema'),'metadata_keys':list(metadata),'private_present':{k:k in metadata for k in ('compatibility_snapshot_valid','compatibility_globals_snapshot','compatibility_trace_globals_snapshot','compatibility_event_globals_snapshot')},'reopened_private_defaults':case['expected_prepatch']['private_native_reopened_values']};row['snapshot_observations'].append(observation)\n          ^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\capture-feature82-prepatch-1.py\", line 17, in pointer\n    for key in p.split('/')[1:]:v=v[key.replace('~1','/').replace('~0','~')]\n                                  ~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: 'NoneType' object is not subscriptable\n"
+        }
+      }
+    ],
+    "setup_correction": {
+      "field": "mining_input_shape",
+      "old": "table",
+      "new": "dataframe",
+      "source": "src/backend/tools/active_source_route.hpp:42-47",
+      "reason": "Actual public route vocabulary, before native table preparation; product behavior correct. No product fix."
+    },
+    "original_eight_request_response_bytes_retained": true,
+    "six_passing_cases_replayed": false,
+    "product_native_failure": false
+  },
+  "native_attempt_lineage": {
+    "parent_manifest": {
+      "path": "build/native-feature81-2c778ea0d76643579fc80cb63356a7d0/build-manifest.json",
+      "bytes": 357790,
+      "sha256": "d26f42d44809d6a42de890f1f20e4dcf89ee6772594766b3cf45d3e5b39a72d0"
+    },
+    "current_commands": [
+      {
+        "exit_code": 0,
+        "stdout": {
+          "path": "build/native-feature82-driver-final2-recovery-4e7fe375ef0647b19e4e1b99372ac427/command-0.stdout.txt",
+          "bytes": 656,
+          "sha256": "40f9bc55347d03b5ce4515536108cee24878e12a97bbf2a3e8980533f9a50e03"
+        },
+        "stderr": {
+          "path": "build/native-feature82-driver-final2-recovery-4e7fe375ef0647b19e4e1b99372ac427/command-0.stderr.txt",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "exit_code": 0,
+        "stdout": {
+          "path": "build/native-feature82-driver-final2-recovery-4e7fe375ef0647b19e4e1b99372ac427/command-1.stdout.txt",
+          "bytes": 1451,
+          "sha256": "01a25c6c01897816ab9919a604c699e57c8653136adf592896f06856bdbccd7b"
+        },
+        "stderr": {
+          "path": "build/native-feature82-driver-final2-recovery-4e7fe375ef0647b19e4e1b99372ac427/command-1.stderr.txt",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "exit_code": 0,
+        "stdout": {
+          "path": "build/native-feature82-driver-final2-recovery-4e7fe375ef0647b19e4e1b99372ac427/command-2.stdout.txt",
+          "bytes": 469,
+          "sha256": "4152df28c9fe5f5e1e4cddfe24345e4351b203b207fea006d4e2432500934f77"
+        },
+        "stderr": {
+          "path": "build/native-feature82-driver-final2-recovery-4e7fe375ef0647b19e4e1b99372ac427/command-2.stderr.txt",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "historical_native_build_attempts": [
+      {
+        "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/build-manifest.json",
+        "bytes": 329067,
+        "sha256": "5530e56ff650047f0639776fb3927a4a08367d4babe6da426947f31d0d629d92"
+      },
+      {
+        "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/build-manifest.json",
+        "bytes": 336948,
+        "sha256": "fdd597eaaea08ff839cc281e950ec9f718dfac9c30b98bc78f64379305e1670e"
+      },
+      {
+        "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/build-manifest.json",
+        "bytes": 339829,
+        "sha256": "7f2c602c906d7e5746ef49b1e325d1af03d8aba97112b7b917f974f331794bca"
+      }
+    ],
+    "current_executed_suite_count": 2,
+    "failed_ctest_evidence": {
+      "manifest": {
+        "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/build-manifest.json",
+        "bytes": 329067,
+        "sha256": "5530e56ff650047f0639776fb3927a4a08367d4babe6da426947f31d0d629d92"
+      },
+      "stdout": {
+        "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/command-3.stdout.txt",
+        "bytes": 2020,
+        "sha256": "f4bf8d74f25c4d82e178c673b01db6ea3b4ac1ee195c510d8b343e01625ee6da"
+      },
+      "stderr": {
+        "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/command-3.stderr.txt",
+        "bytes": 27,
+        "sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4"
+      },
+      "registration": {
+        "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/targeted-ctest/CTestTestfile.cmake",
+        "bytes": 1725,
+        "sha256": "a1008be682dccb6904780a9d15080d6323f49fac0223ac039daaea5cf17da5e8"
+      },
+      "exit_code": 8,
+      "failed_targets": [
+        "minera_embedding_workbench_json_tests",
+        "minera_edit_distance_workbench_json_tests",
+        "minera_bose_workbench_json_tests",
+        "minera_discovery_workbench_json_tests"
+      ]
+    },
+    "completed_prefix_bindings": {
+      "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/native-build/product-targets/Release/minera_core.lib": "e2e082c18ab62bc87d311cd293dc78429ff80851e3b91ce9eaeea0838172d37b",
+      "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/native-build/product-targets/Release/minera_server.exe": "92468544fb0c57405229bb646a782df462c1ddfc65ae177b29c266c3ee6b27dc"
+    },
+    "driver_only_recovery": true,
+    "configured_recovery": {
+      "path": "build/native-feature82-driver-recovery-153232502f8b4b15b6625a937b9f1fc7/build-manifest.json",
+      "bytes": 331142,
+      "sha256": "6ade45f6289926035277ad3955a13eab40742d5a0da9243eeb0482b4bb381c6d"
+    },
+    "partially_passing_native": {
+      "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/build-manifest.json",
+      "bytes": 336948,
+      "sha256": "fdd597eaaea08ff839cc281e950ec9f718dfac9c30b98bc78f64379305e1670e"
+    },
+    "partial_ctest_evidence": {
+      "manifest": {
+        "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/build-manifest.json",
+        "bytes": 336948,
+        "sha256": "fdd597eaaea08ff839cc281e950ec9f718dfac9c30b98bc78f64379305e1670e"
+      },
+      "stdout": {
+        "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/command-1.stdout.txt",
+        "bytes": 1598,
+        "sha256": "de167f9ad0b5ecc2e3f1aad2f6b57e7cbb64e2930e4fb5d9dc89c6f30e435a3b"
+      },
+      "stderr": {
+        "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/command-1.stderr.txt",
+        "bytes": 27,
+        "sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4"
+      },
+      "run_log": {
+        "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/targeted-ctest/Testing/Temporary/LastTest.log",
+        "bytes": 4907,
+        "sha256": "b18873b37707be2ea02a15c2ec2f6f62543cd4328af115f18bf1627893a703ac"
+      },
+      "failed_log": {
+        "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/targeted-ctest/Testing/Temporary/LastTestsFailed.log",
+        "bytes": 77,
+        "sha256": "bb10e2a72b26699d74a2085fad7e15c0f90f34d5da96960290ad9ce99f0af784"
+      },
+      "registration": {
+        "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/targeted-ctest/CTestTestfile.cmake",
+        "bytes": 1773,
+        "sha256": "f0f0092a43ea2360f865cac26b8f804afc870b3577db77494a0629f69363d49b"
+      },
+      "exit_code": 8,
+      "passing_targets": [
+        "minera_embedding_workbench_json_tests",
+        "minera_edit_distance_workbench_json_tests"
+      ],
+      "failed_targets": [
+        "minera_bose_workbench_json_tests",
+        "minera_discovery_workbench_json_tests"
+      ]
+    },
+    "previous_two_driver_failure": {
+      "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/build-manifest.json",
+      "bytes": 339829,
+      "sha256": "7f2c602c906d7e5746ef49b1e325d1af03d8aba97112b7b917f974f331794bca"
+    },
+    "previous_two_driver_ctest_evidence": {
+      "manifest": {
+        "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/build-manifest.json",
+        "bytes": 339829,
+        "sha256": "7f2c602c906d7e5746ef49b1e325d1af03d8aba97112b7b917f974f331794bca"
+      },
+      "stdout": {
+        "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/command-2.stdout.txt",
+        "bytes": 1105,
+        "sha256": "234e2bd3b7a6d1395f3e1a1e128f8ad223781a2323bfe0f1fba47ba635cebbd5"
+      },
+      "stderr": {
+        "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/command-2.stderr.txt",
+        "bytes": 27,
+        "sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4"
+      },
+      "run_log": {
+        "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/targeted-ctest/Testing/Temporary/LastTest.log",
+        "bytes": 2259,
+        "sha256": "d8b7e2b1eba4b277ebce19331abee1fe3683793a52e32b0dd4fda6befb910875"
+      },
+      "registration": {
+        "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/targeted-ctest/CTestTestfile.cmake",
+        "bytes": 901,
+        "sha256": "2014743274dc66d19a23369ab725d6184175da7dbaa773e500b5c8b84ae8f68f"
+      },
+      "exit_code": 8,
+      "failed_targets": [
+        "minera_bose_workbench_json_tests",
+        "minera_discovery_workbench_json_tests"
+      ]
+    },
+    "historical_failed_ctest_invocations": [
+      {
+        "manifest": {
+          "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/build-manifest.json",
+          "bytes": 329067,
+          "sha256": "5530e56ff650047f0639776fb3927a4a08367d4babe6da426947f31d0d629d92"
+        },
+        "stdout": {
+          "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/command-3.stdout.txt",
+          "bytes": 2020,
+          "sha256": "f4bf8d74f25c4d82e178c673b01db6ea3b4ac1ee195c510d8b343e01625ee6da"
+        },
+        "stderr": {
+          "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/command-3.stderr.txt",
+          "bytes": 27,
+          "sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4"
+        },
+        "registration": {
+          "path": "build/native-feature82-15257bfce22644d1ab8a692b32cc26a9/targeted-ctest/CTestTestfile.cmake",
+          "bytes": 1725,
+          "sha256": "a1008be682dccb6904780a9d15080d6323f49fac0223ac039daaea5cf17da5e8"
+        },
+        "exit_code": 8,
+        "failed_targets": [
+          "minera_embedding_workbench_json_tests",
+          "minera_edit_distance_workbench_json_tests",
+          "minera_bose_workbench_json_tests",
+          "minera_discovery_workbench_json_tests"
+        ]
+      },
+      {
+        "manifest": {
+          "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/build-manifest.json",
+          "bytes": 336948,
+          "sha256": "fdd597eaaea08ff839cc281e950ec9f718dfac9c30b98bc78f64379305e1670e"
+        },
+        "stdout": {
+          "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/command-1.stdout.txt",
+          "bytes": 1598,
+          "sha256": "de167f9ad0b5ecc2e3f1aad2f6b57e7cbb64e2930e4fb5d9dc89c6f30e435a3b"
+        },
+        "stderr": {
+          "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/command-1.stderr.txt",
+          "bytes": 27,
+          "sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4"
+        },
+        "run_log": {
+          "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/targeted-ctest/Testing/Temporary/LastTest.log",
+          "bytes": 4907,
+          "sha256": "b18873b37707be2ea02a15c2ec2f6f62543cd4328af115f18bf1627893a703ac"
+        },
+        "failed_log": {
+          "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/targeted-ctest/Testing/Temporary/LastTestsFailed.log",
+          "bytes": 77,
+          "sha256": "bb10e2a72b26699d74a2085fad7e15c0f90f34d5da96960290ad9ce99f0af784"
+        },
+        "registration": {
+          "path": "build/native-feature82-driver-resume-da79547a0263429f868143cfa554b25e/targeted-ctest/CTestTestfile.cmake",
+          "bytes": 1773,
+          "sha256": "f0f0092a43ea2360f865cac26b8f804afc870b3577db77494a0629f69363d49b"
+        },
+        "exit_code": 8,
+        "passing_targets": [
+          "minera_embedding_workbench_json_tests",
+          "minera_edit_distance_workbench_json_tests"
+        ],
+        "failed_targets": [
+          "minera_bose_workbench_json_tests",
+          "minera_discovery_workbench_json_tests"
+        ]
+      },
+      {
+        "manifest": {
+          "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/build-manifest.json",
+          "bytes": 339829,
+          "sha256": "7f2c602c906d7e5746ef49b1e325d1af03d8aba97112b7b917f974f331794bca"
+        },
+        "stdout": {
+          "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/command-2.stdout.txt",
+          "bytes": 1105,
+          "sha256": "234e2bd3b7a6d1395f3e1a1e128f8ad223781a2323bfe0f1fba47ba635cebbd5"
+        },
+        "stderr": {
+          "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/command-2.stderr.txt",
+          "bytes": 27,
+          "sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4"
+        },
+        "run_log": {
+          "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/targeted-ctest/Testing/Temporary/LastTest.log",
+          "bytes": 2259,
+          "sha256": "d8b7e2b1eba4b277ebce19331abee1fe3683793a52e32b0dd4fda6befb910875"
+        },
+        "registration": {
+          "path": "build/native-feature82-driver-final-recovery-79699c2218ff44699e556069a047c062/targeted-ctest/CTestTestfile.cmake",
+          "bytes": 901,
+          "sha256": "2014743274dc66d19a23369ab725d6184175da7dbaa773e500b5c8b84ae8f68f"
+        },
+        "exit_code": 8,
+        "failed_targets": [
+          "minera_bose_workbench_json_tests",
+          "minera_discovery_workbench_json_tests"
+        ]
+      }
+    ],
+    "retained_feature_passing_targets": [
+      "minera_embedding_workbench_json_tests",
+      "minera_edit_distance_workbench_json_tests"
+    ],
+    "feature_scope_test_suites": 4,
+    "feature_scope_execution_ctest_count": 2,
+    "historical_driver_recovery_attempts": [
+      {
+        "path": "build/native-feature82-driver-recovery-153232502f8b4b15b6625a937b9f1fc7/build-manifest.json",
+        "bytes": 331142,
+        "sha256": "6ade45f6289926035277ad3955a13eab40742d5a0da9243eeb0482b4bb381c6d"
+      },
+      {
+        "path": "build/feature82-configured-resume-1-precommand-failure.json",
+        "bytes": 487,
+        "sha256": "853f275f832039575f97afcf1cedb427a6e94ced5d0e2a77eec59f9a66b92c97"
+      }
+    ],
+    "recovery_diagnostic": {
+      "path": "build/table-metadata82-completed-library-diagnostic-2/validation.json",
+      "bytes": 172466,
+      "sha256": "8c02482e6df9daf3627aa058a055f08262497bacd13058d399a477edb3b6a4ce"
+    },
+    "failed_diagnostic_compilation": {
+      "path": "build/table-metadata82-completed-library-diagnostic-1/validation.json",
+      "bytes": 3558,
+      "sha256": "3df2d2bccf10c5c8ee1b7d6380928886f3dca177039a96be05e9865d9bb85380"
+    },
+    "current_attempt_configure_commands": 1,
+    "current_attempt_compiled_core_sources": 0,
+    "current_attempt_compiled_server_sources": 0,
+    "current_attempt_compiled_test_drivers": 2,
+    "pre_output_tool_failure_history": null
+  },
+  "api_attempt_lineage": {
+    "current_validation": {
+      "path": "build/table-metadata82-api-offline-corrected-20261019-1/validation.json",
+      "bytes": 1454456,
+      "sha256": "5f0dd53c2f16b62ef073fb7b653c78777ac50ce527ec84e3144581ec55adbf02"
+    },
+    "original_validation": {
+      "path": "build/table-metadata82-api-actual-20261019-1/validation.json",
+      "bytes": 594138,
+      "sha256": "08e637bec8f79a1e718126230364f01c4c37ba901e74470d57e4438628bbb437"
+    },
+    "historical_false_checks": [
+      {
+        "id": "05-embedding-nondefault",
+        "physical_call_index": 5,
+        "check": "full stored table/defaults/10metadata at /source/active_source/input_before",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "05-embedding-nondefault",
+        "physical_call_index": 5,
+        "check": "full stored table/defaults/10metadata at /source/active_source/input_after",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "05-embedding-nondefault",
+        "physical_call_index": 5,
+        "check": "full stored table/defaults/10metadata at /source/active_source/checked_table",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "06-edit_distance-nondefault",
+        "physical_call_index": 6,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "06-edit_distance-nondefault",
+        "physical_call_index": 6,
+        "check": "full stored table/defaults/10metadata at /inputs_after_native/source",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "07-bose-nondefault",
+        "physical_call_index": 7,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "08-discovery-nondefault",
+        "physical_call_index": 8,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "independent-compatibility_snapshot_valid",
+        "physical_call_index": 9,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "independent-compatibility_snapshot_valid",
+        "physical_call_index": 9,
+        "check": "full stored table/defaults/10metadata at /inputs_after_native/source",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "independent-compatibility_globals_snapshot",
+        "physical_call_index": 10,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "independent-compatibility_globals_snapshot",
+        "physical_call_index": 10,
+        "check": "full stored table/defaults/10metadata at /inputs_after_native/source",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "independent-compatibility_trace_globals_snapshot",
+        "physical_call_index": 11,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "independent-compatibility_trace_globals_snapshot",
+        "physical_call_index": 11,
+        "check": "full stored table/defaults/10metadata at /inputs_after_native/source",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "independent-compatibility_event_globals_snapshot",
+        "physical_call_index": 12,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "independent-compatibility_event_globals_snapshot",
+        "physical_call_index": 12,
+        "check": "full stored table/defaults/10metadata at /inputs_after_native/source",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "full-ten-metadata-typed-storage",
+        "physical_call_index": 13,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "full-ten-metadata-typed-storage",
+        "physical_call_index": 13,
+        "check": "full stored table/defaults/10metadata at /inputs_after_native/source",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "existing-all-byte-fallback-control",
+        "physical_call_index": 14,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "existing-all-byte-fallback-control",
+        "physical_call_index": 14,
+        "check": "full stored table/defaults/10metadata at /inputs_after_native/source",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "edit_distance-valid-lazy",
+        "physical_call_index": 15,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "edit_distance-default-invalid-lazy",
+        "physical_call_index": 16,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "bose-valid-lazy",
+        "physical_call_index": 19,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "bose-default-invalid-lazy",
+        "physical_call_index": 20,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "discovery-valid-lazy",
+        "physical_call_index": 23,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "discovery-default-invalid-lazy",
+        "physical_call_index": 24,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "synchronization-baseline-preserved",
+        "physical_call_index": 27,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "synchronization-baseline-preserved",
+        "physical_call_index": 27,
+        "check": "native XES synchronization baseline/deletion consequence",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "synchronization-no-baseline-control",
+        "physical_call_index": 28,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "bose-returned-table-metadata",
+        "physical_call_index": 29,
+        "check": "source-bound status/native entry/return/error phase",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "bose-returned-table-metadata",
+        "physical_call_index": 29,
+        "check": "full stored table/defaults/10metadata at /input_context/source/original_constructor",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "bose-returned-table-metadata",
+        "physical_call_index": 29,
+        "check": "full stored table/defaults/10metadata at /inputs_after_native/source",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      },
+      {
+        "id": "bose-returned-table-metadata",
+        "physical_call_index": 29,
+        "check": "actual BOSE fresh returned tables retain native-default metadata and legacy shape",
+        "passed": false,
+        "failure": {
+          "type": "TypeError",
+          "message": "'NoneType' object is not subscriptable"
+        }
+      },
+      {
+        "id": "actual-UI-File-reupload-discovery",
+        "physical_call_index": 33,
+        "check": "native XES synchronization baseline/deletion consequence",
+        "passed": false,
+        "failure": {
+          "type": "AssertionError",
+          "message": ""
+        }
+      }
+    ],
+    "offline_revalidation": true,
+    "amendment": {
+      "path": "build/feature82-api-offline-amendment-1-20261019/amendment.json",
+      "bytes": 10302,
+      "sha256": "9325f0bd4237ccb8280023dc816f41f3f99627004c82aa3e80acf29888ba2ed1"
+    },
+    "original_reader": {
+      "path": "build/feature82_api_readers_2.py",
+      "bytes": 5636,
+      "sha256": "48abd9de38bc10267879bf8fe82a2e6b6d53cba53a11650a8119f257fff011a9"
+    },
+    "current_reader": {
+      "path": "build/feature82_api_readers_3.py",
+      "bytes": 5678,
+      "sha256": "4bf49aa32a7414a6e806467744757cdd53717627fd29aab8e38af92e412ac950"
+    },
+    "revalidator": {
+      "path": "build/revalidate-feature82-api-saved-1.py",
+      "bytes": 9631,
+      "sha256": "975a63876257f0f58682128a5610a637369344c97d337afef344190ecbecbe9a"
+    },
+    "original_records_retained": true,
+    "actual_original_UI_File_dependencies_revalidated": 4,
+    "new_http_calls": 0
+  },
+  "portable_attempt_history": {
+    "correction": {
+      "path": "build/feature82-portable-oracle-correction-1-20261019.json",
+      "bytes": 2056,
+      "sha256": "ed829ff64f5247f235d64075dcd7489b9921cc6242e46d042cea0a4270a63eaa"
+    },
+    "validation_attempts": [
+      {
+        "path": "build/feature82-compact-fixture-types-eda1a2cd1ac34e659df4901d99567aab/validation.json",
+        "bytes": 96627,
+        "sha256": "26f8977ef77e02f643b182285155692fc56391c58fe91d123622fb91e5a0d116"
+      },
+      {
+        "path": "build/feature82-compact-fixture-validation-71aba1abd9564658a24e68be6958ae91/validation.json",
+        "bytes": 63842,
+        "sha256": "f2d1a2efe684ad3d92aa84faa22921dddf0ff82367dd25211ef383d3dcefde67"
+      }
+    ],
+    "wrapper_attempts": []
+  },
+  "baseline_attempt_history": [],
+  "open_host_transport_issues": [],
+  "boundaries": [
+    "Every81prior delivery and86catalogue entry remains unchanged; closure is owned by Feature82 and does not rewrite prior historical reports. Strict86/387/46/199/228 scope is unchanged.",
+    "The four private fields are native transport state, not new public interchange fields. Native metadata operator== intentionally omits them, so explicitfield/fullstorage assertions are required.",
+    "No parser grammar, shared native algorithm, public header, CMake, server or authored UI change. Existing fullraw fallback remains the complete constructor carrier.",
+    "The three refresh_lazy implementations are unchanged; corrected serialization prevents metadata-bearing invalid tables being silently mistaken for the default invalid constructor. Actual source-owned exceptions and phase boundaries remain preserved.",
+    "Prepatch10physical and selected8 chronology is separate from the final dedicated API corpus and two separate live smokes. Original two embedding setup errors are preserved; correction uses actual dataframe control and replays none of the six passing cases.",
+    "Three actual failed CTest invocations are retained: four initial metadata/grammar assertions, two default-invalid exception-oracle assertions, and two preparation-call location assertions. Diagnostic1 compilation failure is retained separately. Corrected tests compare converted logs against actual native conversion and use the proper empty-table grammar; repair core bytes remain unchanged. Final two-driver recovery retains the two earlier actual feature passes and reuses the completed library/server and208objects; wrapper validation failures are separate from actual native test failures.",
+    "The original35physical API capture and all33historical failed checks remain immutable. Only partial-input schema semantics, the native date-type rejection expectation and the outer XES fallback marker expectations were corrected offline. Complete output storage validation stays strict. No positive generated BOSE-frame API result or different XES marker presence between these baseline/control requests is claimed.",
+    "Actual new HTTP calls derive from actual current capture; zero is asserted only for genuine offline revalidation. Native suite lineage is not represented as a new replay of all retained suites.",
+    "Browser rendering and download interaction remain unverified. The actual Feature82 browser retry while Feature81 served was denied by saved policy before navigation despite explicit authorization; prior Feature81 denial remains historical evidence."
+  ],
+  "delivery_library": {
+    "path": "build/feature82-delivery-prepared-8/tableMetadata82_delivery_common.py",
+    "bytes": 11084,
+    "sha256": "6a4643757b6645f25f4f8c027677062d20cbca95a00b35339033228105826f97"
+  }
+}

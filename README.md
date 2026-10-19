@@ -2798,3 +2798,9 @@ See [validation and boundaries](docs/feature-first-original-timing-workbench-val
 Upload a complete EventLog for passed time, service time, cycle time, case arrival or case statistics. Edit every native option, choose an explicit or omitted default argument where the public function supports it, and inspect complete results. Supplied stored results can be sent directly to the five native serializers; three enum name helpers are also available. Download canonical inputs and results separately from exact native output bytes. Existing cached workflows remain available.
 
 See [validation and boundaries](docs/feature-first-original-time-analysis-workbench-validation.json).
+
+### Preserve table metadata across workbenches
+
+Table snapshots and reusable constructor artifacts across embedding, edit distance, BOSE and discovery preserve the full native metadata needed by later operations and exports. Existing scalar/default files retain their previous output. Ordinary JSON and XES interchange formats remain unchanged.
+
+See [validation and boundaries](docs/feature-first-shared-table-metadata-validation.json).
