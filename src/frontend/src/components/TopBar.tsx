@@ -34,11 +34,12 @@ interface TopBarProps {
   onOriginalPetriAnalysis?: () => void;
   onOriginalRootCause?: () => void;
   onOriginalAnonymization?: () => void;
+  onOriginalQuality?: () => void;
   onOriginalOcPlayout?: () => void;
   onActiveSource?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalOcPlayout, onActiveSource }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalOcPlayout, onActiveSource }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -84,6 +85,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onOriginalPetriAnalysis && <button className="btn-ghost" onClick={onOriginalPetriAnalysis}>Original Petri analysis</button>}
       {onOriginalRootCause && <button className="btn-ghost" onClick={onOriginalRootCause}>Original root cause</button>}
       {onOriginalAnonymization && <button className="btn-ghost" onClick={onOriginalAnonymization}>Original anonymization</button>}
+      {onOriginalQuality && <button className="btn-ghost" onClick={onOriginalQuality}>Original model quality</button>}
       {onOriginalOcPlayout && <button className="btn-ghost" onClick={onOriginalOcPlayout}>Original object-centric playout</button>}
       {onActiveSource && <button className="btn-ghost" onClick={onActiveSource}>Source inputs</button>}
       <label className="btn-open">
