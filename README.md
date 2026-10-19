@@ -2759,3 +2759,12 @@ Open **Original anonymization** before mining. Edit or upload a complete raw sou
 Inspect full source/query snapshots, results, diagnostics, ordered frequency maps and native calls. Download all actual artifacts, raw responses, reports, CSV, selected records and original requests. Reopen compatible source/query/released-log artifacts directly as Files, reuse configured options as a File control, or hand actual PRIPEL result diagnostics to the diagnostics member. Native errors and optional XES failures remain visible; direct native diagnostics text is retained as bytes and need not be valid JSON or UTF-8.
 
 NativeFloat64 retains finite binary64 values, signed zero and semantic NaN/INF/-INF values; raw NaN payload/sign/signalling bits and caller decimal lexeme identity are not claimed. Secure outputs are checked structurally, and the reported seed remains the configured seed rather than an entropy identity. Browser rendering, privacy guarantees and strict reference parity remain pending. See [validation and boundaries](docs/feature-first-original-anonymization-workbench-validation.json).
+
+
+### Explore original model quality with independent inputs
+
+Open **Original quality** before mining. Edit or upload complete log, stream, table or lazy source storage, or choose its EventDataView form. Supply a Petri net, process tree, marked PNML document or supported presentation and select replay fitness, precision, generalization, simplicity or composite evaluation. All native controls preserve omitted versus supplied presence, nested defaults, exact integers, byte strings and semantic nonfinite values. Three explicit callback tables expose actual invocation records.
+
+Inspect complete source/model snapshots, typed results, nested diagnostics, call and scan history, tables, CSV, selected records, raw responses, reports and original requests. Download eight canonical byte artifacts and reopen compatible artifacts through actual File controls. Native exceptions and computed-false returns remain visible.
+
+Browser rendering and strict reference parity remain pending. Feature76 retains full table metadata; the older embedding, edit-distance, Bose and discovery table-carrier follow-up remains open. See [validation and boundaries](docs/feature-first-original-quality-workbench-validation.json).

@@ -40,3 +40,4 @@ src/frontend/tests/fixtures/original-genetic-matrix-byte-fidelity* -text -whites
 src/frontend/tests/fixtures/original-petri-analysis-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-root-cause-workbench* -text -whitespace
 src/frontend/tests/fixtures/original-anonymization-workbench* -text -whitespace
+src/frontend/tests/fixtures/original-quality-workbench* -text -whitespace
