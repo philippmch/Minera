@@ -2768,3 +2768,9 @@ Open **Original quality** before mining. Edit or upload complete log, stream, ta
 Inspect complete source/model snapshots, typed results, nested diagnostics, call and scan history, tables, CSV, selected records, raw responses, reports and original requests. Download eight canonical byte artifacts and reopen compatible artifacts through actual File controls. Native exceptions and computed-false returns remain visible.
 
 Browser rendering and strict reference parity remain pending. Feature76 retains full table metadata; the older embedding, edit-distance, Bose and discovery table-carrier follow-up remains open. See [validation and boundaries](docs/feature-first-original-quality-workbench-validation.json).
+
+### Explore original clustering with independent inputs
+
+Upload a complete EventLog for hierarchical or profile clustering, compute exact trace groups, or supply a complete stored result to either native serializer. All 22 native options are editable. Inspect complete results, download exact canonical artifacts, and export selected traces with full metadata and source-position provenance. The existing cached clustering tools remain available.
+
+See [validation and boundaries](docs/feature-first-original-clustering-workbench-validation.json).
