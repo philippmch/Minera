@@ -103,6 +103,7 @@
 #include "minera/clustering_workbench_json.hpp"
 #include "minera/organizational_workbench_json.hpp"
 #include "minera/temporal_workbench_json.hpp"
+#include "minera/timing_workbench_json.hpp"
 #include "minera/genetic_matrix_conversion.hpp"
 #include "../footprints/conformance_log_model.hpp"
 #include "../footprints/conformance_log_extensive.hpp"
@@ -4067,6 +4068,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_clustering_route.hpp"
 #include "original_organizational_route.hpp"
 #include "original_temporal_route.hpp"
+#include "original_timing_route.hpp"
 #include "original_emd_route.hpp"
 #include "original_object_centric_playout_route.hpp"
 
@@ -10654,6 +10656,7 @@ int main(int argc, char** argv) {
   server.Post("/api/organizational-workbench", handle_original_organizational_workbench);
   server.Options("/api/temporal-workbench", preflight);
   server.Post("/api/temporal-workbench", handle_original_temporal_workbench);
+  server.Post("/api/timing-workbench", handle_original_timing_workbench);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/decision-tables", handle_decision_tables);

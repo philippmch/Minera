@@ -292,7 +292,7 @@ TemporalWorkbenchResponse execute(const std::vector<DiscoveryWorkbenchPart>& par
   bool known=false;for(const auto& d:declarations)if(d.operation==operation)known=true;if(!known)invalid("unknown public operation");
   if(source_operation){
    if(operation=="discover_temporal_profile"){if(source_kind.empty())invalid("source_kind is required");}
-   else{const std::string inferred=operation=="discover_temporal_profile_dataframe"||operation=="conform_temporal_profile_dataframe"?"table":operation=="conform_temporal_profile"?"view":"log";if(source_kind.empty())source_kind=inferred;else if(source_kind!=inferred)invalid("source_kind differs from declared source");}
+   else{const std::string inferred=operation=="discover_temporal_profile_dataframe"||operation=="conform_temporal_profile_dataframe"?"table":operation=="conform_temporal_profile"?"view":"log";if(!find("source_kind"))source_kind=inferred;else if(source_kind!=inferred)invalid("source_kind differs from declared source");}
    if(!source_name(source_kind))invalid("unsupported source_kind");
    if(source_kind=="view"){if(view_kind.empty()||view_kind=="view"||!source_name(view_kind))invalid("view_kind requires a concrete source");}else if(find("view_kind"))invalid("view_kind requires source_kind=view");
   }else if(find("source_kind")||find("view_kind"))invalid("source_kind/view_kind inapplicable to selected operation");
