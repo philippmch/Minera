@@ -83,6 +83,7 @@
 #include "minera/process_tree_alignment_workbench_json.hpp"
 #include "minera/petri_anti_multi_workbench_json.hpp"
 #include "minera/model_conversion_workbench_json.hpp"
+#include "minera/tree_reduction_workbench_json.hpp"
 #include "minera/active_event_source.hpp"
 #include "minera/monte_carlo_workbench_json.hpp"
 #include "minera/playout_workbench_json.hpp"
@@ -4072,6 +4073,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "process_tree_alignment_route.hpp"
 #include "petri_anti_multi_route.hpp"
 #include "model_conversion_route.hpp"
+#include "tree_reduction_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
 #include "original_decision_route.hpp"
@@ -10687,7 +10689,10 @@ int main(int argc, char** argv) {
   server.Post("/api/discover-inductive-input", handle_inductive_input_discovery);
   server.Post("/api/align-process-tree-workbench", handle_process_tree_alignment_workbench);
   server.Post("/api/align-petri-anti-multi-workbench", handle_petri_anti_multi_workbench);
-  server.Post("/api/model-conversion-workbench", handle_model_conversion_workbench);
+  server.Post("/api/model-conversion-workbench", [](const httplib::Request& request, httplib::Response& response) {
+    if (request_uses_tree_reduction(request)) handle_tree_reduction_workbench(request, response);
+    else handle_model_conversion_workbench(request, response);
+  });
   server.Post("/api/monte-carlo-workbench", handle_monte_carlo_workbench);
   server.Post("/api/playout-workbench", handle_playout_workbench);
   server.Post("/api/decision-workbench", handle_original_decision_workbench);
