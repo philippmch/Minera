@@ -13797,3 +13797,14 @@ Evidence: docs/feature-first-exact-source-acquisition-validation.json. No strict
 - Browser: current authorized attempt was rejected before navigation;0 rendered checks. No further settings request or workaround.
 - Availability count:95 delivered extensions. Strict scope remains46/86 packages,199/387 modules,228 incomplete units; full parity remains false.
 - Evidence: docs/feature-first-original-log-features-validation.json
+
+
+### Feature96: call-local provider settings and plain prompt (2026-10-20)
+
+- Before: the own native bridge returned400 for per-call provider settings. All current completion surfaces now accept3 new optional fields while preserving startup defaults and full7-field results. Plain chat is reachable without loading a dataset.
+- Delivered: transient provider controls across chat, SQL generation and studies; completion flags in native/Python CLIs; report snapshots omit only new top-level config, retaining provider output.
+- Validation:95 distinct native suites (93 retained+2 fresh),218 retained core objects,32 affected Python tests, fresh strict frontend build and9499 checks/168 files;24 API cases;8 CLI cases;4 real public-helper POSTs; exact live assets and1 live pre-provider validation rejection.
+- Retained harness failures: missing Git path and duplicate metadata key before calls; one incompatible study CSV fixture before provider access; one unforwarded helper fetch failure. Recovery retains3 CLI and2 helper successes and executes only failed/unrun cases, without successful replay.
+- Browser: latest authorized tool attempt was rejected before navigation despite enabled-settings report;0 rendered checks. No repeated settings request or workaround.
+- Availability count:96 delivered extensions. Strict scope remains46/86 packages,199/387 modules,228 incomplete units; full parity remains false.
+- Next: original contextual label splitting, complete SQL options/parameters and the remaining breadth/strict gates. Evidence: docs/feature-first-provider-call-configuration-validation.json

@@ -1,3 +1,5 @@
+import {ProviderCallControls} from "./ProviderCallControls";
+import {defaultProviderCallForms,providerCallOverrides,providerCallConfigured,ProviderCallRequestGate,type ProviderCallForm} from "../provider-call-config";
 import { useEffect,useRef,useState } from "react";
 import { type MineraExport } from "../types";
 import { LLM_PROVIDERS,llmCompletionRequest,requestLlmCompletion,requestLlmStatus,type LlmProvider,type LlmRuntimeStatus,type LlmCompletion } from "../llm";
@@ -10,17 +12,19 @@ export function LlmStudies({task,data,available,mining,onOpenFiltered}:{task:Stu
  const [maxLen,setMaxLen]=useState("10000");const [limit,setLimit]=useState("1000");const [prompt,setPrompt]=useState("");const [response,setResponse]=useState("");const [completion,setCompletion]=useState<LlmCompletion|null>(null);
  const [provider,setProvider]=useState<LlmProvider>("openai");const [model,setModel]=useState("");const [clusters,setClusters]=useState<ClusterStudyItem[]|null>(null);const [hypotheses,setHypotheses]=useState<HypothesisStudyItem[]|null>(null);
  const [pending,setPending]=useState<string|null>(null);const [error,setError]=useState<string|null>(null);const request=useRef<AbortController|null>(null);const load=useRef<AbortController|null>(null);
+ const [callForms,setCallForms]=useState(defaultProviderCallForms);const callGate=useRef(new ProviderCallRequestGate());const overrides=providerCallOverrides(provider,callForms[provider]);const callCurrent=useRef({provider,form:callForms[provider]});callCurrent.current={provider,form:callForms[provider]};
+ const cancelCall=()=>{callGate.current.invalidate();request.current?.abort();request.current=null;setPending(null);setError(null);};const editCall=(value:ProviderCallForm)=>{cancelCall();setCallForms(forms=>({...forms,[provider]:value}));};
  const clear=()=>{setClusters(null);setHypotheses(null);setError(null);};
  const refresh=async()=>{if(!available)return;load.current?.abort();const controller=new AbortController();load.current=controller;try{const [next,runtime]=await Promise.all([requestLogQuerySchema(controller.signal),requestLlmStatus(controller.signal).catch(()=>null)]);if(load.current===controller&&!controller.signal.aborted){setSchema(next);setStatus(runtime);setPrompt(studyPrompt(task,data,next,engine,Number(maxLen)));clear();}}catch(cause){if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}};
- useEffect(()=>{void refresh();return()=>{request.current?.abort();load.current?.abort();};},[available]);
+ useEffect(()=>{void refresh();return()=>{callGate.current.invalidate();request.current?.abort();load.current?.abort();};},[available]);
  useEffect(()=>{if(mining){request.current?.abort();request.current=null;setPending(null);clear();}},[mining]);
- const disabled=!available||mining||!!pending||!schema;const configured=status?.ready&&status.providers.some(item=>item.id===provider&&item.configured);
+ const disabled=!available||mining||!!pending||!schema;const configured=providerCallConfigured(status,provider,overrides);
  const run=async(operation:"generate"|"generate-execute"|"parse"|"execute",index?:number)=>{
-  if(disabled||!schema)return;const controller=new AbortController();request.current=controller;setPending(operation);setError(null);if(operation!=="execute")clear();
+  if(disabled||!schema)return;const controller=new AbortController();const callTicket=callGate.current.issue(provider,callForms[provider]);request.current=controller;setPending(operation);setError(null);if(operation!=="execute")clear();
   try{
    let text=response;let clusterPlan=clusters;let hypothesisPlan=hypotheses;
    if(operation==="generate"||operation==="generate-execute"){
-    const next=await requestLlmCompletion(llmCompletionRequest(provider,model,prompt,"4096",""),controller.signal);if(request.current!==controller||controller.signal.aborted)return;setCompletion(next);text=next.text;setResponse(text);
+    const next=await requestLlmCompletion(llmCompletionRequest(provider,model,prompt,"4096","",overrides),controller.signal);if(request.current!==controller||controller.signal.aborted||!callGate.current.accepts(callTicket,callCurrent.current.provider,callCurrent.current.form,controller.signal))return;setCompletion(next);text=next.text;setResponse(text);
    }
    if(operation!=="execute"){
     if(task==="clusters"){clusterPlan=clusterDefinitions(text).map(item=>({...item,result:null,error:null}));setClusters(clusterPlan);}else{hypothesisPlan=hypothesisDefinitions(text).map(item=>({...item,result:null,error:null}));setHypotheses(hypothesisPlan);}
@@ -48,7 +52,8 @@ export function LlmStudies({task,data,available,mining,onOpenFiltered}:{task:Stu
    <div className="ask-model-options"><label className="filters-field"><span>Context character limit</span><input type="number" min="1" max="2097152" value={maxLen} onChange={event=>setMaxLen(event.target.value)} /></label>{task==="hypotheses"&&<><label className="filters-field"><span>Hypothesis query engine</span><select value={engine} onChange={event=>{const next=event.target.value as QueryEngine;setEngine(next);setHypotheses(items=>items?.map(item=>({...item,result:null,error:null}))??null);try{setPrompt(studyPrompt(task,data,schema!,next,Number(maxLen)));setError(null);}catch(cause){setError(cause instanceof Error?cause.message:String(cause));}}}><option value="sqlite" disabled={schema?.sqlite_available===false}>SQLite · native</option><option value="duckdb" disabled={schema?.duckdb_configured===false}>DuckDB · runtime</option></select></label><label className="filters-field"><span>Hypothesis display row limit</span><input type="number" min="1" max="1000000" value={limit} onChange={event=>setLimit(event.target.value)} /></label></>}</div>
    <button className="btn-ghost" onClick={()=>{try{setPrompt(studyPrompt(task,data,schema!,engine,Number(maxLen)));setError(null);}catch(cause){setError(cause instanceof Error?cause.message:String(cause));}}}>Build study prompt</button>
    <label className="ask-model-text"><span>Study prompt to send</span><textarea rows={8} value={prompt} onChange={event=>setPrompt(event.target.value)} /></label>
-   <div className="ask-model-options"><label className="filters-field"><span>Study provider</span><select value={provider} onChange={event=>setProvider(event.target.value as LlmProvider)}>{LLM_PROVIDERS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label className="filters-field ask-model-name"><span>Study model name</span><input value={model} onChange={event=>setModel(event.target.value)} /></label></div>
+   <div className="ask-model-options"><label className="filters-field"><span>Study provider</span><select value={provider} onChange={event=>{cancelCall();setProvider(event.target.value as LlmProvider);}}>{LLM_PROVIDERS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label className="filters-field ask-model-name"><span>Study model name</span><input value={model} onChange={event=>setModel(event.target.value)} /></label></div>
+   <ProviderCallControls provider={provider} value={callForms[provider]} onChange={editCall}/>
    <p className="ask-model-intro">Only the displayed prompt is sent to {provider}. You can also paste an existing model response.</p>
    <div className="ask-model-actions"><button className="btn-ghost" disabled={!configured} onClick={()=>void run("generate")}>Generate study definitions</button><button className="btn-ghost" disabled={!configured||task==="clusters"&&!schema?.cluster_runtime_configured} onClick={()=>void run("generate-execute")}>Generate and execute study</button></div>
    <label className="ask-model-text"><span>Study response to parse</span><textarea rows={8} value={response} onChange={event=>{setResponse(event.target.value);setCompletion(null);clear();}} /></label>

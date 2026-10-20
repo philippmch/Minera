@@ -1,4 +1,5 @@
 import {hasExactKnowledge,requestExactKnowledge,type ExactKnowledgeRequest,type ExactKnowledgeEnvelope,type KnowledgeRequest} from "./exact-knowledge";
+import type {LlmCallOverrides} from "./provider-call-config";
 import { knowledgeInjectionQuery } from "./api";
 import { isKnowledgeInjectionResult, type KnowledgeInjectionOptions, type KnowledgeInjectionResult, type KnowledgeInjectionVariant, type MineraExport } from "./types";
 
@@ -6,7 +7,7 @@ export const LLM_PROVIDERS = [{id:"openai",label:"OpenAI"},{id:"anthropic",label
 export type LlmProvider = typeof LLM_PROVIDERS[number]["id"];
 export interface LlmRuntimeStatus { family:"LLM_RUNTIME";ready:boolean;providers:{id:LlmProvider;configured:boolean;base_url:string}[];error?:string;max_input_bytes?:number; }
 export interface LlmImage {name:string;media_type:string;data:string;detail?:"auto"|"low"|"high"|"original";}
-export interface LlmRequestExtras {images?:LlmImage[];extra_payload?:Record<string,unknown>;openai_api?:"responses"|"chat_completions";}
+export interface LlmRequestExtras extends LlmCallOverrides {images?:LlmImage[];extra_payload?:Record<string,unknown>;openai_api?:"responses"|"chat_completions";}
 export interface LlmCompletionRequest extends LlmRequestExtras { provider:LlmProvider;model:string;prompt:string;max_tokens:number;temperature?:number; }
 export interface LlmCompletion { family:"LLM_COMPLETION";provider:LlmProvider;model:string;text:string;finish_reason:string;usage:{input_tokens:number|null;output_tokens:number|null};response:Record<string,unknown>; }
 const provider = (value:unknown):value is LlmProvider => LLM_PROVIDERS.some(item=>item.id===value);
