@@ -86,6 +86,7 @@
 #include "minera/model_conversion_workbench_json.hpp"
 #include "minera/tree_reduction_workbench_json.hpp"
 #include "minera/original_model_context_workbench_json.hpp"
+#include "minera/original_features_workbench_json.hpp"
 #include "minera/active_event_source.hpp"
 #include "minera/monte_carlo_workbench_json.hpp"
 #include "minera/playout_workbench_json.hpp"
@@ -4085,6 +4086,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "model_conversion_route.hpp"
 #include "tree_reduction_route.hpp"
 #include "original_model_context_route.hpp"
+#include "original_features_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
 #include "original_decision_route.hpp"
@@ -10469,6 +10471,7 @@ int main(int argc, char** argv) {
   server.Options("/api/log-query/export", preflight);
   server.Options("/api/log-cluster", preflight);
   server.Options("/api/llm-context", preflight);
+  server.Options("/api/original-log-to-features", preflight);
   server.Options("/api/llm/complete", [](const httplib::Request& request, httplib::Response& response) {
     if (!llm_origin_allowed(request, response)) return;
     response.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -10716,6 +10719,7 @@ int main(int argc, char** argv) {
   server.Post("/api/footprints-workbench", handle_original_footprints_workbench);
   server.Post("/api/genetic-matrix-workbench", handle_original_genetic_matrix_workbench);
   server.Post("/api/embedding-workbench", exact_filter_discovery_route::embedding);
+  server.Post("/api/original-log-to-features", handle_original_features_workbench);
   server.Options("/api/emd-workbench", preflight);
   server.Post("/api/emd-workbench", handle_original_emd_workbench);
   server.Options("/api/object-centric-playout-workbench", preflight);
