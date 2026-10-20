@@ -21,6 +21,11 @@ numeric regression and affected core/evaluation checks pass. Its precise scope
 is recorded in [quality-numeric-json-contract.md](quality-numeric-json-contract.md);
 this output repair does not itself promote an algorithm module.
 
+PNML imports now retain mixed ordinary/reset/inhibitor and parallel extended
+arcs sharing an endpoint. Exact arc weights, IDs and occurrence inventories
+survive export/reimport. Five affected native suites pass; see
+[pnml-mixed-input-arcs.md](pnml-mixed-input-arcs.md).
+
 | Requirement | Evidence |
 | --- | --- |
 | Arc-degree simplicity module | 120 retained public selector records covering 102 numeric states; exact scalar, identity, arc occurrence, baseline and input invariants; assertion-enabled focused and full evaluation contract checks |
@@ -46,7 +51,6 @@ The machine-readable source of truth is
 ## Active requirements
 
 - Check composite OCEL 2.0 graph enrichment, including metadata and mutation behavior.
-- Repair PNML import of mixed ordinary/reset/inhibitor arcs sharing an endpoint.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in
   the broader public captures, so it is not evidence of 28 incorrect models.

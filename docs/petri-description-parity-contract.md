@@ -106,10 +106,11 @@ primary occurrence diagnostic and a retained nonnull export diagnostic. The
 original failed CTest/build logs and `arc-diagnostic-*` outputs are retained.
 Windows assertion/exception reporting now makes such failures visible.
 
-The PNML importer still rejects ordinary/reset/inhibitor arcs sharing the same
-place/transition endpoint, although the full native constructor and this context
-formatter support them. This is a remaining import gap, not completed import
-parity. It is separate from the description module's supplied-graph contract.
+The PNML importer rejected ordinary/reset/inhibitor arcs sharing an endpoint
+during this capture's first integration attempt. The subsequent parser repair
+and five passing regression suites are recorded in
+[pnml-mixed-input-arcs.md](pnml-mixed-input-arcs.md). This does not establish full
+PNML import parity; the description module's supplied-graph contract is separate.
 
 The compact `petri-description-public.json.gz` archive contains the complete
 two actual captures, both own recipes, snapshot helper, runtime packet and fresh root pin
