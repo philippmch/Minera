@@ -1,3 +1,4 @@
+import {OriginalLabelSplittingWorkspace} from "./OriginalLabelSplittingWorkspace";
 import {OriginalFeaturesWorkspace} from "./OriginalFeaturesWorkspace";
 import {LiteralControlsPanel} from "./LiteralControlsPanel";
 import {logToFeaturesQuery, logToTargetQuery} from "../api";
@@ -52,5 +53,6 @@ export function TransformationWorkspace({data,available,mining,onOpenTransformed
     </section>}
     {method!=="labels"&&<LiteralControlsPanel key={method} group={method==="targets"?"target":"features"} sourceId={schema?.source_id} available={available} mining={mining} configurationIdentity={method==="targets"?targets:features} legacyFields={literalFields}/>}
     <OriginalFeaturesWorkspace/>
+    <OriginalLabelSplittingWorkspace/>
   </>;
 }

@@ -518,7 +518,7 @@
       ]
     },
     {
-      "feature_delivery_status": "transformation_workflow_available",
+      "feature_delivery_status": "original_label_splitting_workbench_available",
       "package": "algo.label_splitting",
       "parity_status": "partial",
       "selectors": [
@@ -4151,6 +4151,26 @@
       "browser_validation_complete": false,
       "strict_promotion": false,
       "added": "2026-10-20"
+    },
+    {
+      "id": "original_label_splitting_workbench_available",
+      "state": "original_label_splitting_workbench_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [
+        "algo.label_splitting"
+      ],
+      "public_calls": [
+        "split_activity_labels",
+        "contextual_label_splitting",
+        "label_splitting_json"
+      ],
+      "options_fields": 8,
+      "result_fields": 2,
+      "validation": "docs/feature-first-original-label-splitting-validation.json",
+      "browser_validation_complete": false,
+      "strict_promotion": false,
+      "added": "2026-10-20"
     }
   ],
   "execution_priority": [
@@ -4224,7 +4244,8 @@
     "native_independent_original_time_analysis_workbench_available": "Independent original finite EventLog time analysis exposes all21actual public callables, full options/results and exact native output artifacts. This adjunct availability adds no strict catalogue promotion.",
     "native_shared_table_metadata_transport_preserved": "Shared native table transport preserves complete metadata without changing ordinary interchange grammar, algorithms or strict parity status.",
     "native_independent_original_log_features_workbench_available": "Independent full native EventLog extraction exposes all three variants, all56 stored options and full6 results, plus the supplied-result native serializer. Original Files, exact byte artifacts, standalone API/CLI/UI entry points and completed functional evidence are available. This adds no strict catalogue promotion; browser rendering and every strict reference gate remain open.",
-    "call_local_provider_configuration_and_plain_prompt_available": "All current chat, generated-SQL, study and completion-CLI surfaces accept transient call-local provider configuration, retaining defaults, complete provider results and sanitized own request downloads. Plain chat is reachable without a dataset. Own base-URL/token extensions, browser rendering and strict reference behavior remain separate gates."
+    "call_local_provider_configuration_and_plain_prompt_available": "All current chat, generated-SQL, study and completion-CLI surfaces accept transient call-local provider configuration, retaining defaults, complete provider results and sanitized own request downloads. Plain chat is reachable without a dataset. Own base-URL/token extensions, browser rendering and strict reference behavior remain separate gates.",
+    "original_label_splitting_workbench_available": "Independent original full native EventLog contextual label splitting through both actual public functions, true defaults or complete eight-field options, plus original two-field result serialization. Full snapshots, raw File provenance and five native byte artifacts support direct original-log/result File reuse. Strict behavior/browser/platform/performance gates remain separate."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

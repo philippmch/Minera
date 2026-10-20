@@ -13808,3 +13808,14 @@ Evidence: docs/feature-first-exact-source-acquisition-validation.json. No strict
 - Browser: latest authorized tool attempt was rejected before navigation despite enabled-settings report;0 rendered checks. No repeated settings request or workaround.
 - Availability count:96 delivered extensions. Strict scope remains46/86 packages,199/387 modules,228 incomplete units; full parity remains false.
 - Next: original contextual label splitting, complete SQL options/parameters and the remaining breadth/strict gates. Evidence: docs/feature-first-provider-call-configuration-validation.json
+
+
+### Feature97: original contextual label splitting (2026-10-20)
+
+- Delivered both original EventLog public calls with true native defaults or complete8 options, original2-field result serialization and5 independently inspectable native artifacts. Actual bare-log/full-result Files can feed the next original operation without reconstruction.
+- Evidence:97 distinct native suites (95 retained+2 fresh);219 core objects (218 reused+1 fresh). Final frontend passing aggregate 9539 tests/170 files with strict production build; execution/recovery details remain in the proof.
+- Actual API/CLI/File/helper/OLD/BEFORE counts are derived from their immutable proofs in docs/feature-first-original-label-splitting-validation.json; failed histories remain retained. No fresh full-frontend-pass claim is inferred from aggregate totals.
+- Native application assets activated on8562 while actual provider PID29184/8189 is preserved unchanged; activation performs one owned native negative control POST and no provider workflow.
+- Latest authorized browser attempt was rejected before navigation;0 rendered checks and no workaround.
+- Catalogue availability status changes only for algo.label_splitting, mapped from this delivery. Its parity status/selectors and all other catalogue rows remain unchanged. Strict scope46/86 packages,199/387 modules,228 incomplete units; full parity remains false.
+- Availability checkpoint97; next continue SQL input/options and remaining breadth/strict gates. Evidence: docs/feature-first-original-label-splitting-validation.json
