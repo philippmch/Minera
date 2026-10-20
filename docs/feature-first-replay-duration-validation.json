@@ -1,0 +1,315 @@
+{
+  "complete": true,
+  "feature": 87,
+  "features_delivered": 87,
+  "parent_head": "62a6c4ddc99696cb3d0719bab73f751c63e20490",
+  "feature_baseline_head": "87f0cd5a09196cd7b62e5de101e878b8536f6c89",
+  "baseline": {
+    "path": "build/replay-duration-feature87-baseline.json",
+    "bytes": 2821581,
+    "sha256": "71fe295de0fe6dede7f0b86af3cbcfcc804676a81a5f3b6fa7854b30cc92aa5b"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature87-cca309343d0b4331ba11dfed80fd2bf6/build-manifest.json",
+      "bytes": 391221,
+      "sha256": "bf2ae11caefc0cdf1328c433c976bee0526d0486b7e0b394b5390cf32612fc2d"
+    },
+    "api": {
+      "path": "build/replay-duration87-api-validation.json",
+      "bytes": 234615,
+      "sha256": "38d280d03dd8abe014c05fc68207434ff52482d5e526eadcd30b7de3d3455c20"
+    },
+    "frontend": {
+      "path": "build/replay-duration87-frontend-1bf2f70b9dfd44fda02c739beccab0c6/validation.json",
+      "bytes": 2753930,
+      "sha256": "7f67636b6d26f977e9b7faa5bcf4b7092d8438bec108e9a99f2d2c108a1f334b"
+    },
+    "backend": {
+      "path": "build/replay-duration-feature87-backend-postcommit.json",
+      "bytes": 5492,
+      "sha256": "229c3bb494df366a91cb997c68fddf1fcc27e616ab258bda948a660de80cd86c"
+    },
+    "live": {
+      "path": "build/replay-duration-feature87-live-runtime.json",
+      "bytes": 12716,
+      "sha256": "cf3a37ac5e2bda218a3c941fe7f7218d3366ca67177ee8f225444cf83bba18bf"
+    },
+    "cleanup": {
+      "path": "build/replay-duration-feature87-test-cleanup.json",
+      "bytes": 4741,
+      "sha256": "560e48db90144e575209fd1edeb049cb4ace042abc13755b54db65d5b134f55e"
+    },
+    "file_bridge": {
+      "path": "build/replay-duration87-file-bridge-validation.json",
+      "bytes": 5447,
+      "sha256": "7f72f634e5e957593e36529f7308bdc27a93a6b56c22ab8683c7cd5220042686"
+    },
+    "source_audit": {
+      "path": "build/feature87-replay-input-source-audit/audit.json",
+      "bytes": 14757,
+      "sha256": "8a52f9a9649c8910cc96bd457c8efb51607802416911f79fbb901410bb81304e"
+    },
+    "source_review": {
+      "path": "build/replay-duration87-source-review-2.json",
+      "bytes": 2585,
+      "sha256": "62a104bd0ae3269412798d7a74c4baef24cdbae49437d2b4aa2e04d217296d20"
+    },
+    "native_oracle": {
+      "path": "build/replay-duration87-native-oracle-validation.json",
+      "bytes": 1543,
+      "sha256": "f5cf2af56797fd4635e1378397a97e4644d37fba4b346fc3ef0caacb17e152bf"
+    }
+  },
+  "previous_delivery_report": {
+    "path": "docs/feature-first-ocpn-controls-validation.json",
+    "bytes": 10759,
+    "sha256": "61bf0ebc1fbbc38677c1bb3f8a31c38ae8c1481632e421ddfb1860180dee3901"
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_API_cases": 28,
+    "physical_HTTP_calls": 28,
+    "dedicated_API_corpus_POSTs": 28,
+    "frontend_tests": 9198,
+    "frontend_files": 153,
+    "frontend_full_suite_delta": 19,
+    "actual_File_handoffs": 1,
+    "File_followup_HTTP_calls": 2,
+    "wire_mocked_fetches": 0,
+    "wire_mock_transport_File_arguments": 0,
+    "wire_network_requests_executed": 2,
+    "live_smoke_HTTP_calls": 2,
+    "native_contributing_suites": 76,
+    "native_retained_suites": 74,
+    "native_freshly_executed_suites": 2,
+    "native_reused_core_objects": 209,
+    "native_fresh_core_objects": 1,
+    "compiled_core_sources": 1,
+    "compiled_server_sources": 1,
+    "compiled_extra_tool_sources": 0,
+    "remaining_audited_extensions": 3,
+    "direct_native_duration_oracle_cases": 23,
+    "native_owned_paths": 6,
+    "frontend_owned_paths": 4,
+    "total_actual_HTTP_calls": 32
+  },
+  "native_test_accounting": {
+    "retained_parent_suites": 74,
+    "freshly_executed_suites": 2,
+    "aggregate_current_passing_suites": 76,
+    "contributing_ctest_invocation_count": 17,
+    "retained_evidence": {
+      "path": "build/native-feature86-e819a648f57b4b6d96f89845340fb5cb/build-manifest.json",
+      "bytes": 384645,
+      "sha256": "0cc2826c0b76e53c9814885736b129012b4d36757d92e9d00f33b52f12c6d994"
+    },
+    "actual_current_evidence": {
+      "path": "build/native-feature87-cca309343d0b4331ba11dfed80fd2bf6/build-manifest.json",
+      "bytes": 391221,
+      "sha256": "bf2ae11caefc0cdf1328c433c976bee0526d0486b7e0b394b5390cf32612fc2d"
+    }
+  },
+  "frontend_test_accounting": {
+    "actual_fresh_full_suite": {
+      "total_tests": 9198,
+      "passed_tests": 9198,
+      "passed_files": 153
+    },
+    "retained_parent_inventory": {
+      "total_tests": 9179,
+      "passed_tests": 9179,
+      "passed_files": 152
+    },
+    "net_test_inventory_delta": 19,
+    "actual_current_evidence": {
+      "path": "build/replay-duration87-frontend-1bf2f70b9dfd44fda02c739beccab0c6/validation.json",
+      "bytes": 2753930,
+      "sha256": "7f67636b6d26f977e9b7faa5bcf4b7092d8438bec108e9a99f2d2c108a1f334b"
+    },
+    "captured_API_fixtures_are_offline_reuse_not_new_HTTP_calls": true
+  },
+  "input_and_result_semantics": [
+    "The new independent duration route supports cohorts, saved_diagnostics, case_duration and median_duration without a mined session; duration computation does not execute replay.",
+    "Transition cohorts retain caller transition identities without requiring PNML. Cohort trace indices are deduplicated by the native helper; standalone median indices retain repeats as weights.",
+    "Unknown-activity baseline exclusion uses the complete submitted activity-key bank, including empty problem cohorts. Null, empty, missing and exact byte labels remain distinct.",
+    "Saved native rows, native diagnostics envelopes, complete replay-workbench envelopes and replay-report envelopes have explicit shapes. Tagged public full_result values do not substitute for event-level diagnostic rows.",
+    "Saved payloads can be inline or actual multipart diagnostic Files, with presence conflicts rejected. Original saved File bytes, original analysis text, opaque fields, arbitrary token integers, markings, domains and order remain retained; only trace/event/problem/unknown indices are projected for duration computation. This is not a full diagnostic-structure roundtrip.",
+    "Saved reanalysis uses the original supplied PNML and source indices. Original model bytes, place and transition IDs, exact marking integers and explicit zero marking keys remain available; uploaded content is not proof of authenticity or provenance.",
+    "Original source import/adapters remain available, with an additional complete raw native log carrier for typed timestamps, nulls and byte strings. Duplicate case labels remain separate grouped trace identities.",
+    "Computation status and native exception data are independent from optional source/model presentation errors. Optional invalid PNML does not discard successful cohort or scalar output.",
+    "Existing replay and duration algorithms remain unchanged. New code adds exact input projection, full result serialization and independent route/UI availability."
+  ],
+  "native_duration_oracle": {
+    "path": "build/replay-duration87-native-oracle-validation.json",
+    "bytes": 1543,
+    "sha256": "f5cf2af56797fd4635e1378397a97e4644d37fba4b346fc3ef0caacb17e152bf"
+  },
+  "direct_native_oracle_accounting": {
+    "duration_cases": 23,
+    "behavioral_witnesses": {
+      "caller_cohort_changes_native_output": true,
+      "empty_unknown_key_changes_baseline": true,
+      "event_diagnostics_govern_saved_reanalysis": true,
+      "weighted_median_retains_duplicates": true,
+      "literal_label_domains_distinct": true,
+      "nonpositive_baseline_zero_ratio": true,
+      "exact_model_identity": true,
+      "native_errors_retained": true
+    },
+    "evidence": {
+      "path": "build/replay-duration87-native-oracle-validation.json",
+      "bytes": 1543,
+      "sha256": "f5cf2af56797fd4635e1378397a97e4644d37fba4b346fc3ef0caacb17e152bf"
+    },
+    "CLI_equivalence_claimed": false,
+    "external_reference_equivalence_claimed": false
+  },
+  "HTTP_accounting": {
+    "selected_cases": 28,
+    "dedicated_API_corpus_HTTP_calls": 28,
+    "dedicated_API_corpus_POSTs": 28,
+    "File_followup_HTTP_calls": 2,
+    "live_smoke_HTTP_calls": 2,
+    "actual_File_handoffs": 1,
+    "total_actual_HTTP_calls": 32,
+    "File_handoffs_are_retained_original_inputs_not_product_exports": true,
+    "dedicated_API_corpus": {
+      "path": "build/replay-duration87-api-validation.json",
+      "bytes": 234615,
+      "sha256": "38d280d03dd8abe014c05fc68207434ff52482d5e526eadcd30b7de3d3455c20"
+    },
+    "optional_wire_or_File_proof": {
+      "path": "build/replay-duration87-file-bridge-validation.json",
+      "bytes": 5447,
+      "sha256": "7f72f634e5e957593e36529f7308bdc27a93a6b56c22ab8683c7cd5220042686"
+    },
+    "wire_mocked_fetches": 0,
+    "mock_transport_File_arguments": 0,
+    "wire_network_requests_executed": 2,
+    "mocked_File_arguments_are_not_native_File_handoffs": true,
+    "frontend_saved_response_inspection_adds_no_HTTP_calls": true,
+    "actual_saved_File_followup_HTTP_is_counted_separately": true,
+    "live_smokes_excluded_from_dedicated_corpus": true
+  },
+  "frontend_correction_history": {
+    "current_integration": {
+      "path": "build/replay-duration87-frontend-integration-2.json",
+      "bytes": 2661400,
+      "sha256": "6460ad4680609e2db05aa4be1e782826f54a18c20cba8c3c33c43eee5a760485"
+    },
+    "current_candidate": {
+      "path": "build/feature87-frontend-candidate-3/manifest.json",
+      "bytes": 5677,
+      "sha256": "6bb932c37d919723289aaa4bf5d9ee1dd7b53e121fe389da48fb4f6cc082b951"
+    },
+    "actual_current_frontend_validation": {
+      "path": "build/replay-duration87-frontend-1bf2f70b9dfd44fda02c739beccab0c6/validation.json",
+      "bytes": 2753930,
+      "sha256": "7f67636b6d26f977e9b7faa5bcf4b7092d8438bec108e9a99f2d2c108a1f334b"
+    },
+    "source_review": {
+      "path": "build/replay-duration87-source-review-2.json",
+      "bytes": 2585,
+      "sha256": "62a104bd0ae3269412798d7a74c4baef24cdbae49437d2b4aa2e04d217296d20"
+    }
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "delivered_feature87"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "delivered_feature84"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "delivered_feature85"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "delivered_feature86"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "open_source_proven_extension"
+    }
+  ],
+  "source_availability_audit": {
+    "path": "build/feature87-replay-input-source-audit/audit.json",
+    "bytes": 14757,
+    "sha256": "8a52f9a9649c8910cc96bd457c8efb51607802416911f79fbb901410bb81304e"
+  },
+  "proof_history": {
+    "native": {},
+    "api": {
+      "historical_failed_capture": {
+        "path": "build/replay-duration87-api-actual-1/validation.json",
+        "bytes": 82082,
+        "sha256": "9ab0e0cf32b65202a104653f17ca47cecd24b23d5fd5118b8864ce9ddd388b53"
+      },
+      "historical_collector_faults": [
+        {
+          "type": "AssertionError",
+          "message": "optional-model-presentation-error",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature87-api-prepared-1\\run-acceptance-1.py\", line 139, in main\n    row['response_body']=durable(folder/'response.body',raw);row['response']=dict(status=status,headers=headers,bytes=len(raw),sha256=sha(raw));row['checks']=evaluate(case,json.loads(raw),status,expected,bank);row['passed']=all(c['passed']for c in row['checks']);save(folder/'record.json',row);checkpoint();print(case['id'],row['passed'],flush=True);assert row['passed'],case['id']\n                                                                                                                                                                                                                                                                                                                                                                     ~~~^^^^^^^^^^\nAssertionError: optional-model-presentation-error\n"
+        }
+      ],
+      "historical_false_checks": [
+        {
+          "id": "optional-model-presentation-error",
+          "check": "optional invalid PNML presentation error separate from successful duration",
+          "passed": false,
+          "error": "AssertionError: "
+        }
+      ]
+    },
+    "frontend": {},
+    "backend": {},
+    "live": {},
+    "cleanup": {},
+    "file_bridge": {},
+    "source_audit": {},
+    "source_review": {},
+    "native_oracle": {}
+  },
+  "journal_policy": "Preserve complete inherited working prefix; stage parent HEAD journal plus owned Feature87 suffix only.",
+  "browser_ui_verified": false,
+  "browser_evidence": "No Feature87 rendered-browser validation is claimed. The prior permission denial remains a separate unresolved verification boundary.",
+  "browser_retry": null,
+  "full_parity": false,
+  "goal_complete": false,
+  "claim_boundary": "Duration workbench availability and direct native witnesses do not prove full reference behavior, saved-input authenticity, every remaining catalogue control, browser, performance or concurrency parity."
+}

@@ -8,6 +8,8 @@ import { nativeJson } from "../native-json";
 import { downloadQueryBlob } from "../log-query";
 import { DiagnosticTableView } from "./ModelDiagnosticsInspection";
 
+import { ReplayDurationWorkbench } from "./ReplayDurationWorkbench";
+
 export function TokenReplayWorkspace({file,source=null}:{file:File|null;source?:ActiveMiningSourceDescriptor|null}){
   const [log,setLog]=useState<File|null>(file);const [model,setModel]=useState<File|null>(null);
   const [form,setForm]=useState(defaultTokenReplayWorkbenchForm);const [run,setRun]=useState<TokenReplayWorkbenchRun|null>(null);
@@ -28,6 +30,7 @@ export function TokenReplayWorkspace({file,source=null}:{file:File|null;source?:
   const download=(raw:string,name:string,type="application/json")=>downloadQueryBlob(new Blob([activeMiningSourceBytes(raw)],{type}),name);
   const isXes=/\.(?:xes|xes\.gz|gz)$/i.test(log?.name??"");
   return <>
+    <ReplayDurationWorkbench file={file} source={source} replayRun={run}/>
     <section className="panel" aria-label="Independent token replay">
       <div className="panel-head"><h2>Replay a log against a PNML model</h2><span className="panel-meta">Independent inputs</span></div>
       <p>Upload a log and its model, choose the replay policy, then inspect every trace, marking and diagnostic. The model keeps its supplied initial and final tokens.</p>
