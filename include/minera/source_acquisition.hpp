@@ -2,6 +2,8 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
+#include "minera/xes_export.hpp"
 #include "minera/event_log.hpp"
 #include "minera/repository_history.hpp"
 #include "minera/windows_event_source.hpp"
@@ -36,4 +38,10 @@ struct SourceAcquisitionResult {
 };
 [[nodiscard]] SourceAcquisitionResult acquire_source(const SourceAcquisitionInput& input);
 [[nodiscard]] std::string source_acquisition_json(const SourceAcquisitionResult& result);
+// Exact serializers retain all stored result/capture state and opaque native
+// serializer bytes. Optional legacy serializers are isolated as artifacts.
+[[nodiscard]] std::string source_acquisition_result_exact_json(const SourceAcquisitionResult& result);
+[[nodiscard]] std::string source_acquisition_artifacts_json(const SourceAcquisitionResult& result);
+[[nodiscard]] XesExportOptions parse_source_acquisition_xes_options_json(std::string_view input);
+[[nodiscard]] std::string source_acquisition_xes_options_json(const XesExportOptions& options);
 }  // namespace minera
