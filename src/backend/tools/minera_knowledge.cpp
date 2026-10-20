@@ -1,4 +1,8 @@
 #include <charconv>
+#include <filesystem>
+#include <fstream>
+#include <optional>
+#include <sstream>
 #include <iostream>
 #include <cmath>
 #include <stdexcept>
@@ -17,6 +21,8 @@
 #endif
 
 #include "minera/knowledge_injection.hpp"
+#include "minera/knowledge_exact_json.hpp"
+#include "minera/literal_controls_json.hpp"
 #include "llm_runtime.hpp"
 
 namespace {
@@ -34,16 +40,33 @@ int usage(const char* program) {
             << " --variant description|process_mining|database"
                " [--description TEXT] [--query TEXT] [--database-schema TEXT]"
                " [--max-input-bytes N] [--max-prompt-bytes N]"
+               " [--assumptions-json JSON | --assumptions-file PATH]"
+               " [--context-json JSON | --context-file PATH]"
+               " [--options-json JSON | --options-file PATH]"
                " [--runtime-url URL --provider openai|anthropic|google --model MODEL]"
                " [--max-tokens N] [--temperature N] [--openai-api responses|chat_completions]"
                " [--image PATH] [--image-detail auto|low|high|original]"
                " [--extra-payload JSON | --extra-payload-file PATH]\n";
+  std::cerr << "Exact options require all eight native fields. Assumptions are NativeString arrays; context is [NativeString,NativeString] pairs. File controls preserve original bytes. Exact output retains the complete native preview separately from optional explicit runtime completion.\n";
   return 2;
 }
 
 }  // namespace
 
 int run(int argc, char** argv) {
+  const auto exact_name=[](std::string_view name)->std::string{
+    if(name=="--assumptions-json")return "knowledge_assumptions_json";
+    if(name=="--assumptions-file")return "knowledge_assumptions_file";
+    if(name=="--context-json")return "knowledge_context_json";
+    if(name=="--context-file")return "knowledge_context_file";
+    if(name=="--options-json")return "knowledge_options_json";
+    if(name=="--options-file")return "knowledge_options_file";
+    return {};
+  };
+  bool exact_mode=false;for(int i=1;i<argc;i+=2)if(!exact_name(argv[i]).empty())exact_mode=true;
+  std::vector<minera::KnowledgeExactInput> exact_inputs;
+  std::optional<minera::KnowledgeInjectionOptions> exact_options;
+  std::optional<minera::KnowledgeInjectionResult> exact_result;
   try {
     minera::KnowledgeInjectionOptions options;
     minera::llm_runtime::CompletionOptions completion;
@@ -51,8 +74,27 @@ int run(int argc, char** argv) {
     std::string image_detail;
     for (int index = 1; index < argc; ++index) {
       const std::string option = argv[index];
-      if (index + 1 >= argc) return usage(argv[0]);
+      if (index + 1 >= argc) {if(exact_mode)throw std::invalid_argument(option+" expects a value");return usage(argv[0]);}
       const std::string value = argv[++index];
+      if(exact_mode){
+        if(const auto field=exact_name(option);!field.empty()){
+          if(field.ends_with("_file")){
+            const auto path=std::filesystem::u8path(value);std::ifstream input(path,std::ios::binary);
+            if(!input)throw std::invalid_argument("cannot open exact knowledge input File");
+            std::ostringstream bytes;bytes<<input.rdbuf();const auto filename=path.filename().u8string();
+            exact_inputs.push_back({field,std::string(filename.begin(),filename.end()),bytes.str()});
+          }else exact_inputs.push_back({field,std::nullopt,value});
+          continue;
+        }
+        std::string field;
+        if(option=="--variant")field="knowledge_variant";
+        else if(option=="--description")field="knowledge_description";
+        else if(option=="--query")field="knowledge_query";
+        else if(option=="--database-schema")field="knowledge_database_schema";
+        else if(option=="--max-input-bytes")field="knowledge_max_input_bytes";
+        else if(option=="--max-prompt-bytes")field="knowledge_max_prompt_bytes";
+        if(!field.empty()){exact_inputs.push_back({field,std::nullopt,value});continue;}
+      }
       if (option == "--variant")
         options.variant = minera::knowledge_injection_variant_from_string(value);
       else if (option == "--description") options.description = value;
@@ -85,6 +127,18 @@ int run(int argc, char** argv) {
         throw std::invalid_argument("invalid OpenAI image detail");
       for (auto& image : completion.images) image.detail = image_detail;
     }
+    if(exact_mode){
+      exact_options=minera::parse_knowledge_exact_inputs(exact_inputs);
+      exact_result=minera::build_knowledge_prompt(*exact_options);
+      auto envelope=minera::serialize_knowledge_exact_envelope_json(exact_options,exact_result,exact_inputs);
+      if(!runtime_url.empty()){
+        if(!exact_result->computed)throw std::runtime_error(exact_result->error);
+        if(minera::literal_controls_transport_error(minera::knowledge_injection_json(*exact_result)))throw std::invalid_argument("native prompt is not scalar UTF-8; review a Unicode provider prompt separately");
+        const auto completion_json=minera::llm_runtime::completion_json(runtime_url,exact_result->prompt,completion);
+        envelope.pop_back();envelope+=",\"completion\":"+completion_json+"}";
+      }
+      std::cout<<envelope<<'\n';return 0;
+    }
     const auto result = minera::build_knowledge_prompt(options);
     if (runtime_url.empty()) std::cout << minera::knowledge_injection_json(result) << '\n';
     else {
@@ -93,6 +147,7 @@ int run(int argc, char** argv) {
     }
     return 0;
   } catch (const std::exception& error) {
+    if(exact_mode)std::cout<<minera::serialize_knowledge_exact_envelope_json(exact_options,exact_result,exact_inputs,error.what())<<'\n';
     std::cerr << "error: " << error.what() << '\n';
     return 1;
   }
