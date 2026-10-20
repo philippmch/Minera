@@ -1,0 +1,313 @@
+{
+  "complete": true,
+  "feature": 88,
+  "features_delivered": 88,
+  "parent_head": "d654d87d14f5538b344c574f770ef01844264ae9",
+  "feature_baseline_head": "8fb65a4695a446ef752139f8caf639afa847b5a9",
+  "baseline": {
+    "path": "build/saved-dfg-feature88-baseline.json",
+    "bytes": 2822862,
+    "sha256": "c2a6e97c672020326f9f1bfcfa1b38942e840bf23623c170a413f87105886649"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature88-cb268e38ae994ba1adbee0995c0a4568/build-manifest.json",
+      "bytes": 397397,
+      "sha256": "bf2682b4fb8beb0e1f72e721043224bdd2ba955bfbe63b44d58a53fa8fcea742"
+    },
+    "api": {
+      "path": "build/saved-dfg88-api-validation.json",
+      "bytes": 254308,
+      "sha256": "63f0b3727b49b440b68152b650f3db53d3a097700b446a0f43ab1698b006b2e8"
+    },
+    "frontend": {
+      "path": "build/saved-dfg88-frontend-ea41c65b71b241e484753b287fd89035/validation.json",
+      "bytes": 2754722,
+      "sha256": "d6fbadac21ada1ae1b5894493446630803cf94d07dde913776387ffb7f81786c"
+    },
+    "backend": {
+      "path": "build/saved-dfg-feature88-backend-postcommit.json",
+      "bytes": 5865,
+      "sha256": "c022202136ee3eb6dab859306fe2363c5381453ec0dfa88ad391708e3753584a"
+    },
+    "live": {
+      "path": "build/saved-dfg-feature88-live-runtime.json",
+      "bytes": 12708,
+      "sha256": "89845bd76277fbea5ba52ddc56494d41a91cd0a63468666613a23dbabf3de9a5"
+    },
+    "cleanup": {
+      "path": "build/saved-dfg-feature88-test-cleanup.json",
+      "bytes": 4699,
+      "sha256": "d26040677fede9299575bfcedd9fe5973aef2f6efe4366ed41881240071b05a1"
+    },
+    "file_bridge": {
+      "path": "build/saved-dfg88-file-bridge-validation.json",
+      "bytes": 16120,
+      "sha256": "441fea762f29c23ac9134922edd3e7fd9aeb5b013cf078c7d5a35bd3f3a6ba28"
+    },
+    "source_audit": {
+      "path": "build/saved-dfg88-source-review.json",
+      "bytes": 7674,
+      "sha256": "d6c23806de49f414c50668a42b663a800c7d3405aa2b5e57370a73085a0253f5"
+    },
+    "source_review": {
+      "path": "build/saved-dfg88-source-review.json",
+      "bytes": 7674,
+      "sha256": "d6c23806de49f414c50668a42b663a800c7d3405aa2b5e57370a73085a0253f5"
+    },
+    "native_oracle": {
+      "path": "build/saved-dfg88-native-oracle-validation.json",
+      "bytes": 16044,
+      "sha256": "ce4683a1ad5391b8c9e86ef617867545fff2ecbcf5c5efb9e4c656cd26a4def8"
+    }
+  },
+  "previous_delivery_report": {
+    "path": "docs/feature-first-replay-duration-validation.json",
+    "bytes": 14654,
+    "sha256": "3aa026d4e5abc0d0a86934d1719994af4521f4b9cc426574cb507e6fa8d1e93c"
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_API_cases": 31,
+    "physical_HTTP_calls": 31,
+    "dedicated_API_corpus_POSTs": 31,
+    "frontend_tests": 9221,
+    "frontend_files": 154,
+    "frontend_full_suite_delta": 23,
+    "actual_File_handoffs": 1,
+    "client_bridge_HTTP_calls": 2,
+    "wire_mocked_fetches": 0,
+    "wire_mock_transport_File_arguments": 0,
+    "wire_network_requests_executed": 2,
+    "live_smoke_HTTP_calls": 2,
+    "native_contributing_suites": 78,
+    "native_retained_suites": 76,
+    "native_freshly_executed_suites": 2,
+    "native_reused_core_objects": 210,
+    "native_fresh_core_objects": 1,
+    "compiled_core_sources": 1,
+    "compiled_server_sources": 1,
+    "compiled_extra_tool_sources": 0,
+    "remaining_audited_extensions": 2,
+    "direct_native_projection_oracle_cases": 15,
+    "native_owned_paths": 6,
+    "frontend_owned_paths": 4,
+    "client_bridge_alignment_seed_HTTP_calls": 1,
+    "saved_projection_followup_HTTP_calls": 1,
+    "total_actual_HTTP_calls": 35
+  },
+  "native_test_accounting": {
+    "retained_parent_suites": 76,
+    "freshly_executed_suites": 2,
+    "aggregate_current_passing_suites": 78,
+    "contributing_ctest_invocation_count": 18,
+    "retained_evidence": {
+      "path": "build/native-feature87-cca309343d0b4331ba11dfed80fd2bf6/build-manifest.json",
+      "bytes": 391221,
+      "sha256": "bf2ae11caefc0cdf1328c433c976bee0526d0486b7e0b394b5390cf32612fc2d"
+    },
+    "actual_current_evidence": {
+      "path": "build/native-feature88-cb268e38ae994ba1adbee0995c0a4568/build-manifest.json",
+      "bytes": 397397,
+      "sha256": "bf2682b4fb8beb0e1f72e721043224bdd2ba955bfbe63b44d58a53fa8fcea742"
+    }
+  },
+  "frontend_test_accounting": {
+    "actual_fresh_full_suite": {
+      "total_tests": 9221,
+      "passed_tests": 9221,
+      "passed_files": 154
+    },
+    "retained_parent_inventory": {
+      "total_tests": 9198,
+      "passed_tests": 9198,
+      "passed_files": 153
+    },
+    "net_test_inventory_delta": 23,
+    "actual_current_evidence": {
+      "path": "build/saved-dfg88-frontend-ea41c65b71b241e484753b287fd89035/validation.json",
+      "bytes": 2754722,
+      "sha256": "d6fbadac21ada1ae1b5894493446630803cf94d07dde913776387ffb7f81786c"
+    },
+    "captured_API_fixtures_are_offline_reuse_not_new_HTTP_calls": true
+  },
+  "input_and_result_semantics": [
+    "An explicit project_saved_dfg operation on the existing graph alignment route accepts full supplied DfgAlignmentLogResult state and calls only native supplied-result projection overloads; alignment search and score recalculation do not run.",
+    "Original CSV/XES, complete typed EventTable and byte-safe raw EventLog sources are supported with exact native selectors. Complete DFG JSON or text models retain explicit start/end boundaries including empty maps.",
+    "Native result, workbench and report envelopes are selected explicitly. Saved results are supplied as an actual original multipart File or inline text with presence conflicts rejected. Complete original upload bytes and outer envelopes stay inspectable.",
+    "All native moves, computed flags, finite and nonfinite scores, unique variants and search counters are retained. NativeString carriers preserve arbitrary byte and WTF8 labels; unsigned counters accept exact tokens or decimal strings.",
+    "Canonical supplied state, source/model snapshots, native metrics, byte-safe raw projected log and optional legacy log/XES/model exports are independently retained. A failed projection or export does not discard the submitted result.",
+    "The same original source/model File objects can be reused from a completed grouped-log DFG alignment with the whole captured workbench as an actual saved File. Explicit inline editing replaces that File input.",
+    "A source-bound direct native witness verifies different supplied routes for identical traces change projected timestamps and adjacent-pair metrics. Supplied content does not establish authenticity, provenance or optimality.",
+    "Existing alignment and projection algorithms are unchanged. Tests and HTTP proofs establish this input/result workflow; they do not establish full reference equivalence."
+  ],
+  "native_projection_oracle": {
+    "path": "build/saved-dfg88-native-oracle-validation.json",
+    "bytes": 16044,
+    "sha256": "ce4683a1ad5391b8c9e86ef617867545fff2ecbcf5c5efb9e4c656cd26a4def8"
+  },
+  "direct_native_oracle_accounting": {
+    "projection_cases": 15,
+    "behavioral_witnesses": {
+      "duplicate_variant_routes_remain_distinct": true,
+      "native_unusual_adjacent_pair_counts": true,
+      "native_timestamp_projection": true,
+      "exact_counters_nonfinite_scores": true,
+      "separate_projection_failures": true,
+      "empty_boundaries_without_search": true,
+      "byte_labels_exact_selectors": true
+    },
+    "evidence": {
+      "path": "build/saved-dfg88-native-oracle-validation.json",
+      "bytes": 16044,
+      "sha256": "ce4683a1ad5391b8c9e86ef617867545fff2ecbcf5c5efb9e4c656cd26a4def8"
+    },
+    "CLI_equivalence_claimed": false,
+    "external_reference_equivalence_claimed": false
+  },
+  "HTTP_accounting": {
+    "client_bridge_alignment_seed_HTTP_calls": 1,
+    "saved_projection_followup_HTTP_calls": 1,
+    "selected_cases": 31,
+    "dedicated_API_corpus_HTTP_calls": 31,
+    "dedicated_API_corpus_POSTs": 31,
+    "client_bridge_HTTP_calls": 2,
+    "live_smoke_HTTP_calls": 2,
+    "actual_File_handoffs": 1,
+    "total_actual_HTTP_calls": 35,
+    "File_handoffs_are_retained_original_inputs_not_product_exports": true,
+    "dedicated_API_corpus": {
+      "path": "build/saved-dfg88-api-validation.json",
+      "bytes": 254308,
+      "sha256": "63f0b3727b49b440b68152b650f3db53d3a097700b446a0f43ab1698b006b2e8"
+    },
+    "optional_wire_or_File_proof": {
+      "path": "build/saved-dfg88-file-bridge-validation.json",
+      "bytes": 16120,
+      "sha256": "441fea762f29c23ac9134922edd3e7fd9aeb5b013cf078c7d5a35bd3f3a6ba28"
+    },
+    "wire_mocked_fetches": 0,
+    "mock_transport_File_arguments": 0,
+    "wire_network_requests_executed": 2,
+    "mocked_File_arguments_are_not_native_File_handoffs": true,
+    "frontend_saved_response_inspection_adds_no_HTTP_calls": true,
+    "client_bridge_seed_and_saved_projection_are_counted_separately": true,
+    "live_smokes_excluded_from_dedicated_corpus": true
+  },
+  "frontend_correction_history": {
+    "current_integration": {
+      "path": "build/saved-dfg88-frontend-integration-2.json",
+      "bytes": 2661557,
+      "sha256": "6e72c9f2ac9be07442b62cd544ffd16ea9e126443093ea5353ea9be55210c8c3"
+    },
+    "current_candidate": {
+      "path": "build/feature88-frontend-candidate-2/manifest.json",
+      "bytes": 3882,
+      "sha256": "3200eaa295e2eb8514817bab9347710e6cc8c9baeec720bcd8f0fecfd7cd72c9"
+    },
+    "actual_current_frontend_validation": {
+      "path": "build/saved-dfg88-frontend-ea41c65b71b241e484753b287fd89035/validation.json",
+      "bytes": 2754722,
+      "sha256": "d6fbadac21ada1ae1b5894493446630803cf94d07dde913776387ffb7f81786c"
+    },
+    "source_review": {
+      "path": "build/saved-dfg88-source-review.json",
+      "bytes": 7674,
+      "sha256": "d6c23806de49f414c50668a42b663a800c7d3405aa2b5e57370a73085a0253f5"
+    }
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "delivered_feature87"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "delivered_feature88"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "delivered_feature84"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "delivered_feature85"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "delivered_feature86"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "open_source_proven_extension"
+    }
+  ],
+  "source_availability_audit": {
+    "path": "build/saved-dfg88-source-review.json",
+    "bytes": 7674,
+    "sha256": "d6c23806de49f414c50668a42b663a800c7d3405aa2b5e57370a73085a0253f5"
+  },
+  "proof_history": {
+    "native": {},
+    "api": {},
+    "frontend": {},
+    "backend": {
+      "historical_incomplete_stage_intent": {
+        "path": "build/saved-dfg-feature88-backend-precommit.json",
+        "bytes": 2283,
+        "sha256": "bc45b9c932e6bff2b7d8d6087cdf2269f946ec623b0723b0176e280c3fdc4338"
+      }
+    },
+    "live": {},
+    "cleanup": {},
+    "file_bridge": {},
+    "source_audit": {},
+    "source_review": {},
+    "native_oracle": {
+      "historical_failed_oracle": {
+        "path": "build/saved-dfg88-direct-native-actual-1/validation.json",
+        "bytes": 8881,
+        "sha256": "7b9c25c57767ada96aea587a1f13a685b18d329ed4f146b811affb0217869345"
+      },
+      "historical_oracle_failure_reason": "Invalid scalar table cells in the test helper caused an uncaught existing-codec exception. Corrected EventAttribute cells and top-level diagnostics; product sources unchanged."
+    }
+  },
+  "journal_policy": "Preserve complete inherited working prefix; stage parent HEAD journal plus owned Feature88 suffix only.",
+  "browser_ui_verified": false,
+  "browser_evidence": "No Feature88 rendered-browser validation is claimed. A fresh retry still received a tool permission denial despite enabled user settings; server health was independently confirmed.",
+  "browser_retry": {
+    "path": "build/saved-dfg88-browser-retry.json",
+    "bytes": 871,
+    "sha256": "8d082f5223d4f6be07e543198e17f0b91ab76a1d5a41b76df4a011e445ad1480"
+  },
+  "full_parity": false,
+  "goal_complete": false,
+  "claim_boundary": "Saved DFG projection availability and direct native witnesses do not prove full reference behavior, saved-input authenticity, every remaining catalogue control, browser, performance or concurrency parity."
+}
