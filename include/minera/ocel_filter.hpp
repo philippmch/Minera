@@ -8,12 +8,34 @@
 #include <vector>
 
 #include "minera/ocel.hpp"
+#include "minera/timestamp.hpp"
 
 namespace minera {
 
 [[nodiscard]] Ocel filter_ocel_event_attribute(
     const Ocel& log, std::string_view attribute_key,
     const std::vector<OcelValue>& values, bool positive = true);
+
+// Public categorical filtering preserves the distinction between a timestamp
+// value and a literal string, and compares bool/integer/real scalars numerically.
+using OcelEventAttributeFilterValue =
+    std::variant<std::nullptr_t, bool, std::int64_t, double, std::string,
+                 ParsedExactTimestamp>;
+enum class OcelEventAttributeColumnKind { kAutomatic, kScalar, kTimestamp };
+[[nodiscard]] Ocel filter_ocel_event_attribute_exact(
+    const Ocel& log, std::string_view attribute_key,
+    const std::vector<OcelEventAttributeFilterValue>& values,
+    bool positive = true,
+    OcelEventAttributeColumnKind column_kind =
+        OcelEventAttributeColumnKind::kAutomatic);
+
+// Strings use the public whole-second date format; parsed timestamps represent
+// datetime arguments with their exact fractional instant and timezone state.
+using OcelEventTimestampBound = std::variant<std::string, ParsedExactTimestamp>;
+[[nodiscard]] Ocel filter_ocel_events_timestamp_exact(
+    const Ocel& log, const OcelEventTimestampBound& from,
+    const OcelEventTimestampBound& to,
+    std::string_view timestamp_key = "ocel:timestamp");
 
 [[nodiscard]] Ocel filter_ocel_object_attribute(
     const Ocel& log, std::string_view attribute_key,

@@ -50,6 +50,7 @@ survive export/reimport. Five affected native suites pass; see
 | Log start/end activity filters | Admission and supplied-variant helpers match all 66 captured outcomes, custom keys, polarity, protected endpoint class and exact thresholds |
 | OCEL object-type endpoint filtering | Existing start/end implementations match all 160 captured full returned logs; six-table propagation, order and metadata verified |
 | OCEL per-type object-count filtering | Exact integer/fractional thresholds added; 183 captured full returned logs and 175 compatible legacy controls pass |
+| OCEL event-attribute filtering | Exact membership and timestamp companions match 195 captured full logs and 50 native diagnostics; typed datetime columns, nanosecond boundaries and all six table projections retained |
 | Log rework filtering | Faithful standalone filter matches all 88 captured outcomes, typed targets, exact thresholds, lazy errors and noncomplement NaN polarity |
 | Supplied case descriptions | All 32 captured byte/error outcomes pass, including nested containers, literal selectors, four formatting flags, no truncation above 2 MiB and input preservation |
 | Log trace filtering | New serialized-activity API matches all 50 captured outcomes, custom keys, polarity, full metadata and missing-value errors |
@@ -61,14 +62,15 @@ These are semantic module closures, including missing helper implementations
 and repairs. They do not complete their parent families. Detailed contracts
 and evidence limits are linked from each module's coverage record.
 
-Coverage is now **46 complete / 40 partial packages**, **223 complete / 164
-partial modules**, and **204 open strict coverage units**, down from 228.
+Coverage is now **46 complete / 40 partial packages**, **224 complete / 163
+partial modules**, and **203 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 
 ## Active requirements
 
-- Close OCEL event-attribute filtering.
+- Expose the exact OCEL membership, timestamp and count controls in the
+  preparation workspace; continue object-attribute and OCDFG working-time gaps.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in
   the broader public captures, so it is not evidence of 28 incorrect models.
