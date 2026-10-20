@@ -13744,3 +13744,10 @@ Validation: docs/feature-first-replay-duration-validation.json.
 Feature88 adds projection from independently supplied full DFG alignment results inside the existing graph-alignment workspace. Original source and model Files, complete saved routes, scores, counters and original saved bytes remain available without running alignment search. Identical source traces can use distinct supplied routes; native log and metrics projections retain separate failures and byte-safe raw output. Validation passed 31 selected cases / 31 dedicated physical HTTP calls, 2 actual client bridge HTTP calls (one fresh alignment seed and one saved projection follow-up), 2 live checks and 9221 frontend tests in 154 files. 2 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
 
 Validation: docs/feature-first-saved-dfg-validation.json.
+
+
+## Feature89 - Arbitrary OTG relation thresholds
+
+Feature89 adds arbitrary per-relation OTG conformance thresholds to the existing workspace, both public request helpers and native CLI. Exact relation names and all native double threshold values are supported, with complete original graph/source Files, canonical options and byte-safe native results retained. Validation passed 31 selected cases / 31 dedicated physical HTTP calls, 2 actual client bridge HTTP calls through the two public helpers, 2 live checks, 25 CLI invocations and 9254 frontend tests in 156 files. 1 audited extension remains. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
+
+Validation: docs/feature-first-otg-threshold-validation.json.
