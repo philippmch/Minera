@@ -32,6 +32,7 @@ add_library(minera_core
   src/backend/filtering_boundary_common.cpp
   src/backend/log_trace_filter.cpp
   src/backend/log_segments_filter.cpp
+  src/backend/pripel_trace_distance.cpp
   src/backend/attribute_value_repetition.cpp
   src/backend/case_grouping.cpp
   src/backend/chaotic_activities.cpp
@@ -969,6 +970,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_log_segments_filter_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_segments_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_segments_filter_tests COMMAND minera_log_segments_filter_tests)
+
+  add_executable(minera_pripel_trace_distance_tests src/backend/tests/test_pripel_trace_distance.cpp)
+  target_link_libraries(minera_pripel_trace_distance_tests PRIVATE minera::core)
+  target_compile_features(minera_pripel_trace_distance_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_pripel_trace_distance_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_pripel_trace_distance_tests COMMAND minera_pripel_trace_distance_tests)
 
   add_executable(minera_quality_json_numbers_tests src/backend/tests/test_quality_json_numbers.cpp)
   target_link_libraries(minera_quality_json_numbers_tests PRIVATE minera::core)

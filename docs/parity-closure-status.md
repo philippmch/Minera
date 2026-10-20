@@ -36,6 +36,7 @@ survive export/reimport. Five affected native suites pass; see
 | Infix-to-regex conversion | Missing converter implemented; all 34 captured outputs match, including wildcard boundaries and every ASCII escaping character |
 | Log prefix and suffix filtering | Two modules match all 60 captured cuts, strict anchor exclusion, first/last occurrence, literal empty labels, custom keys and full metadata |
 | OCEL 2.0 graph computation | New faithful companion matches all 134 captured outcomes, original-row multiplicity, copy/append behavior, selected failures and composite-specific inheritance behavior |
+| PRIPEL encoded trace helpers | Three missing string helpers implemented; 205 captured length, enumeration and token edit-distance outcomes match |
 | Log trace filtering | New serialized-activity API matches all 50 captured outcomes, custom keys, polarity, full metadata and missing-value errors |
 | Object-codeath, descendants and inheritance graphs | Three direct modules each match 119/119 captured outcomes; literal IDs and missing-event diagnostics repaired; six affected suites pass |
 | Petri-net descriptions | Sixteen captured full-byte outputs match; literal quoting and weighted/parallel arc occurrences repaired; full context suite passes |
@@ -45,8 +46,8 @@ These are semantic module closures, including missing helper implementations
 and repairs. They do not complete their parent families. Detailed contracts
 and evidence limits are linked from each module's coverage record.
 
-Coverage is now **46 complete / 40 partial packages**, **215 complete / 172
-partial modules**, and **212 open strict coverage units**, down from 228.
+Coverage is now **46 complete / 40 partial packages**, **216 complete / 171
+partial modules**, and **211 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 

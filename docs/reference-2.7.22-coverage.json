@@ -6161,8 +6161,37 @@
       "owner": "algo.anonymization.pripel",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pripel-trace-distance-parity-contract.md",
+      "artifacts": [
+        "include/minera/pripel_trace_distance.hpp",
+        "src/backend/pripel_trace_distance.cpp",
+        "src/backend/tests/test_pripel_trace_distance.cpp"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.pripel.util.trace_levenshtein",
+        "implementation": [
+          {
+            "path": "src/backend/pripel_trace_distance.cpp",
+            "symbol": "pripel_encoded_trace_length"
+          },
+          {
+            "path": "src/backend/pripel_trace_distance.cpp",
+            "symbol": "enumerate_pripel_trace"
+          },
+          {
+            "path": "src/backend/pripel_trace_distance.cpp",
+            "symbol": "pripel_trace_levenshtein"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pripel_trace_distance.cpp",
+            "executable": "minera_pripel_trace_distance_tests",
+            "case": "pripel_trace_distance_module_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.pripel.util.TraceMatcher",
