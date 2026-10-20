@@ -1,5 +1,6 @@
 #include "minera/exact_filter_discovery_json.hpp"
 #include "minera/case_description_workbench_json.hpp"
+#include "minera/reference_log_filter_workbench.hpp"
 #include "case_relations_input.hpp"
 #include "case_relations_typed_input.hpp"
 // Local application server: serves the built frontend and mines uploaded
@@ -4094,6 +4095,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_label_splitting_route.hpp"
 #include "original_log_query_route.hpp"
 #include "case_description_route.hpp"
+#include "reference_log_filter_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
 #include "original_decision_route.hpp"
@@ -10480,6 +10482,7 @@ int main(int argc, char** argv) {
   server.Options("/api/mine", preflight);
   server.Options("/api/log-query", preflight);
   server.Options("/api/log-query/export", preflight);
+  server.Options("/api/reference-log-filter", preflight);
   server.Options("/api/log-cluster", preflight);
   server.Options("/api/llm-context", preflight);
   server.Options("/api/original-log-to-features", preflight);
@@ -10734,6 +10737,7 @@ int main(int argc, char** argv) {
   server.Post("/api/original-log-to-features", handle_original_features_workbench);
   server.Post("/api/original-label-splitting-workbench", handle_original_label_splitting_workbench);
   server.Post("/api/original-log-query-workbench", handle_original_log_query_workbench);
+  server.Post("/api/reference-log-filter", handle_reference_log_filter);
   server.Options("/api/emd-workbench", preflight);
   server.Post("/api/emd-workbench", handle_original_emd_workbench);
   server.Options("/api/object-centric-playout-workbench", preflight);

@@ -15,6 +15,15 @@ TypeScript and the production build passed; the product PDF writer's sample
 was independently parsed, rendered and visually checked. Rendered application
 interaction remains unverified under the previously recorded browser block.
 
+The original-query workspace now exposes trace, prefix, suffix, start, end
+and rework filtering for CSV, XES and full native logs. Results can be
+downloaded as complete native JSON or XES, and opened with their actual
+activity selector. Native-to-XES projections are explicitly labeled.
+The native workflow and real multipart HTTP acceptance tests pass. All
+9,651 frontend tests passed before the final handoff fixes; the final 67
+focused tests, TypeScript and production build also pass. See
+[reference-log-filter-workflow.md](reference-log-filter-workflow.md).
+
 Quality-result JSON also preserves computed double values through parsing,
 including negative zero, instead of rounding to six significant digits. The
 numeric regression and affected core/evaluation checks pass. Its precise scope
@@ -60,7 +69,6 @@ The machine-readable source of truth is
 ## Active requirements
 
 - Close OCEL event-attribute filtering.
-- Connect the faithful native log filters to the application workflow.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in
   the broader public captures, so it is not evidence of 28 incorrect models.
