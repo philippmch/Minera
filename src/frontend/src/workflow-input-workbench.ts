@@ -1,3 +1,5 @@
+import {hasExactFilters,hasFullHeuristic,exactFilterFields,appendExactFilterFiles,readExactFilterResponse,OwnedExactFilterResult,type ExactFilterControls,type ExactFilterRun} from "./exact-filter-controls";
+import {originalEditDistanceWireFilename} from "./original-edit-distance-workbench";
 import {appendNativeMultipartField, nativeStringBytes as workflowInputNativeBytes} from "./native-multipart";
 export {workflowInputNativeBytes};
 import type { MineraExport, LogConversionTableCell } from "./types";
@@ -14,6 +16,7 @@ export type WorkflowInputShape = typeof WORKFLOW_INPUT_SHAPES[number];
 export type WorkflowInputFormat = typeof WORKFLOW_INPUT_FORMATS[number];
 export type WorkflowInputFamily = "alpha" | "heuristic";
 export interface WorkflowInputForm {
+  exact?: ExactFilterControls;
   family: WorkflowInputFamily; shape: WorkflowInputShape; format: WorkflowInputFormat;
   alphaVariant: "classic" | "plus"; heuristicVariant: "classic" | "plusplus";
   importFields: Record<string, string>; fields: Record<string, string>; explicitEmptySelectors: Record<string, boolean>;
@@ -76,11 +79,13 @@ export function workflowInputControlActive(control: WorkflowInputControl, form: 
 export function workflowInputFields(form: WorkflowInputForm, name: string): Array<[string, string]> {
   if (!["alpha", "heuristic"].includes(form.family) || !WORKFLOW_INPUT_SHAPES.includes(form.shape) || !WORKFLOW_INPUT_FORMATS.includes(form.format)) throw new Error("Select a supported discovery family, input shape and format.");
   if (!["classic", "plus"].includes(form.alphaVariant) || !["classic", "plusplus"].includes(form.heuristicVariant)) throw new Error("Select a supported native discovery variant.");
+  const full = form.family === "heuristic" && hasFullHeuristic(form.exact??{});
   const variant = form.family === "alpha" ? form.alphaVariant : form.heuristicVariant;
-  if (form.shape === "dfg" && (form.format !== "dfg_json" || variant !== "classic")) throw new Error("Structured DFG input requires Classic discovery and the DFG JSON format.");
+  if (form.shape === "dfg" && (form.format !== "dfg_json" || !full && variant !== "classic")) throw new Error("Structured DFG input requires Classic discovery and the DFG JSON format.");
   if (form.format === "dfg_json" && form.shape !== "dfg") throw new Error("DFG JSON requires the DFG input shape.");
-  if (form.shape === "pandas_mutable" && (form.family !== "heuristic" || variant !== "plusplus")) throw new Error("Mutable pandas input requires Heuristics++.");
-  const fields: Array<[string, string]> = [["discovery_family", form.family], ["input_shape", form.shape], ["input_format", form.format], [form.family === "alpha" ? "alpha_variant" : "heuristic_variant", variant]];
+  if (form.shape === "pandas_mutable" && (form.family !== "heuristic" || !full && variant !== "plusplus")) throw new Error("Mutable pandas input requires Heuristics++.");
+  const fields: Array<[string, string]> = [["discovery_family", form.family], ["input_shape", form.shape], ["input_format", form.format]];
+  if (!full) fields.push([form.family === "alpha" ? "alpha_variant" : "heuristic_variant", variant]);
   if (form.format === "auto") {
     for (const [key] of TOKEN_REPLAY_IMPORT_CONTROLS) {const value = form.importFields[key]; if (value !== undefined && value !== "") fields.push([key, value]);}
     for (const [key] of TOKEN_REPLAY_XES_BOOLEAN_CONTROLS) {
@@ -110,6 +115,11 @@ export function workflowInputFields(form: WorkflowInputForm, name: string): Arra
     fields.push([control.key, value]);
   }
   if (Object.keys(selectors).length) fields.push(["discovery_selectors_json", JSON.stringify(selectors)]);
+  if (form.exact && hasExactFilters(form.exact)) {
+    if (form.family !== "heuristic" || Object.entries(form.exact).some(([k,v])=>k.startsWith("ltl_")&&v!==undefined)) throw new Error("Independent workflow exact controls are Heuristic path pairs only.");
+    const legacy = full ? [...fields,...Object.entries(form.fields),...Object.entries(form.explicitEmptySelectors).filter(([,v])=>v).map(([k])=>[k,""] as [string,string])] : Object.hasOwn(form.fields,"heuristic_most_common_paths") && !fields.some(([key])=>key==="heuristic_most_common_paths") ? [...fields,["heuristic_most_common_paths",form.fields.heuristic_most_common_paths] as [string,string]] : fields;
+    fields.push(...exactFilterFields(form.exact,legacy));
+  }
   return fields;
 }
 export interface WorkflowInputCell extends Omit<LogConversionTableCell, "kind" | "children"> {
@@ -258,6 +268,7 @@ export function workflowInputTables(value: WorkflowInputDiscovery, fields?: Arra
   return tables;
 }
 export interface WorkflowInputRun {
+  exact?: ExactFilterRun;
   value: WorkflowInputDiscovery; raw: string; fields: Array<[string, string]>; tables: DiagnosticTable[];
   input: File; input_sha256: string; http_status: number;
 }
@@ -268,16 +279,20 @@ export async function runWorkflowInput(file: File, form: WorkflowInputForm, sign
   const fields = workflowInputFields(form, file.name), submitted = Object.fromEntries(fields), hash = await fileHash(file);
   signal?.throwIfAborted();
   const body = new FormData(); body.append("input", file); fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
+  appendExactFilterFiles(body,form.exact??{});
   const path = "/api/discover-workflow-input", response = await fetch(path, {method: "POST", body, signal});
-  const value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
+  const exact = form.exact && hasExactFilters(form.exact) ? await readExactFilterResponse(response,path,body,fields,signal) : undefined;
+  const value = exact?.value ?? await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
+  if (exact && (!response.ok || exact.value.family === "EXACT_FILTER_DISCOVERY" || hasFullHeuristic(form.exact??{}))) throw new OwnedExactFilterResult(exact);
   if (!isWorkflowInputDiscovery(value)) {
+    if (exact) throw new OwnedExactFilterResult(exact);
     if (!response.ok) throw new Error(object(value) && typeof value.error === "string" ? value.error : `Workflow input discovery failed (${response.status}).`);
     throw new Error("The server did not return a valid native workflow input discovery envelope.");
   }
   const input = value.input_context;
-  if (value.method !== submitted.discovery_family || value.variant !== (submitted.alpha_variant ?? submitted.heuristic_variant) || input.adapter !== submitted.input_shape || input.format !== submitted.input_format || input.dataset !== file.name || unsigned(input, "original_input_bytes") !== BigInt(file.size)) throw new Error("The workflow response does not match the submitted file, input shape and discovery options.");
+  if (value.method !== submitted.discovery_family || value.variant !== (submitted.alpha_variant ?? submitted.heuristic_variant) || input.adapter !== submitted.input_shape || input.format !== submitted.input_format || input.dataset !== (exact ? await originalEditDistanceWireFilename(file.name) : file.name) || unsigned(input, "original_input_bytes") !== BigInt(file.size)) throw new Error("The workflow response does not match the submitted file, input shape and discovery options.");
   if (!response.ok && value.computed) throw new Error(`The server returned a computed workflow with failure status ${response.status}.`);
-  return {value, raw: nativeResponseJson(value), fields, tables: workflowInputTables(value, fields), input: file, input_sha256: hash, http_status: response.status};
+  return {value, raw: nativeResponseJson(value), fields, tables: workflowInputTables(value, fields), input: file, input_sha256: hash, http_status: response.status, exact};
 }
 export class WorkflowInputRequestGate {
   private generation = 0;
@@ -333,3 +348,5 @@ export function workflowInputDfgExample(family: WorkflowInputFamily): string {
   const dfg = [{source: "A", target: "B", count: 2}];
   return family === "alpha" ? nativeJson({kind: "sparse", dfg}, 2) : nativeJson({dfg, activities: ["A", "B"], activity_counts: {A: 2, B: 2}, start_counts: {A: 2}, end_counts: {B: 2}, window_two_dfg: [], frequency_triples: [], start_activities: ["A"], end_activities: ["B"]}, 2);
 }
+
+export async function runExactWorkflowInput(file:File,form:WorkflowInputForm,signal?:AbortSignal):Promise<ExactFilterRun>{if(!form.exact||!hasExactFilters(form.exact))throw new Error("Supply exact Heuristic path controls.");try{const run=await runWorkflowInput(file,form,signal);if(!run.exact)throw new Error("Missing exact workflow inspection.");return run.exact;}catch(cause){if(cause instanceof OwnedExactFilterResult)return cause.run;throw cause;}}

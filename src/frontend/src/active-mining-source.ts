@@ -1,3 +1,4 @@
+import {cloneExactFilterFiles,exactFilterMatchesWireFilename} from "./exact-filter-controls";
 import {isMineraExport, type MineraExport} from "./types";
 import {isOcelJsonDocument} from "./app-logic";
 import {nativeCell, nativeJson, parseNativeJson} from "./native-json";
@@ -67,8 +68,8 @@ export function assertMiningSourceBinding(expected: string | null, current: stri
 export function cancelMiningRequest(requestId: string): void {void fetch(`/api/cancel-mine?request_id=${encodeURIComponent(requestId)}`, {method: "POST"}).catch(() => undefined);}
 export function miningSourceDescriptor(file: File, sha256: string, options: MineOptions, data: ActiveDatasetResult): ActiveMiningSourceDescriptor {
   const snapshot = data.active_source ?? null, source_id = data.source_id; if (!source_id) throw new Error("The mined analysis did not identify its active native source.");
-  if (snapshot && (!isActiveMiningSourceSnapshot(snapshot) || snapshot.source_id !== source_id || snapshot.original_dataset !== file.name || BigInt(String(nativeCell(snapshot, "original_input_bytes"))) !== BigInt(file.size))) throw new Error("The active native source does not match the uploaded file and analysis.");
-  return {file, sha256, options: structuredClone(options), format: snapshot?.format ?? options.miningInputFormat ?? "auto", shape: snapshot?.shape ?? options.miningInputShape ?? "log", selectors: snapshot ? {...snapshot.source_selectors} : {...options.miningSelectors}, source_id, snapshot};
+  if (snapshot && (!isActiveMiningSourceSnapshot(snapshot) || snapshot.source_id !== source_id || !(exactFilterMatchesWireFilename(data,"log",snapshot.original_dataset) ?? snapshot.original_dataset === file.name) || BigInt(String(nativeCell(snapshot, "original_input_bytes"))) !== BigInt(file.size))) throw new Error("The active native source does not match the uploaded file and analysis.");
+  return {file, sha256, options: cloneExactFilterFiles(options), format: snapshot?.format ?? options.miningInputFormat ?? "auto", shape: snapshot?.shape ?? options.miningInputShape ?? "log", selectors: snapshot ? {...snapshot.source_selectors} : {...options.miningSelectors}, source_id, snapshot};
 }
 export function miningSourceFormFromDescriptor(source: ActiveMiningSourceDescriptor): MiningSourceForm {const form = defaultMiningSourceForm(); form.format = source.format; form.shape = source.shape; form.importFields = miningSourceWorkbenchFields(source, {}).importFields; for (const [key, value] of Object.entries(source.selectors)) {form.selectors[key as MiningSourceSelector] = value; form.supplied[key as MiningSourceSelector] = true;} return form;}
 /** Map actual source selectors onto a workbench's literal carrier without rewriting its completed runs. */

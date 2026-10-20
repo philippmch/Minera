@@ -1,3 +1,5 @@
+import {appendNativeMultipartField} from "./native-multipart";
+import {hasExactFilters,exactFilterFields,appendExactFilterFiles,readExactFilterResponse,OwnedExactFilterResult,type ExactFilterControls} from "./exact-filter-controls";
 import {hasExactKnowledge,exactKnowledgeQuery,requestExactKnowledge,type ExactKnowledgeRequest,type ExactKnowledgeEnvelope,type KnowledgeRequest} from "./exact-knowledge";
 import {requireExactOtgEnvelope,OTG_THRESHOLD_FIELD,appendOtgThresholds,otgThresholdQueryText,validateOtgThresholdOptions,bindOtgConformanceMetadata} from "./otg-thresholds";
 import {parseNativeJson} from "./native-json";
@@ -297,7 +299,7 @@ export type LtlVariant =
   | "four_eyes_principle"
   | "attr_value_different_persons";
 
-export interface LtlFilterOptions {
+export interface LtlFilterOptions extends ExactFilterControls {
   ltlVariant?: LtlVariant;
   ltlAttributeKey?: string;
   ltlAttributeValues?: string[];
@@ -434,7 +436,7 @@ export interface FilterOptions extends LtlFilterOptions {
 }
 
 /** Discovery options for the miners themselves, applied at mine time. */
-export interface MinerOptions {
+export interface MinerOptions extends ExactFilterControls {
   /** Inductive Miner – infrequent noise threshold in [0, 1]; 0 is classic. */
   noiseThreshold?: number;
   /** "log" splits sublogs; "imf" applies infrequent filtering; "dfg" recurses on the graph (IMd). */
@@ -670,7 +672,11 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     throw new Error("Choose either comma-separated or literal Declare considered activities.");
   if (options.dfgCaseAttributes !== undefined && options.dfgCaseAttributesExact !== undefined)
     throw new Error("Choose either comma-separated or literal DFG case attributes.");
-  const entries: Array<[string, string]> = [];
+  const exactFields = exactFilterFields(options, [
+    ...([['ltlVariant','ltl_variant'],['ltlAttributeKey','ltl_attribute_key'],['ltlAttributeValues','ltl_attribute_values'],['ltlPositive','ltl_positive'],['ltlEnableTimestamp','ltl_enable_timestamp'],['ltlTimestampDiffBoundaries','ltl_timestamp_diff_boundaries'],['ltlResourceKey','ltl_resource_key'],['heuristicVariant','heuristic_variant'],['heuristicActivityAttribute','heuristic_activity_attribute'],['heuristicTimestampAttribute','heuristic_timestamp_attribute'],['dependencyThreshold','dependency_threshold'],['andThreshold','and_threshold'],['minEdgeFrequency','min_edge_frequency'],['heuristicMinActivityCount','heuristic_min_activity_count'],['heuristicDecoration','heuristic_decoration'],['heuristicPerformanceAggregation','heuristic_performance_aggregation'],['heuristicBusinessHours','heuristic_business_hours'],['heuristicBusinessHourSlots','heuristic_business_hour_slots'],['heuristicDfgPreCleaningNoiseThreshold','heuristic_dfg_pre_cleaning_noise_threshold'],['heuristicLoopLengthTwoThreshold','heuristic_loop_length_two_threshold'],['heuristicKeepOncePerCase','heuristic_keep_once_per_case'],['heuristicStartTimestampAttribute','heuristic_start_timestamp_attribute'],['heuristicLifecycleInstanceAttribute','heuristic_lifecycle_instance_attribute'],['heuristicMostCommonPaths','heuristic_most_common_paths']] as const).filter(([key])=>options[key]!==undefined).map(([,wire])=>[wire,''] as [string,string])
+  ]);
+  const exactValues = options.ltl_attribute_values_json !== undefined || options.ltl_attribute_values_file !== undefined;
+  const entries: Array<[string, string]> = [...exactFields];
   const add = (name: string, value: string) => entries.push([name, value]);
   const validateNonnegativeInteger = (name: string, value: number) => {
     if (!Number.isInteger(value) || value < 0)
@@ -1293,16 +1299,14 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
         add("path_positive", String(options.pathPositive));
     }
   }
-  if (options.ltlVariant && options.ltlAttributeValues?.length) {
-    add("ltl_variant", options.ltlVariant);
-    add("ltl_attribute_values", options.ltlAttributeValues.join(","));
-    if (options.ltlAttributeKey) add("ltl_attribute_key", options.ltlAttributeKey);
+  if (exactValues || options.ltlVariant && options.ltlAttributeValues?.length) {
+    if (options.ltlVariant !== undefined) add("ltl_variant", options.ltlVariant);
+    if (options.ltlAttributeValues !== undefined) add("ltl_attribute_values", options.ltlAttributeValues.join(","));
+    if (exactValues ? options.ltlAttributeKey !== undefined : options.ltlAttributeKey) add("ltl_attribute_key", options.ltlAttributeKey!);
     if (options.ltlPositive !== undefined) add("ltl_positive", String(options.ltlPositive));
-    if (options.ltlEnableTimestamp !== undefined)
-      add("ltl_enable_timestamp", String(options.ltlEnableTimestamp));
-    if (options.ltlTimestampDiffBoundaries?.length)
-      add("ltl_timestamp_diff_boundaries", options.ltlTimestampDiffBoundaries.map(([lo, hi]) => `${lo}:${hi}`).join(","));
-    if (options.ltlResourceKey) add("ltl_resource_key", options.ltlResourceKey);
+    if (options.ltlEnableTimestamp !== undefined) add("ltl_enable_timestamp", String(options.ltlEnableTimestamp));
+    if (exactValues ? options.ltlTimestampDiffBoundaries !== undefined : options.ltlTimestampDiffBoundaries?.length) add("ltl_timestamp_diff_boundaries", options.ltlTimestampDiffBoundaries!.map(([lo,hi])=>`${lo}:${hi}`).join(","));
+    if (exactValues ? options.ltlResourceKey !== undefined : options.ltlResourceKey) add("ltl_resource_key", options.ltlResourceKey!);
   }
   const allLogSkeletonConstraints = [
     "equivalence",
@@ -1736,9 +1740,10 @@ export async function mineActiveDataset(
   signal?: AbortSignal,
 ): Promise<ActiveDatasetResult> {
   const form = new FormData();
-  form.append("log", file, file.name);
+  if (hasExactFilters(options)) form.append("log", file); else form.append("log", file, file.name);
   const fields = mineFormEntries({...options, miningRequestId: options.miningRequestId ?? crypto.randomUUID()});
-  for (const [name, value] of fields) form.append(name, value);
+  for (const [name, value] of fields) {if (hasExactFilters(options)) appendNativeMultipartField(form, name, value); else form.append(name, value);}
+  appendExactFilterFiles(form, options);
 
   let response: Response;
   try {
@@ -1750,16 +1755,20 @@ export async function mineActiveDataset(
     );
   }
 
-  const parsed: unknown = await readNativeResponse(response, {path: "/api/mine", fields});
+  const exactRun = hasExactFilters(options) ? await readExactFilterResponse(response, "/api/mine", form, fields, signal) : null;
+  const parsed: unknown = exactRun?.value ?? await readNativeResponse(response, {path: "/api/mine", fields});
+  if (exactRun && (!response.ok || exactRun.value.family === "EXACT_FILTER_DISCOVERY")) throw new OwnedExactFilterResult(exactRun);
   signal?.throwIfAborted();
   if (isActiveSourceMining(parsed)) return parsed;
   if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+    if (exactRun) throw new OwnedExactFilterResult(exactRun);
     throw new Error(String((parsed as { error: unknown }).error));
   }
   if (!response.ok) {
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   if (!isMineraExport(parsed)) {
+    if (exactRun) throw new OwnedExactFilterResult(exactRun);
     throw new Error("the Minera backend returned an invalid analysis");
   }
   return parsed;

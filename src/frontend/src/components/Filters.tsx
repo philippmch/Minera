@@ -1,3 +1,5 @@
+import {ExactLiteralInput} from "./OriginalLtlFilter";
+import {LTL_COMPLETE_EXAMPLE,HEURISTIC_COMPLETE_EXAMPLE,literalFilterEditor,filterEditorControl,exactFilterFields,type ExactFilterControls} from "../exact-filter-controls";
 import {DiscoveryVectorInput} from "./DiscoveryVectorInput";
 import {parseDiscoveryStringVector, discoveryStringVectorValidation, type DiscoveryVectorMode} from "../discovery-string-vectors";
 import { useState } from "react";
@@ -163,6 +165,7 @@ interface FiltersProps {
   active: boolean;
   mining: boolean;
   onApply: (options: FilterOptions & MinerOptions) => void;
+  onExactEdit?: () => void;
 }
 
 /** Validation for temporal controls that are only relevant once enabled. */
@@ -666,6 +669,7 @@ export function Filters({
   active,
   mining,
   onApply,
+  onExactEdit,
 }: FiltersProps) {
   const [open, setOpen] = useState(false);
   const [topVariants, setTopVariants] = useState("");
@@ -871,6 +875,15 @@ export function Filters({
   const [logSkeletonConstraints, setLogSkeletonConstraints] = useState<Set<string>>(
     () => new Set(logSkeletonFamilies.map(([name]) => name)),
   );
+  const [ltlExactKind,setLtlExactKind] = useState<"values"|"options">("values");
+  const [ltlValuesExact,setLtlValuesExact] = useState(()=>literalFilterEditor("[]"));
+  const [ltlOptionsExact,setLtlOptionsExact] = useState(()=>literalFilterEditor(LTL_COMPLETE_EXAMPLE));
+  const ltlExact = ltlExactKind === "values" ? ltlValuesExact : ltlOptionsExact;
+  const setLtlExact = (value: typeof ltlExact) => {onExactEdit?.(); (ltlExactKind === "values" ? setLtlValuesExact : setLtlOptionsExact)(value);};
+  const [pathsExact,setPathsExact] = useState(()=>literalFilterEditor("[]"));
+  const [heuristicOptionsExact,setHeuristicOptionsExact]=useState(()=>literalFilterEditor(HEURISTIC_COMPLETE_EXAMPLE));
+  const [heuristicExactKind,setHeuristicExactKind]=useState<"pairs"|"options">("pairs");
+  const heuristicExact=heuristicExactKind==="options"?heuristicOptionsExact:pathsExact,heuristicFullExact=heuristicExactKind==="options"&&heuristicExact.mode!=="omitted";
   const [ltlVariant, setLtlVariant] = useState<LtlVariant | "">("");
   const [ltlAttributeKey, setLtlAttributeKey] = useState("");
   const [ltlAttributeValues, setLtlAttributeValues] = useState("");
@@ -1193,9 +1206,14 @@ export function Filters({
     overlap,
     overlapEpsilon,
   });
+  const ltlExactActive = ltlExact.mode !== "omitted", ltlFullExact = ltlExactActive && ltlExactKind === "options";
+  let exactOptions: ExactFilterControls = {}, exactValidationError: string|null = null;
+  try {exactOptions = {...filterEditorControl(ltlExact, ltlExactKind === "options" ? "ltl_options" : "ltl_attribute_values"), ...filterEditorControl(heuristicExact,heuristicExactKind==="options"?"heuristic_options":"heuristic_most_common_paths")}; exactFilterFields(exactOptions);} catch(cause) {exactValidationError = cause instanceof Error ? cause.message : String(cause);}
   const ltlNames = ltlAttributeValues.split(",").map((value) => value.trim()).filter(Boolean);
   const ltlTimestampActive = ltlVariant === "eventually_follows" && ltlEnableTimestamp;
   const ltlValidationError = (() => {
+    if (exactValidationError) return exactValidationError;
+    if (ltlExactActive) {if (!ltlFullExact && ltlTimestampBounds && !toLtlBounds(ltlTimestampBounds)) return "Timestamp scalar syntax needs finite min:max pairs; use full LTL JSON for all IEEE values."; return null;}
     if (!ltlVariant) return null;
     const expected = ltlVariant === "eventually_follows" ? 1 :
       ltlVariant === "a_next_b_next_c" ? 3 : ltlVariant === "four_eyes_principle" ? 2 : 1;
@@ -1271,7 +1289,7 @@ export function Filters({
     removeUnconnected: alphaRemoveUnconnected,
     maxRowsToMaterialize: alphaMaxRowsToMaterialize,
   });
-  const heuristicBusinessHourSlotsValidationError =
+  const heuristicBusinessHourSlotsValidationError = heuristicFullExact ? null :
     heuristicBusinessHourSlotsValidationMessage(
       heuristicBusinessHourSlots,
       heuristicBusinessHoursOptionsActive && heuristicBusinessHours,
@@ -1370,7 +1388,9 @@ export function Filters({
         : undefined;
     const declareAutoSelectionActive =
       declareMinSupportRatio.trim() === "" && declareMinConfidenceRatio.trim() === "";
-    onApply({
+    const emit = (options:FilterOptions & MinerOptions) => {if(heuristicFullExact)for(const key of Object.keys(options))if(key.startsWith("heuristic")&&!key.startsWith("heuristic_")||["dependencyThreshold","andThreshold","minEdgeFrequency"].includes(key))delete (options as Record<string,unknown>)[key];onApply(options);};
+    emit({
+      ...exactOptions,
       topVariants: toInt(topVariants),
       maxActivities: maxActivities.trim() ? Number(maxActivities) : undefined,
       topActivitiesAttributeKey: maxActivities.trim()
@@ -1476,14 +1496,14 @@ export function Filters({
         removeCaseValueList.length > 0 ? caseAttributeKey : undefined,
       removeCaseAttributeValues:
         removeCaseValueList.length > 0 ? removeCaseValueList : undefined,
-      ltlVariant: ltlVariant || undefined,
-      ltlAttributeKey: ltlVariant ? ltlAttributeKey || undefined : undefined,
-      ltlAttributeValues: ltlVariant ? toLtlValues(ltlAttributeValues) : undefined,
-      ltlPositive: ltlVariant ? ltlPositive : undefined,
-      ltlEnableTimestamp: ltlTimestampActive ? true : undefined,
+      ltlVariant: ltlFullExact ? undefined : ltlVariant || undefined,
+      ltlAttributeKey: ltlFullExact ? undefined : ltlExactActive ? ltlAttributeKey : ltlVariant ? ltlAttributeKey || undefined : undefined,
+      ltlAttributeValues: ltlExactActive ? undefined : ltlVariant ? toLtlValues(ltlAttributeValues) : undefined,
+      ltlPositive: ltlFullExact ? undefined : ltlExactActive || ltlVariant ? ltlPositive : undefined,
+      ltlEnableTimestamp: ltlFullExact ? undefined : ltlExactActive ? ltlEnableTimestamp : ltlTimestampActive ? true : undefined,
       ltlTimestampDiffBoundaries:
-        ltlTimestampActive ? toLtlBounds(ltlTimestampBounds) : undefined,
-      ltlResourceKey: ltlVariant ? ltlResourceKey || undefined : undefined,
+        ltlFullExact ? undefined : ltlExactActive ? (ltlTimestampBounds ? toLtlBounds(ltlTimestampBounds) : []) : ltlTimestampActive ? toLtlBounds(ltlTimestampBounds) : undefined,
+      ltlResourceKey: ltlFullExact ? undefined : ltlExactActive ? ltlResourceKey : ltlVariant ? ltlResourceKey || undefined : undefined,
       noiseThreshold: toFloat(noiseThreshold),
       inductiveVariant: inductiveVariant !== "log" ? inductiveVariant : undefined,
       ...inductiveOptionsFromForm({
@@ -1535,7 +1555,7 @@ export function Filters({
       ),
       heuristicKeepOncePerCase: heuristicKeepOncePerCase || undefined,
       heuristicMostCommonPaths:
-        heuristicMostCommonPaths.trim() || undefined,
+        heuristicExact.mode !== "omitted" ? undefined : heuristicMostCommonPaths.trim() || undefined,
       ...heuristicStartTimestampOptionsFromForm(heuristicStartTimestampAttribute),
       heuristicLifecycleInstanceAttribute:
         heuristicLifecycleInstanceAttribute !== "concept:instance"
@@ -1946,6 +1966,7 @@ export function Filters({
     setOverlapCompletionAttribute("");
     setOverlapEpsilon("0.00001");
     setOverlapStrict(false);
+    setLtlValuesExact(literalFilterEditor("[]")); setLtlOptionsExact(literalFilterEditor(LTL_COMPLETE_EXAMPLE)); setPathsExact(literalFilterEditor("[]"));setHeuristicOptionsExact(literalFilterEditor(HEURISTIC_COMPLETE_EXAMPLE));setHeuristicExactKind("pairs"); setLtlExactKind("values");
     setLtlVariant("");
     setLtlAttributeKey("");
     setLtlAttributeValues("");
@@ -2068,7 +2089,7 @@ export function Filters({
     heuristicMostCommonPaths.trim() !== "" ||
     heuristicStartTimestampAttribute.trim() !== "" ||
     heuristicLifecycleInstanceAttribute !== "concept:instance";
-  const ltlDirty = ltlVariant !== "" || ltlAttributeValues.trim() !== "" ||
+  const ltlDirty = ltlExact.mode !== "omitted" || heuristicExact.mode !== "omitted" || ltlVariant !== "" || ltlAttributeValues.trim() !== "" ||
     ltlAttributeKey.trim() !== "" || ltlResourceKey.trim() !== "" ||
     !ltlPositive || ltlEnableTimestamp || ltlTimestampBounds.trim() !== "";
 
@@ -2133,7 +2154,7 @@ export function Filters({
     declareDirty || footprintsDirty || dfgDirty || correlationDirty || temporalDirty || ltlDirty;
 
   return (
-    <section className="filters reveal">
+    <section className="filters reveal" onChangeCapture={()=>{if(ltlExactActive||heuristicExact.mode!=="omitted")onExactEdit?.();}}>
       <div className="filters-bar">
         <button
           className={open ? "filters-toggle open" : "filters-toggle"}
@@ -4002,11 +4023,15 @@ export function Filters({
                 type="text"
                 placeholder="A -> B, C -> D"
                 value={heuristicMostCommonPaths}
-                disabled={heuristicVariant !== "classic"}
+                disabled={heuristicVariant !== "classic" || heuristicExact.mode !== "omitted"}
                 onChange={(e) => setHeuristicMostCommonPaths(e.target.value)}
               />
             </label>
           </div>
+          <label className="filters-field"><span>Exact Heuristic container</span><select value={heuristicExactKind} onChange={e=>{onExactEdit?.();setHeuristicExactKind(e.target.value as "pairs"|"options");}}><option value="pairs">Literal protected path pairs</option><option value="options">All 24 native options</option></select></label>
+          <ExactLiteralInput label={heuristicExactKind==="options"?"Complete 24-field Heuristic options":"Heuristic literal protected path pairs (CLASSIC use; PLUSPLUS retains state)"} value={heuristicExact} onChange={v=>{onExactEdit?.();(heuristicExactKind==="options"?setHeuristicOptionsExact:setPathsExact)(v);}}/>
+          {heuristicFullExact&&<p>Complete native options supply every Heuristic setting, including inactive state. Scalar Heuristic controls below and above are retained locally and omitted from this request.</p>}
+
           <div className="filters-row">
             <label className="filters-field">
               <span>Performance aggregation</span>
@@ -4040,10 +4065,13 @@ export function Filters({
           </div>
 
           <div className="filters-subhead">LTL trace filter</div>
+          <label className="filters-field"><span>Exact LTL container</span><select value={ltlExactKind} onChange={e=>{const kind=e.target.value as "values"|"options";onExactEdit?.();setLtlExactKind(kind);}}><option value="values">Ordered values with scalar options</option><option value="options">All seven native options</option></select></label>
+          <ExactLiteralInput label={ltlExactKind==="options"?"Complete seven-field LTL options":"Ordered LTL values"} value={ltlExact} onChange={setLtlExact}/>
+          <fieldset disabled={ltlFullExact}>
           <div className="filters-row">
             <label className="filters-field">
               <span>Predicate variant</span>
-              <select value={ltlVariant} onChange={(e) => setLtlVariant(e.target.value as LtlVariant | "")}>
+              <select value={ltlVariant} onChange={(e) => {if(ltlExactActive)onExactEdit?.();setLtlVariant(e.target.value as LtlVariant | "");}}>
                 <option value="">off</option>
                 <option value="eventually_follows">eventually follows</option>
                 <option value="a_next_b_next_c">A next B next C</option>
@@ -4053,18 +4081,18 @@ export function Filters({
             </label>
             <label className="filters-field">
               <span>Attribute key <small>(blank = activity)</small></span>
-              <input type="text" value={ltlAttributeKey} disabled={!ltlVariant}
-                onChange={(e) => setLtlAttributeKey(e.target.value)} />
+              <input type="text" value={ltlAttributeKey} disabled={!ltlVariant && !ltlExactActive}
+                onChange={(e) => {if(ltlExactActive)onExactEdit?.();setLtlAttributeKey(e.target.value);}} />
             </label>
             <label className="filters-field filters-field-wide">
               <span>Ordered values <small>(comma-separated)</small></span>
-              <input type="text" placeholder="A, B" value={ltlAttributeValues} disabled={!ltlVariant}
-                onChange={(e) => setLtlAttributeValues(e.target.value)} />
+              <input type="text" placeholder="A, B" value={ltlAttributeValues} disabled={!ltlVariant || ltlExactActive}
+                onChange={(e) => {if(ltlExactActive)onExactEdit?.();setLtlAttributeValues(e.target.value);}} />
             </label>
             <label className="filters-field">
               <span>Match polarity</span>
-              <select value={ltlPositive ? "positive" : "negative"} disabled={!ltlVariant}
-                onChange={(e) => setLtlPositive(e.target.value === "positive")}>
+              <select value={ltlPositive ? "positive" : "negative"} disabled={!ltlVariant && !ltlExactActive}
+                onChange={(e) => {if(ltlExactActive)onExactEdit?.();setLtlPositive(e.target.value === "positive");}}>
                 <option value="positive">positive (keep matches)</option>
                 <option value="negative">negative (drop matches)</option>
               </select>
@@ -4073,22 +4101,23 @@ export function Filters({
           <div className="filters-row">
             <label className="filters-field">
               <span>Resource key <small>(blank = resource)</small></span>
-              <input type="text" value={ltlResourceKey} disabled={!ltlVariant || ltlVariant === "eventually_follows" || ltlVariant === "a_next_b_next_c"}
-                onChange={(e) => setLtlResourceKey(e.target.value)} />
+              <input type="text" value={ltlResourceKey} disabled={!ltlExactActive && (!ltlVariant || ltlVariant === "eventually_follows" || ltlVariant === "a_next_b_next_c")}
+                onChange={(e) => {if(ltlExactActive)onExactEdit?.();setLtlResourceKey(e.target.value);}} />
             </label>
             <label className="filters-field filters-check">
               <input type="checkbox" checked={ltlEnableTimestamp}
-                disabled={!ltlVariant || ltlVariant !== "eventually_follows"}
-                onChange={(e) => setLtlEnableTimestamp(e.target.checked)} />
+                disabled={!ltlExactActive && (!ltlVariant || ltlVariant !== "eventually_follows")}
+                onChange={(e) => {if(ltlExactActive)onExactEdit?.();setLtlEnableTimestamp(e.target.checked);}} />
               <span>Enable timestamp bounds</span>
             </label>
             <label className="filters-field filters-field-wide">
               <span>Timestamp bounds <small>(min:max pairs)</small></span>
               <input type="text" placeholder="0:10,0:30" value={ltlTimestampBounds}
-                disabled={!ltlEnableTimestamp} onChange={(e) => setLtlTimestampBounds(e.target.value)} />
+                disabled={!ltlEnableTimestamp && !ltlExactActive} onChange={(e) => {if(ltlExactActive)onExactEdit?.();setLtlTimestampBounds(e.target.value);}} />
             </label>
           </div>
 
+          </fieldset>
           <div className="filters-subhead">Temporal &amp; behavioral discovery</div>
           <div className="filters-row">
             <label className="filters-field">
