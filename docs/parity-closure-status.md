@@ -6,6 +6,15 @@ and support modules. Full parity is not complete.
 
 ## Closed in this pass
 
+Displayed diagrams, charts and tables now have direct PNG and raster PDF
+downloads. A single diagram also has styled SVG export. The controls are
+available in the dataset views and all 44 independent workspace branches.
+SVG fonts are not embedded. This is a delivered application capability,
+separate from strict algorithm module counts. All 9,628 frontend tests,
+TypeScript and the production build passed; the product PDF writer's sample
+was independently parsed, rendered and visually checked. Rendered application
+interaction remains unverified under the previously recorded browser block.
+
 | Requirement | Evidence |
 | --- | --- |
 | Arc-degree simplicity module | 120 retained public selector records covering 102 numeric states; exact scalar, identity, arc occurrence, baseline and input invariants; assertion-enabled focused and full evaluation contract checks |
@@ -22,7 +31,6 @@ The machine-readable source of truth is
 
 ## Active requirements
 
-- Finish direct diagram downloads and validate PNG, styled SVG and raster PDF.
 - Close common start/end activity frequency and threshold behavior.
 - Close the object-interaction graph relation against direct public edge sets.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
