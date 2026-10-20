@@ -968,3 +968,123 @@ match, and the fresh 152-suite build passes. See
 The original seventeen larger choice/flood fixtures and broader acceptance
 contracts remain unresolved. No catalogue row is promoted; totals remain 46/86
 packages, 199/387 modules and 228 incomplete units.
+
+
+## Arc-degree module completion
+
+The bounded completion target is
+`algo.evaluation.simplicity.variants.arc_degree`. Its public native entry point
+is `evaluate_simplicity` with `SimplicityVariant::ARC_DEGREE`; the exact public
+scalar is `simplicity_arc_degree_result_json`. The simplicity dispatcher and
+other variants retain their separate coverage status.
+
+The supported mathematical input is a finite Petri graph with distinct place
+and transition identities and incident arc objects. `PetriNetPresentation`
+represents that input without merging equal names, weighted arcs or parallel
+occurrences. `PnmlDocument` uses the same view, retaining imported occurrences.
+An executable `PetriNet` represents its own grouped arc inventory; callers who
+need original parallel object identity use the presentation/document overload.
+Names, labels, properties, arc order and arc weights have no effect on total
+incident degree. Every incident arc contributes once at each of its two
+endpoints, so the mean degree is twice the occurrence count divided by the
+number of nodes, with zero for an empty graph. This establishes why all valid
+topologies with the same two counts share the scalar result; it does not
+assume that parallel objects can be collapsed.
+
+The meaningful parameter is baseline `k`, with native default 2.0. All binary64
+values are accepted, including signed zero, NaN and infinities. The metric is
+`1 / (1 + max(mean_degree - k, 0))`, using the observed floating-point operation
+order and NaN propagation. Marking, reachability limits and other variants'
+controls are inactive. The retained public signatures and exported `Parameters.K`
+key in `simplicity-structure-validation.json` identify this effective control.
+Equivalent supported native values are the parity requirement; a Python enum
+key is not a separate native algorithm or parameter family.
+
+Of the 1,510 retained public structural calls described above, **982 are
+arc-degree calls: 628 direct and 354 through the dispatcher**. They have no
+reference errors or input/parameter mutations and include all 264 graph
+fixtures. Their exact public float hex values reduce to **120 (node count, arc count, baseline selector)
+records covering 102 distinct effective numeric states**, retaining the
+default/explicit and enum-key aliases. The registered
+`arc_degree_module_acceptance` case in
+`src/backend/tests/test_evaluation_parity_contracts.cpp` embeds those captured
+hex outcomes rather than computing expected values from the implementation.
+It checks every state against the current native metric and exact scalar
+writer, default invocation, unchanged graph/options, equal names and shared
+numeric IDs across node kinds, parallel occurrences, reordered and reweighted
+arcs, and inactive marking/state controls. It also calls the imported
+occurrence regression. Extreme finite and subnormal native baselines supplement
+the retained public sample; they are not additional reference observations.
+
+The focused acceptance case and the complete evaluation-contract executable
+both pass with MSVC assertions explicitly enabled (`/UNDEBUG`), linked against
+the validated Feature99 core. Neither metric production source nor its exact
+scalar writer needed a change. The scalar writer retains IEEE hexadecimal
+values, including NaN and subnormals; historical six-digit application output
+is not used as the exact public result. Existing registered contracts also
+retain the native diagnostic for invalid identities/endpoints and rejection
+of stale imported occurrence metadata. These structural native diagnostics
+are not presented as captured exceptions from corrupted reference internals.
+
+The earlier PNML retention gate is addressed by the imported occurrence
+section and its archive above; broader cyclomatic, replay, platform and package
+gates remain assigned to their own units. The finite public corpora alone are
+not an exhaustive test of all graphs. This module conclusion combines the
+captured public surface, identity-preserving input model, structural degree
+invariant, complete meaningful parameter domain, exact scalar carrier and
+registered acceptance proof. No new reference calls or reference implementation
+reads are part of this completion step.
+
+
+## Extended Cardoso module completion
+
+`algo.evaluation.simplicity.variants.extended_cardoso` is complete under the
+repository's semantic parity definition. The public native selector is
+`SimplicityVariant::EXTENDED_CARDOSO` in `include/minera/evaluation.hpp`; it
+selects the Cardoso branch of `evaluate_simplicity` in `evaluation.cpp`.
+Presentation inputs retain separate place and transition identities, node-kind
+identity scopes, silent labels and separate ordered arc occurrences. The
+executable-net and PNML-document overloads are also available. Names, labels,
+properties, markings, weights and parallel occurrences do not identify or
+multiply successor-set choices. Each place contributes one for each distinct
+set of successor places among its outgoing transitions; an empty successor set
+is one such choice. Places without outgoing transitions contribute zero.
+
+There is no meaningful Cardoso-specific parameter. The default native argument
+form and explicit options are both exercised; all marking, state-limit and
+arc-degree controls are inactive for this selector, including nonfinite
+arc-degree baselines. Invalid native identities/endpoints give an uncomputed
+result, and stale imported occurrence metadata is rejected. These are native
+input diagnostics, not claims of byte-identical exceptions for corrupted
+reference internals.
+
+The retained structural capture contains **528 Cardoso calls: 264 direct and
+264 dispatcher calls**, all with unchanged inputs/parameters and integer scalar
+results. The PNML capture adds **528 Cardoso calls** on the corresponding
+264 imported models. The structural fixtures enumerate all 256 binary
+incidence graphs on two places/two transitions, plus empty/isolated,
+weighted/parallel and same/different/empty-successor controls. These public
+observations are retained in `simplicity-structure-validation.json` and
+`simplicity-pnml-validation.json`; they are not new reference calls.
+
+`src/backend/tests/test_extended_cardoso_module.cpp` embeds the 264 returned
+integers directly from the retained structural capture, independently of the
+native formula, after checking direct/dispatcher agreement. It replays every
+fixture and an order permutation, and separately checks equal names, shared
+numeric IDs across kinds, maximum native IDs, byte-string metadata, huge/signed
+weights, parallel input/output occurrences, inactive options, full input/options
+immutability, native invalid-identity diagnostics, and executable/PNML inputs
+including export/reimport. The focused `minera_extended_cardoso_module_tests`
+passes with MSVC assertions enabled (`/UNDEBUG`), linked against the validated
+Feature99 core. No metric production source required a change.
+
+The public Python result is an integer; the native diagnostic scalar is a
+double. Cardoso's count is bounded by the explicit place-to-transition arc
+inventory, and the supported allocatable graphs retain that integer exactly.
+This representation difference is not Python API compatibility, which the
+repository does not require. The finite corpus is not an exhaustive graph
+test: the module conclusion also uses the identity-preserving input contract,
+the successor-set invariant and complete meaningful parameter surface. It
+promotes neither the containing simplicity package nor cyclomatic, replay,
+platform, general PNML formatting or other module contracts. No reference
+implementation/private-state inspection was used in this completion step.

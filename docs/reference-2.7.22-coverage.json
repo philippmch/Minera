@@ -11205,8 +11205,35 @@
           "selector": "SIMPLICITY_ARC_DEGREE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/simplicity-parity-contract.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "include/minera/json_export.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/token_replay_result_json.cpp",
+        "src/backend/tests/test_evaluation_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.simplicity.variants.arc_degree",
+        "implementation": [
+          {
+            "path": "src/backend/evaluation.cpp",
+            "symbol": "evaluate_simplicity"
+          },
+          {
+            "path": "src/backend/token_replay_result_json.cpp",
+            "symbol": "simplicity_arc_degree_result_json"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_parity_contracts.cpp",
+            "executable": "minera_evaluation_parity_contracts_tests",
+            "case": "arc_degree_module_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.simplicity.variants.extended_cardoso",
@@ -11219,8 +11246,34 @@
           "selector": "EXTENDED_CARDOSO"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/simplicity-parity-contract.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_extended_cardoso_module.cpp"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.simplicity.variants.extended_cardoso",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "SimplicityVariant::EXTENDED_CARDOSO"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_extended_cardoso_module.cpp",
+            "executable": "minera_extended_cardoso_module_tests",
+            "case": "native_invalid_identity_diagnostics"
+          },
+          {
+            "path": "src/backend/tests/test_extended_cardoso_module.cpp",
+            "executable": "minera_extended_cardoso_module_tests",
+            "case": "native_executable_and_pnml_entrypoints"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.simplicity.variants.extended_cyclomatic",
