@@ -1,3 +1,4 @@
+import {OriginalLogQueryWorkspace} from "./OriginalLogQueryWorkspace";
 import {LogQueryOptionsControls,useExactQueryDraft,ExactQueryInspection} from "./LogQueryOptionsControls";
 import {requestExactLogQuery,requestExactQueryFilter,exactQueryFilteredFile,exactQueryStringBytes,ExactQueryRequestGate,type ExactLogQueryRun,type ExactQueryIdentity} from "../exact-log-query";
 import {ProviderCallControls} from "./ProviderCallControls";
@@ -34,7 +35,7 @@ export function QueryWorkspace({data,sourceId,dataset,sourceOptions,available,mi
  };
  const configured=providerCallConfigured(status,provider,overrides);
  const sourceIndex=queryDraft.exact?exactSuccess?.value.result?.value?.can_filter===true:result?.columns.includes(result.event_index_column)&&result.can_filter;
- return <section className="panel query-workspace">
+ return <><OriginalLogQueryWorkspace/><section className="panel query-workspace">
   <div className="panel-head"><h2>Query and filter the source</h2><span className="panel-meta">{dataset??data?.dataset??"Active native source"}</span></div>
   <p className="query-intro">Run SQL on the loaded event table, or generate SQL from a question. Query results and filtered logs can be exported.</p>
   {!available&&<p className="model-empty">Open and mine CSV, XES or a native EventTable to query it. Saved exports do not provide an active query source.</p>}
@@ -50,5 +51,5 @@ export function QueryWorkspace({data,sourceId,dataset,sourceOptions,available,mi
   {error&&<div className="error-banner" role="alert">{error}</div>}
   {(result||exactSuccess)&&<section className="query-results">{result&&<><div className="panel-head"><h2>Query result</h2><span className="panel-meta">{result.rows.length} rows · {result.columns.length} columns</span></div>{result.output_truncated&&<p>The display reached its row limit. Filter export reruns the complete selection.</p>}<div className="query-table-wrap"><table className="activity-table"><thead><tr>{result.columns.map((column,index)=><th key={index}>{column}</th>)}</tr></thead><tbody>{result.rows.slice(page*25,page*25+25).map((row,index)=><tr key={index}>{row.map((value,column)=><td key={column}>{queryCellText(value)}</td>)}</tr>)}</tbody></table></div>{result.rows.length>25&&<div className="model-pagination"><button className="btn-ghost" disabled={page===0} onClick={()=>setPage(page-1)}>Previous</button><span>Page {page+1} of {Math.ceil(result.rows.length/25)}</span><button className="btn-ghost" disabled={(page+1)*25>=result.rows.length} onClick={()=>setPage(page+1)}>Next</button></div>}</>}<fieldset className="query-filter" disabled={disabled||!sourceIndex}><label className="filters-field"><span>Retain matching</span><select value={mode} onChange={event=>setMode(event.target.value as typeof mode)}><option value="cases" disabled={schema?.case_count===null}>Whole cases</option><option value="events">Events only</option></select></label><p>Filtered logs retain the original event order and attributes. Export uses the complete query selection.</p><div className="query-actions"><button className="btn-ghost" onClick={()=>void run("xes")}>Download filtered XES</button><button className="btn-ghost" onClick={()=>void run("json")}>Download filtered table JSON</button><button className="btn-ghost" onClick={()=>void run("open")}>Open filtered log</button><button className="btn-ghost" onClick={()=>void run("open-table")}>Open filtered native table</button></div></fieldset>{!sourceIndex&&<p>To create a filtered log, return the source event identity column, for example with SELECT *.</p>}</section>}
   {exactFailure&&<ExactQueryInspection run={exactFailure} failed/>}{exactSuccess&&<ExactQueryInspection run={exactSuccess}/>} {!schema?.duckdb_configured&&<details className="query-setup"><summary>Connect DuckDB</summary><pre>python -m pip install -r scripts/requirements-query.txt{"\n"}python scripts/query_runtime.py --port 8192{"\n"}minera_server --query-runtime-url http://127.0.0.1:8192</pre></details>}
- </section>;
+ </section></>;
 }

@@ -13831,3 +13831,12 @@ Evidence: docs/feature-first-exact-source-acquisition-validation.json. No strict
 - Browser evidence carried from historical rejection:0 new attempts/0 rendered checks, no settings dispute/workaround.
 - Availability status changes only for algo.querying.llm.injection.db_knowledge. Other catalogue rows/selectors/parity/backlog unchanged. Full strict scope46/86,199/387,228 incomplete units remains; full parity false.
 - Independent original query-table/filter/result constructors remain queued. Availability checkpoint98.
+
+
+### Feature99: independent original log-query workbench (2026-10-20)
+
+- Delivered all six own public log-query calls through independent original log/table/result Files, actual defaults or explicit controls, HTTP, CLI and UI. Full2 table/full7 storage/all10 metadata/full8 result and eight native artifacts support direct File handoff, including selected event indices.
+- Evidence:99 distinct native suites (98 retained+1 fresh),221 core objects (220 reused+1 fresh), fresh strict frontend build and passing aggregate 9612 tests/174 files. Actual affected/retained test accounting and all bounded API/CLI/File/OLD/BEFORE evidence are in docs/feature-first-original-log-query-validation.json.
+- The native application assets are active on8562; recovered query runtime PID29740/8192 and recovered provider PID11724/8189 remain unchanged from the bound recovery epoch. One live capability POST verifies the independent route without invoking either runtime.
+- Browser history is carried without a new attempt or rendered check; user settings are not disputed.
+- Availability checkpoint99 changes only the selected query family delivery status. All strict statuses/selectors/backlog and the complete scope remain:46/86 packages,199/387 modules,228 incomplete units; full parity remains false.
