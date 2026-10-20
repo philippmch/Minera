@@ -2,10 +2,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ctime>
+#include <iomanip>
 #include <limits>
+#include <locale>
 #include <map>
+#include <optional>
 #include <set>
+#include <sstream>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -368,6 +374,188 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
     const bool matches =
         has_attribute_value(event.attributes, attribute_key, values);
     return positive ? matches : !matches;
+  });
+  return propagate_event_filter(std::move(filtered));
+}
+
+namespace {
+bool event_filter_column_exists(const Ocel& log, std::string_view key) {
+  if (key == "ocel:eid" || key == "ocel:activity" || key == "ocel:timestamp")
+    return true;
+  if (log.table_columns.events)
+    return std::find(log.table_columns.events->begin(),
+                     log.table_columns.events->end(), key) !=
+           log.table_columns.events->end();
+  for (const auto& event : log.events)
+    for (const auto& attribute : event.attributes)
+      if (attribute.key == key) return true;
+  return false;
+}
+
+OcelValue event_filter_scalar(const OcelEvent& event, std::string_view key) {
+  if (key == "ocel:eid") return event.id;
+  if (key == "ocel:activity") return event.activity;
+  if (key == "ocel:timestamp") return event.timestamp;
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == key) return attribute.value;
+  // An absent cell in a declared dataframe column is NaN, not explicit None.
+  return std::numeric_limits<double>::quiet_NaN();
+}
+
+bool event_filter_numeric_integer_equal(std::int64_t integer, double real) {
+  return std::isfinite(real) && real >= -0x1p63 && real < 0x1p63 &&
+         std::trunc(real) == real && integer == static_cast<std::int64_t>(real);
+}
+
+bool event_filter_scalar_equal(const OcelValue& left,
+                              const OcelEventAttributeFilterValue& right) {
+  if (right.index() >= std::variant_size_v<OcelValue>) return false;
+  if (left.index() == right.index()) {
+    if (const auto* value = std::get_if<double>(&left)) {
+      const double other = std::get<double>(right);
+      return *value == other || (std::isnan(*value) && std::isnan(other));
+    }
+    return std::visit([&](const auto& value) {
+      using Value = std::decay_t<decltype(value)>;
+      const auto* other = std::get_if<Value>(&right);
+      return other && value == *other;
+    }, left);
+  }
+  const auto integer = [](const auto& value) -> std::optional<std::int64_t> {
+    if (const auto* number = std::get_if<std::int64_t>(&value)) return *number;
+    if (const auto* boolean = std::get_if<bool>(&value)) return *boolean ? 1 : 0;
+    return std::nullopt;
+  };
+  const auto left_integer = integer(left), right_integer = integer(right);
+  if (left_integer && right_integer) return *left_integer == *right_integer;
+  if (left_integer) {
+    const auto* real = std::get_if<double>(&right);
+    return real && event_filter_numeric_integer_equal(*left_integer, *real);
+  }
+  if (right_integer) {
+    const auto* real = std::get_if<double>(&left);
+    return real && event_filter_numeric_integer_equal(*right_integer, *real);
+  }
+  return false;
+}
+
+bool event_filter_instant_equal(const ParsedExactTimestamp& left,
+                                const ParsedExactTimestamp& right) {
+  return left.timezone_aware == right.timezone_aware &&
+         left.seconds == right.seconds && left.nanoseconds == right.nanoseconds;
+}
+
+bool event_filter_timestamp_column(const Ocel& log, const OcelEvent& event,
+                                   std::string_view key,
+                                   OcelEventAttributeColumnKind kind) {
+  if (kind != OcelEventAttributeColumnKind::kAutomatic)
+    return kind == OcelEventAttributeColumnKind::kTimestamp;
+  if (key == "ocel:timestamp") return true;
+  const auto type = log.event_type_attributes.find(event.activity);
+  if (type == log.event_type_attributes.end()) return false;
+  const auto attribute = type->second.find(std::string(key));
+  return attribute != type->second.end() &&
+         (attribute->second.find("date") != std::string::npos ||
+          attribute->second.find("time") != std::string::npos);
+}
+
+ParsedExactTimestamp event_filter_timestamp_bound(
+    const OcelEventTimestampBound& bound) {
+  if (const auto* datetime = std::get_if<ParsedExactTimestamp>(&bound)) {
+    auto result = *datetime;
+    // The public filter replaces tzinfo with UTC without converting the local
+    // clock. Reconstruct that clock from the parsed instant's stored offset.
+    const auto delta = std::int64_t{result.offset_minutes} * 60;
+    if ((delta > 0 && result.seconds > std::numeric_limits<std::int64_t>::max() - delta) ||
+        (delta < 0 && result.seconds < std::numeric_limits<std::int64_t>::min() - delta))
+      throw std::invalid_argument("OCEL timestamp bound is out of range");
+    result.seconds += delta;
+    result.timezone_aware = true;
+    result.offset_minutes = 0;
+    return result;
+  }
+  const auto& text = std::get<std::string>(bound);
+  const auto invalid = [&]() -> ParsedExactTimestamp {
+    throw std::invalid_argument("time data '" + text +
+        "' does not match format '%Y-%m-%d %H:%M:%S'");
+  };
+  std::istringstream input{text};
+  input.imbue(std::locale::classic());
+  std::tm calendar{};
+  calendar.tm_year = std::numeric_limits<int>::min();
+  calendar.tm_mon = calendar.tm_mday = calendar.tm_hour =
+      calendar.tm_min = calendar.tm_sec = -1;
+  input >> std::get_time(&calendar, "%Y-%m-%d %H:%M:%S");
+  if (input.fail() || calendar.tm_year == std::numeric_limits<int>::min() ||
+      calendar.tm_mon < 0 || calendar.tm_mday < 0 || calendar.tm_hour < 0 ||
+      calendar.tm_min < 0 || calendar.tm_sec < 0) return invalid();
+  if (input.peek() != std::char_traits<char>::eof()) {
+    std::string remaining;
+    std::getline(input, remaining, '\0');
+    throw std::invalid_argument("unconverted data remains: " + remaining);
+  }
+  std::ostringstream normalized;
+  normalized.imbue(std::locale::classic());
+  normalized << std::setfill('0') << std::setw(4) << calendar.tm_year + 1900
+             << '-' << std::setw(2) << calendar.tm_mon + 1
+             << '-' << std::setw(2) << calendar.tm_mday << 'T'
+             << std::setw(2) << calendar.tm_hour << ':'
+             << std::setw(2) << calendar.tm_min << ':'
+             << std::setw(2) << calendar.tm_sec << 'Z';
+  const auto parsed = parse_timestamp_exact(normalized.str());
+  return parsed ? *parsed : invalid();
+}
+
+bool event_filter_instant_less(const ParsedExactTimestamp& left,
+                               const ParsedExactTimestamp& right) {
+  return std::tie(left.seconds, left.nanoseconds) <
+         std::tie(right.seconds, right.nanoseconds);
+}
+}  // namespace
+
+Ocel filter_ocel_event_attribute_exact(
+    const Ocel& log, std::string_view attribute_key,
+    const std::vector<OcelEventAttributeFilterValue>& values, bool positive,
+    OcelEventAttributeColumnKind column_kind) {
+  if (!event_filter_column_exists(log, attribute_key))
+    throw std::out_of_range("'" + std::string(attribute_key) + "'");
+  Ocel filtered = log;
+  filter_records(filtered.events, [&](const OcelEvent& event) {
+    bool matches = false;
+    const auto candidate = event_filter_scalar(event, attribute_key);
+    if (event_filter_timestamp_column(log, event, attribute_key, column_kind)) {
+      const auto* text = std::get_if<std::string>(&candidate);
+      if (const auto instant = text ? parse_timestamp_exact(*text) : std::nullopt) {
+        for (const auto& value : values)
+          if (const auto* other = std::get_if<ParsedExactTimestamp>(&value))
+            matches = matches || event_filter_instant_equal(*instant, *other);
+      }
+    } else {
+      for (const auto& value : values)
+        matches = matches || event_filter_scalar_equal(candidate, value);
+    }
+    return matches == positive;
+  });
+  return propagate_event_filter(std::move(filtered));
+}
+
+Ocel filter_ocel_events_timestamp_exact(
+    const Ocel& log, const OcelEventTimestampBound& from,
+    const OcelEventTimestampBound& to, std::string_view timestamp_key) {
+  const auto lower = event_filter_timestamp_bound(from);
+  const auto upper = event_filter_timestamp_bound(to);
+  if (!event_filter_column_exists(log, timestamp_key))
+    throw std::out_of_range("'" + std::string(timestamp_key) + "'");
+  Ocel filtered = log;
+  filter_records(filtered.events, [&](const OcelEvent& event) {
+    const auto value = event_filter_scalar(event, timestamp_key);
+    const auto* text = std::get_if<std::string>(&value);
+    const auto instant = text ? parse_timestamp_exact(*text) : std::nullopt;
+    if (!instant) return false;
+    if (!instant->timezone_aware)
+      throw std::invalid_argument("OCEL timestamp comparison requires timezone-aware source values");
+    return !event_filter_instant_less(*instant, lower) &&
+           !event_filter_instant_less(upper, *instant);
   });
   return propagate_event_filter(std::move(filtered));
 }
