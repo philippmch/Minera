@@ -4092,6 +4092,24 @@
       "browser_validation_complete": false,
       "strict_promotion": false,
       "added": "2026-10-20"
+    },
+    {
+      "id": "native_exact_source_acquisition_and_full_XES_export",
+      "state": "lossless_acquisition_and_complete_native_export_controls_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [],
+      "operations": [
+        "acquire_exact_source",
+        "inspect_acquired_source",
+        "list_acquired_sources",
+        "release_acquired_source",
+        "export_acquired_source_full_XES_options"
+      ],
+      "validation": "docs/feature-first-exact-source-acquisition-validation.json",
+      "browser_validation_complete": false,
+      "strict_promotion": false,
+      "added": "2026-10-20"
     }
   ],
   "execution_priority": [

@@ -1,0 +1,331 @@
+{
+  "complete": true,
+  "feature": 94,
+  "features_delivered": 94,
+  "parent_head": "7b9868dcad92c1a2e12b6153a984e8de69100ef4",
+  "feature_baseline_head": "dfe1d22d951df12f77d6fbbde12630ad3b8af228",
+  "baseline": {
+    "path": "build/feature94-baseline.json",
+    "bytes": 2829838,
+    "sha256": "1cb64b73aea13b5da49b8d17c8ff902ac95fa258faddffddfb8de12ee2cc0897"
+  },
+  "previous_delivery_report": {
+    "path": "docs/feature-first-exact-filter-discovery-validation.json",
+    "bytes": 87643,
+    "sha256": "0d3514a9dffd5c7d542b61c14132a707aad9151d170a177273f1470f9499214a"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/feature94-native-test-recovery-actual-1/build-manifest.json",
+      "bytes": 7017052,
+      "sha256": "32e6ae3c29b5b37f04104db0edb79671d0ded14cc0af9b9665d954c21b9a94d5"
+    },
+    "api": {
+      "path": "build/feature94-api-actual-1/validation.json",
+      "bytes": 130805,
+      "sha256": "566b3de9d2796008e4654a37bd7adfa53d61094c55b2dbe871567f1ea7922e49"
+    },
+    "frontend": {
+      "path": "build/source-acquisition94-frontend-77f79cbaa380415bb57ae2cdd2279c2e/validation.json",
+      "bytes": 2760694,
+      "sha256": "3ef12477fa1294a31b47ff3d3289130a7f50355b510038389c475bc5ffdf904b"
+    },
+    "backend": {
+      "path": "build/source-acquisition-feature94-backend-postcommit.json",
+      "bytes": 5663,
+      "sha256": "fbb56e77db544a916b2e06c9ed00ec3210a6014c25507dd499c654d810ec3cb9"
+    },
+    "live": {
+      "path": "build/source-acquisition-feature94-live-runtime.json",
+      "bytes": 12441,
+      "sha256": "8ad743478d52fad8f0bd36c1687700cd40b4d9d009b433d0f7fc3382fc8c9a11"
+    },
+    "cleanup": {
+      "path": "build/source-acquisition-feature94-test-cleanup.json",
+      "bytes": 2795,
+      "sha256": "f5d1541d27b0b5c8933eae6bc998ca169aa82eef99359aea5d6476acf6b87e86"
+    },
+    "file_bridge": {
+      "path": "build/feature94-file-bridge-recovery-actual-1/validation.json",
+      "bytes": 44374,
+      "sha256": "e1fbcf0c2f9f89f60ea065ca18d3df0c8a5a3a4acdf9ed25cba6e2cd77fccad0"
+    },
+    "old_native_oracle": {
+      "path": "build/feature94-old-native-oracle-actual-1/validation.json",
+      "bytes": 24070,
+      "sha256": "e88f911195339d281482a1a75550dc2cb7e3dade0aaafc776f12a4436cc530e7"
+    },
+    "cli": {
+      "path": "build/feature94-cli-actual-1/validation.json",
+      "bytes": 44879,
+      "sha256": "6c669a46973b9590071dc03f87575fbb898e11c2084cb5273bdd5c5b754471c2"
+    },
+    "source_review": {
+      "path": "build/feature94-file-bridge-prepared-1/source-review.json",
+      "bytes": 12156,
+      "sha256": "0f88d99e4f8dea0799131b4f5e2a3e5218df2bd75d52cd0e26a71a9899a7f69f"
+    },
+    "source_audit": {
+      "path": "build/feature94-current-source-audit-prepared-2/review.json",
+      "bytes": 5021,
+      "sha256": "64ecb4cd8392ce62f3f60f3a7777260da6222396a435a039c81f04e67233cb48",
+      "historical_context": "Bounded pre94 source93 audit; final product bindings are verified separately."
+    },
+    "before_native": {
+      "path": "build/feature94-before-native-actual-1/validation.json",
+      "bytes": 9963,
+      "sha256": "bb958454fbf003a847727dc093aab46ed890e9f3951039418a3a2e2369af4e47"
+    },
+    "before_client": {
+      "path": "build/feature94-before-client-actual-1/validation.json",
+      "bytes": 15634,
+      "sha256": "c035977b24e8e6719cd8a4ab3f0b6b5020048a68c4cd9de136d16e137e69f307"
+    },
+    "browser": {
+      "path": "build/feature94-browser-current-retry.json",
+      "bytes": 683,
+      "sha256": "678688e5d0015a7aaa2cebbf2c98f2abfde7958f3f30455692e57065e5f94af2"
+    },
+    "breadth95_audit": {
+      "path": "build/feature95-breadth-availability-audit-prepared-1/audit.json",
+      "bytes": 10334,
+      "sha256": "0e99f8f8b4c1c967fec298d19c3d77a59673688272345f3c06feca1f84aee64a"
+    },
+    "failed_native": {
+      "path": "build/native-feature94-d2fdb952a6974162b0a555921a5e409a/build-manifest.json",
+      "bytes": 6970456,
+      "sha256": "a2c7296e8f7688edf1c8d489f746990cade6b95d427c72fe83db73f6166434a8"
+    },
+    "failed_frontend": {
+      "path": "build/source-acquisition94-frontend-59affd8372fd4bb18850304aa441d6af/validation.json",
+      "bytes": 2757662,
+      "sha256": "377214e065ea71d1855a68754c0da9a9f0a75815866cd45a539ead98b92d0894"
+    }
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_API_cases": 50,
+    "dedicated_API_HTTP_calls": 50,
+    "API_physical_methods": {
+      "GET": 7,
+      "POST": 43
+    },
+    "CLI_invocations": 12,
+    "client_HTTP_calls": 4,
+    "client_original_File_handoffs": 3,
+    "client_completed_helper_outcomes": 4,
+    "client_downloads": 20,
+    "client_artifact_downloads": 12,
+    "client_report_downloads": 4,
+    "client_CSV_downloads": 4,
+    "client_original_Files": 3,
+    "live_HTTP_calls": 2,
+    "newruntime_HTTP_calls": 56,
+    "beforechange_HTTP_calls": 1,
+    "beforechange_direct_native_acquisitions": 1,
+    "old_native_entry_counts": {
+      "acquire_source": 9,
+      "serialize_xes": 12,
+      "export_xes_event_log": 3
+    },
+    "old93_oracle_replays": 0,
+    "native_contributing_suites": 92,
+    "native_parent_retained_suites": 89,
+    "native_newly_executed_suites": 3,
+    "native_refreshed_parent_suites": 0,
+    "native_reused_core_objects": 216,
+    "native_fresh_core_objects": 1,
+    "native_total_core_objects": 217,
+    "native_owned_paths": 6,
+    "frontend_tests": 9430,
+    "frontend_files": 164,
+    "frontend_owned_paths": 5,
+    "browser_attempts": 1,
+    "rendered_UI_checks": 0,
+    "total_HTTP_including_beforechange": 57,
+    "provider_stub_http_requests": {
+      "fixture_GETs": 6,
+      "health_GETs": 1,
+      "all_GETs": 7
+    }
+  },
+  "summary": "Feature 94 adds lossless source-acquisition reports across the nine connector workflows, preserving all seven native result fields, independent optional captures, original source bytes and separate serialization errors. All five native XES export options are available through JSON/File controls and the CLI, including automatic compression and arbitrary native name bytes. Validation passed 50 selected API cases, 12 CLI invocations, 4 public-client requests and 2 live checks; the strict frontend build and 9430 tests across 164 files passed. Native evidence contributes 92 passing suites: 89 retained and three newly executed, with one fresh core object and 216 reused. A before-change native acquisition and public-client File handoff demonstrated FF-byte replacement in the old client path. Complete native source/result state and export bytes now have an explicit safe inspection path. Strict parity remains unfinished across all 228 incomplete units. One browser attempt was denied before navigation; zero rendered UI checks completed.",
+  "native_test_accounting": {
+    "aggregate": 92,
+    "retained_parent": 89,
+    "newly_executed": 3,
+    "refreshed_parent": 0,
+    "new_targets": [
+      "minera_outlook_source_tests",
+      "minera_source_acquisition_tests",
+      "minera_windows_event_source_tests"
+    ],
+    "full_parent_replay": false
+  },
+  "old_native_oracle_accounting": {
+    "acquire_source": 9,
+    "serialize_xes": 12,
+    "export_xes_event_log": 3
+  },
+  "frontend_test_accounting": {
+    "total_tests": 9430,
+    "passed_tests": 9430,
+    "passed_files": 164
+  },
+  "source_availability_audit": {
+    "path": "build/feature94-current-source-audit-prepared-2/review.json",
+    "bytes": 5021,
+    "sha256": "64ecb4cd8392ce62f3f60f3a7777260da6222396a435a039c81f04e67233cb48",
+    "historical_context": "Bounded pre94 source93 audit; final product bindings are verified separately."
+  },
+  "source_availability_audit_context": "Historical bounded pre94 audit of source93: its cited acquisition/server hashes are not asserted equal to installed94. Final94 product source is bound separately by source_review/native/frontend proofs.",
+  "availability_audit_accounting": {
+    "previous_bounded_reviewed_units": 38,
+    "new_direct_native_availability_reviewed": 11,
+    "total_direct_source_reviewed": 49,
+    "remaining_without_direct_review": 179,
+    "selected_but_unresolved_direct_contracts": 11,
+    "audit": {
+      "path": "build/feature95-breadth-availability-audit-prepared-1/audit.json",
+      "bytes": 10334,
+      "sha256": "0e99f8f8b4c1c967fec298d19c3d77a59673688272345f3c06feca1f84aee64a"
+    },
+    "feature95_implemented": false,
+    "strict_promotion": false
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "delivered_feature87"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "delivered_feature88"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "delivered_feature89"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "delivered_feature84"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "delivered_feature85"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "delivered_feature86"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "delivered_feature90"
+    }
+  ],
+  "remaining_availability_backlog": [
+    {
+      "id": "G91-original-process-tree-trace-reduction",
+      "state": "delivered_feature91",
+      "supporting_modules": [
+        "algo.reduction.process_tree.reducer",
+        "algo.reduction.process_tree.variants.tree_tr_based"
+      ]
+    },
+    {
+      "id": "G92-native-query-parameter-exposure",
+      "state": "open_ranked_candidate_not_assigned",
+      "catalogue_link": "Indirect SQL utility association; native parameter/options exposure gap independently source confirmed."
+    },
+    {
+      "id": "standalone-original-PNML-context",
+      "state": "delivered_feature92",
+      "question": "Expose standalone original PNML native LLM context in public File workspace without cached event log.",
+      "claim_boundary": "Additional UI/native-caller source candidate; not included in the two directly reviewed tree units and not behavioral parity proof.",
+      "validation": "docs/feature-first-original-model-context-validation.json",
+      "strict_promotion": false
+    },
+    {
+      "id": "F94-byte-result",
+      "state": "delivered_feature94",
+      "validation": "docs/feature-first-exact-source-acquisition-validation.json",
+      "strict_promotion": false
+    },
+    {
+      "id": "F94-xes-controls",
+      "state": "delivered_feature94",
+      "validation": "docs/feature-first-exact-source-acquisition-validation.json",
+      "strict_promotion": false
+    },
+    {
+      "id": "F94-provider-call-config",
+      "state": "open_ranked_candidate_not_assigned",
+      "question": "Per-call endpoint/key named inputs remain absent; current deployment configuration works.",
+      "claim_boundary": "Public signature and own source finding only; endpoint/profile contract and exact precedence/default behavior remain unresolved."
+    },
+    {
+      "id": "F95-original-feature-extraction",
+      "state": "confirmed_source_gap_not_implemented",
+      "question": "Independent original full EventLog feature extraction for EVENT_BASED, TRACE_BASED and TEMPORAL, all56 original options and complete six-field native result.",
+      "audit": {
+        "path": "build/feature95-breadth-availability-audit-prepared-1/audit.json",
+        "bytes": 10334,
+        "sha256": "0e99f8f8b4c1c967fec298d19c3d77a59673688272345f3c06feca1f84aee64a"
+      },
+      "strict_promotion": false
+    }
+  ],
+  "backlog_resolution": {
+    "feature": 94,
+    "selected_gap": "lossless_acquired_source_results_and_complete_XES_export_options",
+    "state": "delivered_without_strict_promotion"
+  },
+  "input_result_semantics": {
+    "result_fields": 7,
+    "XES_options": 5,
+    "independent_optional_captures": true,
+    "opaque_native_result_bytes": true,
+    "raw_File_identity": true,
+    "legacy_omission_preserved": true,
+    "resolved_credentials_excluded": true,
+    "literal_user_source_bytes_retained": true
+  },
+  "histories": "Failed compile, failed frontend typecheck and their corrected successor proofs remain in immutable build artifacts referenced by proofs; no raw multi-megabyte proof payload is embedded here.",
+  "limitations": [
+    "All 228 strict catalogue units remain incomplete; availability evidence does not establish behavioral, performance or browser parity.",
+    "Inherited HTTP multipart handling rejects browser-escaped CR/LF filenames before route entry; supported quote/Unicode filenames are separate evidence.",
+    "Controlled uploaded fixtures and injected repository/capture tests do not claim live external account, COM service or ODBC provider coverage.",
+    "NativeAttributeValue generated private scalar identity is outside the explicit constructor transport contract; all ten explicit EventDataMetadata fields are retained.",
+    "Identical query pairs may be normalized by inherited httplib before route provenance is collected.",
+    "Exact report bytes preserve native artifacts; optional legacy serialization errors are separate from the primary acquisition result."
+  ],
+  "journal_policy": "Index contains parent HEAD plus owned94 suffix only; complete inherited dirty working journal prefix is preserved.",
+  "browser_ui_verified": false,
+  "strict_promotion": false,
+  "full_parity": false,
+  "goal_complete": false,
+  "next_work": "Implement independent original full EventLog feature extraction for all three native variants, all56 options and complete native results in existing feature workspace/API/CLI. Retain SQL parameter exposure, per-call provider configuration and the complete remaining catalogue."
+}
