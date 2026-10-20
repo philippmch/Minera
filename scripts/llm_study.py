@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import sys
 import urllib.error
 import urllib.request
@@ -58,11 +59,11 @@ def select_cluster_bounded(payload):
     return json.loads(process.stdout)
 
 
-def study_prompt(task,columns,variants,engine,context='',max_len=10000):
+def study_prompt(task,columns,variants,engine,context='',max_len=10000,table_name='dataframe'):
     if task=='clusters':
         lines=['If I have a process with the following process variants:',*[' '+sequence+' ( frequency = '+str(count)+' )' for sequence,count in variants],"Identify clusters of traces. Return a JSON list inside ```json tags, with string 'name' and 'regex' fields for every cluster. Regex searches activity sequences joined with ' -> '. Cases may match more than one cluster."]
     else:
-        lines=['Formulate hypotheses over the event data.',context,'The database engine is '+engine+'. Table dataframe has one row per event. Columns (quote literal names):',*[json.dumps(column,ensure_ascii=False) for column in columns],'Return each hypothesis in <description> and </description> tags, with its read-only SELECT query between ```sql and ``` tags. Use only dataframe. Do not modify data or access files.']
+        lines=['Formulate hypotheses over the event data.',context,'The database engine is '+engine+'. Table '+table_name+' has one row per event. Columns (quote literal names):',*[json.dumps(column,ensure_ascii=False) for column in columns],'Return each hypothesis in <description> and </description> tags, with its read-only SELECT query between ```sql and ``` tags. Use only '+table_name+'. Do not modify data or access files.']
     return '\n\n'.join(lines[:-1])[:max_len]+'\n\n'+lines[-1]
 
 
@@ -70,6 +71,62 @@ def native_json(binary,args):
     process=subprocess.run([binary,*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=90)
     if process.returncode:raise ValueError(process.stderr.decode('utf-8',errors='replace').strip())
     return json.loads(process.stdout)
+
+
+def exact_query_json(value):
+    # The native binary64 writer may emit -0 without a fractional suffix.
+    # Keep that sign only in exact projections; legacy native_json is unchanged.
+    return json.loads(value,parse_int=lambda token:-0.0 if token=='-0' else int(token))
+
+
+def hypothesis_query_exact(binary,args,report_directory=None,index=0):
+    def execute(directory):
+        directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
+        report_path=directory/f'hypothesis-{index+1}-query.json'
+        if report_path.exists():raise ValueError('Exact query report already exists: '+str(report_path))
+        process=subprocess.run([binary,*args,'--exact-query-report',str(report_path)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=90)
+        report_bytes=None
+        try:
+            report_bytes=report_path.read_bytes();report=exact_query_json(report_bytes)
+            if not isinstance(report,dict) or report.get('family')!='EXACT_LOG_QUERY':raise ValueError('Invalid exact query report.')
+        except (OSError,ValueError,UnicodeError) as error:
+            # Report I/O/projection failure is not evidence of a failed native
+            # query. Preserve physical streams and any legacy result while the
+            # authoritative query outcome remains explicitly unobserved.
+            result={'query_report':None,'query_report_bytes':None if report_bytes is None else {'native_bytes':'hex-v1','data':report_bytes.hex()},
+                    'query_exit_code':process.returncode,'query_report_error':{'phase':'report_io','message':str(error)},
+                    'query_stdout':{'native_bytes':'hex-v1','data':process.stdout.hex()},'query_stderr':{'native_bytes':'hex-v1','data':process.stderr.hex()},
+                    'legacy_projection_error':None,'result':None,'error':{'phase':'report_io','message':'The canonical query outcome is unavailable; this is not a native-query failure assertion.'}}
+            try:result['result']=exact_query_json(process.stdout)
+            except (ValueError,UnicodeError) as projection_error:result['legacy_projection_error']=str(projection_error)
+            return result
+        result={'query_report':report,'query_report_bytes':{'native_bytes':'hex-v1','data':report_bytes.hex()},'query_exit_code':process.returncode,'legacy_projection_error':None,'result':None,'error':None}
+        query=report.get('calls',{}).get('query',{})
+        if query.get('returned'):
+            try:result['result']=exact_query_json(process.stdout)
+            except (ValueError,UnicodeError) as error:
+                result['legacy_projection_error']=str(error)
+                result['result']=report.get('result')
+        else:result['result']=report.get('result')
+        if report.get('error') is not None:result['error']=report['error']
+        elif process.returncode:result['error']={'phase':'cli','message':'Query process failed; canonical report and original stdout/stderr retained.'}
+        return result
+    if report_directory is not None:return execute(report_directory)
+    with tempfile.TemporaryDirectory(prefix='minera-hypothesis-query-') as directory:return execute(directory)
+
+
+def hypothesis_table_name(options_json,options_file):
+    # Prompt preview consumes a separate copy. It never rewrites either the
+    # original options File or the raw JSON passed to the native consumer.
+    if options_json is None and options_file is None:return 'dataframe'
+    text=options_json if options_json is not None else Path(options_file).read_bytes()
+    value=json.loads(text);name=value['table_name']
+    if isinstance(name,dict):
+        if set(name)!={'native_bytes','data'} or name['native_bytes']!='hex-v1':raise ValueError('Invalid prompt table NativeString.')
+        name=bytes.fromhex(name['data']).decode('utf-8',errors='strict')
+    if not isinstance(name,str):raise ValueError('The table name cannot be represented in the provider prompt.')
+    name.encode('utf-8',errors='strict')
+    return '"'+name.replace('"','""')+'"'
 
 
 def main(argv=None):
@@ -84,8 +141,13 @@ def main(argv=None):
     parser.add_argument('--response-file');parser.add_argument('--obtain-query',choices=('true','false'),default='true');parser.add_argument('--execute-query',choices=('true','false'),default='true')
     parser.add_argument('--provider',choices=('openai','anthropic','google'),default='openai');parser.add_argument('--model');parser.add_argument('--engine',choices=('sqlite','duckdb'),default='sqlite')
     parser.add_argument('--case-attribute',default='case:concept:name');parser.add_argument('--activity-attribute');parser.add_argument('--max-len',type=int,default=10000);parser.add_argument('--row-limit',type=int,default=1000);parser.add_argument('--output-dir')
+    parser.add_argument('--query-options-json');parser.add_argument('--query-options-file');parser.add_argument('--exact-query-report-dir')
     add_provider_call_arguments(parser)
     args=parser.parse_args(argv)
+    exact_query=args.query_options_json is not None or args.query_options_file is not None
+    if args.query_options_json is not None and args.query_options_file is not None:raise ValueError('Query options JSON/File conflict by presence.')
+    if args.task!='hypotheses' and (exact_query or args.exact_query_report_dir is not None):raise ValueError('Query options/report directory apply only to hypotheses.')
+    if args.exact_query_report_dir is not None and not exact_query:raise ValueError('Exact query report directory requires full query options.')
     if not 1<=args.max_len<=2*1024*1024 or not 1<=args.row_limit<=1000000:raise ValueError('Invalid prompt or row bound.')
     source=native_json(args.query_cli,[args.log,'--sql','SELECT * FROM dataframe','--limit','1000000'])
     if source['output_truncated']:raise ValueError('The source exceeds the complete study bound.')
@@ -97,11 +159,19 @@ def main(argv=None):
         if not isinstance(row[case_column],str) or not isinstance(row[activity_column],str):raise ValueError('Case and activity cells must be strings for the study prompt.')
         cases.setdefault(row[case_column],[]).append(row[activity_column])
     variants=Counter(' -> '.join(events) for events in cases.values()).most_common()
-    prompt=study_prompt(args.task,[name for name in columns if name!=source['event_index_column']],variants,args.engine,'Cases: '+str(len(cases))+'; events: '+str(len(source['rows'])),args.max_len)
+    prompt_error=None
+    try:
+        prompt_table=hypothesis_table_name(args.query_options_json,args.query_options_file) if exact_query else 'dataframe'
+        prompt=study_prompt(args.task,[name for name in columns if name!=source['event_index_column']],variants,args.engine,'Cases: '+str(len(cases))+'; events: '+str(len(source['rows'])),args.max_len,table_name=prompt_table)
+    except (OSError,ValueError,UnicodeError,KeyError,TypeError) as error:
+        if not exact_query:raise
+        prompt=None;prompt_error=str(error)
     report={'family':'LLM_STUDY','task':args.task,'prompt':prompt,'results':[]}
+    if exact_query:report['prompt_error']=prompt_error
     if args.obtain_query=='false':print(json.dumps(report,ensure_ascii=False));return 0
     if args.response_file:response=Path(args.response_file).read_text(encoding='utf-8')
     else:
+        if prompt_error:raise ValueError('Cannot generate a provider prompt for these exact options: '+prompt_error)
         if not args.model:raise ValueError('Enter --model or supply --response-file.')
         request=urllib.request.Request(args.llm_runtime_url.rstrip('/')+'/complete',data=json.dumps({'provider':args.provider,'model':args.model,'prompt':prompt,'max_tokens':4096,**provider_call_overrides(args)}).encode(),headers={'Content-Type':'application/json'})
         with urllib.request.urlopen(request,timeout=90) as reply:completion=json.load(reply)
@@ -121,9 +191,13 @@ def main(argv=None):
                     command+=['--filter-output',str(output)]
                 item['result']=native_json(args.cluster_cli,command)
             else:
-                command=[args.log,'--sql',plan['sql'],'--limit',str(args.row_limit)]
+                command=[args.log,'--sql',plan['sql']]
+                if exact_query:
+                    command+=['--query-options-json',args.query_options_json] if args.query_options_json is not None else ['--query-options-file',args.query_options_file]
+                else:command+=['--limit',str(args.row_limit)]
                 if args.engine=='duckdb':command+=['--engine','duckdb','--runtime-url',args.query_runtime_url]
-                item['result']=native_json(args.query_cli,command)
+                if exact_query:item.update(hypothesis_query_exact(args.query_cli,command,args.exact_query_report_dir,index))
+                else:item['result']=native_json(args.query_cli,command)
         except Exception as error:item['error']=str(error)
     print(json.dumps(report,ensure_ascii=False));return 0
 

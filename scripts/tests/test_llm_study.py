@@ -1,4 +1,5 @@
 import importlib.util,json
+import math
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -83,5 +84,84 @@ class LlmStudyTests(unittest.TestCase):
                 provider.assert_not_called()
                 self.assertNotIn('synthetic-unused-key',output.getvalue())
                 self.assertNotIn('http://127.0.0.1:9002/v1',output.getvalue())
+
+
+    def test_exact_hypothesis_sidecar_survives_invalid_legacy_stdout(self):
+        canonical={'type':'LogQueryResult','value':{'rows':[{'index':3,'value':{'native_bytes':'hex-v1','data':'ff'}}]}}
+        owned={'family':'EXACT_LOG_QUERY','calls':{'query':{'entered':True,'returned':True}},'result':canonical,'error':None,'cli':{'stdout':{'native_bytes':'hex-v1','data':'ff'},'stderr':''}}
+        def execute(command,**kwargs):
+            report=Path(command[command.index('--exact-query-report')+1]);report.write_text(json.dumps(owned),encoding='utf-8')
+            class Process:returncode=0;stdout=b'\xff';stderr=b''
+            return Process()
+        with patch.object(study.subprocess,'run',side_effect=execute):
+            result=study.hypothesis_query_exact('native',['original.xes','--sql','SELECT ?','--query-options-json','{}'])
+        self.assertEqual(result['result'],canonical);self.assertIsNone(result['error']);self.assertIsNotNone(result['legacy_projection_error']);self.assertEqual(result['query_report'],owned)
+    def test_exact_hypothesis_native_error_retains_owned_report(self):
+        owned={'family':'EXACT_LOG_QUERY','calls':{'query':{'entered':True,'returned':False}},'result':None,'error':{'phase':'query','message':'count mismatch'}}
+        def execute(command,**kwargs):
+            Path(command[command.index('--exact-query-report')+1]).write_text(json.dumps(owned),encoding='utf-8')
+            class Process:returncode=1;stdout=b'';stderr=b'count mismatch'
+            return Process()
+        with patch.object(study.subprocess,'run',side_effect=execute):result=study.hypothesis_query_exact('native',['original.xes'])
+        self.assertEqual(result['error'],owned['error']);self.assertEqual(result['query_exit_code'],1);self.assertEqual(result['query_report'],owned)
+    def test_exact_options_hypotheses_passthrough_does_not_change_source_query(self):
+        source={'columns':['case:concept:name','concept:name','__minera_event_index'],'rows':[['c1','A',0]],'output_truncated':False,'event_index_column':'__minera_event_index'}
+        options=json.dumps({'table_name':' spaced " table ','max_rows':1,'max_vm_steps':50000,'parameters':[{'index':1,'value':'7'}]})
+        with tempfile.TemporaryDirectory() as directory:
+            response=Path(directory)/'response.txt';response.write_text('<description>value</description>```sql\nSELECT ?\n```')
+            output=io.StringIO()
+            with patch.object(study,'native_json',return_value=source) as native,patch.object(study,'hypothesis_query_exact',return_value={'result':{'rows':[[7]]},'error':None,'query_report':{}}) as exact,redirect_stdout(output):
+                self.assertEqual(study.main(['original.xes','--task','hypotheses','--response-file',str(response),'--query-options-json',options]),0)
+            native.assert_called_once_with('minera_query',['original.xes','--sql','SELECT * FROM dataframe','--limit','1000000'])
+            command=exact.call_args.args[1];self.assertEqual(command,['original.xes','--sql','SELECT ?','--query-options-json',options]);self.assertNotIn('--limit',command)
+            self.assertIn('" spaced "" table "',json.loads(output.getvalue())['prompt'])
+    def test_query_options_reject_clusters_and_keep_original_file_for_preview(self):
+        with self.assertRaisesRegex(ValueError,'only to hypotheses'):
+            study.main(['original.xes','--task','clusters','--query-options-json',''])
+        with tempfile.TemporaryDirectory() as directory:
+            file=Path(directory)/'options.json';raw=b'{"table_name":{"native_bytes":"hex-v1","data":"20412220"}}';file.write_bytes(raw)
+            self.assertEqual(study.hypothesis_table_name(None,str(file)),'" A"" "');self.assertEqual(file.read_bytes(),raw)
+
+    def test_exact_report_io_error_is_not_claimed_as_native_query_failure(self):
+        class Process:returncode=1;stdout=b'{"family":"LOG_QUERY","rows":[[7]]}';stderr=b'report write failed'
+        with patch.object(study.subprocess,'run',return_value=Process()):result=study.hypothesis_query_exact('native',['original.xes'])
+        self.assertEqual(result['result']['rows'],[[7]]);self.assertIsNone(result['query_report']);self.assertEqual(result['error']['phase'],'report_io')
+        self.assertEqual(result['query_stdout']['data'],Process.stdout.hex());self.assertEqual(result['query_stderr']['data'],Process.stderr.hex())
+
+    def test_missing_options_file_preview_does_not_block_response_file_execution(self):
+        source={'columns':['case:concept:name','concept:name','__minera_event_index'],'rows':[['c1','A',0]],'output_truncated':False,'event_index_column':'__minera_event_index'}
+        with tempfile.TemporaryDirectory() as directory:
+            response=Path(directory)/'response.txt';response.write_text('<description>value</description>```sql\nSELECT 1\n```')
+            missing=str(Path(directory)/'missing-options.json');output=io.StringIO()
+            owned={'result':None,'error':{'phase':'control','message':'could not open query input'},'query_report':{'family':'EXACT_LOG_QUERY'}}
+            with patch.object(study,'native_json',return_value=source),patch.object(study,'hypothesis_query_exact',return_value=owned) as exact,patch.object(study.urllib.request,'urlopen') as provider,redirect_stdout(output):
+                self.assertEqual(study.main(['original.xes','--task','hypotheses','--response-file',str(response),'--query-options-file',missing]),0)
+            self.assertEqual(exact.call_args.args[1],['original.xes','--sql','SELECT 1','--query-options-file',missing]);provider.assert_not_called()
+            report=json.loads(output.getvalue());self.assertIsNone(report['prompt']);self.assertTrue(report['prompt_error']);self.assertEqual(report['results'][0]['query_report'],owned['query_report'])
+
+    def test_exact_numeric_negative_zero_survives_sidecar_and_stdout_projection(self):
+        raw=(b'{"family":"EXACT_LOG_QUERY","calls":{"query":{"entered":true,"returned":true}},'
+             b'"configured_options":{"engine":"sqlite","value":{"parameters":[{"index":2,"value":-0}]}},'
+             b'"result":{"type":"LogQueryResult","value":{"rows":[[{"index":2,"value":-0}]]}},'
+             b'"error":null,"cli":{"stdout":"{\\\"rows\\\":[[-0]]}\\n","stderr":""}}')
+        stdout=b'{"family":"LOG_QUERY","rows":[[-0]]}'
+        def execute(command,**kwargs):
+            Path(command[command.index('--exact-query-report')+1]).write_bytes(raw)
+            class Process:returncode=0;stderr=b''
+            process=Process();process.stdout=stdout;return process
+        with patch.object(study.subprocess,'run',side_effect=execute):
+            result=study.hypothesis_query_exact('native',['original.xes'])
+        report=result['query_report']
+        for value in (report['configured_options']['value']['parameters'][0]['value'],report['result']['value']['rows'][0][0]['value'],result['result']['rows'][0][0]):
+            self.assertEqual(value,0.0);self.assertLess(math.copysign(1.0,value),0)
+        self.assertEqual(bytes.fromhex(result['query_report_bytes']['data']),raw)
+        # A report-I/O failure leaves the native outcome unobserved, while its
+        # separately preserved physical stdout projection still retains -0.
+        class MissingReportProcess:returncode=1;stderr=b'report write failed'
+        process=MissingReportProcess();process.stdout=stdout
+        with patch.object(study.subprocess,'run',return_value=process):
+            missing=study.hypothesis_query_exact('native',['original.xes'])
+        self.assertLess(math.copysign(1.0,missing['result']['rows'][0][0]),0)
+        self.assertEqual(bytes.fromhex(missing['query_stdout']['data']),stdout)
 
 if __name__=='__main__':unittest.main()

@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 R=Path(__file__).resolve().parents[2];spec=importlib.util.spec_from_file_location('query_runtime',R/'scripts/query_runtime.py');runtime=importlib.util.module_from_spec(spec);spec.loader.exec_module(runtime)
 def cell(value,kind='string'):
@@ -49,4 +50,40 @@ class QueryRuntimeTests(unittest.TestCase):
         ambiguous=runtime.query(payload('SELECT __minera_event_index,__minera_event_index FROM dataframe'));self.assertFalse(ambiguous['can_filter']);self.assertEqual(ambiguous['selected_event_indices'],[])
     def test_source_metadata_is_unchanged(self):
         input=payload('SELECT * FROM dataframe');before=json.dumps(input,sort_keys=True);runtime.query(input);self.assertEqual(json.dumps(input,sort_keys=True),before)
+
+    def test_exact_table_alias_and_ordered_native_parameters(self):
+        request=payload('SELECT ? AS second,? AS first,? AS again FROM " literal,? table " LIMIT 1')
+        request.pop('max_rows');request['exact_options']={'table_name':' literal,? table ','max_rows':'1','parameters':[{'index':1,'value':'9223372036854775807'},{'index':1,'value':'-9223372036854775808'},{'index':1,'value':'9223372036854775807'}]}
+        before=json.dumps(request,sort_keys=True)
+        result=runtime.query(request)
+        self.assertEqual(result['rows'],[[{'type':'integer','value':'9223372036854775807'},{'type':'integer','value':'-9223372036854775808'},{'type':'integer','value':'9223372036854775807'}]])
+        self.assertEqual(json.dumps(request,sort_keys=True),before)
+    def test_exact_blob_extension_null_string_and_ieee_values(self):
+        request=payload('SELECT ?,?,?,?,?');request.pop('max_rows')
+        request['exact_options']={'table_name':'dataframe','max_rows':1000,'parameters':[{'index':0,'value':None},{'index':3,'value':' A,?\u0000 '},{'index':4,'value':{'hex':'00ffEDa080'}},{'index':2,'value':'INF'},{'index':2,'value':-0.0}]}
+        row=runtime.query(request)['rows'][0]
+        self.assertEqual(row[:3],[None,' A,?\u0000 ',{'type':'blob','value':'00ffeda080'}])
+        self.assertEqual(row[3],{'type':'float','value':'Infinity'})
+        self.assertEqual(runtime.exact_parameter({'index':4,'value':{'hex':''}}),b'')
+    def test_exact_budget_inapplicability_and_strict_constructor_types(self):
+        base={'table_name':'dataframe','max_rows':1000,'parameters':[]}
+        for bad in ({**base,'max_vm_steps':50000000},{**base,'parameters':[{'index':1,'value':True}]},{**base,'parameters':[{'index':4,'value':{'hex':'0 ff'}}]},{**base,'parameters':[{'index':3,'value':{'native_bytes':'hex-v1','data':'ff'}}]},{**base,'max_rows':0}):
+            with self.subTest(bad=bad),self.assertRaises((ValueError,UnicodeError)):runtime.exact_options(bad)
+    def test_exact_selection_honors_same_row_limit_and_parameters(self):
+        request=payload('SELECT * FROM " alias " WHERE cost>=?');request.pop('max_rows');request['exact_options']={'table_name':' alias ','max_rows':1,'parameters':[{'index':1,'value':'10'}]}
+        result=runtime.query(request);self.assertTrue(result['output_truncated']);self.assertEqual(result['selected_event_indices'],[])
+        with self.assertRaises(ValueError):runtime.query(request,True)
+        request['exact_options']['max_rows']=1000
+        self.assertEqual(runtime.query(request,True),{'indices':[0,1,2]})
+
+    def test_exact_call_metadata_observes_function_invocation_on_success_and_error(self):
+        with patch.object(runtime,'query',return_value={'family':'LOG_QUERY','rows':[]}) as call:
+            status,value=runtime.observed_exact_query({'exact_options':{}},False)
+            call.assert_called_once_with({'exact_options':{}},False)
+            self.assertEqual(status,200);self.assertEqual(value['exact_call'],{'entered':True,'returned':True,'error':None})
+        with patch.object(runtime,'query',side_effect=ValueError('fixture rejection')) as call:
+            status,value=runtime.observed_exact_query({'exact_options':{}},True)
+            call.assert_called_once_with({'exact_options':{}},True)
+            self.assertEqual(status,400);self.assertEqual(value['exact_call'],{'entered':True,'returned':False,'error':{'type':'ValueError','message':'fixture rejection'}})
+
 if __name__=='__main__':unittest.main()
