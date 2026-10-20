@@ -1,3 +1,4 @@
+import { type OcpnDiscoveryFlags } from "./ocpn-discovery-options";
 import { type OcelDiscoveryOptions } from "./api";
 import { type OcelDiscoveryVariant } from "./types";
 
@@ -13,11 +14,13 @@ export interface OcelExplorerSettings {
   objectTypeAttribute: string;
   annotated: boolean;
   replayDiagnostics: boolean;
+  ocpnDiscovery?: OcpnDiscoveryFlags;
 }
 export function ocelExplorerOptions(variant: OcelDiscoveryVariant, settings: OcelExplorerSettings): OcelDiscoveryOptions {
   const options: OcelDiscoveryOptions = { variant };
   const activity = settings.activityAttribute.trim(), type = settings.objectTypeAttribute.trim();
   if (variant === "ocpn") {
+    Object.assign(options, settings.ocpnDiscovery);
     options.ocpn_annotation = settings.annotated ? "annotated" : "none";
     options.diagnostics_with_token_based_replay = settings.replayDiagnostics;
     if (activity) options.ocpn_activity_attribute = activity;

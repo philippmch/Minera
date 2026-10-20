@@ -1,3 +1,4 @@
+import { appendOcpnDiscoveryFlags, type OcpnDiscoveryFlags } from "./ocpn-discovery-options";
 import {discoveryStringVectorJson, type DiscoveryNativeString} from "./discovery-string-vectors";
 import {
   type ActivityStat,
@@ -6181,7 +6182,7 @@ export async function requestRandomTree(options: RandomTreeOptions = {}): Promis
   return payload;
 }
 
-export interface OcelDiscoveryOptions {
+export interface OcelDiscoveryOptions extends OcpnDiscoveryFlags {
   variant?: OcelDiscoveryVariant;
   compute_edges_performance?: boolean;
   ocdfg_activity_attribute?: string;
@@ -6196,6 +6197,7 @@ export interface OcelDiscoveryOptions {
 
 export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
   const query = new URLSearchParams();
+  appendOcpnDiscoveryFlags(query, options);
   if (options.variant !== undefined) query.set("variant", options.variant);
   if (options.compute_edges_performance !== undefined) {
     query.set("compute_edges_performance", options.compute_edges_performance ? "true" : "false");
@@ -6721,7 +6723,7 @@ export async function requestOcelEventObjectGraph(
 
 export const requestOcelHeterogeneousGraph = requestOcelEventObjectGraph;
 
-export interface OcelPlayoutOptions {
+export interface OcelPlayoutOptions extends OcpnDiscoveryFlags {
   model?: "ocpn" | "causal_net";
   variant?: "extensive";
   max_bindings_per_activity?: number;
@@ -6759,6 +6761,7 @@ function escapeOcelPlayoutPart(value: string): string {
 
 export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
   const query = new URLSearchParams();
+  appendOcpnDiscoveryFlags(query, options);
   if (options.model !== undefined) query.set("model", options.model);
   if (options.variant !== undefined) query.set("variant", options.variant);
   const addInteger = (name: string, value: number | undefined) => {

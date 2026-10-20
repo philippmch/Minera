@@ -1,0 +1,268 @@
+{
+  "complete": true,
+  "feature": 86,
+  "features_delivered": 86,
+  "parent_head": "e25bb676d6a3a0155e5ea5969fa89092fb824996",
+  "feature_baseline_head": "133333669d6c1b0caf47f3e050ddb3bc4511d215",
+  "baseline": {
+    "path": "build/ocpn-controls-feature86-baseline.json",
+    "bytes": 2820859,
+    "sha256": "e76119f9af5a956032058953fa6f52627756b71643adc9098d8fa4ce07060cd1"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature86-e819a648f57b4b6d96f89845340fb5cb/build-manifest.json",
+      "bytes": 384645,
+      "sha256": "0cc2826c0b76e53c9814885736b129012b4d36757d92e9d00f33b52f12c6d994"
+    },
+    "api": {
+      "path": "build/ocpn-controls86-api-validation.json",
+      "bytes": 58917,
+      "sha256": "50326626f7185cc08249ee80bdbea36d34c99bfb99e99656508ce2e576fe7a80"
+    },
+    "frontend": {
+      "path": "build/ocpn-controls86-frontend-0462464464914f0aad17a34dfcbd8098/validation.json",
+      "bytes": 2753461,
+      "sha256": "f6934458761b5d6a7cb1a8349cf09f22bb2f439f0537f05319f9eb2493557d58"
+    },
+    "backend": {
+      "path": "build/ocpn-controls-feature86-backend-postcommit.json",
+      "bytes": 3623,
+      "sha256": "8454b4408f1c4bfa3481bcb1096104359692933b36092d4e1b6ffed963c8a01c"
+    },
+    "live": {
+      "path": "build/ocpn-controls-feature86-live-runtime.json",
+      "bytes": 10550,
+      "sha256": "4e2721049a92e8cfd564156e20198b80bee7dfc6ef9119bc12186c8fa95666ce"
+    },
+    "cleanup": {
+      "path": "build/ocpn-controls-feature86-test-cleanup.json",
+      "bytes": 4727,
+      "sha256": "bb12eb4fd233d43e24398f97f50314b40889f6a1b802258d50d908eee42dcc1b"
+    },
+    "source_audit": {
+      "path": "build/feature86-api-prepared-1/source-audit.json",
+      "bytes": 9084,
+      "sha256": "38dff303d3fc062a90f0292457f630608cb4b485633c0e5865ad17dcadf005f5"
+    },
+    "source_review": {
+      "path": "build/feature86-api-prepared-1/source-review.json",
+      "bytes": 7937,
+      "sha256": "39ecb4d89775080767e78d47a897ece0ba78daf5e14bea4173e1fa743f9537b7"
+    },
+    "native_oracle": {
+      "path": "build/ocpn-controls86-native-CLI-validation.json",
+      "bytes": 14303,
+      "sha256": "6a10f49c119e3e635c276a05bd8e6eaa48342286178ccffcb7c140628594826e"
+    }
+  },
+  "previous_delivery_report": {
+    "path": "docs/feature-first-literal-vectors-validation.json",
+    "bytes": 10277,
+    "sha256": "e596cccc0c79bbc5cc1ba0164713e99a04d9bc204feea31f367b15337e244e97"
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_API_cases": 16,
+    "physical_HTTP_calls": 16,
+    "dedicated_API_corpus_POSTs": 16,
+    "frontend_tests": 9179,
+    "frontend_files": 152,
+    "frontend_full_suite_delta": 14,
+    "actual_File_handoffs": 0,
+    "File_followup_HTTP_calls": 0,
+    "wire_mocked_fetches": 0,
+    "wire_mock_transport_File_arguments": 0,
+    "wire_network_requests_executed": 0,
+    "live_smoke_HTTP_calls": 2,
+    "native_contributing_suites": 74,
+    "native_retained_suites": 73,
+    "native_freshly_executed_suites": 1,
+    "native_reused_core_objects": 209,
+    "native_fresh_core_objects": 0,
+    "compiled_core_sources": 0,
+    "compiled_server_sources": 1,
+    "compiled_extra_tool_sources": 1,
+    "remaining_audited_extensions": 4,
+    "CLI_processes": 10,
+    "direct_native_models": 4,
+    "direct_native_playouts": 7
+  },
+  "native_test_accounting": {
+    "retained_parent_suites": 73,
+    "freshly_executed_suites": 1,
+    "aggregate_current_passing_suites": 74,
+    "contributing_ctest_invocation_count": 16,
+    "retained_evidence": {
+      "path": "build/native-feature85-bca1cc85307b406f9f65aec6abb75d51/build-manifest.json",
+      "bytes": 381390,
+      "sha256": "6479194c7b8513433f1eb92bc3070d36a0071a007b0f9ab490cdc2fac2c37bf7"
+    },
+    "actual_current_evidence": {
+      "path": "build/native-feature86-e819a648f57b4b6d96f89845340fb5cb/build-manifest.json",
+      "bytes": 384645,
+      "sha256": "0cc2826c0b76e53c9814885736b129012b4d36757d92e9d00f33b52f12c6d994"
+    }
+  },
+  "frontend_test_accounting": {
+    "actual_fresh_full_suite": {
+      "total_tests": 9179,
+      "passed_tests": 9179,
+      "passed_files": 152
+    },
+    "retained_parent_inventory": {
+      "total_tests": 9165,
+      "passed_tests": 9165,
+      "passed_files": 151
+    },
+    "net_test_inventory_delta": 14,
+    "actual_current_evidence": {
+      "path": "build/ocpn-controls86-frontend-0462464464914f0aad17a34dfcbd8098/validation.json",
+      "bytes": 2753461,
+      "sha256": "f6934458761b5d6a7cb1a8349cf09f22bb2f439f0537f05319f9eb2493557d58"
+    },
+    "captured_API_fixtures_are_offline_reuse_not_new_HTTP_calls": true
+  },
+  "input_and_result_semantics": [
+    "ocpn_disable_strict_sequence_cut and ocpn_disable_fallthroughs use the existing strict ocel_query_bool parser.",
+    "Omitted controls and explicit false retain native default policies; true and 1 enable each selected policy.",
+    "Disabling the strict sequence cut selects the ordinary sequence cut; disabling specialized fallthroughs retains empty-trace and flower fallback behavior.",
+    "HTTP discovery and shared model-discovery-before-playout options reach the same native object-type miner projections, including causal workflow projections.",
+    "CLI --ocpn-disable-strict-sequence-cut and --ocpn-disable-fallthroughs use exact true, false, 1 or 0 values and reject missing, empty or malformed values.",
+    "Native algorithms, headers and build configuration remain unchanged; API and CLI outputs are validated using policy-sensitive OCEL counterexamples."
+  ],
+  "native_CLI_oracle": {
+    "path": "build/ocpn-controls86-native-CLI-validation.json",
+    "bytes": 14303,
+    "sha256": "6a10f49c119e3e635c276a05bd8e6eaa48342286178ccffcb7c140628594826e"
+  },
+  "CLI_accounting": {
+    "actual_processes": 10,
+    "direct_native_models": 4,
+    "direct_native_playouts": 7,
+    "evidence": {
+      "path": "build/ocpn-controls86-native-CLI-validation.json",
+      "bytes": 14303,
+      "sha256": "6a10f49c119e3e635c276a05bd8e6eaa48342286178ccffcb7c140628594826e"
+    },
+    "external_reference_equivalence_claimed": false
+  },
+  "HTTP_accounting": {
+    "selected_cases": 16,
+    "dedicated_API_corpus_HTTP_calls": 16,
+    "dedicated_API_corpus_POSTs": 16,
+    "File_followup_HTTP_calls": 0,
+    "live_smoke_HTTP_calls": 2,
+    "actual_product_export_Files": 0,
+    "dedicated_API_corpus": {
+      "path": "build/ocpn-controls86-api-validation.json",
+      "bytes": 58917,
+      "sha256": "50326626f7185cc08249ee80bdbea36d34c99bfb99e99656508ce2e576fe7a80"
+    },
+    "optional_wire_or_File_proof": null,
+    "wire_mocked_fetches": 0,
+    "mock_transport_File_arguments": 0,
+    "wire_network_requests_executed": 0,
+    "mocked_File_arguments_are_not_native_File_handoffs": true,
+    "frontend_saved_response_reuse_adds_no_HTTP_calls": true,
+    "live_smokes_excluded_from_dedicated_corpus": true
+  },
+  "frontend_correction_history": {
+    "current_integration": {
+      "path": "build/ocpn-controls86-frontend-integration-1.json",
+      "bytes": 2660911,
+      "sha256": "fe5f56699dbddf96edadd572aa6b96c1729765b80b3cb0bb4a2a2fe042e25c29"
+    },
+    "current_candidate": {
+      "path": "build/feature86-frontend-candidate-1/manifest.json",
+      "bytes": 5011,
+      "sha256": "87911cbb396719d6466f4215706350f64a6e2771c41c3fd91c2e8c35c62f1da5"
+    },
+    "actual_current_frontend_validation": {
+      "path": "build/ocpn-controls86-frontend-0462464464914f0aad17a34dfcbd8098/validation.json",
+      "bytes": 2753461,
+      "sha256": "f6934458761b5d6a7cb1a8349cf09f22bb2f439f0537f05319f9eb2493557d58"
+    },
+    "source_review": {
+      "path": "build/feature86-api-prepared-1/source-review.json",
+      "bytes": 7937,
+      "sha256": "39ecb4d89775080767e78d47a897ece0ba78daf5e14bea4173e1fa743f9537b7"
+    }
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "delivered_feature84"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "delivered_feature85"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "delivered_feature86"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "open_source_proven_extension"
+    }
+  ],
+  "source_availability_audit": {
+    "path": "build/feature86-api-prepared-1/source-audit.json",
+    "bytes": 9084,
+    "sha256": "38dff303d3fc062a90f0292457f630608cb4b485633c0e5865ad17dcadf005f5"
+  },
+  "proof_history": {
+    "native": {},
+    "api": {},
+    "frontend": {},
+    "backend": {},
+    "live": {},
+    "cleanup": {},
+    "source_audit": {},
+    "source_review": {},
+    "native_oracle": {}
+  },
+  "journal_policy": "Preserve complete inherited working prefix; stage parent HEAD journal plus owned Feature86 suffix only.",
+  "browser_ui_verified": false,
+  "browser_evidence": "No Feature86 rendered-browser validation is claimed. The prior permission denial remains a separate unresolved verification boundary.",
+  "browser_retry": null,
+  "full_parity": false,
+  "goal_complete": false,
+  "claim_boundary": "OCPN policy-control availability does not prove strict reference behavior, every remaining catalogue control, browser, performance or concurrency parity."
+}

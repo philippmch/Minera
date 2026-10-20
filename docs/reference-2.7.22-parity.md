@@ -13723,3 +13723,10 @@ Validation: docs/feature-first-typed-relations-validation.json.
 Feature85 adds literal JSON selections to existing Declare and DFG discovery. Select activity "A,B" or trace attribute "cost,net" as one exact name. Whitespace, empty values, Unicode and NativeString bytes survive request parsing; order and duplicates reach native options. Omitted controls retain defaults; [] is explicit empty. Legacy comma controls retain their behavior and conflict with exact controls when supplied together. Validation passed 16 selected cases / 16 dedicated physical HTTP calls and 9165 frontend tests in 151 files. 5 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
 
 Validation: docs/feature-first-literal-vectors-validation.json.
+
+
+## Feature86 - OCPN discovery policies
+
+Feature86 exposes OCPN strict-sequence-cut and specialized-fallthrough policy in existing OCEL discovery and model discovery before OCPN or causal-net playout. Both controls default to false, preserve explicit false, and accept only true, false, 1 or 0 at the HTTP and CLI boundaries. The CLI forwards discovery options into OCPN playout as well as direct discovery and causal-net discovery. Validation passed 16 selected cases / 16 dedicated physical HTTP calls and 9179 frontend tests in 152 files. 4 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
+
+Validation: docs/feature-first-ocpn-controls-validation.json.
