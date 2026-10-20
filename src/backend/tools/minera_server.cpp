@@ -1,3 +1,4 @@
+#include "minera/exact_filter_discovery_json.hpp"
 #include "case_relations_input.hpp"
 #include "case_relations_typed_input.hpp"
 // Local application server: serves the built frontend and mines uploaded
@@ -968,14 +969,17 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           });
     }
 
+    const auto exact_heuristic_options=params.heuristic;
     std::string paired_csv_import_error;
     auto active_source = std::make_shared<const minera::ActiveEventSource>(
         prepare_active_event_source(request, csv, dataset, params, &paired_csv_import_error, true));
+    if(minera::exact_heuristic_options_requested([&](std::string_view key){return active_source_supplied(request,key);}))params.heuristic=exact_heuristic_options;
+    minera::record_exact_effective_options(params);
     const auto literal_source_selectors = active_source_supplied(request, "mining_selectors_json")
         ? minera::parse_workflow_selector_strings_json(active_source_field(request, "mining_selectors_json"))
         : std::map<std::string, std::string>{};
     if (active_source->file().format == "table" ||
-        active_source->selected_kind() != minera::EventDataKind::kEventLog || !literal_source_selectors.empty()) {
+        active_source->selected_kind() != minera::EventDataKind::kEventLog || !literal_source_selectors.empty() || minera::exact_filter_discovery_recording()) {
       ticket->native_source_dispatch = true;
       handle_active_source_mining(request, response, dataset, params, active_source, ticket, paired_csv_import_error);
       return;
@@ -3968,6 +3972,7 @@ void handle_workflow_discovery(const httplib::Request& request,
       "heuristic_business_hour_slots", "heuristic_start_timestamp_attribute",
       "heuristic_lifecycle_instance_attribute", "heuristic_dfg_pre_cleaning_noise_threshold",
       "heuristic_loop_length_two_threshold", "heuristic_keep_once_per_case",
+      "heuristic_options_json", "heuristic_options_file", "heuristic_most_common_paths_json", "heuristic_most_common_paths_file",
       "heuristic_most_common_paths", "heuristic_plusplus_decoration_selector",
       "heuristic_plusplus_decoration_value", "heuristic_connect_all"};
     const auto& allowed = family == "alpha" ? alpha_fields : heuristic_fields;
@@ -3983,7 +3988,10 @@ void handle_workflow_discovery(const httplib::Request& request,
     };
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
     auto params = minera::parse_mine_params(lookup, present);
+    const auto exact_cached_heuristic=params.heuristic;
     overlay_cached_source_selectors(request,*session,params);
+    if(minera::exact_heuristic_options_requested(present))params.heuristic=exact_cached_heuristic;
+    minera::record_exact_effective_options(params);
     const auto discovery_input = session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session));
     if (family == "heuristic")
       params.heuristic.connect_all = ocel_query_bool(request, "heuristic_connect_all", params.heuristic.connect_all);
@@ -3998,8 +4006,9 @@ void handle_workflow_discovery(const httplib::Request& request,
         net = alpha_plus->net;
       } else net = minera::discover_petri_net(discovery_input, params.alpha);
     } else {
-      heuristic = minera::discover_heuristics_net(discovery_input, params.heuristic);
-      net = minera::to_petri_net(*heuristic);
+      heuristic = minera::observe_exact_heuristic_call(discovery_input,params.heuristic,[&]{return minera::discover_heuristics_net(discovery_input, params.heuristic);});
+      try{net = minera::to_petri_net(*heuristic);minera::record_exact_petri_net(net);}
+      catch(const std::exception& e){minera::record_exact_optional_artifact("conversion",e.what(),true);throw;}
     }
     auto graph = session->log_ready ? minera::discover_directly_follows_graph(require_prepared_log(*session)) : minera::DirectlyFollowsGraph{};
     for (const auto& activity : net.activities()) graph.ensure_activity(activity);
@@ -4084,6 +4093,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_footprints_route.hpp"
 #include "original_genetic_matrix_route.hpp"
 #include "original_embedding_route.hpp"
+#include "exact_filter_discovery_route.hpp"
 #include "original_edit_distance_route.hpp"
 #include "original_bose_route.hpp"
 #include "original_discovery_route.hpp"
@@ -10584,7 +10594,7 @@ int main(int argc, char** argv) {
   for(const auto* route:{"acquire","snapshot","original","capture","table","export","list","release"})server.Options(std::string("/api/source-acquisition/")+route,source_preflight);
   server.Options("/api/knowledge-injection", preflight);
 
-  server.Post("/api/mine", handle_mine);
+  server.Post("/api/mine", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"mine",handle_mine);});
   server.Post("/api/cancel-mine", handle_cancel_mine);
   server.Get("/api/active-source", handle_active_source);
   server.Get("/api/active-source-file", handle_active_source_file);
@@ -10689,8 +10699,8 @@ int main(int argc, char** argv) {
   server.Post("/api/reduce-petri-net", handle_reduce_petri_net);
   server.Post("/api/align-dfg", handle_align_dfg);
   server.Post("/api/discover-alpha-plus", handle_alpha_plus_result);
-  server.Post("/api/discover-workflow", handle_workflow_discovery);
-  server.Post("/api/discover-workflow-input", handle_workflow_input_discovery);
+  server.Post("/api/discover-workflow", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"discover_workflow",handle_workflow_discovery);});
+  server.Post("/api/discover-workflow-input", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"discover_workflow_input",handle_workflow_input_discovery);});
   server.Post("/api/discover-inductive-input", handle_inductive_input_discovery);
   server.Post("/api/align-process-tree-workbench", handle_process_tree_alignment_workbench);
   server.Post("/api/align-petri-anti-multi-workbench", handle_petri_anti_multi_workbench);
@@ -10705,7 +10715,7 @@ int main(int argc, char** argv) {
   server.Post("/api/log-skeleton-workbench", handle_original_log_skeleton_workbench);
   server.Post("/api/footprints-workbench", handle_original_footprints_workbench);
   server.Post("/api/genetic-matrix-workbench", handle_original_genetic_matrix_workbench);
-  server.Post("/api/embedding-workbench", handle_original_embedding_workbench);
+  server.Post("/api/embedding-workbench", exact_filter_discovery_route::embedding);
   server.Options("/api/emd-workbench", preflight);
   server.Post("/api/emd-workbench", handle_original_emd_workbench);
   server.Options("/api/object-centric-playout-workbench", preflight);

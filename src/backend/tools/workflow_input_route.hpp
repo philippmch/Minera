@@ -97,6 +97,7 @@ void handle_workflow_input_discovery(const httplib::Request& request,
       "xes_require_timestamp", "xes_timestamp_sort", "xes_reverse_sort", "xes_max_traces", "xes_attributes_to_read", "xes_max_decompressed_bytes",
       "alpha_variant", "alpha_activity_attribute", "alpha_case_id_attribute", "alpha_timestamp_attribute", "alpha_start_timestamp_attribute",
       "alpha_sort_caseid_required", "alpha_sort_timestamp_along_case_id", "alpha_remove_unconnected", "alpha_max_rows_to_materialize",
+      "heuristic_options_json", "heuristic_options_file", "heuristic_most_common_paths_json", "heuristic_most_common_paths_file",
       "heuristic_variant", "heuristic_activity_attribute", "heuristic_case_id_attribute", "heuristic_timestamp_attribute", "heuristic_start_timestamp_attribute",
       "heuristic_lifecycle_instance_attribute", "dependency_threshold", "and_threshold", "min_edge_frequency", "heuristic_min_activity_count", "heuristic_connect_all",
       "heuristic_decoration", "heuristic_performance_aggregation", "heuristic_business_hours", "heuristic_business_hour_slots",
@@ -124,7 +125,10 @@ void handle_workflow_input_discovery(const httplib::Request& request,
     auto params = minera::parse_mine_params(
         [&](std::string_view key) {return selectors.contains(std::string(key)) ? std::string{} : lookup(key);},
         [&](std::string_view key) {return !selectors.contains(std::string(key)) && present(key);});
-    const auto supplied = [&](const std::string& key) {return present(key) || selectors.contains(key);};
+    const bool full_heuristic=minera::exact_heuristic_options_requested(present);
+    if(full_heuristic&&!selectors.empty())throw std::invalid_argument("heuristic_options_json: conflicts by presence with discovery_selectors_json");
+    const bool exact_heuristic=full_heuristic||minera::exact_heuristic_pairs_requested(present);
+    const auto supplied = [&](const std::string& key) {return (full_heuristic&&key.starts_with("heuristic_")) || present(key) || selectors.contains(key);};
     const auto& file = request.get_file_value("input");
     minera::EventLog source_log;
     std::optional<minera::EventTable> table;
@@ -135,7 +139,7 @@ void handle_workflow_input_discovery(const httplib::Request& request,
     if (format == "dfg_json") {
       origin = "uploaded_dfg";
       if (family == "alpha") {alpha_dfg = minera::parse_alpha_dfg_input_json(file.content); dfg_json = minera::serialize_alpha_dfg_input_json(*alpha_dfg);}
-      else {heuristic_dfg = minera::parse_heuristic_dfg_input_json(file.content); dfg_json = minera::serialize_heuristic_dfg_input_json(*heuristic_dfg);}
+      else {heuristic_dfg = exact_heuristic?minera::parse_exact_heuristic_dfg_json(file.content):minera::parse_heuristic_dfg_input_json(file.content); dfg_json = exact_heuristic?minera::serialize_exact_heuristic_dfg_json(*heuristic_dfg):minera::serialize_heuristic_dfg_input_json(*heuristic_dfg);}
     } else if (format == "table") {
       table = minera::parse_event_table_json(file.content);
       origin = "uploaded_typed_table";
@@ -169,7 +173,8 @@ void handle_workflow_input_discovery(const httplib::Request& request,
       else params.heuristic.plusplus_decoration_selector = value;
     }
     if (!table && adapter != "dfg" && adapter != "log") table = minera::event_log_to_table(source_log);
-    const auto before = table ? minera::serialize_event_table_input_json(*table) : "null";
+    minera::record_exact_effective_options(params);
+    const auto before = table ? (exact_heuristic?minera::serialize_embedding_workbench_table_json(*table):minera::serialize_event_table_input_json(*table)) : "null";
     const auto original_events = table ? table->size() : source_log.event_count();
     const auto variant = family == "alpha" ? (params.alpha.short_loops ? "plus" : "classic") :
         (params.heuristic.variant == minera::HeuristicMinerVariant::kPlusPlus ? "plusplus" : "classic");
@@ -188,11 +193,11 @@ void handle_workflow_input_discovery(const httplib::Request& request,
           else if (alpha_dfg->start_activities)
             net = minera::discover_petri_net(alpha_dfg->dfg, *alpha_dfg->start_activities, *alpha_dfg->end_activities, params.alpha);
           else net = minera::discover_petri_net(alpha_dfg->dfg, params.alpha);
-        } else heuristics = minera::discover_heuristics_net(*heuristic_dfg, params.heuristic);
+        } else heuristics = minera::observe_exact_heuristic_call(*heuristic_dfg,params.heuristic,[&]{return minera::discover_heuristics_net(*heuristic_dfg, params.heuristic);});
       } else if (adapter == "pandas_mutable") {
         if (params.heuristic.variant != minera::HeuristicMinerVariant::kPlusPlus)
           throw std::invalid_argument("mutable pandas shape requires PLUSPLUS");
-        heuristics = minera::discover_plus_plus_pandas(*table, params.heuristic);
+        heuristics = minera::observe_exact_heuristic_call(minera::EventDataView(*table),params.heuristic,[&]{return minera::discover_plus_plus_pandas(*table, params.heuristic);});
       } else {
         std::optional<minera::EventStream> stream;
         std::optional<minera::LazyEventTable> lazy;
@@ -209,17 +214,23 @@ void handle_workflow_input_discovery(const httplib::Request& request,
         if (family == "alpha") {
           if (params.alpha.short_loops) {plus = minera::discover_alpha_plus_result(data, params.alpha); net = plus->net;}
           else net = minera::discover_petri_net(data, params.alpha);
-        } else heuristics = minera::discover_heuristics_net(data, params.heuristic);
+        } else heuristics = minera::observe_exact_heuristic_call(data,params.heuristic,[&]{return minera::discover_heuristics_net(data, params.heuristic);});
       }
       computed = true;
     } catch (const minera::HeuristicPandasError& error) {error_type = error.reference_type(); error_message = error.what();}
       catch (const std::exception& error) {error_type = "native_error"; error_message = error.what();}
     if (computed && heuristics) {
-      native_heuristics = minera::workflow_input_heuristics_json(*heuristics);
+      if(exact_heuristic) {
+        try{native_heuristics=minera::workflow_input_heuristics_json(*heuristics);minera::record_exact_optional_artifact("legacy_heuristics_json",native_heuristics);}
+        catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_heuristics_json",e.what(),true);}
+      } else native_heuristics = minera::workflow_input_heuristics_json(*heuristics);
       try {net = minera::to_petri_net(*heuristics);}
-      catch (const std::exception& error) {conversion_error = error.what();}
+      catch (const std::exception& error) {conversion_error = error.what();minera::record_exact_optional_artifact("conversion",error.what(),true);}
     }
-    if (computed && net) native_net = minera::workflow_input_petri_json(*net);
+    if (computed && net) {minera::record_exact_petri_net(*net);
+      if(exact_heuristic){try{native_net=minera::workflow_input_petri_json(*net);minera::record_exact_optional_artifact("legacy_petri_json",native_net);}catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_petri_json",e.what(),true);}}
+      else native_net = minera::workflow_input_petri_json(*net);
+    }
     const auto quote = minera::embedding_runtime::detail::escape_json;
     std::string pnml, bpmn, ptml, pnml_error, bpmn_error, ptml_error;
     if (computed && net) {
@@ -241,7 +252,7 @@ void handle_workflow_input_discovery(const httplib::Request& request,
             nullptr, family == "alpha" ? &*net : nullptr, heuristics ? &*heuristics : nullptr,
             nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
             nullptr, nullptr, family == "heuristic" ? &*net : nullptr);
-      } catch (const std::exception& error) {conversion_error = error.what();}
+      } catch (const std::exception& error) {conversion_error = error.what();minera::record_exact_optional_artifact("conversion",error.what(),true);}
       try {
         if (plus) {
           if (!plus->detached_initial_marking.empty() || !plus->detached_final_marking.empty())
@@ -258,7 +269,7 @@ void handle_workflow_input_discovery(const httplib::Request& request,
       catch (const std::exception& error) {ptml_error = error.what();}
     }
     const auto optional_text = [&](const std::string& value) {return value.empty() ? std::string("null") : quote(value);};
-    const auto after = table ? minera::serialize_event_table_input_json(*table) : "null";
+    const auto after = table ? (exact_heuristic?minera::serialize_embedding_workbench_table_json(*table):minera::serialize_event_table_input_json(*table)) : "null";
     response.status = error_message.empty() ? 200 : 400;
     response.set_content(workflow_input_safe_json("{\"family\":\"WORKFLOW_INPUT_DISCOVERY\",\"method\":" + quote(family) +
         ",\"variant\":" + quote(variant) + ",\"computed\":" + (computed ? "true" : "false") +

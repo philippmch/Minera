@@ -216,6 +216,7 @@ add_library(minera_core
   src/backend/powl_discovery.cpp
   src/backend/pnml.cpp
   src/backend/ptml.cpp
+  src/backend/exact_filter_discovery_json.cpp
   src/backend/request_params.cpp
   src/backend/rework.cpp
   src/backend/repository_history.cpp
@@ -263,6 +264,10 @@ if(MSVC)
 else()
   target_compile_options(minera_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+add_executable(minera_ltl_filter src/backend/tools/minera_ltl_filter.cpp)
+target_link_libraries(minera_ltl_filter PRIVATE minera::core)
+target_compile_features(minera_ltl_filter PRIVATE cxx_std_20)
 
 add_executable(minera_export
   src/backend/tools/minera_export.cpp
@@ -416,6 +421,7 @@ if(WIN32)
   target_link_libraries(minera_core PUBLIC odbc32)
   target_link_libraries(minera_core PUBLIC ole32 oleaut32)
   target_link_libraries(minera_server PRIVATE winhttp)
+  target_link_libraries(minera_export PRIVATE winhttp)
   target_link_libraries(minera_acquire_source PRIVATE winhttp)
 else()
   find_package(OpenSSL QUIET)
@@ -601,7 +607,7 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_dataframe_format_json_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dataframe_format_json_tests COMMAND minera_dataframe_format_json_tests)
 
-  foreach(workflow_input_test original_model_context tree_reduction_workbench_json knowledge_exact_json otg_threshold_json saved_dfg_projection_json replay_duration_workbench_json dfg_graph_input workflow_input_alpha_result workflow_discovery_input_json workflow_input_result_json graph_alignment_workbench_json inductive_input_json process_tree_alignment_workbench_json petri_anti_multi_workbench_json model_conversion_workbench_json active_event_source monte_carlo_workbench_json playout_workbench_json dfg_playout_input_json decision_workbench_json declare_workbench_json log_skeleton_workbench_json footprints_workbench_json genetic_matrix_workbench_json embedding_workbench_json emd_workbench_json object_centric_playout_workbench_json literal_controls_json edit_distance_workbench_json bose_workbench_json discovery_workbench_json petri_analysis_workbench_json root_cause_workbench_json anonymization_workbench_json quality_workbench_json clustering_workbench_json organizational_workbench_json temporal_workbench_json timing_workbench_json time_analysis_workbench_json structural_inputs_json)
+  foreach(workflow_input_test exact_filter_discovery_json original_model_context tree_reduction_workbench_json knowledge_exact_json otg_threshold_json saved_dfg_projection_json replay_duration_workbench_json dfg_graph_input workflow_input_alpha_result workflow_discovery_input_json workflow_input_result_json graph_alignment_workbench_json inductive_input_json process_tree_alignment_workbench_json petri_anti_multi_workbench_json model_conversion_workbench_json active_event_source monte_carlo_workbench_json playout_workbench_json dfg_playout_input_json decision_workbench_json declare_workbench_json log_skeleton_workbench_json footprints_workbench_json genetic_matrix_workbench_json embedding_workbench_json emd_workbench_json object_centric_playout_workbench_json literal_controls_json edit_distance_workbench_json bose_workbench_json discovery_workbench_json petri_analysis_workbench_json root_cause_workbench_json anonymization_workbench_json quality_workbench_json clustering_workbench_json organizational_workbench_json temporal_workbench_json timing_workbench_json time_analysis_workbench_json structural_inputs_json)
     add_executable(minera_${workflow_input_test}_tests src/backend/tests/test_${workflow_input_test}.cpp)
     target_link_libraries(minera_${workflow_input_test}_tests PRIVATE minera::core)
     target_compile_features(minera_${workflow_input_test}_tests PRIVATE cxx_std_20)

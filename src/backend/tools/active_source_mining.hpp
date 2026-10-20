@@ -30,6 +30,7 @@ void handle_active_source_mining(const httplib::Request& request,
     catch (const minera::HeuristicPandasError& e) {
       error = "{\"type\":" + active_source_quote(e.reference_type()) + ",\"message\":" + active_source_quote(e.what()) + '}';
     } catch (const std::exception& e) {
+      if(family=="heuristic_petri_conversion")minera::record_exact_optional_artifact("conversion",e.what(),true);
       error = "{\"type\":\"native_error\",\"message\":" + active_source_quote(e.what()) + '}';
     }
     records[family] = "{\"attempted\":true,\"executed\":" + std::string(native_returned ? "true" : "false") + ",\"native_result_returned\":" + std::string(native_returned ? "true" : "false") + ",\"native_input_kind\":" + active_source_quote(input_kind) +
@@ -65,14 +66,16 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   std::optional<minera::HeuristicsNet> heuristics;
   run("heuristic", selected, [&](bool& native_returned) {
-    heuristics = minera::discover_heuristics_net(data(), params.heuristic);
+    heuristics = minera::observe_exact_heuristic_call(data(),params.heuristic,[&]{return minera::discover_heuristics_net(data(), params.heuristic);});
     native_returned = true;
-    return minera::workflow_input_heuristics_json(*heuristics);
+    try{auto bytes=minera::workflow_input_heuristics_json(*heuristics);minera::record_exact_optional_artifact("legacy_heuristics_json",bytes);return bytes;}
+    catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_heuristics_json",e.what(),true);throw;}
   });
   if (heuristics) run("heuristic_petri_conversion", "heuristics_net", [&](bool& native_returned) {
-    auto net = minera::to_petri_net(*heuristics); session->nets.emplace("heuristic", net);
+    auto net = minera::to_petri_net(*heuristics); minera::record_exact_petri_net(net); session->nets.emplace("heuristic", net);
     native_returned = true;
-    return minera::workflow_input_petri_json(net);
+    try{auto bytes=minera::workflow_input_petri_json(net);minera::record_exact_optional_artifact("legacy_petri_json",bytes);return bytes;}
+    catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_petri_json",e.what(),true);throw;}
   });
   run("inductive", selected, [&](bool& native_returned) {
     session->tree = minera::discover_process_tree(data(), params.inductive);
