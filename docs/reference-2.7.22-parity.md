@@ -13819,3 +13819,15 @@ Evidence: docs/feature-first-exact-source-acquisition-validation.json. No strict
 - Latest authorized browser attempt was rejected before navigation;0 rendered checks and no workaround.
 - Catalogue availability status changes only for algo.label_splitting, mapped from this delivery. Its parity status/selectors and all other catalogue rows remain unchanged. Strict scope46/86 packages,199/387 modules,228 incomplete units; full parity remains false.
 - Availability checkpoint97; next continue SQL input/options and remaining breadth/strict gates. Evidence: docs/feature-first-original-label-splitting-validation.json
+
+
+### Feature98: complete existing SQL options workflow (2026-10-20)
+
+- Delivered full4 SQLite options and exact ordered5-alternative parameters through existing query/export/minera_query/hypothesis paths, plus explicit3-field DuckDB own extension. Full options persist through selection; truncated selections cannot become partial exports. Legacy omission stays unchanged.
+- Complete actual source/options/result/error/provenance and7 native byte artifacts retained. CLI sidecars keep physical stdout/stderr and signed zero; File preview failures do not block manual supplied-response execution.
+- Evidence:98 distinct native suites (96 retained+2 fresh),220 core objects (219 reused+1 fresh); final frontend 9571 passing aggregate/172 files with strict build; Python 28 aggregate (13 retained+15 fresh). Actual retained/fresh/failure histories remain in the proof.
+- Actual OLD/BEFORE/API/CLI/study/File counts derive from their bound proofs; no successful-call replay or earlier failed-run relabeling is inferred. Report: docs/feature-first-exact-log-query-validation.json
+- Checked application assets activated on8562 with new private pinned query runtime8192; real provider29184/8189 preserved. Activation uses one owned control rejection, no source-cache seed or functional query/provider call.
+- Browser evidence carried from historical rejection:0 new attempts/0 rendered checks, no settings dispute/workaround.
+- Availability status changes only for algo.querying.llm.injection.db_knowledge. Other catalogue rows/selectors/parity/backlog unchanged. Full strict scope46/86,199/387,228 incomplete units remains; full parity false.
+- Independent original query-table/filter/result constructors remain queued. Availability checkpoint98.
