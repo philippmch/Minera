@@ -14315,8 +14315,35 @@
       "owner": "support:transformation.ocel.graphs",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/ocel-cobirth-parity-contract.md",
+      "artifacts": [
+        "include/minera/ocel_transform.hpp",
+        "src/backend/ocel_transform.cpp",
+        "src/backend/tests/test_ocel_cobirth_module.cpp",
+        "src/backend/tests/test_ocel_interaction_module.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.graphs.object_cobirth_graph",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_transform.hpp",
+            "symbol": "OcelEnrichmentGraph::kCobirth"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_cobirth_module.cpp",
+            "executable": "minera_ocel_cobirth_module_tests",
+            "case": "retained_public_cobirth_cases"
+          },
+          {
+            "path": "src/backend/tests/test_ocel_cobirth_module.cpp",
+            "executable": "minera_ocel_cobirth_module_tests",
+            "case": "preserved_validation_and_other_selectors"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.graphs.object_codeath_graph",

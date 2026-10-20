@@ -274,7 +274,7 @@ void preserved_validation_and_other_selectors() {
     if (spec.change != "empty-object-id" && spec.change != "empty-event-id") continue;
     source = model(spec);
     for (auto graph : {OcelEnrichmentGraph::kDescendants, OcelEnrichmentGraph::kInheritance,
-                       OcelEnrichmentGraph::kCobirth, OcelEnrichmentGraph::kCodeath})
+                       OcelEnrichmentGraph::kCodeath})
       rejects(source, graph);
     bool threw = false;
     try { (void)enrich_ocel(source); }
