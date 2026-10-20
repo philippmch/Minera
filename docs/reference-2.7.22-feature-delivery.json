@@ -4044,6 +4044,29 @@
       "validation": "docs/feature-first-tree-reduction-validation.json",
       "browser_validation_complete": false,
       "added": "2026-10-20"
+    },
+    {
+      "id": "native_independent_original_model_contexts",
+      "state": "four_original_model_contexts_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [],
+      "supporting_modules": [
+        "algo.querying.llm.abstractions.net_to_descr",
+        "algo.querying.llm.abstractions.declare_to_descr",
+        "algo.querying.llm.abstractions.logske_to_descr",
+        "algo.querying.llm.abstractions.tempprofile_to_descr"
+      ],
+      "operations": [
+        "describe_original_petri_net_and_markings",
+        "describe_original_declare_model",
+        "describe_original_log_skeleton",
+        "describe_original_temporal_profile"
+      ],
+      "validation": "docs/feature-first-original-model-context-validation.json",
+      "browser_validation_complete": false,
+      "strict_promotion": false,
+      "added": "2026-10-20"
     }
   ],
   "execution_priority": [
