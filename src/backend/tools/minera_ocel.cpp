@@ -26,6 +26,7 @@
 #endif
 
 #include "minera/ocel.hpp"
+#include "minera/otg_threshold_json.hpp"
 #include "minera/ocel_csv.hpp"
 #include "minera/ocel_sqlite.hpp"
 #include "minera/ocel_xml.hpp"
@@ -52,6 +53,7 @@ int run_ocel(int argc, char** argv) {
       std::cerr << "prefix feature controls: --features-prefix-length | --features-no-prefix-length | --features-prefix-timediff | --features-no-prefix-timediff | --features-prefix-activities | --features-no-prefix-activities\n";
       std::cerr << "OCPN discovery policy: --ocpn-disable-strict-sequence-cut BOOL --ocpn-disable-fallthroughs BOOL (true, false, 1, or 0; default false; applies to discovery and model discovery before playout)\n";
       std::cerr << "lifecycle feature controls: --features-lifecycle-paths | --features-no-lifecycle-paths\n";
+      std::cerr << "exact OTG thresholds: --otg-theta-by-relation-json JSON | --otg-theta-by-relation-file PATH; JSON is an array of [NativeString, finite-number-or-NaN/INF/-INF-string] pairs. Exact mode emits an OCEL_CONFORMANCE envelope with safe result, canonical graphs/options and original bytes. Cannot combine with five named relation aliases.\n";
       std::cerr << "flatten options: --flatten-object-type TYPE [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME]\n";
       return 2;
     }
@@ -110,6 +112,9 @@ int run_ocel(int argc, char** argv) {
     double alpha = 1.0, beta = 1.0, gamma = 1.0, delta = 1.0;
     double etot_theta = 0.1, otg_theta = 0.2;
     std::map<std::string, double> otg_theta_by_relation;
+    std::optional<std::string> exact_otg_threshold_json;
+    bool legacy_otg_threshold_used=false;
+    const auto read_exact_bytes=[](const std::filesystem::path& path){std::ifstream input(path,std::ios::binary);if(!input)throw std::runtime_error("cannot open exact OTG input");std::ostringstream out;out<<input.rdbuf();return out.str();};
     double ocdfg_theta_activity = 0.0, ocdfg_theta_flow = 0.0;
     minera::OcpnDiscoveryOptions ocpn_options;
     minera::OcdfgDiscoveryOptions ocdfg_options;
@@ -858,6 +863,10 @@ int run_ocel(int argc, char** argv) {
         delta = conformance_number(argv[++i], "--delta");
       } else if (option == "--etot-theta" && i + 1 < argc) {
         etot_theta = conformance_number(argv[++i], "--etot-theta");
+      } else if (option == "--otg-theta-by-relation-json" || option == "--otg-theta-by-relation-file") {
+        if(exact_otg_threshold_json)throw std::invalid_argument("exact OTG threshold input may be supplied once");
+        const auto value=required_value(i,option.c_str());
+        exact_otg_threshold_json=option=="--otg-theta-by-relation-file"?read_exact_bytes(std::filesystem::u8path(value)):value;
       } else if (option == "--otg-theta" && i + 1 < argc) {
         otg_theta = conformance_number(argv[++i], "--otg-theta");
       } else if ((option == "--otg-theta-interaction" ||
@@ -875,6 +884,7 @@ int run_ocel(int argc, char** argv) {
                         : option == "--otg-theta-cobirth"
                             ? "object_cobirth"
                             : "object_codeath";
+        legacy_otg_threshold_used=true;
         otg_theta_by_relation[relation] = conformance_number(argv[++i], option.c_str());
       } else if (option == "--ocdfg-theta-activity" && i + 1 < argc) {
         ocdfg_theta_activity = conformance_number(argv[++i], "--ocdfg-theta-activity");
@@ -1178,6 +1188,9 @@ int run_ocel(int argc, char** argv) {
         conformance != "otg") {
       throw std::invalid_argument("conformance must be etot, ocdfg, or otg");
     }
+    if(exact_otg_threshold_json&&conformance!="otg")throw std::invalid_argument("exact OTG thresholds require --conformance otg");
+    if(exact_otg_threshold_json&&legacy_otg_threshold_used)throw std::invalid_argument("exact OTG thresholds cannot combine with legacy relation aliases");
+    if(exact_otg_threshold_json)otg_theta_by_relation=minera::parse_otg_theta_by_relation_json(*exact_otg_threshold_json);
     if (real_mode != "ocel" && real_mode != "graph") {
       throw std::invalid_argument("real must be ocel or graph");
     }
@@ -1591,6 +1604,16 @@ int run_ocel(int argc, char** argv) {
         options.gamma = gamma;
         options.theta = otg_theta;
         options.theta_by_relation = otg_theta_by_relation;
+        if(exact_otg_threshold_json) {
+          const auto real_bytes=read_exact_bytes(input_path),normative_bytes=read_exact_bytes(normative_file);
+          const auto real_exact=real_mode=="graph"?minera::parse_exact_otg_graph_json(real_graph_json):minera::discover_otg_classic(log);
+          std::optional<minera::OtgGraph> normative_exact;
+          if(normative_is_json)try{normative_exact=minera::parse_exact_otg_graph_json(normative_json);}catch(const std::exception&){/* Retain regular OCEL fallback. */}
+          if(!normative_exact){if(normative_is_json)normative=minera::parse_ocel_json(normative_json);normative_exact=minera::discover_otg_classic(normative);}
+          const auto result=minera::compare_otg(real_exact,*normative_exact,options);
+          std::cout<<minera::serialize_exact_otg_conformance_json(result,real_exact,*normative_exact,options,real_bytes,normative_bytes,*exact_otg_threshold_json)<<'\n';
+          return 0;
+        }
         std::optional<minera::OtgGraph> real_graph;
         if (real_mode == "graph")
           real_graph = minera::parse_otg_json(real_graph_json);
