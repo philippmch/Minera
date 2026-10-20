@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 #include "minera/ocel.hpp"
@@ -49,6 +50,14 @@ ocel_event_object_type_counts(const Ocel& log);
 [[nodiscard]] Ocel filter_ocel_events_object_type_counts(
     const Ocel& log,
     const std::map<std::string, std::size_t>& minimum_counts);
+
+// Exact signed integer and binary64 lower bounds for the public object-type
+// count filter. Relation rows, including duplicates, contribute to the count;
+// a required type must occur even when its lower bound is zero or negative.
+using OcelObjectTypeCountThreshold = std::variant<TokenInteger, double>;
+[[nodiscard]] Ocel filter_ocel_events_object_type_counts_exact(
+    const Ocel& log,
+    const std::map<std::string, OcelObjectTypeCountThreshold>& minimum_counts);
 
 // Keep the first/last relation event for each object of the selected type.
 [[nodiscard]] Ocel filter_ocel_start_events_per_object_type(

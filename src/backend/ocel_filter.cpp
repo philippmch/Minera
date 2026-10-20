@@ -1,6 +1,7 @@
 #include "minera/ocel_filter.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <map>
 #include <set>
@@ -517,6 +518,46 @@ Ocel filter_ocel_events_object_type_counts(
     if (keep) selected_events.insert(event_id);
   }
 
+  Ocel filtered = log;
+  filter_records(filtered.events, [&](const OcelEvent& event) {
+    return selected_events.count(event.id) != 0;
+  });
+  return propagate_event_filter(std::move(filtered));
+}
+
+namespace {
+bool meets_object_type_count(std::size_t count,
+                             const OcelObjectTypeCountThreshold& minimum) {
+  if (const auto* integer = std::get_if<TokenInteger>(&minimum))
+    return TokenInteger{count} >= *integer;
+  const double threshold = std::get<double>(minimum);
+  if (std::isnan(threshold)) return false;
+  if (threshold <= 0.0) return true;
+  // Comparing through double(count) would round exact counts above 2^53.
+  // Range-check the threshold before converting its integral ceiling.
+  if (threshold >= std::ldexp(1.0, std::numeric_limits<std::size_t>::digits))
+    return false;
+  return count >= static_cast<std::size_t>(std::ceil(threshold));
+}
+}  // namespace
+
+Ocel filter_ocel_events_object_type_counts_exact(
+    const Ocel& log,
+    const std::map<std::string, OcelObjectTypeCountThreshold>& minimum_counts) {
+  const auto counts = ocel_event_object_type_counts(log);
+  IdSet selected_events;
+  for (const auto& [event_id, by_type] : counts) {
+    bool keep = true;
+    for (const auto& [object_type, minimum] : minimum_counts) {
+      const auto type_it = by_type.find(object_type);
+      if (type_it == by_type.end() ||
+          !meets_object_type_count(type_it->second, minimum)) {
+        keep = false;
+        break;
+      }
+    }
+    if (keep) selected_events.insert(event_id);
+  }
   Ocel filtered = log;
   filter_records(filtered.events, [&](const OcelEvent& event) {
     return selected_events.count(event.id) != 0;
