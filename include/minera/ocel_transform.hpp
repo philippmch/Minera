@@ -47,6 +47,15 @@ struct OcelEnrichmentOptions {
 [[nodiscard]] Ocel enrich_ocel(
     const Ocel& log, const OcelEnrichmentOptions& options = {});
 
+// Public OCEL 2.0 graph computation: return a copy with computed O2O rows
+// appended. Null selection includes all five graphs; an empty selection adds
+// none, and unknown names are ignored. Existing rows retain order/multiplicity.
+// Only interaction emits both orientations. E2O qualifiers are unchanged.
+// Computed rows use deterministic native ordering instead of hash-set order.
+[[nodiscard]] Ocel compute_ocel20(
+    const Ocel& log,
+    const std::optional<std::vector<std::string>>& included_graphs = std::nullopt);
+
 [[nodiscard]] std::string serialize_ocel_enrichment_json(
     const Ocel& log, const OcelEnrichmentOptions& options = {});
 
