@@ -1,3 +1,5 @@
+import {ProviderCallControls} from "./ProviderCallControls";
+import {defaultProviderCallForms,providerCallOverrides,providerCallConfigured,llmDownloadRequest,ProviderCallRequestGate,type ProviderCallForm} from "../provider-call-config";
 import {defaultKnowledgeEditor,knowledgeEditorRequest,isExactKnowledgeEnvelope,exactKnowledgeMetadata,exactKnowledgeArtifacts,exactKnowledgeProviderText,type ExactKnowledgeEnvelope,type KnowledgeEditor,type ExactKnowledgeRequest} from "../exact-knowledge";
 import {nativeJson,nativeCell} from "../native-json";
 import {nativeStringBytes} from "../native-multipart";
@@ -23,11 +25,15 @@ export function PromptChat({data,mining,available=false,ocelFile=null,dataset,vi
   const [maxTokens,setMaxTokens]=useState("4096");const [temperature,setTemperature]=useState("");
   const [images,setImages]=useState<LlmImage[]>(visualization?[visualization.image]:[]);const [openaiApi,setOpenaiApi]=useState<"responses"|"chat_completions">("responses");const [extraPayload,setExtraPayload]=useState("{}");
   const [resultRequest,setResultRequest]=useState<LlmCompletionRequest|null>(null);const attachmentRead=useRef(0);
+  const [callForms,setCallForms]=useState(defaultProviderCallForms);const callGate=useRef(new ProviderCallRequestGate());
   const [status,setStatus]=useState<LlmRuntimeStatus|null>(null);const [result,setResult]=useState<LlmCompletion|null>(null);
   const [error,setError]=useState<string|null>(null);const [pending,setPending]=useState<"preview"|"completion"|"attachment"|null>(null);
   const request=useRef<AbortController|null>(null);const readiness=useRef<AbortController|null>(null);
+  const overrides=providerCallOverrides(provider,callForms[provider]);const callCurrent=useRef({provider,form:callForms[provider]});callCurrent.current={provider,form:callForms[provider]};
+  const cancelCall=()=>{callGate.current.invalidate();request.current?.abort();request.current=null;attachmentRead.current++;setPending(null);setResult(null);setResultRequest(null);setError(null);};
+  const editCall=(value:ProviderCallForm)=>{cancelCall();setCallForms(forms=>({...forms,[provider]:value}));};
   const refresh=async()=>{readiness.current?.abort();const controller=new AbortController();readiness.current=controller;try{const next=await requestLlmStatus(controller.signal);if(readiness.current===controller&&!controller.signal.aborted)setStatus(next);}catch(cause){if(!controller.signal.aborted)setStatus({family:"LLM_RUNTIME",ready:false,providers:[],error:cause instanceof Error?cause.message:String(cause)});}};
-  useEffect(()=>{void refresh();return()=>{request.current?.abort();readiness.current?.abort();attachmentRead.current++;};},[]);
+  useEffect(()=>{void refresh();return()=>{callGate.current.invalidate();request.current?.abort();readiness.current?.abort();attachmentRead.current++;};},[]);
   useEffect(()=>{if(mining){request.current?.abort();request.current=null;attachmentRead.current++;setPending(null);setResult(null);}},[mining]);
   const attach=async(files:File[])=>{
     const generation=++attachmentRead.current;setPending("attachment");setError(null);setResult(null);
@@ -38,18 +44,18 @@ export function PromptChat({data,mining,available=false,ocelFile=null,dataset,vi
   const invalidate=()=>{setPrompt("");setResult(null);setNativePreview(null);setError(null);};
   const run=async(operation:"preview"|"completion")=>{
     if(mining||pending)return;
-    let input;try{input=operation==="preview"?(knowledge.mode==="legacy"?llmKnowledgeOptions(variant,context,question,schema):knowledgeEditorRequest(knowledge,variant,context,question,schema)):llmCompletionRequest(provider,model,prompt,maxTokens,temperature,{...(images.length?{images}:{}),...(extraPayload.trim()&&extraPayload.trim()!=="{}"?{extra_payload:llmExtraPayload(extraPayload)}:{}),...(provider==="openai"?{openai_api:openaiApi}:{})});}catch(cause){setError(cause instanceof Error?cause.message:String(cause));return;}
-    const controller=new AbortController();request.current=controller;setPending(operation);setError(null);setResult(null);if(operation==="preview"){setNativePreview(null);if(knowledge.mode!=="legacy")setPrompt("");}
-    try{if(operation==="preview"){const next=await requestKnowledgePreview(input as ExactKnowledgeRequest,controller.signal);if(request.current===controller&&!controller.signal.aborted){if(isExactKnowledgeEnvelope(next)){setNativePreview(next);if(!next.result?.computed)setError("Native prompt construction did not complete. The complete result and error are retained below.");}else{const legacy=next as unknown as import("../types").KnowledgeInjectionResult;if(!legacy.computed)throw new Error(legacy.error||"Could not build the prompt.");setPrompt(legacy.prompt);}}}else{const submitted=input as LlmCompletionRequest;const next=await requestLlmCompletion(submitted,controller.signal);if(request.current===controller&&!controller.signal.aborted){setResult(next);setResultRequest(submitted);}}}
+    let input;try{input=operation==="preview"?(knowledge.mode==="legacy"?llmKnowledgeOptions(variant,context,question,schema):knowledgeEditorRequest(knowledge,variant,context,question,schema)):llmCompletionRequest(provider,model,prompt,maxTokens,temperature,{...(images.length?{images}:{}),...(extraPayload.trim()&&extraPayload.trim()!=="{}"?{extra_payload:llmExtraPayload(extraPayload)}:{}),...(provider==="openai"?{openai_api:openaiApi}:{}),...overrides});}catch(cause){setError(cause instanceof Error?cause.message:String(cause));return;}
+    const controller=new AbortController();const callTicket=operation==="completion"?callGate.current.issue(provider,callForms[provider]):null;request.current=controller;setPending(operation);setError(null);setResult(null);if(operation==="preview"){setNativePreview(null);if(knowledge.mode!=="legacy")setPrompt("");}
+    try{if(operation==="preview"){const next=await requestKnowledgePreview(input as ExactKnowledgeRequest,controller.signal);if(request.current===controller&&!controller.signal.aborted){if(isExactKnowledgeEnvelope(next)){setNativePreview(next);if(!next.result?.computed)setError("Native prompt construction did not complete. The complete result and error are retained below.");}else{const legacy=next as unknown as import("../types").KnowledgeInjectionResult;if(!legacy.computed)throw new Error(legacy.error||"Could not build the prompt.");setPrompt(legacy.prompt);}}}else{const submitted=input as LlmCompletionRequest;const next=await requestLlmCompletion(submitted,controller.signal);if(request.current===controller&&!controller.signal.aborted&&callTicket&&callGate.current.accepts(callTicket,callCurrent.current.provider,callCurrent.current.form,controller.signal)){setResult(next);setResultRequest(llmDownloadRequest(submitted));}}}
     catch(cause){if(request.current===controller&&!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}
     finally{if(request.current===controller){request.current=null;setPending(null);}}
   };
-  const configured=status?.ready&&status.providers.some(item=>item.id===provider&&item.configured);
+  const configured=providerCallConfigured(status,provider,overrides);
   const endpoint=status?.providers.find(item=>item.id===provider)?.base_url;
   const label=LLM_PROVIDERS.find(item=>item.id===provider)!.label;
   return <section className="panel ask-model-panel">
     <div className="panel-head"><h2>Ask a model</h2><span className="panel-meta">{data?.dataset??dataset??ocelFile?.name}</span></div>
-    <p className="ask-model-intro">Build a prompt from the log or a database schema. Review and edit the displayed prompt before sending it.</p>
+    <p className="ask-model-intro">Enter a prompt, or build one from a log or database schema. Review and edit it before sending.</p>
     {visualization&&<p className="ask-model-intro">Rendered {visualization.title} from {visualization.dataset} · {visualization.width} × {visualization.height} pixels. The attachment captures the selected view and its displayed detail.</p>}
     <ContextBuilder available={available} mining={mining} ocelFile={ocelFile} onUse={text=>{request.current?.abort();request.current=null;attachmentRead.current++;setPending(null);if(variant==="database")setVariant("process_mining");setContext(text);setPrompt("");setNativePreview(null);setResult(null);setError(null);}} />
     <fieldset className="ask-model-fields" disabled={mining||pending!==null}>
@@ -63,14 +69,15 @@ export function PromptChat({data,mining,available=false,ocelFile=null,dataset,vi
       <p className="ask-model-intro">Attach process diagrams or other images, then ask about what they show. Review the selected images before sending. The complete request has a 2 MiB limit.</p>
       {!!images.length&&<div className="llm-attachments">{images.map((image,index)=><figure key={index}><img src={llmImageUrl(image)} alt={image.name}/><figcaption>{image.name} · {image.media_type}</figcaption><button className="btn-ghost" onClick={()=>{setImages(value=>value.filter((_,i)=>i!==index));setResult(null);}}>Remove image {index+1}</button></figure>)}</div>}
       <div className="ask-model-options">
-        <label className="filters-field"><span>Provider</span><select value={provider} onChange={event=>{setProvider(event.target.value as LlmProvider);setResult(null);}}>{LLM_PROVIDERS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+        <label className="filters-field"><span>Provider</span><select value={provider} onChange={event=>{cancelCall();setProvider(event.target.value as LlmProvider);}}>{LLM_PROVIDERS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         <label className="filters-field ask-model-name"><span>Model name</span><input value={model} onChange={event=>{setModel(event.target.value);setResult(null);}} placeholder="A model available to your provider" /></label>
         <label className="filters-field"><span>Output token limit</span><input type="number" min="1" max="1000000" value={maxTokens} onChange={event=>{setMaxTokens(event.target.value);setResult(null);}} /></label>
         <label className="filters-field"><span>Temperature</span><input type="number" min="0" max={provider==="anthropic"?"1":"2"} step="0.1" value={temperature} onChange={event=>{setTemperature(event.target.value);setResult(null);}} placeholder="Model default" /></label>
         {provider==="openai"&&<label className="filters-field"><span>OpenAI API</span><select value={openaiApi} onChange={event=>{setOpenaiApi(event.target.value as typeof openaiApi);setResult(null);}}><option value="responses">Responses</option><option value="chat_completions">Chat Completions</option></select></label>}
       </div>
       <details><summary>Extra provider payload</summary><label className="ask-model-text"><span>Extra payload JSON</span><textarea rows={5} value={extraPayload} onChange={event=>{setExtraPayload(event.target.value);setResult(null);}} /></label><p className="ask-model-intro">These fields override generated provider fields. Use the provider's JSON names; Google generation controls belong inside generationConfig. Streaming and background responses need a separate consumer.</p></details>
-      <p className="ask-model-intro">{configured?`${label} is configured at ${endpoint}. The displayed prompt, selected images and extra payload are sent.`:status?.error||`${label} is not configured. Set its credential or local endpoint in the runtime environment.`}</p>
+      <ProviderCallControls provider={provider} value={callForms[provider]} onChange={editCall}/>
+      <p className="ask-model-intro">{configured?(Object.keys(overrides).length?`${label} uses the call settings above. The displayed prompt, selected images and extra payload are sent.`:`${label} is configured at ${endpoint}. The displayed prompt, selected images and extra payload are sent.`):status?.error||`${label} is not configured. Use the call settings above or configure the runtime environment.`}</p>
       <div className="ask-model-actions"><button className="btn-open" disabled={!configured||!prompt.trim()} onClick={()=>void run("completion")}>Send displayed prompt to {label}</button><button className="btn-ghost" onClick={()=>void refresh()}>Refresh runtime</button><button className="btn-ghost" disabled={!prompt} onClick={()=>downloadModelJson({prompt,images,provider,model,openai_api:provider==="openai"?openaiApi:undefined,extra_payload:extraPayload},"minera-prompt.json")}>Download prompt</button></div>
     </fieldset>
     {nativePreview&&<KnowledgePreviewInspection value={nativePreview} onUse={text=>{setPrompt(text);setResult(null);}} disabled={mining||pending!==null}/>}

@@ -1,0 +1,199 @@
+{
+  "complete": true,
+  "feature": 96,
+  "features_delivered": 96,
+  "parent_head": "63fbae501f5976c20b8f82139fa31a84d144098d",
+  "feature_baseline_head": "0e8bd25599d8add3b258cd374333634d860104c3",
+  "baseline": {
+    "path": "build/feature96-baseline.json",
+    "bytes": 2831445,
+    "sha256": "6fc62cb46cca86bfee15efd8263fdedd05d405b57087afa8c95494e72bd9efd2"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature96-61bc07a42c7445e48b3d05618598cc02/build-manifest.json",
+      "bytes": 3119893,
+      "sha256": "4a22f0bf939e510b5b2690600571fa9a7175699fce583b2685a68cdb3e1b2c23"
+    },
+    "python": {
+      "path": "build/provider-call96-python-915ee215c4be4e05b2337887896dbd3b/validation.json",
+      "bytes": 4273,
+      "sha256": "f5d05d708c4e43c10c233591672ca670d8a647116ce6a265340f6523f1355d3f"
+    },
+    "frontend": {
+      "path": "build/provider-call96-frontend-c845313129914ebdade17e91258d7145/validation.json",
+      "bytes": 2762932,
+      "sha256": "b35a9ea6d6b20371499620b300e97a47f93a24e37d28d949d0f091d56bdd0395"
+    },
+    "api": {
+      "path": "build/feature96-api-actual-1/validation.json",
+      "bytes": 157387,
+      "sha256": "ff19a511c033eb2cc511490598edf2254cfed563de87358cca41d1b4a64dc5e8"
+    },
+    "cli": {
+      "path": "build/feature96-cli-recovery-actual-1/validation.json",
+      "bytes": 100837,
+      "sha256": "b932af570eddd2b3977dc77ca5c6ae7545187521d451f6b7806f403fd7fa1b8e"
+    },
+    "file_bridge": {
+      "path": "build/feature96-helper-bridge-recovery-actual-1/validation.json",
+      "bytes": 42204,
+      "sha256": "633655dd53e6f0764a4b3671ae20a48e7cef2d491038840627c743b50c9b4e45"
+    },
+    "before": {
+      "path": "build/feature96-before-actual-1/validation.json",
+      "bytes": 10227,
+      "sha256": "37c54b44d54095939ecbce4144d933ec94bcf82501accd06cd4429bdaa1d9c0a"
+    },
+    "source_review": {
+      "path": "build/feature96-paired-source-review-1/review.json",
+      "bytes": 15437,
+      "sha256": "9e32c3f4ae5d21c2ff1f7b58f5a688b32364e151419a7f8d8a5c7988918afcdc"
+    },
+    "browser": {
+      "path": "build/feature96-browser-current-retry.json",
+      "bytes": 549,
+      "sha256": "f051f50a445df27d8c706f2579caac1e1041342d10395f5158749591fc4d2f5f"
+    },
+    "breadth": {
+      "path": "build/feature96-breadth-availability-audit-prepared-1/manifest.json",
+      "bytes": 2910,
+      "sha256": "ef972b567351134c2b1e8b141fac5bb69a49ce0a22dcae0d64977e32eb18ecc9"
+    },
+    "cleanup": {
+      "path": "build/feature96-after-service-actual-2/journal.json",
+      "bytes": 46791,
+      "sha256": "331c70e35c3edf7950f68b169199bf42455b8e9f0353e69da94151f9f387961a"
+    },
+    "backend": {
+      "path": "build/provider-call96-backend-postcommit.json",
+      "bytes": 3927,
+      "sha256": "1ccf3a58524dbd7e6fe35f58b34a08faf5ced083a2c93778bc0284b679b2f238"
+    },
+    "live": {
+      "path": "build/provider-call96-live-runtime.json",
+      "bytes": 6958,
+      "sha256": "e45e90028b861c3b406afc2b7dc18537e7250853a0350a9865e41c6292deba19"
+    }
+  },
+  "problem": "The previous own runtime accepted provider configuration only at startup; the native completion bridge returned400 for the same call-local configuration, and plain chat had no empty-Landing entry.",
+  "delivered": {
+    "new_flat_fields": [
+      "api_key",
+      "api_url",
+      "openai_token_field"
+    ],
+    "existing_api_mode": "openai_api unchanged",
+    "providers": [
+      "openai",
+      "anthropic",
+      "google"
+    ],
+    "protocols": [
+      "OpenAI Chat Completions",
+      "OpenAI Responses",
+      "Anthropic Messages",
+      "Google generateContent"
+    ],
+    "surfaces": [
+      "AskModel/PromptChat including images and visualization",
+      "QueryWorkspace SQL generation",
+      "LlmStudies clustering and hypotheses",
+      "minera_knowledge including exact mode",
+      "llm_runtime --complete",
+      "llm_study.py",
+      "llm_visualization.py direct/runtime/prompt-only"
+    ],
+    "cli_flags": [
+      "--api-key",
+      "--api-url",
+      "--openai-token-field"
+    ],
+    "semantics": "Missing/null new fields inherit. Empty key clears for this call only; empty URL is invalid. Nonnull token field is OpenAI-only. No mutation of startup config, environment, other providers or later calls.",
+    "own_request_downloads": "Omit only the three new top-level config fields. Existing prompts/images/extras/API mode and all seven authoritative result fields/full upstream dictionaries remain intact.",
+    "frontend_state": "Transient per-provider component drafts, password input and explicit clear; no persistent credential storage. Explicit Send/Generate actions only.",
+    "native_forwarding_and_CMake_unchanged": true
+  },
+  "functional_evidence": {
+    "native_distinct_passing_suites": 95,
+    "native_retained_parent_suites": 93,
+    "native_fresh_suites": 2,
+    "core_objects_retained": 218,
+    "core_sources_fresh": 0,
+    "affected_tools_rebuilt": [
+      "minera_server",
+      "minera_knowledge",
+      "minera_query",
+      "minera_cluster"
+    ],
+    "python_test_accounting": {
+      "passed_suites": 3,
+      "passed_tests": 32
+    },
+    "frontend_test_accounting": {
+      "total_tests": 9499,
+      "passed_tests": 9499,
+      "passed_files": 168
+    },
+    "frontend_fresh_full_suite": true,
+    "frontend_strict_build": true,
+    "api_cases": 24,
+    "api_provider_calls": 14,
+    "cli_cases": 8,
+    "cli_physical_attempts": 9,
+    "cli_provider_calls": 5,
+    "cli_runtime_completion_http_calls": 3,
+    "real_public_helper_posts": 4,
+    "helper_fetch_attempts": 5,
+    "helper_successes_retained": 2,
+    "helper_successes_fresh": 2,
+    "unforwarded_failed_fetch_attempts": 1,
+    "live_negative_validation_posts": 1,
+    "live_assets_exact": true,
+    "external_provider_calls": 0,
+    "browser_rendered_checks": 0
+  },
+  "retained_history": {
+    "after_service_preparation_failure": "Initial sanitized test-worker PATH omitted Git. Failure preceded native/runtime/provider launch and all functional requests; cleanup passed. Immutable successor adds literal Git path and retains the entire failed record.",
+    "cli_preparation_failure": "Initial CLI proof initialization duplicated the packet keyword; it failed before fixture creation or any CLI/provider/runtime invocation. The immutable successor preserves the failed-launch record and distinguishes controlled and CLI packet bindings.",
+    "cli_fixture_failure": "The study CSV fixture used a non-default case header, rejected by the existing native query importer before provider access. Retain three successful CLI cases and the failed fourth; correct only the fixture and execute the failed case plus unrun suffix.",
+    "helper_transport_failure": "Retain two successful helper calls and reports. A third fetch failed without a runtime/provider record. Execute only that failed call and the unrun suffix with controlled Connection: close transport; pooled keepalive expiry is an inference, not a confirmed product diagnosis.",
+    "successful_calls_replayed": 0
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "strict_promotion": false,
+  "full_parity_achieved": false,
+  "goal_complete": false,
+  "unrelated_preserved": 110,
+  "boundaries": [
+    "All228 incomplete strict units remain open across86 families/387 modules; availability extensions do not change strict statuses.",
+    "Public named api_key evidence exists for all3 providers and api_url for OpenAI. All-provider base URLs and token-field selection are own runtime extensions; full-endpoint semantics/arbitrary kwargs are not proven strict parity.",
+    "Provider-returned text/dictionaries remain authoritative even when they contain config-looking fields. Only application-added request metadata omits new call config.",
+    "Controlled synthetic providers prove transport and isolation. No real credential/provider availability or external provider behavior is claimed.",
+    "A fresh authorized browser action was rejected before navigation despite all settings being reported enabled. No rendered browser checks or workaround.",
+    "Inherited framework behavior, performance, cancellation after an upstream request has started, platform/provider requirements and the remaining strict catalogue gates remain separate."
+  ],
+  "breadth_audit": {
+    "source_selected_new": 18,
+    "directly_availability_assessed": 15,
+    "available": 13,
+    "concrete_label_splitting_gaps": 2,
+    "support_contracts_unresolved": 3,
+    "cumulative_source_selected": 78,
+    "never_source_selected": 150,
+    "strict_units": 228,
+    "strict_promotion": false
+  },
+  "next_work": "Independent original contextual label splitting with all8 native options, followed by SQL options/parameters and remaining source/support-contract breadth; complete strict behavior/browser/platform/performance gates afterwards.",
+  "helper": {
+    "path": "build/finalize-provider-call96-1.py",
+    "bytes": 15463,
+    "sha256": "ba3c71e1ce849d8d7124706b9e0c619a1954538074de664e4d995ac35a32c226"
+  }
+}
