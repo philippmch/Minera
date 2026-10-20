@@ -1,6 +1,7 @@
 #include "minera/exact_filter_discovery_json.hpp"
 #include "minera/case_description_workbench_json.hpp"
 #include "minera/reference_log_filter_workbench.hpp"
+#include "minera/ocel_exact_filter_controls.hpp"
 #include "case_relations_input.hpp"
 #include "case_relations_typed_input.hpp"
 // Local application server: serves the built frontend and mines uploaded
@@ -1694,6 +1695,8 @@ std::map<std::string, std::vector<std::string>> parse_ocel_filter_allowed(
   return result;
 }
 
+#include "ocel_exact_filter_route.hpp"
+
 void handle_ocel_filter(const httplib::Request& request,
                         httplib::Response& response) {
   try {
@@ -1701,7 +1704,8 @@ void handle_ocel_filter(const httplib::Request& request,
         "variant", "attribute_key", "attribute_values", "positive", "types",
         "ids", "event_ids", "from", "to", "object_type", "activity",
         "minimum_counts", "level", "object_id", "min_size", "max_size",
-        "allowed", "include_open_source"};
+        "allowed", "include_open_source", "attribute_values_json", "column_kind",
+        "timestamp_key", "from_json", "to_json", "minimum_counts_json"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key)) {
@@ -1713,7 +1717,9 @@ void handle_ocel_filter(const httplib::Request& request,
                                       : std::string("object_count"));
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
-    const auto source = minera::parse_ocel_json(body);
+    const bool exact_names=variant=="event_attribute_exact" ||
+        variant=="timestamp_exact" || variant=="object_count_exact";
+    const auto source = exact_names?minera::parse_ocel_json_literal_names(body):minera::parse_ocel_json(body);
     const bool positive = ocel_query_bool(request, "positive", true);
     const auto object_type = request.has_param("object_type")
                                  ? request.get_param_value("object_type")
@@ -1728,7 +1734,9 @@ void handle_ocel_filter(const httplib::Request& request,
     }
     minera::Ocel filtered;
     std::string canonical;
-    if (variant == "event_attribute") {
+    if (auto exact = dispatch_ocel_exact_filter(source,request,variant,positive)) {
+      filtered=std::move(exact->log);canonical=std::move(exact->variant);
+    } else if (variant == "event_attribute") {
       if (!request.has_param("attribute_key"))
         throw std::invalid_argument("event_attribute requires attribute_key");
       filtered = minera::filter_ocel_event_attribute(
@@ -1811,11 +1819,12 @@ void handle_ocel_filter(const httplib::Request& request,
     } else {
       throw std::invalid_argument("variant is not a supported OCEL filter");
     }
+    const auto output_json=[&](minera::OcelJsonFormat format){return exact_names?
+        minera::serialize_ocel_exact_filter_json(filtered,format):minera::serialize_ocel_json(filtered,format);};
     auto payload = std::string("{\"family\":\"OCEL_FILTER\",\"variant\":\"") +
-                   canonical + "\",\"log\":" + minera::serialize_ocel_json(filtered);
+                   canonical + "\",\"log\":" + output_json(minera::OcelJsonFormat::kClassic);
     if (ocel_query_bool(request, "include_open_source", false))
-      payload += ",\"open_log\":" + minera::serialize_ocel_json(
-          filtered, minera::OcelJsonFormat::kStandard);
+      payload += ",\"open_log\":" + output_json(minera::OcelJsonFormat::kStandard);
     response.set_content(payload + "}", "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

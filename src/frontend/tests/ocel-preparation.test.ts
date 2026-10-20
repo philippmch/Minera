@@ -13,8 +13,8 @@ const upload=new File(['{"ocel:events":{},"ocel:objects":{}}'],'source-東京.js
 const mock=(raw:string,ok=true)=>vi.fn(async(_url:string,_init:RequestInit)=>({ok,status:ok?200:400,text:async()=>raw}));
 afterEach(()=>vi.unstubAllGlobals());
 describe('native OCEL preparation workflows',()=>{
- it('exposes all fifteen filter selectors and preserves native default versus no enrichment graphs',()=>{
-  expect(OCEL_FILTERS).toHaveLength(15);expect(ocelEnrichmentQuery({})).toBe('');expect(ocelEnrichmentQuery({graphs:[]})).toBe('graphs=none');const form=defaultOcelEnrichment();expect(ocelPreparationEnrichmentQuery(form)).toBe('');form.mode='selected';for(const key of Object.keys(form.graphs) as (keyof typeof form.graphs)[])form.graphs[key]=false;form.lifecycle='false';expect(ocelPreparationEnrichmentQuery(form)).toBe('graphs=none&lifecycle_qualifiers=false');
+ it('exposes fifteen convenience and three exact filter selectors and preserves native default versus no enrichment graphs',()=>{
+  expect(OCEL_FILTERS).toHaveLength(18);expect(ocelEnrichmentQuery({})).toBe('');expect(ocelEnrichmentQuery({graphs:[]})).toBe('graphs=none');const form=defaultOcelEnrichment();expect(ocelPreparationEnrichmentQuery(form)).toBe('');form.mode='selected';for(const key of Object.keys(form.graphs) as (keyof typeof form.graphs)[])form.graphs[key]=false;form.lifecycle='false';expect(ocelPreparationEnrichmentQuery(form)).toBe('graphs=none&lifecycle_qualifiers=false');
  });
  it('transports exact typed scalar values, delimiters and int64 boundaries',()=>{
   expect(typedOcelFilterValues('[{"type":"integer","value":9223372036854775807},{"type":"integer","value":"-9223372036854775808"},{"type":"decimal","value":"1.0"},{"type":"string","value":"A,B:C;D|E\\\\東京"},{"type":"boolean","value":false},{"type":"null"}]')).toBe('i:9223372036854775807,i:-9223372036854775808,d:1.0,s:A\\,B\\:C\\;D\\|E\\\\東京,b:false,n:');

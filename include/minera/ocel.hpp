@@ -101,6 +101,10 @@ enum class OcelJsonFormat { kClassic, kStandard };
 
 Ocel parse_ocel_json(std::string_view json,
                      const OcelJsonLimits& limits = {});
+// Exact native filter inputs may use literal empty IDs, type names and
+// attribute names. The default interchange reader retains its validation.
+Ocel parse_ocel_json_literal_names(std::string_view json,
+                                  const OcelJsonLimits& limits = {});
 std::string serialize_ocel_json(const Ocel& log,
                                 OcelJsonFormat format = OcelJsonFormat::kClassic);
 

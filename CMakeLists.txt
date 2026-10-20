@@ -34,6 +34,7 @@ add_library(minera_core
   src/backend/log_segments_filter.cpp
   src/backend/log_boundary_filter.cpp
   src/backend/log_rework_filter.cpp
+  src/backend/ocel_exact_filter_controls.cpp
   src/backend/reference_log_filter_workbench.cpp
   src/backend/pripel_trace_distance.cpp
   src/backend/attribute_value_repetition.cpp
@@ -1870,6 +1871,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_ocel_event_attributes_module_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_event_attributes_module_tests COMMAND minera_ocel_event_attributes_module_tests)
 
+  add_executable(minera_ocel_exact_filter_controls_tests src/backend/tests/test_ocel_exact_filter_controls.cpp)
+  target_link_libraries(minera_ocel_exact_filter_controls_tests PRIVATE minera::core Threads::Threads)
+  target_include_directories(minera_ocel_exact_filter_controls_tests PRIVATE third_party)
+  target_compile_features(minera_ocel_exact_filter_controls_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_exact_filter_controls_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_exact_filter_controls_tests COMMAND minera_ocel_exact_filter_controls_tests)
 
   add_executable(minera_ocel_playout_tests
     src/backend/tests/test_ocel_playout.cpp
