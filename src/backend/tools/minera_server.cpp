@@ -10790,6 +10790,7 @@ int main(int argc, char** argv) {
   server.Get("/api/source-acquisition/capture",handle_acquired_capture);
   server.Get("/api/source-acquisition/table",handle_acquired_database_table);
   server.Get("/api/source-acquisition/export",handle_acquired_export);
+  server.Post("/api/source-acquisition/export",handle_acquired_export);
   server.Get("/api/source-acquisition/list",handle_acquired_list);
   server.Post("/api/source-acquisition/release",handle_acquired_release);
   server.Get("/api/stream-reader/snapshot",handle_reader_snapshot);
