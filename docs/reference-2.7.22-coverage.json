@@ -12550,8 +12550,48 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/temporal-description-parity-contract.md",
+      "artifacts": [
+        "include/minera/original_model_context.hpp",
+        "src/backend/original_model_context.cpp",
+        "src/backend/tests/test_original_model_context.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.tempprofile_to_descr",
+        "implementation": [
+          {
+            "path": "include/minera/original_model_context.hpp",
+            "symbol": "abstract_temporal_profile"
+          },
+          {
+            "path": "src/backend/original_model_context.cpp",
+            "symbol": "abstract_temporal_profile"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "temporal_public_byte_vectors"
+          },
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "temporal_numeric_environment"
+          },
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "public_templates_and_native_order"
+          },
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "unbounded_and_byte_models"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.connectors.anthropic",

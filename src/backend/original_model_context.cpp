@@ -1,13 +1,22 @@
 #include "minera/original_model_context.hpp"
 #include <algorithm>
-#include <iomanip>
-#include <sstream>
+#include <array>
+#include <charconv>
+#include <cmath>
 #include <stdexcept>
 #include <map>
 namespace minera { namespace {
 std::size_t characters(std::string_view text){return std::count_if(text.begin(),text.end(),[](unsigned char c){return (c&0xc0)!=0x80;});}
 LlmContextResult finish(std::string variant,std::string text){const auto count=characters(text);return {std::move(variant),std::move(text),count,false};}
-std::string fixed(double value){std::ostringstream out;out<<std::fixed<<std::setprecision(2)<<value;return out.str();}
+// The public description uses binary64 fixed-point, two decimals, nearest-even.
+// to_chars is locale independent and does not consult the process rounding mode.
+std::string fixed(double value){
+ if(std::isnan(value))return "nan"; // Python suppresses a NaN sign, including -NaN.
+ std::array<char,512> buffer{}; // All finite binary64 fixed-point values fit (<=313 bytes).
+ const auto result=std::to_chars(buffer.data(),buffer.data()+buffer.size(),value,std::chars_format::fixed,2);
+ if(result.ec!=std::errc{})throw std::runtime_error("temporal description number formatting failed");
+ return {buffer.data(),result.ptr};
+}
 // Python-style string representation for the observed string-label domain.
 // Invalid native bytes remain literal bytes; arbitrary Python non-string names,
 // Unicode printability classification and all quote edge cases are not proven.
@@ -32,6 +41,8 @@ LlmContextResult abstract_log_skeleton(const LogSkeletonModel& model,bool includ
 }
 LlmContextResult abstract_temporal_profile(const TemporalProfile& profile,bool include_header){
  std::string text=include_header?"\n\nThe temporal profile is a model describing the average and the standard deviation of the times between couples of activities eventually (not only directly) following each other in at least a process execution (so in a trace <A,B,C,D> the couples (A,B) (A,C) (A,D) (B,C) (B,D) (C,D) shall be considered). Given a positive value ZETA, a deviation occurs in a process execution when the time between two activities is lower than AVG - ZETA * STDEV or greater than AVG + ZETA * STDEV.\nFor this process, the model is:\n\n":"\n\n";
+ // The public empty model has only the leading/header newline, without an entry separator.
+ if(profile.entries.empty())text.pop_back();
  bool first=true;for(const auto& entry:profile.entries){if(!first)text+='\n';first=false;text+=entry.source+" -> "+entry.target+" :  AVG: "+fixed(entry.mean_seconds)+" s  STD: "+fixed(entry.standard_deviation_seconds)+" s";}
  return finish("temporal_profile",std::move(text));
 }
