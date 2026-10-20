@@ -1,3 +1,5 @@
+import {ExactLiteralInput,ExactFilterInspection} from "./OriginalLtlFilter";
+import {HEURISTIC_COMPLETE_EXAMPLE,EXACT_HEURISTIC_DFG_EXAMPLE,literalFilterEditor,filterEditorControl,cloneExactFilterFiles,OwnedExactFilterResult,type ExactFilterRun} from "../exact-filter-controls";
 import {miningSourceWorkbenchFields, type ActiveMiningSourceDescriptor} from "../active-mining-source";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,17 +19,23 @@ import { ModelGraph } from "./ModelGraph";
 const SHAPE_LABELS: Record<WorkflowInputShape, string> = {log: "Grouped log", stream: "Event stream", dataframe: "Dataframe", lazyframe: "Lazyframe", dfg: "Direct structured DFG", pandas_mutable: "Mutable Heuristics++ pandas table"};
 const FORMAT_LABELS: Record<WorkflowInputFormat, string> = {auto: "CSV / TSV / XES / gzip XES", table: "Typed EventTable JSON", dfg_json: "Structured DFG JSON"};
 export function WorkflowInputWorkspace({file: original = null, source = null}: {file?: File | null; source?: ActiveMiningSourceDescriptor | null}) {
+  const [pathsExact,setPathsExact] = useState(()=>literalFilterEditor("[]"));
+  const [fullExact,setFullExact]=useState(()=>literalFilterEditor(HEURISTIC_COMPLETE_EXAMPLE));
+  const [exactKind,setExactKind]=useState<"pairs"|"options">("pairs");
+  const exactEditor=exactKind==="options"?fullExact:pathsExact;
+  const [exactResult,setExactResult] = useState<ExactFilterRun|null>(null),[exactFailed,setExactFailed]=useState<ExactFilterRun|null>(null);
   const [input, setInput] = useState<File | null>(original), [form, setForm] = useState(defaultWorkflowInputForm);
   const [completed, setCompleted] = useState<WorkflowInputRun | null>(null), [failed, setFailed] = useState<WorkflowInputRun | null>(null);
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
+  const currentState=useRef({form,pathsExact,fullExact,exactKind,original,source});currentState.current={form,pathsExact,fullExact,exactKind,original,source};
   const controller = useRef<AbortController | null>(null), gate = useRef(new WorkflowInputRequestGate()), inputIdentity = useRef<File | null>(original);
   const cancel = () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null; setPending(false);};
-  const chooseInput = (value: File | null) => {cancel(); inputIdentity.current = value; setInput(value); setCompleted(null); setFailed(null); setError(null);};
+  const chooseInput = (value: File | null) => {cancel(); inputIdentity.current = value; setInput(value); setCompleted(null); setFailed(null); setExactResult(null);setExactFailed(null);setError(null);};
   const adoptSource = () => {chooseInput(original); if (source) {const mapped = miningSourceWorkbenchFields(source, {case_id_key: ["alpha_case_id_attribute", "heuristic_case_id_attribute"], activity_key: ["alpha_activity_attribute", "heuristic_activity_attribute"], timestamp_key: ["alpha_timestamp_attribute", "heuristic_timestamp_attribute"]}); setForm(current => ({...current, format: source.format, shape: source.shape, fields: {...current.fields, ...mapped.fields}, explicitEmptySelectors: {...current.explicitEmptySelectors, ...mapped.explicitEmptySelectors}, importFields: mapped.importFields}));}};
   useEffect(() => {adoptSource();}, [original, source]);
   useEffect(() => () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null;}, []);
-  const field = (key: string, value: string) => setForm(current => ({...current, fields: {...current.fields, [key]: value}}));
-  const importField = (key: string, value: string) => setForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));
+  const field = (key: string, value: string) => {cancel();setForm(current => ({...current, fields: {...current.fields, [key]: value}}));};
+  const importField = (key: string, value: string) => {cancel();setForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));};
   const family = (value: WorkflowInputFamily) => setForm(current => ({...current, family: value, ...(current.shape === "pandas_mutable" && value === "alpha" ? {shape: "dataframe" as const} : {})}));
   const shape = (value: WorkflowInputShape) => setForm(current => ({...current, shape: value,
     ...(value === "dfg" ? {format: "dfg_json" as const, alphaVariant: "classic" as const, heuristicVariant: "classic" as const} : current.format === "dfg_json" ? {format: "table" as const} : {}),
@@ -36,29 +44,31 @@ export function WorkflowInputWorkspace({file: original = null, source = null}: {
   const format = (value: WorkflowInputFormat) => setForm(current => ({...current, format: value,
     ...(value === "dfg_json" ? {shape: "dfg" as const, alphaVariant: "classic" as const, heuristicVariant: "classic" as const} : current.shape === "dfg" ? {shape: "dataframe" as const} : {}),
   }));
+  useEffect(()=>{cancel();},[form,pathsExact,fullExact,exactKind]);
   const execute = async () => {
     if (!input) return;
-    cancel(); const active = new AbortController(), ticket = gate.current.issue(), selected = input, snapshot = structuredClone(form);
+    cancel(); const active = new AbortController(), ticket = gate.current.issue(), selected = input, selectedState=currentState.current, snapshot = {...structuredClone(form),exact:form.exact?cloneExactFilterFiles(form.exact):undefined};
+    if (snapshot.family === "heuristic" && exactEditor.mode !== "omitted") {snapshot.exact = filterEditorControl(exactEditor,exactKind==="options"?"heuristic_options":"heuristic_most_common_paths");if(exactKind==="options"){snapshot.fields={};snapshot.explicitEmptySelectors={};}else delete snapshot.fields.heuristic_most_common_paths;}
     controller.current = active; setPending(true); setError(null);
-    const accepts = () => inputIdentity.current === selected && controller.current === active && gate.current.accepts(ticket, active.signal);
+    const accepts = () => inputIdentity.current === selected && controller.current === active && Object.entries(selectedState).every(([k,v])=>(currentState.current as Record<string,unknown>)[k]===v) && gate.current.accepts(ticket, active.signal);
     try {
       const result = await runWorkflowInput(selected, snapshot, active.signal);
       if (accepts()) {
-        if (result.value.computed) {setCompleted(result); setFailed(null);} else {setFailed(result); setError(`${result.value.error!.type}: ${result.value.error!.message}`);}
+        if (result.value.computed) {setExactResult(result.exact??null);setExactFailed(null);setCompleted(result); setFailed(null);} else {if(result.exact)setExactFailed(result.exact);setFailed(result); setError(`${result.value.error!.type}: ${result.value.error!.message}`);}
       }
-    } catch (cause) {if (accepts()) setError(cause instanceof Error ? cause.message : String(cause));}
+    } catch (cause) {if (accepts()) {if(cause instanceof OwnedExactFilterResult){if(cause.run.http_status>=400)setExactFailed(cause.run);else {setExactResult(cause.run);setExactFailed(null);}}setError(cause instanceof Error ? cause.message : String(cause));}}
     finally {if (controller.current === active) {controller.current = null; setPending(false);}}
   };
   const isXes = /\.(?:xes|xes\.gz|gz)$/i.test(input?.name ?? "");
   const controls = WORKFLOW_INPUT_CONTROLS[form.family].filter(control => workflowInputControlActive(control, form));
   const download = (text: string, name: string) => downloadQueryBlob(new Blob([workflowInputNativeBytes(text)], {type: "application/json"}), name);
   return <>
-    <section className="panel" aria-label="Independent workflow input discovery">
+    <section className="panel" aria-label="Independent workflow input discovery" onChangeCapture={cancel}>
       <div className="panel-head"><h2>Discover a workflow from original inputs</h2><span className="panel-meta">Independent Alpha and Heuristic discovery</span></div>
       <p>Upload an original log, a typed event table or a structured DFG. Choose the native input path, then inspect its complete model, table state and exports.</p>
       <fieldset className="query-fields" disabled={pending}>
         <div className="query-options">
-          <label className="filters-field"><span>Independent discovery input file</span><input type="file" accept={form.format === "auto" ? ".csv,.tsv,.xes,.xes.gz,.gz,text/csv,application/xml,application/gzip" : ".json,application/json"} onChange={event => chooseInput(event.target.files?.[0] ?? null)} /><span>{input?.name ?? "Choose an original input file"}</span></label>
+          <label className="filters-field"><span>Independent discovery input file</span><input type="file" accept={form.format === "auto" ? ".csv,.tsv,.xes,.xes.gz,.gz,text/csv,application/xml,application/gzip" : ".json,application/json"} onChange={event => {const file=event.target.files?.[0]??null;event.target.value="";chooseInput(file);setExactResult(null);}} /><span>{input?.name ?? "Choose an original input file"}</span></label>
           <label className="filters-field"><span>Independent discovery family</span><select value={form.family} onChange={event => family(event.target.value as WorkflowInputFamily)}><option value="alpha">Alpha</option><option value="heuristic">Heuristic</option></select></label>
           <label className="filters-field"><span>Independent discovery variant</span><select value={form.family === "alpha" ? form.alphaVariant : form.heuristicVariant} disabled={form.shape === "dfg" || form.shape === "pandas_mutable"} onChange={event => setForm(current => current.family === "alpha" ? {...current, alphaVariant: event.target.value as WorkflowInputForm["alphaVariant"]} : {...current, heuristicVariant: event.target.value as WorkflowInputForm["heuristicVariant"]})}>
             <option value="classic">Classic</option><option value={form.family === "alpha" ? "plus" : "plusplus"}>{form.family === "alpha" ? "Alpha+" : "Heuristics++"}</option>
@@ -88,9 +98,12 @@ export function WorkflowInputWorkspace({file: original = null, source = null}: {
         <p>Blank controls use native defaults. Numeric and JSON text is submitted as entered. For a literal empty selector, choose its explicit-empty option. Completed results retain their original input file and options.</p>
         <button className="btn-open" disabled={!input} onClick={() => void execute()}>Discover independent workflow</button>
       </fieldset>
+      {form.family==="heuristic"&&<><label className="filters-field"><span>Independent exact Heuristic container</span><select value={exactKind} onChange={e=>{cancel();setExactKind(e.target.value as "pairs"|"options");}}><option value="pairs">Literal protected path pairs</option><option value="options">All 24 native options</option></select></label><ExactLiteralInput label={exactKind==="options"?"Independent complete 24-field Heuristic options":"Independent Heuristic literal protected path pairs"} value={exactEditor} onChange={value=>{cancel();(exactKind==="options"?setFullExact:setPathsExact)(value);}}/>{exactKind==="options"&&exactEditor.mode!=="omitted"&&<p>Full native options supply the Heuristic variant and every setting. The scalar discovery settings remain local; import columns still describe the uploaded source.</p>}<details><summary>Complete byte-safe original Heuristic DFG constructor</summary><p>With any exact Heuristic control, dfg_json accepts all 14 native members. Entry arrays preserve arbitrary byte keys; raw original files, optional fields, variant payloads and errors remain available.</p><pre>{EXACT_HEURISTIC_DFG_EXAMPLE}</pre><button className="btn-ghost" onClick={()=>download(EXACT_HEURISTIC_DFG_EXAMPLE,"minera-complete-heuristic-dfg.json")}>Download full native Heuristic DFG example</button></details></>}
       {pending && <p role="status">Discovering independent workflow… <button className="btn-ghost" onClick={cancel}>Cancel independent discovery request</button></p>}
       {error && <p className="error-banner" role="alert">{error}</p>}
     </section>
+    {exactFailed&&<ExactFilterInspection key={exactFailed.raw} run={exactFailed} title="Failed exact original workflow diagnostics"/>}
+    {exactResult&&<ExactFilterInspection key={exactResult.raw} run={exactResult} title="Complete exact original workflow inspection"/>}
     {failed && <WorkflowInputInspection key={failed.raw + ":" + failed.input_sha256} run={failed} failed />}
     {completed && <WorkflowInputInspection key={completed.raw + ":" + completed.input_sha256} run={completed} />}
   </>;

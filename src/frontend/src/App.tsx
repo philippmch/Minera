@@ -1,3 +1,5 @@
+import {OwnedExactFilterResult,exactFilterRun,clearExactFilterControls,hasFullHeuristic,clearLegacyHeuristicOptions,type ExactFilterRun} from "./exact-filter-controls";
+import {ExactFilterInspection} from "./components/OriginalLtlFilter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Alignments,
@@ -144,6 +146,9 @@ import {
 } from "./app-logic";
 
 export default function App() {
+  const [exactInspection,setExactInspection] = useState<ExactFilterRun|null>(null);
+  const [ownedExactInspection,setOwnedExactInspection] = useState(false);
+  const [previousExactSuccess,setPreviousExactSuccess] = useState<ExactFilterRun|null>(null);
   const [data, setData] = useState<MineraExport | null>(null);
   const [ocelResult, setOcelResult] = useState<OcelDiscoveryResult | null>(null);
   const [showOcelIo, setShowOcelIo] = useState(false);
@@ -238,7 +243,7 @@ export default function App() {
   const sourceAvailable = source !== null && liveSourceId === source.source_id;
   const clearSourceCaches = () => {cacheGeneration.current += 1; alignCache.current = {}; decideCache.current = {}; dfgCache.current = {}; editCache.current = {}; processTreeCache.current = {}; decomposedCache.current = {}; petriAntiCache.current = {}; petriMultiCache.current = {}; reductionCache.current = {}; evaluationCache.current = {}; petriAnalysisCache.current = {}; emdCache.current = {}; conceptDriftCache.current = {};};
   const cancelSourceLoad = () => {sourceGate.current.invalidate(); const previous = sourceRequest.current; sourceRequest.current = null; previous?.controller.abort(); if (previous?.posted) cancelMiningRequest(previous.request_id); ocelRequest.current?.abort(); ocelRequest.current = null; setMining(false);};
-  const beginSourceLoad = () => {cancelSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false}; setMining(true); setError(null); return {ticket, controller};};
+  const beginSourceLoad = () => {setOwnedExactInspection(false);cancelSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false}; setMining(true); setError(null); return {ticket, controller};};
   useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
 
   useEffect(() => {
@@ -517,6 +522,7 @@ export default function App() {
         sourceRequest.current!.posted = true;
         const result = await mineActiveDataset(file, options, controller.signal);
         if (!accepts()) return;
+        setExactInspection(exactFilterRun(result) ?? null); setOwnedExactInspection(false); if(exactFilterRun(result))setPreviousExactSuccess(exactFilterRun(result)!);
         const descriptor = miningSourceDescriptor(file, sha256, options, result), analysis = activeDatasetAnalysis(result);
         liveSource.current = descriptor.source_id;
         setLiveSourceId(descriptor.source_id);
@@ -538,7 +544,7 @@ export default function App() {
         if (analysis) openData(analysis); else {setData(null); setOcelResult(null); setOcelFile(null); setOcelDataset(null); setShowActiveSource(true); setError(null);}
     })()
       .catch((cause: Error) => {
-        if (accepts()) {setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setShowActiveSource(true);}
+        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setShowActiveSource(true);}
       })
       .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; ocelRequest.current = null; setMining(false);}});
   };
@@ -560,11 +566,12 @@ export default function App() {
   // keeping the active tab. Always mines from source.file so nothing compounds.
   const applyFilters = (filters: FilterOptions & MinerOptions) => {
     if (!source) return;
-    const original = source, {ticket, controller} = beginSourceLoad(), options: MineOptions = {...original.options, ...filters, miningRequestId: ticket.request_id};
+    const original = source, {ticket, controller} = beginSourceLoad(), options: MineOptions = {...(hasFullHeuristic(filters)?clearLegacyHeuristicOptions(clearExactFilterControls(original.options)):clearExactFilterControls(original.options)), ...filters, miningRequestId: ticket.request_id};
     sourceRequest.current!.posted = true;
     mineActiveDataset(original.file, options, controller.signal)
       .then((result) => {
         if (!sourceGate.current.accepts(ticket, controller.signal) || sourceRequest.current?.controller !== controller) return;
+        setExactInspection(exactFilterRun(result) ?? null); setOwnedExactInspection(false); if(exactFilterRun(result))setPreviousExactSuccess(exactFilterRun(result)!);
         const descriptor = miningSourceDescriptor(original.file, original.sha256, options, result), analysis = activeDatasetAnalysis(result);
         liveSource.current = descriptor.source_id; setLiveSourceId(descriptor.source_id);
         setSource({...original, ...descriptor}); setSourceOutcome(isActiveSourceMining(result) ? result : null);
@@ -589,7 +596,7 @@ export default function App() {
         setThreshold(1);
         setError(null);
       })
-      .catch((cause: Error) => {if (sourceGate.current.accepts(ticket, controller.signal)) setError(`Could not filter ${original.file.name}: ${cause.message}`);})
+      .catch((cause: Error) => {if (sourceGate.current.accepts(ticket, controller.signal)) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} setError(`Could not filter ${original.file.name}: ${cause.message}`);}})
       .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; setMining(false);}});
   };
 
@@ -716,6 +723,7 @@ export default function App() {
   if (showTreeAlignment) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Tree alignment inputs'} datasetKind="independent process-tree alignment" onOpenFile={loadFile} onHome={()=>setShowTreeAlignment(false)}/><main className="layout-log process-tree-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowTreeAlignment(false)}>Return to current workspace</button><ProcessTreeAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
   if (showInductiveInputs) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Inductive inputs'} datasetKind="independent Inductive discovery" onOpenFile={loadFile} onHome={()=>setShowInductiveInputs(false)}/><main className="layout-log inductive-input-workspace"><button className="btn-ghost" onClick={()=>setShowInductiveInputs(false)}>Return to current workspace</button><InductiveInputWorkspace file={source?.file??null} source={source}/></main></>;
   if (showGraphAlignment) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Graph alignment inputs'} datasetKind="independent graph alignment" onOpenFile={loadFile} onHome={()=>setShowGraphAlignment(false)}/><main className="layout-log graph-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowGraphAlignment(false)}>Return to current workspace</button><GraphAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
+  if (exactInspection && ownedExactInspection) return <><TopBar dataset="Exact native operation" datasetKind="complete native result and diagnostics" onOpenFile={loadFile} onHome={()=>setOwnedExactInspection(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setOwnedExactInspection(false)}>Return to current workspace</button><ExactFilterInspection run={exactInspection}/>{previousExactSuccess&&previousExactSuccess!==exactInspection&&<details><summary>Earlier returned exact native result</summary><ExactFilterInspection run={previousExactSuccess}/></details>}</main></>;
   if (showWorkflowInputs) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Workflow inputs'} datasetKind="independent workflow discovery" onOpenFile={loadFile} onHome={()=>setShowWorkflowInputs(false)}/><main className="layout-log workflow-input-workspace"><button className="btn-ghost" onClick={()=>setShowWorkflowInputs(false)}>Return to current workspace</button><WorkflowInputWorkspace file={source?.file??null} source={source}/></main></>;
   if (showPetriAlignment) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Alignment inputs'} datasetKind="Petri alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAlignment(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowPetriAlignment(false)}>Return to current workspace</button><PetriAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
   if (showTokenReplay) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Replay inputs'} datasetKind="token replay" onOpenFile={loadFile} onHome={()=>setShowTokenReplay(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTokenReplay(false)}>Return to current workspace</button><TokenReplayWorkspace file={source?.file??null} source={source}/></main></>;
@@ -728,7 +736,7 @@ export default function App() {
   if (showStreaming) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} sourceFormat={source?.format} busy={mining} data={data??undefined} onOpen={loadFile}/></main></>;
   if (showRelatedLogs) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/><main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} sourceFormat={source?.format} available={sourceAvailable} mining={mining} dataset={data?.dataset??source?.file.name} onOpen={loadFile}/></main></>;
 
-  if (showActiveSource || (!data && source)) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={source?.file.name??pendingSourceFile?.name??"Original native source"} datasetKind="native event source" onOpenFile={loadFile} onHome={()=>{if(data||ocelResult)setShowActiveSource(false);else{cancelSourceLoad();liveSource.current=null;setLiveSourceId(null);setSource(null);setSourceOutcome(null);setPendingSourceFile(null);setShowActiveSource(false);setError(null);}}} onWorkflowInputs={()=>setShowWorkflowInputs(true)} onGraphAlignment={()=>setShowGraphAlignment(true)} onInductiveInputs={()=>setShowInductiveInputs(true)} onTreeAlignment={()=>setShowTreeAlignment(true)} onPetriAntiMulti={()=>setShowPetriAntiMulti(true)} onTokenReplay={()=>setShowTokenReplay(true)} onPetriAlignment={()=>setShowPetriAlignment(true)} onModelConversion={()=>setShowModelConversion(true)} onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)} onOriginalFootprints={()=>setShowOriginalFootprints(true)} onOriginalGeneticMatrix={()=>setShowOriginalGeneticMatrix(true)} onOriginalEmbeddingFilter={()=>setShowOriginalEmbeddingFilter(true)} onOriginalEmd={()=>setShowOriginalEmd(true)} onOriginalEditDistance={()=>setShowOriginalEditDistance(true)} onOriginalBose={()=>setShowOriginalBose(true)} onOriginalDiscovery={()=>setShowOriginalDiscovery(true)} onOriginalPetriAnalysis={()=>setShowOriginalPetriAnalysis(true)} onOriginalRootCause={()=>setShowOriginalRootCause(true)} onOriginalAnonymization={()=>setShowOriginalAnonymization(true)} onOriginalQuality={()=>setShowOriginalQuality(true)} onOriginalClustering={()=>setShowOriginalClustering(true)} onOriginalOrganizational={()=>setShowOriginalOrganizational(true)} onOriginalTemporal={()=>setShowOriginalTemporal(true)} onOriginalTiming={()=>setShowOriginalTiming(true)} onOriginalTimeAnalysis={()=>setShowOriginalTimeAnalysis(true)} onOriginalOcPlayout={()=>setShowOriginalOcPlayout(true)}/><main className="layout-log active-mining-source-workspace">{(data||ocelResult)&&<button className="btn-ghost" onClick={()=>setShowActiveSource(false)}>Return to current workspace</button>}{error&&<div className="error-banner" role="alert">{error}</div>}<ActiveMiningSource source={source} initialFile={pendingSourceFile} data={data} outcome={sourceOutcome} available={sourceAvailable} mining={mining} onOpen={(file,options)=>{loadFile(file,undefined,undefined,options);setShowActiveSource(true);}} onCancel={cancelSourceLoad}/>{source&&<QueryWorkspace key={cacheGeneration.current} sourceId={source.source_id} dataset={source.file.name} sourceOptions={{miningInputShape:source.shape,miningSelectors:source.selectors}} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)}/>}</main></>;
+  if (showActiveSource || (!data && source)) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={source?.file.name??pendingSourceFile?.name??"Original native source"} datasetKind="native event source" onOpenFile={loadFile} onHome={()=>{if(data||ocelResult)setShowActiveSource(false);else{cancelSourceLoad();liveSource.current=null;setLiveSourceId(null);setSource(null);setSourceOutcome(null);setPendingSourceFile(null);setShowActiveSource(false);setError(null);}}} onWorkflowInputs={()=>setShowWorkflowInputs(true)} onGraphAlignment={()=>setShowGraphAlignment(true)} onInductiveInputs={()=>setShowInductiveInputs(true)} onTreeAlignment={()=>setShowTreeAlignment(true)} onPetriAntiMulti={()=>setShowPetriAntiMulti(true)} onTokenReplay={()=>setShowTokenReplay(true)} onPetriAlignment={()=>setShowPetriAlignment(true)} onModelConversion={()=>setShowModelConversion(true)} onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)} onOriginalFootprints={()=>setShowOriginalFootprints(true)} onOriginalGeneticMatrix={()=>setShowOriginalGeneticMatrix(true)} onOriginalEmbeddingFilter={()=>setShowOriginalEmbeddingFilter(true)} onOriginalEmd={()=>setShowOriginalEmd(true)} onOriginalEditDistance={()=>setShowOriginalEditDistance(true)} onOriginalBose={()=>setShowOriginalBose(true)} onOriginalDiscovery={()=>setShowOriginalDiscovery(true)} onOriginalPetriAnalysis={()=>setShowOriginalPetriAnalysis(true)} onOriginalRootCause={()=>setShowOriginalRootCause(true)} onOriginalAnonymization={()=>setShowOriginalAnonymization(true)} onOriginalQuality={()=>setShowOriginalQuality(true)} onOriginalClustering={()=>setShowOriginalClustering(true)} onOriginalOrganizational={()=>setShowOriginalOrganizational(true)} onOriginalTemporal={()=>setShowOriginalTemporal(true)} onOriginalTiming={()=>setShowOriginalTiming(true)} onOriginalTimeAnalysis={()=>setShowOriginalTimeAnalysis(true)} onOriginalOcPlayout={()=>setShowOriginalOcPlayout(true)}/><main className="layout-log active-mining-source-workspace">{(data||ocelResult)&&<button className="btn-ghost" onClick={()=>setShowActiveSource(false)}>Return to current workspace</button>}{error&&<div className="error-banner" role="alert">{error}</div>}{exactInspection&&<details><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}<ActiveMiningSource source={source} initialFile={pendingSourceFile} data={data} outcome={sourceOutcome} available={sourceAvailable} mining={mining} onOpen={(file,options)=>{loadFile(file,undefined,undefined,options);setShowActiveSource(true);}} onCancel={cancelSourceLoad}/>{source&&<QueryWorkspace key={cacheGeneration.current} sourceId={source.source_id} dataset={source.file.name} sourceOptions={{miningInputShape:source.shape,miningSelectors:source.selectors}} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)}/>}</main></>;
 
   if (!data && ocelResult) {
     return (
@@ -921,6 +929,7 @@ export default function App() {
       </nav>
       <Kpis data={data} />
       {tab!=="llm"&&tab!=="query"&&tab!=="embeddings"&&tab!=="anonymization"&&<VisualizationExplain key={cacheGeneration.current+":"+tab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");}} />}
+      {exactInspection&&<details><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}
       {source && (
         <Filters
           key={source.file.name}
@@ -932,6 +941,7 @@ export default function App() {
           active={filtersActive}
           mining={mining}
           onApply={applyFilters}
+          onExactEdit={cancelSourceLoad}
         />
       )}
       {tab === "log" && (

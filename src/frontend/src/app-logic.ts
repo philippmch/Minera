@@ -1,3 +1,4 @@
+import {hasExactFilters} from "./exact-filter-controls";
 import { type FilterOptions, type MinerOptions } from "./api";
 import { type MineraExport } from "./types";
 import {
@@ -23,6 +24,7 @@ export function initialTab(data: MineraExport): Tab {
  * heuristic settings, so for those only absence means default.
  */
 export function hasActiveMinerOptions(options: MinerOptions): boolean {
+  if (hasExactFilters(options)) return true;
   const allLogSkeletonConstraints = [
     "equivalence",
     "always_after",
@@ -202,6 +204,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
 
 /** Whether any filter constraint is set; drives the "filtered" badge. */
 export function hasActiveFilters(filters: FilterOptions): boolean {
+  if (hasExactFilters(filters)) return true;
   return Boolean(
     filters.topVariants ||
       filters.minVariantFrequency ||

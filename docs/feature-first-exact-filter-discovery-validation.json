@@ -1,0 +1,2349 @@
+{
+  "complete": true,
+  "feature": 93,
+  "features_delivered": 93,
+  "parent_head": "dd3126c9e5d970c298c8385eff8fc1d9007eaa36",
+  "feature_baseline_head": "94051e948c0e8b112be6b3adc6d6f841cdbcf3de",
+  "baseline": {
+    "path": "build/feature93-baseline.json",
+    "bytes": 2828362,
+    "sha256": "1762f4a7a3433cca4718d2800ed904a537f2d5b10742b599b6512151a2057765"
+  },
+  "previous_delivery_report": {
+    "path": "docs/feature-first-original-model-context-validation.json",
+    "bytes": 821088,
+    "sha256": "6051fe35c17d2f1da48271dcd1e52afc526d59bd3e6e39c1e8d8b4a523a2d007"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature93-status-9f891a9b782a4bf0b98994b788646c1f/build-manifest.json",
+      "bytes": 13841767,
+      "sha256": "e6ef95bb9106b9d058dbd50e1b19a4cd191da5bf1e6d99826a801d068a71593a"
+    },
+    "api": {
+      "path": "build/feature93-api-recovery-actual-1/validation.json",
+      "bytes": 427198,
+      "sha256": "0a821019ddd230e09828a596a4e3df19accb6477f70a2734c1d5c8c26fbd39f2"
+    },
+    "frontend": {
+      "path": "build/exact-filter-discovery93-frontend-d6d03e2b685b4aafa00790646c5602f0/validation.json",
+      "bytes": 2761166,
+      "sha256": "9caf31640a688a7138904a4017a3a63b4d0b64fe2d0252670db56874f9b2646d"
+    },
+    "old_native_oracle": {
+      "path": "build/feature93-old-native-oracle-actual-2/validation.json",
+      "bytes": 26504,
+      "sha256": "e0f7a3afed042754499c9ab71d91cba592a6e2ad3c3829d12e78370469b40cc3"
+    },
+    "kernel_retention": {
+      "path": "build/exact-filter-discovery93-kernel-retention-final-validation.json",
+      "bytes": 3472,
+      "sha256": "3878b493edea3441660fc50d9fd4cffecaeb4e1a20dfe1fee276505d62ef02f6"
+    },
+    "cli": {
+      "path": "build/exact-filter-discovery93-cli-final-validation.json",
+      "bytes": 184592,
+      "sha256": "5e14f7022a29358d067f9622f331004dfd1553f0dacb047ecdd284247e50977d"
+    },
+    "source_review": {
+      "path": "build/feature93-final-source-review-prepared-4/review.json",
+      "bytes": 30177,
+      "sha256": "8a8e9fc6bc45b0ed062f64d67a6e8eda84192b4066e766d342727e9a5e5c353b"
+    },
+    "recovery_review": {
+      "path": "build/feature93-recovery-review-accepted.json",
+      "bytes": 1095,
+      "sha256": "3a1d7cb0be4b167fa5d1ea2ccb4f4cfcf5d26a023dfc1ea744a503a5d2633f2b"
+    },
+    "status_build_review": {
+      "path": "build/feature93-status-builder-source-review-2.json",
+      "bytes": 6390900,
+      "sha256": "e350ad577f3ff3754c19d0b0bc51a3bb7960a3e64097e37395e3f4f04c479ca5"
+    },
+    "file_bridge": {
+      "path": "build/feature93-client-recovery-actual-2/validation.json",
+      "bytes": 114085,
+      "sha256": "67f309aea8f83fc7fbff2b41ee6348a7ba822de1fbc51e21531d08ab83e96e23"
+    },
+    "cached_stream_oracle": {
+      "path": "build/feature93-cached-stream-old-oracle-actual-1/validation.json",
+      "bytes": 7697,
+      "sha256": "052bc299765f92fbfca89ca23d866cfbe7354376bb23d039ed49b7c3a91b38d8"
+    },
+    "backend": {
+      "path": "build/exact-filter-discovery-feature93-backend-postcommit.json",
+      "bytes": 8215,
+      "sha256": "247773ca9429c144936f1a76ace045dd540d1518c5986750d7e45d578126fa41"
+    },
+    "live": {
+      "path": "build/exact-filter-discovery-feature93-live-runtime.json",
+      "bytes": 12616,
+      "sha256": "45b9c477d666e517b4c6af4f4d241c83f27532e48ab4231e63d5a96d3617bb1e"
+    },
+    "cleanup": {
+      "path": "build/exact-filter-discovery-feature93-test-cleanup.json",
+      "bytes": 4882,
+      "sha256": "d1a66c97d8796b536fcab26e9dcf6e1f9d5401fb0088bca4cb6bc7bf57c596f5"
+    }
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_API_cases": 60,
+    "dedicated_API_corpus_HTTP_calls": 61,
+    "CLI_invocations": 20,
+    "client_bridge_HTTP_calls": 6,
+    "selected_client_bridge_successes": 4,
+    "client_new_HTTP_requests": 2,
+    "client_retained_successful_prefix": 2,
+    "historical_failed_client_requests": 2,
+    "product_fix_client_guard_reruns": 1,
+    "corrected_invalid_cached_selector_requests": 1,
+    "successful_client_requests_replayed": 0,
+    "actual_File_handoffs": 4,
+    "actual_original_Files": 7,
+    "client_downloads": 42,
+    "direct_client_artifacts": 23,
+    "live_smoke_HTTP_calls": 2,
+    "newruntime_HTTP_calls": 69,
+    "beforechange_historical_HTTP_calls": 2,
+    "historical_failed_API_requests": 1,
+    "product_fix_API_regression_reruns": 1,
+    "successful_API_requests_replayed": 0,
+    "CLI_retained_prefix": 17,
+    "CLI_new_suffix": 3,
+    "direct_OLD_native_oracle_cases": 21,
+    "retained_original_OLD_native_oracle_cases": 20,
+    "additional_cached_stream_OLD_oracle_cases": 1,
+    "retained_OLD_oracle_cases_replayed": 0,
+    "new_public_reference_calls": 0,
+    "frontend_tests": 9393,
+    "frontend_files": 162,
+    "native_contributing_suites": 89,
+    "native_parent_retained": 85,
+    "native_freshly_executed_suites": 4,
+    "native_new_suite_targets": 3,
+    "native_refreshed_parent_targets": 1,
+    "native_reused_core_objects": 215,
+    "native_fresh_core_objects": 2,
+    "native_total_core_objects": 217,
+    "native_owned_paths": 11,
+    "frontend_owned_paths": 13,
+    "provider_calls": 0,
+    "feature93_browser_attempts": 1,
+    "completed_browser_checks": 0,
+    "total_HTTP_including_beforechange": 71
+  },
+  "summary": "Feature 93 adds exact ordered LTL values and all seven options for original EventLog filtering, plus exact Heuristics protected pairs and all 24 options. Original DFG inputs retain all 14 fields; native HeuristicsNet results retain all 35 fields and separate export errors. Validation passed 60 selected API cases across 61 requests, 20 CLI invocations, four public-client successes across six requests preserving seven original Files, two live checks, and 9393 frontend tests. Two real defects were fixed: mining status metadata and the client guard for an existing EventStream carrier. Both product failures were rerun once; successful outcomes were retained. A separate invalid cached-selector input was corrected without replaying either successful client outcome. An additional cached-stream oracle supplements 20 retained native cases. Native evidence covers 89 passing suites (85 retained plus four fresh executions) and 217 core objects. Functional evidence totals 69 POSTs, or 71 including two before-change observations. Strict parity remains unfinished: 228 catalogue units are incomplete. Browser access was rejected by tool policy despite user-enabled settings, so zero rendered UI checks completed.",
+  "native_test_accounting": {
+    "aggregate_current_passing_test_suites": 89,
+    "retained_parent_passing_test_suites": 85,
+    "current_attempt_executed_test_suites": 0
+  },
+  "native_execution_accounting": {
+    "current_attempt_compiled_core_sources": 0,
+    "retained_prefix_compiled_core_sources": 2,
+    "current_attempt_compiled_server_sources": 1,
+    "retained_prefix_compiled_server_sources": 1,
+    "refreshed_parent_targets": [
+      "minera_request_params_tests"
+    ],
+    "new_suite_targets": [
+      "minera_exact_filter_discovery_json_tests",
+      "minera_heuristic_variants_tests",
+      "minera_ltl_filter_tests"
+    ],
+    "no_full_parent_suite_replay": true,
+    "original_no_parent_suite_replay_label_too_broad": true,
+    "clarification": "The actual build manifest retains an overbroad no_parent_suite_replay label. Exactly request_params was refreshed; 85 other parent suites were retained and three targets were newly added. No complete parent suite replay occurred."
+  },
+  "frontend_test_accounting": {
+    "total_tests": 9393,
+    "passed_tests": 9393,
+    "passed_files": 162
+  },
+  "frontend_execution_accounting": {
+    "fresh_strict_build": true,
+    "fresh_full_suite": true,
+    "candidate": {
+      "path": "build/feature93-frontend-candidate-2/manifest.json",
+      "bytes": 17105,
+      "sha256": "b3cdfa9b13153d94bb18a3c91c2af9134f7360c499326711e8303c639aa0242f"
+    },
+    "steps": [
+      {
+        "name": "frontend-build",
+        "argv": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+          "run",
+          "build",
+          "--",
+          "--config",
+          "C:\\Users\\pmoch\\Documents\\Minera\\build\\exact-filter-discovery93-frontend-d6d03e2b685b4aafa00790646c5602f0\\vite.config.mjs",
+          "--configLoader",
+          "native",
+          "--outDir",
+          "C:\\Users\\pmoch\\Documents\\Minera\\build\\exact-filter-discovery93-frontend-d6d03e2b685b4aafa00790646c5602f0\\dist"
+        ],
+        "pid": 41872,
+        "exit_code": 0,
+        "elapsed_seconds": 20.46900000000096,
+        "log": {
+          "path": "build/exact-filter-discovery93-frontend-d6d03e2b685b4aafa00790646c5602f0/frontend-build.log",
+          "bytes": 8792,
+          "sha256": "63f0dd544cb0ebd33e23b49997b384b22df30aaec097204b6868c5c564c11855"
+        }
+      },
+      {
+        "name": "frontend-test",
+        "argv": [
+          "C:/Program Files/nodejs/node.exe",
+          "C:\\Users\\pmoch\\Documents\\Minera\\src\\frontend\\node_modules\\vitest\\vitest.mjs",
+          "run",
+          "--config",
+          "C:\\Users\\pmoch\\Documents\\Minera\\build\\exact-filter-discovery93-frontend-d6d03e2b685b4aafa00790646c5602f0\\vitest.config.mjs",
+          "--configLoader",
+          "native"
+        ],
+        "pid": 10936,
+        "exit_code": 0,
+        "elapsed_seconds": 112.76599999999962,
+        "log": {
+          "path": "build/exact-filter-discovery93-frontend-d6d03e2b685b4aafa00790646c5602f0/frontend-test.log",
+          "bytes": 90418,
+          "sha256": "a63b6d52c3e7391a68d177ca52e46787ca72fbd1bac55b0a9782dcc72a54e757"
+        }
+      }
+    ],
+    "prior_frontend_context": {
+      "path": "build/exact-filter-discovery93-frontend-final-validation.json",
+      "bytes": 2761598,
+      "sha256": "f0a96e84df9958616798ecff2615baf65609a7999e684e8cfda73a359d149e91"
+    },
+    "safe_EventStream_guard_corrected": true
+  },
+  "client_execution_accounting": {
+    "physical_HTTP_calls": [
+      {
+        "id": "public-original-ltl",
+        "index": 1,
+        "method": "POST",
+        "path": "/api/embedding-workbench",
+        "mime": "multipart/form-data; boundary=----formdata-undici-081834263491",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-file-bridge-actual-1/actual/request-1.body",
+          "bytes": 216361,
+          "sha256": "b9c920f27652cc6546d00c58be1029b63a46e3f86260e0e846d98d592e01e99b"
+        },
+        "form_entries": [
+          {
+            "field": "source_file",
+            "local_filename": "native-\"\u03a9-source.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-1-part-1.bin",
+              "bytes": 215598,
+              "sha256": "fc0a5017b03ee275ffc3b964f83662634f1e7d3310bc5572c9dbde85b12004c5"
+            }
+          },
+          {
+            "field": "operation",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-1-part-2.bin",
+              "bytes": 10,
+              "sha256": "682642e644f5da60c97e2b549e82b8658742ff0fad9a058875feaf7f1990aa88"
+            }
+          },
+          {
+            "field": "ltl_options_file",
+            "local_filename": "native-byte-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-1-part-3.bin",
+              "bytes": 298,
+              "sha256": "ad9ec4fd635b0bff4889174efd904cf8c21fe8cc70fe65b70c8290df118e04ff"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-file-bridge-actual-1/actual/response-1.body",
+          "bytes": 1202790,
+          "sha256": "d999632048af4d90515b05e369419b1672bf2e671a1eda017625b50b1feb56c4"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "1202790"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "public_result": {
+          "report": {
+            "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-complete-report.json",
+            "bytes": 1793347,
+            "sha256": "15d1c76d4a284e4ced1ed8fc7979257f2e0d7b9a13d747043554c33085cc17c8"
+          },
+          "raw": {
+            "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-native-response.json",
+            "bytes": 1202790,
+            "sha256": "d999632048af4d90515b05e369419b1672bf2e671a1eda017625b50b1feb56c4"
+          },
+          "csv": {
+            "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-all-tables.csv",
+            "bytes": 3901061,
+            "sha256": "f232958778f1fecc31672e779dbbb9b277f061048eb67f2e502f975282dd08a1"
+          }
+        }
+      },
+      {
+        "id": "public-mine",
+        "index": 2,
+        "method": "POST",
+        "path": "/api/mine",
+        "mime": "multipart/form-data; boundary=----formdata-undici-095794590841",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-file-bridge-actual-1/actual/request-2.body",
+          "bytes": 1094,
+          "sha256": "f71cca82450e8b94c6cb7aba871098b3066b040dfed04b8bf5fcdacc768c54ba"
+        },
+        "form_entries": [
+          {
+            "field": "log",
+            "local_filename": "literal-original.csv",
+            "file": true,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-2-part-1.bin",
+              "bytes": 210,
+              "sha256": "c0c1561dcf0b14e217961171f5d36e0e8fe4f01f6ff1adfaa0850e3a82ee9baa"
+            }
+          },
+          {
+            "field": "mining_input_shape",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-2-part-2.bin",
+              "bytes": 6,
+              "sha256": "dca83e717b1f64eb141057a7415a330ad1361f51703efa2e4776f40047898a04"
+            }
+          },
+          {
+            "field": "mining_request_id",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-2-part-3.bin",
+              "bytes": 36,
+              "sha256": "5ff78f253d2b50a3fc3caa12f9d7b7f1a1e9b8c1bce54f889b2bc64f46bd83b2"
+            }
+          },
+          {
+            "field": "ltl_options_file",
+            "local_filename": "literal-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-2-part-4.bin",
+              "bytes": 296,
+              "sha256": "28faaf6a9a391a8e951e84ac4f00e2c45d97a4cc37f36c21975ed64948bdf763"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-file-bridge-actual-1/actual/response-2.body",
+          "bytes": 331321,
+          "sha256": "3cf3c8beede5e6594b8343159b5adffa3f75e0578b841c27c7ee3fcc32cf64ef"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "331321"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ]
+      },
+      {
+        "id": "public-mine",
+        "index": 1,
+        "method": "POST",
+        "path": "/api/mine",
+        "mime": "multipart/form-data; boundary=----formdata-undici-085297354333",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-client-recovery-actual-1/actual/request-1.body",
+          "bytes": 1094,
+          "sha256": "f4a6fb67d3195eda16da5c3d337b2188c0f8793b5a95116afc137f5e0e16da5d"
+        },
+        "form_entries": [
+          {
+            "field": "log",
+            "local_filename": "literal-original.csv",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-1-part-1.bin",
+              "bytes": 210,
+              "sha256": "c0c1561dcf0b14e217961171f5d36e0e8fe4f01f6ff1adfaa0850e3a82ee9baa"
+            }
+          },
+          {
+            "field": "mining_input_shape",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-1-part-2.bin",
+              "bytes": 6,
+              "sha256": "dca83e717b1f64eb141057a7415a330ad1361f51703efa2e4776f40047898a04"
+            }
+          },
+          {
+            "field": "mining_request_id",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-1-part-3.bin",
+              "bytes": 36,
+              "sha256": "10dcb723c608f3616672e9374de29164a50e8dea60198c770e15de469ed1004b"
+            }
+          },
+          {
+            "field": "ltl_options_file",
+            "local_filename": "literal-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-1-part-4.bin",
+              "bytes": 296,
+              "sha256": "28faaf6a9a391a8e951e84ac4f00e2c45d97a4cc37f36c21975ed64948bdf763"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-client-recovery-actual-1/actual/response-1.body",
+          "bytes": 331321,
+          "sha256": "b8e3a9b118e37b18926816b654ff934d75375b62dea4e45c5b0f448eb319f017"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "331321"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "public_result": {
+          "report": {
+            "path": "build/feature93-client-recovery-actual-1/actual/public-mine-complete-report.json",
+            "bytes": 631328,
+            "sha256": "0d73626624efe728b78a8ac77b742e76c7631d662fa06715f39e5537d32c298b"
+          },
+          "raw": {
+            "path": "build/feature93-client-recovery-actual-1/actual/public-mine-native-response.json",
+            "bytes": 331321,
+            "sha256": "b8e3a9b118e37b18926816b654ff934d75375b62dea4e45c5b0f448eb319f017"
+          },
+          "csv": {
+            "path": "build/feature93-client-recovery-actual-1/actual/public-mine-all-tables.csv",
+            "bytes": 3716795,
+            "sha256": "9beda6c7f245b9e309a776ca758d30cd615ebae0682d3857fc0838e4883d4174"
+          }
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "index": 2,
+        "method": "POST",
+        "path": "/api/discover-workflow",
+        "mime": "multipart/form-data; boundary=----formdata-undici-008855070423",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-client-recovery-actual-1/actual/request-2.body",
+          "bytes": 1623,
+          "sha256": "07e05e46f6cd57ded479239a7ca49cc31ebe15e23e07a8f9037dcdef39e4cbef"
+        },
+        "form_entries": [
+          {
+            "field": "source_id",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-2-part-1.bin",
+              "bytes": 1,
+              "sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+            }
+          },
+          {
+            "field": "family",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-2-part-2.bin",
+              "bytes": 9,
+              "sha256": "bcbb0eeac8d6a4240d57cdd7fa1415a152f30c13a9b06c26043dd6155b636fca"
+            }
+          },
+          {
+            "field": "heuristic_options_file",
+            "local_filename": "full-native-cached-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-2-part-3.bin",
+              "bytes": 1219,
+              "sha256": "99d96cf3b176e162eb0164b5a2e8170742713388a5e3b8e7ce854c733b585819"
+            }
+          }
+        ],
+        "status": 400,
+        "response_body": {
+          "path": "build/feature93-client-recovery-actual-1/actual/response-2.body",
+          "bytes": 37425,
+          "sha256": "1a8629279cc68e48655ba4c9b9f657c2b5b9c0ad9fa86982f6d650535b2728e6"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "37425"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ]
+      },
+      {
+        "id": "public-cached-workflow",
+        "index": 1,
+        "method": "POST",
+        "path": "/api/discover-workflow",
+        "mime": "multipart/form-data; boundary=----formdata-undici-020050372389",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-client-recovery-actual-2/actual/request-1.body",
+          "bytes": 1585,
+          "sha256": "d141d4357626268face8ce32585fcdfe3ebb446cc244efb9d2f5b92637a2405b"
+        },
+        "form_entries": [
+          {
+            "field": "source_id",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-1-part-1.bin",
+              "bytes": 1,
+              "sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+            }
+          },
+          {
+            "field": "family",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-1-part-2.bin",
+              "bytes": 9,
+              "sha256": "bcbb0eeac8d6a4240d57cdd7fa1415a152f30c13a9b06c26043dd6155b636fca"
+            }
+          },
+          {
+            "field": "heuristic_options_file",
+            "local_filename": "full-native-cached-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-1-part-3.bin",
+              "bytes": 1181,
+              "sha256": "196cf8ba5f6ec48778f2c6c749cd649d06c3492d40117ff33058081e25b1ed08"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-client-recovery-actual-2/actual/response-1.body",
+          "bytes": 70497,
+          "sha256": "0f0862bd9fa3ef250ccb89ee8f5cb68d6d9836f4cf9d83ecabb491bfe2a32bf6"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "70497"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "public_result": {
+          "report": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-complete-report.json",
+            "bytes": 144376,
+            "sha256": "6637a067425af9517b536489c8786243c3faf8b3174d473f091aba36e754bf34"
+          },
+          "raw": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-native-response.json",
+            "bytes": 70497,
+            "sha256": "0f0862bd9fa3ef250ccb89ee8f5cb68d6d9836f4cf9d83ecabb491bfe2a32bf6"
+          },
+          "csv": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-all-tables.csv",
+            "bytes": 853648,
+            "sha256": "1fa7f877dc69c8de50b70bff10b531f8db30b0414113f9c9979f94a73e0ba0f0"
+          }
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "index": 2,
+        "method": "POST",
+        "path": "/api/discover-workflow-input",
+        "mime": "multipart/form-data; boundary=----formdata-undici-079103397664",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-client-recovery-actual-2/actual/request-2.body",
+          "bytes": 5432,
+          "sha256": "7ddf8038052e6ca4068320e6ff4504af9bdba8379738aeea7150b59a88070f25"
+        },
+        "form_entries": [
+          {
+            "field": "input",
+            "local_filename": "original-typed-DFG.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-1.bin",
+              "bytes": 2462,
+              "sha256": "28cfbe93f1214ffa41e2397d5a6387425e81bd62b29b324d362bd15547eb1213"
+            }
+          },
+          {
+            "field": "discovery_family",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-2.bin",
+              "bytes": 9,
+              "sha256": "bcbb0eeac8d6a4240d57cdd7fa1415a152f30c13a9b06c26043dd6155b636fca"
+            }
+          },
+          {
+            "field": "input_shape",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-3.bin",
+              "bytes": 3,
+              "sha256": "16ba121a04d5ad3b885f09af5c6c08b68766ce43d990f8420dc97f6ff485cb37"
+            }
+          },
+          {
+            "field": "input_format",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-4.bin",
+              "bytes": 8,
+              "sha256": "c72f4f244d3abe7cac5352123485c79bd13cea8bdca52e66b8cab8fd995e1a93"
+            }
+          },
+          {
+            "field": "heuristic_options_file",
+            "local_filename": "all24-native-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-5.bin",
+              "bytes": 2303,
+              "sha256": "dc1dd59cc3f19ce32ed8be84c2254d92944012cb1cc318e558cf450527cfd3a8"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-client-recovery-actual-2/actual/response-2.body",
+          "bytes": 81942,
+          "sha256": "a82641ccf9ed3864286a2704cba939187fca0c789f2fb43b88e9a2d407b0a6e5"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "81942"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "public_result": {
+          "report": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-complete-report.json",
+            "bytes": 128626,
+            "sha256": "c611d0464db5d99e2d72757318840a742e6331bba319e5c1e8bd14e253f4bca3"
+          },
+          "raw": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-native-response.json",
+            "bytes": 81942,
+            "sha256": "a82641ccf9ed3864286a2704cba939187fca0c789f2fb43b88e9a2d407b0a6e5"
+          },
+          "csv": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-all-tables.csv",
+            "bytes": 519868,
+            "sha256": "51a4f26e58309053bf121e3b50cb777dbac334eac6df7cb1e5670c5550ffda49"
+          }
+        }
+      }
+    ],
+    "selected_HTTP_calls": [
+      {
+        "id": "public-original-ltl",
+        "index": 1,
+        "method": "POST",
+        "path": "/api/embedding-workbench",
+        "mime": "multipart/form-data; boundary=----formdata-undici-081834263491",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-file-bridge-actual-1/actual/request-1.body",
+          "bytes": 216361,
+          "sha256": "b9c920f27652cc6546d00c58be1029b63a46e3f86260e0e846d98d592e01e99b"
+        },
+        "form_entries": [
+          {
+            "field": "source_file",
+            "local_filename": "native-\"\u03a9-source.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-1-part-1.bin",
+              "bytes": 215598,
+              "sha256": "fc0a5017b03ee275ffc3b964f83662634f1e7d3310bc5572c9dbde85b12004c5"
+            }
+          },
+          {
+            "field": "operation",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-1-part-2.bin",
+              "bytes": 10,
+              "sha256": "682642e644f5da60c97e2b549e82b8658742ff0fad9a058875feaf7f1990aa88"
+            }
+          },
+          {
+            "field": "ltl_options_file",
+            "local_filename": "native-byte-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-1-part-3.bin",
+              "bytes": 298,
+              "sha256": "ad9ec4fd635b0bff4889174efd904cf8c21fe8cc70fe65b70c8290df118e04ff"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-file-bridge-actual-1/actual/response-1.body",
+          "bytes": 1202790,
+          "sha256": "d999632048af4d90515b05e369419b1672bf2e671a1eda017625b50b1feb56c4"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "1202790"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "public_result": {
+          "report": {
+            "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-complete-report.json",
+            "bytes": 1793347,
+            "sha256": "15d1c76d4a284e4ced1ed8fc7979257f2e0d7b9a13d747043554c33085cc17c8"
+          },
+          "raw": {
+            "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-native-response.json",
+            "bytes": 1202790,
+            "sha256": "d999632048af4d90515b05e369419b1672bf2e671a1eda017625b50b1feb56c4"
+          },
+          "csv": {
+            "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-all-tables.csv",
+            "bytes": 3901061,
+            "sha256": "f232958778f1fecc31672e779dbbb9b277f061048eb67f2e502f975282dd08a1"
+          }
+        }
+      },
+      {
+        "id": "public-mine",
+        "index": 1,
+        "method": "POST",
+        "path": "/api/mine",
+        "mime": "multipart/form-data; boundary=----formdata-undici-085297354333",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-client-recovery-actual-1/actual/request-1.body",
+          "bytes": 1094,
+          "sha256": "f4a6fb67d3195eda16da5c3d337b2188c0f8793b5a95116afc137f5e0e16da5d"
+        },
+        "form_entries": [
+          {
+            "field": "log",
+            "local_filename": "literal-original.csv",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-1-part-1.bin",
+              "bytes": 210,
+              "sha256": "c0c1561dcf0b14e217961171f5d36e0e8fe4f01f6ff1adfaa0850e3a82ee9baa"
+            }
+          },
+          {
+            "field": "mining_input_shape",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-1-part-2.bin",
+              "bytes": 6,
+              "sha256": "dca83e717b1f64eb141057a7415a330ad1361f51703efa2e4776f40047898a04"
+            }
+          },
+          {
+            "field": "mining_request_id",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-1-part-3.bin",
+              "bytes": 36,
+              "sha256": "10dcb723c608f3616672e9374de29164a50e8dea60198c770e15de469ed1004b"
+            }
+          },
+          {
+            "field": "ltl_options_file",
+            "local_filename": "literal-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-1-part-4.bin",
+              "bytes": 296,
+              "sha256": "28faaf6a9a391a8e951e84ac4f00e2c45d97a4cc37f36c21975ed64948bdf763"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-client-recovery-actual-1/actual/response-1.body",
+          "bytes": 331321,
+          "sha256": "b8e3a9b118e37b18926816b654ff934d75375b62dea4e45c5b0f448eb319f017"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "331321"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "public_result": {
+          "report": {
+            "path": "build/feature93-client-recovery-actual-1/actual/public-mine-complete-report.json",
+            "bytes": 631328,
+            "sha256": "0d73626624efe728b78a8ac77b742e76c7631d662fa06715f39e5537d32c298b"
+          },
+          "raw": {
+            "path": "build/feature93-client-recovery-actual-1/actual/public-mine-native-response.json",
+            "bytes": 331321,
+            "sha256": "b8e3a9b118e37b18926816b654ff934d75375b62dea4e45c5b0f448eb319f017"
+          },
+          "csv": {
+            "path": "build/feature93-client-recovery-actual-1/actual/public-mine-all-tables.csv",
+            "bytes": 3716795,
+            "sha256": "9beda6c7f245b9e309a776ca758d30cd615ebae0682d3857fc0838e4883d4174"
+          }
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "index": 1,
+        "method": "POST",
+        "path": "/api/discover-workflow",
+        "mime": "multipart/form-data; boundary=----formdata-undici-020050372389",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-client-recovery-actual-2/actual/request-1.body",
+          "bytes": 1585,
+          "sha256": "d141d4357626268face8ce32585fcdfe3ebb446cc244efb9d2f5b92637a2405b"
+        },
+        "form_entries": [
+          {
+            "field": "source_id",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-1-part-1.bin",
+              "bytes": 1,
+              "sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+            }
+          },
+          {
+            "field": "family",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-1-part-2.bin",
+              "bytes": 9,
+              "sha256": "bcbb0eeac8d6a4240d57cdd7fa1415a152f30c13a9b06c26043dd6155b636fca"
+            }
+          },
+          {
+            "field": "heuristic_options_file",
+            "local_filename": "full-native-cached-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-1-part-3.bin",
+              "bytes": 1181,
+              "sha256": "196cf8ba5f6ec48778f2c6c749cd649d06c3492d40117ff33058081e25b1ed08"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-client-recovery-actual-2/actual/response-1.body",
+          "bytes": 70497,
+          "sha256": "0f0862bd9fa3ef250ccb89ee8f5cb68d6d9836f4cf9d83ecabb491bfe2a32bf6"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "70497"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "public_result": {
+          "report": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-complete-report.json",
+            "bytes": 144376,
+            "sha256": "6637a067425af9517b536489c8786243c3faf8b3174d473f091aba36e754bf34"
+          },
+          "raw": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-native-response.json",
+            "bytes": 70497,
+            "sha256": "0f0862bd9fa3ef250ccb89ee8f5cb68d6d9836f4cf9d83ecabb491bfe2a32bf6"
+          },
+          "csv": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-all-tables.csv",
+            "bytes": 853648,
+            "sha256": "1fa7f877dc69c8de50b70bff10b531f8db30b0414113f9c9979f94a73e0ba0f0"
+          }
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "index": 2,
+        "method": "POST",
+        "path": "/api/discover-workflow-input",
+        "mime": "multipart/form-data; boundary=----formdata-undici-079103397664",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-client-recovery-actual-2/actual/request-2.body",
+          "bytes": 5432,
+          "sha256": "7ddf8038052e6ca4068320e6ff4504af9bdba8379738aeea7150b59a88070f25"
+        },
+        "form_entries": [
+          {
+            "field": "input",
+            "local_filename": "original-typed-DFG.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-1.bin",
+              "bytes": 2462,
+              "sha256": "28cfbe93f1214ffa41e2397d5a6387425e81bd62b29b324d362bd15547eb1213"
+            }
+          },
+          {
+            "field": "discovery_family",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-2.bin",
+              "bytes": 9,
+              "sha256": "bcbb0eeac8d6a4240d57cdd7fa1415a152f30c13a9b06c26043dd6155b636fca"
+            }
+          },
+          {
+            "field": "input_shape",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-3.bin",
+              "bytes": 3,
+              "sha256": "16ba121a04d5ad3b885f09af5c6c08b68766ce43d990f8420dc97f6ff485cb37"
+            }
+          },
+          {
+            "field": "input_format",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-4.bin",
+              "bytes": 8,
+              "sha256": "c72f4f244d3abe7cac5352123485c79bd13cea8bdca52e66b8cab8fd995e1a93"
+            }
+          },
+          {
+            "field": "heuristic_options_file",
+            "local_filename": "all24-native-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-2/actual/request-2-part-5.bin",
+              "bytes": 2303,
+              "sha256": "dc1dd59cc3f19ce32ed8be84c2254d92944012cb1cc318e558cf450527cfd3a8"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-client-recovery-actual-2/actual/response-2.body",
+          "bytes": 81942,
+          "sha256": "a82641ccf9ed3864286a2704cba939187fca0c789f2fb43b88e9a2d407b0a6e5"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "81942"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "public_result": {
+          "report": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-complete-report.json",
+            "bytes": 128626,
+            "sha256": "c611d0464db5d99e2d72757318840a742e6331bba319e5c1e8bd14e253f4bca3"
+          },
+          "raw": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-native-response.json",
+            "bytes": 81942,
+            "sha256": "a82641ccf9ed3864286a2704cba939187fca0c789f2fb43b88e9a2d407b0a6e5"
+          },
+          "csv": {
+            "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-all-tables.csv",
+            "bytes": 519868,
+            "sha256": "51a4f26e58309053bf121e3b50cb777dbac334eac6df7cb1e5670c5550ffda49"
+          }
+        }
+      }
+    ],
+    "historical_failed_cases": [
+      {
+        "id": "public-mine",
+        "index": 2,
+        "method": "POST",
+        "path": "/api/mine",
+        "mime": "multipart/form-data; boundary=----formdata-undici-095794590841",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-file-bridge-actual-1/actual/request-2.body",
+          "bytes": 1094,
+          "sha256": "f71cca82450e8b94c6cb7aba871098b3066b040dfed04b8bf5fcdacc768c54ba"
+        },
+        "form_entries": [
+          {
+            "field": "log",
+            "local_filename": "literal-original.csv",
+            "file": true,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-2-part-1.bin",
+              "bytes": 210,
+              "sha256": "c0c1561dcf0b14e217961171f5d36e0e8fe4f01f6ff1adfaa0850e3a82ee9baa"
+            }
+          },
+          {
+            "field": "mining_input_shape",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-2-part-2.bin",
+              "bytes": 6,
+              "sha256": "dca83e717b1f64eb141057a7415a330ad1361f51703efa2e4776f40047898a04"
+            }
+          },
+          {
+            "field": "mining_request_id",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-2-part-3.bin",
+              "bytes": 36,
+              "sha256": "5ff78f253d2b50a3fc3caa12f9d7b7f1a1e9b8c1bce54f889b2bc64f46bd83b2"
+            }
+          },
+          {
+            "field": "ltl_options_file",
+            "local_filename": "literal-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-file-bridge-actual-1/actual/request-2-part-4.bin",
+              "bytes": 296,
+              "sha256": "28faaf6a9a391a8e951e84ac4f00e2c45d97a4cc37f36c21975ed64948bdf763"
+            }
+          }
+        ],
+        "status": 200,
+        "response_body": {
+          "path": "build/feature93-file-bridge-actual-1/actual/response-2.body",
+          "bytes": 331321,
+          "sha256": "3cf3c8beede5e6594b8343159b5adffa3f75e0578b841c27c7ee3fcc32cf64ef"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "331321"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "historical_failed_product_guard": true,
+        "original_frontend_integration": {
+          "path": "build/exact-filter-discovery93-frontend-integration-2.json",
+          "bytes": 2665179,
+          "sha256": "1d1c62eb2f8a0bfb6a8a729059e6076991127cf6dba6dcd6cae03a18000cdb87"
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "index": 2,
+        "method": "POST",
+        "path": "/api/discover-workflow",
+        "mime": "multipart/form-data; boundary=----formdata-undici-008855070423",
+        "attempted": true,
+        "request_body": {
+          "path": "build/feature93-client-recovery-actual-1/actual/request-2.body",
+          "bytes": 1623,
+          "sha256": "07e05e46f6cd57ded479239a7ca49cc31ebe15e23e07a8f9037dcdef39e4cbef"
+        },
+        "form_entries": [
+          {
+            "field": "source_id",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-2-part-1.bin",
+              "bytes": 1,
+              "sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+            }
+          },
+          {
+            "field": "family",
+            "local_filename": null,
+            "file": false,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-2-part-2.bin",
+              "bytes": 9,
+              "sha256": "bcbb0eeac8d6a4240d57cdd7fa1415a152f30c13a9b06c26043dd6155b636fca"
+            }
+          },
+          {
+            "field": "heuristic_options_file",
+            "local_filename": "full-native-cached-options.json",
+            "file": true,
+            "content": {
+              "path": "build/feature93-client-recovery-actual-1/actual/request-2-part-3.bin",
+              "bytes": 1219,
+              "sha256": "99d96cf3b176e162eb0164b5a2e8170742713388a5e3b8e7ce854c733b585819"
+            }
+          }
+        ],
+        "status": 400,
+        "response_body": {
+          "path": "build/feature93-client-recovery-actual-1/actual/response-2.body",
+          "bytes": 37425,
+          "sha256": "1a8629279cc68e48655ba4c9b9f657c2b5b9c0ad9fa86982f6d650535b2728e6"
+        },
+        "headers": [
+          [
+            "access-control-allow-origin",
+            "*"
+          ],
+          [
+            "content-length",
+            "37425"
+          ],
+          [
+            "content-type",
+            "application/json"
+          ],
+          [
+            "keep-alive",
+            "timeout=5, max=100"
+          ]
+        ],
+        "historical_invalid_selector_request": true,
+        "product_defect": false,
+        "retained_as_valid_native_error": true
+      }
+    ],
+    "actual_File_handoffs": [
+      {
+        "id": "public-original-ltl",
+        "helper": "requestOriginalLtl",
+        "original_File_count": 2,
+        "files": {
+          "source_file": {
+            "identity": true,
+            "name": "native-\"\u03a9-source.json",
+            "size": 215598,
+            "last_modified": 93001,
+            "sha256": "fc0a5017b03ee275ffc3b964f83662634f1e7d3310bc5572c9dbde85b12004c5"
+          },
+          "ltl_options_file": {
+            "identity": true,
+            "name": "native-byte-options.json",
+            "size": 298,
+            "last_modified": 93001,
+            "sha256": "ad9ec4fd635b0bff4889174efd904cf8c21fe8cc70fe65b70c8290df118e04ff"
+          }
+        }
+      },
+      {
+        "id": "public-mine",
+        "helper": "mineActiveDataset",
+        "original_File_count": 2,
+        "files": {
+          "log": {
+            "identity": true,
+            "name": "literal-original.csv",
+            "size": 210,
+            "last_modified": 93001,
+            "sha256": "c0c1561dcf0b14e217961171f5d36e0e8fe4f01f6ff1adfaa0850e3a82ee9baa"
+          },
+          "ltl_options_file": {
+            "identity": true,
+            "name": "literal-options.json",
+            "size": 296,
+            "last_modified": 93001,
+            "sha256": "28faaf6a9a391a8e951e84ac4f00e2c45d97a4cc37f36c21975ed64948bdf763"
+          }
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "helper": "requestExactCachedWorkflow",
+        "original_File_count": 1,
+        "files": {
+          "heuristic_options_file": {
+            "identity": true,
+            "name": "full-native-cached-options.json",
+            "size": 1181,
+            "last_modified": 93001,
+            "sha256": "196cf8ba5f6ec48778f2c6c749cd649d06c3492d40117ff33058081e25b1ed08"
+          }
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "helper": "runExactWorkflowInput",
+        "original_File_count": 2,
+        "files": {
+          "input": {
+            "identity": true,
+            "name": "original-typed-DFG.json",
+            "size": 2462,
+            "last_modified": 93001,
+            "sha256": "28cfbe93f1214ffa41e2397d5a6387425e81bd62b29b324d362bd15547eb1213"
+          },
+          "heuristic_options_file": {
+            "identity": true,
+            "name": "all24-native-options.json",
+            "size": 2303,
+            "last_modified": 93001,
+            "sha256": "dc1dd59cc3f19ce32ed8be84c2254d92944012cb1cc318e558cf450527cfd3a8"
+          }
+        }
+      }
+    ],
+    "downloads": [
+      {
+        "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-complete-report.json",
+        "bytes": 1793347,
+        "sha256": "15d1c76d4a284e4ced1ed8fc7979257f2e0d7b9a13d747043554c33085cc17c8"
+      },
+      {
+        "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-native-response.json",
+        "bytes": 1202790,
+        "sha256": "d999632048af4d90515b05e369419b1672bf2e671a1eda017625b50b1feb56c4"
+      },
+      {
+        "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-all-tables.csv",
+        "bytes": 3901061,
+        "sha256": "f232958778f1fecc31672e779dbbb9b277f061048eb67f2e502f975282dd08a1"
+      },
+      {
+        "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-0-source_log_json.json",
+        "bytes": 158204,
+        "sha256": "8ab4c6b52eeeb4087129cecb08cd769006f87fb730e9908ef38356a486f4fda3"
+      },
+      {
+        "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-1-result_log_json.json",
+        "bytes": 102702,
+        "sha256": "ff0099b1a8160fccb1e4e8dd3b9f2fbc4875e0e8898b64dfa5b034357ec36e8d"
+      },
+      {
+        "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-original-source_file.bin",
+        "bytes": 215598,
+        "sha256": "fc0a5017b03ee275ffc3b964f83662634f1e7d3310bc5572c9dbde85b12004c5"
+      },
+      {
+        "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-original-ltl_options_file.bin",
+        "bytes": 298,
+        "sha256": "ad9ec4fd635b0bff4889174efd904cf8c21fe8cc70fe65b70c8290df118e04ff"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-complete-report.json",
+        "bytes": 631328,
+        "sha256": "0d73626624efe728b78a8ac77b742e76c7631d662fa06715f39e5537d32c298b"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-native-response.json",
+        "bytes": 331321,
+        "sha256": "b8e3a9b118e37b18926816b654ff934d75375b62dea4e45c5b0f448eb319f017"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-all-tables.csv",
+        "bytes": 3716795,
+        "sha256": "9beda6c7f245b9e309a776ca758d30cd615ebae0682d3857fc0838e4883d4174"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-0-legacy-response.bin",
+        "bytes": 91564,
+        "sha256": "fefa2c90dd38979b8e924dd5bfb9286e79ab5bdc5cb3cfbb725f40a13eb5e62c"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-1-source_before.json",
+        "bytes": 7841,
+        "sha256": "bb7ac8a9dbd0f3ba94e6bc71c45eefce2ebd545bf027db64e149364e60a3afaa"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-2-source_after.json",
+        "bytes": 7841,
+        "sha256": "bb7ac8a9dbd0f3ba94e6bc71c45eefce2ebd545bf027db64e149364e60a3afaa"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-3-heuristics_net.json",
+        "bytes": 2095,
+        "sha256": "2a245a2478cd996f19343bbb874a8f5a184bc6bea5d739232b5ee05dcdc41c91"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-4-petri_net.json",
+        "bytes": 504,
+        "sha256": "b18f1761f2d6712619a985f6939cecd5e14f5c2b660b5b498fc186689914de57"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-5-heuristic_call.json",
+        "bytes": 19612,
+        "sha256": "c4f79281bd36eba444b7f79a7ce5269fcbba41eb7608322c1f27f8980f4d598d"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-6-legacy_heuristics_json.bin",
+        "bytes": 1974,
+        "sha256": "9176704b522124ab041b1caf81e0ecc611c1878affcf9137ea19032dd35d136c"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-7-legacy_petri_json.bin",
+        "bytes": 686,
+        "sha256": "ae7857184b65d4a5494c7074288498004c43a2dfc94c28495e8125bef82595e2"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-original-log.bin",
+        "bytes": 210,
+        "sha256": "c0c1561dcf0b14e217961171f5d36e0e8fe4f01f6ff1adfaa0850e3a82ee9baa"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-1/actual/public-mine-original-ltl_options_file.bin",
+        "bytes": 296,
+        "sha256": "28faaf6a9a391a8e951e84ac4f00e2c45d97a4cc37f36c21975ed64948bdf763"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-complete-report.json",
+        "bytes": 144376,
+        "sha256": "6637a067425af9517b536489c8786243c3faf8b3174d473f091aba36e754bf34"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-native-response.json",
+        "bytes": 70497,
+        "sha256": "0f0862bd9fa3ef250ccb89ee8f5cb68d6d9836f4cf9d83ecabb491bfe2a32bf6"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-all-tables.csv",
+        "bytes": 853648,
+        "sha256": "1fa7f877dc69c8de50b70bff10b531f8db30b0414113f9c9979f94a73e0ba0f0"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-0-legacy-response.bin",
+        "bytes": 9219,
+        "sha256": "442dee91f746ad436a4207586498ff06b51e3375474e0f3b2cce6f525b9004c9"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-1-source_before.json",
+        "bytes": 7841,
+        "sha256": "bb7ac8a9dbd0f3ba94e6bc71c45eefce2ebd545bf027db64e149364e60a3afaa"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-2-source_after.json",
+        "bytes": 7841,
+        "sha256": "bb7ac8a9dbd0f3ba94e6bc71c45eefce2ebd545bf027db64e149364e60a3afaa"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-3-heuristics_net.json",
+        "bytes": 2095,
+        "sha256": "2a245a2478cd996f19343bbb874a8f5a184bc6bea5d739232b5ee05dcdc41c91"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-4-petri_net.json",
+        "bytes": 504,
+        "sha256": "b18f1761f2d6712619a985f6939cecd5e14f5c2b660b5b498fc186689914de57"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-5-heuristic_call.json",
+        "bytes": 19600,
+        "sha256": "5b4246f0b03166ee0a40a0d014c3092752dd4efa6875ff8b179323f9b9cf1a51"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-original-heuristic_options_file.bin",
+        "bytes": 1181,
+        "sha256": "196cf8ba5f6ec48778f2c6c749cd649d06c3492d40117ff33058081e25b1ed08"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-complete-report.json",
+        "bytes": 128626,
+        "sha256": "c611d0464db5d99e2d72757318840a742e6331bba319e5c1e8bd14e253f4bca3"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-native-response.json",
+        "bytes": 81942,
+        "sha256": "a82641ccf9ed3864286a2704cba939187fca0c789f2fb43b88e9a2d407b0a6e5"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-all-tables.csv",
+        "bytes": 519868,
+        "sha256": "51a4f26e58309053bf121e3b50cb777dbac334eac6df7cb1e5670c5550ffda49"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-0-legacy-response.bin",
+        "bytes": 12880,
+        "sha256": "80561af29784e78427f1cdd49146980aaa6e47896b2d11dbdcffedcc0aa5c291"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-1-source_before.json",
+        "bytes": 1256,
+        "sha256": "8f39d962668d93088c5b5477d1f52c2e1301ff0c0c6a1197f9244f5fd40637fd"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-2-source_after.json",
+        "bytes": 1256,
+        "sha256": "8f39d962668d93088c5b5477d1f52c2e1301ff0c0c6a1197f9244f5fd40637fd"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-3-heuristics_net.json",
+        "bytes": 5122,
+        "sha256": "51944f26afa16bbcd852bdc239f5dd12d40ae70903bc2111489fa358334f88d4"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-4-petri_net.json",
+        "bytes": 1004,
+        "sha256": "f26d1613b8fb9e513ff8b76b5568b9d0aa1cb9355e86b358bf605a815bcbd372"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-5-heuristic_call.json",
+        "bytes": 10476,
+        "sha256": "5ca819fe629419760a7bb849f6693024b4db6b5c815270ab119776354a23c56b"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-6-legacy_petri_json.bin",
+        "bytes": 1510,
+        "sha256": "375029d0fd2e561eb20de2bc0b1d3c87322da15c174af1906120d128582b3dd8"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-original-input.bin",
+        "bytes": 2462,
+        "sha256": "28cfbe93f1214ffa41e2397d5a6387425e81bd62b29b324d362bd15547eb1213"
+      },
+      {
+        "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-original-heuristic_options_file.bin",
+        "bytes": 2303,
+        "sha256": "dc1dd59cc3f19ce32ed8be84c2254d92944012cb1cc318e558cf450527cfd3a8"
+      }
+    ],
+    "direct_artifacts": [
+      {
+        "id": "public-original-ltl",
+        "name": "source_log_json.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-0-source_log_json.json",
+          "bytes": 158204,
+          "sha256": "8ab4c6b52eeeb4087129cecb08cd769006f87fb730e9908ef38356a486f4fda3"
+        }
+      },
+      {
+        "id": "public-original-ltl",
+        "name": "result_log_json.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-file-bridge-actual-1/actual/public-original-ltl-1-result_log_json.json",
+          "bytes": 102702,
+          "sha256": "ff0099b1a8160fccb1e4e8dd3b9f2fbc4875e0e8898b64dfa5b034357ec36e8d"
+        }
+      },
+      {
+        "id": "public-mine",
+        "name": "legacy-response.bin",
+        "mime": "application/octet-stream",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-1/actual/public-mine-0-legacy-response.bin",
+          "bytes": 91564,
+          "sha256": "fefa2c90dd38979b8e924dd5bfb9286e79ab5bdc5cb3cfbb725f40a13eb5e62c"
+        }
+      },
+      {
+        "id": "public-mine",
+        "name": "source_before.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-1/actual/public-mine-1-source_before.json",
+          "bytes": 7841,
+          "sha256": "bb7ac8a9dbd0f3ba94e6bc71c45eefce2ebd545bf027db64e149364e60a3afaa"
+        }
+      },
+      {
+        "id": "public-mine",
+        "name": "source_after.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-1/actual/public-mine-2-source_after.json",
+          "bytes": 7841,
+          "sha256": "bb7ac8a9dbd0f3ba94e6bc71c45eefce2ebd545bf027db64e149364e60a3afaa"
+        }
+      },
+      {
+        "id": "public-mine",
+        "name": "heuristics_net.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-1/actual/public-mine-3-heuristics_net.json",
+          "bytes": 2095,
+          "sha256": "2a245a2478cd996f19343bbb874a8f5a184bc6bea5d739232b5ee05dcdc41c91"
+        }
+      },
+      {
+        "id": "public-mine",
+        "name": "petri_net.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-1/actual/public-mine-4-petri_net.json",
+          "bytes": 504,
+          "sha256": "b18f1761f2d6712619a985f6939cecd5e14f5c2b660b5b498fc186689914de57"
+        }
+      },
+      {
+        "id": "public-mine",
+        "name": "heuristic_call.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-1/actual/public-mine-5-heuristic_call.json",
+          "bytes": 19612,
+          "sha256": "c4f79281bd36eba444b7f79a7ce5269fcbba41eb7608322c1f27f8980f4d598d"
+        }
+      },
+      {
+        "id": "public-mine",
+        "name": "legacy_heuristics_json.bin",
+        "mime": "application/octet-stream",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-1/actual/public-mine-6-legacy_heuristics_json.bin",
+          "bytes": 1974,
+          "sha256": "9176704b522124ab041b1caf81e0ecc611c1878affcf9137ea19032dd35d136c"
+        }
+      },
+      {
+        "id": "public-mine",
+        "name": "legacy_petri_json.bin",
+        "mime": "application/octet-stream",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-1/actual/public-mine-7-legacy_petri_json.bin",
+          "bytes": 686,
+          "sha256": "ae7857184b65d4a5494c7074288498004c43a2dfc94c28495e8125bef82595e2"
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "name": "legacy-response.bin",
+        "mime": "application/octet-stream",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-0-legacy-response.bin",
+          "bytes": 9219,
+          "sha256": "442dee91f746ad436a4207586498ff06b51e3375474e0f3b2cce6f525b9004c9"
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "name": "source_before.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-1-source_before.json",
+          "bytes": 7841,
+          "sha256": "bb7ac8a9dbd0f3ba94e6bc71c45eefce2ebd545bf027db64e149364e60a3afaa"
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "name": "source_after.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-2-source_after.json",
+          "bytes": 7841,
+          "sha256": "bb7ac8a9dbd0f3ba94e6bc71c45eefce2ebd545bf027db64e149364e60a3afaa"
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "name": "heuristics_net.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-3-heuristics_net.json",
+          "bytes": 2095,
+          "sha256": "2a245a2478cd996f19343bbb874a8f5a184bc6bea5d739232b5ee05dcdc41c91"
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "name": "petri_net.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-4-petri_net.json",
+          "bytes": 504,
+          "sha256": "b18f1761f2d6712619a985f6939cecd5e14f5c2b660b5b498fc186689914de57"
+        }
+      },
+      {
+        "id": "public-cached-workflow",
+        "name": "heuristic_call.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-cached-workflow-5-heuristic_call.json",
+          "bytes": 19600,
+          "sha256": "5b4246f0b03166ee0a40a0d014c3092752dd4efa6875ff8b179323f9b9cf1a51"
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "name": "legacy-response.bin",
+        "mime": "application/octet-stream",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-0-legacy-response.bin",
+          "bytes": 12880,
+          "sha256": "80561af29784e78427f1cdd49146980aaa6e47896b2d11dbdcffedcc0aa5c291"
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "name": "source_before.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-1-source_before.json",
+          "bytes": 1256,
+          "sha256": "8f39d962668d93088c5b5477d1f52c2e1301ff0c0c6a1197f9244f5fd40637fd"
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "name": "source_after.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-2-source_after.json",
+          "bytes": 1256,
+          "sha256": "8f39d962668d93088c5b5477d1f52c2e1301ff0c0c6a1197f9244f5fd40637fd"
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "name": "heuristics_net.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-3-heuristics_net.json",
+          "bytes": 5122,
+          "sha256": "51944f26afa16bbcd852bdc239f5dd12d40ae70903bc2111489fa358334f88d4"
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "name": "petri_net.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-4-petri_net.json",
+          "bytes": 1004,
+          "sha256": "f26d1613b8fb9e513ff8b76b5568b9d0aa1cb9355e86b358bf605a815bcbd372"
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "name": "heuristic_call.json",
+        "mime": "application/json",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-5-heuristic_call.json",
+          "bytes": 10476,
+          "sha256": "5ca819fe629419760a7bb849f6693024b4db6b5c815270ab119776354a23c56b"
+        }
+      },
+      {
+        "id": "public-original-dfg",
+        "name": "legacy_petri_json.bin",
+        "mime": "application/octet-stream",
+        "saved": {
+          "path": "build/feature93-client-recovery-actual-2/actual/public-original-dfg-6-legacy_petri_json.bin",
+          "bytes": 1510,
+          "sha256": "375029d0fd2e561eb20de2bc0b1d3c87322da15c174af1906120d128582b3dd8"
+        }
+      }
+    ],
+    "independent_offline_checks": [
+      {
+        "id": "public-original-ltl",
+        "check": "HTTP or mapped native CLI status",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "complete owned envelope",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "all physical/query input bytes, original File names and presence retained",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "all ten canonical/artifact-error members",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "actual native call boundary and outcome",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "complete seven configured fields and before/after options",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "full original EventLog all stored fields before/after",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "complete independent native filtered EventLog result",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "downloadable complete canonical result",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "separate retained complete legacy result bytes or serialization error",
+        "passed": true
+      },
+      {
+        "id": "public-original-ltl",
+        "check": "downloadable complete original canonical source",
+        "passed": true
+      },
+      {
+        "check": "public-original-ltl: complete native report equality",
+        "passed": true
+      },
+      {
+        "check": "public-original-ltl: untouched raw response downloadable",
+        "passed": true
+      },
+      {
+        "check": "public-original-ltl: nonempty full helper CSV downloadable",
+        "passed": true
+      },
+      {
+        "check": "public-original-ltl: every available native artifact exported once",
+        "passed": true
+      },
+      {
+        "check": "public-original-ltl: exact direct artifact source_log_json.json",
+        "passed": true
+      },
+      {
+        "check": "public-original-ltl: exact direct artifact result_log_json.json",
+        "passed": true
+      },
+      {
+        "id": "public-mine",
+        "check": "HTTP or mapped native CLI status",
+        "passed": true
+      },
+      {
+        "id": "public-mine",
+        "check": "complete owned envelope",
+        "passed": true
+      },
+      {
+        "id": "public-mine",
+        "check": "all physical/query input bytes, original File names and presence retained",
+        "passed": true
+      },
+      {
+        "id": "public-mine",
+        "check": "exact controls version and explicit native observation availability",
+        "passed": true
+      },
+      {
+        "id": "public-mine",
+        "check": "actual unmodified legacy response/status or explicit lossless fallback",
+        "passed": true
+      },
+      {
+        "id": "public-mine",
+        "check": "integrated native filter selects literal-comma trace rather than legacy split",
+        "passed": true
+      },
+      {
+        "id": "public-mine",
+        "check": "effective full seven literal LTL options retained",
+        "passed": true
+      },
+      {
+        "check": "public-mine: complete native report equality",
+        "passed": true
+      },
+      {
+        "check": "public-mine: untouched raw response downloadable",
+        "passed": true
+      },
+      {
+        "check": "public-mine: nonempty full helper CSV downloadable",
+        "passed": true
+      },
+      {
+        "check": "public-mine: every available native artifact exported once",
+        "passed": true
+      },
+      {
+        "check": "public-mine: exact direct artifact legacy-response.bin",
+        "passed": true
+      },
+      {
+        "check": "public-mine: exact direct artifact source_before.json",
+        "passed": true
+      },
+      {
+        "check": "public-mine: exact direct artifact source_after.json",
+        "passed": true
+      },
+      {
+        "check": "public-mine: exact direct artifact heuristics_net.json",
+        "passed": true
+      },
+      {
+        "check": "public-mine: exact direct artifact petri_net.json",
+        "passed": true
+      },
+      {
+        "check": "public-mine: exact direct artifact heuristic_call.json",
+        "passed": true
+      },
+      {
+        "check": "public-mine: exact direct artifact legacy_heuristics_json.bin",
+        "passed": true
+      },
+      {
+        "check": "public-mine: exact direct artifact legacy_petri_json.bin",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "HTTP or mapped native CLI status",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "complete owned envelope",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "all physical/query input bytes, original File names and presence retained",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "exact controls version and explicit native observation availability",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "actual unmodified legacy response/status or explicit lossless fallback",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "cached request explicitly binds preceding actual source_id",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "actual cached source Heuristic complete typed result retained",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "cached source contains actual literal comma edge from filtered producer",
+        "passed": true
+      },
+      {
+        "id": "public-cached-workflow",
+        "check": "cached full24 explicit original option state retained",
+        "passed": true
+      },
+      {
+        "check": "cached corrected full35 result equals independent OLD stream oracle",
+        "passed": true
+      },
+      {
+        "check": "cached complete24 options and unchanged state equal independent OLD stream oracle",
+        "passed": true
+      },
+      {
+        "check": "cached complete original stream before/after equals independent manually constructed OLD input",
+        "passed": true
+      },
+      {
+        "check": "cached actual native boundary returned complete result before optional exports",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: complete native report equality",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: untouched raw response downloadable",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: nonempty full helper CSV downloadable",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: every available native artifact exported once",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: exact direct artifact legacy-response.bin",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: exact direct artifact source_before.json",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: exact direct artifact source_after.json",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: exact direct artifact heuristics_net.json",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: exact direct artifact petri_net.json",
+        "passed": true
+      },
+      {
+        "check": "public-cached-workflow: exact direct artifact heuristic_call.json",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "HTTP or mapped native CLI status",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "complete owned envelope",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "all physical/query input bytes, original File names and presence retained",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "exact controls version and explicit native observation availability",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "actual unmodified legacy response/status or explicit lossless fallback",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "complete effective24 native Heuristic options match independent OLD oracle",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "complete native35-field HeuristicsNet matches independent OLD oracle",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "exact configured canonical protected pairset",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "complete actual parsed14-field original DFG before/after unchanged",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "primary native discovery captured before optional conversion/export",
+        "passed": true
+      },
+      {
+        "id": "public-original-dfg",
+        "check": "complete original14-field DFG constructor submitted without projection",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: complete native report equality",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: untouched raw response downloadable",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: nonempty full helper CSV downloadable",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: every available native artifact exported once",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: exact direct artifact legacy-response.bin",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: exact direct artifact source_before.json",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: exact direct artifact source_after.json",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: exact direct artifact heuristics_net.json",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: exact direct artifact petri_net.json",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: exact direct artifact heuristic_call.json",
+        "passed": true
+      },
+      {
+        "check": "public-original-dfg: exact direct artifact legacy_petri_json.bin",
+        "passed": true
+      },
+      {
+        "check": "all selected original File handoffs executed before offline validation",
+        "passed": true
+      }
+    ],
+    "retained_parent_capture": {
+      "path": "build/feature93-client-recovery-actual-1/validation.json",
+      "bytes": 52584,
+      "sha256": "b75d0c336402a2b2f8076f4192e66f7d43b3b683495bf068e1292c983d091cc4"
+    },
+    "retained_parent_actual": {
+      "path": "build/feature93-client-recovery-actual-1/actual/validation.json",
+      "bytes": 12705,
+      "sha256": "91f419c8a8cd6cd125a39723d8661470634a0bfa8eabced9ef74ebaf05724035"
+    },
+    "new_requests": 2,
+    "retained_requests": 4,
+    "physical_requests": 6,
+    "selected_successes": 4,
+    "successful_original_Files": 7,
+    "retained_successes": 2,
+    "original_LTL_success_replayed": false,
+    "successful_mine_replayed": false,
+    "failed_mine_guard_regression_rerun_retained": true,
+    "invalid_cached_selectors_corrected": true,
+    "old_consumed_UUID": "93000000-0000-4000-8000-000000000093",
+    "new_required_UUID": "93000000-0000-4000-8000-000000000094",
+    "actual_new_source_id": "3"
+  },
+  "cached_stream_oracle": {
+    "path": "build/feature93-cached-stream-old-oracle-actual-1/validation.json",
+    "bytes": 7697,
+    "sha256": "052bc299765f92fbfca89ca23d866cfbe7354376bb23d039ed49b7c3a91b38d8"
+  },
+  "cached_stream_oracle_expected": {
+    "path": "build/feature93-cached-stream-old-oracle-actual-1/expected.json",
+    "bytes": 12446,
+    "sha256": "2ea000a625d9036c983e9cd8ce923522d909eb885423af66d31c2404e5e08137"
+  },
+  "direct_OLD_native_oracle_accounting": {
+    "original_cases_retained": 20,
+    "original_cases_replayed": 0,
+    "additional_cached_stream_calls": 1,
+    "total": 21
+  },
+  "beforechange": {
+    "path": "build/literal-selection93-before-behavior-validation.json",
+    "bytes": 9643,
+    "sha256": "b7ce03bd2287deeae237c1a72b62d1dfdf0a5e2a31cde88a5998a9c3f4e3c522"
+  },
+  "browser_evidence": {
+    "path": "build/feature93-browser-current-retry.json",
+    "bytes": 851,
+    "sha256": "9974ad88c4732be465645b62ff2e53bf5364f3c0190585225310fde667f30014"
+  },
+  "source_availability_audit": {
+    "path": "build/original-model-context92-source-availability-audit.json",
+    "bytes": 10331,
+    "sha256": "901b106d930af885b38d8868bd4cae8566b871cfe47471c44499d3284b74daa8"
+  },
+  "availability_audit_accounting": {
+    "authoritative_incomplete_units": 228,
+    "inventory_rows_indexed": 228,
+    "catalogue_metadata_verified_against_current": 228,
+    "native_signature_and_adapter_availability_units_inspected": 26,
+    "new_feature92_bounded_inspected_units": 24,
+    "retained_feature91_bounded_inspected_units": 2,
+    "units_not_given_direct_unit_level_source_availability_review": 202,
+    "full_behavioral_parity_units_verified": 0
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "delivered_feature87"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "delivered_feature88"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "delivered_feature89"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "delivered_feature84"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "delivered_feature85"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "delivered_feature86"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "delivered_feature90"
+    }
+  ],
+  "remaining_availability_backlog": [
+    {
+      "id": "G91-original-process-tree-trace-reduction",
+      "state": "delivered_feature91",
+      "supporting_modules": [
+        "algo.reduction.process_tree.reducer",
+        "algo.reduction.process_tree.variants.tree_tr_based"
+      ]
+    },
+    {
+      "id": "G92-native-query-parameter-exposure",
+      "state": "open_ranked_candidate_not_assigned",
+      "catalogue_link": "Indirect SQL utility association; native parameter/options exposure gap independently source confirmed."
+    },
+    {
+      "id": "standalone-original-PNML-context",
+      "state": "source_candidate_pending_direct_unit_review",
+      "question": "Expose standalone original PNML native LLM context in public File workspace without cached event log.",
+      "claim_boundary": "Additional UI/native-caller source candidate; not included in the two directly reviewed tree units and not behavioral parity proof."
+    }
+  ],
+  "backlog_resolution": {
+    "feature": 93,
+    "selected_findings": [
+      "F92-LTL-1",
+      "heuristic-literal-protected-path-set"
+    ],
+    "state": "delivered_without_strict_promotion",
+    "historical_standalone_original_PNML_context_candidate": "delivered_feature92; inherited historical backlog entry is superseded"
+  },
+  "input_and_result_semantics": {
+    "ltl_options": 7,
+    "heuristic_options": 24,
+    "heuristic_DFG_fields": 14,
+    "heuristics_net_fields": 35,
+    "actual_primary_result_before_legacy_projection": true,
+    "legacy_omission_preserved": true,
+    "complete_original_request_bytes": true,
+    "complete_results_separate_from_optional_export_errors": true
+  },
+  "limitations": [
+    "Strict reference behavior and performance remain unproven for all 228 incomplete catalogue units.",
+    "Only 26 unique incomplete units received prior bounded signature/carrier/adapter review; 202 remain without direct unit-level availability review. These historical source maps do not claim current hashes.",
+    "Inherited httplib rejects browser-escaped CRLF filenames before route entry; the shared HTTP framework was not changed.",
+    "NativeAttributeValue generated private scalar identity and raw NaN payload bit identity are not constructor transport guarantees.",
+    "Identical raw query pairs may be normalized upstream by inherited httplib; route provenance begins after that boundary.",
+    "The CLI tee records logical C++ stream bytes before Windows text translation. Captured physical stdout remains separately retained and is checked against exact LF-to-CRLF expansion; those two byte domains are not conflated.",
+    "LTL pandas/polars reference modules and partial heuristics dispatcher are associations; no PLUSPLUS-module or complete CLASSIC-module parity promotion is claimed."
+  ],
+  "journal_policy": "Index contains parent HEAD plus owned93 suffix only; working journal retains complete inherited dirty prefix.",
+  "browser_ui_verified": false,
+  "strict_promotion": false,
+  "full_parity": false,
+  "goal_complete": false,
+  "next_work": "Continue every remaining catalogue input, operation, control and result gap; then complete strict behavioral, browser, concurrency and performance verification."
+}

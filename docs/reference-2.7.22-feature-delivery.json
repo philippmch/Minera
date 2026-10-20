@@ -4067,6 +4067,31 @@
       "browser_validation_complete": false,
       "strict_promotion": false,
       "added": "2026-10-20"
+    },
+    {
+      "id": "native_exact_ltl_and_heuristic_controls",
+      "state": "exact_original_filter_and_discovery_controls_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [],
+      "supporting_modules": [
+        "algo.filtering.log.ltl.ltl_checker",
+        "algo.filtering.pandas.ltl.ltl_checker",
+        "algo.filtering.polars.ltl.ltl_checker"
+      ],
+      "supporting_dispatchers": [
+        "algo.discovery.heuristics"
+      ],
+      "operations": [
+        "filter_original_eventlog_ltl",
+        "mine_exact_controls",
+        "discover_original_heuristic_dfg",
+        "discover_cached_workflow_exact_controls"
+      ],
+      "validation": "docs/feature-first-exact-filter-discovery-validation.json",
+      "browser_validation_complete": false,
+      "strict_promotion": false,
+      "added": "2026-10-20"
     }
   ],
   "execution_priority": [
