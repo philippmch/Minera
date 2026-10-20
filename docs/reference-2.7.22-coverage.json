@@ -14597,8 +14597,39 @@
       "owner": "support:transformation.ocel.graphs",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/ocel20-computation-parity-contract.md",
+      "artifacts": [
+        "include/minera/ocel_transform.hpp",
+        "src/backend/ocel_transform.cpp",
+        "src/backend/tests/test_ocel20_computation_module.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.graphs.ocel20_computation",
+        "implementation": [
+          {
+            "path": "src/backend/ocel_transform.cpp",
+            "symbol": "compute_ocel20"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel20_computation_module.cpp",
+            "executable": "minera_ocel20_computation_module_tests",
+            "case": "retained_public_ocel20_cases"
+          },
+          {
+            "path": "src/backend/tests/test_ocel20_computation_module.cpp",
+            "executable": "minera_ocel20_computation_module_tests",
+            "case": "metadata_multiplicity_and_independent_result"
+          },
+          {
+            "path": "src/backend/tests/test_ocel20_computation_module.cpp",
+            "executable": "minera_ocel20_computation_module_tests",
+            "case": "selected_graph_diagnostics_and_legacy_separation"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.split_ocel.variants.ancestors_descendants",
