@@ -152,6 +152,7 @@
 #include "minera/monte_carlo.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/ocel.hpp"
+#include "minera/otg_threshold_json.hpp"
 #include "minera/ocel_csv.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/ocel_filter.hpp"
@@ -3299,6 +3300,8 @@ void handle_ocel_conformance(const httplib::Request& request,
     response.set_content(error_json(error.what()), "application/json");
   }
 }
+
+#include "otg_threshold_route.hpp"
 
 // Checks the most recently mined log against a user-supplied model â€” a PNML
 // workflow net, a BPMN 2.0 process, or a PTML process tree, told apart by the
@@ -10591,7 +10594,10 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/filter", handle_ocel_filter);
   server.Post("/api/ocel/sqlite", handle_ocel_sqlite);
   server.Post("/api/ocel/io", handle_ocel_exchange);
-  server.Post("/api/ocel/conformance", handle_ocel_conformance);
+  server.Post("/api/ocel/conformance", [](const httplib::Request& request, httplib::Response& response) {
+    if(request.has_param("otg_theta_by_relation_json")||request.has_file("otg_theta_by_relation_json"))handle_exact_otg_conformance(request,response);
+    else handle_ocel_conformance(request,response);
+  });
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);
   server.Post("/api/genetic-mine", handle_genetic_mine);
