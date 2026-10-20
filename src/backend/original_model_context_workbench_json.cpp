@@ -33,6 +33,7 @@ struct Json {
   using Array = std::vector<Json>;
   using Object = std::map<std::string, Json, std::less<>>;
   std::variant<std::nullptr_t, bool, Number, std::string, Array, Object> value;
+  std::vector<std::string> object_order; // Source order for ordered dictionary consumers.
   bool null() const { return std::holds_alternative<std::nullptr_t>(value); }
   const Object& object() const {
     if (const auto* result = std::get_if<Object>(&value)) return *result;
@@ -170,16 +171,18 @@ class Parser {
     const auto c = text_[position_];
     if (c == '"') return Json{string()};
     if (take('{')) {
-      Json::Object result;
+      Json::Object result;std::vector<std::string> order;
       if (!take('}')) {
         do {
           auto key = string();
           require(':');
-          if (!result.emplace(std::move(key), value(depth + 1)).second) invalid("duplicate object key");
+          auto item=value(depth+1);
+          if (!result.emplace(key,std::move(item)).second) invalid("duplicate object key");
+          order.push_back(std::move(key));
         } while (take(','));
         require('}');
       }
-      return Json{std::move(result)};
+      return Json{std::move(result),std::move(order)};
     }
     if (take('[')) {
       Json::Array result;
@@ -371,6 +374,8 @@ template<class T>struct Record;
 #define RECORD(Type,...) template<>struct Record<Type>{static auto members(){using V=Type;return std::make_tuple(__VA_ARGS__);}};
 RECORD(DeclareConstraint,F(first),F(second),F(binary),F(support),F(confidence))
 RECORD(DeclareModel,F(rules))
+RECORD(OrderedDeclareFamily,F(key),F(value))
+RECORD(OrderedDeclareModel,F(rules))
 RECORD(LogSkeletonPair,F(source),F(target))
 RECORD(LogSkeletonModel,F(equivalence),F(always_after),F(always_before),F(never_together),F(directly_follows),F(activ_freq))
 RECORD(TemporalProfileEntry,F(source),F(target),F(count),F(mean_seconds),F(standard_deviation_seconds))
@@ -449,7 +454,7 @@ template<class T>void write(std::ostream& out,const T& value){
  else{out<<'{';bool first=true;std::apply([&](const auto&...entry){([&]{if(!first)out<<',';first=false;out<<q(entry.name)<<':';write(out,value.*(entry.pointer));}(),...);},Record<T>::members());out<<'}';}
 }
 std::string parts_json(const std::vector<DiscoveryWorkbenchPart>& parts){auto out=output();out<<'[';bool first=true;for(const auto& part:parts){if(!first)out<<',';first=false;out<<"{\"name\":"<<q(part.name)<<",\"filename\":"<<q(part.filename)<<",\"bytes\":"<<q(part.bytes)<<",\"file\":"<<(part.file?"true":"false")<<'}';}out<<']';return out.str();}
-using Model=std::variant<DeclareModel,LogSkeletonModel,TemporalProfile,PetriNet,PnmlDocument>;
+using Model=std::variant<OrderedDeclareModel,LogSkeletonModel,TemporalProfile,PetriNet,PnmlDocument>;
 std::string snapshot(const Model& value){return std::visit([](const auto& x){return render(x);},value);}
 std::string type_name(const Model& value){static const char* names[]={"DeclareModel","LogSkeletonModel","TemporalProfile","PetriNet","PnmlDocument"};return names[value.index()];}
 bool header_text(std::string_view value){if(value=="true"||value=="1")return true;if(value=="false"||value=="0")return false;invalid("header expects true/false or 1/0");}
@@ -457,12 +462,24 @@ bool header_options(std::string_view value){const auto doc=Parser(value).parse()
 PnmlImportOptions import_options(std::string_view value){const auto doc=Parser(value).parse();const auto& o=doc.object();if(o.size()!=5)invalid("PNML import options require all five native fields");for(const auto* key:{"infer_initial_marking","infer_final_marking","import_stochastic_map","require_workflow_boundaries","public_marking_semantics"})(void)required(o,key);return read<PnmlImportOptions>(doc);}
 } // namespace
 DeclareModel parse_original_context_declare_json(std::string_view input){const auto doc=Parser(input).parse();const auto& o=doc.object();allowed_fields(o,{"rules"});DeclareModel model;model.rules=read<decltype(model.rules)>(required(o,"rules"));return model;}
+OrderedDeclareModel parse_original_context_ordered_declare_json(std::string_view input){
+ const auto doc=Parser(input).parse();const auto& root=doc.object();allowed_fields(root,{"rules"});
+ const auto& rules=required(root,"rules");OrderedDeclareModel model;std::set<std::string> seen;
+ const auto append=[&](std::string family,const Json& entries){if(!seen.insert(family).second)invalid("duplicate decoded map key");model.rules.push_back({std::move(family),read<std::vector<DeclareConstraint>>(entries)});};
+ if(const auto* object=std::get_if<Json::Object>(&rules.value)){
+  for(const auto& family:rules.object_order)append(family,object->at(family));
+ }else for(const auto& item:rules.array()){
+  const auto& entry=item.object();allowed_fields(entry,{"key","value"});append(required(entry,"key").string(),required(entry,"value"));
+ }
+ return model;
+}
 LogSkeletonModel parse_original_context_skeleton_json(std::string_view input){return read<LogSkeletonModel>(Parser(input).parse());}
 TemporalProfile parse_original_context_temporal_json(std::string_view input){return read<TemporalProfile>(Parser(input).parse());}
 PetriNet parse_original_context_net_json(std::string_view input){return read<PetriNet>(Parser(input).parse());}
 PnmlDocument parse_original_context_document_json(std::string_view input){return read<PnmlDocument>(Parser(input).parse());}
 TokenMarking parse_original_context_marking_json(std::string_view input){return read<TokenMarking>(Parser(input).parse());}
 std::string serialize_original_context_model_json(const DeclareModel& value){return render(value);}
+std::string serialize_original_context_model_json(const OrderedDeclareModel& value){return render(value);}
 std::string serialize_original_context_model_json(const LogSkeletonModel& value){return render(value);}
 std::string serialize_original_context_model_json(const TemporalProfile& value){return render(value);}
 std::string serialize_original_context_model_json(const PetriNet& value){return render(value);}
@@ -499,7 +516,7 @@ DiscoveryWorkbenchResponse execute_original_model_context(const std::vector<Disc
    if(variant!="petri_net")detected=variant=="declare"?"declare_json":variant=="log_skeleton"?"log_skeleton_json":"temporal_profile_json";
    else{const auto pos=original_bytes.find_first_not_of(" \t\r\n");if(pos!=std::string::npos&&original_bytes[pos]=='{'){const auto doc=Parser(original_bytes).parse();detected=doc.object().contains("net")?"native_document":"native_net";}else detected="pnml";}
   }
-  if(variant=="declare"&&detected=="declare_json")model=parse_original_context_declare_json(original_bytes);
+  if(variant=="declare"&&detected=="declare_json")model=parse_original_context_ordered_declare_json(original_bytes);
   else if(variant=="log_skeleton"&&detected=="log_skeleton_json")model=parse_original_context_skeleton_json(original_bytes);
   else if(variant=="temporal_profile"&&detected=="temporal_profile_json")model=parse_original_context_temporal_json(original_bytes);
   else if(variant=="petri_net"&&detected=="native_net")model=parse_original_context_net_json(original_bytes);
@@ -524,7 +541,7 @@ DiscoveryWorkbenchResponse execute_original_model_context(const std::vector<Disc
   effective_before=snapshot(*effective);effective_after=effective_before;
   phase="native_error";entered=true;
   std::visit([&](const auto& input){using T=std::decay_t<decltype(input)>;
-   if constexpr(std::is_same_v<T,DeclareModel>)result=abstract_declare(input,*header);
+   if constexpr(std::is_same_v<T,OrderedDeclareModel>)result=abstract_declare(input,*header);
    else if constexpr(std::is_same_v<T,LogSkeletonModel>)result=abstract_log_skeleton(input,*header);
    else if constexpr(std::is_same_v<T,TemporalProfile>)result=abstract_temporal_profile(input,*header);
    else if constexpr(std::is_same_v<T,PnmlDocument>)result=abstract_petri_net(input,*header);
