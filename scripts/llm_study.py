@@ -13,6 +13,10 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+if __package__:
+    from .llm_runtime import add_provider_call_arguments, provider_call_overrides
+else:
+    from llm_runtime import add_provider_call_arguments, provider_call_overrides
 
 
 def restore_sql(sql):
@@ -80,6 +84,7 @@ def main(argv=None):
     parser.add_argument('--response-file');parser.add_argument('--obtain-query',choices=('true','false'),default='true');parser.add_argument('--execute-query',choices=('true','false'),default='true')
     parser.add_argument('--provider',choices=('openai','anthropic','google'),default='openai');parser.add_argument('--model');parser.add_argument('--engine',choices=('sqlite','duckdb'),default='sqlite')
     parser.add_argument('--case-attribute',default='case:concept:name');parser.add_argument('--activity-attribute');parser.add_argument('--max-len',type=int,default=10000);parser.add_argument('--row-limit',type=int,default=1000);parser.add_argument('--output-dir')
+    add_provider_call_arguments(parser)
     args=parser.parse_args(argv)
     if not 1<=args.max_len<=2*1024*1024 or not 1<=args.row_limit<=1000000:raise ValueError('Invalid prompt or row bound.')
     source=native_json(args.query_cli,[args.log,'--sql','SELECT * FROM dataframe','--limit','1000000'])
@@ -98,7 +103,7 @@ def main(argv=None):
     if args.response_file:response=Path(args.response_file).read_text(encoding='utf-8')
     else:
         if not args.model:raise ValueError('Enter --model or supply --response-file.')
-        request=urllib.request.Request(args.llm_runtime_url.rstrip('/')+'/complete',data=json.dumps({'provider':args.provider,'model':args.model,'prompt':prompt,'max_tokens':4096}).encode(),headers={'Content-Type':'application/json'})
+        request=urllib.request.Request(args.llm_runtime_url.rstrip('/')+'/complete',data=json.dumps({'provider':args.provider,'model':args.model,'prompt':prompt,'max_tokens':4096,**provider_call_overrides(args)}).encode(),headers={'Content-Type':'application/json'})
         with urllib.request.urlopen(request,timeout=90) as reply:completion=json.load(reply)
         report['completion']=completion;response=completion['text']
     report['response']=response

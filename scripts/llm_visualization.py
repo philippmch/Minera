@@ -13,9 +13,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 if __package__:
-    from .llm_runtime import MAX_INPUT_BYTES, MAX_RESPONSE_BYTES, NoRedirect, ProviderError, ProviderRuntime, image_file, provider_configs
+    from .llm_runtime import (
+        MAX_INPUT_BYTES, MAX_RESPONSE_BYTES, NoRedirect, ProviderError,
+        ProviderRuntime, image_file, provider_configs, add_provider_call_arguments,
+        provider_call_overrides, provider_call_report_request,
+    )
 else:
-    from llm_runtime import MAX_INPUT_BYTES, MAX_RESPONSE_BYTES, NoRedirect, ProviderError, ProviderRuntime, image_file, provider_configs
+    from llm_runtime import (
+        MAX_INPUT_BYTES, MAX_RESPONSE_BYTES, NoRedirect, ProviderError,
+        ProviderRuntime, image_file, provider_configs, add_provider_call_arguments,
+        provider_call_overrides, provider_call_report_request,
+    )
 import os
 
 
@@ -71,6 +79,7 @@ def main(argv=None):
     parser.add_argument("--max-tokens", type=int, default=4096)
     parser.add_argument("--prompt-only", action="store_true")
     parser.add_argument("--output")
+    add_provider_call_arguments(parser)
     args = parser.parse_args(argv)
     try:
         module, name = args.saver.rsplit(":", 1)
@@ -80,9 +89,9 @@ def main(argv=None):
         if not isinstance(values, list) or not isinstance(options, dict):
             raise ValueError("Saver arguments must be a JSON list and options a JSON object.")
         draft = prepare_visualization(saver, *values, description=args.description, **options)
-        request = {**draft, "provider": args.provider, "model": args.model or "", "max_tokens": args.max_tokens}
+        request = {**draft, "provider": args.provider, "model": args.model or "", "max_tokens": args.max_tokens, **provider_call_overrides(args)}
         if args.provider == "openai": request["openai_api"] = args.openai_api
-        report = {"family": "LLM_VISUALIZATION", "saver": args.saver, "request": request}
+        report = {"family": "LLM_VISUALIZATION", "saver": args.saver, "request": provider_call_report_request(request)}
         if not args.prompt_only:
             if not args.model: raise ValueError("Enter a model name or use --prompt-only.")
             report["completion"] = runtime_completion(args.runtime_url, request) if args.runtime_url else ProviderRuntime(provider_configs(os.environ)).complete(request)

@@ -3,6 +3,12 @@ import importlib.util
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
+from contextlib import redirect_stdout
+import io
+import json
+import tempfile
+import types
 
 R=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(R/"scripts"))
@@ -40,5 +46,67 @@ class VisualizationTests(unittest.TestCase):
             def saver(path):
                 if payload is not None:Path(path).write_bytes(payload)
             with self.assertRaises((ValueError,OSError)):vis.prepare_visualization(saver)
+
+    def test_cli_overrides_are_completion_only_and_report_request_is_sanitized(self):
+        completion={'family':'LLM_COMPLETION','text':'provider answer',
+                    'response':{'api_key':'provider-owned-independent-value','other':['full',1]}}
+        for direct in (False,True):
+            with self.subTest(direct=direct),tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);arguments=root/'args.json';options=root/'options.json'
+                arguments.write_text('[{"native":"model"}]',encoding='utf-8')
+                options.write_text('{"annotated":true}',encoding='utf-8')
+                module=types.ModuleType('owned_visualization_saver');saves=[]
+                def saver(model,path,**kwargs):
+                    saves.append((model,kwargs));Path(path).write_bytes(PNG)
+                module.save=saver
+                output=io.StringIO();calls=[]
+                def complete(request):calls.append(request);return completion
+                def runtime(url,request):
+                    self.assertEqual(url,'http://127.0.0.1:8189');return complete(request)
+                argv=['--saver','owned_visualization_saver:save','--args-file',str(arguments),
+                      '--options-file',str(options),'--model','fixture','--api-key','synthetic-visual-key',
+                      '--api-url','http://127.0.0.1:9003/v1','--openai-token-field','max_tokens']
+                if not direct:argv+=['--runtime-url','http://127.0.0.1:8189']
+                with patch.dict(sys.modules,{'owned_visualization_saver':module}), \
+                     patch.object(vis,'runtime_completion',side_effect=runtime) as bridge, \
+                     patch.object(vis,'provider_configs',return_value={'fixture':'startup'}) as configs, \
+                     patch.object(vis,'ProviderRuntime') as provider,redirect_stdout(output):
+                    provider.return_value.complete.side_effect=complete
+                    self.assertEqual(vis.main(argv),0)
+                    if direct:
+                        bridge.assert_not_called();configs.assert_called_once()
+                        provider.assert_called_once_with({'fixture':'startup'})
+                    else:provider.assert_not_called();configs.assert_not_called()
+                self.assertEqual(saves,[({'native':'model'},{'annotated':True})])
+                self.assertEqual(len(calls),1)
+                request=calls[0]
+                self.assertEqual(request['api_key'],'synthetic-visual-key')
+                self.assertEqual(request['api_url'],'http://127.0.0.1:9003/v1')
+                self.assertEqual(request['openai_token_field'],'max_tokens')
+                self.assertEqual(base64.b64decode(request['images'][0]['data']),PNG)
+                report=json.loads(output.getvalue())
+                self.assertEqual(report['completion'],completion)
+                for name in ('api_key','api_url','openai_token_field'):self.assertNotIn(name,report['request'])
+                self.assertNotIn('synthetic-visual-key',output.getvalue())
+                self.assertNotIn('http://127.0.0.1:9003/v1',output.getvalue())
+
+    def test_prompt_only_output_omits_call_configuration_without_calling_provider(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);arguments=root/'args.json';output=root/'report.json'
+            arguments.write_text('[]',encoding='utf-8')
+            module=types.ModuleType('owned_visualization_saver')
+            def saver(path):Path(path).write_bytes(PNG)
+            module.save=saver
+            with patch.dict(sys.modules,{'owned_visualization_saver':module}), \
+                 patch.object(vis,'runtime_completion') as bridge,patch.object(vis,'ProviderRuntime') as provider:
+                self.assertEqual(vis.main(['--saver','owned_visualization_saver:save',
+                    '--args-file',str(arguments),'--prompt-only','--output',str(output),
+                    '--api-key','','--api-url','http://127.0.0.1:9004/v1',
+                    '--openai-token-field','max_tokens']),0)
+                bridge.assert_not_called();provider.assert_not_called()
+            report=json.loads(output.read_text(encoding='utf-8'))
+            self.assertNotIn('completion',report)
+            for name in ('api_key','api_url','openai_token_field'):self.assertNotIn(name,report['request'])
+            self.assertNotIn('http://127.0.0.1:9004/v1',output.read_text(encoding='utf-8'))
 
 if __name__=="__main__":unittest.main()

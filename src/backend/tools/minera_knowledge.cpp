@@ -46,7 +46,8 @@ int usage(const char* program) {
                " [--runtime-url URL --provider openai|anthropic|google --model MODEL]"
                " [--max-tokens N] [--temperature N] [--openai-api responses|chat_completions]"
                " [--image PATH] [--image-detail auto|low|high|original]"
-               " [--extra-payload JSON | --extra-payload-file PATH]\n";
+               " [--extra-payload JSON | --extra-payload-file PATH]"
+               " [--api-key TEXT] [--api-url URL] [--openai-token-field max_completion_tokens|max_tokens]\n";
   std::cerr << "Exact options require all eight native fields. Assumptions are NativeString arrays; context is [NativeString,NativeString] pairs. File controls preserve original bytes. Exact output retains the complete native preview separately from optional explicit runtime completion.\n";
   return 2;
 }
@@ -109,6 +110,9 @@ int run(int argc, char** argv) {
       else if (option == "--model") completion.model = value;
       else if (option == "--max-tokens") completion.max_tokens = positive_size(value, option);
       else if (option == "--openai-api") completion.openai_api = value;
+      else if (option == "--api-key") completion.api_key = value;
+      else if (option == "--api-url") completion.api_url = value;
+      else if (option == "--openai-token-field") completion.openai_token_field = value;
       else if (option == "--image") completion.images.push_back(minera::llm_runtime::image_file(std::filesystem::u8path(value)));
       else if (option == "--image-detail") image_detail = value;
       else if (option == "--extra-payload") completion.extra_payload = value;
