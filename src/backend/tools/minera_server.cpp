@@ -2072,7 +2072,8 @@ void handle_ocel_discovery(const httplib::Request& request,
   try {
     static const std::set<std::string> allowed = {
         "variant", "compute_edges_performance", "ocpn_annotation",
-        "diagnostics_with_token_based_replay", "ocpn_activity_attribute",
+        "diagnostics_with_token_based_replay", "ocpn_disable_strict_sequence_cut",
+        "ocpn_disable_fallthroughs", "ocpn_activity_attribute",
         "ocpn_object_type_attribute", "ocdfg_activity_attribute",
         "ocdfg_object_type_attribute", "saw_activity_attribute",
         "saw_object_type_attribute"};
@@ -2099,6 +2100,10 @@ void handle_ocel_discovery(const httplib::Request& request,
       payload = minera::otg_json(minera::discover_otg_classic(log));
     } else if (variant == "ocpn") {
       minera::OcpnDiscoveryOptions discovery;
+      discovery.disable_strict_sequence_cut = ocel_query_bool(
+          request, "ocpn_disable_strict_sequence_cut", false);
+      discovery.disable_fallthroughs = ocel_query_bool(
+          request, "ocpn_disable_fallthroughs", false);
       if (request.has_param("ocpn_annotation")) {
         const auto value = request.get_param_value("ocpn_annotation");
         if (value == "annotated" || value == "classic") {
@@ -2439,6 +2444,7 @@ void handle_ocel_playout(const httplib::Request& request,
         "return_traces",
         "seed", "start", "case_interval", "event_interval", "ocpn_variant",
         "double_arc_threshold", "noise_threshold", "ocpn_annotation",
+        "ocpn_disable_strict_sequence_cut", "ocpn_disable_fallthroughs",
         "ocpn_activity_attribute", "ocpn_object_type_attribute",
         "include_open_source", "include_model"};
     for (const auto& [key, value] : request.params) {
@@ -2536,6 +2542,10 @@ void handle_ocel_playout(const httplib::Request& request,
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     minera::OcpnDiscoveryOptions discovery;
+    discovery.disable_strict_sequence_cut = ocel_query_bool(
+        request, "ocpn_disable_strict_sequence_cut", false);
+    discovery.disable_fallthroughs = ocel_query_bool(
+        request, "ocpn_disable_fallthroughs", false);
     if (request.has_param("ocpn_variant")) {
       const auto value = request.get_param_value("ocpn_variant");
       if (value == "log" || value == "im") {

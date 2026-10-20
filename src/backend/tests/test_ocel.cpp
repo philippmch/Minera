@@ -5,14 +5,119 @@
 #include <cstdint>
 #include <cmath>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/inductive_miner.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/saw_nets.hpp"
 
 namespace {
+
+std::string policy_net_signature(const minera::PetriNet& net) {
+  std::ostringstream out;
+  out << net.place_count() << ':' << net.source() << ':' << net.sink() << ':';
+  for (const auto& activity : net.activities()) out << activity << ',';
+  for (const auto& transition : net.transitions()) {
+    out << '|';
+    if (transition.activity) out << 'a' << *transition.activity;
+    else out << 't';
+    out << '[';
+    for (const auto place : transition.inputs) out << place << ',';
+    out << "]>[";
+    for (const auto place : transition.outputs) out << place << ',';
+    out << ']';
+  }
+  return out.str();
+}
+
+minera::Ocel policy_ocel_from_traces(
+    const std::vector<std::vector<std::string>>& traces) {
+  minera::Ocel result;
+  for (std::size_t trace = 0; trace < traces.size(); ++trace) {
+    const auto suffix = std::to_string(trace);
+    const auto order_id = "order-" + suffix;
+    const auto item_id = "item-" + suffix;
+    result.objects.push_back({order_id, "order", {}});
+    result.objects.push_back({item_id, "item", {}});
+    for (std::size_t event = 0; event < traces[trace].size(); ++event) {
+      const auto id = "event-" + suffix + "-" + std::to_string(event);
+      const auto timestamp = "2026-01-01T00:00:0" +
+                             std::to_string(event) + "Z";
+      result.events.push_back({id, traces[trace][event], timestamp, {}});
+      result.relations.push_back({id, order_id, ""});
+      result.relations.push_back({id, item_id, ""});
+    }
+  }
+  return result;
+}
+
+void ocpn_miner_policy_contract() {
+  // These are existing inductive-miner policy counterexamples, lifted to
+  // shared-event OCELs. Both object types must receive each selected policy.
+  const std::vector<std::vector<std::vector<std::string>>> fixtures = {
+      {{"a"}, {"a", "b", "c"}},
+      {{"a", "c", "b", "b"}, {"c", "b", "a"}},
+      {{"A", "D", "B"}, {"C", "A", "C"}, {"C", "D", "D", "B"}}};
+  for (std::size_t fixture = 0; fixture < fixtures.size(); ++fixture) {
+    const auto log = policy_ocel_from_traces(fixtures[fixture]);
+    const auto default_model = minera::discover_ocpn(log);
+    minera::OcpnDiscoveryOptions explicit_defaults;
+    explicit_defaults.disable_strict_sequence_cut = false;
+    explicit_defaults.disable_fallthroughs = false;
+    assert(minera::serialize_ocpn_json(default_model) ==
+           minera::serialize_ocpn_json(
+               minera::discover_ocpn(log, explicit_defaults)));
+
+    for (const auto variant : {minera::OcpnInductiveVariant::kLog,
+                               minera::OcpnInductiveVariant::kDfg}) {
+      std::vector<std::string> policy_signatures;
+      for (const bool disable_strict : {false, true}) {
+        for (const bool disable_fallthroughs : {false, true}) {
+          minera::OcpnDiscoveryOptions options;
+          options.variant = variant;
+          options.disable_strict_sequence_cut = disable_strict;
+          options.disable_fallthroughs = disable_fallthroughs;
+          const auto model = minera::discover_ocpn(log, options);
+          const auto causal = minera::discover_oc_causal_net(log, options);
+          assert(minera::serialize_ocpn_json(model) ==
+                 minera::serialize_ocpn_json(causal.workflow_projection));
+
+          // Compare each complete discovered net with a separately configured
+          // direct inductive-miner invocation, including invisible routing.
+          minera::InductiveMinerVariantLog variants;
+          for (const auto& trace : fixtures[fixture])
+            variants.push_back({trace, 1});
+          minera::InductiveMinerOptions miner;
+          miner.variant = variant == minera::OcpnInductiveVariant::kLog
+                              ? minera::InductiveMinerVariant::kLog
+                              : minera::InductiveMinerVariant::kDfg;
+          miner.disable_strict_sequence_cut = disable_strict;
+          miner.disable_fallthroughs = disable_fallthroughs;
+          const auto expected = policy_net_signature(minera::to_petri_net(
+              minera::discover_process_tree(variants, miner)));
+          assert(model.petri_nets.size() == 2);
+          for (const auto& [type, net] : model.petri_nets) {
+            assert(type == "order" || type == "item");
+            assert(policy_net_signature(net) == expected);
+          }
+          policy_signatures.push_back(expected);
+        }
+      }
+      // Defaults vs one enabled option: [false,false], [false,true],
+      // [true,false], [true,true]. Compare actual executable topology.
+      if (fixture == 0 && variant == minera::OcpnInductiveVariant::kLog)
+        assert(policy_signatures[0] != policy_signatures[2]);
+      if (fixture == 1 && variant == minera::OcpnInductiveVariant::kLog)
+        assert(policy_signatures[0] != policy_signatures[1]);
+      if (fixture == 2 && variant == minera::OcpnInductiveVariant::kDfg)
+        assert(policy_signatures[0] != policy_signatures[2]);
+    }
+  }
+}
 
 void variant1_text_contract(const minera::Ocel& log) {
   const auto text = minera::describe_ocel_text(log);
@@ -87,6 +192,7 @@ void variant2_tuple_contract(const minera::Ocel& log) {
 }  // namespace
 
 int main() {
+  ocpn_miner_policy_contract();
   const std::string input =
       R"({"ocel:events":{"e2":{"ocel:activity":"Ship","ocel:timestamp":"2024-01-02T00:00:00Z","ocel:omap":["o1","o2"],"ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"source"},{"ocel:oid":"o2","ocel:qualifier":"target"}],"ocel:vmap":{"count":2}},"e1":{"ocel:activity":"Create","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]}},"ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{"amount":12.5}},"o2":{"ocel:type":"item","ocel:ovmap":{}}}})";
   auto log = minera::parse_ocel_json(input);
