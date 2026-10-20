@@ -30,6 +30,7 @@ add_library(minera_core
   src/backend/attribute_kde.cpp
   src/backend/boundary_activities.cpp
   src/backend/filtering_boundary_common.cpp
+  src/backend/log_trace_filter.cpp
   src/backend/attribute_value_repetition.cpp
   src/backend/case_grouping.cpp
   src/backend/chaotic_activities.cpp
@@ -956,6 +957,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_infix_to_regex_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_infix_to_regex_tests COMMAND minera_infix_to_regex_tests)
 
+  add_executable(minera_log_trace_filter_tests src/backend/tests/test_log_trace_filter.cpp)
+  target_link_libraries(minera_log_trace_filter_tests PRIVATE minera::core)
+  target_compile_features(minera_log_trace_filter_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_log_trace_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_log_trace_filter_tests COMMAND minera_log_trace_filter_tests)
+
   add_executable(minera_variant_statistics_tests src/backend/tests/test_variant_statistics.cpp)
   target_link_libraries(minera_variant_statistics_tests PRIVATE minera::core)
   target_compile_features(minera_variant_statistics_tests PRIVATE cxx_std_20)
@@ -1764,6 +1771,9 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_ocel_cobirth_module_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_cobirth_module_tests
            COMMAND minera_ocel_cobirth_module_tests)
+
+
+
 
   add_executable(minera_ocel_playout_tests
     src/backend/tests/test_ocel_playout.cpp

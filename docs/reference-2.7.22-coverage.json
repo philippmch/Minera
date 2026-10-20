@@ -11537,8 +11537,29 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/log-trace-filter-parity-contract.md",
+      "artifacts": [
+        "include/minera/log_trace_filter.hpp",
+        "src/backend/log_trace_filter.cpp",
+        "src/backend/tests/test_log_trace_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.traces.trace_filter",
+        "implementation": [
+          {
+            "path": "src/backend/log_trace_filter.cpp",
+            "symbol": "filter_log_traces"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_trace_filter.cpp",
+            "executable": "minera_log_trace_filter_tests",
+            "case": "log_trace_filter_module_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.variants.variants_filter",

@@ -23,20 +23,20 @@ interaction remains unverified under the previously recorded browser block.
 | Object-interaction graph | Empty event/object identities repaired; 90/90 direct public edge sets match, with preserved validation and existing OCEL regressions |
 | Temporal-profile description | Empty-model newlines repaired; seven complete public-byte outputs match; numeric text verified under a hostile locale and all four rounding modes |
 | Infix-to-regex conversion | Missing converter implemented; all 34 captured outputs match, including wildcard boundaries and every ASCII escaping character |
+| Log trace filtering | New serialized-activity API matches all 50 captured outcomes, custom keys, polarity, full metadata and missing-value errors |
 | Object-cobirth graph | Empty IDs and missing-event failures repaired; 97/97 captured outcomes match, including ordering and parameter controls |
 
 These are semantic module closures, including missing helper implementations
 and repairs. They do not complete their parent families. Detailed contracts
 and evidence limits are linked from each module's coverage record.
 
-Coverage is now **46 complete / 40 partial packages**, **207 complete / 180
-partial modules**, and **220 open strict coverage units**, down from 228.
+Coverage is now **46 complete / 40 partial packages**, **208 complete / 179
+partial modules**, and **219 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 
 ## Active requirements
 
-- Check actual log trace-filter behavior against wildcard and literal patterns.
 - Check the remaining OCEL lifecycle graph relations against direct edge sets.
 - Close Petri-description literal quoting, including nonprinting Unicode.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
