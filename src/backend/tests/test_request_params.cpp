@@ -2238,6 +2238,141 @@ void parse_mine_params_preserves_explicit_empty_declare_filters() {
   assert(!absent.declare_options.allowed_templates.has_value());
 }
 
+// Both discovery operations consume native string vectors. The exact carrier
+// must preserve values before their algorithms deliberately form native sets.
+void parse_mine_params_preserves_literal_discovery_vectors() {
+  const std::string vector_json =
+      R"(["A,B"," spaced ","",{"native_bytes":"hex-v1","data":"00ff2c20"},"A,B","\u03b1\u96ea"] )";
+  const std::vector<std::string> expected = {
+      "A,B", " spaced ", "", std::string("\0\xff, ", 4), "A,B",
+      "\xce\xb1\xe9\x9b\xaa"};
+  const auto exact = minera::parse_mine_params(fields({
+      {"declare_considered_activities_json", vector_json},
+      {"dfg_case_attributes_json", vector_json},
+  }));
+  assert(exact.declare_options.considered_activities == expected);
+  assert(exact.dfg_statistics.case_attributes == expected);
+
+  const auto omitted = minera::parse_mine_params(fields({}));
+  assert(!omitted.declare_options.considered_activities);
+  assert((omitted.dfg_statistics.case_attributes ==
+          std::vector<std::string>{"concept:name"}));
+  const auto empty = minera::parse_mine_params(fields({
+      {"declare_considered_activities_json", "[]"},
+      {"dfg_case_attributes_json", "[]"},
+  }));
+  assert(empty.declare_options.considered_activities.has_value());
+  assert(empty.declare_options.considered_activities->empty());
+  assert(empty.dfg_statistics.case_attributes.empty());
+}
+
+void parse_mine_params_rejects_literal_discovery_vector_conflicts_and_errors() {
+  for (const auto& names : {
+           std::pair{"declare_considered_activities_json", "declare_considered_activities"},
+           std::pair{"dfg_case_attributes_json", "dfg_case_attributes"}}) {
+    for (const std::string legacy : {"", "A,B"}) {
+      const std::map<std::string, std::string> values = {
+          {names.first, "[]"}, {names.second, legacy}};
+      bool rejected = false;
+      try {
+        (void)minera::parse_mine_params(fields(values), [&](std::string_view name) {
+          return values.contains(std::string(name));
+        });
+      } catch (const std::invalid_argument& error) {
+        const std::string message = error.what();
+        rejected = message.find(names.first) != std::string::npos &&
+                   message.find(names.second) != std::string::npos;
+      }
+      assert(rejected);
+    }
+    for (const std::string malformed : {
+             "", "null", "{}", "1", "[true]", "[null]", "[1]", "[[]]",
+             "[\"A\",]",
+             R"([{"native_bytes":"hex-v2","data":"00"}])",
+             R"([{"native_bytes":"hex-v1","data":"0"}])",
+             R"([{"native_bytes":"hex-v1","data":"gg"}])",
+             R"([{"native_bytes":"hex-v1","data":0}])",
+             R"([{"native_bytes":"hex-v1","data":"00","extra":1}])",
+             R"([{"native_bytes":"hex-v1"}])"}) {
+      const std::map<std::string, std::string> values = {{names.first, malformed}};
+      bool rejected = false;
+      try {
+        (void)minera::parse_mine_params(fields(values), [&](std::string_view name) {
+          return values.contains(std::string(name));
+        });
+      } catch (const std::invalid_argument& error) {
+        rejected = std::string(error.what()).find(names.first) != std::string::npos;
+      }
+      assert(rejected);
+    }
+  }
+}
+
+void literal_discovery_vectors_reach_native_algorithms() {
+  minera::Trace trace;
+  trace.case_id = "c1";
+  for (const std::string label : {"A,B", " spaced ", "X"}) {
+    minera::Event event;
+    event.activity = label;
+    event.activity_state = minera::FirstClassAttributeState::kPresent;
+    trace.events.push_back(std::move(event));
+  }
+  const minera::EventLog source{std::vector<minera::Trace>{trace}};
+  const auto declare_options = [](const std::map<std::string, std::string>& selection) {
+    auto values = selection;
+    values.emplace("declare_allowed_templates", "existence");
+    values.emplace("declare_min_support_ratio", "1");
+    values.emplace("declare_min_confidence_ratio", "1");
+    return minera::parse_mine_params(fields(values)).declare_options;
+  };
+  const auto exact = minera::discover_declare(source, declare_options({
+      {"declare_considered_activities_json", R"(["A,B"])"}}));
+  assert(exact.size() == 1);
+  const auto& rule = exact.rules.at(minera::kDeclareExistence).front();
+  assert(rule.first == "A,B" && !rule.binary);
+  assert(rule.support == 1 && rule.confidence == 1);
+  assert(minera::discover_declare(source, declare_options({
+      {"declare_considered_activities", "A,B"}})).size() == 0);
+  assert(minera::discover_declare(source, declare_options({})).size() == 3);
+  assert(minera::discover_declare(source, declare_options({
+      {"declare_considered_activities_json", "[]"}})).size() == 0);
+  const auto spaced = minera::discover_declare(source, declare_options({
+      {"declare_considered_activities_json", R"([" spaced "])"}}));
+  assert(spaced.size() == 1);
+  assert(spaced.rules.at(minera::kDeclareExistence).front().first == " spaced ");
+
+  trace.events.resize(2);
+  trace.events[0].activity = "A";
+  trace.events[1].activity = "B";
+  trace.attributes = {{"cost,net", "10", minera::AttributeKind::kString},
+                      {" spaced ", "kept", minera::AttributeKind::kString}};
+  const minera::EventLog dfg_source{std::vector<minera::Trace>{trace}};
+  const auto dfg_options = [](const std::map<std::string, std::string>& selection) {
+    auto values = selection;
+    values.emplace("dfg_return_node_attributes", "true");
+    return minera::parse_mine_params(fields(values)).dfg_statistics;
+  };
+  const auto counts = minera::discover_case_attribute_dfg(dfg_source, dfg_options({
+      {"dfg_case_attributes_json", R"(["cost,net"," spaced ","cost,net"])"}}));
+  assert(counts.edges.size() == 1 && counts.nodes.size() == 2);
+  assert(counts.edges.at({"A", "B"}).size() == 2);
+  assert(counts.edges.at({"A", "B"}).at("cost,net").at("10") == 1);
+  assert(counts.edges.at({"A", "B"}).at(" spaced ").at("kept") == 1);
+  for (const std::string activity : {"A", "B"}) {
+    assert(counts.nodes.at(activity).size() == 2);
+    assert(counts.nodes.at(activity).at("cost,net").at("10") == 1);
+    assert(counts.nodes.at(activity).at(" spaced ").at("kept") == 1);
+  }
+  for (const auto selection : {
+           std::map<std::string, std::string>{{"dfg_case_attributes", "cost,net"}},
+           std::map<std::string, std::string>{{"dfg_case_attributes_json", "[]"}}}) {
+    const auto none = minera::discover_case_attribute_dfg(dfg_source, dfg_options(selection));
+    assert(none.edges.empty() && none.nodes.empty());
+  }
+  const auto defaults = minera::discover_case_attribute_dfg(dfg_source, dfg_options({}));
+  assert(defaults.edges.at({"A", "B"}).at("concept:name").at("c1") == 1);
+}
+
 void parse_mine_params_preserves_explicit_empty_log_skeleton_constraints() {
   const std::map<std::string, std::string> values = {
       {"log_skeleton_constraints", ""},
@@ -6133,6 +6268,9 @@ int main() {
   parse_mine_params_rejects_invalid_log_skeleton_fields();
   parse_mine_params_maps_declare_options();
   parse_mine_params_preserves_explicit_empty_declare_filters();
+  parse_mine_params_preserves_literal_discovery_vectors();
+  parse_mine_params_rejects_literal_discovery_vector_conflicts_and_errors();
+  literal_discovery_vectors_reach_native_algorithms();
   parse_mine_params_preserves_explicit_empty_log_skeleton_constraints();
   parse_mine_params_rejects_blank_declarative_selectors();
   parse_mine_params_rejects_invalid_declare_fields();
