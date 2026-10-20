@@ -520,6 +520,8 @@ struct MultipartFormData {
   std::string content;
   std::string filename;
   std::string content_type;
+  // Preserve absent versus explicitly empty multipart filename parameters.
+  bool filename_present = false;
 };
 using MultipartFormDataItems = std::vector<MultipartFormData>;
 using MultipartFormDataMap = std::multimap<std::string, MultipartFormData>;
@@ -4818,7 +4820,15 @@ public:
     while (buf_size() > 0) {
       switch (state_) {
       case 0: { // Initial boundary
-        buf_erase(buf_find(dash_boundary_crlf_));
+        const auto boundary_pos = buf_find(dash_boundary_crlf_);
+        if (boundary_pos == buf_size()) {
+          // An initial marker may span reads. Preserve its possible prefix,
+          // while discarding preamble bytes that cannot belong to that marker.
+          const auto retained = dash_boundary_crlf_.size() - 1;
+          if (buf_size() > retained) { buf_erase(buf_size() - retained); }
+          return true;
+        }
+        buf_erase(boundary_pos);
         if (dash_boundary_crlf_.size() > buf_size()) { return true; }
         if (!buf_start_with(dash_boundary_crlf_)) { return false; }
         buf_erase(dash_boundary_crlf_.size());
@@ -4877,10 +4887,11 @@ public:
               }
 
               it = params.find("filename");
-              if (it != params.end()) { file_.filename = it->second; }
+              if (it != params.end()) { file_.filename = it->second; file_.filename_present = true; }
 
               it = params.find("filename*");
               if (it != params.end()) {
+                file_.filename_present = true;
                 // Only allow UTF-8 enconnding...
                 static const std::regex re_rfc5987_encoding(
                     R"~(^UTF-8''(.+?)$)~", std::regex_constants::icase);
@@ -4951,6 +4962,7 @@ private:
   void clear_file_info() {
     file_.name.clear();
     file_.filename.clear();
+    file_.filename_present = false;
     file_.content_type.clear();
   }
 

@@ -72,6 +72,7 @@
 #include "minera/json_export.hpp"
 #include "minera/event_table_json.hpp"
 #include "minera/knowledge_injection.hpp"
+#include "minera/knowledge_exact_json.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/eventually_follows.hpp"
@@ -4599,6 +4600,8 @@ void handle_knowledge_injection(const httplib::Request& request,
     response.set_content(error_json(error.what()), "application/json");
   }
 }
+
+#include "knowledge_exact_route.hpp"
 
 bool llm_origin_allowed(const httplib::Request& request, httplib::Response& response) {
   if (!request.has_header("Origin")) return true;
@@ -10610,7 +10613,11 @@ int main(int argc, char** argv) {
   server.Post("/api/link-analysis", handle_link_analysis);
   server.Post("/api/roles", handle_roles);
   server.Post("/api/resource-profiles", handle_resource_profiles);
-  server.Post("/api/knowledge-injection", handle_knowledge_injection);
+  server.Post("/api/knowledge-injection", [](const httplib::Request& request,httplib::Response& response){
+    for(const auto& [name,value]:request.params){(void)value;if(minera::knowledge_exact_control(name)){handle_knowledge_exact(request,response);return;}}
+    for(const auto& [name,value]:request.files){(void)value;if(minera::knowledge_exact_control(name)){handle_knowledge_exact(request,response);return;}}
+    handle_knowledge_injection(request,response);
+  });
   server.Get("/api/llm/status", handle_llm_status);
   server.Post("/api/llm/complete", handle_llm_complete);
   server.Get("/api/log-query/schema",handle_log_query_schema);
