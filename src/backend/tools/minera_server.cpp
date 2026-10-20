@@ -87,6 +87,7 @@
 #include "minera/tree_reduction_workbench_json.hpp"
 #include "minera/original_model_context_workbench_json.hpp"
 #include "minera/original_features_workbench_json.hpp"
+#include "minera/original_label_splitting_workbench_json.hpp"
 #include "minera/active_event_source.hpp"
 #include "minera/monte_carlo_workbench_json.hpp"
 #include "minera/playout_workbench_json.hpp"
@@ -4087,6 +4088,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "tree_reduction_route.hpp"
 #include "original_model_context_route.hpp"
 #include "original_features_route.hpp"
+#include "original_label_splitting_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
 #include "original_decision_route.hpp"
@@ -10720,6 +10722,7 @@ int main(int argc, char** argv) {
   server.Post("/api/genetic-matrix-workbench", handle_original_genetic_matrix_workbench);
   server.Post("/api/embedding-workbench", exact_filter_discovery_route::embedding);
   server.Post("/api/original-log-to-features", handle_original_features_workbench);
+  server.Post("/api/original-label-splitting-workbench", handle_original_label_splitting_workbench);
   server.Options("/api/emd-workbench", preflight);
   server.Post("/api/emd-workbench", handle_original_emd_workbench);
   server.Options("/api/object-centric-playout-workbench", preflight);
