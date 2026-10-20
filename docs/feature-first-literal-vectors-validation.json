@@ -1,0 +1,256 @@
+{
+  "complete": true,
+  "feature": 85,
+  "features_delivered": 85,
+  "parent_head": "d57f61e0a643f2e5caf8a54c5e93b40d7aaa9868",
+  "feature_baseline_head": "81707afb4d8b7a01e529b62b24628aadf1795f19",
+  "baseline": {
+    "path": "build/literal-vectors-feature85-baseline.json",
+    "bytes": 2820116,
+    "sha256": "926db71b8c0205110fe5e5a636b2b7b17a3df0392f35bc03f9bce2b690638c90"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature85-bca1cc85307b406f9f65aec6abb75d51/build-manifest.json",
+      "bytes": 381390,
+      "sha256": "6479194c7b8513433f1eb92bc3070d36a0071a007b0f9ab490cdc2fac2c37bf7"
+    },
+    "api": {
+      "path": "build/literal-vectors85-api-validation.json",
+      "bytes": 63916,
+      "sha256": "781490ccc5ac93f63bc78a878ff600569409bcc43f4927fabd871ca8a8caef29"
+    },
+    "frontend": {
+      "path": "build/literal-vectors85-frontend-46135b18267c4ec1b8705a109c07b19a/validation.json",
+      "bytes": 2753345,
+      "sha256": "d65e701d87112771decad04a2a1587f27ed2caaca81d5f94e366e36e8374f28d"
+    },
+    "backend": {
+      "path": "build/literal-vectors-feature85-backend-postcommit.json",
+      "bytes": 3646,
+      "sha256": "8de079b3712b7ce1603464affe086406d5bc538ab465f7df82556b272cf8d8fa"
+    },
+    "live": {
+      "path": "build/literal-vectors-feature85-live-runtime.json",
+      "bytes": 11040,
+      "sha256": "3d04da7a35fe5fadbfe43e7a0630b1e965f100560046b4df456ddbdae54447ff"
+    },
+    "cleanup": {
+      "path": "build/literal-vectors-feature85-test-cleanup.json",
+      "bytes": 4747,
+      "sha256": "7b29aae0c4e5f64108622907a38a4afeae49a338d462d186b7a64d4c60add76b"
+    },
+    "file_bridge": {
+      "path": "build/literal-vectors85-wire-validation.json",
+      "bytes": 12842,
+      "sha256": "0482000d7d882be272640ab359490149cc61a797b3e0da25ee8014b7418c7ede"
+    },
+    "source_audit": {
+      "path": "build/literal-vectors85-source-audit.json",
+      "bytes": 732,
+      "sha256": "84361cd66d16ca46c86fcbb96ffd22ccd4b50f16dc3044169d229ff010b9e845"
+    },
+    "source_review": {
+      "path": "build/feature85-api-prepared-1/source-review.json",
+      "bytes": 11463,
+      "sha256": "45b263b6c209303fe64b4ca872584561ff6bff96381d4cd81906dbf4a8dd9621"
+    }
+  },
+  "previous_delivery_report": {
+    "path": "docs/feature-first-typed-relations-validation.json",
+    "bytes": 13914,
+    "sha256": "8ad3a5614e23423503e177698f47e21567b1ddd8a0f24c75aec16e82806cec0f"
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_API_cases": 16,
+    "physical_HTTP_calls": 16,
+    "dedicated_API_corpus_POSTs": 16,
+    "frontend_tests": 9165,
+    "frontend_files": 151,
+    "frontend_full_suite_delta": 15,
+    "actual_File_handoffs": 0,
+    "File_followup_HTTP_calls": 0,
+    "wire_mocked_fetches": 8,
+    "wire_mock_transport_File_arguments": 2,
+    "wire_network_requests_executed": 0,
+    "live_smoke_HTTP_calls": 2,
+    "native_contributing_suites": 73,
+    "native_retained_suites": 69,
+    "native_freshly_executed_suites": 4,
+    "native_reused_core_objects": 208,
+    "native_fresh_core_objects": 1,
+    "compiled_core_sources": 1,
+    "compiled_server_sources": 1,
+    "remaining_audited_extensions": 5
+  },
+  "native_test_accounting": {
+    "retained_parent_suites": 69,
+    "freshly_executed_suites": 4,
+    "aggregate_current_passing_suites": 73,
+    "contributing_ctest_invocation_count": 15,
+    "retained_evidence": {
+      "path": "build/native-feature84-76b7a51951894c32bf43c2b255c9cd91/build-manifest.json",
+      "bytes": 375089,
+      "sha256": "48492d184c1e83ba5e660dbf07656724167a7bfdb99b34b373359e070c7308ac"
+    },
+    "actual_current_evidence": {
+      "path": "build/native-feature85-bca1cc85307b406f9f65aec6abb75d51/build-manifest.json",
+      "bytes": 381390,
+      "sha256": "6479194c7b8513433f1eb92bc3070d36a0071a007b0f9ab490cdc2fac2c37bf7"
+    }
+  },
+  "frontend_test_accounting": {
+    "actual_fresh_full_suite": {
+      "total_tests": 9165,
+      "passed_tests": 9165,
+      "passed_files": 151
+    },
+    "retained_parent_inventory": {
+      "total_tests": 9150,
+      "passed_tests": 9150,
+      "passed_files": 150
+    },
+    "net_test_inventory_delta": 15,
+    "actual_current_evidence": {
+      "path": "build/literal-vectors85-frontend-46135b18267c4ec1b8705a109c07b19a/validation.json",
+      "bytes": 2753345,
+      "sha256": "d65e701d87112771decad04a2a1587f27ed2caaca81d5f94e366e36e8374f28d"
+    },
+    "captured_API_fixtures_are_offline_reuse_not_new_HTTP_calls": true
+  },
+  "input_and_result_semantics": [
+    "declare_considered_activities_json and dfg_case_attributes_json reuse parse_literal_string_vector_json.",
+    "Literal values, ordering and duplicates are preserved by transport; actual native algorithms still deliberately form sets.",
+    "Omission preserves Declare inference and DFG concept:name defaults; [] explicitly selects no names.",
+    "Simultaneous exact and legacy fields reject by presence, including an explicitly empty legacy value.",
+    "Existing cached-source identity, model/conformance/diagnostic and DFG result/export workflows remain in place.",
+    "NativeString parser transport covers arbitrary bytes; this checkpoint does not establish universal UTF8 losslessness in older analysis_json result envelopes."
+  ],
+  "HTTP_accounting": {
+    "selected_cases": 16,
+    "dedicated_API_corpus_HTTP_calls": 16,
+    "dedicated_API_corpus_POSTs": 16,
+    "File_followup_HTTP_calls": 0,
+    "live_smoke_HTTP_calls": 2,
+    "actual_product_export_Files": 0,
+    "dedicated_API_corpus": {
+      "path": "build/literal-vectors85-api-validation.json",
+      "bytes": 63916,
+      "sha256": "781490ccc5ac93f63bc78a878ff600569409bcc43f4927fabd871ca8a8caef29"
+    },
+    "optional_wire_or_File_proof": {
+      "path": "build/literal-vectors85-wire-validation.json",
+      "bytes": 12842,
+      "sha256": "0482000d7d882be272640ab359490149cc61a797b3e0da25ee8014b7418c7ede"
+    },
+    "wire_mocked_fetches": 8,
+    "mock_transport_File_arguments": 2,
+    "wire_network_requests_executed": 0,
+    "mocked_File_arguments_are_not_native_File_handoffs": true,
+    "frontend_saved_response_reuse_adds_no_HTTP_calls": true,
+    "live_smokes_excluded_from_dedicated_corpus": true
+  },
+  "frontend_correction_history": {
+    "current_integration": {
+      "path": "build/literal-vectors85-frontend-integration-1.json",
+      "bytes": 2660841,
+      "sha256": "7ee911077729e250b96a577d3aec506e15ccd1ae4a74e4d56ce110f2f1ff980c"
+    },
+    "current_candidate": {
+      "path": "build/literal85-frontend-candidate/manifest.json",
+      "bytes": 4550,
+      "sha256": "9358f0fe11de4c104b988a5f721a835d50c9cdcf6d6591980ff5e2137e66d22f"
+    },
+    "actual_current_frontend_validation": {
+      "path": "build/literal-vectors85-frontend-46135b18267c4ec1b8705a109c07b19a/validation.json",
+      "bytes": 2753345,
+      "sha256": "d65e701d87112771decad04a2a1587f27ed2caaca81d5f94e366e36e8374f28d"
+    },
+    "source_review": {
+      "path": "build/feature85-api-prepared-1/source-review.json",
+      "bytes": 11463,
+      "sha256": "45b263b6c209303fe64b4ca872584561ff6bff96381d4cd81906dbf4a8dd9621"
+    }
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "delivered_feature84"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "delivered_feature85"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "open_source_proven_extension"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "open_source_proven_extension"
+    }
+  ],
+  "source_availability_audit": {
+    "path": "build/literal-vectors85-source-audit.json",
+    "bytes": 732,
+    "sha256": "84361cd66d16ca46c86fcbb96ffd22ccd4b50f16dc3044169d229ff010b9e845"
+  },
+  "proof_history": {
+    "native": {},
+    "api": {},
+    "frontend": {},
+    "backend": {},
+    "live": {},
+    "cleanup": {},
+    "file_bridge": {},
+    "source_audit": {},
+    "source_review": {}
+  },
+  "journal_policy": "Preserve complete inherited working prefix; stage parent HEAD journal plus owned Feature85 suffix only.",
+  "browser_ui_verified": false,
+  "browser_evidence": "No Feature85 rendered-browser validation is claimed. The prior permission denial remains a separate unresolved verification boundary.",
+  "browser_retry": {
+    "path": "build/literal-vectors85-browser-attempt-1.json",
+    "bytes": 1042,
+    "sha256": "09ca037e96bd8fe106a48936606926056e7af8ed98a32c077a367d425c5746b1"
+  },
+  "full_parity": false,
+  "goal_complete": false,
+  "claim_boundary": "Literal discovery-vector availability does not prove strict reference behavior, every remaining catalogue control, browser, performance or concurrency parity."
+}

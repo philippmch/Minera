@@ -1,3 +1,5 @@
+import {DiscoveryVectorInput} from "./DiscoveryVectorInput";
+import {parseDiscoveryStringVector, discoveryStringVectorValidation, type DiscoveryVectorMode} from "../discovery-string-vectors";
 import { useState } from "react";
 import {
   type AttributeFilterMode,
@@ -887,6 +889,8 @@ export function Filters({
     ["nonchainsuccession", "Non-chain succession"],
   ] as const;
   const [declareConsideredActivities, setDeclareConsideredActivities] = useState("");
+  const [declareActivitiesMode, setDeclareActivitiesMode] = useState<DiscoveryVectorMode>("legacy");
+  const [declareActivitiesJson, setDeclareActivitiesJson] = useState("[]");
   const [declareActivityAttribute, setDeclareActivityAttribute] =
     useState("concept:name");
   const [declareAllowedTemplates, setDeclareAllowedTemplates] = useState<Set<string>>(
@@ -928,6 +932,8 @@ export function Filters({
   const [dfgBusinessHours, setDfgBusinessHours] = useState(false);
   const [dfgBusinessHourSlots, setDfgBusinessHourSlots] = useState("");
   const [dfgCaseAttributes, setDfgCaseAttributes] = useState("concept:name");
+  const [dfgAttributesMode, setDfgAttributesMode] = useState<DiscoveryVectorMode>("legacy");
+  const [dfgAttributesJson, setDfgAttributesJson] = useState('["concept:name"]');
   const [dfgReturnNodeAttributes, setDfgReturnNodeAttributes] = useState(false);
   const dfgFrequencyOptionsActive =
     dfgCausalVariants.size > 0 ||
@@ -1303,7 +1309,11 @@ export function Filters({
   } catch (error) {
     rootCauseValidationError = (error as Error).message;
   }
-  const selectorValidationError = rootCauseValidationError ||
+  const literalVectorValidationError = (declareActivitiesMode === "literal_json"
+    ? discoveryStringVectorValidation(declareActivitiesJson, "Declare considered activities") : null) ||
+    (dfgCaseAttributeOptionsActive && dfgAttributesMode === "literal_json"
+      ? discoveryStringVectorValidation(dfgAttributesJson, "DFG case attributes") : null);
+  const selectorValidationError = literalVectorValidationError || rootCauseValidationError ||
     tokenReplayInputValidationMessage(tokenReplayMaxRows, tokenReplayTimestampAttribute,
       tokenReplayPolicies.tokenReplayIncludeDurationDiagnostics) ||
     (!logSkeletonActivityAttribute.trim()
@@ -1573,7 +1583,10 @@ export function Filters({
         declareActivityAttribute.trim() !== "concept:name"
           ? declareActivityAttribute.trim() || undefined
           : undefined,
-      declareConsideredActivities: toDeclareActivities(declareConsideredActivities),
+      declareConsideredActivities: declareActivitiesMode === "legacy"
+        ? toDeclareActivities(declareConsideredActivities) : undefined,
+      declareConsideredActivitiesExact: declareActivitiesMode === "literal_json"
+        ? parseDiscoveryStringVector(declareActivitiesJson, "Declare considered activities") : undefined,
       declareAllowedTemplates:
         declareAllowedTemplates.size === declareFamilies.length
           ? undefined
@@ -1633,9 +1646,11 @@ export function Filters({
       dfgBusinessHourSlots:
         dfgPerformanceOptionsActive && dfgBusinessHours
           ? dfgBusinessHourSlots.trim() || undefined : undefined,
-      dfgCaseAttributes: dfgCaseAttributeOptionsActive
+      dfgCaseAttributes: dfgCaseAttributeOptionsActive && dfgAttributesMode === "legacy"
         ? dfgCaseAttributes.split(",").map((name) => name.trim()).filter(Boolean)
         : undefined,
+      dfgCaseAttributesExact: dfgCaseAttributeOptionsActive && dfgAttributesMode === "literal_json"
+        ? parseDiscoveryStringVector(dfgAttributesJson, "DFG case attributes") : undefined,
       dfgReturnNodeAttributes:
         dfgCaseAttributeOptionsActive && dfgReturnNodeAttributes
           ? true : undefined,
@@ -1854,6 +1869,8 @@ export function Filters({
     setLogSkeletonActivityAttribute("concept:name");
     setLogSkeletonConstraints(new Set(logSkeletonFamilies.map(([name]) => name)));
     setDeclareConsideredActivities("");
+    setDeclareActivitiesMode("legacy");
+    setDeclareActivitiesJson("[]");
     setDeclareActivityAttribute("concept:name");
     setDeclareAllowedTemplates(new Set(DECLARE_TEMPLATES));
     setDeclareMinSupportRatio("");
@@ -1880,6 +1897,8 @@ export function Filters({
     setDfgBusinessHours(false);
     setDfgBusinessHourSlots("");
     setDfgCaseAttributes("concept:name");
+    setDfgAttributesMode("legacy");
+    setDfgAttributesJson('["concept:name"]');
     setDfgReturnNodeAttributes(false);
     setCorrelationVariants(new Set());
     setCorrelationActivityAttribute("concept:name");
@@ -2073,7 +2092,7 @@ export function Filters({
     logSkeletonActivityAttribute.trim() !== "concept:name";
   const declareDirty =
     declareActivityAttribute.trim() !== "concept:name" ||
-    declareConsideredActivities.trim() !== "" ||
+    declareActivitiesMode !== "legacy" || declareConsideredActivities.trim() !== "" ||
     declareAllowedTemplates.size !== declareFamilies.length ||
     declareMinSupportRatio !== "" || declareMinConfidenceRatio !== "" ||
     declareAutoSelectionMultiplier !== "" && declareAutoSelectionMultiplier !== "0.8";
@@ -2575,15 +2594,10 @@ export function Filters({
                 onChange={(event) => setDeclareActivityAttribute(event.target.value)}
               />
             </label>
-            <label className="filters-field filters-field-wide">
-              <span>Declare considered activities <small>(comma-separated; blank = infer)</small></span>
-              <input
-                type="text"
-                placeholder="A, B, C"
-                value={declareConsideredActivities}
-                onChange={(event) => setDeclareConsideredActivities(event.target.value)}
-              />
-            </label>
+            <DiscoveryVectorInput label="Declare considered activities" mode={declareActivitiesMode}
+              legacyValue={declareConsideredActivities} literalValue={declareActivitiesJson}
+              onMode={setDeclareActivitiesMode} onLegacy={setDeclareConsideredActivities}
+              onLiteral={setDeclareActivitiesJson} legacyHint="Comma separated; blank infers activities from the source."/>
             <label className="filters-field">
               <span>Declare min support ratio</span>
               <input
@@ -2827,12 +2841,10 @@ export function Filters({
                 disabled={!dfgPerformanceOptionsActive}
                 onChange={(event) => setDfgStartTimestampAttribute(event.target.value)} />
             </label>
-            <label className="filters-field">
-              <span>Case attributes <small>(comma-separated)</small></span>
-              <input type="text" value={dfgCaseAttributes}
-                disabled={!dfgCaseAttributeOptionsActive}
-                onChange={(event) => setDfgCaseAttributes(event.target.value)} />
-            </label>
+            <DiscoveryVectorInput label="DFG case attributes" mode={dfgAttributesMode}
+              legacyValue={dfgCaseAttributes} literalValue={dfgAttributesJson}
+              onMode={setDfgAttributesMode} onLegacy={setDfgCaseAttributes}
+              onLiteral={setDfgAttributesJson} disabled={!dfgCaseAttributeOptionsActive}/>
           </div>
           <div className="filters-row">
             <label className="filters-field filters-field-wide">

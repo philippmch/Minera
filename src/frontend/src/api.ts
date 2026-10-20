@@ -1,3 +1,4 @@
+import {discoveryStringVectorJson, type DiscoveryNativeString} from "./discovery-string-vectors";
 import {
   type ActivityStat,
   type Alignments,
@@ -549,6 +550,8 @@ export interface MinerOptions {
   declareActivityAttribute?: string;
   /** Classic Declare discovery controls. */
   declareConsideredActivities?: string[];
+  /** Literal native vector. Omission infers; [] explicitly selects none. Mutually exclusive with the comma-separated option. */
+  declareConsideredActivitiesExact?: DiscoveryNativeString[];
   declareAllowedTemplates?: string[];
   declareMinSupportRatio?: number;
   declareMinConfidenceRatio?: number;
@@ -586,6 +589,8 @@ export interface MinerOptions {
   dfgBusinessHours?: boolean;
   dfgBusinessHourSlots?: string;
   dfgCaseAttributes?: string[];
+  /** Literal native vector, including [] and arbitrary byte-string keys. */
+  dfgCaseAttributesExact?: DiscoveryNativeString[];
   dfgReturnNodeAttributes?: boolean;
   /** Optional correlation-mining analyses. */
   correlationVariants?: string[];
@@ -657,6 +662,10 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     options = {...options};
     for (const key of ["caseColumn", "activityColumn", "timestampColumn", "delimiter", "xesVariant", "xesCaseAttribute", "xesActivityAttribute", "xesTimestampAttribute", "xesResourceAttribute", "xesLifecycleAttribute", "xesRequireTimestamp", "xesTimestampSort", "xesReverseSort", "xesMaxTraces", "xesAttributesToRead", "xesMaxDecompressedBytes"] as const) delete options[key];
   }
+  if (options.declareConsideredActivities !== undefined && options.declareConsideredActivitiesExact !== undefined)
+    throw new Error("Choose either comma-separated or literal Declare considered activities.");
+  if (options.dfgCaseAttributes !== undefined && options.dfgCaseAttributesExact !== undefined)
+    throw new Error("Choose either comma-separated or literal DFG case attributes.");
   const entries: Array<[string, string]> = [];
   const add = (name: string, value: string) => entries.push([name, value]);
   const validateNonnegativeInteger = (name: string, value: number) => {
@@ -1318,7 +1327,9 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   const selectedDeclareTemplates = options.declareAllowedTemplates?.filter(
     (name) => (DECLARE_TEMPLATES as readonly string[]).includes(name),
   );
-  if (options.declareConsideredActivities?.length)
+  if (options.declareConsideredActivitiesExact !== undefined)
+    add("declare_considered_activities_json", discoveryStringVectorJson(options.declareConsideredActivitiesExact, "Declare considered activities"));
+  else if (options.declareConsideredActivities?.length)
     add("declare_considered_activities", options.declareConsideredActivities.join(","));
   if (selectedDeclareTemplates !== undefined) {
     if (options.declareAllowedTemplates!.length === 0) {
@@ -1532,6 +1543,8 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (timestampAttribute && timestampAttribute !== "time:timestamp")
       add("dfg_timestamp_attribute", timestampAttribute);
   }
+  if (options.dfgCaseAttributesExact !== undefined)
+    add("dfg_case_attributes_json", discoveryStringVectorJson(options.dfgCaseAttributesExact, "DFG case attributes"));
   if (hasDfgCaseAttributes) {
     const caseAttributes = options.dfgCaseAttributes?.map((name) => name.trim()).filter(Boolean);
     if (caseAttributes?.length && !(caseAttributes.length === 1 && caseAttributes[0] === "concept:name"))

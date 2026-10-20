@@ -13716,3 +13716,10 @@ Validation: docs/feature-first-saved-structures-validation.json. Full parity and
 Feature84 adds native EventTable JSON to Related logs. Supply base, incoming and relation tables without a cached log. Typed keys, duplicate relations, native indices, categories and complete metadata remain available; literal selectors preserve their bytes. Canonical results stay separate from fallible log and export projections. Validation passed 16 selected/18 dedicated physical requests, 4 actual File handoffs and 9150 frontend tests in 150 files. 23 total POSTs include File followups and live smokes. 6 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
 
 Validation: docs/feature-first-typed-relations-validation.json.
+
+
+## Feature85 - literal Declare and DFG selections
+
+Feature85 adds literal JSON selections to existing Declare and DFG discovery. Select activity "A,B" or trace attribute "cost,net" as one exact name. Whitespace, empty values, Unicode and NativeString bytes survive request parsing; order and duplicates reach native options. Omitted controls retain defaults; [] is explicit empty. Legacy comma controls retain their behavior and conflict with exact controls when supplied together. Validation passed 16 selected cases / 16 dedicated physical HTTP calls and 9165 frontend tests in 151 files. 5 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
+
+Validation: docs/feature-first-literal-vectors-validation.json.
