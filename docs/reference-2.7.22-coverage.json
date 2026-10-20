@@ -12556,8 +12556,51 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/petri-description-parity-contract.md",
+      "artifacts": [
+        "include/minera/original_model_context.hpp",
+        "src/backend/original_model_context.cpp",
+        "src/backend/root_cause_unicode.hpp",
+        "src/backend/tests/test_original_model_context.cpp",
+        "include/minera/pnml.hpp",
+        "src/backend/pnml.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.net_to_descr",
+        "implementation": [
+          {
+            "path": "include/minera/original_model_context.hpp",
+            "symbol": "abstract_petri_net"
+          },
+          {
+            "path": "src/backend/original_model_context.cpp",
+            "symbol": "abstract_petri_net"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "petri_arc_occurrence_byte_vectors"
+          },
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "petri_public_byte_vectors"
+          },
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "petri_native_byte_extensions"
+          },
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "petri_full_storage_and_overrides"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.ocel_fea_descr",

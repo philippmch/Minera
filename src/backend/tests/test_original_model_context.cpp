@@ -6,6 +6,7 @@
 #include <locale>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <source_location>
@@ -133,6 +134,400 @@ void temporal_public_byte_vectors(){
   assert(result.text==expected);assert(result.characters==2755);assert(!result.truncated);
  }
 }
+// Complete native descriptions matched against the root-only twelve-call public corpus.
+// Capture SHA-256: 02819b74d606ad801b4be42e64e60ea6e1a7c6d9c51cf96ea21749b270d03811.
+// Expected strings use result.hex, not JSON-decoded text (which can merge adjacent surrogates).
+void petri_public_byte_vectors(){
+ { // empty-None
+  PetriNetLiteralStorage storage;storage.place_count=0;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(0);document.final_marking.resize(0);document.initial_marking_keys.assign(0,false);document.final_marking_keys.assign(0,false);
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document);
+  const auto expected=std::string("\x0a\x0a\x49\x66\x20\x49\x20\x68\x61\x76\x65\x20\x61\x20\x50\x65\x74\x72\x69\x20\x6e\x65\x74\x3a\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x5d\x0a\x0a",108);
+  assert(result.text==expected);assert(result.characters==108);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // empty-True
+  PetriNetLiteralStorage storage;storage.place_count=0;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(0);document.final_marking.resize(0);document.initial_marking_keys.assign(0,false);document.final_marking_keys.assign(0,false);
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,true);
+  const auto expected=std::string("\x0a\x0a\x49\x66\x20\x49\x20\x68\x61\x76\x65\x20\x61\x20\x50\x65\x74\x72\x69\x20\x6e\x65\x74\x3a\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x5d\x0a\x0a",108);
+  assert(result.text==expected);assert(result.characters==108);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // empty-False
+  PetriNetLiteralStorage storage;storage.place_count=0;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(0);document.final_marking.resize(0);document.initial_marking_keys.assign(0,false);document.final_marking_keys.assign(0,false);
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,false);
+  const auto expected=std::string("\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x5d\x0a\x0a",84);
+  assert(result.text==expected);assert(result.characters==84);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // plain-None
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x73\x6f\x75\x72\x63\x65",6));
+  document.place_ids.push_back(std::string("\x73\x69\x6e\x6b",4));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9",10));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31",13));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[0]=TokenInteger(2);document.initial_marking_keys[0]=true;
+  document.initial_marking[1]=TokenInteger(0);document.initial_marking_keys[1]=true;
+  document.final_marking[1]=TokenInteger(3);document.final_marking_keys[1]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document);
+  const auto expected=std::string("\x0a\x0a\x49\x66\x20\x49\x20\x68\x61\x76\x65\x20\x61\x20\x50\x65\x74\x72\x69\x20\x6e\x65\x74\x3a\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x30\x27\x2c\x20\x27\x73\x6f\x75\x72\x63\x65\x3a\x32\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x33\x27\x5d\x0a\x0a",334);
+  assert(result.text==expected);assert(result.characters==331);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // plain-True
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x73\x6f\x75\x72\x63\x65",6));
+  document.place_ids.push_back(std::string("\x73\x69\x6e\x6b",4));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9",10));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31",13));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[0]=TokenInteger(2);document.initial_marking_keys[0]=true;
+  document.initial_marking[1]=TokenInteger(0);document.initial_marking_keys[1]=true;
+  document.final_marking[1]=TokenInteger(3);document.final_marking_keys[1]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,true);
+  const auto expected=std::string("\x0a\x0a\x49\x66\x20\x49\x20\x68\x61\x76\x65\x20\x61\x20\x50\x65\x74\x72\x69\x20\x6e\x65\x74\x3a\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x30\x27\x2c\x20\x27\x73\x6f\x75\x72\x63\x65\x3a\x32\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x33\x27\x5d\x0a\x0a",334);
+  assert(result.text==expected);assert(result.characters==331);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // plain-False
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x73\x6f\x75\x72\x63\x65",6));
+  document.place_ids.push_back(std::string("\x73\x69\x6e\x6b",4));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9",10));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31",13));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[0]=TokenInteger(2);document.initial_marking_keys[0]=true;
+  document.initial_marking[1]=TokenInteger(0);document.initial_marking_keys[1]=true;
+  document.final_marking[1]=TokenInteger(3);document.final_marking_keys[1]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,false);
+  const auto expected=std::string("\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x30\x27\x2c\x20\x27\x73\x6f\x75\x72\x63\x65\x3a\x32\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x33\x27\x5d\x0a\x0a",310);
+  assert(result.text==expected);assert(result.characters==307);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // literal-labels-no-header
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x73\x6f\x75\x72\x63\x65",6));
+  document.place_ids.push_back(std::string("\x73\x69\x6e\x6b",4));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x31\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xf3\xa0\x80\x81\xf3\xb0\x80\x80\xf4\x8f\xbf\xbf",12));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x61\x70\x6f\x73\x74\x27\x6f\x6e\x6c\x79",10));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x64\x6f\x75\x62\x6c\x65\x22\x6f\x6e\x6c\x79",11));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x34",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string());
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x33",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x5c",1));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x32",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x62\x6f\x74\x68\x27\x22",6));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x35",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x00\x09\x0d\x0a\x01\x7f\xc2\x85",8));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x36",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xc2\xa0\xc2\xad\xe2\x80\x8b\xe2\x80\xa8\xe2\x80\xa9\xef\xbb\xbf",16));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x37",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xcd\xb8\xee\x80\x80\xef\xbf\xbe",8));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x38",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xed\xa0\x80\xed\xbf\xbf",6));
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x39",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xc3\xa9\xce\xa9\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x99\x82",14));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[0]=TokenInteger(2);document.initial_marking_keys[0]=true;
+  document.initial_marking[1]=TokenInteger(0);document.initial_marking_keys[1]=true;
+  document.final_marking[1]=TokenInteger(3);document.final_marking_keys[1]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,false);
+  const auto expected=std::string("\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x61\x70\x6f\x73\x74\x27\x6f\x6e\x6c\x79\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x27\x64\x6f\x75\x62\x6c\x65\x22\x6f\x6e\x6c\x79\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x32\x2c\x20\x27\x62\x6f\x74\x68\x27\x22\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x33\x2c\x20\x27\x5c\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x34\x2c\x20\x27\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x35\x2c\x20\x27\x00\x09\x0d\x0a\x01\x7f\xc2\x85\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x36\x2c\x20\x27\xc2\xa0\xc2\xad\xe2\x80\x8b\xe2\x80\xa8\xe2\x80\xa9\xef\xbb\xbf\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x37\x2c\x20\x27\xcd\xb8\xee\x80\x80\xef\xbf\xbe\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x38\x2c\x20\x27\xed\xa0\x80\xed\xbf\xbf\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x39\x2c\x20\x27\xc3\xa9\xce\xa9\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x99\x82\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x31\x30\x2c\x20\x27\xf3\xa0\x80\x81\xf3\xb0\x80\x80\xf4\x8f\xbf\xbf\x27\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x61\x70\x6f\x73\x74\x27\x6f\x6e\x6c\x79\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x27\x64\x6f\x75\x62\x6c\x65\x22\x6f\x6e\x6c\x79\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x32\x2c\x20\x27\x62\x6f\x74\x68\x27\x22\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x33\x2c\x20\x27\x5c\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x34\x2c\x20\x27\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x35\x2c\x20\x27\x00\x09\x0d\x0a\x01\x7f\xc2\x85\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x36\x2c\x20\x27\xc2\xa0\xc2\xad\xe2\x80\x8b\xe2\x80\xa8\xe2\x80\xa9\xef\xbb\xbf\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x37\x2c\x20\x27\xcd\xb8\xee\x80\x80\xef\xbf\xbe\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x38\x2c\x20\x27\xed\xa0\x80\xed\xbf\xbf\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x39\x2c\x20\x27\xc3\xa9\xce\xa9\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x99\x82\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x31\x30\x2c\x20\x27\xf3\xa0\x80\x81\xf3\xb0\x80\x80\xf4\x8f\xbf\xbf\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x61\x70\x6f\x73\x74\x27\x6f\x6e\x6c\x79\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x27\x64\x6f\x75\x62\x6c\x65\x22\x6f\x6e\x6c\x79\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x32\x2c\x20\x27\x62\x6f\x74\x68\x27\x22\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x33\x2c\x20\x27\x5c\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x34\x2c\x20\x27\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x35\x2c\x20\x27\x00\x09\x0d\x0a\x01\x7f\xc2\x85\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x36\x2c\x20\x27\xc2\xa0\xc2\xad\xe2\x80\x8b\xe2\x80\xa8\xe2\x80\xa9\xef\xbb\xbf\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x37\x2c\x20\x27\xcd\xb8\xee\x80\x80\xef\xbf\xbe\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x38\x2c\x20\x27\xed\xa0\x80\xed\xbf\xbf\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x39\x2c\x20\x27\xc3\xa9\xce\xa9\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x99\x82\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x31\x30\x2c\x20\x27\xf3\xa0\x80\x81\xf3\xb0\x80\x80\xf4\x8f\xbf\xbf\x27\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x30\x27\x2c\x20\x27\x73\x6f\x75\x72\x63\x65\x3a\x32\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x33\x27\x5d\x0a\x0a",1243);
+  assert(result.text==expected);assert(result.characters==1129);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // literal-labels-header
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x73\x6f\x75\x72\x63\x65",6));
+  document.place_ids.push_back(std::string("\x73\x69\x6e\x6b",4));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x31\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xf3\xa0\x80\x81\xf3\xb0\x80\x80\xf4\x8f\xbf\xbf",12));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x61\x70\x6f\x73\x74\x27\x6f\x6e\x6c\x79",10));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x34",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string());
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x32",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x62\x6f\x74\x68\x27\x22",6));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x64\x6f\x75\x62\x6c\x65\x22\x6f\x6e\x6c\x79",11));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x33",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x5c",1));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x35",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x00\x09\x0d\x0a\x01\x7f\xc2\x85",8));
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x36",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xc2\xa0\xc2\xad\xe2\x80\x8b\xe2\x80\xa8\xe2\x80\xa9\xef\xbb\xbf",16));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x37",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xcd\xb8\xee\x80\x80\xef\xbf\xbe",8));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x38",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xed\xa0\x80\xed\xbf\xbf",6));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x39",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\xc3\xa9\xce\xa9\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x99\x82",14));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[0]=TokenInteger(2);document.initial_marking_keys[0]=true;
+  document.initial_marking[1]=TokenInteger(0);document.initial_marking_keys[1]=true;
+  document.final_marking[1]=TokenInteger(3);document.final_marking_keys[1]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,true);
+  const auto expected=std::string("\x0a\x0a\x49\x66\x20\x49\x20\x68\x61\x76\x65\x20\x61\x20\x50\x65\x74\x72\x69\x20\x6e\x65\x74\x3a\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x61\x70\x6f\x73\x74\x27\x6f\x6e\x6c\x79\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x27\x64\x6f\x75\x62\x6c\x65\x22\x6f\x6e\x6c\x79\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x32\x2c\x20\x27\x62\x6f\x74\x68\x27\x22\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x33\x2c\x20\x27\x5c\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x34\x2c\x20\x27\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x35\x2c\x20\x27\x00\x09\x0d\x0a\x01\x7f\xc2\x85\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x36\x2c\x20\x27\xc2\xa0\xc2\xad\xe2\x80\x8b\xe2\x80\xa8\xe2\x80\xa9\xef\xbb\xbf\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x37\x2c\x20\x27\xcd\xb8\xee\x80\x80\xef\xbf\xbe\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x38\x2c\x20\x27\xed\xa0\x80\xed\xbf\xbf\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x39\x2c\x20\x27\xc3\xa9\xce\xa9\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x99\x82\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x31\x30\x2c\x20\x27\xf3\xa0\x80\x81\xf3\xb0\x80\x80\xf4\x8f\xbf\xbf\x27\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x61\x70\x6f\x73\x74\x27\x6f\x6e\x6c\x79\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x27\x64\x6f\x75\x62\x6c\x65\x22\x6f\x6e\x6c\x79\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x32\x2c\x20\x27\x62\x6f\x74\x68\x27\x22\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x33\x2c\x20\x27\x5c\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x34\x2c\x20\x27\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x35\x2c\x20\x27\x00\x09\x0d\x0a\x01\x7f\xc2\x85\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x36\x2c\x20\x27\xc2\xa0\xc2\xad\xe2\x80\x8b\xe2\x80\xa8\xe2\x80\xa9\xef\xbb\xbf\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x37\x2c\x20\x27\xcd\xb8\xee\x80\x80\xef\xbf\xbe\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x38\x2c\x20\x27\xed\xa0\x80\xed\xbf\xbf\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x39\x2c\x20\x27\xc3\xa9\xce\xa9\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x99\x82\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x31\x30\x2c\x20\x27\xf3\xa0\x80\x81\xf3\xb0\x80\x80\xf4\x8f\xbf\xbf\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x61\x70\x6f\x73\x74\x27\x6f\x6e\x6c\x79\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x27\x64\x6f\x75\x62\x6c\x65\x22\x6f\x6e\x6c\x79\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x32\x2c\x20\x27\x62\x6f\x74\x68\x27\x22\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x33\x2c\x20\x27\x5c\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x34\x2c\x20\x27\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x35\x2c\x20\x27\x00\x09\x0d\x0a\x01\x7f\xc2\x85\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x36\x2c\x20\x27\xc2\xa0\xc2\xad\xe2\x80\x8b\xe2\x80\xa8\xe2\x80\xa9\xef\xbb\xbf\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x37\x2c\x20\x27\xcd\xb8\xee\x80\x80\xef\xbf\xbe\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x38\x2c\x20\x27\xed\xa0\x80\xed\xbf\xbf\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x39\x2c\x20\x27\xc3\xa9\xce\xa9\xe4\xb8\xad\xe6\x96\x87\xf0\x9f\x99\x82\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x31\x30\x2c\x20\x27\xf3\xa0\x80\x81\xf3\xb0\x80\x80\xf4\x8f\xbf\xbf\x27\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x30\x27\x2c\x20\x27\x73\x6f\x75\x72\x63\x65\x3a\x32\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x33\x27\x5d\x0a\x0a",1267);
+  assert(result.text==expected);assert(result.characters==1153);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // literal-place-markings
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x70\xc2\xa0\xe2\x80\x8b\x0a\xed\xa0\x80",10));
+  document.place_ids.push_back(std::string("\x71\xc2\x85\xe2\x80\xa8\xf3\xa0\x80\x81",10));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x41",1));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[0]=TokenInteger(2);document.initial_marking_keys[0]=true;
+  document.initial_marking[1]=TokenInteger(0);document.initial_marking_keys[1]=true;
+  document.final_marking[1]=TokenInteger(3);document.final_marking_keys[1]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,false);
+  const auto expected=std::string("\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x70\xc2\xa0\xe2\x80\x8b\x0a\xed\xa0\x80\x2c\x20\x71\xc2\x85\xe2\x80\xa8\xf3\xa0\x80\x81\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x27\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x27\x29\x2d\x3e\x71\xc2\x85\xe2\x80\xa8\xf3\xa0\x80\x81\x2c\x20\x70\xc2\xa0\xe2\x80\x8b\x0a\xed\xa0\x80\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x27\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x70\x5c\x78\x61\x30\x5c\x75\x32\x30\x30\x62\x5c\x6e\x5c\x75\x64\x38\x30\x30\x3a\x32\x27\x2c\x20\x27\x71\x5c\x78\x38\x35\x5c\x75\x32\x30\x32\x38\x5c\x55\x30\x30\x30\x65\x30\x30\x30\x31\x3a\x30\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x71\x5c\x78\x38\x35\x5c\x75\x32\x30\x32\x38\x5c\x55\x30\x30\x30\x65\x30\x30\x30\x31\x3a\x33\x27\x5d\x0a\x0a",267);
+  assert(result.text==expected);assert(result.characters==245);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // reverse-construction
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x73\x69\x6e\x6b",4));
+  document.place_ids.push_back(std::string("\x73\x6f\x75\x72\x63\x65",6));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31",13));
+   transition.outputs.push_back(0);transition.output_weights.push_back({TokenInteger(1),false});
+   transition.inputs.push_back(1);transition.input_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9",10));
+   transition.inputs.push_back(1);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(0);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[1]=TokenInteger(2);document.initial_marking_keys[1]=true;
+  document.initial_marking[0]=TokenInteger(0);document.initial_marking_keys[0]=true;
+  document.final_marking[0]=TokenInteger(3);document.final_marking_keys[0]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,false);
+  const auto expected=std::string("\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x30\x27\x2c\x20\x27\x73\x6f\x75\x72\x63\x65\x3a\x32\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x33\x27\x5d\x0a\x0a",310);
+  assert(result.text==expected);assert(result.characters==307);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // weighted-arcs
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x73\x6f\x75\x72\x63\x65",6));
+  document.place_ids.push_back(std::string("\x73\x69\x6e\x6b",4));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string("\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9",10));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(2),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(2),false});
+   storage.transitions.push_back(std::move(transition));}
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31",13));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(3),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(3),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[0]=TokenInteger(2);document.initial_marking_keys[0]=true;
+  document.initial_marking[1]=TokenInteger(0);document.initial_marking_keys[1]=true;
+  document.final_marking[1]=TokenInteger(3);document.final_marking_keys[1]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,false);
+  const auto expected=std::string("\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27\x41\x70\x70\x72\x6f\x76\x65\x20\xce\xa9\x27\x29\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x31\x2c\x20\x4e\x6f\x6e\x65\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x30\x27\x2c\x20\x27\x73\x6f\x75\x72\x63\x65\x3a\x32\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x33\x27\x5d\x0a\x0a",310);
+  assert(result.text==expected);assert(result.characters==307);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+ { // long-literal-label
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.transition_names=PetriTransitionNameList{};PnmlDocument document;
+  document.place_ids.push_back(std::string("\x73\x6f\x75\x72\x63\x65",6));
+  document.place_ids.push_back(std::string("\x73\x69\x6e\x6b",4));
+  {PetriTransition transition;storage.transition_names->push_back(std::string("\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30",13));
+   transition.activity=storage.activities.size();storage.activities.push_back(std::string(12001,char(88)));
+   transition.inputs.push_back(0);transition.input_weights.push_back({TokenInteger(1),false});
+   transition.outputs.push_back(1);transition.output_weights.push_back({TokenInteger(1),false});
+   storage.transitions.push_back(std::move(transition));}
+  document.net=PetriNet::from_literal_storage(storage);document.initial_marking.resize(2);document.final_marking.resize(2);document.initial_marking_keys.assign(2,false);document.final_marking_keys.assign(2,false);
+  document.initial_marking[0]=TokenInteger(2);document.initial_marking_keys[0]=true;
+  document.initial_marking[1]=TokenInteger(0);document.initial_marking_keys[1]=true;
+  document.final_marking[1]=TokenInteger(3);document.final_marking_keys[1]=true;
+  const auto before=serialize_original_context_model_json(document);
+  const auto result=abstract_petri_net(document,false);
+  const auto expected=std::string("\x0a\x0a\x70\x6c\x61\x63\x65\x73\x3a\x20\x5b\x20\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x20\x5d\x0a\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27",59)+std::string(12001,char(88))+std::string("\x27\x29\x20\x5d\x0a\x61\x72\x63\x73\x3a\x20\x5b\x20\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27",30)+std::string(12001,char(88))+std::string("\x27\x29\x2d\x3e\x73\x69\x6e\x6b\x2c\x20\x73\x6f\x75\x72\x63\x65\x2d\x3e\x28\x74\x72\x61\x6e\x73\x69\x74\x69\x6f\x6e\x2d\x30\x30\x2c\x20\x27",35)+std::string(12001,char(88))+std::string("\x27\x29\x20\x5d\x0a\x0a\x69\x6e\x69\x74\x69\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x30\x27\x2c\x20\x27\x73\x6f\x75\x72\x63\x65\x3a\x32\x27\x5d\x0a\x66\x69\x6e\x61\x6c\x20\x6d\x61\x72\x6b\x69\x6e\x67\x3a\x20\x5b\x27\x73\x69\x6e\x6b\x3a\x33\x27\x5d\x0a\x0a",73);
+  assert(result.text==expected);assert(result.characters==36200);assert(!result.truncated&&result.variant=="petri_net");
+  assert(serialize_original_context_model_json(document)==before);
+ }
+}
+// Native byte strings are an extension, not replacement-decoded Python text.
+// Four NEW root public controls retain distinct arc objects, not firing multiplicity.
+// Supplemental capture SHA-256: 751ccc85d7c796670b425bc7a38da82feaa25dfecaa2011d3798ac0503e94862.
+void petri_arc_occurrence_byte_vectors(){
+ { // one-weighted-two
+  const auto document=parse_pnml_document("<pnml><net id=\"occurrence-net\"><page id=\"page\"><place id=\"source\"><initialMarking><text>2</text></initialMarking></place><place id=\"sink\"></place><transition id=\"transition-00\"><name><text>A</text></name></transition><arc id=\"arc-0\" source=\"source\" target=\"transition-00\"><inscription><text>2</text></inscription></arc><arc id=\"arc-1\" source=\"transition-00\" target=\"sink\"><inscription><text>1</text></inscription></arc></page><finalmarkings><marking><place idref=\"sink\"><text>1</text></place></marking></finalmarkings></net></pnml>",PnmlImportOptions{false,false,false,false,false});
+  assert(document.arc_occurrences&&document.arc_occurrences->size()==2);
+  const auto before=serialize_original_context_model_json(document);const auto result=abstract_petri_net(document,false);
+  assert(result.text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(result.characters==190&&!result.truncated);
+  assert(serialize_original_context_model_json(document)==before);
+  assert(document.net.transitions().at(0).inputs.size()==2);
+  auto primitive=document;primitive.arc_occurrences.reset();const auto primitive_before=serialize_original_context_model_json(primitive);
+  assert(abstract_petri_net(primitive,false).text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(serialize_original_context_model_json(primitive)==primitive_before);
+  auto stale=document;stale.arc_occurrences->pop_back();const auto stale_before=serialize_original_context_model_json(stale);
+  bool rejected=false;try{(void)abstract_petri_net(stale,false);}catch(const std::invalid_argument&){rejected=true;}assert(rejected);assert(serialize_original_context_model_json(stale)==stale_before);
+ }
+ { // two-parallel-one
+  const auto document=parse_pnml_document("<pnml><net id=\"occurrence-net\"><page id=\"page\"><place id=\"source\"><initialMarking><text>2</text></initialMarking></place><place id=\"sink\"></place><transition id=\"transition-00\"><name><text>A</text></name></transition><arc id=\"arc-0\" source=\"source\" target=\"transition-00\"><inscription><text>1</text></inscription></arc><arc id=\"arc-1\" source=\"source\" target=\"transition-00\"><inscription><text>1</text></inscription></arc><arc id=\"arc-2\" source=\"transition-00\" target=\"sink\"><inscription><text>1</text></inscription></arc></page><finalmarkings><marking><place idref=\"sink\"><text>1</text></place></marking></finalmarkings></net></pnml>",PnmlImportOptions{false,false,false,false,false});
+  assert(document.arc_occurrences&&document.arc_occurrences->size()==3);
+  const auto before=serialize_original_context_model_json(document);const auto result=abstract_petri_net(document,false);
+  assert(result.text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A'), source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(result.characters==220&&!result.truncated);
+  assert(serialize_original_context_model_json(document)==before);
+  assert(document.net.transitions().at(0).inputs.size()==2);
+  auto primitive=document;primitive.arc_occurrences.reset();const auto primitive_before=serialize_original_context_model_json(primitive);
+  assert(abstract_petri_net(primitive,false).text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(serialize_original_context_model_json(primitive)==primitive_before);
+  auto stale=document;stale.arc_occurrences->pop_back();const auto stale_before=serialize_original_context_model_json(stale);
+  bool rejected=false;try{(void)abstract_petri_net(stale,false);}catch(const std::invalid_argument&){rejected=true;}assert(rejected);assert(serialize_original_context_model_json(stale)==stale_before);
+ }
+ { // two-parallel-weighted
+  const auto document=parse_pnml_document("<pnml><net id=\"occurrence-net\"><page id=\"page\"><place id=\"source\"><initialMarking><text>2</text></initialMarking></place><place id=\"sink\"></place><transition id=\"transition-00\"><name><text>A</text></name></transition><arc id=\"arc-0\" source=\"source\" target=\"transition-00\"><inscription><text>2</text></inscription></arc><arc id=\"arc-1\" source=\"source\" target=\"transition-00\"><inscription><text>3</text></inscription></arc><arc id=\"arc-2\" source=\"transition-00\" target=\"sink\"><inscription><text>1</text></inscription></arc></page><finalmarkings><marking><place idref=\"sink\"><text>1</text></place></marking></finalmarkings></net></pnml>",PnmlImportOptions{false,false,false,false,false});
+  assert(document.arc_occurrences&&document.arc_occurrences->size()==3);
+  const auto before=serialize_original_context_model_json(document);const auto result=abstract_petri_net(document,false);
+  assert(result.text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A'), source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(result.characters==220&&!result.truncated);
+  assert(serialize_original_context_model_json(document)==before);
+  assert(document.net.transitions().at(0).inputs.size()==5);
+  auto primitive=document;primitive.arc_occurrences.reset();const auto primitive_before=serialize_original_context_model_json(primitive);
+  assert(abstract_petri_net(primitive,false).text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(serialize_original_context_model_json(primitive)==primitive_before);
+  auto stale=document;stale.arc_occurrences->pop_back();const auto stale_before=serialize_original_context_model_json(stale);
+  bool rejected=false;try{(void)abstract_petri_net(stale,false);}catch(const std::invalid_argument&){rejected=true;}assert(rejected);assert(serialize_original_context_model_json(stale)==stale_before);
+ }
+ { // normal-reset-inhibitor
+  // Full literal storage supports this coherent mixed graph; current PNML
+  // importer mutators reject shared ordinary/reset/inhibitor endpoints.
+  PetriNetLiteralStorage storage;storage.place_count=2;storage.activities={"A"};storage.transition_names=PetriTransitionNameList{"transition-00"};
+  PetriTransition transition;transition.activity=0;transition.inputs={0,0};transition.outputs={1};transition.reset_inputs={0};transition.inhibitor_inputs={0};storage.transitions={transition};
+  PnmlDocument document;document.net=PetriNet::from_literal_storage(storage);document.place_ids={"source","sink"};document.transition_ids={"transition-00"};
+  document.initial_marking={2,0};document.final_marking={0,1};document.initial_marking_keys={true,false};document.final_marking_keys={false,true};
+  document.arc_occurrences=std::vector<PnmlArcOccurrence>{{0,0,true,PetriArcType::kNormal,2,"arc-0"},{0,0,true,PetriArcType::kInhibitor,1,"arc-1"},{0,0,true,PetriArcType::kReset,1,"arc-2"},{1,0,false,PetriArcType::kNormal,1,"arc-3"}};
+  assert(document.arc_occurrences&&document.arc_occurrences->size()==4);
+  const auto before=serialize_original_context_model_json(document);const auto result=abstract_petri_net(document,false);
+  assert(result.text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A'), source->(transition-00, 'A'), source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(result.characters==250&&!result.truncated);
+  assert(serialize_original_context_model_json(document)==before);
+  auto stale=document;stale.arc_occurrences->pop_back();const auto stale_before=serialize_original_context_model_json(stale);
+  bool rejected=false;try{(void)abstract_petri_net(stale,false);}catch(const std::invalid_argument&){rejected=true;}assert(rejected);assert(serialize_original_context_model_json(stale)==stale_before);
+ }
+}
+void petri_native_byte_extensions(){
+ const std::string raw=std::string("'\\\n\0",4)+std::string("\xff\xed\xa0\x80\xc0\xaf\xe2",7);
+ PetriNetLiteralStorage storage;storage.place_count=2;storage.activities={raw};storage.transition_names=PetriTransitionNameList{"literal-name"};
+ PetriTransition transition;transition.activity=0;transition.inputs={0};transition.outputs={1};storage.transitions={transition};
+ PnmlDocument document;document.net=PetriNet::from_literal_storage(storage);
+ document.place_ids={std::string("p\xff\0\xed\xa0\x80\xc0\xaf\xe2",9),"sink"};
+ document.initial_marking={0,0};document.initial_marking_keys={true,false};document.final_marking={0,0};document.final_marking_keys={false,false};
+ const auto before=serialize_original_context_model_json(document);const auto result=abstract_petri_net(document,false);
+ has(result.text,"(literal-name, '"+raw+"')");
+ has(result.text,std::string("initial marking: ['p")+std::string("\xff",1)+"\\x00\\ud800"+std::string("\xc0\xaf\xe2",3)+":0']");
+ assert(serialize_original_context_model_json(document)==before&&!result.truncated);
+ // The shared Unicode repr keeps its established quote policy for tuple users.
+ LogSkeletonModel skeleton;skeleton.equivalence={{std::string("\xc2\xa0",2),"apost'only"}};
+ has(abstract_log_skeleton(skeleton,false).text,"('\\xa0', \"apost'only\")");
+}
 void public_templates_and_native_order(){
  const auto doc=petri();const auto no_header=abstract_petri_net(doc,false);assert(no_header.text=="\n\nplaces: [ middle92, sink92, source92 ]\ntransitions: [ (silent92, None), (visible92, 'Approve Ω') ]\narcs: [ (silent92, None)->sink92, (visible92, 'Approve Ω')->middle92, middle92->(silent92, None), source92->(visible92, 'Approve Ω') ]\n\ninitial marking: ['middle92:0', 'source92:2']\nfinal marking: ['sink92:3']\n\n");assert(abstract_petri_net(doc,true).text=="\n\nIf I have a Petri net:\n\nplaces: [ middle92, sink92, source92 ]\ntransitions: [ (silent92, None), (visible92, 'Approve Ω') ]\narcs: [ (silent92, None)->sink92, (visible92, 'Approve Ω')->middle92, middle92->(silent92, None), source92->(visible92, 'Approve Ω') ]\n\ninitial marking: ['middle92:0', 'source92:2']\nfinal marking: ['sink92:3']\n\n");assert(!no_header.truncated&&no_header.characters==312);
  LogSkeletonModel sk;sk.equivalence={{"Approve Ω","Archive92"}};sk.always_before={{"Archive92","Approve Ω"}};sk.always_after=sk.equivalence;sk.never_together={{"Approve Ω","Never92"}};sk.directly_follows=sk.equivalence;sk.activ_freq={{"Approve Ω",{0,1,3}},{"Archive92",{2}}};assert(abstract_log_skeleton(sk,false).text=="\nEquivalence:  ('Approve Ω', 'Archive92')\n\nAlways Before:  ('Archive92', 'Approve Ω')\n\nAlways After:  ('Approve Ω', 'Archive92')\n\nNever Together:  ('Approve Ω', 'Never92')\n\nActivity Occurrences:  Approve Ω: 0, 1, 3; Archive92: 2;\n\nDirectly-Follows Constraints:  ('Approve Ω', 'Archive92')\n\n");assert(abstract_log_skeleton(sk,true).text=="\n\nThe Log Skeleton process model contains the following declarative constraints:\n- Equivalence (if the first activity occurs, then it has the same occurrences as the second one)\n- Always Before (if the first activity occur, then the second activity should have been executed previously)\n- Always After (if the first activity occur, then the second activity is executed in one of the following events)\n- Never Together (the two activities cannot co-exist inside the same case)\n- Activity Occurrences (bounds the number of occurrences for an activity in a case)\n- Directly-Follows Constraints (if the first activity occurs, then the second activity shall occur immediately after)\n    \n\nI have a Log Skeleton process model containing the following declarative constraints:\n\nEquivalence:  ('Approve Ω', 'Archive92')\n\nAlways Before:  ('Archive92', 'Approve Ω')\n\nAlways After:  ('Approve Ω', 'Archive92')\n\nNever Together:  ('Approve Ω', 'Never92')\n\nActivity Occurrences:  Approve Ω: 0, 1, 3; Archive92: 2;\n\nDirectly-Follows Constraints:  ('Approve Ω', 'Archive92')\n\n");
@@ -164,9 +559,14 @@ void petri_full_storage_and_overrides(){
  d.stochastic_map=StochasticMap{{{999,static_cast<StochasticMapTiming>(-3),static_cast<StochasticMapDistribution>(77),-0.0,std::numeric_limits<double>::quiet_NaN(),std::numeric_limits<double>::infinity(),-7.0,-19}}};d.arc_occurrences=std::vector<PnmlArcOccurrence>{{999,888,false,static_cast<PetriArcType>(-4),TokenInteger("-77"),std::string("\xff\0",2),true}};
  const auto original=serialize_quality_workbench_document_json(d);const auto copy=parse_original_context_document_json(original);assert(serialize_quality_workbench_document_json(copy)==original);assert(serialize_original_context_model_json(copy)==original);
  // PNML document IDs remain original node names when no native name metadata exists.
- auto identity=d;auto unnamed=storage;unnamed.transition_names.reset();identity.net=PetriNet::from_literal_storage(unnamed);identity.transition_ids={"original-visible-id","original-silent-id"};has(abstract_petri_net(identity,false).text,"(original-visible-id, 'Approve Ω')");identity.transition_ids.resize(1);bool short_ids=false;try{(void)abstract_petri_net(identity,false);}catch(const std::out_of_range&){short_ids=true;}assert(short_ids);
+ auto identity=d;identity.arc_occurrences.reset();auto unnamed=storage;unnamed.transition_names.reset();identity.net=PetriNet::from_literal_storage(unnamed);identity.transition_ids={"original-visible-id","original-silent-id"};has(abstract_petri_net(identity,false).text,"(original-visible-id, 'Approve Ω')");identity.transition_ids.resize(1);bool short_ids=false;try{(void)abstract_petri_net(identity,false);}catch(const std::out_of_range&){short_ids=true;}assert(short_ids);
  const auto net_json=serialize_oc_playout_workbench_petri_net_json(d.net);assert(serialize_oc_playout_workbench_petri_net_json(parse_original_context_net_json(net_json))==net_json);
- auto p=request("petri_net",original,"native_document");p.push_back({"initial_marking_file","", "[-999999999999999999999999999999,0,5]",true});const auto run=execute_original_model_context(p);assert(run.status==200);has(run.json,"\"initial_origin\":\"explicit_file\"");has(run.json,"\"final_origin\":\"native_document\"");has(run.json,"\"initial_override\":[-999999999999999999999999999999,0,5]");has(run.json,"\"unchanged\":true");has(run.json,"\"source_pnml\":null");has(run.json,"source_pnml_error");has(run.json,"\"initial_marking_keys\":[true,true,true]");
+ // Arc occurrences are meaningful formatter input: stale inventories now fail
+ // instead of silently falling back to a different executable-arc description.
+ const auto stale_before=serialize_original_context_model_json(d);const auto stale=execute_original_model_context(request("petri_net",stale_before,"native_document"));
+ assert(stale.status==400);has(stale.json,"PNML arc occurrence has an invalid endpoint or weight");has(stale.json,"\"native_entered\":true");has(stale.json,"\"model_unchanged\":true");has(stale.json,"\"source_pnml\":null");has(stale.json,"\"source_pnml_error\":");assert(stale.json.find("\"source_pnml_error\":null")==std::string::npos);assert(serialize_original_context_model_json(d)==stale_before);
+ d.arc_occurrences.reset();const auto renderable=serialize_original_context_model_json(d);
+ auto p=request("petri_net",renderable,"native_document");p.push_back({"initial_marking_file","", "[-999999999999999999999999999999,0,5]",true});const auto run=execute_original_model_context(p);assert(run.status==200);has(run.json,"\"initial_origin\":\"explicit_file\"");has(run.json,"\"final_origin\":\"native_document\"");has(run.json,"\"initial_override\":[-999999999999999999999999999999,0,5]");has(run.json,"\"unchanged\":true");has(run.json,"\"model_unchanged\":true");has(run.json,"\"initial_marking_keys\":[true,true,true]");
  auto net=request("petri_net",net_json,"native_net");fails(net,"requires explicit initial and final marking");net.push_back({"initial_marking_json","","[]",false});net.push_back({"final_marking_file","final.json","[0]",true});assert(execute_original_model_context(net).status==200);
  // Read-safety errors are formatter errors, not lossy transport normalization.
  storage.transition_names=PetriTransitionNameList{};d.net=PetriNet::from_literal_storage(storage);const auto bad=execute_original_model_context(request("petri_net",serialize_original_context_model_json(d),"native_document"));assert(bad.status==400);has(bad.json,"\"native_entered\":true");has(bad.json,"\"model_unchanged\":true");has(bad.json,"\"result\":null");
@@ -196,4 +596,12 @@ void controls_and_parser_failures(){
  pp=request("petri_net",pnml,"pnml");pp.push_back({"initial_marking_json","","[]",false});pp.push_back({"initial_marking_file","i.json","[]",true});fails(pp,"JSON and File are mutually exclusive");
 }
 } // namespace
-int main(){temporal_numeric_environment();temporal_public_byte_vectors();public_templates_and_native_order();unbounded_and_byte_models();petri_full_storage_and_overrides();controls_and_parser_failures();}
+int main(){
+#ifdef _WIN32
+ _set_error_mode(_OUT_TO_STDERR);
+#endif
+ try{
+  petri_arc_occurrence_byte_vectors();petri_native_byte_extensions();petri_public_byte_vectors();temporal_numeric_environment();temporal_public_byte_vectors();public_templates_and_native_order();unbounded_and_byte_models();petri_full_storage_and_overrides();controls_and_parser_failures();
+ }catch(const std::exception& error){std::cerr<<"Unexpected context-test exception: "<<error.what()<<std::endl;return 1;}
+ return 0;
+}
