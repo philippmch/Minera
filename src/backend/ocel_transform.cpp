@@ -311,10 +311,11 @@ struct EnrichmentIndex {
   std::map<std::string, std::vector<std::size_t>> events_by_object;
 };
 
-EnrichmentIndex make_enrichment_index(const Ocel& log) {
+EnrichmentIndex make_enrichment_index(const Ocel& log,
+                                      bool allow_empty_ids = false) {
   EnrichmentIndex result;
   for (std::size_t index = 0; index < log.events.size(); ++index) {
-    if (log.events[index].id.empty() ||
+    if ((!allow_empty_ids && log.events[index].id.empty()) ||
         !result.event_index.emplace(log.events[index].id, index).second) {
       throw std::invalid_argument(
           "OCEL enrichment events require unique non-empty ids");
@@ -323,7 +324,8 @@ EnrichmentIndex make_enrichment_index(const Ocel& log) {
   }
   std::set<std::string> object_ids;
   for (const auto& object : log.objects) {
-    if (object.id.empty() || !object_ids.insert(object.id).second)
+    if ((!allow_empty_ids && object.id.empty()) ||
+        !object_ids.insert(object.id).second)
       throw std::invalid_argument(
           "OCEL enrichment objects require unique non-empty ids");
   }
@@ -548,7 +550,10 @@ std::string serialize_ocel_enrichment_json(const Ocel& log,
 
 OcelObjectGraph discover_ocel_object_graph(const Ocel& log,
                                            OcelEnrichmentGraph graph) {
-  const auto index = make_enrichment_index(log);
+  // Interaction treats every literal string, including empty strings, as an
+  // identity. Other graph/enrichment paths retain their stricter validation.
+  const auto index = make_enrichment_index(
+      log, graph == OcelEnrichmentGraph::kInteraction);
   OcelObjectGraph result;
   result.graph = graph;
   result.object_ids.reserve(log.objects.size());
