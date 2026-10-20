@@ -4110,6 +4110,26 @@
       "browser_validation_complete": false,
       "strict_promotion": false,
       "added": "2026-10-20"
+    },
+    {
+      "id": "native_independent_original_log_features_workbench_available",
+      "state": "independent_original_inputs_and_complete_native_controls_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [],
+      "operations": [
+        "log_to_features",
+        "log_to_features_json"
+      ],
+      "native_variants": [
+        "event_based",
+        "trace_based",
+        "temporal"
+      ],
+      "validation": "docs/feature-first-original-log-features-validation.json",
+      "browser_validation_complete": false,
+      "strict_promotion": false,
+      "added": "2026-10-20"
     }
   ],
   "execution_priority": [
@@ -4127,7 +4147,7 @@
     },
     {
       "area": "Remaining algorithms, parameters, conversions and I/O",
-      "next_action": "Current source audit as of a18be59ffbf4e8c6d1f8418da642b0fc09950e7a traces principal workflows for all 86 families; this does not prove full feature or strict parity. Nine concrete audited extension groups: analysis-G1: Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics. [delivered_feature87]; analysis-G2: Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult. [delivered_feature88]; analysis-G3: Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs. [delivered_feature89]; discovery-G1: Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata. [delivered_feature84]; discovery-G2: Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names. [delivered_feature85]; discovery-G3: Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected. [delivered_feature86]; transformations-G1: Convert a saved or edited TrieModel without rediscovery. [delivered_feature83]; transformations-G2: Query saved intervals while preserving caller order and match indices. [delivered_feature83]; transformations-G3: Build native bounded prompts from separately supplied assumptions/context. [delivered_feature90]. Choose the next open source-proven input/control/result extension. Preserve all remaining browser, exact-default/type/error/order/Unicode/marking/solver/concurrency/performance gates and strict 46/86 packages,199/387 modules,228 incomplete units. Historical delivery chronology and prior reports remain evidence; earlier next-feature statements are not the current plan."
+      "next_action": "Current source audit as of a18be59ffbf4e8c6d1f8418da642b0fc09950e7a traces principal workflows for all 86 families; this does not prove full feature or strict parity. Nine concrete audited extension groups: analysis-G1: Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics. [delivered_feature87]; analysis-G2: Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult. [delivered_feature88]; analysis-G3: Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs. [delivered_feature89]; discovery-G1: Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata. [delivered_feature84]; discovery-G2: Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names. [delivered_feature85]; discovery-G3: Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected. [delivered_feature86]; transformations-G1: Convert a saved or edited TrieModel without rediscovery. [delivered_feature83]; transformations-G2: Query saved intervals while preserving caller order and match indices. [delivered_feature83]; transformations-G3: Build native bounded prompts from separately supplied assumptions/context. [delivered_feature90]. Choose the next open source-proven input/control/result extension. Preserve all remaining browser, exact-default/type/error/order/Unicode/marking/solver/concurrency/performance gates and strict 46/86 packages,199/387 modules,228 incomplete units. Historical delivery chronology and prior reports remain evidence; earlier next-feature statements are not the current plan. Feature95 delivers independent original EventLog features and full-result serialization; continue the remaining source-proven capability audit, including unresolved support contracts and per-call provider configuration."
     }
   ],
   "feature_status_meaning": {
@@ -4181,7 +4201,8 @@
     "native_independent_original_temporal_workbench_available": "Independent original temporal discovery/conformance exposes all public log, stream, table, finite lazy and view forms, literal timestamp/business-hour/zeta options, complete stored profiles/deviations, raw text parser, four native serializers and member helpers. Eighteen exact native artifacts are distinct from explicit client-derived deviation Files. Availability does not promote strict parity.",
     "native_independent_original_timing_workbench_available": "Independent original performance spectrum and batches expose every declared source/default/alias expression, literal activities, complete options/results and exact native artifacts. Availability does not promote strict parity.",
     "native_independent_original_time_analysis_workbench_available": "Independent original finite EventLog time analysis exposes all21actual public callables, full options/results and exact native output artifacts. This adjunct availability adds no strict catalogue promotion.",
-    "native_shared_table_metadata_transport_preserved": "Shared native table transport preserves complete metadata without changing ordinary interchange grammar, algorithms or strict parity status."
+    "native_shared_table_metadata_transport_preserved": "Shared native table transport preserves complete metadata without changing ordinary interchange grammar, algorithms or strict parity status.",
+    "native_independent_original_log_features_workbench_available": "Independent full native EventLog extraction exposes all three variants, all56 stored options and full6 results, plus the supplied-result native serializer. Original Files, exact byte artifacts, standalone API/CLI/UI entry points and completed functional evidence are available. This adds no strict catalogue promotion; browser rendering and every strict reference gate remain open."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [

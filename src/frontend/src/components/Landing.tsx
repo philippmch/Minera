@@ -42,11 +42,12 @@ interface LandingProps {
   onOriginalTiming?: () => void;
   onOriginalTimeAnalysis?: () => void;
   onOriginalOcPlayout?: () => void;
+  onOriginalFeatures?: () => void;
   onActiveSource?: () => void;
   onSavedStructures?: () => void;
 }
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalClustering, onOriginalOrganizational, onOriginalTemporal, onOriginalTiming, onOriginalTimeAnalysis, onOriginalOcPlayout, onActiveSource, onSavedStructures }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, error, mining, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalClustering, onOriginalOrganizational, onOriginalTemporal, onOriginalTiming, onOriginalTimeAnalysis, onOriginalOcPlayout, onOriginalFeatures, onActiveSource, onSavedStructures }: LandingProps) {
   return (
     <div className="landing">
       <div className="landing-inner">
@@ -128,6 +129,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         {onOriginalQuality && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalQuality}>Evaluate independent original sources and models</button>}
         {onSavedStructures && <button className="landing-sample reveal" disabled={mining} onClick={onSavedStructures}>Saved trie and interval structures</button>}
         {onOriginalOcPlayout && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalOcPlayout}>Original object-centric playout</button>}
+        {onOriginalFeatures && <button className="landing-sample reveal" disabled={mining} onClick={onOriginalFeatures}>Original log features and result serializer</button>}
         {onActiveSource && <button className="landing-sample reveal" disabled={mining} onClick={onActiveSource}>Open and inspect a native mining source</button>}
 
         <div className="landing-steps reveal">

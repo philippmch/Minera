@@ -41,11 +41,12 @@ interface TopBarProps {
   onOriginalTiming?: () => void;
   onOriginalTimeAnalysis?: () => void;
   onOriginalOcPlayout?: () => void;
+  onOriginalFeatures?: () => void;
   onActiveSource?: () => void;
   onSavedStructures?: () => void;
 }
 
-export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalClustering, onOriginalOrganizational, onOriginalTemporal, onOriginalTiming, onOriginalTimeAnalysis, onOriginalOcPlayout, onActiveSource, onSavedStructures }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome, onImportOcel, onRelateLogs, onStreaming, onModelExchange, onProcessCube, onTreeGeneration, onAcquisition, onTokenReplay, onPetriAlignment, onWorkflowInputs, onGraphAlignment, onInductiveInputs, onTreeAlignment, onPetriAntiMulti, onModelConversion, onMonteCarlo, onPlayout, onOriginalDecision, onOriginalDeclare, onOriginalLogSkeleton, onOriginalFootprints, onOriginalGeneticMatrix, onOriginalEmbeddingFilter, onOriginalEmd, onOriginalEditDistance, onOriginalBose, onOriginalDiscovery, onOriginalPetriAnalysis, onOriginalRootCause, onOriginalAnonymization, onOriginalQuality, onOriginalClustering, onOriginalOrganizational, onOriginalTemporal, onOriginalTiming, onOriginalTimeAnalysis, onOriginalOcPlayout, onOriginalFeatures, onActiveSource, onSavedStructures }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -98,6 +99,7 @@ export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFi
       {onOriginalTimeAnalysis && <button className="btn-ghost" onClick={onOriginalTimeAnalysis}>Original time analysis</button>}
       {onOriginalQuality && <button className="btn-ghost" onClick={onOriginalQuality}>Original model quality</button>}
       {onOriginalOcPlayout && <button className="btn-ghost" onClick={onOriginalOcPlayout}>Original object-centric playout</button>}
+      {onOriginalFeatures && <button className="btn-ghost" onClick={onOriginalFeatures}>Original log features</button>}
       {onSavedStructures && <button className="btn-ghost" onClick={onSavedStructures}>Saved structures</button>}
       {onActiveSource && <button className="btn-ghost" onClick={onActiveSource}>Source inputs</button>}
       <label className="btn-open">

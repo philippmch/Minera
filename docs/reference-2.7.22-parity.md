@@ -13786,3 +13786,14 @@ Evidence: docs/feature-first-exact-filter-discovery-validation.json. No strict c
 Feature 94 adds lossless source-acquisition reports across the nine connector workflows, preserving all seven native result fields, independent optional captures, original source bytes and separate serialization errors. All five native XES export options are available through JSON/File controls and the CLI, including automatic compression and arbitrary native name bytes. Validation passed 50 selected API cases, 12 CLI invocations, 4 public-client requests and 2 live checks; the strict frontend build and 9430 tests across 164 files passed. Native evidence contributes 92 passing suites: 89 retained and three newly executed, with one fresh core object and 216 reused. A before-change native acquisition and public-client File handoff demonstrated FF-byte replacement in the old client path. Complete native source/result state and export bytes now have an explicit safe inspection path. Strict parity remains unfinished across all 228 incomplete units. One browser attempt was denied before navigation; zero rendered UI checks completed.
 
 Evidence: docs/feature-first-exact-source-acquisition-validation.json. No strict catalogue promotion. The separate Feature95 audit is not implementation.
+
+
+### Feature95: independent original log features (2026-10-20)
+
+- Before: an original EventLog produced feature B natively, but the cached API returned409 without a session. The independent route now accepts that original File directly.
+- Delivered: all3 variants, all56 options, full6 results and the original-result serializer through API, minera_features and a standalone UI. Actual defaults, original File bytes, typed state and independent canonical/legacy artifacts are retained.
+- Validation:94 distinct native suites;217 retained+1 fresh core objects; strict frontend build;9430 retained+37 fresh frontend checks;40 API cases;12 CLI cases;4 real public-helper POSTs;2 live POSTs and exact served assets. Cache A remained A while independent input B yielded B.
+- Failed native/frontend fixtures and the old-oracle offline predicate failure remain recorded. Successful native/API/CLI calls were not replayed to repair harness assertions.
+- Browser: current authorized attempt was rejected before navigation;0 rendered checks. No further settings request or workaround.
+- Availability count:95 delivered extensions. Strict scope remains46/86 packages,199/387 modules,228 incomplete units; full parity remains false.
+- Evidence: docs/feature-first-original-log-features-validation.json

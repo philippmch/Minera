@@ -1,0 +1,226 @@
+{
+  "complete": true,
+  "feature": 95,
+  "features_delivered": 95,
+  "parent_head": "bb6a2d4f684692f18a3a0d3b505191384ee8b022",
+  "feature_baseline_head": "4b30f16e80305f3eec3b7f948221a2c16c45020c",
+  "baseline": {
+    "path": "build/feature95-baseline.json",
+    "bytes": 2830260,
+    "sha256": "2adeb3d9c220baf1154cf04e0dadc504aee55da12878073e30d8d4cbaf2fe948"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/feature95-native-test-recovery-actual-1/build-manifest.json",
+      "bytes": 452750,
+      "sha256": "e0639ef3b90d858014c2efd1dff1a1244c83ccc8057c5bc268fe13b1a4695087"
+    },
+    "api": {
+      "path": "build/feature95-api-actual-1/validation.json",
+      "bytes": 102833,
+      "sha256": "8909447c481dbb40458130ef19a570ad3b6720112ded872c714e275fbeadf9a4"
+    },
+    "frontend": {
+      "path": "build/original-features95-frontend-81657eab9a274509a334f533e8c64bb1/validation.json",
+      "bytes": 2762967,
+      "sha256": "ef447c73172ca845096a3935afba967eb1ec133173c6a8e2053d315201521a10"
+    },
+    "cli": {
+      "path": "build/feature95-cli-actual-1/validation.json",
+      "bytes": 60797,
+      "sha256": "a26351ba103e5e9c380be110a9389c005865f9a9c2ff73018254f049d68a54b1"
+    },
+    "file_bridge": {
+      "path": "build/feature95-file-bridge-actual-1/validation.json",
+      "bytes": 42443,
+      "sha256": "d06055bb46b4edab93f3bc9a281f28fcb6aa03d583ff89ded615db6d3fd2ed98"
+    },
+    "old_native_oracle": {
+      "path": "build/feature95-old-native-oracle-recovery-actual-1/validation.json",
+      "bytes": 31373,
+      "sha256": "5d11878499329d1a071e7365ef938becda261fd10125a10a3689638d2960da6a"
+    },
+    "source_review": {
+      "path": "build/feature95-final-source-review-prepared-2/review.json",
+      "bytes": 9606,
+      "sha256": "bda5f16a49f7b02a40edb19135d24af716439a9ff68d848bd0009fefa58120fd"
+    },
+    "before_native": {
+      "path": "build/feature95-before-native-actual-1/validation.json",
+      "bytes": 9556,
+      "sha256": "e27a1f942bcf8e0b8efb63d8da0c23d7a156fc886b0dc142c696da91924ceaae"
+    },
+    "before_http": {
+      "path": "build/feature95-before-http-actual-1/validation.json",
+      "bytes": 6172,
+      "sha256": "aed2448732f43a9ced7ddd41d0f752db1c2d73e6f63b60cd59a2782a86d198a7"
+    },
+    "before_cleanup": {
+      "path": "build/original-features-feature95-before-cleanup.json",
+      "bytes": 1481,
+      "sha256": "dc08b275d093facad0465c45a2062a90582220cef946e92be6226db34af16cea"
+    },
+    "breadth_audit": {
+      "path": "build/feature95-breadth-availability-audit-prepared-1/audit.json",
+      "bytes": 10334,
+      "sha256": "0e99f8f8b4c1c967fec298d19c3d77a59673688272345f3c06feca1f84aee64a"
+    },
+    "contract": {
+      "path": "build/feature95-contract-freeze-1.json",
+      "bytes": 1659,
+      "sha256": "0f788b0329dbf2ee4c8721e9abd1ce537a9085f2d51f9163b8ae98f47408d388"
+    },
+    "contract_addendum": {
+      "path": "build/feature95-contract-addendum-1.json",
+      "bytes": 907,
+      "sha256": "977332df2a4043fb226fb427d20914ce5cfdc7978bbe37523345f379a2fda22c"
+    },
+    "browser": {
+      "path": "build/feature95-browser-current-retry.json",
+      "bytes": 626,
+      "sha256": "99163e8f73b857b95279a9fe3ca0d017224418ded64f2d27f893d49d62ceea23"
+    },
+    "backend": {
+      "path": "build/original-features-feature95-backend-postcommit.json",
+      "bytes": 4515,
+      "sha256": "ee0a884084b430b08d1e3112ae3f69d6797895c859d1897f25a76f7e012aab1e"
+    },
+    "live": {
+      "path": "build/original-features-feature95-live-runtime.json",
+      "bytes": 12779,
+      "sha256": "7dacd729c9382d1665d133f4fc482e97b403ca4adbfdd9c38d4c2363471d9cb5"
+    },
+    "cleanup": {
+      "path": "build/original-features-feature95-test-cleanup.json",
+      "bytes": 2961,
+      "sha256": "a243a629600370916f4bfa9af04c3e7c4b7520f7980d15d6ada42e9499484e0a"
+    }
+  },
+  "problem": "The old API returned409 without a cached log even when the supplied original EventLog was independently valid and yielded featureB in the old native kernel.",
+  "delivered": {
+    "route": "POST /api/original-log-to-features",
+    "cli": "minera_features",
+    "operations": [
+      "extract_features",
+      "serialize_result"
+    ],
+    "native_functions": [
+      "log_to_features",
+      "log_to_features_json"
+    ],
+    "variants": [
+      "event_based",
+      "trace_based",
+      "temporal"
+    ],
+    "options_fields": 56,
+    "result_fields": 6,
+    "source_metadata_fields": 10,
+    "source_format": "Full original native EventLog JSON, including the global byte-string representation; CSV/XES import is outside this extension.",
+    "option_modes": [
+      "native_default",
+      "variant_default",
+      "inline_json",
+      "file"
+    ],
+    "true_default_call": true,
+    "original_result": "All six stored fields, including inactive/ragged families and complete typed attribute cells; native semantics own return/error decisions.",
+    "frontend": "Independent Landing/TopBar/App entry and existing TransformationWorkspace; actual original File identity, hashes, complete tables/CSV, raw response/report and native byte artifacts.",
+    "canonical_artifact_slots": 4,
+    "independent_optional_error_slots": 8,
+    "cached_routes_preserved": true
+  },
+  "functional_evidence": {
+    "native_passing_suites": 94,
+    "native_retained_parent_suites": 92,
+    "native_new_distinct_suites": 2,
+    "native_core_objects": 218,
+    "retained_core_objects": 217,
+    "fresh_core_objects": 1,
+    "frontend_test_accounting": {
+      "total_tests": 9467,
+      "passed_tests": 9467,
+      "passed_files": 166,
+      "retained_tests": 9430,
+      "retained_files": 164,
+      "fresh_tests": 37,
+      "fresh_files": 2,
+      "previous_feature_tests_superseded": 36
+    },
+    "frontend_strict_build": true,
+    "frontend_single_fresh_full_suite_run": false,
+    "api_cases": 40,
+    "cli_cases": 12,
+    "real_public_helper_calls": 4,
+    "original_File_handoffs": 5,
+    "unique_original_Files": 5,
+    "live_posts": 2,
+    "new_endpoint_http_calls": 46,
+    "before_endpoint_http_calls": 1,
+    "total_endpoint_http_calls_including_before": 47,
+    "asset_and_readiness_GETs_separate": true,
+    "old_native_feature_calls_new": 11,
+    "old_native_serializer_calls_new": 13,
+    "old_native_feature_calls_with_before": 12,
+    "old_native_serializer_calls_with_before": 14,
+    "cached_A_original_B_and_legacy_A_after_verified": true,
+    "external_provider_calls": 0,
+    "browser_rendered_checks": 0
+  },
+  "retained_history": {
+    "native": {
+      "path": "build/native-feature95-0706911eeae445acb26ced295b6ddfd7/build-manifest.json",
+      "bytes": 404640,
+      "sha256": "90291703b4e537b56e75d9b04ecb595fb07a9ae87a8ba030b86ab281a5bede47"
+    },
+    "native_test_recovery": {
+      "path": "build/feature95-native-test-recovery-actual-1/validation.json",
+      "bytes": 97899,
+      "sha256": "9b79c413e57e7c019238f4164c73682a454d0a1f22fb2c0e435295a636737b8a"
+    },
+    "native_fixture": "The intended byte-schema case required the existing explicit ordinary-attribute supplied flag; no native kernel/serializer change or assertion weakening.",
+    "frontend": {
+      "path": "build/original-features95-frontend-a646e72c3e8f4e77a7db7df018f04694/validation.json",
+      "bytes": 2759774,
+      "sha256": "dcd9997bab9c2e040c1ff94001a9ffe356923ba1de5b7129ad5c29bb6ca0bcca"
+    },
+    "frontend_results": {
+      "path": "build/original-features95-frontend-a646e72c3e8f4e77a7db7df018f04694/test-results.json",
+      "bytes": 3712737,
+      "sha256": "52e08e86ed1337ccc2c7fad32183bc15bf23d792ddda887543ac5cb4f533538b"
+    },
+    "frontend_corrections": "Explicit component props typing; one fixture stopped mutating numeric-shadow-backed defaults; pure exported parsers now validate numeric variant lexemes before lossless normalization.",
+    "frontend_pass_retention": "9430 unchanged parent checks from the completed full run;37 feature checks rerun after the scoped helper correction. No fresh combined9467 run is claimed.",
+    "old_oracle": {
+      "path": "build/feature95-old-native-oracle-actual-1/validation.json",
+      "bytes": 18637,
+      "sha256": "ef16bb716a204bceb982b5dec0cf6755c00ed193fc3d5a12d60043d4f278bab2"
+    },
+    "old_oracle_recovery": "Offline predicates repaired from all retained actual outcomes. Unexpected old native semantic errors retained; no native replay."
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "strict_promotion": false,
+  "full_parity_achieved": false,
+  "goal_complete": false,
+  "boundaries": [
+    "All228 incomplete strict coverage units remain open across the complete86-family/387-module catalogue.",
+    "The22-unit breadth audit assessed11 direct native availability paths; unresolved support contracts are not assumed missing algorithms.",
+    "Browser security rejected the latest authorized attempt before navigation; user settings changes do not constitute rendered evidence.",
+    "Inherited httplib filename/identical-query behavior, native private scalar identity and NaN payload bit identity remain separate strict boundaries.",
+    "All public old-kernel oracle calls use the frozen old own-native library; no reference implementation source/private-state inspection.",
+    "API/CLI completed before the pure parser-only frontend correction. Their actual send/native paths are unchanged; current helper source is separately built/tested and bridged."
+  ],
+  "next_work": "Continue feature breadth across the remaining catalogue; resolve public support contracts and review per-call provider configuration. Then complete strict behavior, browser, performance and platform gates.",
+  "unrelated_preserved": 110,
+  "helper": {
+    "path": "build/finalize-original-features95-1.py",
+    "bytes": 13981,
+    "sha256": "40edba5542f6c9a6ef8f27ecc1bd3442fce4f86043f06cb29b4be1d0ac927195"
+  }
+}
