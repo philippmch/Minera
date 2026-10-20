@@ -1,3 +1,4 @@
+import {hasExactKnowledge,requestExactKnowledge,type ExactKnowledgeRequest,type ExactKnowledgeEnvelope,type KnowledgeRequest} from "./exact-knowledge";
 import { knowledgeInjectionQuery } from "./api";
 import { isKnowledgeInjectionResult, type KnowledgeInjectionOptions, type KnowledgeInjectionResult, type KnowledgeInjectionVariant, type MineraExport } from "./types";
 
@@ -60,7 +61,10 @@ async function checkedJson<T>(response:Response,guard:(value:unknown)=>value is 
 export async function requestLlmStatus(signal?:AbortSignal):Promise<LlmRuntimeStatus> {
   return checkedJson(await fetch("/api/llm/status",signal?{signal}:{}),isLlmRuntimeStatus,"language-model runtime status");
 }
-export async function requestKnowledgePreview(options:KnowledgeInjectionOptions,signal?:AbortSignal):Promise<KnowledgeInjectionResult> {
+export function requestKnowledgePreview(options:ExactKnowledgeRequest,signal?:AbortSignal):Promise<ExactKnowledgeEnvelope>;
+export function requestKnowledgePreview(options:KnowledgeInjectionOptions,signal?:AbortSignal):Promise<KnowledgeInjectionResult>;
+export async function requestKnowledgePreview(options:KnowledgeRequest,signal?:AbortSignal):Promise<KnowledgeInjectionResult|ExactKnowledgeEnvelope> {
+  if(hasExactKnowledge(options))return requestExactKnowledge(options,signal);
   const form=new FormData();
   for(const [key,value] of new URLSearchParams(knowledgeInjectionQuery(options)))form.append(key,value);
   const result=await checkedJson(await fetch("/api/knowledge-injection",{method:"POST",body:form,...(signal?{signal}:{})}),isKnowledgeInjectionResult,"knowledge prompt");

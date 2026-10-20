@@ -13751,3 +13751,10 @@ Validation: docs/feature-first-saved-dfg-validation.json.
 Feature89 adds arbitrary per-relation OTG conformance thresholds to the existing workspace, both public request helpers and native CLI. Exact relation names and all native double threshold values are supported, with complete original graph/source Files, canonical options and byte-safe native results retained. Validation passed 31 selected cases / 31 dedicated physical HTTP calls, 2 actual client bridge HTTP calls through the two public helpers, 2 live checks, 25 CLI invocations and 9254 frontend tests in 156 files. 1 audited extension remains. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
 
 Validation: docs/feature-first-otg-threshold-validation.json.
+
+
+## Feature90 - Native prompt assumptions and context
+
+Feature90 exposes native bounded prompt construction from separately supplied assumptions and context, or all eight complete native options, in the existing prompt workspace, both public request helpers and native CLI. Original JSON and Files, exact input and prompt byte counts, native failures, complete options and byte-safe prompt/serializer artifacts remain inspectable. Native output stays separate from the reviewed provider editor and its explicit send action. Validation passed 41 selected cases / 41 dedicated physical HTTP calls, 2 actual client bridge HTTP calls through the two public helpers, 2 live checks, 25 CLI invocations and 9289 frontend tests in 158 files. No extensions remain open in the current nine-item source audit. That availability result does not prove complete feature or behavioral parity. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
+
+Validation: docs/feature-first-knowledge-context-validation.json.
