@@ -39,6 +39,7 @@ survive export/reimport. Five affected native suites pass; see
 | PRIPEL encoded trace helpers | Three missing string helpers implemented; 205 captured length, enumeration and token edit-distance outcomes match |
 | DECLARE descriptions | Supplied family and rule order preserved through formatter and original-model route; twelve captured results/errors match |
 | Log start/end activity filters | Admission and supplied-variant helpers match all 66 captured outcomes, custom keys, polarity, protected endpoint class and exact thresholds |
+| OCEL object-type endpoint filtering | Existing start/end implementations match all 160 captured full returned logs; six-table propagation, order and metadata verified |
 | Log trace filtering | New serialized-activity API matches all 50 captured outcomes, custom keys, polarity, full metadata and missing-value errors |
 | Object-codeath, descendants and inheritance graphs | Three direct modules each match 119/119 captured outcomes; literal IDs and missing-event diagnostics repaired; six affected suites pass |
 | Petri-net descriptions | Sixteen captured full-byte outputs match; literal quoting and weighted/parallel arc occurrences repaired; full context suite passes |
@@ -48,14 +49,14 @@ These are semantic module closures, including missing helper implementations
 and repairs. They do not complete their parent families. Detailed contracts
 and evidence limits are linked from each module's coverage record.
 
-Coverage is now **46 complete / 40 partial packages**, **219 complete / 168
-partial modules**, and **208 open strict coverage units**, down from 228.
+Coverage is now **46 complete / 40 partial packages**, **220 complete / 167
+partial modules**, and **207 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 
 ## Active requirements
 
-- Close OCEL object-type endpoint and per-type count filtering.
+- Close OCEL per-type count filtering.
 - Close log rework and original-case descriptions.
 - Connect the faithful native log filters to the application workflow.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
