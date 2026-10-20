@@ -12573,8 +12573,45 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/declare-description-parity-contract.md",
+      "artifacts": [
+        "include/minera/original_model_context.hpp",
+        "include/minera/original_model_context_workbench_json.hpp",
+        "src/backend/original_model_context.cpp",
+        "src/backend/original_model_context_workbench_json.cpp",
+        "src/backend/root_cause_unicode.hpp",
+        "src/backend/tests/test_original_model_context.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.declare_to_descr",
+        "implementation": [
+          {
+            "path": "include/minera/original_model_context.hpp",
+            "symbol": "abstract_declare"
+          },
+          {
+            "path": "include/minera/original_model_context_workbench_json.hpp",
+            "symbol": "parse_original_context_ordered_declare_json"
+          },
+          {
+            "path": "include/minera/original_model_context_workbench_json.hpp",
+            "symbol": "execute_original_model_context"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "declare_public_byte_vectors"
+          },
+          {
+            "path": "src/backend/tests/test_original_model_context.cpp",
+            "executable": "minera_original_model_context_tests",
+            "case": "declare_ordered_context_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.log_to_cols_descr",
