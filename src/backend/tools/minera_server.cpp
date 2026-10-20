@@ -84,6 +84,7 @@
 #include "minera/petri_anti_multi_workbench_json.hpp"
 #include "minera/model_conversion_workbench_json.hpp"
 #include "minera/tree_reduction_workbench_json.hpp"
+#include "minera/original_model_context_workbench_json.hpp"
 #include "minera/active_event_source.hpp"
 #include "minera/monte_carlo_workbench_json.hpp"
 #include "minera/playout_workbench_json.hpp"
@@ -4074,6 +4075,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "petri_anti_multi_route.hpp"
 #include "model_conversion_route.hpp"
 #include "tree_reduction_route.hpp"
+#include "original_model_context_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
 #include "original_decision_route.hpp"
@@ -10626,7 +10628,10 @@ int main(int argc, char** argv) {
   server.Post("/api/log-query",handle_log_query);
   server.Post("/api/log-query/export",handle_log_query_export);
   server.Post("/api/log-cluster",handle_log_cluster);
-  server.Post("/api/llm-context",handle_llm_context);
+  server.Post("/api/llm-context",[](const httplib::Request& request,httplib::Response& response){
+    if(request_uses_original_model_context(request))handle_original_model_context(request,response);
+    else handle_llm_context(request,response);
+  });
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
   server.Post("/api/profile-clustering", handle_profile_clustering);
