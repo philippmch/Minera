@@ -1,4 +1,5 @@
 #include "minera/request_params.hpp"
+#include "minera/literal_controls_json.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -3126,10 +3127,28 @@ MineParams parse_mine_params(const FieldLookup& field,
   params.declare_conformance_options.activity_key =
       params.declare_options.activity_key;
 
-  if (const auto value = field("declare_considered_activities");
-      present ? present("declare_considered_activities") : !value.empty()) {
-    auto activities = split_csv(value);
-    params.declare_options.considered_activities = std::move(activities);
+  // Exact vectors share the established NativeString JSON codec. Presence,
+  // including an explicit [], is independent of the legacy comma grammar.
+  const auto literal_discovery_vector = [&](std::string_view exact,
+                                             std::string_view legacy)
+      -> std::optional<std::vector<std::string>> {
+    if (!supplied(exact)) return std::nullopt;
+    if (supplied(legacy)) {
+      throw std::invalid_argument(std::string(exact) +
+                                  ": cannot combine with " + std::string(legacy));
+    }
+    try {
+      return parse_literal_string_vector_json(field(exact));
+    } catch (const std::invalid_argument& error) {
+      throw std::invalid_argument(std::string(exact) + ": " + error.what());
+    }
+  };
+  if (auto activities = literal_discovery_vector(
+          "declare_considered_activities_json", "declare_considered_activities")) {
+    params.declare_options.considered_activities = std::move(*activities);
+  } else if (const auto value = field("declare_considered_activities");
+             supplied("declare_considered_activities")) {
+    params.declare_options.considered_activities = split_csv(value);
   }
   if (const auto value = field("declare_allowed_templates");
       present ? present("declare_allowed_templates") : !value.empty()) {
@@ -3389,8 +3408,11 @@ MineParams parse_mine_params(const FieldLookup& field,
           parse_business_hour_slots(value, "dfg_business_hour_slots");
     }
   }
-  if (const auto value = field("dfg_case_attributes");
-      present ? present("dfg_case_attributes") : !value.empty()) {
+  if (auto attributes = literal_discovery_vector(
+          "dfg_case_attributes_json", "dfg_case_attributes")) {
+    params.dfg_statistics.case_attributes = std::move(*attributes);
+  } else if (const auto value = field("dfg_case_attributes");
+             supplied("dfg_case_attributes")) {
     auto attributes = split_csv(value);
     std::sort(attributes.begin(), attributes.end());
     attributes.erase(std::unique(attributes.begin(), attributes.end()),

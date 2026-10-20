@@ -3329,7 +3329,7 @@ void handle_dfg_discovery(const httplib::Request& request,
     if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
     if (!request.has_param("source_id") || request.get_param_value("source_id") != std::to_string(session->query_source_id))
       throw std::invalid_argument("the source log changed; refresh the DFG discovery source");
-    static const std::set<std::string> allowed = {"source_id", "dfg_statistical_variants", "dfg_causal_variants", "dfg_window", "dfg_keep_once_per_case", "dfg_activity_attribute", "dfg_timestamp_attribute", "dfg_start_timestamp_attribute", "dfg_performance_aggregation", "dfg_business_hours", "dfg_business_hour_slots", "dfg_case_attributes", "dfg_return_node_attributes"};
+    static const std::set<std::string> allowed = {"source_id", "dfg_statistical_variants", "dfg_causal_variants", "dfg_window", "dfg_keep_once_per_case", "dfg_activity_attribute", "dfg_timestamp_attribute", "dfg_start_timestamp_attribute", "dfg_performance_aggregation", "dfg_business_hours", "dfg_business_hour_slots", "dfg_case_attributes", "dfg_case_attributes_json", "dfg_return_node_attributes"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown DFG discovery parameter: " + key); }
     const auto lookup = [&](std::string_view name) { return request.has_param(std::string(name)) ? request.get_param_value(std::string(name)) : std::string{}; };
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
@@ -3716,7 +3716,7 @@ void handle_constraint_discovery(const httplib::Request& request,
     if (family != "declare" && family != "log_skeleton")
       throw std::invalid_argument("constraint family expects declare or log_skeleton");
     static const std::set<std::string> declare_fields = {
-      "declare_activity_attribute", "declare_considered_activities", "declare_allowed_templates",
+      "declare_activity_attribute", "declare_considered_activities", "declare_considered_activities_json", "declare_allowed_templates",
       "declare_min_support_ratio", "declare_min_confidence_ratio", "declare_auto_selection_multiplier",
       "generate_log", "declare_playout_traces", "declare_playout_min_length", "declare_playout_max_length", "declare_playout_seed"};
     static const std::set<std::string> skeleton_fields = {
