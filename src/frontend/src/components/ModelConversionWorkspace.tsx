@@ -13,6 +13,7 @@ import {nativeResponseRequest} from "../native-response";
 import {downloadQueryBlob} from "../log-query";
 import {DiagnosticTableView} from "./ModelDiagnosticsInspection";
 import {ModelGraph} from "./ModelGraph";
+import {TreeReductionWorkspace} from "./TreeReductionWorkspace";
 
 const labels: Record<ModelConversionOperation, string> = {tree_to_powl: "Process tree → POWL", net_to_powl: "Petri net → POWL", powl_to_tree: "POWL → process tree", net_to_tree: "Petri net → process tree", powl_to_net: "POWL → Petri net", reduce_petri: "Reduce a Petri net"};
 const formatLabels = {auto: "Detect original model format", ptml: "PTML process tree", tree_json: "Full native process-tree JSON", pnml: "PNML Petri net", powl_text: "Native POWL text"};
@@ -20,6 +21,7 @@ interface OperationState {form: ModelConversionForm; model: File | null; returne
 const initialState = () => Object.fromEntries(MODEL_CONVERSION_OPERATIONS.map(operation => [operation, {form: defaultModelConversionForm(operation), model: null, returned: null, failed: null}])) as Record<ModelConversionOperation, OperationState>;
 export function ModelConversionWorkspace() {
   const [operation, setOperation] = useState<ModelConversionOperation>("tree_to_powl"), [states, setStates] = useState(initialState);
+  const [treeReduction, setTreeReduction] = useState(false);
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null), controller = useRef<AbortController | null>(null), gate = useRef(new ModelConversionRequestGate()), activeOperation = useRef(operation);
   const identities = useRef<Record<ModelConversionOperation, File | null>>(Object.fromEntries(MODEL_CONVERSION_OPERATIONS.map(value => [value, null])) as Record<ModelConversionOperation, File | null>);
   const cancel = () => {gate.current.invalidate(); controller.current?.abort(); controller.current = null; setPending(false);};
@@ -42,8 +44,8 @@ export function ModelConversionWorkspace() {
     <section className="panel" aria-label="Independent original model conversion and reduction">
       <div className="panel-head"><h2>Convert or reduce an original model</h2><span className="panel-meta">Process trees · POWL · Petri nets</span></div>
       <p>Upload an independent original model. Each operation keeps the original model, the complete native result and every available export from the same run.</p>
-      <label className="filters-field"><span>Model operation</span><select value={operation} onChange={event => chooseOperation(event.target.value as ModelConversionOperation)}>{MODEL_CONVERSION_OPERATIONS.map(value => <option key={value} value={value}>{labels[value]}</option>)}</select></label>
-      <fieldset className="query-fields" disabled={pending}>
+      <label className="filters-field"><span>Model operation</span><select value={treeReduction ? "reduce_tree" : operation} onChange={event => {cancel(); setTreeReduction(event.target.value === "reduce_tree"); if (event.target.value !== "reduce_tree") chooseOperation(event.target.value as ModelConversionOperation);}}>{MODEL_CONVERSION_OPERATIONS.map(value => <option key={value} value={value}>{labels[value]}</option>)}<option value="reduce_tree">Reduce an original process tree with a trace</option></select></label>
+      <fieldset className="query-fields" disabled={pending} hidden={treeReduction}>
         <div className="query-options">
           <label className="filters-field"><span>Original {pnml ? "PNML" : powl ? "POWL text" : "process-tree"} model</span><input type="file" accept={pnml ? ".pnml,.xml,application/xml" : powl ? ".powl,.txt,text/plain" : ".ptml,.xml,.json,application/xml,application/json"} onChange={event => chooseModel(event.target.files?.[0] ?? null)} /><span>{selected.model?.name ?? "Choose an original model file"}</span></label>
           <label className="filters-field"><span>Original model format</span><select value={form.modelFormat} onChange={event => editForm(current => ({...current, modelFormat: event.target.value as ModelConversionForm["modelFormat"]}))}>{modelConversionFormats(operation).map(value => <option key={value} value={value}>{formatLabels[value]}</option>)}</select></label>
@@ -56,11 +58,12 @@ export function ModelConversionWorkspace() {
         {operation === "reduce_petri" && <p>The returned changed flag describes reduction. The resulting net is inspected separately because rebuilding can alter native metadata even when changed is false.</p>}
         <div className="query-actions"><button className="btn-ghost" disabled={!selected.model} onClick={() => void execute()}>{operation === "reduce_petri" ? "Reduce original Petri net" : "Convert original model"}</button></div>
       </fieldset>
-      {pending && <p role="status">Processing the original model… <button className="btn-ghost" onClick={cancel}>Cancel model conversion request</button></p>}
-      {error && <p className="error-banner" role="alert">{error}</p>}
+      {!treeReduction && pending && <p role="status">Processing the original model… <button className="btn-ghost" onClick={cancel}>Cancel model conversion request</button></p>}
+      {!treeReduction && error && <p className="error-banner" role="alert">{error}</p>}
     </section>
-    {selected.failed && <ModelConversionInspection key={selected.failed.raw + ":failed"} run={selected.failed} failed />}
-    {selected.returned && <ModelConversionInspection key={selected.returned.raw + ":returned"} run={selected.returned} />}
+    <TreeReductionWorkspace active={treeReduction} />
+    {!treeReduction && selected.failed && <ModelConversionInspection key={selected.failed.raw + ":failed"} run={selected.failed} failed />}
+    {!treeReduction && selected.returned && <ModelConversionInspection key={selected.returned.raw + ":returned"} run={selected.returned} />}
   </>;
 }
 function ModelConversionInspection({run, failed = false}: {run: ModelConversionRun; failed?: boolean}) {

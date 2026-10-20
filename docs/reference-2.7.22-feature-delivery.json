@@ -4024,6 +4024,26 @@
       "validation": "docs/feature-first-knowledge-context-validation.json",
       "browser_validation_complete": false,
       "added": "2026-10-20"
+    },
+    {
+      "id": "native_independent_original_tree_reduction",
+      "state": "original_tree_and_trace_reduction_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [],
+      "supporting_modules": [
+        "algo.reduction.process_tree.reducer",
+        "algo.reduction.process_tree.variants.tree_tr_based"
+      ],
+      "operations": [
+        "reduce_original_process_tree_against_original_trace",
+        "inspect_complete_tree_trace_options_result_and_snapshots",
+        "preserve_original_model_trace_and_option_files",
+        "cli_original_tree_reduction"
+      ],
+      "validation": "docs/feature-first-tree-reduction-validation.json",
+      "browser_validation_complete": false,
+      "added": "2026-10-20"
     }
   ],
   "execution_priority": [
