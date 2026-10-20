@@ -1,0 +1,313 @@
+{
+  "complete": true,
+  "feature": 99,
+  "features_delivered": 99,
+  "parent_head": "a348d00d3411ab8201cd41103c484f7277a5f918",
+  "feature_baseline_head": "385f4bb281e5ea2591aad31d3cfe1b8f017eeb5f",
+  "baseline": {
+    "path": "build/feature99-baseline.json",
+    "bytes": 2834569,
+    "sha256": "fdab03f6b4741b48e80cbb73dabb4c88ce7f8427ef2dc0e39bc60043e1c3aa8e"
+  },
+  "service_recovery": {
+    "path": "build/feature99-service-recovery-1/recovery.json",
+    "bytes": 4670,
+    "sha256": "052fc67890cb27ff5b83559f3a3c34316cd47a6041eb8fa096ad60bc9be6c5bd"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/feature99-native-test-recovery-actual-1/build-manifest.json",
+      "bytes": 473541,
+      "sha256": "a1e67c2359a3789d5a43b11a833047077dcb3b4792f35a78093134721024ad80"
+    },
+    "frontend": {
+      "path": "build/original-query99-frontend-d991ff99b0c7453685d0d1ea50ce4b2c/validation.json",
+      "bytes": 2777577,
+      "sha256": "160bb6104c19e361dd7e397d083416e8b5fdd3bfdbfa8f188ef69ff07f8d0f3b"
+    },
+    "old": {
+      "path": "build/feature99-old-native-oracle-actual-1/validation.json",
+      "bytes": 14937,
+      "sha256": "88524f0080dcff7d6216550b18c80c747830bc9961424cd3ddf30468a8406ff9"
+    },
+    "before": {
+      "path": "build/feature99-before-actual-1/validation.json",
+      "bytes": 11264,
+      "sha256": "ed1dc2d6da53fdabf5a3e1d3b78e87d05d1e88ff94bab2ab36e2cedaf17719cd"
+    },
+    "api": {
+      "path": "build/feature99-api-actual-1/validation.json",
+      "bytes": 211203,
+      "sha256": "47047a5784ca360be82465d2be5108445f52046f7eb1a8f4b2d035745e22c2c5"
+    },
+    "cli": {
+      "path": "build/feature99-cli-actual-1/validation.json",
+      "bytes": 49562,
+      "sha256": "bfa2f75b990ec49b9d6cdc38c38813264720db6ca40c004cfd217b6276ee5688"
+    },
+    "source_review": {
+      "path": "build/feature99-root-source-review-1.json",
+      "bytes": 4735,
+      "sha256": "4b82d24402037f355e0d1946aa2c27fd52f9c1157eb2bbaea4374f596d74e4fc"
+    },
+    "cleanup": {
+      "path": "build/feature99-after-cleanup-1.json",
+      "bytes": 2914,
+      "sha256": "b16cd194b35a3abb1748679f792e04f32178d58d9f8287a587c4c4a41ad382d3"
+    },
+    "browser": {
+      "path": "build/feature99-browser-evidence-carried-2.json",
+      "bytes": 849,
+      "sha256": "4ddeceecfac88b60d59413ea360e274cad433e1ee893177851ce71b16426e0a1"
+    },
+    "service": {
+      "path": "build/feature99-service-actual-1/validation.json",
+      "bytes": 2922,
+      "sha256": "400e0003739ccc986b4d12c8c0fb09397c6554642b696d70c415fc7472e96ff7"
+    },
+    "recovery": {
+      "path": "build/feature99-service-recovery-1/recovery.json",
+      "bytes": 4670,
+      "sha256": "052fc67890cb27ff5b83559f3a3c34316cd47a6041eb8fa096ad60bc9be6c5bd"
+    },
+    "source_context": {
+      "path": "build/feature99-acceptance-source-context-2.json",
+      "bytes": 2760045,
+      "sha256": "17dfc770795426a202a243b7c815bf4b832002fe81626c7a1dce802a592ba082"
+    },
+    "native_failed_history": {
+      "path": "build/native-feature99-5b02cfd3c964452599a9367dc85e842b/build-manifest.json",
+      "bytes": 420541,
+      "sha256": "6b804a52c605de7c6e2d9e3f639c9f2f9c0d91d2a08cd8bcee4a5bb90793c914"
+    },
+    "frontend_failed_history": {
+      "path": "build/original-query99-frontend-eb19a34bd41e4a5c952c448017d54818/validation.json",
+      "bytes": 2774006,
+      "sha256": "ecf04b3868fd323bfd03ab58045253a186d22c5bf1d4024f9d3c95b5078f28a7"
+    },
+    "file_bridge": {
+      "path": "build/feature99-file-bridge-offline-recovery-actual-1/validation.json",
+      "bytes": 109246,
+      "sha256": "6502764df4f6c4d7d88aeaa1133a0e806f09ec641023ef4944120c34af07871c"
+    },
+    "backend": {
+      "path": "build/original-query99-backend-postcommit.json",
+      "bytes": 5359,
+      "sha256": "4343fd6580c1a61e43327a4ff42fbf44d8da46b76c7b6b142fc4d1f83625ed92"
+    },
+    "live": {
+      "path": "build/original-query99-live-runtime.json",
+      "bytes": 11451,
+      "sha256": "32383c6433027d9e2fccf556567395982c44d7b670a55dd1ccec840089cb1938"
+    }
+  },
+  "problem": "Complete original logs, tables and supplied query results could not reach all six own public query functions independently of cached source conversion.",
+  "delivered": {
+    "endpoint": "/api/original-log-query-workbench",
+    "CLI": "minera_original_log_query",
+    "operations": [
+      "log_query_table",
+      "query_log_sqlite",
+      "filter_query_events",
+      "log_query_json",
+      "log_query_table_json",
+      "sqlite_log_query_available"
+    ],
+    "actual_native_defaults": true,
+    "full_table_constructor_fields": 2,
+    "stored_table_fields": 7,
+    "independent_metadata_fields": 10,
+    "full_result_fields": 8,
+    "options_fields": 4,
+    "artifact_slots": [
+      "source_log_json",
+      "query_table_json",
+      "query_result_json",
+      "options_json",
+      "indices_json",
+      "filtered_log_json",
+      "native_json",
+      "selected_event_indices_json"
+    ],
+    "source": "Original full EventLog, original full2 LogQueryTable or supplied full8 LogQueryResult; semantic storage is preserved until the selected native consumer.",
+    "handoff": "Native bare log/table/result/options/indices bytes are copied directly into actual Files, including a separately written selected_event_indices_json vector. No reconstruction from projected legacy display.",
+    "surfaces": [
+      "independent Landing/TopBar/App workspace",
+      "existing QueryWorkspace entry",
+      "standalone shared-core CLI"
+    ]
+  },
+  "functional_evidence": {
+    "native_distinct_passing_suites": 99,
+    "native_retained_parent_suites": 98,
+    "native_fresh_suites": 1,
+    "core_objects_retained": 220,
+    "core_sources_fresh": 1,
+    "core_objects_total": 221,
+    "frontend_test_accounting": {
+      "total_tests": 9612,
+      "passed_tests": 9612,
+      "passed_files": 174,
+      "retained_tests": 7878,
+      "retained_files": 150,
+      "fresh_tests": 1734,
+      "fresh_files": 24
+    },
+    "frontend_strict_build": true,
+    "frontend_execution_boundary": "Fresh affected import-closure tests and strict production build; unchanged tests retained from bound98 evidence. Aggregate, not a fresh full-suite run.",
+    "observed_proof_counts": {
+      "before": {
+        "feature": 99,
+        "parent_feature": 98,
+        "physical_public_calls": {
+          "constructors": 0,
+          "queries": 1,
+          "filters": 0,
+          "result_serializers": 1,
+          "table_serializers": 0,
+          "availability": 0
+        },
+        "core_sources_compiled": 0,
+        "planned_new_records": 1,
+        "product_CLI_calls": 0,
+        "HTTP_calls": 0,
+        "provider_calls": 0,
+        "reference_calls": 0,
+        "old98_calls_replayed": 0,
+        "retained98_query_calls": 19,
+        "retained98_filter_calls": 3,
+        "retained98_result_serializer_calls": 12,
+        "retained98_projection_calls": 19
+      },
+      "old": {
+        "feature": 99,
+        "parent_feature": 98,
+        "physical_public_calls": {
+          "constructors": 1,
+          "queries": 5,
+          "filters": 3,
+          "result_serializers": 5,
+          "table_serializers": 4,
+          "availability": 1
+        },
+        "core_sources_compiled": 0,
+        "planned_new_records": 16,
+        "product_CLI_calls": 0,
+        "HTTP_calls": 0,
+        "provider_calls": 0,
+        "reference_calls": 0,
+        "old98_calls_replayed": 0,
+        "retained98_query_calls": 19,
+        "retained98_filter_calls": 3,
+        "retained98_result_serializer_calls": 12,
+        "retained98_projection_calls": 19
+      },
+      "api": {
+        "feature": 99,
+        "selected_http_cases": 56,
+        "physical_http_calls": 56,
+        "new_http_calls": 56,
+        "retained_http_calls": 0,
+        "successful_requests_replayed": 0,
+        "provider_calls": 0,
+        "direct_native_oracle_calls_executed_by_collector": 0,
+        "selected_passed_cases": 56,
+        "observed_requested_native_entries": 43,
+        "old_oracle_calls_replayed": 0
+      },
+      "cli": {
+        "feature": 99,
+        "selected_CLI_cases": 13,
+        "physical_CLI_invocations": 13,
+        "HTTP_calls": 0,
+        "provider_calls": 0,
+        "old_oracle_calls_replayed": 0,
+        "successful_calls_replayed": 0,
+        "completed_CLI_cases": 13,
+        "direct_native_oracle_calls_executed_by_runner": 0
+      },
+      "file_bridge": {
+        "feature": 99,
+        "network_requests_executed": 6,
+        "helper_calls_attempted": 6,
+        "completed_helper_calls": 6,
+        "original_File_handoff_count": 9,
+        "unique_original_File_count": 8,
+        "native_artifact_File_upload_count": 3,
+        "selected_helper_calls": 6,
+        "mocked_fetch_count": 0,
+        "provider_calls": 0,
+        "source_seed_calls": 0,
+        "old_oracle_calls_replayed": 0,
+        "successful_http_requests_replayed": 0,
+        "new_network_requests": 0,
+        "new_HTTP_calls": 0,
+        "new_Node_invocations": 0,
+        "new_native_calls": 0,
+        "new_CLI_invocations": 0,
+        "new_process_calls": 0,
+        "physical_http_call_count": 6,
+        "retained_successful_helper_calls": 6,
+        "report_download_count": 6,
+        "csv_download_count": 6,
+        "artifact_download_count": 19
+      },
+      "browser": {
+        "feature": 99,
+        "attempts": 0,
+        "rendered_checks": 0
+      }
+    },
+    "live_assets_exact": true,
+    "live_capability_posts": 1,
+    "real_provider_process_preserved": {
+      "path": "build/feature99-service-recovery-1/provider-runtime.json",
+      "bytes": 1644,
+      "sha256": "4a3fb0a286c857236c671dfcc2303562b4845e77163f3a7e0cf8c2d872adc9d2"
+    },
+    "real_query_runtime_preserved": {
+      "path": "build/feature99-service-recovery-1/query-runtime.json",
+      "bytes": 81432,
+      "sha256": "57bfb978c2e20257abb07f6aa5357289b2e1e7a6f5b69f2db224f062ebe2079c"
+    },
+    "browser_rendered_checks": 0
+  },
+  "catalogue_change": {
+    "package": "algo.querying.llm.injection.db_knowledge",
+    "before_feature_delivery_status": "exact_log_query_options_workflow_available",
+    "after_feature_delivery_status": "original_log_query_workbench_available",
+    "strict_parity_status_unchanged": "partial",
+    "selectors_unchanged": [
+      "pandas_duckdb",
+      "sqlite3_traditional"
+    ],
+    "other_catalogue_rows_unchanged": true,
+    "backlog_preserved": true
+  },
+  "history": "Retained original98 native and frontend results remain bound. Feature99 original BEFORE/OLD calls are captured once before product installation. Any failed or corrected execution history remains linked by final proofs; aggregate counts never imply a fresh full-suite pass.",
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "unrelated_preserved": 110,
+  "strict_promotion": false,
+  "full_parity_achieved": false,
+  "goal_complete": false,
+  "boundaries": [
+    "Strict scope remains86 families/387 modules,46 complete packages,199 complete modules and228 incomplete units.",
+    "Private generated scalar identity and exact IEEE NaN payload/sign identity remain the constructor transport boundary.",
+    "Native legacy serializers may omit stored fields or produce nonUnicode/invalid JSON bytes; complete constructor snapshots and raw byte artifacts remain separate.",
+    "Existing HTTP body and multipart/query normalization, Windows argv/path representability and process resources remain explicit.",
+    "No Feature99 browser attempt, fresh browser rejection or rendered UI claim. User browser settings are not disputed.",
+    "No external provider/reference implementation call or change to existing kernels, headers, cached98 workflows or Python modules."
+  ],
+  "next_work": "Continue remaining catalogue feature availability, then unresolved strict behavior, browser, platform and performance gates.",
+  "helper": {
+    "path": "build/feature99-delivery-current-prepared-1/finalize-original-query99-1.py",
+    "bytes": 12814,
+    "sha256": "daea66c24add0b1951aa0193f9e07988262087d02dae8df26a9b73146e890368"
+  }
+}

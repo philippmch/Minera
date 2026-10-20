@@ -598,7 +598,7 @@
       ]
     },
     {
-      "feature_delivery_status": "exact_log_query_options_workflow_available",
+      "feature_delivery_status": "original_log_query_workbench_available",
       "package": "algo.querying.llm.injection.db_knowledge",
       "parity_status": "partial",
       "selectors": [
@@ -4187,6 +4187,33 @@
       "browser_validation_complete": false,
       "strict_promotion": false,
       "added": "2026-10-20"
+    },
+    {
+      "id": "original_log_query_workbench_available",
+      "state": "original_log_query_workbench_available",
+      "complete": true,
+      "ui_delivery_pending": false,
+      "families": [
+        "algo.querying.llm.injection.db_knowledge"
+      ],
+      "public_calls": [
+        "log_query_table",
+        "query_log_sqlite",
+        "filter_query_events",
+        "log_query_json",
+        "log_query_table_json",
+        "sqlite_log_query_available"
+      ],
+      "original_table_fields": 2,
+      "stored_table_fields": 7,
+      "stored_metadata_fields": 10,
+      "result_fields": 8,
+      "options_fields": 4,
+      "native_artifacts": 8,
+      "validation": "docs/feature-first-original-log-query-validation.json",
+      "browser_validation_complete": false,
+      "strict_promotion": false,
+      "added": "2026-10-20"
     }
   ],
   "execution_priority": [
@@ -4262,7 +4289,8 @@
     "native_independent_original_log_features_workbench_available": "Independent full native EventLog extraction exposes all three variants, all56 stored options and full6 results, plus the supplied-result native serializer. Original Files, exact byte artifacts, standalone API/CLI/UI entry points and completed functional evidence are available. This adds no strict catalogue promotion; browser rendering and every strict reference gate remain open.",
     "call_local_provider_configuration_and_plain_prompt_available": "All current chat, generated-SQL, study and completion-CLI surfaces accept transient call-local provider configuration, retaining defaults, complete provider results and sanitized own request downloads. Plain chat is reachable without a dataset. Own base-URL/token extensions, browser rendering and strict reference behavior remain separate gates.",
     "original_label_splitting_workbench_available": "Independent original full native EventLog contextual label splitting through both actual public functions, true defaults or complete eight-field options, plus original two-field result serialization. Full snapshots, raw File provenance and five native byte artifacts support direct original-log/result File reuse. Strict behavior/browser/platform/performance gates remain separate.",
-    "exact_log_query_options_workflow_available": "Existing cached SQL query, filtered export, native query CLI and hypothesis workflows expose complete four-field SQLite options and exact ordered five-alternative parameters. DuckDB has an explicit three-field own extension with observed runtime metadata; complete native/raw outcomes and original controls remain inspectable. Broader independent native constructors and all strict/browser/platform/performance gates remain queued."
+    "exact_log_query_options_workflow_available": "Existing cached SQL query, filtered export, native query CLI and hypothesis workflows expose complete four-field SQLite options and exact ordered five-alternative parameters. DuckDB has an explicit three-field own extension with observed runtime metadata; complete native/raw outcomes and original controls remain inspectable. Broader independent native constructors and all strict/browser/platform/performance gates remain queued.",
+    "original_log_query_workbench_available": "All six own public log-query functions accept independent complete original logs, tables and supplied results, with actual defaults or explicit controls. HTTP, shared-core CLI and independent UI preserve complete constructor state, raw File provenance and eight native byte artifacts for direct File reuse. Strict behavior, browser, platform and performance gates remain separate."
   },
   "full_parity_achieved": false,
   "original_requirement_sources": [
