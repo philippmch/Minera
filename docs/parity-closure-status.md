@@ -25,21 +25,22 @@ interaction remains unverified under the previously recorded browser block.
 | Infix-to-regex conversion | Missing converter implemented; all 34 captured outputs match, including wildcard boundaries and every ASCII escaping character |
 | Log trace filtering | New serialized-activity API matches all 50 captured outcomes, custom keys, polarity, full metadata and missing-value errors |
 | Object-codeath, descendants and inheritance graphs | Three direct modules each match 119/119 captured outcomes; literal IDs and missing-event diagnostics repaired; six affected suites pass |
+| Petri-net descriptions | Sixteen captured full-byte outputs match; literal quoting and weighted/parallel arc occurrences repaired; full context suite passes |
 | Object-cobirth graph | Empty IDs and missing-event failures repaired; 97/97 captured outcomes match, including ordering and parameter controls |
 
 These are semantic module closures, including missing helper implementations
 and repairs. They do not complete their parent families. Detailed contracts
 and evidence limits are linked from each module's coverage record.
 
-Coverage is now **46 complete / 40 partial packages**, **211 complete / 176
-partial modules**, and **216 open strict coverage units**, down from 228.
+Coverage is now **46 complete / 40 partial packages**, **212 complete / 175
+partial modules**, and **215 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 
 ## Active requirements
 
 - Check composite OCEL 2.0 graph enrichment, including metadata and mutation behavior.
-- Close Petri-description literal quoting, including nonprinting Unicode.
+- Repair PNML import of mixed ordinary/reset/inhibitor arcs sharing an endpoint.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in
   the broader public captures, so it is not evidence of 28 incorrect models.
