@@ -363,12 +363,18 @@ std::set<ObjectPair> enrichment_interaction_graph(const EnrichmentIndex& index) 
   return result;
 }
 
-std::set<ObjectPair> enrichment_descendants_graph(const EnrichmentIndex& index) {
+std::set<ObjectPair> enrichment_descendants_graph(
+    const EnrichmentIndex& index, bool require_event_relations = false) {
   std::set<ObjectPair> result;
   std::set<std::string> seen;
   for (const auto& event_id : index.event_order) {
     const auto found = index.objects_by_event.find(event_id);
-    if (found == index.objects_by_event.end()) continue;
+    if (found == index.objects_by_event.end()) {
+      if (require_event_relations)
+        throw std::out_of_range(
+            "OCEL descendants event has no object relations: " + event_id);
+      continue;
+    }
     std::vector<std::string> unseen;
     for (const auto& object : found->second) {
       if (!seen.contains(object)) unseen.push_back(object);
@@ -405,13 +411,19 @@ std::set<ObjectPair> enrichment_cobirth_graph(
   return result;
 }
 
-std::set<ObjectPair> enrichment_codeath_graph(const EnrichmentIndex& index) {
+std::set<ObjectPair> enrichment_codeath_graph(
+    const EnrichmentIndex& index, bool require_event_relations = false) {
   std::set<ObjectPair> result;
   std::set<std::string> seen;
   for (auto event = index.event_order.rbegin(); event != index.event_order.rend();
        ++event) {
     const auto found = index.objects_by_event.find(*event);
-    if (found == index.objects_by_event.end()) continue;
+    if (found == index.objects_by_event.end()) {
+      if (require_event_relations)
+        throw std::out_of_range(
+            "OCEL codeath event has no object relations: " + *event);
+      continue;
+    }
     std::vector<std::string> unseen;
     for (const auto& object : found->second)
       if (!seen.contains(object)) unseen.push_back(object);
@@ -423,7 +435,18 @@ std::set<ObjectPair> enrichment_codeath_graph(const EnrichmentIndex& index) {
   return result;
 }
 
-std::set<ObjectPair> enrichment_inheritance_graph(const EnrichmentIndex& index) {
+std::set<ObjectPair> enrichment_inheritance_graph(
+    const EnrichmentIndex& index, bool require_event_relations = false) {
+  // The direct public relation checks last occurrences first, so the first
+  // missing relation group is reported in reverse event-table order.
+  if (require_event_relations) {
+    for (auto event = index.event_order.rbegin(); event != index.event_order.rend();
+         ++event) {
+      if (!index.objects_by_event.contains(*event))
+        throw std::out_of_range(
+            "OCEL inheritance event has no object relations: " + *event);
+    }
+  }
   std::set<ObjectPair> result;
   std::map<std::string, std::size_t> first, last;
   for (const auto& [object, events] : index.events_by_object) {
@@ -556,11 +579,14 @@ std::string serialize_ocel_enrichment_json(const Ocel& log,
 
 OcelObjectGraph discover_ocel_object_graph(const Ocel& log,
                                            OcelEnrichmentGraph graph) {
-  // These relations treat every literal string, including an empty string,
-  // as an identity. Other graph/enrichment paths keep stricter validation.
-  const auto index = make_enrichment_index(
-      log, graph == OcelEnrichmentGraph::kInteraction ||
-               graph == OcelEnrichmentGraph::kCobirth);
+  // Every direct relation treats literal strings, including empty strings,
+  // as identities. Enrichment keeps its previous validation policy.
+  const bool literal_ids = graph == OcelEnrichmentGraph::kInteraction ||
+      graph == OcelEnrichmentGraph::kDescendants ||
+      graph == OcelEnrichmentGraph::kInheritance ||
+      graph == OcelEnrichmentGraph::kCobirth ||
+      graph == OcelEnrichmentGraph::kCodeath;
+  const auto index = make_enrichment_index(log, literal_ids);
   OcelObjectGraph result;
   result.graph = graph;
   result.object_ids.reserve(log.objects.size());
@@ -576,16 +602,16 @@ OcelObjectGraph discover_ocel_object_graph(const Ocel& log,
       edges = enrichment_interaction_graph(index);
       break;
     case OcelEnrichmentGraph::kDescendants:
-      edges = enrichment_descendants_graph(index);
+      edges = enrichment_descendants_graph(index, true);
       break;
     case OcelEnrichmentGraph::kInheritance:
-      edges = enrichment_inheritance_graph(index);
+      edges = enrichment_inheritance_graph(index, true);
       break;
     case OcelEnrichmentGraph::kCobirth:
       edges = enrichment_cobirth_graph(index, true);
       break;
     case OcelEnrichmentGraph::kCodeath:
-      edges = enrichment_codeath_graph(index);
+      edges = enrichment_codeath_graph(index, true);
       break;
     default:
       throw std::invalid_argument("unknown OCEL object graph");

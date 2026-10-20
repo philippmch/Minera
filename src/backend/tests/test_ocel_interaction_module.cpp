@@ -273,9 +273,17 @@ void preserved_validation_and_other_selectors() {
   for (const auto& spec : cases()) {
     if (spec.change != "empty-object-id" && spec.change != "empty-event-id") continue;
     source = model(spec);
-    for (auto graph : {OcelEnrichmentGraph::kDescendants, OcelEnrichmentGraph::kInheritance,
-                       OcelEnrichmentGraph::kCodeath})
-      rejects(source, graph);
+    // All five direct relations now retain empty literal identities.
+    for (auto graph : {OcelEnrichmentGraph::kInteraction, OcelEnrichmentGraph::kCobirth,
+                       OcelEnrichmentGraph::kCodeath, OcelEnrichmentGraph::kDescendants,
+                       OcelEnrichmentGraph::kInheritance}) {
+      const auto result = discover_ocel_object_graph(source, graph);
+      assert(result.graph == graph);
+      if (graph == OcelEnrichmentGraph::kDescendants || graph == OcelEnrichmentGraph::kInheritance)
+        assert(result.edges.empty());
+      else
+        assert(result.edges.size() == 3);
+    }
     bool threw = false;
     try { (void)enrich_ocel(source); }
     catch (const std::invalid_argument&) { threw = true; }

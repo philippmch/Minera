@@ -53,8 +53,9 @@ expected three co-event pairs.
 `make_enrichment_index` now accepts an `allow_empty_ids` control, default false.
 The interaction repair enabled it only for that direct selector. Unique identity
 and declared endpoint checks remain. The subsequent cobirth module repair also
-enables empty IDs for direct cobirth; descendants, inheritance, codeath and
-enrichment retain their previous nonempty-ID policy. Existing import/transport identifier
+enables empty IDs for direct cobirth. Later direct descendants, inheritance and
+codeath repairs extend the same literal-ID rule to all five direct relations;
+enrichment retains its previous nonempty-ID policy. Existing import/transport identifier
 policies are unchanged; this native relation fix is not a claim that every
 import adapter now accepts empty IDs.
 
