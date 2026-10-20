@@ -382,12 +382,18 @@ std::set<ObjectPair> enrichment_descendants_graph(const EnrichmentIndex& index) 
   return result;
 }
 
-std::set<ObjectPair> enrichment_cobirth_graph(const EnrichmentIndex& index) {
+std::set<ObjectPair> enrichment_cobirth_graph(
+    const EnrichmentIndex& index, bool require_event_relations = false) {
   std::set<ObjectPair> result;
   std::set<std::string> seen;
   for (const auto& event_id : index.event_order) {
     const auto found = index.objects_by_event.find(event_id);
-    if (found == index.objects_by_event.end()) continue;
+    if (found == index.objects_by_event.end()) {
+      if (require_event_relations)
+        throw std::out_of_range(
+            "OCEL cobirth event has no object relations: " + event_id);
+      continue;
+    }
     std::vector<std::string> unseen;
     for (const auto& object : found->second)
       if (!seen.contains(object)) unseen.push_back(object);
@@ -550,10 +556,11 @@ std::string serialize_ocel_enrichment_json(const Ocel& log,
 
 OcelObjectGraph discover_ocel_object_graph(const Ocel& log,
                                            OcelEnrichmentGraph graph) {
-  // Interaction treats every literal string, including empty strings, as an
-  // identity. Other graph/enrichment paths retain their stricter validation.
+  // These relations treat every literal string, including an empty string,
+  // as an identity. Other graph/enrichment paths keep stricter validation.
   const auto index = make_enrichment_index(
-      log, graph == OcelEnrichmentGraph::kInteraction);
+      log, graph == OcelEnrichmentGraph::kInteraction ||
+               graph == OcelEnrichmentGraph::kCobirth);
   OcelObjectGraph result;
   result.graph = graph;
   result.object_ids.reserve(log.objects.size());
@@ -575,7 +582,7 @@ OcelObjectGraph discover_ocel_object_graph(const Ocel& log,
       edges = enrichment_inheritance_graph(index);
       break;
     case OcelEnrichmentGraph::kCobirth:
-      edges = enrichment_cobirth_graph(index);
+      edges = enrichment_cobirth_graph(index, true);
       break;
     case OcelEnrichmentGraph::kCodeath:
       edges = enrichment_codeath_graph(index);
