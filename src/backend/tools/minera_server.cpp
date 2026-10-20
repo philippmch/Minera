@@ -146,6 +146,7 @@
 #include "minera/workflow_discovery_input_json.hpp"
 #include "minera/workflow_input_result_json.hpp"
 #include "minera/graph_alignment_workbench_json.hpp"
+#include "minera/saved_dfg_projection_json.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
@@ -4062,6 +4063,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 
 #include "workflow_input_route.hpp"
 #include "graph_alignment_route.hpp"
+#include "saved_dfg_projection_route.hpp"
 #include "inductive_input_route.hpp"
 #include "process_tree_alignment_route.hpp"
 #include "petri_anti_multi_route.hpp"
@@ -10722,7 +10724,11 @@ int main(int argc, char** argv) {
   server.Post("/api/replay-token-workbench", handle_token_replay_workbench);
   server.Post("/api/analyze-replay-duration-workbench", handle_replay_duration_workbench);
   server.Post("/api/align-petri-workbench", handle_petri_alignment_workbench);
-  server.Post("/api/align-graph-workbench", handle_graph_alignment_workbench);
+  server.Post("/api/align-graph-workbench", [](const httplib::Request& request,httplib::Response& response) {
+    const auto operation=request.has_file("operation")?form_field(request,"operation"):request.has_param("operation")?request.get_param_value("operation"):std::string{};
+    if(operation=="project_saved_dfg")handle_saved_dfg_projection_workbench(request,response);
+    else handle_graph_alignment_workbench(request,response);
+  });
   server.Post("/api/replay-fitness", handle_replay_fitness);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/process-tree-petri", handle_process_tree_petri);
