@@ -75,6 +75,8 @@ add_library(minera_core
   src/backend/original_log_query_workbench_json.cpp
   src/backend/exact_log_query_json.cpp
   src/backend/original_model_context.cpp
+  src/backend/case_description.cpp
+  src/backend/case_description_workbench_json.cpp
   src/backend/original_model_context_workbench_json.cpp
   src/backend/otg_threshold_json.cpp
   src/backend/saved_dfg_projection_json.cpp
@@ -990,6 +992,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_log_rework_filter_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_rework_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_rework_filter_tests COMMAND minera_log_rework_filter_tests)
+
+  add_executable(minera_case_description_tests src/backend/tests/test_case_description.cpp)
+  target_link_libraries(minera_case_description_tests PRIVATE minera::core)
+  target_compile_features(minera_case_description_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_case_description_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_case_description_tests COMMAND minera_case_description_tests)
 
   add_executable(minera_quality_json_numbers_tests src/backend/tests/test_quality_json_numbers.cpp)
   target_link_libraries(minera_quality_json_numbers_tests PRIVATE minera::core)
