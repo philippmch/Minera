@@ -70,7 +70,9 @@ were not broadened by this native module repair.
 `test_ocel_cobirth_module.cpp` embeds all **97 captured outcomes** directly:
 74 exact edge sets and the 23 offending event identities. It also checks full
 native source immutability, inactive typed/byte metadata and preserved native
-validation. A focused MSVC Release build compiled the changed
+validation. Subsequent direct codeath/descendants/inheritance repairs extend
+literal-ID support to all five direct relations; their own event-error checks
+do not change this cobirth contract. A focused MSVC Release build compiled the changed
 `ocel_transform.cpp` object and linked it before the frozen archive; its link
 map identifies the fresh graph/index/cobirth symbols. `/UNDEBUG` enabled
 assertions. The new cobirth suite matched **97/97**, and the interaction module
