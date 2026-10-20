@@ -11492,8 +11492,29 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/log-segments-filter-parity-contract.md",
+      "artifacts": [
+        "include/minera/log_segments_filter.hpp",
+        "src/backend/log_segments_filter.cpp",
+        "src/backend/tests/test_log_segments_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.prefixes.prefix_filter",
+        "implementation": [
+          {
+            "path": "src/backend/log_segments_filter.cpp",
+            "symbol": "filter_log_prefix"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_segments_filter.cpp",
+            "executable": "minera_log_segments_filter_tests",
+            "case": "log_prefix_filter_module_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.rework.rework_filter",
@@ -11519,8 +11540,29 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/log-segments-filter-parity-contract.md",
+      "artifacts": [
+        "include/minera/log_segments_filter.hpp",
+        "src/backend/log_segments_filter.cpp",
+        "src/backend/tests/test_log_segments_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.suffixes.suffix_filter",
+        "implementation": [
+          {
+            "path": "src/backend/log_segments_filter.cpp",
+            "symbol": "filter_log_suffix"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_segments_filter.cpp",
+            "executable": "minera_log_segments_filter_tests",
+            "case": "log_suffix_filter_module_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.timestamp.timestamp_filter",
