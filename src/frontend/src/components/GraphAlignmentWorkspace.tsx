@@ -1,3 +1,4 @@
+import {SavedDfgProjectionWorkspace} from "./SavedDfgProjectionWorkspace";
 import {miningSourceWorkbenchFields, type ActiveMiningSourceDescriptor} from "../active-mining-source";
 import {useEffect, useRef, useState} from "react";
 import {
@@ -24,6 +25,7 @@ const initialState = (input: File | null): Record<GraphAlignmentMode, ModeState>
   RECOMPOS_MAXIMAL: {form: defaultGraphAlignmentForm("RECOMPOS_MAXIMAL"), input, model: null, completed: null, failed: null},
 });
 export function GraphAlignmentWorkspace({file: original = null, source = null}: {file?: File | null; source?: ActiveMiningSourceDescriptor | null}) {
+  const [operation, setOperation] = useState<"new_alignment" | "project_saved_dfg">("new_alignment");
   const [mode, setMode] = useState<GraphAlignmentMode>("DFG_CLASSIC"), [states, setStates] = useState(() => initialState(original));
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null), gate = useRef(new GraphAlignmentRequestGate());
@@ -59,6 +61,11 @@ export function GraphAlignmentWorkspace({file: original = null, source = null}: 
   const isXes = /\.(?:xes|xes\.gz|gz)$/i.test(selected.input?.name ?? "");
   const download = (text: string, name: string) => downloadQueryBlob(new Blob([workflowInputNativeBytes(text)], {type: "application/json"}), name);
   return <>
+    <section className="panel" aria-label="Graph alignment operation">
+      <label className="filters-field"><span>Graph alignment operation</span><select value={operation} onChange={event => {cancel(); setOperation(event.target.value as "new_alignment" | "project_saved_dfg");}}><option value="new_alignment">Compute new alignment</option><option value="project_saved_dfg">Project saved DFG alignment result</option></select></label>
+    </section>
+    <SavedDfgProjectionWorkspace active={operation === "project_saved_dfg"} completed={states.DFG_CLASSIC.completed} original={original} />
+    <div hidden={operation !== "new_alignment"}>
     <section className="panel" aria-label="Independent graph alignment">
       <div className="panel-head"><h2>Align original traces against a DFG or PNML model</h2><span className="panel-meta">Independent inputs</span></div>
       <p>Choose Classic DFG alignment or maximal decomposed Petri alignment. Upload the original input and its normative model, then inspect every returned move, search diagnostic and model snapshot.</p>
@@ -98,6 +105,7 @@ export function GraphAlignmentWorkspace({file: original = null, source = null}: 
     </section>
     {selected.failed && <GraphAlignmentInspection key={selected.failed.raw + ":failed"} run={selected.failed} incomplete />}
     {selected.completed && <GraphAlignmentInspection key={selected.completed.raw + ":completed"} run={selected.completed} />}
+    </div>
   </>;
 }
 function GraphAlignmentField({control, value, explicitEmpty, onChange, onEmptyChange}: {control: GraphAlignmentControl; value: string; explicitEmpty: boolean; onChange: (value: string) => void; onEmptyChange: (value: boolean) => void}) {
