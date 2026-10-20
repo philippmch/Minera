@@ -4,6 +4,7 @@
 #include "minera/pnml.hpp"
 #include "../tools/pnml_model_options.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -631,6 +632,199 @@ void simplicity_presented_arc_occurrences_contract() {
   assert(!evaluate_simplicity(net).computed);
   const auto empty = evaluate_simplicity(PetriNetPresentation{}, SimplicityVariant::EXTENDED_CYCLOMATIC);
   assert(empty.computed && empty.vertices == 1 && empty.value == 0.0);
+}
+
+// Independent public outcomes: retained pinned 2.7.22 capture has 982 arc-degree
+// calls (628 direct, 354 dispatcher), projected to these 120 degree/k-selector
+// records (102 effective numeric states). Hex strings are captured outputs.
+void arc_degree_module_acceptance() {
+  const auto nan = std::numeric_limits<double>::quiet_NaN();
+  const auto infinity = std::numeric_limits<double>::infinity();
+  struct PublicCase { std::size_t vertices, arcs; double k; const char* hex; };
+  const PublicCase public_cases[] = {
+    {4, 0, 2.0, "0x1.0000000000000p+0"}, // default
+    {4, 0, 0.0, "0x1.0000000000000p+0"}, // zero
+    {4, 1, 2.0, "0x1.0000000000000p+0"}, // default
+    {4, 1, 0.0, "0x1.5555555555555p-1"}, // zero
+    {4, 2, 2.0, "0x1.0000000000000p+0"}, // default
+    {4, 2, 0.0, "0x1.0000000000000p-1"}, // zero
+    {4, 3, 2.0, "0x1.0000000000000p+0"}, // default
+    {4, 3, 0.0, "0x1.999999999999ap-2"}, // zero
+    {4, 4, 2.0, "0x1.0000000000000p+0"}, // default
+    {4, 4, 0.0, "0x1.5555555555555p-2"}, // zero
+    {4, 5, 2.0, "0x1.5555555555555p-1"}, // default
+    {4, 5, 0.0, "0x1.2492492492492p-2"}, // zero
+    {4, 6, 2.0, "0x1.0000000000000p-1"}, // default
+    {4, 6, 0.0, "0x1.0000000000000p-2"}, // zero
+    {4, 7, 2.0, "0x1.999999999999ap-2"}, // default
+    {4, 7, 0.0, "0x1.c71c71c71c71cp-3"}, // zero
+    {4, 8, 2.0, "0x1.5555555555555p-2"}, // default
+    {4, 8, 0.0, "0x1.999999999999ap-3"}, // zero
+    {0, 0, 2.0, "0x1.0000000000000p+0"}, // default
+    {0, 0, 0.0, "0x1.0000000000000p+0"}, // zero
+    {3, 0, 2.0, "0x1.0000000000000p+0"}, // default
+    {3, 0, 0.0, "0x1.0000000000000p+0"}, // zero
+    {3, 2, 2.0, "0x1.0000000000000p+0"}, // default
+    {3, 2, 0.0, "0x1.b6db6db6db6dcp-2"}, // zero
+    {3, 3, 2.0, "0x1.0000000000000p+0"}, // default
+    {3, 3, 0.0, "0x1.5555555555555p-2"}, // zero
+    {5, 6, 2.0, "0x1.6db6db6db6db7p-1"}, // default
+    {5, 6, 0.0, "0x1.2d2d2d2d2d2d3p-2"}, // zero
+    {5, 4, 2.0, "0x1.0000000000000p+0"}, // default
+    {5, 4, 0.0, "0x1.89d89d89d89d8p-2"}, // zero
+    {4, 0, -1.0, "0x1.0000000000000p-1"}, // negative
+    {4, 0, -0.0, "0x1.0000000000000p+0"}, // negative_zero
+    {4, 0, 0.25, "0x1.0000000000000p+0"}, // quarter
+    {4, 0, 1.0, "0x1.0000000000000p+0"}, // one
+    {4, 0, 2.0, "0x1.0000000000000p+0"}, // two
+    {4, 0, 10.0, "0x1.0000000000000p+0"}, // ten
+    {4, 0, nan, "nan"}, // nan
+    {4, 0, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {4, 0, -infinity, "0x0.0p+0"}, // negative_infinity
+    {4, 0, 0.0, "0x1.0000000000000p+0"}, // enum_zero
+    {4, 4, -1.0, "0x1.0000000000000p-2"}, // negative
+    {4, 4, -0.0, "0x1.5555555555555p-2"}, // negative_zero
+    {4, 4, 0.25, "0x1.745d1745d1746p-2"}, // quarter
+    {4, 4, 1.0, "0x1.0000000000000p-1"}, // one
+    {4, 4, 2.0, "0x1.0000000000000p+0"}, // two
+    {4, 4, 10.0, "0x1.0000000000000p+0"}, // ten
+    {4, 4, nan, "nan"}, // nan
+    {4, 4, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {4, 4, -infinity, "0x0.0p+0"}, // negative_infinity
+    {4, 4, 0.0, "0x1.5555555555555p-2"}, // enum_zero
+    {4, 8, -1.0, "0x1.5555555555555p-3"}, // negative
+    {4, 8, -0.0, "0x1.999999999999ap-3"}, // negative_zero
+    {4, 8, 0.25, "0x1.af286bca1af28p-3"}, // quarter
+    {4, 8, 1.0, "0x1.0000000000000p-2"}, // one
+    {4, 8, 2.0, "0x1.5555555555555p-2"}, // two
+    {4, 8, 10.0, "0x1.0000000000000p+0"}, // ten
+    {4, 8, nan, "nan"}, // nan
+    {4, 8, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {4, 8, -infinity, "0x0.0p+0"}, // negative_infinity
+    {4, 8, 0.0, "0x1.999999999999ap-3"}, // enum_zero
+    {0, 0, -1.0, "0x1.0000000000000p-1"}, // negative
+    {0, 0, -0.0, "0x1.0000000000000p+0"}, // negative_zero
+    {0, 0, 0.25, "0x1.0000000000000p+0"}, // quarter
+    {0, 0, 1.0, "0x1.0000000000000p+0"}, // one
+    {0, 0, 2.0, "0x1.0000000000000p+0"}, // two
+    {0, 0, 10.0, "0x1.0000000000000p+0"}, // ten
+    {0, 0, nan, "nan"}, // nan
+    {0, 0, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {0, 0, -infinity, "0x0.0p+0"}, // negative_infinity
+    {0, 0, 0.0, "0x1.0000000000000p+0"}, // enum_zero
+    {3, 0, -1.0, "0x1.0000000000000p-1"}, // negative
+    {3, 0, -0.0, "0x1.0000000000000p+0"}, // negative_zero
+    {3, 0, 0.25, "0x1.0000000000000p+0"}, // quarter
+    {3, 0, 1.0, "0x1.0000000000000p+0"}, // one
+    {3, 0, 2.0, "0x1.0000000000000p+0"}, // two
+    {3, 0, 10.0, "0x1.0000000000000p+0"}, // ten
+    {3, 0, nan, "nan"}, // nan
+    {3, 0, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {3, 0, -infinity, "0x0.0p+0"}, // negative_infinity
+    {3, 0, 0.0, "0x1.0000000000000p+0"}, // enum_zero
+    {3, 2, -1.0, "0x1.3333333333334p-2"}, // negative
+    {3, 2, -0.0, "0x1.b6db6db6db6dcp-2"}, // negative_zero
+    {3, 2, 0.25, "0x1.eb851eb851ebap-2"}, // quarter
+    {3, 2, 1.0, "0x1.8000000000000p-1"}, // one
+    {3, 2, 2.0, "0x1.0000000000000p+0"}, // two
+    {3, 2, 10.0, "0x1.0000000000000p+0"}, // ten
+    {3, 2, nan, "nan"}, // nan
+    {3, 2, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {3, 2, -infinity, "0x0.0p+0"}, // negative_infinity
+    {3, 2, 0.0, "0x1.b6db6db6db6dcp-2"}, // enum_zero
+    {3, 3, -1.0, "0x1.0000000000000p-2"}, // negative
+    {3, 3, -0.0, "0x1.5555555555555p-2"}, // negative_zero
+    {3, 3, 0.25, "0x1.745d1745d1746p-2"}, // quarter
+    {3, 3, 1.0, "0x1.0000000000000p-1"}, // one
+    {3, 3, 2.0, "0x1.0000000000000p+0"}, // two
+    {3, 3, 10.0, "0x1.0000000000000p+0"}, // ten
+    {3, 3, nan, "nan"}, // nan
+    {3, 3, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {3, 3, -infinity, "0x0.0p+0"}, // negative_infinity
+    {3, 3, 0.0, "0x1.5555555555555p-2"}, // enum_zero
+    {5, 6, -1.0, "0x1.d1745d1745d17p-3"}, // negative
+    {5, 6, -0.0, "0x1.2d2d2d2d2d2d3p-2"}, // negative_zero
+    {5, 6, 0.25, "0x1.4514514514514p-2"}, // quarter
+    {5, 6, 1.0, "0x1.aaaaaaaaaaaabp-2"}, // one
+    {5, 6, 2.0, "0x1.6db6db6db6db7p-1"}, // two
+    {5, 6, 10.0, "0x1.0000000000000p+0"}, // ten
+    {5, 6, nan, "nan"}, // nan
+    {5, 6, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {5, 6, -infinity, "0x0.0p+0"}, // negative_infinity
+    {5, 6, 0.0, "0x1.2d2d2d2d2d2d3p-2"}, // enum_zero
+    {5, 4, -1.0, "0x1.1c71c71c71c72p-2"}, // negative
+    {5, 4, -0.0, "0x1.89d89d89d89d8p-2"}, // negative_zero
+    {5, 4, 0.25, "0x1.b3bea3677d46dp-2"}, // quarter
+    {5, 4, 1.0, "0x1.4000000000000p-1"}, // one
+    {5, 4, 2.0, "0x1.0000000000000p+0"}, // two
+    {5, 4, 10.0, "0x1.0000000000000p+0"}, // ten
+    {5, 4, nan, "nan"}, // nan
+    {5, 4, infinity, "0x1.0000000000000p+0"}, // positive_infinity
+    {5, 4, -infinity, "0x0.0p+0"}, // negative_infinity
+    {5, 4, 0.0, "0x1.89d89d89d89d8p-2"}, // enum_zero
+  };
+  assert(std::size(public_cases) == 120);
+  for (const auto& expected : public_cases) {
+    PetriNetPresentation graph;
+    graph.name = std::string("raw\0\xff", 5);
+    // Equal names and the same ID in different node-kind namespaces do not
+    // merge identities. Topology/weights cannot change total incident degree.
+    const auto places = expected.vertices / 2;
+    const auto transitions = expected.vertices - places;
+    for (std::size_t i = 0; i < places; ++i)
+      graph.places.push_back({i, "same", {}});
+    for (std::size_t i = 0; i < transitions; ++i)
+      graph.transitions.push_back({i, "same", std::nullopt, {}});
+    for (std::size_t i = 0; i < expected.arcs; ++i) {
+      const PetriNodeRef p{PetriNodeKind::kPlace, i % places};
+      const PetriNodeRef t{PetriNodeKind::kTransition, i % transitions};
+      graph.arcs.push_back({i % 2 ? t : p, i % 2 ? p : t,
+                           TokenInteger(i + 1), {}});
+    }
+    const auto before = petri_net_presentation_json(graph);
+    SimplicityOptions options;
+    options.arc_degree_k = expected.k;
+    // These controls belong to other simplicity variants and must be inactive.
+    options.initial_marking = {-7}; options.final_marking = {-9};
+    options.max_states = 0;
+    const auto result = evaluate_simplicity(graph, SimplicityVariant::ARC_DEGREE, options);
+    assert(result.computed && !result.exhausted && result.error.empty());
+    assert(result.vertices == expected.vertices && result.edges == expected.arcs);
+    assert(simplicity_arc_degree_result_json(result) ==
+           std::string("{\"type\":\"float\",\"hex\":\"") + expected.hex + "\"}");
+    assert(petri_net_presentation_json(graph) == before);
+    assert(std::isnan(expected.k) ? std::isnan(options.arc_degree_k)
+           : options.arc_degree_k == expected.k &&
+             std::signbit(options.arc_degree_k) == std::signbit(expected.k));
+    assert(options.initial_marking == std::vector<int>{-7} &&
+           options.final_marking == std::vector<int>{-9} && options.max_states == 0);
+    // Default invocation is an actual public overload, not a rewritten k value.
+    if (expected.k == 2.0) {
+      const auto defaults = evaluate_simplicity(graph);
+      assert(simplicity_arc_degree_result_json(defaults) ==
+             simplicity_arc_degree_result_json(result));
+    }
+    std::reverse(graph.arcs.begin(), graph.arcs.end());
+    for (auto& arc : graph.arcs) { arc.weight = 0; arc.negative_weight = true; }
+    const auto reordered = evaluate_simplicity(graph, SimplicityVariant::ARC_DEGREE, options);
+    assert(simplicity_arc_degree_result_json(reordered) ==
+           simplicity_arc_degree_result_json(result));
+  }
+  // Native doubles outside the retained k sample follow the same arithmetic
+  // domain; this supplements, and is not described as, a public capture.
+  PetriNetPresentation empty;
+  for (double k : {std::numeric_limits<double>::max(),
+                   -std::numeric_limits<double>::max(),
+                   std::numeric_limits<double>::denorm_min(),
+                   -std::numeric_limits<double>::denorm_min()}) {
+    SimplicityOptions options; options.arc_degree_k = k;
+    const auto result = evaluate_simplicity(empty, SimplicityVariant::ARC_DEGREE, options);
+    assert(result.computed && std::isfinite(result.value));
+    assert(!simplicity_arc_degree_result_json(result).empty());
+  }
+  // Full imported arc objects use the same occurrence-preserving public view;
+  // the executable grouped carrier deliberately has a different arc inventory.
+  simplicity_imported_arc_occurrences_contract();
 }
 
 void simplicity_nonfinite_baseline_contract() {
@@ -1617,7 +1811,12 @@ void process_tree_evaluation_overloads_contract() {
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc == 2 && std::string(argv[1]) == "--arc-degree-module") {
+    arc_degree_module_acceptance();
+    return 0;
+  }
+  arc_degree_module_acceptance();
   replay_fitness_token_contract();
   replay_fitness_backwards_token_contract();
   replay_fitness_alignment_contract();
