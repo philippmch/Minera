@@ -1,0 +1,271 @@
+{
+  "complete": true,
+  "feature": 97,
+  "features_delivered": 97,
+  "parent_head": "d15ad05aac42eea355695da8c4c51643ddb4da7e",
+  "feature_baseline_head": "bae9dd7219a77819cf38c32e8d0ccf80664ccc0b",
+  "baseline": {
+    "path": "build/feature97-baseline.json",
+    "bytes": 2832150,
+    "sha256": "6b2c010fa70145b8f082d03b038a0dd6299a04485c7e135d5ea6c487869dbdd3"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature97-c3fb4ad0ffac4d0daaa5ac1158436337/build-manifest.json",
+      "bytes": 461450,
+      "sha256": "9dab01a139875e7380ec71e1a163a7c876035d5fab9b4331605428fe6cb9a1cc"
+    },
+    "frontend": {
+      "path": "build/original-label97-frontend-recovery-90c9c970e8dd4ff3b884b5022f322577/validation.json",
+      "bytes": 2764796,
+      "sha256": "ed453d10b7befa1083a7b1a0e167b85cc508c1ec66ce2405bf42466b0ca82758"
+    },
+    "old": {
+      "path": "build/feature97-old-native-oracle-actual-1/validation.json",
+      "bytes": 13320,
+      "sha256": "595a43ea811b3b2d9dca11291c76a4b2df409a39ea7880a1c47c7bbf7f3085a4"
+    },
+    "before": {
+      "path": "build/feature97-before-http-actual-1/validation.json",
+      "bytes": 6314,
+      "sha256": "186e2f812400557f93f9a0d4cf8a5989ceec7b75a5253fc86793fb5f2979cbfc"
+    },
+    "api": {
+      "path": "build/feature97-api-recovery-actual-1/validation.json",
+      "bytes": 182960,
+      "sha256": "8739fe3acd63327152ff4f58ad692b3432d0790158184fa9a11b1fd12dc90fa0"
+    },
+    "cli": {
+      "path": "build/feature97-cli-actual-1/validation.json",
+      "bytes": 63779,
+      "sha256": "01aa4a25d773e469eabf3220e4d42131fb430075d9520f6b05d03e50643d41ab"
+    },
+    "file_bridge": {
+      "path": "build/feature97-file-bridge-offline-recovery-2.json",
+      "bytes": 69596,
+      "sha256": "a39133bf47a9326bc278223ec414f8874d0e446383787a5e8a3e832bea7640b4"
+    },
+    "source_review": {
+      "path": "build/feature97-paired-source-review-2/review.json",
+      "bytes": 8639,
+      "sha256": "cae6943978fb02bae3d5b26f6da5f3d3f15fb9a0d7bc4cc3997840a4adb4cf82"
+    },
+    "cleanup": {
+      "path": "build/feature97-after-cleanup-1.json",
+      "bytes": 1877,
+      "sha256": "42861b97d85cb70cae841859c5491f814f6618eac3a4585c78a099e7a10544eb"
+    },
+    "browser": {
+      "path": "build/feature97-browser-current-retry.json",
+      "bytes": 785,
+      "sha256": "f961972a7a17db79ec0ef4c6039847442569900901466f33e9fdf00eccc688cd"
+    },
+    "backend": {
+      "path": "build/original-label97-backend-postcommit.json",
+      "bytes": 3936,
+      "sha256": "b54553d8ee081186909e640d1cf82037f6905b02acca90c3cfc1920f81be22b4"
+    },
+    "live": {
+      "path": "build/original-label97-live-runtime.json",
+      "bytes": 9899,
+      "sha256": "02ff3a2300b6c8ec4dbfdc92a712a15cc82de0fd3416656f67753dc64d16df7a"
+    }
+  },
+  "problem": "The old label endpoint selected its cached prepared log before processing an original File; legacy controls could not preserve an empty separator or literal empty/spaced target vector entries accepted by native.",
+  "delivered": {
+    "endpoint": "/api/original-label-splitting-workbench",
+    "CLI": "minera_label_splitting",
+    "operations": [
+      "split_activity_labels",
+      "contextual_label_splitting",
+      "serialize_result"
+    ],
+    "native_default_argument": true,
+    "options_fields": 8,
+    "result_fields": 2,
+    "original_source": "Complete native EventLog, including all ten metadata fields and full ordered typed Trace/Event/attribute storage.",
+    "options": "Complete JSON or actual original File; no trimming/deduplication/clamping and no parser-only rejection of states owned by native semantic validation.",
+    "result": "Full native LabelSplittingResult and separately the exact label_splitting_json string, with independent optional serialization/transport errors.",
+    "artifact_slots": [
+      "canonical_source_json",
+      "canonical_options_json",
+      "canonical_result_json",
+      "legacy_result_json",
+      "result_log_json"
+    ],
+    "handoff": "Actual native bare result-log and bare full two-field result bytes copied directly into Files, preserving parent response digest and actual original File identities/hashes.",
+    "surfaces": [
+      "existing TransformationWorkspace outside cached fieldset",
+      "Landing/TopBar independent original workspace",
+      "standalone shared-core CLI"
+    ],
+    "legacy_cached_and_minera_export_unchanged": true
+  },
+  "functional_evidence": {
+    "native_distinct_passing_suites": 97,
+    "native_retained_parent_suites": 95,
+    "native_fresh_suites": 2,
+    "core_objects_retained": 218,
+    "core_sources_fresh": 1,
+    "core_objects_total": 219,
+    "frontend_test_accounting": {
+      "total_tests": 9539,
+      "passed_tests": 9539,
+      "passed_files": 170,
+      "retained_tests": 9508,
+      "retained_files": 169,
+      "fresh_tests": 31,
+      "fresh_files": 1,
+      "previous_affected_tests_superseded": 31
+    },
+    "frontend_strict_build": true,
+    "frontend_recovery_history": {
+      "original_full_run": {
+        "passed_tests": 9537,
+        "failed_tests": 2,
+        "proof": {
+          "path": "build/original-label97-frontend-c4e2b565d1d748639ef2ae559426f437/test-results.json",
+          "bytes": 3746734,
+          "sha256": "c44f2f3e8a6506493642384790d568d2897decd00e261a147de14c59a4df94a8"
+        }
+      },
+      "final_aggregate": {
+        "total_tests": 9539,
+        "passed_tests": 9539,
+        "passed_files": 170,
+        "retained_tests": 9508,
+        "retained_files": 169,
+        "fresh_tests": 31,
+        "fresh_files": 1,
+        "previous_affected_tests_superseded": 31
+      },
+      "retained_frontend_validation": {
+        "path": "build/original-label97-frontend-c4e2b565d1d748639ef2ae559426f437/validation.json",
+        "bytes": 2761543,
+        "sha256": "8057cb81b6000285de57d3c06a7b87ac7c4817657be80b1e68c8e7980ad90f02"
+      },
+      "fresh_affected_results": {
+        "path": "build/original-label97-frontend-recovery-90c9c970e8dd4ff3b884b5022f322577/test-results.json",
+        "bytes": 14794,
+        "sha256": "2035890d205811320f7829febc718084efa1263645b6a43b72c3cc29f6e8a155"
+      },
+      "correction": "Production helper nullable role filename postguard fixed, plus two unit expectations; not test-only. Strict production build and all31 affected units refreshed;9508 tests in169 untouched files retained.",
+      "fresh_full_suite_pass_claimed": false
+    },
+    "frontend_execution_boundary": "Passing aggregate accounting; no fresh full-pass claim inferred. Actual retained/fresh full/subset histories are in the bound final frontend proof.",
+    "observed_proof_counts": {
+      "before": {
+        "physical_http_calls": 1,
+        "network_requests_executed": 1
+      },
+      "old": {
+        "physical_http_calls": 0,
+        "physical_cli_calls": 0,
+        "physical_direct_label_calls": 11,
+        "physical_direct_legacy_serializer_calls": 8,
+        "new_direct_label_calls": 11,
+        "new_direct_legacy_serializer_calls": 8,
+        "retained_before_label_calls": 1,
+        "retained_before_serializer_calls": 1,
+        "total_direct_label_calls": 12,
+        "total_direct_legacy_serializer_calls": 9
+      },
+      "api": {
+        "selected_passed_cases": 40,
+        "selected_http_cases": 40,
+        "new_http_calls": 15,
+        "retained_http_calls": 25,
+        "successful_requests_replayed": 0,
+        "retained_original_passes": 24,
+        "offline_corrected_prefix_cases": 1,
+        "physical_http_calls": 40
+      },
+      "cli": {
+        "passed_cases": 12
+      },
+      "file_bridge": {
+        "physical_http_calls": 4,
+        "physical_http_call_count": 4,
+        "network_requests_executed": 4,
+        "completed_helper_calls": 4,
+        "successful_http_requests_replayed": 0
+      },
+      "browser": {
+        "attempts": 1,
+        "rendered_checks": 0
+      }
+    },
+    "live_assets_exact": true,
+    "live_owned_native_negative_posts": 1,
+    "real_provider_process_preserved": {
+      "pid": 29184,
+      "port": 8189,
+      "proof": {
+        "path": "build/provider-call96-live-provider-runtime.json",
+        "bytes": 1467,
+        "sha256": "827c20c4535b7a1f57140d2787743b176d7abe0a0caab12b79d139c10cf67cf9"
+      },
+      "restarted": false
+    },
+    "provider_calls_requested_by_activation": 0,
+    "browser_rendered_checks": 0
+  },
+  "catalogue_change": {
+    "package": "algo.label_splitting",
+    "before_feature_delivery_status": "transformation_workflow_available",
+    "after_feature_delivery_status": "original_label_splitting_workbench_available",
+    "strict_parity_status_unchanged": "partial",
+    "selectors_unchanged": [
+      "CONTEXTUAL"
+    ],
+    "other_catalogue_rows_unchanged": true,
+    "backlog_preserved": true
+  },
+  "history": "Original frontend full run9537 pass/2 fail remains retained. A production helper nullable-role postguard fix plus two unit expectations was checked by a fresh strict build and31 affected units, retaining9508 unaffected tests; final9539/170 is an aggregate, not a fresh full-suite pass. No original successful native/HTTP/CLI calls are replayed.",
+  "api_recovery_history": {
+    "original_plan": 39,
+    "answered_prefix": 25,
+    "retained_original_passes": 24,
+    "offline_corrected_prefix_cases": 1,
+    "correction": "Nonmultipart query-only case25 correctly fails transport before File-role control. Its expected phase is corrected offline against retained response bytes; no product change.",
+    "new_distinct_multipart_query_role_cases": 1,
+    "previously_unrun_suffix_cases": 14,
+    "final_selected_total": 40,
+    "actual_counts": {
+      "selected_passed_cases": 40,
+      "selected_http_cases": 40,
+      "new_http_calls": 15,
+      "retained_http_calls": 25,
+      "successful_requests_replayed": 0,
+      "retained_original_passes": 24,
+      "offline_corrected_prefix_cases": 1,
+      "physical_http_calls": 40
+    },
+    "successful_requests_replayed": 0
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "unrelated_preserved": 110,
+  "strict_promotion": false,
+  "full_parity_achieved": false,
+  "goal_complete": false,
+  "boundaries": [
+    "Full strict scope remains86 families/387 modules and228 incomplete units, with unchanged46/86 dispatcher and199/387 module statuses.",
+    "Private generated scalar identity and exact NaN payload bit identity remain the existing transport boundary.",
+    "The old projected legacy serializer still writes contextual variant metadata and may omit native state or produce nonUnicode/error artifacts; the complete canonical result remains authoritative.",
+    "Inherited identical raw query duplicate normalization, multipart escaped-CRLF filename restrictions and framework body limits remain explicit.",
+    "The latest authorized browser attempt was rejected before navigation. No new settings question, retry/workaround or rendered-browser claim.",
+    "No external provider/reference implementation call or algorithm change is part of this feature. Existing real provider PID29184 remains unchanged."
+  ],
+  "next_work": "Continue source-bound availability breadth, including complete SQL options/parameters and unresolved support contracts; retain strict behavior, browser, platform and performance gates.",
+  "helper": {
+    "path": "build/feature97-delivery-prepared-2/finalize-original-label97-1.py",
+    "bytes": 14080,
+    "sha256": "b011f5b80832c0132f33b2284124e62651a95cb79c0c056a5d0faac6f16bf96e"
+  }
+}
