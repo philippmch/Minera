@@ -164,6 +164,7 @@ add_library(minera_core
   src/backend/log_query.cpp
   src/backend/llm_context.cpp
   src/backend/log_filter.cpp
+  src/backend/infix_to_regex.cpp
   src/backend/log_conversion.cpp
   src/backend/path_filter.cpp
   src/backend/passed_time.cpp
@@ -948,6 +949,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_filtering_boundary_common_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_filtering_boundary_common_tests
            COMMAND minera_filtering_boundary_common_tests)
+
+  add_executable(minera_infix_to_regex_tests src/backend/tests/test_infix_to_regex.cpp)
+  target_link_libraries(minera_infix_to_regex_tests PRIVATE minera::core)
+  target_compile_features(minera_infix_to_regex_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_infix_to_regex_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_infix_to_regex_tests COMMAND minera_infix_to_regex_tests)
 
   add_executable(minera_variant_statistics_tests src/backend/tests/test_variant_statistics.cpp)
   target_link_libraries(minera_variant_statistics_tests PRIVATE minera::core)
