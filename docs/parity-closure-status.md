@@ -15,6 +15,12 @@ TypeScript and the production build passed; the product PDF writer's sample
 was independently parsed, rendered and visually checked. Rendered application
 interaction remains unverified under the previously recorded browser block.
 
+Quality-result JSON also preserves computed double values through parsing,
+including negative zero, instead of rounding to six significant digits. The
+numeric regression and affected core/evaluation checks pass. Its precise scope
+is recorded in [quality-numeric-json-contract.md](quality-numeric-json-contract.md);
+this output repair does not itself promote an algorithm module.
+
 | Requirement | Evidence |
 | --- | --- |
 | Arc-degree simplicity module | 120 retained public selector records covering 102 numeric states; exact scalar, identity, arc occurrence, baseline and input invariants; assertion-enabled focused and full evaluation contract checks |

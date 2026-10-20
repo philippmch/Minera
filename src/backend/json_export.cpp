@@ -2384,8 +2384,17 @@ const char* simplicity_variant_name(SimplicityVariant variant) {
 }
 
 void write_finite_or_null(std::ostream& out, double value) {
-  if (std::isfinite(value)) out << value;
-  else out << "null";
+  if (!std::isfinite(value)) { out << "null"; return; }
+  if (value == 0 && std::signbit(value)) { out << "-0.0"; return; }
+  // Stream defaults round these quality scores to six significant digits.
+  // Shortest round-trip text preserves the computed binary64 independently
+  // of the caller's stream precision and decimal locale.
+  char text[64];
+  const auto converted = std::to_chars(text, text + sizeof(text), value,
+                                       std::chars_format::general);
+  if (converted.ec != std::errc{})
+    throw std::runtime_error("cannot format finite quality JSON number");
+  out.write(text, converted.ptr - text);
 }
 
 void write_replay_fitness(std::ostream& out, const ReplayFitnessResult& result,
