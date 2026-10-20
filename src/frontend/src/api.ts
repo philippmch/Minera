@@ -1,3 +1,5 @@
+import {requireExactOtgEnvelope,OTG_THRESHOLD_FIELD,appendOtgThresholds,otgThresholdQueryText,validateOtgThresholdOptions,bindOtgConformanceMetadata} from "./otg-thresholds";
+import {parseNativeJson} from "./native-json";
 import { appendOcpnDiscoveryFlags, type OcpnDiscoveryFlags } from "./ocpn-discovery-options";
 import {discoveryStringVectorJson, type DiscoveryNativeString} from "./discovery-string-vectors";
 import {
@@ -7171,6 +7173,8 @@ export interface OcelConformanceOptions {
   delta?: number;
   etot_theta?: number;
   otg_theta?: number;
+  /** Exact arbitrary relation map; omission and explicit [] are distinct. OTG only. */
+  otg_theta_by_relation_json?: string;
   otg_theta_interaction?: number;
   otg_theta_descendants?: number;
   otg_theta_inheritance?: number;
@@ -7183,6 +7187,7 @@ export interface OcelConformanceOptions {
 }
 
 export function ocelConformanceQuery(options: OcelConformanceOptions = {}): string {
+  const exactThresholds = validateOtgThresholdOptions(options);
   const query = new URLSearchParams();
   if (options.real !== undefined && options.real !== "ocel" && options.real !== "graph") {
     throw new Error("real must be ocel or graph");
@@ -7217,6 +7222,7 @@ export function ocelConformanceQuery(options: OcelConformanceOptions = {}): stri
   add("delta", options.delta);
   add("etot_theta", options.etot_theta);
   add("otg_theta", options.otg_theta);
+  if (exactThresholds !== undefined) query.set(OTG_THRESHOLD_FIELD, otgThresholdQueryText(exactThresholds));
   const addRelationThreshold = (name: string, value: number | undefined) => {
     if (value === undefined) return;
     if (!Number.isFinite(value) || value < 0)
@@ -7246,14 +7252,19 @@ export async function requestOcelConformance(
   const realField = options.real === "graph" ? "real_graph" : "log";
   form.append(realField, log, logName);
   form.append("normative", normative, normativeName);
-  const query = ocelConformanceQuery(options);
+  const parameters = new URLSearchParams(ocelConformanceQuery(options));
+  const exactThresholds = validateOtgThresholdOptions(options);
+  if (exactThresholds !== undefined) {parameters.delete(OTG_THRESHOLD_FIELD);appendOtgThresholds(form, exactThresholds);}
+  const query = parameters.toString();
   const response = await fetch(`/api/ocel/conformance${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
-  const payload: unknown = await response.json();
+  const raw = exactThresholds !== undefined ? await response.text() : undefined;
+  const payload: unknown = raw !== undefined ? parseNativeJson(raw) : await response.json();
   if (!isOcelConformanceResult(payload)) throw new Error("the Minera backend returned an invalid OCEL conformance result");
+  if (raw !== undefined && exactThresholds !== undefined) {requireExactOtgEnvelope(payload);await bindOtgConformanceMetadata(payload, raw, query, exactThresholds, log, normative);}
   return payload;
 }
 

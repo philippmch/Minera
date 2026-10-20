@@ -1,0 +1,1005 @@
+{
+  "complete": true,
+  "feature": 89,
+  "features_delivered": 89,
+  "parent_head": "1f99fd575d9120f2e9acc31c853081766b9ff450",
+  "feature_baseline_head": "e09bde6b90a419bf0f05534f7e06a828c507f061",
+  "baseline": {
+    "path": "build/otg-threshold-feature89-baseline.json",
+    "bytes": 2824073,
+    "sha256": "9c1627abe8b1fac8b3f748c65b34feb2346561d329a35cba56d472492cf48128"
+  },
+  "proofs": {
+    "native": {
+      "path": "build/native-feature89-8c4b468a3b314098a9a7ba381724fcd6/build-manifest.json",
+      "bytes": 401992,
+      "sha256": "dca742ecbd084a9ce9e1e3c52420ef46f1a313113a2250095be042c4d66356e6"
+    },
+    "api": {
+      "path": "build/otg-threshold89-api-validation.json",
+      "bytes": 359059,
+      "sha256": "178f08646390dd719e37b7b18611d563719ad7188aad28ecfb9fda40502acdff"
+    },
+    "frontend": {
+      "path": "build/otg-threshold89-frontend-fbd018633a2a4b2486b50d3dd1af06a7/validation.json",
+      "bytes": 2755757,
+      "sha256": "3a98f62aaa794b74e072c6b441a855dbe11e6d7d39c5e46aaecd4de1510fe349"
+    },
+    "backend": {
+      "path": "build/otg-threshold-feature89-backend-postcommit.json",
+      "bytes": 5903,
+      "sha256": "fb7ce547fc7ef8a24fec816c4e9c6ce1c0927127127ce58dc4cdb2ed16600c4e"
+    },
+    "live": {
+      "path": "build/otg-threshold-feature89-live-runtime.json",
+      "bytes": 13486,
+      "sha256": "11c9fd4d678b8a60e9cc62a5aa65f9fb6a99e38326f8cd4a3e344d4cc118b02b"
+    },
+    "cleanup": {
+      "path": "build/otg-threshold-feature89-test-cleanup.json",
+      "bytes": 4725,
+      "sha256": "bde8821563f5ccfebfb768d2caeab0b10dcb531be02ebe841dce5fc38495ccd4"
+    },
+    "file_bridge": {
+      "path": "build/otg-threshold89-file-bridge-validation.json",
+      "bytes": 21927,
+      "sha256": "7fbe679dd4f7ee985a323f6390b96e5e7dbf24495d64c3f657213dd7878e9658"
+    },
+    "source_audit": {
+      "path": "build/otg-threshold89-source-review.json",
+      "bytes": 5166,
+      "sha256": "2dd41dd6cf74ac8a66e0214f215f0a4f59ccfd99a9b9852f42803a7473e8e682"
+    },
+    "source_review": {
+      "path": "build/otg-threshold89-source-review.json",
+      "bytes": 5166,
+      "sha256": "2dd41dd6cf74ac8a66e0214f215f0a4f59ccfd99a9b9852f42803a7473e8e682"
+    },
+    "native_oracle": {
+      "path": "build/otg-threshold89-native-oracle-validation.json",
+      "bytes": 13592,
+      "sha256": "9b43e95e97167cd4f7e7d82a370897f9387c0d5798379391f679917ee464065a"
+    },
+    "cli": {
+      "path": "build/otg-threshold89-cli-validation.json",
+      "bytes": 118136,
+      "sha256": "5f1810764c625fd8e39ddbdc8f3900099da04d1111f2a1ed9f3ef142c16e7378"
+    }
+  },
+  "previous_delivery_report": {
+    "path": "docs/feature-first-saved-dfg-validation.json",
+    "bytes": 13738,
+    "sha256": "0fe1bcb172209ee120a0b22649e92d0c3e4e55a95020252ec26c930be04c55f7"
+  },
+  "scope_counts": {
+    "packages": 86,
+    "modules": 387,
+    "complete_packages": 46,
+    "complete_modules": 199,
+    "incomplete_units": 228
+  },
+  "counts": {
+    "selected_API_cases": 31,
+    "physical_HTTP_calls": 31,
+    "dedicated_API_corpus_POSTs": 31,
+    "frontend_tests": 9254,
+    "frontend_files": 156,
+    "frontend_full_suite_delta": 33,
+    "actual_File_handoffs": 1,
+    "client_bridge_HTTP_calls": 2,
+    "wire_mocked_fetches": 0,
+    "wire_mock_transport_File_arguments": 0,
+    "wire_network_requests_executed": 2,
+    "live_smoke_HTTP_calls": 2,
+    "native_contributing_suites": 79,
+    "native_retained_suites": 77,
+    "native_freshly_executed_suites": 2,
+    "native_reused_core_objects": 211,
+    "native_fresh_core_objects": 1,
+    "compiled_core_sources": 1,
+    "compiled_server_sources": 1,
+    "compiled_extra_tool_sources": 1,
+    "remaining_audited_extensions": 1,
+    "direct_native_comparison_oracle_cases": 15,
+    "native_owned_paths": 7,
+    "frontend_owned_paths": 6,
+    "public_API_helper_HTTP_calls": 1,
+    "execution_workspace_helper_HTTP_calls": 1,
+    "CLI_invocations": 25,
+    "total_actual_HTTP_calls": 35
+  },
+  "native_test_accounting": {
+    "retained_parent_suites": 77,
+    "freshly_executed_suites": 2,
+    "aggregate_current_passing_suites": 79,
+    "contributing_ctest_invocation_count": 18,
+    "retained_evidence": {
+      "path": "build/native-feature88-cb268e38ae994ba1adbee0995c0a4568/build-manifest.json",
+      "bytes": 397397,
+      "sha256": "bf2682b4fb8beb0e1f72e721043224bdd2ba955bfbe63b44d58a53fa8fcea742"
+    },
+    "actual_current_evidence": {
+      "path": "build/native-feature89-8c4b468a3b314098a9a7ba381724fcd6/build-manifest.json",
+      "bytes": 401992,
+      "sha256": "dca742ecbd084a9ce9e1e3c52420ef46f1a313113a2250095be042c4d66356e6"
+    }
+  },
+  "frontend_test_accounting": {
+    "actual_fresh_full_suite": {
+      "total_tests": 9254,
+      "passed_tests": 9254,
+      "passed_files": 156
+    },
+    "retained_parent_inventory": {
+      "total_tests": 9221,
+      "passed_tests": 9221,
+      "passed_files": 154
+    },
+    "net_test_inventory_delta": 33,
+    "actual_current_evidence": {
+      "path": "build/otg-threshold89-frontend-fbd018633a2a4b2486b50d3dd1af06a7/validation.json",
+      "bytes": 2755757,
+      "sha256": "3a98f62aaa794b74e072c6b441a855dbe11e6d7d39c5e46aaecd4de1510fe349"
+    },
+    "captured_API_fixtures_are_offline_reuse_not_new_HTTP_calls": true
+  },
+  "input_and_result_semantics": [
+    "The existing OCEL conformance route gains an opt-in exact OTG relation-threshold map. The native CLI exposes matching inline and file controls. Existing compare_otg algorithms and default workflow are unchanged.",
+    "The exact map is an array of NativeString and double-or-IEEE-tag pairs. Omission and explicit empty maps remain distinct transport states. Exact duplicate decoded byte keys, invalid values and conflicts with the five named legacy aliases are rejected by presence.",
+    "The existing HTTP library deduplicates byte-identical raw query pairs before exposing parameters. That compatible normalization remains unchanged; distinct query values and query/multipart conflicts are rejected.",
+    "Relation names are never trimmed, split or restricted to predefined names. Empty, whitespace, Unicode, embedded NUL, arbitrary bytes and WTF8 are preserved. Native map order is lexical byte order rather than submitted insertion order.",
+    "Thresholds support negative finite values, signed zero, finite extremes, subnormals, NaN and signed infinities. IEEE tags preserve comparison semantics rather than arbitrary NaN payload bits.",
+    "Matching map entries override the scalar fallback by exact byte key. Native comparison uses a strict greater-than predicate; custom threshold equality suppresses the corresponding deviation.",
+    "Real and normative graph or OCEL inputs remain independent. Canonical graph snapshots preserve original vector order, duplicate entries, exact frequencies and labels separately from native comparison normalization.",
+    "Complete native deviation results use byte-safe identifiers and nonfinite scalar tags. Original serializer bytes and their transport or presentation errors remain separate from authoritative native data.",
+    "Both existing public helpers accept the same exact map and retain original File identities, source hashes, raw responses and reports. The execution workspace also retains complete tables/CSV and direct legacy-byte downloads within its existing navigation and default controls.",
+    "Direct native witnesses and API, CLI and client captures establish the implemented workflow. They do not establish full external reference behavior, browser, performance or concurrency parity."
+  ],
+  "native_comparison_oracle": {
+    "path": "build/otg-threshold89-native-oracle-validation.json",
+    "bytes": 13592,
+    "sha256": "9b43e95e97167cd4f7e7d82a370897f9387c0d5798379391f679917ee464065a"
+  },
+  "direct_native_oracle_accounting": {
+    "comparison_cases": 15,
+    "source_derived_HTTP_equivalence_cases": [
+      "duplicate-query"
+    ],
+    "source_equivalence_basis": "Native strict-equality result with threshold0.2; scalar fallback0.2 and empty map come from unchanged native defaults and exact lookup source.",
+    "behavioral_witnesses": {
+      "custom_relation_override_changes_native_fitness": true,
+      "strict_equality_suppresses": true,
+      "wrong_trimmed_key_not_applied": true,
+      "all_binary64_map_semantics": true,
+      "signed_zero_retained": true,
+      "byte_labels_exact_counts_duplicate_vectors": true,
+      "complete_native_categories": true,
+      "independent_graphs_for_ocel_paths": true
+    },
+    "evidence": {
+      "path": "build/otg-threshold89-native-oracle-validation.json",
+      "bytes": 13592,
+      "sha256": "9b43e95e97167cd4f7e7d82a370897f9387c0d5798379391f679917ee464065a"
+    },
+    "CLI_evidence": {
+      "path": "build/otg-threshold89-cli-validation.json",
+      "bytes": 118136,
+      "sha256": "5f1810764c625fd8e39ddbdc8f3900099da04d1111f2a1ed9f3ef142c16e7378"
+    },
+    "external_reference_equivalence_claimed": false
+  },
+  "HTTP_accounting": {
+    "client_export_recovery_offline": true,
+    "new_HTTP_during_client_export_recovery": 0,
+    "public_API_helper_HTTP_calls": 1,
+    "execution_workspace_helper_HTTP_calls": 1,
+    "selected_cases": 31,
+    "dedicated_API_corpus_HTTP_calls": 31,
+    "dedicated_API_corpus_POSTs": 31,
+    "client_bridge_HTTP_calls": 2,
+    "live_smoke_HTTP_calls": 2,
+    "actual_File_handoffs": 1,
+    "total_actual_HTTP_calls": 35,
+    "File_handoffs_are_retained_original_inputs_not_product_exports": true,
+    "dedicated_API_corpus": {
+      "path": "build/otg-threshold89-api-validation.json",
+      "bytes": 359059,
+      "sha256": "178f08646390dd719e37b7b18611d563719ad7188aad28ecfb9fda40502acdff"
+    },
+    "optional_wire_or_File_proof": {
+      "path": "build/otg-threshold89-file-bridge-validation.json",
+      "bytes": 21927,
+      "sha256": "7fbe679dd4f7ee985a323f6390b96e5e7dbf24495d64c3f657213dd7878e9658"
+    },
+    "wire_mocked_fetches": 0,
+    "mock_transport_File_arguments": 0,
+    "wire_network_requests_executed": 2,
+    "mocked_File_arguments_are_not_native_File_handoffs": true,
+    "frontend_saved_response_inspection_adds_no_HTTP_calls": true,
+    "two_existing_public_helpers_are_counted_separately": true,
+    "live_smokes_excluded_from_dedicated_corpus": true
+  },
+  "frontend_correction_history": {
+    "current_integration": {
+      "path": "build/otg-threshold89-frontend-integration-1.json",
+      "bytes": 2661664,
+      "sha256": "d7c3cb2c743e84a597bfa72a210ae3df153f56a9718aa3fa09c7b882e5c4302c"
+    },
+    "current_candidate": {
+      "path": "build/feature89-frontend-candidate-3/manifest.json",
+      "bytes": 5584,
+      "sha256": "adc656a19de83f557369dc0411390f54f18ed98ebe542af36c7421509bd3852c"
+    },
+    "actual_current_frontend_validation": {
+      "path": "build/otg-threshold89-frontend-fbd018633a2a4b2486b50d3dd1af06a7/validation.json",
+      "bytes": 2755757,
+      "sha256": "3a98f62aaa794b74e072c6b441a855dbe11e6d7d39c5e46aaecd4de1510fe349"
+    },
+    "source_review": {
+      "path": "build/otg-threshold89-source-review.json",
+      "bytes": 5166,
+      "sha256": "2dd41dd6cf74ac8a66e0214f215f0a4f59ccfd99a9b9852f42803a7473e8e682"
+    }
+  },
+  "current_audited_backlog": [
+    {
+      "id": "analysis-G1",
+      "question": "Compare caller-chosen replay problem cohorts with the native activity-based duration baseline or reanalyse saved replay trace diagnostics.",
+      "state": "delivered_feature87"
+    },
+    {
+      "id": "analysis-G2",
+      "question": "Project a source log or aggregate DFG metrics using a separately supplied saved/selected DfgAlignmentLogResult.",
+      "state": "delivered_feature88"
+    },
+    {
+      "id": "analysis-G3",
+      "question": "Set different deviation thresholds for arbitrary relation names in uploaded OTG graphs.",
+      "state": "delivered_feature89"
+    },
+    {
+      "id": "discovery-G1",
+      "question": "Merge two EventTables using typed relation keys/extra columns, including numeric versus string keys, null/missing/container cells and native index/categories/metadata.",
+      "state": "delivered_feature84"
+    },
+    {
+      "id": "discovery-G2",
+      "question": "Select exactly activity \"A,B\" for Declare or attribute \"cost,net\" for DFG, rather than selecting two names.",
+      "state": "delivered_feature85"
+    },
+    {
+      "id": "discovery-G3",
+      "question": "Discover the OCPN for the same OCEL with disable_strict_sequence_cut and/or disable_fallthroughs selected.",
+      "state": "delivered_feature86"
+    },
+    {
+      "id": "transformations-G1",
+      "question": "Convert a saved or edited TrieModel without rediscovery.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G2",
+      "question": "Query saved intervals while preserving caller order and match indices.",
+      "state": "delivered_feature83"
+    },
+    {
+      "id": "transformations-G3",
+      "question": "Build native bounded prompts from separately supplied assumptions/context.",
+      "state": "open_source_proven_extension"
+    }
+  ],
+  "source_availability_audit": {
+    "path": "build/otg-threshold89-source-review.json",
+    "bytes": 5166,
+    "sha256": "2dd41dd6cf74ac8a66e0214f215f0a4f59ccfd99a9b9852f42803a7473e8e682"
+  },
+  "proof_history": {
+    "native": {},
+    "api": {
+      "historical_query_normalization": {
+        "feature": 89,
+        "complete": true,
+        "preparation_only": true,
+        "original_capture": {
+          "path": "build/otg-threshold89-api-actual-2/validation.json",
+          "bytes": 74882,
+          "sha256": "f403c01097f3af80c3bc4bde29ddaad4194ceea13fbf891256c806ea99f0f93d"
+        },
+        "original_bank": {
+          "path": "build/feature89-api-prepared-3/cases.json",
+          "bytes": 19685,
+          "sha256": "2d1637045423ee5b1bd447a805ca4fcb48c1e6684a8a4e4505f5fd8762c62d5b"
+        },
+        "successor_bank": {
+          "path": "build/feature89-api-prepared-5/cases.json",
+          "bytes": 21802,
+          "sha256": "89a59bd70f6fb14f5231c925f23c91168ed63439abbd612fe6a9504a90e8a950"
+        },
+        "original_prefix_responses": 25,
+        "original_passing_prefix": 24,
+        "original_false_checks": [
+          {
+            "id": "duplicate-query",
+            "check": "HTTP status",
+            "passed": false,
+            "error": "AssertionError: "
+          },
+          {
+            "id": "duplicate-query",
+            "check": "malformed or conflicting control error retained",
+            "passed": false,
+            "error": "AssertionError: "
+          }
+        ],
+        "framework_query_normalization": {
+          "source": {
+            "path": "third_party/httplib.h",
+            "bytes": 354552,
+            "sha256": "d47579b1d08cdc5eb9db17685502fcb7aff2cf869420053ebd1475d2e1ba90ac"
+          },
+          "function": "parse_query_text",
+          "start_line": 4688,
+          "end_line": 4707,
+          "behavior": "Caches full raw key=value text and discards byte-identical pairs before URL decoding and params insertion. Distinct-valued pairs survive for route duplicate rejection.",
+          "compatibility_case": "duplicate-query",
+          "genuine_conflict_case": "distinct-query-conflict",
+          "native_equivalence": {
+            "reference_oracle_case": "strict-equality",
+            "effective_options": {
+              "alpha": 1,
+              "beta": 1,
+              "gamma": 1,
+              "theta": 0.2,
+              "theta_by_relation": []
+            },
+            "reason": "Matching custom-edge delta0.2 is not greater than scalar theta0.2; strict-equality nativeoracle shows identical native result at matching maptheta0.2. Both graphs and old serializer bytes unchanged. Options derive from public headerdefaults; no new native execution claimed.",
+            "native_header": {
+              "path": "include/minera/ocel.hpp",
+              "bytes": 14244,
+              "sha256": "dbd8df31fbbb5af2362d2b9c03b58e9aea95f2056673225735caf02b15deb78e"
+            },
+            "native_implementation": {
+              "path": "src/backend/ocel.cpp",
+              "bytes": 131147,
+              "sha256": "6975f0535e0092b0a96402e20e4c5f33a309f8591914a8bfbd2b5bd549aa98cd"
+            }
+          }
+        },
+        "reviewed_changes": [
+          {
+            "index": 24,
+            "id": "duplicate-query",
+            "old_status": 400,
+            "new_status": 200,
+            "wire_request_changed": false,
+            "expected_native_equivalence": "strict-equality result and graph/serializerbytes; options scalar theta0.2 + empty map derived fromnative defaults"
+          },
+          {
+            "index": 30,
+            "id": "distinct-query-conflict",
+            "new_status": 400,
+            "new_request": true
+          }
+        ],
+        "remaining_HTTP_suffix": 6,
+        "new_total_API_calls": 31,
+        "total_HTTP_with_retained2client_and2live": 35,
+        "completed_HTTP_replayed": false,
+        "original_request_bindings": [
+          {
+            "id": "legacy-default",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/001-legacy-default/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/001-legacy-default/response.body",
+              "bytes": 299,
+              "sha256": "b61f72981522e9f585d46dad83d5f2dddcd27d9658667044e222afe53495b18b"
+            }
+          },
+          {
+            "id": "explicit-empty",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1&otg_theta_by_relation_json=%5B%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/002-explicit-empty/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/002-explicit-empty/response.body",
+              "bytes": 1975,
+              "sha256": "afd739072b5712ad019f97b5f4d46674ac6aae8d9d47a28d17b173a3b376c1aa"
+            }
+          },
+          {
+            "id": "custom-override",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1&otg_theta_by_relation_json=%5B%5B%22+custom%2Crelation%3A%5Cu03a9+%22%2C0.3%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/003-custom-override/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/003-custom-override/response.body",
+              "bytes": 1824,
+              "sha256": "c0550b331ffa4bba599e557d51e7155e3cfc19adbf443547e7b3e3a77bec9f62"
+            }
+          },
+          {
+            "id": "strict-equality",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/004-strict-equality/request.body",
+              "bytes": 737,
+              "sha256": "720cb76e41a202636cd45c27fe3f89d9640200ee765e3514e51800e0b2d3c462"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/004-strict-equality/response.body",
+              "bytes": 1824,
+              "sha256": "01fbf0c0cc52a58f19c7832957fb9b51eaa10a835e1293453d013fa65cfafad3"
+            }
+          },
+          {
+            "id": "exact-whitespace-wrong-key",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1&otg_theta_by_relation_json=%5B%5B%22custom%2Crelation%3A%5Cu03a9%22%2C0.3%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/005-exact-whitespace-wrong-key/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/005-exact-whitespace-wrong-key/response.body",
+              "bytes": 2050,
+              "sha256": "26cb03a7467ecdee63cf0633df34cc9b6b2679654f54e7145fa563e9618dd72c"
+            }
+          },
+          {
+            "id": "complete-binary64-map",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1&otg_theta_by_relation_json=%5B%5B%22negative%22%2C-1%5D%2C%5B%22minuszero%22%2C-0.0%5D%2C%5B%22nan%22%2C%22NaN%22%5D%2C%5B%22positive-infinity%22%2C%22INF%22%5D%2C%5B%22negative-infinity%22%2C%22-INF%22%5D%2C%5B%22subnormal%22%2C5e-324%5D%2C%5B%22largest%22%2C1.7976931348623157e%2B308%5D%2C%5B%22above-one%22%2C2%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/006-complete-binary64-map/request.body",
+              "bytes": 1753,
+              "sha256": "45de9d29c0f2baaadcf062e9d8c7a15c1212f7540f20cac42cca823cc8201031"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/006-complete-binary64-map/response.body",
+              "bytes": 6858,
+              "sha256": "0756cdc492996f252e3d8712ff2fb9761fd4616eee102d6f4ed53b9edcb0a5bb"
+            }
+          },
+          {
+            "id": "literal-labels-exact-counters",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/007-literal-labels-exact-counters/request.body",
+              "bytes": 2655,
+              "sha256": "0353add1bef0fa5da7c9284b327e0f50f6a649ef404995b227e735f1bf11cf8c"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/007-literal-labels-exact-counters/response.body",
+              "bytes": 8840,
+              "sha256": "601b8e7c3b9eb35e3c5744d74304484e8644550fe2065f3d534c2d94c6d69511"
+            }
+          },
+          {
+            "id": "unused-complete-map",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/008-unused-complete-map/request.body",
+              "bytes": 874,
+              "sha256": "118783298a2f9cb6154e2f2e414a12e161a7adcb5f2d04592a261878e5e35889"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/008-unused-complete-map/response.body",
+              "bytes": 2341,
+              "sha256": "a5cb2f913105d1f4050fd01d59b2e1527994309f813d4ebe853e0b30ee89d7a1"
+            }
+          },
+          {
+            "id": "all-deviation-categories",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1&otg_theta_by_relation_json=%5B%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/009-all-deviation-categories/request.body",
+              "bytes": 586,
+              "sha256": "629cbfeb40077379fc9cb61685b7a03097737186b3209f5b02690ecb42dee9de"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/009-all-deviation-categories/response.body",
+              "bytes": 1852,
+              "sha256": "de41a8291ec7f54d7090e1c56fa1210a3b6b8bed0c963488bb355c058c2fb85d"
+            }
+          },
+          {
+            "id": "raw-invalid-utf8-input",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1&otg_theta_by_relation_json=%5B%5B%7B%22native_bytes%22%3A%22hex-v1%22%2C%22data%22%3A%22ff726177eda080%22%7D%2C0.3%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/010-raw-invalid-utf8-input/request.body",
+              "bytes": 561,
+              "sha256": "61c79d5c2e09ce2d0b6f84b4307d5d2ae63e18235cd84b7b6ef4d11b8fb45451"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/010-raw-invalid-utf8-input/response.body",
+              "bytes": 2433,
+              "sha256": "813187304c5d6c5fe3dfbb142b22fa5a28bc03836fc5a5e0ab752ce195e94f56"
+            }
+          },
+          {
+            "id": "decimal-string-frequency",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1&otg_theta_by_relation_json=%5B%5B%22+custom%2Crelation%3A%5Cu03a9+%22%2C0.3%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/011-decimal-string-frequency/request.body",
+              "bytes": 607,
+              "sha256": "6534d65b96070f53f4842529ad9237fb27ebe068d81127a3b0e922941a1df150"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/011-decimal-string-frequency/response.body",
+              "bytes": 1828,
+              "sha256": "f52224ec4a2569a2637ecf496320dd19b62a40e58c15e05b8ec11ace04a01477"
+            }
+          },
+          {
+            "id": "ocel-versus-graph",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=ocel&otg_theta=0.1&otg_theta_by_relation_json=%5B%5B%22object_interaction%22%2C-1%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/012-ocel-versus-graph/request.body",
+              "bytes": 832,
+              "sha256": "aad7a69f1e290b645cac3960f0a0f2c17d8d5741c7eb7897f7b078f7f54a799f"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/012-ocel-versus-graph/response.body",
+              "bytes": 3023,
+              "sha256": "8bf3dea874b4fb6049134716555ea7b8b4d8bea1aa989a9b2f220cf5225306ca"
+            }
+          },
+          {
+            "id": "graph-versus-ocel",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1&otg_theta_by_relation_json=%5B%5B%22object_interaction%22%2C-1%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/013-graph-versus-ocel/request.body",
+              "bytes": 839,
+              "sha256": "92b1caed78b108bc5010fe823d51147823ca0c6bf6f51a247bbfe73e819e62ce"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/013-graph-versus-ocel/response.body",
+              "bytes": 3023,
+              "sha256": "9f4238ef5a6c3d0d50ed735d6286e1ff6569e847d4a7ff2705febc78de1103ec"
+            }
+          },
+          {
+            "id": "ocel-versus-ocel",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=ocel&otg_theta=0.1&otg_theta_by_relation_json=%5B%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/014-ocel-versus-ocel/request.body",
+              "bytes": 729,
+              "sha256": "f3805a6cb104512357cb9a7efe627101a2d2d9cd70771c753d1a864f173f846b"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/014-ocel-versus-ocel/response.body",
+              "bytes": 2677,
+              "sha256": "aec570d31fb0e636d469609490dcdd1a9db8b848792361d9aed6d01d73006d42"
+            }
+          },
+          {
+            "id": "raw-wtf8-threshold-multipart",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta=0.1",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/015-raw-wtf8-threshold-multipart/request.body",
+              "bytes": 748,
+              "sha256": "03f1aa9b3170b4b63d12e2ed715ea7bac3db3f491e0ae2aa0502148adeffba9e"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/015-raw-wtf8-threshold-multipart/response.body",
+              "bytes": 2197,
+              "sha256": "28dee00a979f1bd4316085229e2534d08ffb181ff98862b3a0d314cf8f0e8c96"
+            }
+          },
+          {
+            "id": "null-map",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=null",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/016-null-map/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/016-null-map/response.body",
+              "bytes": 46,
+              "sha256": "d51457659cd03ad13d68b33b307341d91a3d292d7684af97b6c3114e9d17eab4"
+            }
+          },
+          {
+            "id": "object-map",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=%7B%7D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/017-object-map/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/017-object-map/response.body",
+              "bytes": 46,
+              "sha256": "d51457659cd03ad13d68b33b307341d91a3d292d7684af97b6c3114e9d17eab4"
+            }
+          },
+          {
+            "id": "bad-pair",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=%5B%5B%22x%22%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/018-bad-pair/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/018-bad-pair/response.body",
+              "bytes": 73,
+              "sha256": "268d86be5ae0e746e3ee82d4852f30cd83517275bb2dffb3e57a61816e41cd78"
+            }
+          },
+          {
+            "id": "null-key",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=%5B%5Bnull%2C0.3%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/019-null-key/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/019-null-key/response.body",
+              "bytes": 47,
+              "sha256": "4bc38b8101c467e8e189acf29d9a0e1e56c4c4eaac3adb765988aa1e42381728"
+            }
+          },
+          {
+            "id": "null-value",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=%5B%5B%22x%22%2Cnull%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/020-null-value/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/020-null-value/response.body",
+              "bytes": 56,
+              "sha256": "9d74c4cbae35805b1d1f0abe4f21dffd192ed0b697edc2508a791091c45962da"
+            }
+          },
+          {
+            "id": "boolean-value",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=%5B%5B%22x%22%2Ctrue%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/021-boolean-value/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/021-boolean-value/response.body",
+              "bytes": 56,
+              "sha256": "9d74c4cbae35805b1d1f0abe4f21dffd192ed0b697edc2508a791091c45962da"
+            }
+          },
+          {
+            "id": "unknown-ieee",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=%5B%5B%22x%22%2C%22Infinity%22%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/022-unknown-ieee/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/022-unknown-ieee/response.body",
+              "bytes": 52,
+              "sha256": "e33d258a4815bc7b4674f566449c4a65bf4a811f82e15202b8781c4a74ae1de9"
+            }
+          },
+          {
+            "id": "duplicate-decoded",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=%5B%5B%22x%22%2C0.2%5D%2C%5B%7B%22native_bytes%22%3A%22hex-v1%22%2C%22data%22%3A%2278%22%7D%2C0.3%5D%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/023-duplicate-decoded/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/023-duplicate-decoded/response.body",
+              "bytes": 59,
+              "sha256": "4178b07912bc4188384b41e1a29fea8b405c9f6876d25279ab0544c65cb9ab8e"
+            }
+          },
+          {
+            "id": "empty-field",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/024-empty-field/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/024-empty-field/response.body",
+              "bytes": 52,
+              "sha256": "7360eaa1a9a6090ee1209f08e40eb3b7438882cf2e1cdf7b0c5a7dddf908879e"
+            }
+          },
+          {
+            "id": "duplicate-query",
+            "request": {
+              "method": "POST",
+              "path": "/api/ocel/conformance?variant=otg&real=graph&real_graph_kind=otg&otg_theta_by_relation_json=%5B%5D&otg_theta_by_relation_json=%5B%5D",
+              "mime": "multipart/form-data; boundary=MineraFeature89ExactOtg"
+            },
+            "request_body": {
+              "path": "build/otg-threshold89-api-actual-2/025-duplicate-query/request.body",
+              "bytes": 605,
+              "sha256": "8f18521eeae85ea552b3d1c193d501ffb053c009da88e3563dfd86f71686797a"
+            },
+            "response_body": {
+              "path": "build/otg-threshold89-api-actual-2/025-duplicate-query/response.body",
+              "bytes": 1745,
+              "sha256": "8ba3439b04185e02312a898e151c45720a2966712561f0ec20b05f59ea86b233"
+            }
+          }
+        ]
+      },
+      "historical_failed_capture": {
+        "path": "build/otg-threshold89-api-actual-2/validation.json",
+        "bytes": 74882,
+        "sha256": "f403c01097f3af80c3bc4bde29ddaad4194ceea13fbf891256c806ea99f0f93d"
+      },
+      "historical_collector_faults": [
+        {
+          "type": "AssertionError",
+          "message": "duplicate-query",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature89-api-prepared-4\\run-acceptance-1.py\", line 143, in main\n    row['response_body']=durable(folder/'response.body',raw);row['response']=dict(status=status,headers=headers,bytes=len(raw),sha256=sha(raw));row['checks']=evaluate(case,json.loads(raw),status,expected,bank);row['passed']=all(c['passed']for c in row['checks']);save(folder/'record.json',row);checkpoint();print(case['id'],row['passed'],flush=True);assert row['passed'],case['id']\n                                                                                                                                                                                                                                                                                                                                                                     ~~~^^^^^^^^^^\nAssertionError: duplicate-query\n"
+        }
+      ],
+      "historical_false_checks": [
+        {
+          "id": "duplicate-query",
+          "check": "HTTP status",
+          "passed": false,
+          "error": "AssertionError: "
+        },
+        {
+          "id": "duplicate-query",
+          "check": "malformed or conflicting control error retained",
+          "passed": false,
+          "error": "AssertionError: "
+        }
+      ],
+      "historical_previous_capture": {
+        "path": "build/otg-threshold89-api-actual-1/validation.json",
+        "bytes": 7023,
+        "sha256": "5f0a622c8da32610fca4143982f08d5ff37a49adb781182a4a29a1ceecb89b42"
+      },
+      "historical_prior_collector_faults": [
+        {
+          "type": "TypeError",
+          "message": "not a valid non-string sequence or mapping object",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\urllib\\parse.py\", line 969, in urlencode\n    raise TypeError\nTypeError\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature89-api-prepared-3\\run-acceptance-1.py\", line 138, in main\n    folder=output/(str(i+1).zfill(3)+'-'+case['id']);folder.mkdir();path,body,mime=request_for(case,bank)\n                                                                                   ^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature89-api-prepared-3\\run-acceptance-1.py\", line 51, in request_for\n    return '/api/ocel/conformance?'+urlencode(fields),b''.join(chunks),'multipart/form-data; boundary='+boundary\n                                    ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\urllib\\parse.py\", line 975, in urlencode\n    raise TypeError(\"not a valid non-string sequence \"\nTypeError: not a valid non-string sequence or mapping object\n"
+        }
+      ],
+      "historical_API_collector_failure": {
+        "path": "build/otg-threshold89-api-actual-2/validation.json",
+        "bytes": 74882,
+        "sha256": "f403c01097f3af80c3bc4bde29ddaad4194ceea13fbf891256c806ea99f0f93d"
+      },
+      "historical_API_collector_faults": [
+        {
+          "type": "AssertionError",
+          "message": "duplicate-query",
+          "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature89-api-prepared-4\\run-acceptance-1.py\", line 143, in main\n    row['response_body']=durable(folder/'response.body',raw);row['response']=dict(status=status,headers=headers,bytes=len(raw),sha256=sha(raw));row['checks']=evaluate(case,json.loads(raw),status,expected,bank);row['passed']=all(c['passed']for c in row['checks']);save(folder/'record.json',row);checkpoint();print(case['id'],row['passed'],flush=True);assert row['passed'],case['id']\n                                                                                                                                                                                                                                                                                                                                                                     ~~~^^^^^^^^^^\nAssertionError: duplicate-query\n"
+        }
+      ]
+    },
+    "frontend": {},
+    "backend": {},
+    "live": {},
+    "cleanup": {},
+    "file_bridge": {
+      "historical_file_bridge_validation": {
+        "path": "build/otg-threshold89-file-bridge-actual-1/validation.json",
+        "bytes": 12183,
+        "sha256": "02ea1dda381c72d52bdecf52fa021753dc2a02a63a1841095ca9ef495d9666e7"
+      },
+      "historical_failed_capture": {
+        "path": "build/otg-threshold89-file-bridge-actual-1/actual/validation.json",
+        "bytes": 5470,
+        "sha256": "042c6f19521e08d77b9462ab2e4c63d38d016075796e440b8f51375a26d085ee"
+      },
+      "historical_failure": {
+        "type": "AssertionError",
+        "message": "Client File bridge failed; retained command output is authoritative.",
+        "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\pmoch\\Documents\\Minera\\build\\feature89-api-prepared-3\\run-file-bridge-1.py\", line 40, in main\n    row.update(exit_code=code,stdout=desc(out/('command-'+str(i)+'.stdout.txt')),stderr=desc(out/('command-'+str(i)+'.stderr.txt')));checkpoint();assert code==0,'Client File bridge failed; retained command output is authoritative.'\n                                                                                                                                                         ^^^^^^^\nAssertionError: Client File bridge failed; retained command output is authoritative.\n"
+      },
+      "historical_executed_checks": [
+        {
+          "check": "original request multipart files and exact threshold bytes",
+          "passed": true,
+          "evidence": {
+            "path": "build/otg-threshold89-file-bridge-actual-1/file-bridge.cjs",
+            "bytes": 31479,
+            "sha256": "071babc37fd164bf128e0d90b574258431fb772184ae2abc5814267c8b5599b8"
+          },
+          "start_line": 450,
+          "end_line": 459,
+          "kind": "original executed synchronous prefix preceding captured line522 failure; no new offline object-identity claim"
+        },
+        {
+          "check": "original public API File identity and source hash assertions",
+          "passed": true,
+          "evidence": {
+            "path": "build/otg-threshold89-file-bridge-actual-1/file-bridge.cjs",
+            "bytes": 31479,
+            "sha256": "071babc37fd164bf128e0d90b574258431fb772184ae2abc5814267c8b5599b8"
+          },
+          "start_line": 474,
+          "end_line": 480,
+          "kind": "original executed synchronous prefix preceding captured line522 failure; no new offline object-identity claim"
+        },
+        {
+          "check": "original execution File identity and hash assertions",
+          "passed": true,
+          "evidence": {
+            "path": "build/otg-threshold89-file-bridge-actual-1/file-bridge.cjs",
+            "bytes": 31479,
+            "sha256": "071babc37fd164bf128e0d90b574258431fb772184ae2abc5814267c8b5599b8"
+          },
+          "start_line": 487,
+          "end_line": 491,
+          "kind": "original executed synchronous prefix preceding captured line522 failure; no new offline object-identity claim"
+        },
+        {
+          "check": "original complete report/raw-original assertions and seven saved downloads",
+          "passed": true,
+          "evidence": {
+            "path": "build/otg-threshold89-file-bridge-actual-1/file-bridge.cjs",
+            "bytes": 31479,
+            "sha256": "071babc37fd164bf128e0d90b574258431fb772184ae2abc5814267c8b5599b8"
+          },
+          "start_line": 495,
+          "end_line": 511,
+          "kind": "original executed synchronous prefix preceding captured line522 failure; no new offline object-identity claim"
+        }
+      ]
+    },
+    "source_audit": {
+      "preparation_history": [
+        {
+          "path": "build/feature89-api-prepared-1/prepared-manifest.json",
+          "bytes": 6759,
+          "sha256": "653c71479253c6e2052f7eae81c209fdbb727b1a27c0a7d8fe867e81484b1a69"
+        },
+        {
+          "path": "build/feature89-api-prepared-2/prepared-manifest.json",
+          "bytes": 7789,
+          "sha256": "004cca419e4ffe1fad8386d3e690ac2ceb35749eb28ecd448dd5f91a10d90061"
+        }
+      ]
+    },
+    "source_review": {
+      "preparation_history": [
+        {
+          "path": "build/feature89-api-prepared-1/prepared-manifest.json",
+          "bytes": 6759,
+          "sha256": "653c71479253c6e2052f7eae81c209fdbb727b1a27c0a7d8fe867e81484b1a69"
+        },
+        {
+          "path": "build/feature89-api-prepared-2/prepared-manifest.json",
+          "bytes": 7789,
+          "sha256": "004cca419e4ffe1fad8386d3e690ac2ceb35749eb28ecd448dd5f91a10d90061"
+        }
+      ]
+    },
+    "native_oracle": {},
+    "cli": {}
+  },
+  "journal_policy": "Preserve complete inherited working prefix; stage parent HEAD journal plus owned Feature89 suffix only.",
+  "browser_ui_verified": false,
+  "browser_evidence": "No Feature89 rendered-browser validation is claimed. A fresh Feature89 browser retry was denied before navigation by the tool despite explicit user authorization and enabled settings. The local server had a verified listener on port 8562.",
+  "browser_retry": {
+    "path": "build/otg-threshold89-browser-retry.json",
+    "bytes": 882,
+    "sha256": "6a443816388403f5c4c6287c60e0df80e10ae735b3f0ff79970ea664821c50e2"
+  },
+  "full_parity": false,
+  "goal_complete": false,
+  "claim_boundary": "Exact OTG threshold availability and direct native witnesses do not prove full reference behavior, saved-input authenticity, every remaining catalogue control, browser, performance or concurrency parity."
+}
