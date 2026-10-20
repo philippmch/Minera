@@ -6,6 +6,12 @@ from pathlib import Path
 import sys
 from threading import Thread
 import unittest
+from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stdout, redirect_stderr
+import argparse
+import io
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -86,7 +92,7 @@ class RuntimeTests(unittest.TestCase):
         with self.assertRaises(llm.ProviderError):llm.parse_completion('google',{'promptFeedback':{'blockReason':'SAFETY'}})
 
     def test_bad_requests_never_reach_a_provider(self):
-        for extra in ({'provider':'bad'},{'model':''},{'prompt':' '},{'api_key':'not-accepted'},{'temperature':float('nan')},{'temperature':2.1},{'max_tokens':True},{'max_tokens':0}):
+        for extra in ({'provider':'bad'},{'model':''},{'prompt':' '},{'api_key':True},{'temperature':float('nan')},{'temperature':2.1},{'max_tokens':True},{'max_tokens':0}):
             with self.assertRaises((ValueError,UnicodeError)):self.runtime.complete(self.payload(**extra))
         self.assertEqual(self.calls,[])
 
@@ -168,6 +174,125 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(raised.exception.code,status)
                 raised.exception.close()
         finally:server.shutdown();server.server_close();thread.join()
+
+    def test_call_local_config_reaches_all_protocols_without_changing_defaults(self):
+        original=dict(self.runtime.configs)
+        status=self.runtime.status()
+        base=self.configs['openai'].base_url+'/call-local'
+        protocols=[('openai','responses'),('openai','chat_completions'),('anthropic',None),('google',None)]
+        for provider,api in protocols:
+            with self.subTest(provider=provider,api=api):
+                extra={'api_key':'request-key-'+provider,'api_url':base}
+                if api:extra.update(openai_api=api,openai_token_field='max_tokens')
+                result=self.runtime.complete(self.payload(provider,**extra))
+                call=self.calls[-1]
+                self.assertTrue(call['path'].startswith('/v1/call-local/'))
+                header={'openai':'Authorization','anthropic':'X-Api-Key','google':'X-Goog-Api-Key'}[provider]
+                prefix='Bearer ' if provider=='openai' else ''
+                self.assertEqual(call['headers'][header],prefix+'request-key-'+provider)
+                self.assertEqual(set(result),{'family','provider','model','text','finish_reason','usage','response'})
+                self.assertEqual(result['response'],RESPONSES[api if api=='responses' else provider])
+                self.assertNotIn('request-key-'+provider,json.dumps(result))
+                self.assertNotIn(base,json.dumps(result))
+                if api=='chat_completions':
+                    self.assertIn('max_tokens',call['body'])
+                    self.assertNotIn('max_completion_tokens',call['body'])
+        self.assertEqual(self.runtime.configs,original)
+        self.assertEqual(self.runtime.status(),status)
+        self.runtime.complete(self.payload())
+        self.assertEqual(self.calls[-1]['path'],'/v1/chat/completions')
+        self.assertEqual(self.calls[-1]['headers']['Authorization'],'Bearer fixture-secret')
+        self.assertIn('max_completion_tokens',self.calls[-1]['body'])
+
+    def test_missing_null_and_explicit_empty_are_distinct_per_call(self):
+        for provider in llm.PROVIDERS:
+            self.runtime.complete(self.payload(provider,api_key=None,api_url=None,openai_token_field=None))
+            header={'openai':'Authorization','anthropic':'X-Api-Key','google':'X-Goog-Api-Key'}[provider]
+            self.assertEqual(self.calls[-1]['headers'][header],('Bearer ' if provider=='openai' else '')+'fixture-secret')
+        with patch.dict(llm.os.environ,{'OPENAI_API_KEY':'never-fallback-key'}):
+            self.runtime.complete(self.payload(api_key=''))
+            self.assertNotIn('Authorization',self.calls[-1]['headers'])
+            self.assertEqual(llm.os.environ['OPENAI_API_KEY'],'never-fallback-key')
+        remote=llm.ProviderRuntime({name:llm.ProviderConfig('https://synthetic.invalid/v1','startup-key') for name in llm.PROVIDERS})
+        count=len(self.calls)
+        with self.assertRaises(ValueError):remote.complete(self.payload(api_key=''))
+        self.assertEqual(len(self.calls),count)
+        self.assertEqual(remote.configs['openai'].api_key,'startup-key')
+
+    def test_invalid_call_configs_never_reach_provider_or_echo_values(self):
+        cases=[]
+        for name in llm.PROVIDER_CALL_FIELDS:
+            cases.extend({name:value} for value in (True,7,[],{}))
+        cases.extend({'api_url':value} for value in ('','http://external.invalid/v1','https://user:secret-sentinel@synthetic.invalid/v1','https://synthetic.invalid/v1?key=secret-sentinel','https://synthetic.invalid/v1#secret-sentinel','https://synthetic.invalid/ bad','https://[secret-sentinel]/v1'))
+        cases.extend([{'api_key':'secret-sentinel\r\nheader'}, {'openai_token_field':''}, {'openai_token_field':'secret-sentinel'}, {'provider':'anthropic','openai_token_field':'max_tokens'}, {'provider':'google','openai_token_field':'max_completion_tokens'}, {'openai_api':None}, {'provider':'anthropic','openai_api':None}])
+        for extra in cases:
+            with self.subTest(fields=list(extra)):
+                with self.assertRaises(ValueError) as raised:self.runtime.complete(self.payload(**extra))
+                self.assertNotIn('secret-sentinel',str(raised.exception))
+        self.assertEqual(self.calls,[])
+
+    def test_concurrent_configs_and_following_default_call_are_isolated(self):
+        second_calls=[]
+        class SecondProvider(BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def do_POST(self):
+                body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                second_calls.append({'path':self.path,'headers':dict(self.headers),'body':body})
+                raw=json.dumps(RESPONSES['openai']).encode()
+                self.send_response(200);self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+        second=ThreadingHTTPServer(('127.0.0.1',0),SecondProvider)
+        worker=Thread(target=second.serve_forever,daemon=True);worker.start()
+        original=dict(self.runtime.configs)
+        try:
+            with patch.dict(llm.os.environ,{'OPENAI_API_KEY':'environment-unchanged'}):
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    futures=[executor.submit(self.runtime.complete,self.payload(api_key='call-A',api_url=self.configs['openai'].base_url+'/A')),
+                             executor.submit(self.runtime.complete,self.payload(api_key='call-B',api_url=f'http://127.0.0.1:{second.server_port}/B',openai_token_field='max_tokens'))]
+                    for future in futures:self.assertEqual(future.result()['text'],'Summary α\nDone')
+                self.assertEqual(llm.os.environ['OPENAI_API_KEY'],'environment-unchanged')
+            self.assertEqual(self.calls[0]['headers']['Authorization'],'Bearer call-A')
+            self.assertEqual(self.calls[0]['path'],'/v1/A/chat/completions')
+            self.assertEqual(second_calls[0]['headers']['Authorization'],'Bearer call-B')
+            self.assertEqual(second_calls[0]['path'],'/B/chat/completions')
+            self.assertIn('max_tokens',second_calls[0]['body'])
+            self.assertNotIn('max_completion_tokens',second_calls[0]['body'])
+            self.assertEqual(self.runtime.configs,original)
+            self.runtime.complete(self.payload())
+            self.assertEqual(self.calls[-1]['path'],'/v1/chat/completions')
+            self.assertEqual(self.calls[-1]['headers']['Authorization'],'Bearer fixture-secret')
+        finally:second.shutdown();second.server_close();worker.join()
+
+    def test_shared_cli_helpers_preserve_empty_and_sanitize_only_own_request(self):
+        parser=argparse.ArgumentParser(add_help=False);llm.add_provider_call_arguments(parser)
+        self.assertEqual(llm.provider_call_overrides(parser.parse_args([])),{})
+        args=parser.parse_args(['--api-key','','--api-url','http://127.0.0.1:1/v1','--openai-token-field','max_tokens'])
+        overrides=llm.provider_call_overrides(args)
+        self.assertEqual(overrides,{'api_key':'','api_url':'http://127.0.0.1:1/v1','openai_token_field':'max_tokens'})
+        request={**self.payload(),**overrides,'extra_payload':{'metadata':{'source':'owned'}}}
+        report=llm.provider_call_report_request(request)
+        self.assertTrue(all(name not in report for name in llm.PROVIDER_CALL_FIELDS))
+        self.assertTrue(all(name in request for name in llm.PROVIDER_CALL_FIELDS))
+        self.assertEqual(report['extra_payload'],request['extra_payload'])
+
+    def test_runtime_complete_cli_flags_override_json_without_entering_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'request.json'
+            path.write_text(json.dumps(self.payload(api_key='json-key',api_url=None)),encoding='utf8')
+            stdout,stderr=io.StringIO(),io.StringIO()
+            with patch.object(llm,'provider_configs',return_value=self.configs),redirect_stdout(stdout),redirect_stderr(stderr):
+                code=llm.main(['--complete',str(path),'--api-key','','--api-url',self.configs['openai'].base_url+'/cli','--openai-token-field','max_tokens'])
+            self.assertEqual(code,0)
+            self.assertNotIn('Authorization',self.calls[-1]['headers'])
+            self.assertEqual(self.calls[-1]['path'],'/v1/cli/chat/completions')
+            self.assertIn('max_tokens',self.calls[-1]['body'])
+            result=json.loads(stdout.getvalue());self.assertEqual(result['response'],RESPONSES['openai'])
+            self.assertNotIn('json-key',stdout.getvalue()+stderr.getvalue())
+            self.assertNotIn('/v1/cli',stdout.getvalue()+stderr.getvalue())
+        stderr=io.StringIO()
+        with patch.object(llm,'ProviderRuntime') as constructor,redirect_stderr(stderr):
+            self.assertEqual(llm.main(['--api-key','hosted-secret-sentinel']),1)
+        constructor.assert_not_called()
+        self.assertNotIn('hosted-secret-sentinel',stderr.getvalue())
 
 
 if __name__=='__main__':unittest.main()

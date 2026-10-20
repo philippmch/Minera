@@ -1,6 +1,7 @@
 """Minera's optional language-model runtime (Python standard library only).
 
-Credentials and provider base URLs are read from the server environment.
+Credentials and provider base URLs default to the server environment.
+Optional api_key, api_url and openai_token_field apply only to one completion.
 Run with --port 8189, then minera_server --llm-runtime-url http://127.0.0.1:8189.
 Use --complete request.json (or - for stdin) for standalone execution.
 """
@@ -25,6 +26,7 @@ MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 PROVIDERS = ("openai", "anthropic", "google")
 IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp", "image/gif")
+PROVIDER_CALL_FIELDS = ("api_key", "api_url", "openai_token_field")
 
 
 class ProviderError(RuntimeError):
@@ -72,6 +74,40 @@ def provider_configs(environment: Mapping[str, str]) -> dict[str, ProviderConfig
     }
 
 
+def add_provider_call_arguments(parser):
+    """Add only call-local options; None distinguishes omission from empty."""
+    parser.add_argument("--api-key", help="Credential for this call only; empty clears the startup credential.")
+    parser.add_argument("--api-url", help="Provider base URL for this call only.")
+    parser.add_argument("--openai-token-field", help="OpenAI max_completion_tokens or max_tokens for this call.")
+
+
+def provider_call_overrides(args):
+    return {name: value for name in PROVIDER_CALL_FIELDS
+            if (value := getattr(args, name, None)) is not None}
+
+
+def provider_call_report_request(request):
+    """Do not copy request-local configuration into application reports."""
+    return {name: value for name, value in request.items() if name not in PROVIDER_CALL_FIELDS}
+
+
+def call_provider_config(startup, request):
+    """Resolve a separate immutable config; no mapping/environment mutation."""
+    def selected(name, default):
+        value = request.get(name)
+        return default if value is None else value
+    try:
+        return ProviderConfig(
+            selected("api_url", startup.base_url),
+            selected("api_key", startup.api_key),
+            selected("openai_token_field", startup.openai_token_field),
+            request.get("openai_api", startup.openai_api),
+        )
+    except (ValueError, UnicodeError):
+        # URL parsing can include the supplied host in its exception message.
+        raise ValueError("Invalid call-local provider configuration.") from None
+
+
 def image_type(raw: bytes) -> str:
     if raw.startswith(b"\x89PNG\r\n\x1a\n"): return "image/png"
     if raw.startswith(b"\xff\xd8\xff"): return "image/jpeg"
@@ -90,7 +126,7 @@ def image_file(path: str) -> dict[str, str]:
 
 
 def validate_request(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) - {"provider", "model", "prompt", "max_tokens", "temperature", "images", "extra_payload", "openai_api"}:
+    if not isinstance(value, dict) or set(value) - {"provider", "model", "prompt", "max_tokens", "temperature", "images", "extra_payload", "openai_api", *PROVIDER_CALL_FIELDS}:
         raise ValueError("Invalid completion request fields.")
     if value.get("provider") not in PROVIDERS:
         raise ValueError("Unsupported language-model provider.")
@@ -110,6 +146,12 @@ def validate_request(value: Any) -> dict[str, Any]:
         raise ValueError(f"temperature must be from 0 to {maximum}, or omitted for the model default.")
     if "openai_api" in value and (value["provider"] != "openai" or value["openai_api"] not in ("responses", "chat_completions")):
         raise ValueError("openai_api applies to OpenAI and must be responses or chat_completions.")
+    for name in PROVIDER_CALL_FIELDS:
+        field = value.get(name)
+        if field is not None and not isinstance(field, str):
+            raise ValueError(f"{name} must be a string or null.")
+    if value.get("openai_token_field") is not None and value["provider"] != "openai":
+        raise ValueError("openai_token_field applies only to OpenAI.")
     images = value.get("images", [])
     if not isinstance(images, list) or len(images) > 8:
         raise ValueError("images must be a list of at most eight attachments.")
@@ -211,7 +253,7 @@ class ProviderRuntime:
     def complete(self, value: Any) -> dict[str, Any]:
         request = validate_request(value)
         provider, model, prompt = (request[key] for key in ("provider", "model", "prompt"))
-        config = self.configs[provider]
+        config = call_provider_config(self.configs[provider], request)
         if not config.configured:
             raise ValueError("Configure the selected provider credential in the runtime environment.")
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -310,13 +352,19 @@ def main(argv=None):
     parser.add_argument("--timeout", type=float, default=60)
     parser.add_argument("--complete", metavar="JSON_FILE")
     parser.add_argument("--image", action="append", default=[], metavar="IMAGE_FILE", help="Attach an image to --complete; repeat for multiple images.")
+    add_provider_call_arguments(parser)
     args = parser.parse_args(argv)
     try:
+        overrides = provider_call_overrides(args)
+        if overrides and not args.complete:
+            raise ValueError("Call-local provider flags require --complete.")
         runtime = ProviderRuntime(provider_configs(os.environ), timeout=args.timeout)
         if args.complete:
             raw = sys.stdin.buffer.read(MAX_INPUT_BYTES+1) if args.complete == "-" else Path(args.complete).read_bytes()
             if len(raw) > MAX_INPUT_BYTES: raise ValueError("Request exceeds the runtime input bound.")
             value = json.loads(raw)
+            if not isinstance(value, dict): raise ValueError("Invalid completion request fields.")
+            value.update(overrides)
             if args.image:
                 value["images"] = [*value.get("images", []), *(image_file(path) for path in args.image)]
             result = runtime.complete(value)

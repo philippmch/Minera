@@ -26,6 +26,10 @@ struct CompletionOptions {
   std::string extra_payload;
   struct Image { std::string name, media_type, data, detail; };
   std::vector<Image> images;
+  // Omission inherits the runtime config; an engaged empty key clears it.
+  std::optional<std::string> api_key;
+  std::optional<std::string> api_url;
+  std::optional<std::string> openai_token_field;
 };
 
 inline std::string bounded_file(const std::filesystem::path& path) {
@@ -100,12 +104,22 @@ inline std::string completion_json(std::string_view url, std::string_view prompt
   if (!options.openai_api.empty() && (options.provider != "openai" || (options.openai_api != "responses" && options.openai_api != "chat_completions")))
     throw std::invalid_argument("OpenAI API must be responses or chat_completions");
   if (options.images.size() > 8) throw std::invalid_argument("At most eight images can be attached");
+  if (options.api_key && options.api_key->find_first_of("\r\n") != std::string::npos)
+    throw std::invalid_argument("LLM api_key must not contain CR or LF");
+  if (options.api_url && options.api_url->empty())
+    throw std::invalid_argument("LLM api_url must not be empty");
+  if (options.openai_token_field && (options.provider != "openai" ||
+      (*options.openai_token_field != "max_completion_tokens" && *options.openai_token_field != "max_tokens")))
+    throw std::invalid_argument("openai_token_field applies only to OpenAI and must be max_completion_tokens or max_tokens");
   const auto quote = embedding_runtime::detail::escape_json;
   auto body = "{\"provider\":" + quote(options.provider) + ",\"model\":" + quote(options.model) +
               ",\"prompt\":" + quote(prompt) + ",\"max_tokens\":" + std::to_string(options.max_tokens);
   if (options.temperature) body += ",\"temperature\":" + std::to_string(*options.temperature);
   if (!options.openai_api.empty()) body += ",\"openai_api\":" + quote(options.openai_api);
   if (!options.extra_payload.empty()) body += ",\"extra_payload\":" + quote(options.extra_payload);
+  if (options.api_key) body += ",\"api_key\":" + quote(*options.api_key);
+  if (options.api_url) body += ",\"api_url\":" + quote(*options.api_url);
+  if (options.openai_token_field) body += ",\"openai_token_field\":" + quote(*options.openai_token_field);
   if (!options.images.empty()) {
     body += ",\"images\":[";
     for (std::size_t i = 0; i < options.images.size(); ++i) {
