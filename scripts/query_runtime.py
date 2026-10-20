@@ -64,12 +64,68 @@ def identifier(name):
     if not isinstance(name,str) or '\x00' in name:raise ValueError('Invalid query column name.')
     return '"'+name.replace('"','""')+'"'
 
+def exact_native_string(value):
+    if isinstance(value,str):
+        value.encode('utf-8',errors='strict')
+        return value
+    if not isinstance(value,dict) or set(value)!={'native_bytes','data'} or value['native_bytes']!='hex-v1':
+        raise ValueError('Expected NativeString.')
+    raw=value['data']
+    if not isinstance(raw,str) or len(raw)%2 or re.fullmatch(r'[0-9a-fA-F]*',raw) is None:
+        raise ValueError('Invalid NativeString hex bytes.')
+    try:return bytes.fromhex(raw).decode('utf-8',errors='strict')
+    except UnicodeError:raise ValueError('DuckDB requires scalar UTF8 strings; arbitrary native bytes remain in the exact report.') from None
+
+
+def exact_parameter(value):
+    if not isinstance(value,dict) or set(value)!={'index','value'} or type(value['index']) is not int:
+        raise ValueError('Expected tagged QueryValue.')
+    index=value['index'];v=value['value']
+    if index==0:
+        if v is not None:raise ValueError('Monostate parameter requires null.')
+        return None
+    if index==1:
+        if type(v) is int:result=v
+        elif isinstance(v,str) and re.fullmatch(r'-?[0-9]+',v):result=int(v)
+        else:raise ValueError('Expected exact signed64 parameter.')
+        if not -(1<<63)<=result<(1<<63):raise ValueError('Signed64 parameter overflow.')
+        return result
+    if index==2:
+        if type(v) in (int,float):return float(v)
+        if v in ('NaN','INF','-INF') and isinstance(v,str):return {'NaN':float('nan'),'INF':float('inf'),'-INF':-float('inf')}[v]
+        raise ValueError('Expected double parameter or IEEE tag.')
+    if index==3:return exact_native_string(v)
+    if index==4:
+        if not isinstance(v,dict) or set(v)!={'hex'}:raise ValueError('Expected QueryBlob.hex.')
+        text=exact_native_string(v['hex'])
+        if len(text)%2 or re.fullmatch(r'[0-9a-fA-F]*',text) is None:raise ValueError('DuckDB blob binding requires even ASCII hexadecimal bytes.')
+        return bytes.fromhex(text)
+    raise ValueError('QueryValue index must be0through4.')
+
+
+def exact_options(value):
+    if not isinstance(value,dict):raise ValueError('Expected complete DuckDB query options.')
+    if 'max_vm_steps' in value:raise ValueError('max_vm_steps is SQLite-only.')
+    if set(value)!={'table_name','max_rows','parameters'}:raise ValueError('Expected all three DuckDB query options.')
+    name=exact_native_string(value['table_name']);identifier(name)
+    limit=value['max_rows']
+    if isinstance(limit,str) and re.fullmatch(r'[0-9]+',limit):limit=int(limit)
+    if type(limit) is not int or not 1<=limit<=1000000:raise ValueError('Invalid query row limit.')
+    if not isinstance(value['parameters'],list):raise ValueError('Expected ordered query parameters.')
+    return name,limit,[exact_parameter(v) for v in value['parameters']]
+
+
 def query(payload,select_only=False):
     import duckdb
-    if not isinstance(payload,dict) or set(payload)-{'sql','max_rows','source_id','data'}:raise ValueError('Invalid query request fields.')
-    sql=payload.get('sql')
+    if not isinstance(payload,dict):raise ValueError('Invalid query request fields.')
+    exact='exact_options' in payload
+    allowed={'sql','source_id','data','exact_options'} if exact else {'sql','max_rows','source_id','data'}
+    if set(payload)-allowed:raise ValueError('Invalid query request fields.')
+    table_name='dataframe';parameters=[]
+    if exact:table_name,exact_limit,parameters=exact_options(payload['exact_options'])
+    sql=exact_native_string(payload.get('sql')) if exact else payload.get('sql')
     if not isinstance(sql,str) or not sql.strip() or len(sql.encode('utf-8'))>1024*1024:raise ValueError('Enter SQL within the input bound.')
-    limit=payload.get('max_rows',1000)
+    limit=exact_limit if exact else payload.get('max_rows',1000)
     if type(limit) is not int or not 1<=limit<=1000000:raise ValueError('Invalid query row limit.')
     data=payload['data'];table=data['table'];columns=table['columns'];rows=table['rows'];index_name=data['event_index_column']
     if not isinstance(columns,list) or not columns or len(columns)!=len(set(columns)) or any(not isinstance(row,list) or len(row)!=len(columns) for row in rows):raise ValueError('Invalid source event table.')
@@ -77,14 +133,15 @@ def query(payload,select_only=False):
     timer=None
     try:
         types=[column_type([row[column] for row in rows]) for column in range(len(columns))]
-        connection.execute('CREATE TABLE dataframe ('+','.join(identifier(name)+' '+kind for name,kind in zip(columns,types))+')')
+        table_identifier=identifier(table_name) if exact else 'dataframe'
+        connection.execute('CREATE TABLE '+table_identifier+' ('+','.join(identifier(name)+' '+kind for name,kind in zip(columns,types))+')')
         if rows:
             values=[[scalar(cell) for cell in row] for row in rows]
-            connection.executemany('INSERT INTO dataframe VALUES ('+','.join('?' for _ in columns)+')',values)
+            connection.executemany('INSERT INTO '+table_identifier+' VALUES ('+','.join('?' for _ in columns)+')',values)
         statements=connection.extract_statements(sql)
         if len(statements)!=1 or statements[0].type!=duckdb.StatementType.SELECT:raise ValueError('Expected one read-only result query.')
         timer=Timer(20,connection.interrupt);timer.daemon=True;timer.start()
-        cursor=connection.execute(sql)
+        cursor=connection.execute(sql,parameters) if exact else connection.execute(sql)
         result_columns=[item[0] for item in cursor.description]
         records=cursor.fetchmany(limit+1);truncated=len(records)>limit;records=records[:limit]
         index_column=result_columns.index(index_name) if result_columns.count(index_name)==1 else None
@@ -101,6 +158,18 @@ def query(payload,select_only=False):
     finally:
         if timer:timer.cancel()
         connection.close()
+
+def observed_exact_query(payload,select_only=False):
+    call={'entered':False,'returned':False,'error':None}
+    try:
+        call['entered']=True
+        value=query(payload,select_only)
+    except Exception as error:
+        call['error']={'type':type(error).__name__,'message':str(error)}
+        return 400,{'error':str(error),'exact_call':call}
+    call['returned']=True
+    return 200,{**value,'exact_call':call}
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args):pass
@@ -119,6 +188,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path not in ('/query','/select','/cluster-select'):self.send_json(404,{'error':'Unknown query route.'});return
         if self.headers.get('Origin'):self.send_json(403,{'error':'Use the native Minera query bridge.'});return
+        exact_call=None
         try:
             length=int(self.headers.get('Content-Length','0'))
             if not 0<length<=MAX_INPUT:self.send_json(413,{'error':'Query input exceeds 32 MiB.'});return
@@ -127,8 +197,16 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/cluster-select':
                 from llm_study import select_cluster_bounded
                 self.send_json(200,select_cluster_bounded(payload))
+            elif isinstance(payload,dict) and 'exact_options' in payload:
+                status,value=observed_exact_query(payload,self.path=='/select')
+                self.send_json(status,value)
             else:self.send_json(200,query(payload,self.path=='/select'))
-        except Exception as error:self.send_json(400,{'error':str(error)})
+        except Exception as error:
+            value={'error':str(error)}
+            if exact_call is not None:
+                exact_call['error']={'type':type(error).__name__,'message':str(error)}
+                value['exact_call']=exact_call
+            self.send_json(400,value)
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--port',type=int,default=8192);parser.add_argument('--execute',metavar='JSON_FILE');args=parser.parse_args()

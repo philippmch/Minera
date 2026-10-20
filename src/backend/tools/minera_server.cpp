@@ -39,6 +39,7 @@
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
 #include "query_runtime.hpp"
+#include "minera/exact_log_query_json.hpp"
 #include "log_cluster_runtime.hpp"
 #include "llm_context_options.hpp"
 #include "minera/log_query.hpp"
@@ -4694,6 +4695,8 @@ std::string duckdb_query_body(const minera::LogQueryTable& table,std::string_vie
   const auto quote=minera::embedding_runtime::detail::escape_json;
   return "{\"sql\":"+quote(sql)+",\"max_rows\":"+std::to_string(limit)+",\"source_id\":"+quote(source)+",\"data\":"+minera::log_query_table_json(table)+'}';
 }
+#include "exact_log_query_route.hpp"
+
 void handle_log_query_schema(const httplib::Request& request,httplib::Response& response){
  try{
   const auto session=query_session(request);const auto table=cached_source_query_table(*session);const auto quote=minera::embedding_runtime::detail::escape_json;
@@ -4702,6 +4705,7 @@ void handle_log_query_schema(const httplib::Request& request,httplib::Response& 
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 void handle_log_query(const httplib::Request& request,httplib::Response& response){
+ if(exact_log_query_requested(request)){handle_exact_log_query(request,response,false);return;}
  try{
   validate_query_fields(request);const auto session=query_session(request);const auto table=cached_source_query_table(*session);const auto engine=query_engine(request);const auto limit=query_limit(request,1000);const auto source=std::to_string(session->query_source_id);
   if(engine=="sqlite"){
@@ -4713,6 +4717,7 @@ void handle_log_query(const httplib::Request& request,httplib::Response& respons
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 void handle_log_query_export(const httplib::Request& request,httplib::Response& response){
+ if(exact_log_query_requested(request)){handle_exact_log_query(request,response,true);return;}
  try{
   validate_query_fields(request);if(!request.has_param("source_id"))throw std::invalid_argument("source_id is required for filtered log export");
   const auto session=query_session(request);const auto table=cached_source_query_table(*session);const auto engine=query_engine(request);std::vector<std::size_t> indices;
