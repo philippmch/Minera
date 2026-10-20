@@ -1,3 +1,4 @@
+#include "minera/exact_filter_discovery_json.hpp"
 #include "minera/request_params.hpp"
 #include "minera/literal_controls_json.hpp"
 
@@ -1878,6 +1879,16 @@ MineParams parse_mine_params(const FieldLookup& field,
     return present ? present(name) : !field(name).empty();
   };
 
+  const bool exact_ltl = exact_ltl_requested(supplied);
+  const auto exact_carrier = [&](std::string_view json,std::string_view file) {
+    if(supplied(json)&&supplied(file))throw std::invalid_argument(std::string(json)+": JSON and File conflict by presence");
+    return supplied(file)?field(file):field(json);
+  };
+  const bool full_heuristic = exact_heuristic_options_requested(supplied);
+  if(full_heuristic) {
+    for(const auto name : {"heuristic_variant","heuristic_activity_attribute","heuristic_case_id_attribute","heuristic_timestamp_attribute","heuristic_start_timestamp_attribute","heuristic_lifecycle_instance_attribute","dependency_threshold","and_threshold","min_edge_frequency","heuristic_min_activity_count","heuristic_connect_all","heuristic_decoration","heuristic_performance_aggregation","heuristic_business_hours","heuristic_business_hour_slots","heuristic_dfg_pre_cleaning_noise_threshold","heuristic_loop_length_two_threshold","heuristic_keep_once_per_case","heuristic_most_common_paths","heuristic_plusplus_decoration_selector","heuristic_plusplus_decoration_value","heuristic_plusplus_min_activity_count","heuristic_plusplus_min_frequency","heuristic_most_common_paths_json","heuristic_most_common_paths_file"})
+      if(supplied(name))throw std::invalid_argument(std::string("heuristic_options_json: conflicts by presence with ")+name);
+  }
   const bool segment_prefix_supplied =
       supplied("segment_prefix_activity") || supplied("segment_prefix_strict") ||
       supplied("segment_prefix_occurrence");
@@ -1994,13 +2005,18 @@ MineParams parse_mine_params(const FieldLookup& field,
                             supplied("ltl_enable_timestamp") ||
                             supplied("ltl_timestamp_diff_boundaries") ||
                             supplied("ltl_resource_key");
-  if (ltl_supplied) {
+  if(supplied("ltl_options_json")||supplied("ltl_options_file")) {
+    for(const auto name:{"ltl_variant","ltl_attribute_key","ltl_attribute_values","ltl_positive","ltl_enable_timestamp","ltl_timestamp_diff_boundaries","ltl_resource_key","ltl_attribute_values_json","ltl_attribute_values_file"})
+      if(supplied(name))throw std::invalid_argument(std::string("ltl_options_json: conflicts by presence with ")+name);
+    params.ltl=parse_exact_ltl_options_json(exact_carrier("ltl_options_json","ltl_options_file"));params.ltl_enabled=true;
+  } else if (ltl_supplied || exact_ltl) {
     LtlFilterOptions options;
     if (supplied("ltl_variant"))
       options.variant = parse_ltl_variant(field("ltl_variant"));
-    if (!supplied("ltl_attribute_values"))
+    if(exact_ltl && supplied("ltl_attribute_values"))throw std::invalid_argument("ltl_attribute_values_json: conflicts by presence with ltl_attribute_values");
+    if (!exact_ltl && !supplied("ltl_attribute_values"))
       throw std::invalid_argument("ltl_attribute_values: field is required when LTL filtering is enabled");
-    options.attribute_values =
+    options.attribute_values = exact_ltl ? parse_exact_ltl_values_json(exact_carrier("ltl_attribute_values_json","ltl_attribute_values_file")) :
         parse_strict_csv(field("ltl_attribute_values"), "ltl_attribute_values");
     if (supplied("ltl_attribute_key")) options.attribute_key = field("ltl_attribute_key");
     if (supplied("ltl_resource_key")) options.resource_key = field("ltl_resource_key");
@@ -2011,6 +2027,7 @@ MineParams parse_mine_params(const FieldLookup& field,
     if (supplied("ltl_timestamp_diff_boundaries"))
       options.timestamp_diff_boundaries = parse_ltl_boundaries(
           field("ltl_timestamp_diff_boundaries"), "ltl_timestamp_diff_boundaries");
+    if (!exact_ltl) {
     if (options.variant != LtlFilterVariant::kEventuallyFollows &&
         (options.enable_timestamp || !options.timestamp_diff_boundaries.empty()))
       throw std::invalid_argument(
@@ -2029,6 +2046,7 @@ MineParams parse_mine_params(const FieldLookup& field,
     if ((expected == 0 && options.attribute_values.empty()) ||
         (expected != 0 && options.attribute_values.size() != expected))
       throw std::invalid_argument("ltl_attribute_values: wrong number of values for selected variant");
+    }
     params.ltl = std::move(options);
     params.ltl_enabled = true;
   }
@@ -3831,6 +3849,12 @@ MineParams parse_mine_params(const FieldLookup& field,
         "batch_event_id_attribute: requires batch_variant=pandas or polars");
   }
 
+  if(exact_heuristic_pairs_requested(supplied)) {
+    if(supplied("heuristic_most_common_paths"))throw std::invalid_argument("heuristic_most_common_paths_json: conflicts by presence with heuristic_most_common_paths");
+    params.heuristic.most_common_paths=parse_exact_heuristic_pairs_json(exact_carrier("heuristic_most_common_paths_json","heuristic_most_common_paths_file"));
+  }
+  if(full_heuristic)params.heuristic=parse_exact_heuristic_options_json(exact_carrier("heuristic_options_json","heuristic_options_file"));
+  record_exact_parsed_options(params);
   return params;
 }
 

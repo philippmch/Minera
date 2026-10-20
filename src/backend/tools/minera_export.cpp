@@ -1,3 +1,6 @@
+#include "minera/exact_filter_discovery_json.hpp"
+#include <memory>
+#include <streambuf>
 #include "case_relations_input.hpp"
 // Runs the Minera core on a CSV event log and emits the analysis (event log
 // plus discovered directly-follows graph) as JSON for the frontend.
@@ -584,6 +587,15 @@ int usage(const char* program) {
             << " <event_log.csv|.xes> [options]\n"
                "  A .xes file is imported as XES; any other file as CSV.\n"
                "  -o <path>                 Write JSON to <path> instead of stdout\n"
+               "  --ltl-attribute-values-json <JSON> Exact ordered NativeString values\n"
+               "  --ltl-attribute-values-file <path> Exact values JSON File\n"
+               "  --ltl-options-json <JSON> Complete seven native LTL options\n"
+               "  --ltl-options-file <path> Complete LTL options JSON File\n"
+               "  --heuristic-most-common-paths-json <JSON> Exact NativeString pairs\n"
+               "  --heuristic-most-common-paths-file <path> Exact pair JSON File\n"
+               "  --heuristic-options-json <JSON> Complete 24 native heuristic options\n"
+               "  --heuristic-options-file <path> Complete heuristic options JSON File\n"
+               "  --exact-controls-report <path> Save byte-safe input/options/result and actual output/status sidecar\n"
                "  --case-column <name>      Case id column (default: case_id)\n"
                "  --activity-column <name>  Activity column (default: activity)\n"
                "  --timestamp-column <name> Timestamp column (default: timestamp)\n"
@@ -1841,7 +1853,40 @@ minera::BatchDiscovery discover_selected_batches(
 
 }  // namespace
 
-int run_export(int argc, char** argv) {
+namespace {
+class ExactExportTee final:public std::streambuf {
+ std::streambuf* original_;std::string& bytes_;
+ protected:int overflow(int c)override{if(c!=traits_type::eof()){bytes_+=static_cast<char>(c);return original_->sputc(static_cast<char>(c));}return traits_type::not_eof(c);}
+ std::streamsize xsputn(const char* p,std::streamsize n)override{bytes_.append(p,static_cast<std::size_t>(n));return original_->sputn(p,n);}
+ int sync()override{return original_->pubsync();}
+ public:ExactExportTee(std::streambuf* original,std::string& bytes):original_(original),bytes_(bytes){}
+};
+struct ExactExportState {
+ minera::ExactFilterDiscoveryContext context;
+ std::unique_ptr<minera::ExactFilterDiscoveryScope> scope;
+ std::map<std::string,std::string> controls;
+ std::map<std::string,unsigned> seen;
+ int raw_argc;char** raw_argv;
+ std::filesystem::path report_path,output_path;
+ std::string stdout_bytes,stderr_bytes;
+ std::streambuf* old_out=std::cout.rdbuf();std::streambuf* old_err=std::cerr.rdbuf();
+ ExactExportTee out{old_out,stdout_bytes},err{old_err,stderr_bytes};
+ ExactExportState(int argc,char** argv):raw_argc(argc),raw_argv(argv){}
+ ~ExactExportState(){if(scope){std::cout.rdbuf(old_out);std::cerr.rdbuf(old_err);}}
+ void enable(){if(!scope){scope=std::make_unique<minera::ExactFilterDiscoveryScope>(context);for(int i=0;i<raw_argc;++i)context.original_inputs.push_back({"argv_"+std::to_string(i),"",raw_argv[i],false});std::cout.rdbuf(&out);std::cerr.rdbuf(&err);}}
+ static std::string read(const std::filesystem::path& path){std::ifstream f(path,std::ios::binary);if(!f)throw std::invalid_argument("cannot read exact CLI File");std::ostringstream s;s<<f.rdbuf();if(f.bad())throw std::invalid_argument("cannot read exact CLI File");return s.str();}
+ void exact(std::string name,std::string value){enable();const bool file=name.ends_with("_file");std::string filename;if(file){const auto path=cli_path(value);const auto n=path.filename().u8string();filename.assign(n.begin(),n.end());value=read(path);}context.original_inputs.push_back({name,filename,value,file});if(!controls.emplace(name,value).second)throw std::invalid_argument("duplicate exact CLI control: "+name);}
+ bool full_heuristic()const{return controls.contains("heuristic_options_json")||controls.contains("heuristic_options_file");}
+ void validate(){if(!scope)return;for(const auto& [name,count]:seen)if(count>1)throw std::invalid_argument("duplicate exact CLI option: "+name);
+  if(full_heuristic())for(const auto& [name,count]:seen){(void)count;if((name.starts_with("--heuristic-")&&name!="--heuristic-options-json"&&name!="--heuristic-options-file")||name=="--dependency-threshold"||name=="--and-threshold"||name=="--min-edge-frequency")throw std::invalid_argument("heuristic_options_json: conflicts by presence with "+name);}
+ }
+ void finish(int status){if(report_path.empty())return;minera::record_exact_optional_artifact("cli_stdout",stdout_bytes);minera::record_exact_optional_artifact("cli_stderr",stderr_bytes);std::string body=stdout_bytes;if(status==0&&!output_path.empty()){try{body=read(output_path);}catch(const std::exception& e){minera::record_exact_optional_artifact("cli_output",e.what(),true);}}
+  const auto report=minera::exact_filter_discovery_response(context,"export",status,body);std::ofstream f(report_path,std::ios::binary);if(!f)throw std::invalid_argument("cannot open --exact-controls-report File");f<<report;f.flush();if(!f)throw std::invalid_argument("cannot write --exact-controls-report File");
+ }
+};
+}
+
+int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   std::filesystem::path input;
   std::filesystem::path output;
   std::filesystem::path pnml_output;
@@ -2220,9 +2265,14 @@ int run_export(int argc, char** argv) {
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
+    if(!arg.empty()&&arg.front()=='-')++exact.seen[std::string(arg)];
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    if(arg=="--exact-controls-report") {const auto* value=next();if(!value)return usage(argv[0]);exact.enable();if(!exact.report_path.empty())throw std::invalid_argument("duplicate --exact-controls-report");exact.report_path=cli_path(value);continue;}
+    if(arg=="--ltl-attribute-values-json"||arg=="--ltl-attribute-values-file"||arg=="--ltl-options-json"||arg=="--ltl-options-file"||arg=="--heuristic-most-common-paths-json"||arg=="--heuristic-most-common-paths-file"||arg=="--heuristic-options-json"||arg=="--heuristic-options-file") {
+      exact.enable();const auto* value=next();if(!value)throw std::invalid_argument(std::string(arg)+" requires a value");std::string name(arg.substr(2));std::replace(name.begin(),name.end(),'-','_');exact.exact(name,value);if(name.starts_with("ltl_"))ltl_fields[name]=exact.controls.at(name);continue;
+    }
     if (arg == "--heuristic-business-hours") {
       heuristic_options.use_business_hours = true;
       continue;
@@ -5396,6 +5446,19 @@ int run_export(int argc, char** argv) {
     }
   }
 
+  if(exact.scope){
+    exact.output_path=output;
+    if(!input.empty()){const auto n=input.filename().u8string();exact.context.original_inputs.push_back({"input",std::string(n.begin(),n.end()),ExactExportState::read(input),true});}
+    exact.validate();
+    const auto field=[&](std::string_view name){const auto i=exact.controls.find(std::string(name));return i==exact.controls.end()?std::string{}:i->second;};
+    const auto present=[&](std::string_view name){return exact.controls.contains(std::string(name));};
+    if(exact.full_heuristic())heuristic_options=minera::parse_mine_params(field,present).heuristic;
+    else if(minera::exact_heuristic_pairs_requested(present)) {
+      if(exact.seen.contains("--heuristic-most-common-paths"))throw std::invalid_argument("heuristic_most_common_paths_json: conflicts by presence with heuristic_most_common_paths");
+      heuristic_options.most_common_paths=minera::parse_mine_params(field,present).heuristic.most_common_paths;
+    }
+    minera::record_exact_heuristic_options(heuristic_options,true);
+  }
   if (spectrum_option_used && !spectrum_requested) {
     std::cerr << "error: --spectrum-variant/--spectrum-sample-size/"
                  "--spectrum-sort-log/--spectrum-*-key require --spectrum\n";
@@ -6330,8 +6393,11 @@ int run_export(int argc, char** argv) {
         return ltl_fields.contains(std::string(name));
       };
       const auto params = minera::parse_mine_params(lookup, present);
-      if (params.ltl_enabled && params.ltl)
+      if (params.ltl_enabled && params.ltl) {
+        minera::record_exact_source(log,false);
         log = minera::filter_ltl_event_log(log, *params.ltl);
+        minera::record_exact_source(log,true);
+      }
     }
     if (!token_replay_model.empty()) {
       if (!ends_with_ci(cli_path_text(input), ".csv") && !is_xes_path(input))
@@ -7256,8 +7322,7 @@ int run_export(int argc, char** argv) {
                                       alpha_options.activity_attribute);
     for (const auto& activity : net.activities())
       graph.ensure_activity(activity);
-    const auto heuristics =
-        minera::discover_heuristics_net(log, heuristic_options);
+    const auto heuristics = minera::observe_exact_heuristic_call(minera::EventDataView(log),heuristic_options,[&]{return minera::discover_heuristics_net(log, heuristic_options);});
     const auto powl = minera::discover_powl(log, powl_options);
     register_powl_labels(graph, powl);
     const auto powl_log = project_powl_activity(
@@ -8379,6 +8444,8 @@ int run_export(int argc, char** argv) {
 
   return 0;
 }
+
+int run_export(int argc,char** argv){ExactExportState exact(argc,argv);int status=1;try{status=run_export_impl(argc,argv,exact);}catch(const std::exception& e){if(!exact.scope)throw;std::cerr<<"error: "<<e.what()<<'\n';status=1;}try{exact.finish(status);}catch(const std::exception& e){std::cerr<<"error: "<<e.what()<<'\n';return 1;}return status;}
 
 #ifdef _WIN32
 int wmain(int argc, wchar_t** argv) {
