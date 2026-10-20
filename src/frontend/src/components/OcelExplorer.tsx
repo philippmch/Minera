@@ -1,3 +1,4 @@
+import { OcpnDiscoveryControls } from "./OcpnDiscoveryControls";
 import { useState } from "react";
 import { type OcelDiscoveryResult } from "../types";
 import { type OcelDiscoveryOptions } from "../api";
@@ -43,6 +44,7 @@ export function OcelExplorer({ result, busy, onDiscover }: OcelExplorerProps) {
         <label>Activity attribute<input aria-label="OCEL activity attribute" disabled={busy} value={settings.activityAttribute} placeholder="Default activity" onChange={e => setSettings({...settings,activityAttribute:e.target.value})} /></label>
         <label>Object-type attribute<input aria-label="OCEL object-type attribute" disabled={busy} value={settings.objectTypeAttribute} placeholder="Default object type" onChange={e => setSettings({...settings,objectTypeAttribute:e.target.value})} /></label>
         {selected === "ocpn" && <>
+          <OcpnDiscoveryControls scope="OCEL discovery" options={settings.ocpnDiscovery} disabled={busy} onChange={ocpnDiscovery => setSettings({...settings,ocpnDiscovery})} />
           <label className="ocel-check"><input type="checkbox" disabled={busy} checked={settings.annotated} onChange={e => setSettings({...settings,annotated:e.target.checked})} />Model annotations</label>
           <label className="ocel-check"><input type="checkbox" disabled={busy} checked={settings.replayDiagnostics} onChange={e => setSettings({...settings,replayDiagnostics:e.target.checked})} />Replay diagnostics</label>
         </>}
