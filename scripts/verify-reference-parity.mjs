@@ -170,7 +170,9 @@ function maskRange(buffer, source, begin, end) {
 }
 
 function maskCommentsAndLiterals(source) {
-  const buffer = [...source];
+  // All cursor and RegExp offsets below use UTF-16 code units. Iterating code
+  // points shifts masks after an astral character and can hide later calls.
+  const buffer = source.split("");
   for (let index = 0; index < source.length;) {
     const raw = source.slice(index).match(/^(?:u8|u|U|L)?R"([^\s()\\]{0,16})\(/u);
     if (raw) {
