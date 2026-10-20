@@ -11390,8 +11390,29 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/infix-to-regex-parity-contract.md",
+      "artifacts": [
+        "include/minera/infix_to_regex.hpp",
+        "src/backend/infix_to_regex.cpp",
+        "src/backend/tests/test_infix_to_regex.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.common.traces.infix_to_regex",
+        "implementation": [
+          {
+            "path": "src/backend/infix_to_regex.cpp",
+            "symbol": "translate_infix_to_regex"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_infix_to_regex.cpp",
+            "executable": "minera_infix_to_regex_tests",
+            "case": "infix_to_regex_module_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.dfg.dfg_filtering",
