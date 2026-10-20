@@ -1,3 +1,4 @@
+import {hasExactKnowledge,exactKnowledgeQuery,requestExactKnowledge,type ExactKnowledgeRequest,type ExactKnowledgeEnvelope,type KnowledgeRequest} from "./exact-knowledge";
 import {requireExactOtgEnvelope,OTG_THRESHOLD_FIELD,appendOtgThresholds,otgThresholdQueryText,validateOtgThresholdOptions,bindOtgConformanceMetadata} from "./otg-thresholds";
 import {parseNativeJson} from "./native-json";
 import { appendOcpnDiscoveryFlags, type OcpnDiscoveryFlags } from "./ocpn-discovery-options";
@@ -7268,7 +7269,8 @@ export async function requestOcelConformance(
   return payload;
 }
 
-export function knowledgeInjectionQuery(options: import("./types").KnowledgeInjectionOptions = {}): string {
+export function knowledgeInjectionQuery(options: KnowledgeRequest = {}): string {
+  if (hasExactKnowledge(options)) return exactKnowledgeQuery(options);
   const query = new URLSearchParams();
   const variant = options.knowledge_variant;
   if (variant !== undefined && !["description", "process_mining", "database"].includes(variant))
@@ -7282,14 +7284,17 @@ export function knowledgeInjectionQuery(options: import("./types").KnowledgeInje
   if (options.knowledge_description !== undefined) query.set("knowledge_description", options.knowledge_description);
   if (options.knowledge_query !== undefined) query.set("knowledge_query", options.knowledge_query);
   if (options.knowledge_database_schema !== undefined) query.set("knowledge_database_schema", options.knowledge_database_schema);
-  positive("knowledge_max_input_bytes", options.knowledge_max_input_bytes);
-  positive("knowledge_max_prompt_bytes", options.knowledge_max_prompt_bytes);
+  positive("knowledge_max_input_bytes", options.knowledge_max_input_bytes as number | undefined);
+  positive("knowledge_max_prompt_bytes", options.knowledge_max_prompt_bytes as number | undefined);
   return query.toString();
 }
 
+export function requestKnowledgeInjection(options: ExactKnowledgeRequest): Promise<ExactKnowledgeEnvelope>;
+export function requestKnowledgeInjection(options?: import("./types").KnowledgeInjectionOptions): Promise<import("./types").KnowledgeInjectionResult>;
 export async function requestKnowledgeInjection(
-  options: import("./types").KnowledgeInjectionOptions = {},
-): Promise<import("./types").KnowledgeInjectionResult> {
+  options: KnowledgeRequest = {},
+): Promise<import("./types").KnowledgeInjectionResult | ExactKnowledgeEnvelope> {
+  if (hasExactKnowledge(options)) return requestExactKnowledge(options);
   const query = knowledgeInjectionQuery(options);
   const response = await fetch(`/api/knowledge-injection${query ? `?${query}` : ""}`, { method: "POST" });
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
