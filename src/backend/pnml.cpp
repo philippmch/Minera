@@ -909,8 +909,9 @@ PnmlDocument parse_pnml_document(std::string_view xml,
 
   // Assemble the net: visible transitions with the same label share an
   // activity, in first-seen order.
-  PetriNet net;
-  for (std::size_t i = 0; i < places.size(); ++i) net.add_place();
+  PetriNetLiteralStorage storage;
+  storage.place_count = places.size();
+  storage.transitions.reserve(transitions.size());
 
   std::vector<std::string> activities;
   std::unordered_map<std::string, std::size_t> activity_ids;
@@ -992,14 +993,16 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       if (inserted) activities.push_back(parsed.label);
       activity = it->second;
     }
-    net.add_transition(activity, std::move(inputs[t]), std::move(outputs[t]));
-    if (compact[t]) net.set_ordinary_arc_weights(t,std::move(input_weights[t]),std::move(output_weights[t]));
-    for (std::size_t i = 0; i < reset_inputs[t].size(); ++i)
-      net.add_reset_arc(t, reset_inputs[t][i], reset_weights[t][i].magnitude, reset_weights[t][i].negative);
-    for (std::size_t i = 0; i < inhibitor_inputs[t].size(); ++i)
-      net.add_inhibitor_arc(t, inhibitor_inputs[t][i], inhibitor_weights[t][i].magnitude, inhibitor_weights[t][i].negative);
+    // The parsed document owns distinct typed arc objects. Incremental net
+    // mutators intentionally reject mixed/parallel extended arcs, but those
+    // editing restrictions must not discard a valid imported graph.
+    storage.transitions.push_back(PetriTransition{activity, std::move(inputs[t]),
+        std::move(outputs[t]), std::move(reset_inputs[t]), std::move(inhibitor_inputs[t]),
+        std::move(reset_weights[t]), std::move(inhibitor_weights[t]),
+        std::move(input_weights[t]), std::move(output_weights[t])});
   }
-  net.set_activities(std::move(activities));
+  storage.activities = std::move(activities);
+  PetriNet net = PetriNet::from_literal_storage(std::move(storage));
 
   PnmlDocument document;
   document.arc_occurrences = std::move(arc_occurrences);

@@ -4,6 +4,7 @@
 #include "minera/json_export.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/pnml.hpp"
+#include "minera/quality_workbench_json.hpp"
 #include "minera/playout.hpp"
 #include "../tools/pnml_model_options.hpp"
 
@@ -512,6 +513,71 @@ void pnml_document_export_preserves_xml_whitespace() {
   assert(restored.net.transitions()[1].outputs == std::vector<std::size_t>({3}));
 }
 
+// Import full typed arc objects without applying incremental-edit restrictions.
+void pnml_mixed_input_arc_occurrences() {
+  struct Input { PetriArcType type; std::string weight; };
+  const std::vector<std::vector<Input>> cases = {
+    {{PetriArcType::kNormal,"2"},{PetriArcType::kReset,"3"}},
+    {{PetriArcType::kNormal,"2"},{PetriArcType::kInhibitor,"5"}},
+    {{PetriArcType::kReset,"3"},{PetriArcType::kInhibitor,"5"}},
+    {{PetriArcType::kNormal,"2"},{PetriArcType::kReset,"3"},{PetriArcType::kInhibitor,"5"}},
+    {{PetriArcType::kReset,"3"},{PetriArcType::kReset,"4"}},
+    {{PetriArcType::kInhibitor,"5"},{PetriArcType::kInhibitor,"6"}},
+    {{PetriArcType::kNormal,"-0"},{PetriArcType::kReset,"-7"},
+     {PetriArcType::kInhibitor,"1844674407370955161600000000000000000000"}}
+  };
+  for (const auto& inputs : cases) {
+    std::string xml="<pnml><net id=\"mixed\"><page id=\"page\">"
+      "<place id=\"source\"><initialMarking><text>2</text></initialMarking></place>"
+      "<place id=\"sink\"/><transition id=\"move\"><name><text>A</text></name></transition>";
+    std::size_t resets=0,inhibitors=0;
+    for (std::size_t i=0;i<inputs.size();++i) {
+      const auto& arc=inputs[i];
+      xml+="<arc id=\"input-"+std::to_string(i)+"&#10;&amp;\" source=\"source\" target=\"move\">"
+        "<inscription><text>"+arc.weight+"</text></inscription>";
+      if (arc.type==PetriArcType::kReset) {xml+="<arctype><text>reset</text></arctype>";++resets;}
+      if (arc.type==PetriArcType::kInhibitor) {xml+="<arctype><text>inhibitor</text></arctype>";++inhibitors;}
+      xml+="</arc>";
+    }
+    xml+="<arc id=\"output\" source=\"move\" target=\"sink\"/></page>"
+      "<finalmarkings><marking><place idref=\"sink\"><text>1</text></place></marking></finalmarkings></net></pnml>";
+    const auto document=parse_pnml_document(xml);
+    assert(document.arc_occurrences&&document.arc_occurrences->size()==inputs.size()+1);
+    const auto& transition=document.net.transitions().at(0);
+    assert(transition.reset_inputs.size()==resets&&transition.inhibitor_inputs.size()==inhibitors);
+    for(std::size_t i=0;i<inputs.size();++i) {
+      const auto& arc=document.arc_occurrences->at(i);
+      const TokenInteger signed_weight(inputs[i].weight);
+      assert(arc.input&&arc.place==0&&arc.transition==0&&arc.type==inputs[i].type);
+      assert(arc.weight==(signed_weight<0?-signed_weight:signed_weight));
+      assert(arc.negative_weight==(signed_weight<0));
+      assert(arc.id=="input-"+std::to_string(i)+"\n&");
+    }
+    const auto before=serialize_quality_workbench_document_json(document);
+    const auto graph=to_petri_net_presentation(document);
+    assert(graph.arcs.size()==inputs.size()+1);
+    const auto restored=parse_pnml_document(to_pnml(document));
+    assert(serialize_quality_workbench_document_json(restored)==before);
+    assert(serialize_quality_workbench_document_json(document)==before);
+
+    const auto rejects_without_mutation=[](const PnmlDocument& invalid) {
+      const auto before=serialize_quality_workbench_document_json(invalid);
+      std::ostringstream out;out<<"untouched";bool rejected=false;
+      try{write_pnml(out,invalid);}catch(const std::invalid_argument&){rejected=true;}
+      assert(rejected&&out.str()=="untouched");
+      rejected=false;try{(void)to_petri_net_presentation(invalid);}catch(const std::invalid_argument&){rejected=true;}
+      assert(rejected&&serialize_quality_workbench_document_json(invalid)==before);
+    };
+    auto invalid=document;invalid.arc_occurrences->at(0).transition=99;rejects_without_mutation(invalid);
+    invalid=document;invalid.arc_occurrences->at(0).weight+=1;rejects_without_mutation(invalid);
+    invalid=document;invalid.arc_occurrences->pop_back();rejects_without_mutation(invalid);
+  }
+  // This fixes import assembly; the existing incremental editing policy stays.
+  PetriNet edited;edited.add_place();edited.add_place();edited.add_transition(0,{0},{1});
+  bool rejected=false;try{edited.add_reset_arc(0,0);}catch(const std::invalid_argument&){rejected=true;}
+  assert(rejected&&edited.transitions()[0].reset_inputs.empty());
+}
+
 void pnml_document_preserves_arc_occurrences() {
   const auto document = parse_pnml_document(R"(<pnml><net id="parallel"><page id="page">
     <place id="p0"><initialMarking><text>3</text></initialMarking></place>
@@ -960,6 +1026,7 @@ int main() {
   pnml_document_export_rejects_atomically();
   pnml_document_export_retains_routing_order();
   pnml_document_export_preserves_xml_whitespace();
+  pnml_mixed_input_arc_occurrences();
   pnml_document_preserves_arc_occurrences();
   equation_guard_and_workflow_topology();
   normal_alignment_smoke();
