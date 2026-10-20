@@ -19,19 +19,20 @@ interaction remains unverified under the previously recorded browser block.
 | --- | --- |
 | Arc-degree simplicity module | 120 retained public selector records covering 102 numeric states; exact scalar, identity, arc occurrence, baseline and input invariants; assertion-enabled focused and full evaluation contract checks |
 | Extended Cardoso simplicity module | All 264 retained public graph fixtures, graph permutations, identities, inactive options, diagnostics and PNML entry points; assertion-enabled focused check |
+| Start/end activity common helpers | 76 public sorting/threshold observations; stable mapping ties, adaptive scans, nonfinite factors and exact uint64 comparisons; assertion-enabled native check |
 
 These are semantic module closures for existing implementations. They do not
 claim new algorithms or completion of the simplicity dispatcher. The detailed
 contracts and evidence limits are in [simplicity-parity-contract.md](simplicity-parity-contract.md).
 
-Coverage is now **46 complete / 40 partial packages**, **201 complete / 186
-partial modules**, and **226 open strict coverage units**, down from 228.
+Coverage is now **46 complete / 40 partial packages**, **203 complete / 184
+partial modules**, and **224 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 
 ## Active requirements
 
-- Close common start/end activity frequency and threshold behavior.
+- Close literal infix-pattern conversion to a regular expression.
 - Close the object-interaction graph relation against direct public edge sets.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in

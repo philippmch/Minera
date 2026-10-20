@@ -11304,8 +11304,33 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/filtering-boundary-common-parity-contract.md",
+      "artifacts": [
+        "include/minera/filtering_boundary_common.hpp",
+        "src/backend/filtering_boundary_common.cpp",
+        "src/backend/tests/test_filtering_boundary_common.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.common.end_activities.end_activities_common",
+        "implementation": [
+          {
+            "path": "src/backend/filtering_boundary_common.cpp",
+            "symbol": "get_sorted_end_activities_list"
+          },
+          {
+            "path": "src/backend/filtering_boundary_common.cpp",
+            "symbol": "get_end_activities_threshold"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_filtering_boundary_common.cpp",
+            "executable": "minera_filtering_boundary_common_tests",
+            "case": "filtering_end_activities_common_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.common.filtering_constants",
@@ -11322,8 +11347,33 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/filtering-boundary-common-parity-contract.md",
+      "artifacts": [
+        "include/minera/filtering_boundary_common.hpp",
+        "src/backend/filtering_boundary_common.cpp",
+        "src/backend/tests/test_filtering_boundary_common.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.common.start_activities.start_activities_common",
+        "implementation": [
+          {
+            "path": "src/backend/filtering_boundary_common.cpp",
+            "symbol": "get_sorted_start_activities_list"
+          },
+          {
+            "path": "src/backend/filtering_boundary_common.cpp",
+            "symbol": "get_start_activities_threshold"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_filtering_boundary_common.cpp",
+            "executable": "minera_filtering_boundary_common_tests",
+            "case": "filtering_start_activities_common_acceptance"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.common.timestamp.timestamp_common",

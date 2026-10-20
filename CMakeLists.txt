@@ -29,6 +29,7 @@ add_library(minera_core
   src/backend/attribute_distribution.cpp
   src/backend/attribute_kde.cpp
   src/backend/boundary_activities.cpp
+  src/backend/filtering_boundary_common.cpp
   src/backend/attribute_value_repetition.cpp
   src/backend/case_grouping.cpp
   src/backend/chaotic_activities.cpp
@@ -931,6 +932,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_boundary_activities_tests PRIVATE cxx_std_20)
   target_compile_options(minera_boundary_activities_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_boundary_activities_tests COMMAND minera_boundary_activities_tests)
+
+  add_executable(minera_filtering_boundary_common_tests
+    src/backend/tests/test_filtering_boundary_common.cpp
+  )
+  target_link_libraries(minera_filtering_boundary_common_tests PRIVATE minera::core)
+  target_compile_features(minera_filtering_boundary_common_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_filtering_boundary_common_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_filtering_boundary_common_tests
+           COMMAND minera_filtering_boundary_common_tests)
 
   add_executable(minera_variant_statistics_tests src/backend/tests/test_variant_statistics.cpp)
   target_link_libraries(minera_variant_statistics_tests PRIVATE minera::core)
