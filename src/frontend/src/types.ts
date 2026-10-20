@@ -1727,6 +1727,7 @@ export interface OcelConformanceResult {
 export type OcelFilterVariant =
   | "EVENT_ATTRIBUTE" | "OBJECT_ATTRIBUTE" | "OBJECT_TYPES" | "OBJECTS"
   | "EVENTS" | "TIMESTAMP" | "ACTIVITY_TYPE_MATCHING" | "OBJECT_COUNT"
+  | "EVENT_ATTRIBUTE_EXACT" | "TIMESTAMP_EXACT" | "OBJECT_COUNT_EXACT"
   | "START_EVENTS" | "END_EVENTS" | "ACTIVITIES_OBJECT_TYPE" | "CC_OBJECT"
   | "CC_LENGTH" | "CC_OBJECT_TYPE" | "CC_ACTIVITY";
 export interface OcelFilterResult {
@@ -1906,6 +1907,7 @@ export function isOcelFilterResult(value: unknown): value is OcelFilterResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_FILTER" ||
       !["EVENT_ATTRIBUTE", "OBJECT_ATTRIBUTE", "OBJECT_TYPES", "OBJECTS",
         "EVENTS", "TIMESTAMP", "ACTIVITY_TYPE_MATCHING", "OBJECT_COUNT",
+        "EVENT_ATTRIBUTE_EXACT", "TIMESTAMP_EXACT", "OBJECT_COUNT_EXACT",
         "START_EVENTS", "END_EVENTS", "ACTIVITIES_OBJECT_TYPE", "CC_OBJECT",
         "CC_LENGTH", "CC_OBJECT_TYPE", "CC_ACTIVITY"].includes(String(value.variant)) ||
       !isOcelRecord(value.log)) return false;

@@ -6478,12 +6478,19 @@ export async function requestOcelFlatten(
 export type OcelFilterSelector =
   | "event_attribute" | "object_attribute" | "object_types" | "objects"
   | "events" | "timestamp" | "activity_type_matching" | "object_count"
+  | "event_attribute_exact" | "timestamp_exact" | "object_count_exact"
   | "start_events" | "end_events" | "activities_object_type" | "cc_object"
   | "cc_length" | "cc_object_type" | "cc_activity";
 export interface OcelFilterOptions {
   variant?: OcelFilterSelector;
   attribute_key?: string;
   attribute_values?: Array<string | number | boolean | null>;
+  attribute_values_json?: string;
+  column_kind?: "auto" | "scalar" | "timestamp";
+  timestamp_key?: string;
+  from_json?: string;
+  to_json?: string;
+  minimum_counts_json?: string;
   positive?: boolean;
   types?: string[];
   ids?: string[];
@@ -6504,6 +6511,12 @@ export function ocelFilterQuery(options: OcelFilterOptions = {}): string {
   const query = new URLSearchParams();
   if (options.variant !== undefined) query.set("variant", options.variant);
   if (options.attribute_key !== undefined) query.set("attribute_key", options.attribute_key);
+  for (const key of ["attribute_values_json", "timestamp_key", "from_json", "to_json", "minimum_counts_json"] as const)
+    if (options[key] !== undefined) query.set(key, options[key]);
+  if (options.column_kind !== undefined) {
+    if (!["auto", "scalar", "timestamp"].includes(options.column_kind)) throw new Error("OCEL event column kind must be auto, scalar or timestamp");
+    query.set("column_kind", options.column_kind);
+  }
   const escapePart = (value: string) => value.replaceAll("\\", "\\\\")
     .replaceAll(",", "\\,").replaceAll(":", "\\:")
     .replaceAll(";", "\\;").replaceAll("|", "\\|");
@@ -6574,7 +6587,8 @@ export async function requestOcelFilter(
     body: form,
   });
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
-  const payload: unknown = await response.json();
+  const raw = typeof response.text === "function" ? await response.text() : undefined;
+  const payload: unknown = raw !== undefined ? parseNativeJson(raw) : await response.json();
   if (!isOcelFilterResult(payload)) throw new Error("the Minera backend returned an invalid OCEL filter result");
   return payload;
 }
