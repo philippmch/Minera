@@ -1,3 +1,4 @@
+import {parseDiscoveryStringVector, discoveryStringVectorJson, type DiscoveryVectorMode} from "./discovery-string-vectors";
 import { DECLARE_TEMPLATES, isMineraExport, type MineraExport } from "./types";
 import type { LogQuerySchema } from "./log-query";
 import { nativeJson } from "./native-json";
@@ -9,13 +10,13 @@ export const SKELETON_FAMILIES = ["equivalence", "always_after", "always_before"
 export interface ConstraintForm {
   activity: string; conformanceActivity: string; diagnosticsCase: string;
   selection: "native" | "selected"; templates: string[];
-  activitySelection: "native" | "selected"; activities: string;
+  activitySelection: "native" | "selected"; activities: string; activitiesMode: DiscoveryVectorMode; activitiesJson: string;
   support: string; confidence: string; multiplier: string; noise: string;
   generateLog: boolean; traces: string; minimum: string; maximum: string; seed: string;
 }
 export function defaultConstraintForm(family: ConstraintFamily): ConstraintForm {
   return {activity:"", conformanceActivity:"", diagnosticsCase:"", selection:"native", templates:[...(family === "declare" ? DECLARE_TEMPLATES : SKELETON_FAMILIES)],
-    activitySelection:"native", activities:"", support:"", confidence:"", multiplier:"", noise:"", generateLog:false, traces:"", minimum:"", maximum:"", seed:""};
+    activitySelection:"native", activities:"", activitiesMode:"legacy", activitiesJson:"[]", support:"", confidence:"", multiplier:"", noise:"", generateLog:false, traces:"", minimum:"", maximum:"", seed:""};
 }
 export function constraintQuery(family: ConstraintFamily, form: ConstraintForm, sourceId: string): URLSearchParams {
   if (!sourceId) throw new Error("Refresh the constraint source first.");
@@ -35,7 +36,10 @@ export function constraintQuery(family: ConstraintFamily, form: ConstraintForm, 
     q.set(key,text.trim());
   };
   if (family === "declare") {
-    if (form.activitySelection === "selected") q.set("declare_considered_activities", form.activities.split(",").map(x=>x.trim()).filter(Boolean).join(","));
+    if (form.activitySelection === "selected") {
+      if (form.activitiesMode === "literal_json") q.set("declare_considered_activities_json", discoveryStringVectorJson(parseDiscoveryStringVector(form.activitiesJson, "Declare considered activities"), "Declare considered activities"));
+      else q.set("declare_considered_activities", form.activities.split(",").map(x=>x.trim()).filter(Boolean).join(","));
+    }
     ratio("declare_min_support_ratio",form.support); ratio("declare_min_confidence_ratio",form.confidence); ratio("declare_auto_selection_multiplier",form.multiplier);
     if (form.generateLog) {
       q.set("generate_log","true");

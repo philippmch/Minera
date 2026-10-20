@@ -151,6 +151,8 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
         options.logSkeletonNoiseThreshold !== 0 ||
       logSkeletonConstraintsActive ||
       options.declareConsideredActivities?.length ||
+      options.declareConsideredActivitiesExact !== undefined ||
+      options.dfgCaseAttributesExact !== undefined ||
       declareAllowedTemplatesActive ||
       options.declareMinSupportRatio !== undefined ||
       options.declareMinConfidenceRatio !== undefined ||

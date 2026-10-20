@@ -1,3 +1,4 @@
+import {parseDiscoveryStringVector, discoveryStringVectorJson, type DiscoveryVectorMode} from "./discovery-string-vectors";
 import { isMineraExport,type MineraExport } from "./types";
 import { nativeCell,nativeJson } from "./native-json";
 import { nativeResponseJson,readNativeResponse } from "./native-response";
@@ -7,8 +8,8 @@ export const DFG_STATISTICAL=['native','frequency','frequency_greedy','frequency
 export const DFG_CAUSAL=['alpha','heuristic'] as const;
 export const DFG_AGGREGATIONS=['mean','median','min','max','stdev','sum','raw_values','all'] as const;
 export type DfgNativeSwitch='native'|'true'|'false';
-export interface DfgDiscoveryForm {statistical:string[];causal:string[];window:string;keep:DfgNativeSwitch;activity:string;timestamp:string;start:string;overrideStart:boolean;aggregation:string;business:DfgNativeSwitch;overrideSlots:boolean;slots:string;overrideAttributes:boolean;attributes:string;nodes:DfgNativeSwitch;}
-export const defaultDfgDiscoveryForm=():DfgDiscoveryForm=>({statistical:['frequency'],causal:[],window:'',keep:'native',activity:'',timestamp:'',start:'',overrideStart:false,aggregation:'native',business:'native',overrideSlots:false,slots:'',overrideAttributes:false,attributes:'',nodes:'native'});
+export interface DfgDiscoveryForm {statistical:string[];causal:string[];window:string;keep:DfgNativeSwitch;activity:string;timestamp:string;start:string;overrideStart:boolean;aggregation:string;business:DfgNativeSwitch;overrideSlots:boolean;slots:string;overrideAttributes:boolean;attributes:string;attributesMode:DiscoveryVectorMode;attributesJson:string;nodes:DfgNativeSwitch;}
+export const defaultDfgDiscoveryForm=():DfgDiscoveryForm=>({statistical:['frequency'],causal:[],window:'',keep:'native',activity:'',timestamp:'',start:'',overrideStart:false,aggregation:'native',business:'native',overrideSlots:false,slots:'',overrideAttributes:false,attributes:'',attributesMode:'legacy',attributesJson:'["concept:name"]',nodes:'native'});
 const selected=(catalog:readonly string[],choices:string[])=>{if(choices.some(c=>!catalog.includes(c)))throw new Error('Select supported native DFG variants.');return catalog.filter(c=>choices.includes(c));};
 export function dfgDiscoveryQuery(form:DfgDiscoveryForm,sourceId:string):URLSearchParams {
   if(!sourceId)throw new Error('Refresh the DFG discovery source first.');
@@ -18,7 +19,7 @@ export function dfgDiscoveryQuery(form:DfgDiscoveryForm,sourceId:string):URLSear
   const text=(key:string,value:string)=>{if(value.trim())q.set(key,value.trim());};const flag=(key:string,value:DfgNativeSwitch)=>{if(!['native','true','false'].includes(value))throw new Error('Select a native boolean setting.');if(value!=='native')q.set(key,value);};
   text('dfg_activity_attribute',form.activity);text('dfg_timestamp_attribute',form.timestamp);if(form.overrideStart)q.set('dfg_start_timestamp_attribute',form.start.trim());else text('dfg_start_timestamp_attribute',form.start);
   if(form.aggregation!=='native'){if(!(DFG_AGGREGATIONS as readonly string[]).includes(form.aggregation))throw new Error('Select a native performance aggregation.');q.set('dfg_performance_aggregation',form.aggregation);}
-  flag('dfg_keep_once_per_case',form.keep);flag('dfg_business_hours',form.business);flag('dfg_return_node_attributes',form.nodes);if(form.overrideSlots)q.set('dfg_business_hour_slots',form.slots.trim());if(form.overrideAttributes)q.set('dfg_case_attributes',form.attributes.trim());return q;
+  flag('dfg_keep_once_per_case',form.keep);flag('dfg_business_hours',form.business);flag('dfg_return_node_attributes',form.nodes);if(form.overrideSlots)q.set('dfg_business_hour_slots',form.slots.trim());if(form.overrideAttributes){if(form.attributesMode==='literal_json')q.set('dfg_case_attributes_json',discoveryStringVectorJson(parseDiscoveryStringVector(form.attributesJson,'DFG case attributes'),'DFG case attributes'));else q.set('dfg_case_attributes',form.attributes.trim());}return q;
 }
 export interface DfgDiscovery {family:'DFG_DISCOVERY';source_id:string;dataset:string;source:{case_count:number;event_count:number};input_origin:'cached_source_log';statistical_variants:string[];causal_variants:string[];result:MineraExport;}
 const record=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);

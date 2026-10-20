@@ -1,3 +1,4 @@
+import {DiscoveryVectorInput} from "./DiscoveryVectorInput";
 import { useEffect, useRef, useState } from "react";
 import { DECLARE_TEMPLATES, type MineraExport } from "../types";
 import { defaultConstraintForm, runConstraintDiscovery, SKELETON_FAMILIES, type ConstraintFamily, type ConstraintForm, type ConstraintRun } from "../constraint-discovery";
@@ -32,7 +33,7 @@ export function ConstraintDiscovery({family,data,available,mining,onOpenLog}:{fa
         <label>Constraint family selection<select value={form.selection} onChange={event=>change('selection',event.target.value as ConstraintForm['selection'])}><option value="native">Native default</option><option value="selected">Selected families (including none)</option></select></label>
         {family === "declare" ? <>
           <label>Declare activity selection<select value={form.activitySelection} onChange={event=>change('activitySelection',event.target.value as ConstraintForm['activitySelection'])}><option value="native">Infer from source</option><option value="selected">Explicit activities (including none)</option></select></label>
-          {form.activitySelection === "selected"&&<label>Declare considered activities<input value={form.activities} placeholder="comma separated; blank selects none" onChange={event=>change('activities',event.target.value)}/></label>}
+          {form.activitySelection === "selected"&&<DiscoveryVectorInput label="Declare considered activities" mode={form.activitiesMode} legacyValue={form.activities} literalValue={form.activitiesJson} onMode={value=>change('activitiesMode',value)} onLegacy={value=>change('activities',value)} onLiteral={value=>change('activitiesJson',value)}/>}
           {([['support','Declare minimum support ratio'],['confidence','Declare minimum confidence ratio'],['multiplier','Declare automatic selection multiplier']] as const).map(([key,label])=><label key={key}>{label}<input value={form[key]} placeholder={key === 'multiplier' ? '0.8 (automatic selection)' : 'native automatic selection'} onChange={event=>change(key,event.target.value)}/></label>)}
         </> : <label>Log Skeleton noise threshold<input value={form.noise} placeholder="0" onChange={event=>change('noise',event.target.value)}/></label>}
       </div>
