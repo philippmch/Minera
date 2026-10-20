@@ -1,4 +1,5 @@
 #include "minera/exact_filter_discovery_json.hpp"
+#include "minera/case_description_workbench_json.hpp"
 #include "case_relations_input.hpp"
 #include "case_relations_typed_input.hpp"
 // Local application server: serves the built frontend and mines uploaded
@@ -4092,6 +4093,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_features_route.hpp"
 #include "original_label_splitting_route.hpp"
 #include "original_log_query_route.hpp"
+#include "case_description_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
 #include "original_decision_route.hpp"
@@ -10651,7 +10653,8 @@ int main(int argc, char** argv) {
   server.Post("/api/log-query/export",handle_log_query_export);
   server.Post("/api/log-cluster",handle_log_cluster);
   server.Post("/api/llm-context",[](const httplib::Request& request,httplib::Response& response){
-    if(request_uses_original_model_context(request))handle_original_model_context(request,response);
+    if(request_uses_supplied_case_context(request))handle_supplied_case_context(request,response);
+    else if(request_uses_original_model_context(request))handle_original_model_context(request,response);
     else handle_llm_context(request,response);
   });
   server.Post("/api/local-diagnostics", handle_local_diagnostics);

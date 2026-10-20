@@ -12691,8 +12691,41 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/case-description-audit.md",
+      "artifacts": [
+        "include/minera/case_description.hpp",
+        "include/minera/case_description_workbench_json.hpp",
+        "src/backend/case_description.cpp",
+        "src/backend/case_description_workbench_json.cpp",
+        "src/backend/tools/case_description_route.hpp",
+        "src/backend/tests/test_case_description.cpp",
+        "src/backend/tests/case_description_public_vectors.inc"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.case_to_descr",
+        "implementation": [
+          {
+            "path": "include/minera/case_description.hpp",
+            "symbol": "abstract_case"
+          },
+          {
+            "path": "include/minera/case_description_workbench_json.hpp",
+            "symbol": "parse_case_description_json"
+          },
+          {
+            "path": "include/minera/case_description_workbench_json.hpp",
+            "symbol": "execute_supplied_case_context"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_case_description.cpp",
+            "executable": "minera_case_description_tests",
+            "case": "configuration"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.declare_to_descr",
