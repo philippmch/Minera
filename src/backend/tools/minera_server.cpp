@@ -94,6 +94,9 @@
 #include "minera/emd_workbench_json.hpp"
 #include "minera/object_centric_playout_workbench_json.hpp"
 #include "minera/literal_controls_json.hpp"
+#include "minera/replay_duration_workbench_json.hpp"
+#include "minera/token_replay_duration_error.hpp"
+#include "minera/token_replay_error.hpp"
 #include "minera/edit_distance_workbench_json.hpp"
 #include "minera/bose_workbench_json.hpp"
 #include "minera/discovery_workbench_json.hpp"
@@ -5770,6 +5773,8 @@ void handle_token_replay_workbench(const httplib::Request& request,
   }
 }
 
+#include "replay_duration_route.hpp"
+
 // Alignment uses independent original inputs; the cached mining session is
 // neither required nor changed. Flat CSV adapters retain the parser's rows.
 void handle_petri_alignment_workbench(const httplib::Request& request,
@@ -10540,6 +10545,7 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
   server.Options("/api/token-replay", preflight);
   server.Options("/api/replay-token-workbench", preflight);
+  server.Options("/api/analyze-replay-duration-workbench", preflight);
   server.Options("/api/align-petri-workbench", preflight);
   server.Options("/api/align-graph-workbench", preflight);
   server.Options("/api/discover-inductive-input", preflight);
@@ -10714,6 +10720,7 @@ int main(int argc, char** argv) {
   server.Post("/api/check-model", handle_check_model);
   server.Post("/api/token-replay", handle_token_replay);
   server.Post("/api/replay-token-workbench", handle_token_replay_workbench);
+  server.Post("/api/analyze-replay-duration-workbench", handle_replay_duration_workbench);
   server.Post("/api/align-petri-workbench", handle_petri_alignment_workbench);
   server.Post("/api/align-graph-workbench", handle_graph_alignment_workbench);
   server.Post("/api/replay-fitness", handle_replay_fitness);
