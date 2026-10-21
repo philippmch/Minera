@@ -12258,7 +12258,7 @@
       "classification": "internal-variant",
       "selectors": [],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/polars-variants-filter-parity-contract.md"
     },
     {
       "module": "algo.label_splitting.variants.contextual",
