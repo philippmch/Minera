@@ -49,12 +49,15 @@ retained; see
 
 Between-activity extraction now has independent log, pandas and Polars native
 companions, with complete result downloads and usable log/table controls.
-All 641 representable outcomes from 642 distinct public calls pass: 169 log,
-139 pandas and 333 Polars. The pandas missing-argument call is outside the C++
+All 689 representable outcomes from 690 distinct public calls pass: 189 log,
+157 pandas and 343 Polars. The pandas missing-argument call is outside the C++
 signature. Acceptance preserves raw endpoint equality, dtype-specific missing
-cases, adjacent nanoseconds and Polars lexical segment numbering. Seven native
-suites, 9,711 frontend tests, TypeScript, Vite and 33 final production HTTP
-requests pass. Earlier failures and the byte-identical diagnostic literal
+cases, adjacent nanoseconds and Polars lexical segment numbering. Typed-key
+diagnostics, float32 and nullable numeric projections, nested temporal labels,
+category dictionaries and declared Enum case order now have disjoint acceptance.
+Fourteen native suites and 37 final production HTTP requests pass. The frontend
+is unchanged from its passing 9,711-test, TypeScript and Vite checkpoint; eight
+owned source/test hashes verify this. Earlier failures and the byte-identical diagnostic literal
 repair remain retained. All three canonical rows remain partial for their
 documented typed-control, dtype, warning, object and physical-plan domains.
 See [log-between-parity-contract.md](log-between-parity-contract.md),

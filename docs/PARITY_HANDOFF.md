@@ -16,7 +16,7 @@ uncovered banks only in new output directories.
 
 ## Pushed checkpoints
 
-Eleven functional continuation commits are pushed after `7849925b`:
+Fourteen functional continuation commits are pushed after `7849925b`:
 
 - `7cfe40d9`: locale-independent OCEL annotation/conformance JSON, exact signed
   zero and int64 boundaries. The embedded writer is
@@ -56,6 +56,17 @@ Eleven functional continuation commits are pushed after `7849925b`:
 - `dc1d36dc`: usable between controls in the log and table workspaces, complete
   downloads, literal controls, correct reopening, actual HTTP acceptance and
   final source/binary evidence bindings.
+- `ec101e14`: nullable UInt64/Float64 and float32 case projections, float32
+  label formatting, nested Timestamp/stdlib datetime labels and nested NaT;
+  18 new full pandas tables pass alongside the unchanged 139-outcome suite.
+- `156c5eae`: Polars category-label dictionaries and Enum declaration order,
+  cached Enum ranks and strict missing-dictionary/unknown-value rejection.
+  Existing table metadata now admits Polars dictionaries without changing its
+  ABI; complete codec/lazy/workbench transport and shared validation regressions
+  pass. Ten fresh complete dictionary-label projections extend Polars to 343.
+- `2cd4127c`: typed log selector diagnostics for dates, float/signed-zero/NaN,
+  frozensets, recursive keys and NaT, plus typed result keys and lazy hashing.
+  All 189 log outcomes pass; previous evidence archives remain unchanged.
 
 The earlier seven functional commits after `e68e191d` remain relevant:
 
@@ -132,10 +143,12 @@ downloads. It does not convert those tables into logs. Log mode accepts typed
 bytes as hexadecimal target JSON and retains native JSON/XES/opening behavior.
 Earlier evidence archives are historical source snapshots. The repetition
 workflow archive bound 21 sources at that checkpoint; the new between workflow
-archive binds 34 current implementation/test/contract/CMake sources.
+archive bound 34 sources at that checkpoint. The latest ordinary continuation
+archive binds 41 current implementation/test/contract/CMake sources and 35
+compiled identities; older archives remain historical snapshots.
 
 Between now has separate native log, pandas and Polars companions. Its banks
-contain 169, 140 and 333 distinct public calls respectively, with all 641
+contain 189, 158 and 343 distinct public calls respectively, with all 689
 representable native outcomes passing. The missing-required-argument pandas
 call is outside its C++ signature. Log boundary reuse depends on original
 endpoint equality: scalar versus singleton array differs, and array order and
@@ -144,6 +157,17 @@ start; Polars sorts by selected case and canonical `time:timestamp`, keeps the
 latest start and ranks textual interval indexes lexically. Thus `10_11` can
 receive a lower number than `2_3`, while output stays in sorted row order.
 Complete output rows/context and the supported typed native carriers survive.
+
+The numeric/temporal continuation covers missing UInt64/Float64 array
+projections, float32 shortest labels and magnitude thresholds, nested
+nanosecond Timestamp/timezone labels and standard datetime constructor forms.
+Polars dictionaries preserve unused category labels and declaration order.
+Categorical case sorting is lexical; Enum sorting follows its dictionary order.
+Selected Enum sort columns require complete dictionaries, and unknown values
+are rejected even for one-row inputs. Rank maps are built once per collection.
+Named dtype declarations survive as text, but runtime category context aliasing
+and physical codes are not represented. Category metadata API warnings are
+retained separately from actual algorithm warnings. The rows remain partial.
 
 Log nonstring result keys use an explicit typed sidecar; EventLog projection
 rejects a nonempty sidecar. The workspace exposes literal string selectors and
@@ -155,6 +179,40 @@ canonical rows remain partial; read their between contracts and
 `docs/table-between-filter-workflow.md`.
 
 ## Current final validation
+
+- **Fourteen assertion-enabled native suites pass**: all between targets,
+  new pandas ordinary cases, original EventData validation, category codec/lazy/
+  workbench transport, log/table routes and both table repetition regressions.
+  Logs: `build/parity-closures/native-current/ctest-between-ordinary.log` and
+  `build-between-ordinary.log`; configure: `configure-between-ordinary.log`.
+- All **689 representable between outcomes** from 690 public calls pass,
+  including complete returned values and retained diagnostic bytes/phases.
+  The one excluded pandas call omits a required C++ argument. The latest 48
+  public calls were disjoint from every earlier retained receipt; none replayed.
+- **37 final production requests pass** on an independently owned server:
+  `build/parity-closures/between-ordinary-production-http-2`. It exited and did
+  not replace the existing application. Server SHA256 is
+  `858abef8eca626a36754b884b02c53a018197d6d22cbd39db2d958c6bda8a4f5`.
+  The first attempt's harness incorrectly compared minimal upload fields with
+  canonical exports; its script/records/failure context remain retained. The
+  corrected check compares the exported dictionary with the parsed source.
+  No product change was needed for that harness failure.
+- Frontend source/tests remain unchanged from the passing **182-file /
+  9,711-test**, TypeScript and Vite checkpoint. Eight current file hashes are
+  verified in `build/parity-closures/between-ordinary-frontend-unchanged.json`;
+  no redundant frontend run was used for this C++/metadata-only continuation.
+- Offline structural catalogue validation passes:
+  `build/parity-closures/catalog-between-ordinary.log`. Counts remain 46/40
+  packages, 226/161 modules and 201 strict open units; no row was promoted.
+- `docs/between-ordinary-workflow-checks.jsonl.gz` retains 84 members, 41 current
+  sources, 35 compiled bindings and all final acceptance receipts. Manifest:
+  `build/parity-closures/between-ordinary-evidence-manifest.json`. Dedicated
+  selector, pandas-ordinary and Polars-categorical archives retain the new
+  public observations, pre-entry audits, generators and native proof.
+  Original 169-log, 139-pandas and 333-Polars evidence remains historical and
+  unchanged. Rendered browser interaction remains unverified.
+
+## Earlier between foundation validation
 
 - **Seven assertion-enabled native suites pass**, including the three between
   companions, log workbench/route and new table workbench/route:
@@ -248,15 +306,20 @@ Rendered application interaction remains unverified.
 
 ## Next open requirements
 
-- Continue the between modules' declared boundaries. Log ordinary typed
-  selector/error representations have a prepared **unexecuted** 20-case bank:
-  `build/filtering-between-log-selectors-prepared-1`. Before root executes it,
-  add the newer equality bank to its prior-receipt audit: the recipe was
-  prepared before `build/filtering-between-log-equality-public-actual-1`.
-  Keep date/float/frozenset selectors, nested nonstring keys and typed-source
-  carrier limits explicit. Pandas nullable UInt64/Float64, float32 case
-  projections and nested temporal labels remain open. Polars warning emission,
-  unobserved dtypes/category dictionaries and physical plans remain open.
+- Continue the between modules' declared boundaries. The 20-case log-selector
+  bank is now **executed and accepted**, with the equality bank explicitly
+  included in its prior-receipt audit; do not replay it. Its retained output is
+  `build/filtering-between-log-selectors-public-actual-1`. The pandas 16-case
+  ordinary bank and two-case float32 sweep are also executed and accepted;
+  retained outputs are `filtering-between-pandas-ordinary-public-actual-1`
+  and `filtering-between-pandas-float32-public-actual-1` under `build/`.
+  The ten categorical calls are at
+  `build/filtering-between-polars-categorical-public-actual-1`, with 38 complete
+  dictionary snapshots and separate observer warnings. Native acceptance
+  covers label dictionaries, not physical codes/context identity. Keep log
+  typed-source/nested nonstring-key carriers, unobserved selector forms, pandas
+  extension dtypes/temporal resolutions/identity graphs, Polars warning
+  emission, unobserved dtype/cast/diagnostic domains and physical plans open.
 - Continue the wider OCDFG gate. Reuse the retained 77-call bank at
   `build/parity-closures/ocdfg-performance-public-actual-1/capture.json`;
   all retained timing/discovery/aggregation/strict-selector outcomes now have
