@@ -3,11 +3,13 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 
 #include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
+#include "root_cause_unicode.hpp"
 
 namespace minera {
 namespace {
@@ -16,12 +18,53 @@ namespace {
   throw PandasAttributeRepetitionError(std::move(type), std::move(message));
 }
 
+std::string string_key_repr(std::string_view value) {
+  const char quote = value.find('\'') != std::string_view::npos &&
+                             value.find('"') == std::string_view::npos
+                         ? '"' : '\'';
+  std::string result(1, quote);
+  constexpr char hex[] = "0123456789abcdef";
+  for (std::size_t position = 0; position < value.size();) {
+    const auto start = position;
+    const auto first = static_cast<unsigned char>(value[position++]);
+    char32_t code = first;
+    unsigned continuation = 0;
+    if (first < 0x80) {}
+    else if (first >= 0xc2 && first <= 0xdf) { code = first & 31; continuation = 1; }
+    else if (first >= 0xe0 && first <= 0xef) { code = first & 15; continuation = 2; }
+    else if (first >= 0xf0 && first <= 0xf4) { code = first & 7; continuation = 3; }
+    else error("ValueError", "attribute repetition selector has invalid UTF-8");
+    for (unsigned i = 0; i < continuation; ++i) {
+      if (position == value.size()) error("ValueError", "attribute repetition selector has short UTF-8");
+      const auto next = static_cast<unsigned char>(value[position++]);
+      if ((next & 0xc0) != 0x80) error("ValueError", "attribute repetition selector has invalid UTF-8 continuation");
+      code = (code << 6) | (next & 63);
+    }
+    if ((continuation == 1 && code < 0x80) ||
+        (continuation == 2 && code < 0x800) ||
+        (continuation == 3 && code < 0x10000) || code > 0x10ffff)
+      error("ValueError", "attribute repetition selector has invalid code point");
+    if (code == static_cast<unsigned char>(quote) || code == '\\') {
+      result += '\\'; result += static_cast<char>(code);
+    } else if (code == '\n') result += "\\n";
+    else if (code == '\r') result += "\\r";
+    else if (code == '\t') result += "\\t";
+    else if (!root_cause_unicode_printable(code)) {
+      const int digits = code <= 0xff ? 2 : code <= 0xffff ? 4 : 8;
+      result += digits == 2 ? "\\x" : digits == 4 ? "\\u" : "\\U";
+      for (int shift = (digits - 1) * 4; shift >= 0; shift -= 4)
+        result += hex[(code >> shift) & 15];
+    } else result.append(value.substr(start, position - start));
+  }
+  return result + quote;
+}
+
 std::string key_text(const PandasAttributeRepetitionScalar& key) {
   return std::visit([](const auto& value) -> std::string {
     using T=std::decay_t<decltype(value)>;
     if constexpr (std::is_same_v<T,std::nullptr_t>) return "None";
     else if constexpr (std::is_same_v<T,bool>) return value ? "True" : "False";
-    else if constexpr (std::is_same_v<T,std::string>) return "'"+value+"'";
+    else if constexpr (std::is_same_v<T,std::string>) return string_key_repr(value);
     else if constexpr (std::is_same_v<T,TokenInteger>) return value.decimal();
     else return std::to_string(value);
   },key);
