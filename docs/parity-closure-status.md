@@ -38,6 +38,15 @@ missing-column diagnostics. All 344 retained log/pandas native outcomes pass;
 the first combined Polars diagnostic failure is preserved alongside the final
 nine-suite success. These continuations keep both canonical modules partial.
 
+The filtering workspace now offers separate pandas and Polars table modes
+using complete native table JSON, with typed metadata, exact integer storage,
+full downloads and engine-specific apply/collect errors. Log mode also accepts
+exact binary byte targets. Final validation passes nine native suites, 9,702
+frontend tests, TypeScript, Vite and seventeen requests per production route
+against the final server. The earlier timeout and native failures remain
+retained; see
+[table-attribute-repetition-workflow.md](table-attribute-repetition-workflow.md).
+
 The OCEL preparation workspace also exposes exact event and object membership,
 timestamp, activity/type matching and object-count filters, including typed NaT
 queries. Literal JSON controls retain integer

@@ -95,3 +95,12 @@ Repetition evidence is retained in `log-attribute-repetition-public.json.gz`
 and `log-attribute-repetition-workflow-checks.json.gz`, including the frozen
 public recipes/receipts, complete native outcomes, source bindings, compiler
 and test logs, and actual production HTTP request/response records.
+
+
+The data-model selector also opens independent pandas and Polars native-table
+repetition workspaces. Their complete EventTable input, engine-specific dtype
+examples, lazy collection errors and table downloads are documented in
+`table-attribute-repetition-workflow.md`. The log envelope and log opening path
+retain their existing behavior. Typed repetition targets additionally accept
+`{"type":"bytes","value":"ff00"}` hexadecimal data, including empty bytes;
+odd-length/nonhex encodings are rejected.

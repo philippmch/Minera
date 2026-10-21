@@ -1,6 +1,7 @@
 #include "minera/exact_filter_discovery_json.hpp"
 #include "minera/case_description_workbench_json.hpp"
 #include "minera/reference_log_filter_workbench.hpp"
+#include "minera/table_attribute_repetition_workbench.hpp"
 #include "minera/ocel_exact_filter_controls.hpp"
 #include "minera/ocel_activity_type_matching.hpp"
 #include "ocdfg_performance_route.hpp"
@@ -4124,6 +4125,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "original_log_query_route.hpp"
 #include "case_description_route.hpp"
 #include "reference_log_filter_route.hpp"
+#include "table_attribute_repetition_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
 #include "original_decision_route.hpp"
@@ -10766,6 +10768,7 @@ int main(int argc, char** argv) {
   server.Post("/api/original-label-splitting-workbench", handle_original_label_splitting_workbench);
   server.Post("/api/original-log-query-workbench", handle_original_log_query_workbench);
   server.Post("/api/reference-log-filter", handle_reference_log_filter);
+  server.Post("/api/reference-table-repetition", handle_table_attribute_repetition);
   server.Options("/api/emd-workbench", preflight);
   server.Post("/api/emd-workbench", handle_original_emd_workbench);
   server.Options("/api/object-centric-playout-workbench", preflight);

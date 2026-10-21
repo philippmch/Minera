@@ -40,6 +40,7 @@ add_library(minera_core
   src/backend/polars_attribute_repetition_filter.cpp
   src/backend/ocel_exact_filter_controls.cpp
   src/backend/reference_log_filter_workbench.cpp
+  src/backend/table_attribute_repetition_workbench.cpp
   src/backend/pripel_trace_distance.cpp
   src/backend/attribute_value_repetition.cpp
   src/backend/case_grouping.cpp
@@ -1039,6 +1040,19 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_case_description_tests PRIVATE cxx_std_20)
   target_compile_options(minera_case_description_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_case_description_tests COMMAND minera_case_description_tests)
+
+  add_executable(minera_table_attribute_repetition_workbench_tests src/backend/tests/test_table_attribute_repetition_workbench.cpp)
+  target_link_libraries(minera_table_attribute_repetition_workbench_tests PRIVATE minera::core)
+  target_compile_features(minera_table_attribute_repetition_workbench_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_table_attribute_repetition_workbench_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_table_attribute_repetition_workbench_tests COMMAND minera_table_attribute_repetition_workbench_tests)
+
+  add_executable(minera_table_attribute_repetition_route_tests src/backend/tests/test_table_attribute_repetition_route.cpp)
+  target_link_libraries(minera_table_attribute_repetition_route_tests PRIVATE minera::core Threads::Threads)
+  target_include_directories(minera_table_attribute_repetition_route_tests PRIVATE third_party)
+  target_compile_features(minera_table_attribute_repetition_route_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_table_attribute_repetition_route_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_table_attribute_repetition_route_tests COMMAND minera_table_attribute_repetition_route_tests)
 
   add_executable(minera_reference_log_filter_workbench_tests src/backend/tests/test_reference_log_filter_workbench.cpp)
   target_link_libraries(minera_reference_log_filter_workbench_tests PRIVATE minera::core)
