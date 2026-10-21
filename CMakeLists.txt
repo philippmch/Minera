@@ -40,6 +40,7 @@ add_library(minera_core
   src/backend/pandas_between_filter.cpp
   src/backend/polars_between_filter.cpp
   src/backend/table_between_filter_workbench.cpp
+  src/backend/log_timestamp_filter.cpp
   src/backend/case_filter_controls.cpp
   src/backend/log_case_filter.cpp
   src/backend/pandas_case_filter.cpp
@@ -1059,6 +1060,18 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_categorical_table_metadata_tests COMMAND minera_polars_categorical_table_metadata_tests)
 
   foreach(unit log_paths_filter pandas_paths_filter polars_paths_filter table_paths_filter_workbench table_paths_filter_route log_case_filter pandas_case_filter polars_case_filter table_case_filter_workbench table_case_filter_route)
+    add_executable(minera_${unit}_tests src/backend/tests/test_${unit}.cpp)
+    target_link_libraries(minera_${unit}_tests PRIVATE minera::core Threads::Threads)
+    target_include_directories(minera_${unit}_tests PRIVATE third_party)
+    target_compile_features(minera_${unit}_tests PRIVATE cxx_std_20)
+    target_compile_options(minera_${unit}_tests PRIVATE ${MINERA_TEST_OPTIONS})
+    if(MSVC)
+      target_compile_options(minera_${unit}_tests PRIVATE /bigobj)
+    endif()
+    add_test(NAME minera_${unit}_tests COMMAND minera_${unit}_tests)
+  endforeach()
+
+  foreach(unit log_timestamp_filter)
     add_executable(minera_${unit}_tests src/backend/tests/test_${unit}.cpp)
     target_link_libraries(minera_${unit}_tests PRIVATE minera::core Threads::Threads)
     target_include_directories(minera_${unit}_tests PRIVATE third_party)
