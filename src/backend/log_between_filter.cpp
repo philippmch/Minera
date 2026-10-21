@@ -54,11 +54,23 @@ std::string quoted(std::string_view value) {
 }
 std::string key_repr(const EventAttribute& key) {
   if(text(key))return quoted(key.value);
+  if(type(key)=="NaTType")return "NaT";
   if(key.kind==AttributeKind::kId && !key.is_null)return "UUID("+quoted(key.value)+")";
   if(key.is_null)return "None";
   if(type(key)=="bool")return native_attribute_number(key)?"True":"False";
   if(key.container==AttributeContainerKind::kTuple){std::string result="(";for(const auto& child:key.children){if(result.size()>1)result+=", ";result+=key_repr(child);}if(key.children.size()==1)result+=',';return result+')';}
+  if(key.container==AttributeContainerKind::kFrozenSet){
+    const auto members=root_cause_set_members(key);if(members.empty())return "frozenset()";
+    std::string result="frozenset({";for(const auto* child:members){if(result.size()>11)result+=", ";result+=key_repr(*child);}return result+"})";
+  }
   if(is_native_na_attribute(key))return "<NA>";
+  if(type(key)=="datetime.datetime") {
+    // The shared native formatter renders datetime constructors when nested.
+    // A temporary tuple supplies that context without changing the value.
+    EventAttribute tuple;tuple.container=AttributeContainerKind::kTuple;tuple.children={key};
+    const auto nested=root_cause_attribute_category(tuple);return nested.substr(1,nested.size()-3);
+  }
+  if(type(key)=="float"||type(key)=="int"||type(key)=="bytes")return root_cause_attribute_category(key);
   return key.value;
 }
 void hash_key(const EventAttribute& key) {

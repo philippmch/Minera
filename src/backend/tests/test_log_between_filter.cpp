@@ -4642,6 +4642,102 @@ log.traces.push_back(snapshot_120_trace_1());
 log.traces.push_back(snapshot_120_trace_2());
 log.traces.push_back(snapshot_120_trace_3());
 return log;}
+MINERA_NOINLINE Trace snapshot_121_trace_0(){Trace trace;trace.attributes={EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)},EventAttribute{std::string("\x20\x6c\x69\x74\x65\x72\x61\x6c\x20\x63\x61\x73\x65\x0a\x00\xce\xa9\x20",18),std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x30",8)},integer_value(std::string("\x74\x72\x61\x63\x65\x20\x70\x6f\x73\x69\x74\x69\x6f\x6e",14),std::int64_t{0LL}),container_value(std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c\x20\x63\x6f\x6e\x74\x65\x78\x74",16),AttributeContainerKind::kContainer,{container_value(std::string("\x6e\x65\x73\x74\x65\x64",6),AttributeContainerKind::kList,{null_value(std::string("\x30",1)),boolean_value(std::string("\x31",1),false),integer_value(std::string("\x32",1),std::int64_t{9007199254740993LL})})})};trace.properties={EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x70\x72\x6f\x70\x65\x72\x74\x79",14),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x30\x30\x66\x66",4)))};
+trace.case_id_attribute=EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)};trace.case_id=trace.case_id_attribute->value;trace.case_id_state=trace.case_id_attribute->is_null?FirstClassAttributeState::kNull:FirstClassAttributeState::kPresent;trace.case_id_source_key="concept:name";
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x41",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x42",1)},EventAttribute{std::string("",0),std::string("\x41",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x41",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x30",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{0LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x30\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=0;trace.events.push_back(std::move(event));}
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x42",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x41",1)},EventAttribute{std::string("",0),std::string("\x42",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x42",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x31",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{1LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x31\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=1;trace.events.push_back(std::move(event));}
+return trace;}
+MINERA_NOINLINE EventLog snapshot_121(){EventLog log;
+log.attributes={EventAttribute{std::string("\x62\x61\x6e\x6b",4),std::string("\x6c\x6f\x67\x2d\x62\x65\x74\x77\x65\x65\x6e\x2d\x73\x65\x6c\x65\x63\x74\x6f\x72\x73\x2d\x32\x30\x32\x36\x31\x30\x32\x31\x2d\x42\x35",33)},integer_value(std::string("\x77\x69\x64\x65\x20\x69\x6e\x74\x65\x67\x65\x72",12),std::int64_t{9007199254740993LL})};log.metadata.properties={container_value(std::string("\x6c\x6f\x67\x20\x70\x72\x6f\x70\x65\x72\x74\x79",12),AttributeContainerKind::kContainer,{container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x72\x65\x74\x61\x69\x6e\x65\x64",8)},boolean_value(std::string("\x31",1),true)}),make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4)))})};
+log.metadata.extensions.push_back({std::string("\x43\x6f\x6e\x63\x65\x70\x74",7),std::string("\x63\x6f\x6e\x63\x65\x70\x74",7),std::string("\x75\x72\x6e\x3a\x63\x6f\x6e\x63\x65\x70\x74",11)});
+log.metadata.classifiers.push_back({std::string("\x41\x63\x74\x69\x76\x69\x74\x79",8),{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12)}});
+log.metadata.classifiers.push_back({std::string("\x4c\x69\x74\x65\x72\x61\x6c",7),{std::string("",0),std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14)}});
+log.metadata.trace_globals={EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}};
+log.metadata.globals.push_back({std::string("\x74\x72\x61\x63\x65",5),{EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}}});
+log.metadata.event_globals={boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)};
+log.metadata.globals.push_back({std::string("\x65\x76\x65\x6e\x74",5),{boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)}});
+log.metadata.globals.push_back({std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x73\x63\x6f\x70\x65",12),{container_value(std::string("\x63\x75\x73\x74\x6f\x6d\x20\x67\x6c\x6f\x62\x61\x6c",13),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x78",1)},integer_value(std::string("\x31",1),std::int64_t{1LL})})}});
+log.traces.push_back(snapshot_121_trace_0());
+return log;}
+MINERA_NOINLINE Trace snapshot_122_trace_0(){Trace trace;trace.attributes={EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)},EventAttribute{std::string("\x20\x6c\x69\x74\x65\x72\x61\x6c\x20\x63\x61\x73\x65\x0a\x00\xce\xa9\x20",18),std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x30",8)},integer_value(std::string("\x74\x72\x61\x63\x65\x20\x70\x6f\x73\x69\x74\x69\x6f\x6e",14),std::int64_t{0LL}),container_value(std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c\x20\x63\x6f\x6e\x74\x65\x78\x74",16),AttributeContainerKind::kContainer,{container_value(std::string("\x6e\x65\x73\x74\x65\x64",6),AttributeContainerKind::kList,{null_value(std::string("\x30",1)),boolean_value(std::string("\x31",1),false),integer_value(std::string("\x32",1),std::int64_t{9007199254740993LL})})})};trace.properties={};
+trace.case_id_attribute=EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)};trace.case_id=trace.case_id_attribute->value;trace.case_id_state=trace.case_id_attribute->is_null?FirstClassAttributeState::kNull:FirstClassAttributeState::kPresent;trace.case_id_source_key="concept:name";
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x41",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x42",1)},EventAttribute{std::string("",0),std::string("\x41",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x41",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x30",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{0LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x30\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=0;trace.events.push_back(std::move(event));}
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x42",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x41",1)},EventAttribute{std::string("",0),std::string("\x42",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x42",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x31",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{1LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x31\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=1;trace.events.push_back(std::move(event));}
+return trace;}
+MINERA_NOINLINE EventLog snapshot_122(){EventLog log;
+log.attributes={EventAttribute{std::string("\x62\x61\x6e\x6b",4),std::string("\x6c\x6f\x67\x2d\x62\x65\x74\x77\x65\x65\x6e\x2d\x73\x65\x6c\x65\x63\x74\x6f\x72\x73\x2d\x32\x30\x32\x36\x31\x30\x32\x31\x2d\x42\x35",33)},integer_value(std::string("\x77\x69\x64\x65\x20\x69\x6e\x74\x65\x67\x65\x72",12),std::int64_t{9007199254740993LL})};log.metadata.properties={container_value(std::string("\x6c\x6f\x67\x20\x70\x72\x6f\x70\x65\x72\x74\x79",12),AttributeContainerKind::kContainer,{container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x72\x65\x74\x61\x69\x6e\x65\x64",8)},boolean_value(std::string("\x31",1),true)}),make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4)))})};
+log.metadata.extensions.push_back({std::string("\x43\x6f\x6e\x63\x65\x70\x74",7),std::string("\x63\x6f\x6e\x63\x65\x70\x74",7),std::string("\x75\x72\x6e\x3a\x63\x6f\x6e\x63\x65\x70\x74",11)});
+log.metadata.classifiers.push_back({std::string("\x41\x63\x74\x69\x76\x69\x74\x79",8),{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12)}});
+log.metadata.classifiers.push_back({std::string("\x4c\x69\x74\x65\x72\x61\x6c",7),{std::string("",0),std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14)}});
+log.metadata.trace_globals={EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}};
+log.metadata.globals.push_back({std::string("\x74\x72\x61\x63\x65",5),{EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}}});
+log.metadata.event_globals={boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)};
+log.metadata.globals.push_back({std::string("\x65\x76\x65\x6e\x74",5),{boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)}});
+log.metadata.globals.push_back({std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x73\x63\x6f\x70\x65",12),{container_value(std::string("\x63\x75\x73\x74\x6f\x6d\x20\x67\x6c\x6f\x62\x61\x6c",13),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x78",1)},integer_value(std::string("\x31",1),std::int64_t{1LL})})}});
+log.traces.push_back(snapshot_122_trace_0());
+return log;}
+MINERA_NOINLINE Trace snapshot_123_trace_0(){Trace trace;trace.attributes={EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)},EventAttribute{std::string("\x20\x6c\x69\x74\x65\x72\x61\x6c\x20\x63\x61\x73\x65\x0a\x00\xce\xa9\x20",18),std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x30",8)},integer_value(std::string("\x74\x72\x61\x63\x65\x20\x70\x6f\x73\x69\x74\x69\x6f\x6e",14),std::int64_t{0LL}),container_value(std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c\x20\x63\x6f\x6e\x74\x65\x78\x74",16),AttributeContainerKind::kContainer,{container_value(std::string("\x6e\x65\x73\x74\x65\x64",6),AttributeContainerKind::kList,{null_value(std::string("\x30",1)),boolean_value(std::string("\x31",1),false),integer_value(std::string("\x32",1),std::int64_t{9007199254740993LL})})})};trace.properties={};
+trace.case_id_attribute=EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)};trace.case_id=trace.case_id_attribute->value;trace.case_id_state=trace.case_id_attribute->is_null?FirstClassAttributeState::kNull:FirstClassAttributeState::kPresent;trace.case_id_source_key="concept:name";
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x41",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x42",1)},EventAttribute{std::string("",0),std::string("\x41",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x41",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x30",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{0LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x30\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=0;trace.events.push_back(std::move(event));}
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x42",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x41",1)},EventAttribute{std::string("",0),std::string("\x42",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x42",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x31",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{1LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x31\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=1;trace.events.push_back(std::move(event));}
+return trace;}
+MINERA_NOINLINE EventLog snapshot_123(){EventLog log;
+log.attributes={EventAttribute{std::string("\x62\x61\x6e\x6b",4),std::string("\x6c\x6f\x67\x2d\x62\x65\x74\x77\x65\x65\x6e\x2d\x73\x65\x6c\x65\x63\x74\x6f\x72\x73\x2d\x32\x30\x32\x36\x31\x30\x32\x31\x2d\x42\x35",33)},integer_value(std::string("\x77\x69\x64\x65\x20\x69\x6e\x74\x65\x67\x65\x72",12),std::int64_t{9007199254740993LL})};log.metadata.properties={container_value(std::string("\x6c\x6f\x67\x20\x70\x72\x6f\x70\x65\x72\x74\x79",12),AttributeContainerKind::kContainer,{container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x72\x65\x74\x61\x69\x6e\x65\x64",8)},boolean_value(std::string("\x31",1),true)}),make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4)))})};
+log.metadata.extensions.push_back({std::string("\x43\x6f\x6e\x63\x65\x70\x74",7),std::string("\x63\x6f\x6e\x63\x65\x70\x74",7),std::string("\x75\x72\x6e\x3a\x63\x6f\x6e\x63\x65\x70\x74",11)});
+log.metadata.classifiers.push_back({std::string("\x41\x63\x74\x69\x76\x69\x74\x79",8),{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12)}});
+log.metadata.classifiers.push_back({std::string("\x4c\x69\x74\x65\x72\x61\x6c",7),{std::string("",0),std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14)}});
+log.metadata.trace_globals={EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}};
+log.metadata.globals.push_back({std::string("\x74\x72\x61\x63\x65",5),{EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}}});
+log.metadata.event_globals={boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)};
+log.metadata.globals.push_back({std::string("\x65\x76\x65\x6e\x74",5),{boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)}});
+log.metadata.globals.push_back({std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x73\x63\x6f\x70\x65",12),{container_value(std::string("\x63\x75\x73\x74\x6f\x6d\x20\x67\x6c\x6f\x62\x61\x6c",13),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x78",1)},integer_value(std::string("\x31",1),std::int64_t{1LL})})}});
+log.traces.push_back(snapshot_123_trace_0());
+return log;}
+MINERA_NOINLINE Trace snapshot_124_trace_0(){Trace trace;trace.attributes={EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)},EventAttribute{std::string("\x20\x6c\x69\x74\x65\x72\x61\x6c\x20\x63\x61\x73\x65\x0a\x00\xce\xa9\x20",18),std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x30",8)},integer_value(std::string("\x74\x72\x61\x63\x65\x20\x70\x6f\x73\x69\x74\x69\x6f\x6e",14),std::int64_t{0LL}),container_value(std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c\x20\x63\x6f\x6e\x74\x65\x78\x74",16),AttributeContainerKind::kContainer,{container_value(std::string("\x6e\x65\x73\x74\x65\x64",6),AttributeContainerKind::kList,{null_value(std::string("\x30",1)),boolean_value(std::string("\x31",1),false),integer_value(std::string("\x32",1),std::int64_t{9007199254740993LL})})})};trace.properties={};
+trace.case_id_attribute=EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)};trace.case_id=trace.case_id_attribute->value;trace.case_id_state=trace.case_id_attribute->is_null?FirstClassAttributeState::kNull:FirstClassAttributeState::kPresent;trace.case_id_source_key="concept:name";
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x41",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x42",1)},EventAttribute{std::string("",0),std::string("\x41",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x41",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x30",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{0LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x30\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=0;trace.events.push_back(std::move(event));}
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x42",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x41",1)},EventAttribute{std::string("",0),std::string("\x42",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x42",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x31",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{1LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x31\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=1;trace.events.push_back(std::move(event));}
+return trace;}
+MINERA_NOINLINE EventLog snapshot_124(){EventLog log;
+log.attributes={EventAttribute{std::string("\x62\x61\x6e\x6b",4),std::string("\x6c\x6f\x67\x2d\x62\x65\x74\x77\x65\x65\x6e\x2d\x73\x65\x6c\x65\x63\x74\x6f\x72\x73\x2d\x32\x30\x32\x36\x31\x30\x32\x31\x2d\x42\x35",33)},integer_value(std::string("\x77\x69\x64\x65\x20\x69\x6e\x74\x65\x67\x65\x72",12),std::int64_t{9007199254740993LL})};log.metadata.properties={container_value(std::string("\x6c\x6f\x67\x20\x70\x72\x6f\x70\x65\x72\x74\x79",12),AttributeContainerKind::kContainer,{container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x72\x65\x74\x61\x69\x6e\x65\x64",8)},boolean_value(std::string("\x31",1),true)}),make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4)))})};
+log.metadata.extensions.push_back({std::string("\x43\x6f\x6e\x63\x65\x70\x74",7),std::string("\x63\x6f\x6e\x63\x65\x70\x74",7),std::string("\x75\x72\x6e\x3a\x63\x6f\x6e\x63\x65\x70\x74",11)});
+log.metadata.classifiers.push_back({std::string("\x41\x63\x74\x69\x76\x69\x74\x79",8),{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12)}});
+log.metadata.classifiers.push_back({std::string("\x4c\x69\x74\x65\x72\x61\x6c",7),{std::string("",0),std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14)}});
+log.metadata.trace_globals={EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}};
+log.metadata.globals.push_back({std::string("\x74\x72\x61\x63\x65",5),{EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}}});
+log.metadata.event_globals={boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)};
+log.metadata.globals.push_back({std::string("\x65\x76\x65\x6e\x74",5),{boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)}});
+log.metadata.globals.push_back({std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x73\x63\x6f\x70\x65",12),{container_value(std::string("\x63\x75\x73\x74\x6f\x6d\x20\x67\x6c\x6f\x62\x61\x6c",13),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x78",1)},integer_value(std::string("\x31",1),std::int64_t{1LL})})}});
+log.traces.push_back(snapshot_124_trace_0());
+return log;}
+MINERA_NOINLINE Trace snapshot_125_trace_0(){Trace trace;trace.attributes={EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)},EventAttribute{std::string("\x20\x6c\x69\x74\x65\x72\x61\x6c\x20\x63\x61\x73\x65\x0a\x00\xce\xa9\x20",18),std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x30",8)},integer_value(std::string("\x74\x72\x61\x63\x65\x20\x70\x6f\x73\x69\x74\x69\x6f\x6e",14),std::int64_t{0LL}),container_value(std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c\x20\x63\x6f\x6e\x74\x65\x78\x74",16),AttributeContainerKind::kContainer,{container_value(std::string("\x6e\x65\x73\x74\x65\x64",6),AttributeContainerKind::kList,{null_value(std::string("\x30",1)),boolean_value(std::string("\x31",1),false),integer_value(std::string("\x32",1),std::int64_t{9007199254740993LL})})})};trace.properties={EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x70\x72\x6f\x70\x65\x72\x74\x79",14),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x30\x30\x66\x66",4)))};
+trace.case_id_attribute=EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x63\x61\x73\x65\x2d\x30",13)};trace.case_id=trace.case_id_attribute->value;trace.case_id_state=trace.case_id_attribute->is_null?FirstClassAttributeState::kNull:FirstClassAttributeState::kPresent;trace.case_id_source_key="concept:name";
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x58",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x58",1)},EventAttribute{std::string("",0),std::string("\x58",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x58",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x30",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{0LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x30\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=0;trace.events.push_back(std::move(event));}
+{auto event=event_for({EventAttribute{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12),std::string("\x42",1)},EventAttribute{std::string("\x73\x65\x6c\x65\x63\x74\x65\x64",8),std::string("\x41",1)},EventAttribute{std::string("",0),std::string("\x42",1)},EventAttribute{std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14),std::string("\x42",1)},EventAttribute{std::string("\x61\x63\x74\x69\x76\x69\x74\x79",8),std::string("\x63\x6f\x6e\x76\x65\x6e\x69\x65\x6e\x63\x65\x20\x61\x6c\x69\x61\x73\x20\x69\x73\x20\x6c\x69\x74\x65\x72\x61\x6c",28)},EventAttribute{std::string("\x65\x76\x65\x6e\x74\x20\x69\x64\x65\x6e\x74\x69\x74\x79",14),std::string("\x4c\x42\x54\x2d\x42\x35\x2d\x30\x2d\x31",10)},integer_value(std::string("\x70\x6f\x73\x69\x74\x69\x6f\x6e",8),std::int64_t{1LL}),date_value(std::string("\x74\x69\x6d\x65\x3a\x74\x69\x6d\x65\x73\x74\x61\x6d\x70",14),std::string("\x32\x30\x32\x36\x2d\x30\x34\x2d\x30\x35\x54\x30\x36\x3a\x30\x37\x3a\x30\x31\x2b\x30\x30\x3a\x30\x30",25)),container_value(std::string("\x72\x65\x74\x61\x69\x6e\x65\x64\x20\x70\x61\x79\x6c\x6f\x61\x64",16),AttributeContainerKind::kContainer,{make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4))),container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)},integer_value(std::string("\x31",1),std::int64_t{9007199254740993LL})})})});event.input_order=1;trace.events.push_back(std::move(event));}
+return trace;}
+MINERA_NOINLINE EventLog snapshot_125(){EventLog log;
+log.attributes={EventAttribute{std::string("\x62\x61\x6e\x6b",4),std::string("\x6c\x6f\x67\x2d\x62\x65\x74\x77\x65\x65\x6e\x2d\x73\x65\x6c\x65\x63\x74\x6f\x72\x73\x2d\x32\x30\x32\x36\x31\x30\x32\x31\x2d\x42\x35",33)},integer_value(std::string("\x77\x69\x64\x65\x20\x69\x6e\x74\x65\x67\x65\x72",12),std::int64_t{9007199254740993LL})};log.metadata.properties={container_value(std::string("\x6c\x6f\x67\x20\x70\x72\x6f\x70\x65\x72\x74\x79",12),AttributeContainerKind::kContainer,{container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x72\x65\x74\x61\x69\x6e\x65\x64",8)},boolean_value(std::string("\x31",1),true)}),make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4)))})};
+log.metadata.extensions.push_back({std::string("\x43\x6f\x6e\x63\x65\x70\x74",7),std::string("\x63\x6f\x6e\x63\x65\x70\x74",7),std::string("\x75\x72\x6e\x3a\x63\x6f\x6e\x63\x65\x70\x74",11)});
+log.metadata.classifiers.push_back({std::string("\x41\x63\x74\x69\x76\x69\x74\x79",8),{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12)}});
+log.metadata.classifiers.push_back({std::string("\x4c\x69\x74\x65\x72\x61\x6c",7),{std::string("",0),std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14)}});
+log.metadata.trace_globals={EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}};
+log.metadata.globals.push_back({std::string("\x74\x72\x61\x63\x65",5),{EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}}});
+log.metadata.event_globals={boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)};
+log.metadata.globals.push_back({std::string("\x65\x76\x65\x6e\x74",5),{boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)}});
+log.metadata.globals.push_back({std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x73\x63\x6f\x70\x65",12),{container_value(std::string("\x63\x75\x73\x74\x6f\x6d\x20\x67\x6c\x6f\x62\x61\x6c",13),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x78",1)},integer_value(std::string("\x31",1),std::int64_t{1LL})})}});
+log.traces.push_back(snapshot_125_trace_0());
+return log;}
+MINERA_NOINLINE EventLog snapshot_126(){EventLog log;
+log.attributes={EventAttribute{std::string("\x62\x61\x6e\x6b",4),std::string("\x6c\x6f\x67\x2d\x62\x65\x74\x77\x65\x65\x6e\x2d\x73\x65\x6c\x65\x63\x74\x6f\x72\x73\x2d\x32\x30\x32\x36\x31\x30\x32\x31\x2d\x42\x35",33)},integer_value(std::string("\x77\x69\x64\x65\x20\x69\x6e\x74\x65\x67\x65\x72",12),std::int64_t{9007199254740993LL})};log.metadata.properties={container_value(std::string("\x6c\x6f\x67\x20\x70\x72\x6f\x70\x65\x72\x74\x79",12),AttributeContainerKind::kContainer,{container_value(std::string("\x74\x75\x70\x6c\x65",5),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x72\x65\x74\x61\x69\x6e\x65\x64",8)},boolean_value(std::string("\x31",1),true)}),make_bytes_attribute(std::string("\x62\x79\x74\x65\x73",5),bytes(std::string("\x66\x66\x30\x30",4)))})};
+log.metadata.extensions.push_back({std::string("\x43\x6f\x6e\x63\x65\x70\x74",7),std::string("\x63\x6f\x6e\x63\x65\x70\x74",7),std::string("\x75\x72\x6e\x3a\x63\x6f\x6e\x63\x65\x70\x74",11)});
+log.metadata.classifiers.push_back({std::string("\x41\x63\x74\x69\x76\x69\x74\x79",8),{std::string("\x63\x6f\x6e\x63\x65\x70\x74\x3a\x6e\x61\x6d\x65",12)}});
+log.metadata.classifiers.push_back({std::string("\x4c\x69\x74\x65\x72\x61\x6c",7),{std::string("",0),std::string("\x20\x73\x65\x6c\x65\x63\x74\x6f\x72\x0a\x00\xce\xa9\x20",14)}});
+log.metadata.trace_globals={EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}};
+log.metadata.globals.push_back({std::string("\x74\x72\x61\x63\x65",5),{EventAttribute{std::string("\x74\x72\x61\x63\x65\x20\x67\x6c\x6f\x62\x61\x6c",12),std::string("\x6f\x72\x69\x67\x69\x6e\x61\x6c",8)}}});
+log.metadata.event_globals={boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)};
+log.metadata.globals.push_back({std::string("\x65\x76\x65\x6e\x74",5),{boolean_value(std::string("\x65\x76\x65\x6e\x74\x20\x67\x6c\x6f\x62\x61\x6c",12),false)}});
+log.metadata.globals.push_back({std::string("\x63\x75\x73\x74\x6f\x6d\x2d\x73\x63\x6f\x70\x65",12),{container_value(std::string("\x63\x75\x73\x74\x6f\x6d\x20\x67\x6c\x6f\x62\x61\x6c",13),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x78",1)},integer_value(std::string("\x31",1),std::int64_t{1LL})})}});
+return log;}
 MINERA_NOINLINE void retained_case_0(){ // LBT-B1-defaults-omitted
 const auto source=snapshot_0();const auto before=serialize_embedding_workbench_raw_log_json(source);
 const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
@@ -6508,6 +6604,202 @@ const auto full=serialize_log_between_filter_result_json(result);assert(full.fin
 assert(serialize_embedding_workbench_raw_log_json(result.project_event_log())==serialize_embedding_workbench_raw_log_json(expected));
 }catch(...){throw;}assert(returned);
 assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_169(){ // LBT-B5-activity-date-naive
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=date_value(std::string("",0),std::string("\x32\x30\x32\x36\x2d\x30\x32\x2d\x30\x33\x54\x30\x34\x3a\x30\x35\x3a\x30\x36\x2e\x30\x30\x30\x30\x30\x37",26));
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-date-naive");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x64\x61\x74\x65\x74\x69\x6d\x65\x2e\x64\x61\x74\x65\x74\x69\x6d\x65\x28\x32\x30\x32\x36\x2c\x20\x32\x2c\x20\x33\x2c\x20\x34\x2c\x20\x35\x2c\x20\x36\x2c\x20\x37\x29",41))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_170(){ // LBT-B5-activity-date-offset
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=date_value(std::string("",0),std::string("\x32\x30\x32\x36\x2d\x30\x32\x2d\x30\x33\x54\x30\x34\x3a\x30\x35\x3a\x30\x36\x2e\x30\x30\x30\x30\x30\x37\x2b\x30\x35\x3a\x33\x30",32));
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-date-offset");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x64\x61\x74\x65\x74\x69\x6d\x65\x2e\x64\x61\x74\x65\x74\x69\x6d\x65\x28\x32\x30\x32\x36\x2c\x20\x32\x2c\x20\x33\x2c\x20\x34\x2c\x20\x35\x2c\x20\x36\x2c\x20\x37\x2c\x20\x74\x7a\x69\x6e\x66\x6f\x3d\x64\x61\x74\x65\x74\x69\x6d\x65\x2e\x74\x69\x6d\x65\x7a\x6f\x6e\x65\x28\x64\x61\x74\x65\x74\x69\x6d\x65\x2e\x74\x69\x6d\x65\x64\x65\x6c\x74\x61\x28\x73\x65\x63\x6f\x6e\x64\x73\x3d\x31\x39\x38\x30\x30\x29\x29\x29",102))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_171(){ // LBT-B5-activity-float-fraction
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=float_value(std::string("",0),0x1.4000000000000p+0);
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-float-fraction");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x31\x2e\x32\x35",4))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_172(){ // LBT-B5-activity-float-nan
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=float_value(std::string("",0),std::numeric_limits<double>::quiet_NaN());
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-float-nan");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x6e\x61\x6e",3))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_173(){ // LBT-B5-activity-float-inf
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=float_value(std::string("",0),std::numeric_limits<double>::infinity());
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-float-inf");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x69\x6e\x66",3))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_174(){ // LBT-B5-activity-float-negzero
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=float_value(std::string("",0),-0x0.0p+0);
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-float-negzero");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x2d\x30\x2e\x30",4))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_175(){ // LBT-B5-activity-frozen-empty
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=container_value(std::string("",0),AttributeContainerKind::kFrozenSet,{});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-frozen-empty");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x66\x72\x6f\x7a\x65\x6e\x73\x65\x74\x28\x29",11))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_176(){ // LBT-B5-activity-frozen-singleton
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=container_value(std::string("",0),AttributeContainerKind::kFrozenSet,{EventAttribute{std::string("\x30",1),std::string("\x66\x72\x6f\x7a\x65\x6e\x0a\x00\xce\xa9",10)}});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-frozen-singleton");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x66\x72\x6f\x7a\x65\x6e\x73\x65\x74\x28\x7b\x27\x66\x72\x6f\x7a\x65\x6e\x5c\x6e\x5c\x78\x30\x30\xce\xa9\x27\x7d\x29",29))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_177(){ // LBT-B5-activity-recursive-hashable
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=container_value(std::string("",0),AttributeContainerKind::kTuple,{date_value(std::string("\x30",1),std::string("\x32\x30\x32\x36\x2d\x30\x32\x2d\x30\x33\x54\x30\x34\x3a\x30\x35\x3a\x30\x36\x2e\x30\x30\x30\x30\x30\x37",26)),container_value(std::string("\x31",1),AttributeContainerKind::kFrozenSet,{container_value(std::string("\x30",1),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6e\x65\x73\x74\x65\x64",6)},integer_value(std::string("\x31",1),std::int64_t{3LL})})})});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-recursive-hashable");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x28\x64\x61\x74\x65\x74\x69\x6d\x65\x2e\x64\x61\x74\x65\x74\x69\x6d\x65\x28\x32\x30\x32\x36\x2c\x20\x32\x2c\x20\x33\x2c\x20\x34\x2c\x20\x35\x2c\x20\x36\x2c\x20\x37\x29\x2c\x20\x66\x72\x6f\x7a\x65\x6e\x73\x65\x74\x28\x7b\x28\x27\x6e\x65\x73\x74\x65\x64\x27\x2c\x20\x33\x29\x7d\x29\x29",71))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_178(){ // LBT-B5-activity-recursive-unhashable
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=container_value(std::string("",0),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x75\x74\x65\x72",5)},container_value(std::string("\x31",1),AttributeContainerKind::kTuple,{container_value(std::string("\x30",1),AttributeContainerKind::kContainer,{integer_value(std::string("\x6d\x75\x74\x61\x62\x6c\x65",7),std::int64_t{1LL})})})});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-recursive-unhashable");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x54\x79\x70\x65\x45\x72\x72\x6f\x72",9)||error.message!=std::string("\x75\x6e\x68\x61\x73\x68\x61\x62\x6c\x65\x20\x74\x79\x70\x65\x3a\x20\x27\x64\x69\x63\x74\x27",23))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_179(){ // LBT-B5-activity-nat
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.activity_key=nat_value(std::string("",0));
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-activity-nat");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x4b\x65\x79\x45\x72\x72\x6f\x72",8)||error.message!=std::string("\x4e\x61\x54",3))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_180(){ // LBT-B5-case-date
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.case_id_key=date_value(std::string("",0),std::string("\x32\x30\x32\x36\x2d\x30\x32\x2d\x30\x33\x54\x30\x34\x3a\x30\x35\x3a\x30\x36\x2e\x30\x30\x30\x30\x30\x37",26));
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+const auto expected=snapshot_122();
+if(serialize_embedding_workbench_raw_log_json(result.string_key_log)!=serialize_embedding_workbench_raw_log_json(expected))throw std::runtime_error("Full returned log mismatch: LBT-B5-case-date");
+const std::vector<LogBetweenTypedTraceAttribute> expected_keys={{0,date_value(std::string("",0),std::string("\x32\x30\x32\x36\x2d\x30\x32\x2d\x30\x33\x54\x30\x34\x3a\x30\x35\x3a\x30\x36\x2e\x30\x30\x30\x30\x30\x37",26)),EventAttribute{std::string("",0),std::string("\x30\x23\x23\x40\x40\x30",6)}}};assert(result.typed_trace_attributes==expected_keys);
+const auto full=serialize_log_between_filter_result_json(result);assert(full.find("log-between-result-v1")!=std::string::npos);
+bool projection_rejected=false;try{(void)result.project_event_log();}catch(const std::invalid_argument&){projection_rejected=true;}assert(projection_rejected);
+}catch(...){throw;}assert(returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_181(){ // LBT-B5-case-frozen
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.case_id_key=container_value(std::string("",0),AttributeContainerKind::kFrozenSet,{EventAttribute{std::string("\x30",1),std::string("\x66\x72\x6f\x7a\x65\x6e\x0a\x00\xce\xa9",10)}});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+const auto expected=snapshot_123();
+if(serialize_embedding_workbench_raw_log_json(result.string_key_log)!=serialize_embedding_workbench_raw_log_json(expected))throw std::runtime_error("Full returned log mismatch: LBT-B5-case-frozen");
+const std::vector<LogBetweenTypedTraceAttribute> expected_keys={{0,container_value(std::string("",0),AttributeContainerKind::kFrozenSet,{EventAttribute{std::string("\x30",1),std::string("\x66\x72\x6f\x7a\x65\x6e\x0a\x00\xce\xa9",10)}}),EventAttribute{std::string("",0),std::string("\x30\x23\x23\x40\x40\x30",6)}}};assert(result.typed_trace_attributes==expected_keys);
+const auto full=serialize_log_between_filter_result_json(result);assert(full.find("log-between-result-v1")!=std::string::npos);
+bool projection_rejected=false;try{(void)result.project_event_log();}catch(const std::invalid_argument&){projection_rejected=true;}assert(projection_rejected);
+}catch(...){throw;}assert(returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_182(){ // LBT-B5-case-float-nan
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.case_id_key=float_value(std::string("",0),std::numeric_limits<double>::quiet_NaN());
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+const auto expected=snapshot_124();
+if(serialize_embedding_workbench_raw_log_json(result.string_key_log)!=serialize_embedding_workbench_raw_log_json(expected))throw std::runtime_error("Full returned log mismatch: LBT-B5-case-float-nan");
+const std::vector<LogBetweenTypedTraceAttribute> expected_keys={{0,float_value(std::string("",0),std::numeric_limits<double>::quiet_NaN()),EventAttribute{std::string("",0),std::string("\x30\x23\x23\x40\x40\x30",6)}}};assert(result.typed_trace_attributes==expected_keys);
+const auto full=serialize_log_between_filter_result_json(result);assert(full.find("log-between-result-v1")!=std::string::npos);
+bool projection_rejected=false;try{(void)result.project_event_log();}catch(const std::invalid_argument&){projection_rejected=true;}assert(projection_rejected);
+}catch(...){throw;}assert(returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_183(){ // LBT-B5-case-recursive-unhashable
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.case_id_key=container_value(std::string("",0),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x75\x74\x65\x72",5)},container_value(std::string("\x31",1),AttributeContainerKind::kTuple,{container_value(std::string("\x30",1),AttributeContainerKind::kContainer,{integer_value(std::string("\x6d\x75\x74\x61\x62\x6c\x65",7),std::int64_t{1LL})})})});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-case-recursive-unhashable");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x54\x79\x70\x65\x45\x72\x72\x6f\x72",9)||error.message!=std::string("\x75\x6e\x68\x61\x73\x68\x61\x62\x6c\x65\x20\x74\x79\x70\x65\x3a\x20\x27\x64\x69\x63\x74\x27",23))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_184(){ // LBT-B5-case-unhashable-no-start
+const auto source=snapshot_125();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.case_id_key=container_value(std::string("",0),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x6f\x75\x74\x65\x72",5)},container_value(std::string("\x31",1),AttributeContainerKind::kTuple,{container_value(std::string("\x30",1),AttributeContainerKind::kContainer,{integer_value(std::string("\x6d\x75\x74\x61\x62\x6c\x65",7),std::int64_t{1LL})})})});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+const auto expected=snapshot_126();
+if(serialize_embedding_workbench_raw_log_json(result.string_key_log)!=serialize_embedding_workbench_raw_log_json(expected))throw std::runtime_error("Full returned log mismatch: LBT-B5-case-unhashable-no-start");
+const std::vector<LogBetweenTypedTraceAttribute> expected_keys={};assert(result.typed_trace_attributes==expected_keys);
+const auto full=serialize_log_between_filter_result_json(result);assert(full.find("log-between-result-v1")!=std::string::npos);
+assert(serialize_embedding_workbench_raw_log_json(result.project_event_log())==serialize_embedding_workbench_raw_log_json(expected));
+}catch(...){throw;}assert(returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_185(){ // LBT-B5-separator-date
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.subcase_separator=date_value(std::string("",0),std::string("\x32\x30\x32\x36\x2d\x30\x32\x2d\x30\x33\x54\x30\x34\x3a\x30\x35\x3a\x30\x36\x2e\x30\x30\x30\x30\x30\x37",26));
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-separator-date");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x54\x79\x70\x65\x45\x72\x72\x6f\x72",9)||error.message!=std::string("\x63\x61\x6e\x20\x6f\x6e\x6c\x79\x20\x63\x6f\x6e\x63\x61\x74\x65\x6e\x61\x74\x65\x20\x73\x74\x72\x20\x28\x6e\x6f\x74\x20\x22\x64\x61\x74\x65\x74\x69\x6d\x65\x2e\x64\x61\x74\x65\x74\x69\x6d\x65\x22\x29\x20\x74\x6f\x20\x73\x74\x72",57))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_186(){ // LBT-B5-separator-frozen
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.subcase_separator=container_value(std::string("",0),AttributeContainerKind::kFrozenSet,{EventAttribute{std::string("\x30",1),std::string("\x66\x72\x6f\x7a\x65\x6e\x0a\x00\xce\xa9",10)}});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-separator-frozen");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x54\x79\x70\x65\x45\x72\x72\x6f\x72",9)||error.message!=std::string("\x63\x61\x6e\x20\x6f\x6e\x6c\x79\x20\x63\x6f\x6e\x63\x61\x74\x65\x6e\x61\x74\x65\x20\x73\x74\x72\x20\x28\x6e\x6f\x74\x20\x22\x66\x72\x6f\x7a\x65\x6e\x73\x65\x74\x22\x29\x20\x74\x6f\x20\x73\x74\x72",49))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_187(){ // LBT-B5-separator-dict
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.subcase_separator=container_value(std::string("",0),AttributeContainerKind::kContainer,{integer_value(std::string("\x78",1),std::int64_t{1LL})});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-separator-dict");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x54\x79\x70\x65\x45\x72\x72\x6f\x72",9)||error.message!=std::string("\x63\x61\x6e\x20\x6f\x6e\x6c\x79\x20\x63\x6f\x6e\x63\x61\x74\x65\x6e\x61\x74\x65\x20\x73\x74\x72\x20\x28\x6e\x6f\x74\x20\x22\x64\x69\x63\x74\x22\x29\x20\x74\x6f\x20\x73\x74\x72",44))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
+MINERA_NOINLINE void retained_case_188(){ // LBT-B5-separator-tuple
+const auto source=snapshot_121();const auto before=serialize_embedding_workbench_raw_log_json(source);
+const auto act1=EventAttribute{std::string("",0),std::string("\x41",1)};const auto act2=EventAttribute{std::string("",0),std::string("\x42",1)};
+LogBetweenFilterOptions options;
+options.subcase_separator=container_value(std::string("",0),AttributeContainerKind::kTuple,{EventAttribute{std::string("\x30",1),std::string("\x73\x65\x70\x61\x72\x61\x74\x6f\x72",9)}});
+bool returned=false;try{const auto result=filter_log_between_result(source,act1,act2,options);returned=true;
+throw std::runtime_error("Expected captured error for LBT-B5-separator-tuple");
+}catch(const LogBetweenFilterError& error){if(error.type!=std::string("\x54\x79\x70\x65\x45\x72\x72\x6f\x72",9)||error.message!=std::string("\x63\x61\x6e\x20\x6f\x6e\x6c\x79\x20\x63\x6f\x6e\x63\x61\x74\x65\x6e\x61\x74\x65\x20\x73\x74\x72\x20\x28\x6e\x6f\x74\x20\x22\x74\x75\x70\x6c\x65\x22\x29\x20\x74\x6f\x20\x73\x74\x72",45))throw std::runtime_error(std::string("Wrong error: ")+error.what());}assert(!returned);
+assert(serialize_embedding_workbench_raw_log_json(source)==before);}
 void retained_public_between_cases(){std::size_t matched=0;
 retained_case_0();++matched;
 retained_case_1();++matched;
@@ -6678,7 +6970,27 @@ retained_case_165();++matched;
 retained_case_166();++matched;
 retained_case_167();++matched;
 retained_case_168();++matched;
-assert(matched==169);std::cout<<matched<<"/169 full retained between outcomes/errors passed\n";}
+retained_case_169();++matched;
+retained_case_170();++matched;
+retained_case_171();++matched;
+retained_case_172();++matched;
+retained_case_173();++matched;
+retained_case_174();++matched;
+retained_case_175();++matched;
+retained_case_176();++matched;
+retained_case_177();++matched;
+retained_case_178();++matched;
+retained_case_179();++matched;
+retained_case_180();++matched;
+retained_case_181();++matched;
+retained_case_182();++matched;
+retained_case_183();++matched;
+retained_case_184();++matched;
+retained_case_185();++matched;
+retained_case_186();++matched;
+retained_case_187();++matched;
+retained_case_188();++matched;
+assert(matched==189);std::cout<<matched<<"/189 full retained between outcomes/errors passed\n";}
 void native_between_storage_controls(){
  EventLog log;Trace trace;trace.case_id="original";trace.case_id_source_key="concept:name";trace.case_id_state=FirstClassAttributeState::kPresent;trace.case_id_attribute=EventAttribute{"concept:name","original"};trace.attributes={{"concept:name","original"},{"custom","chosen"}};trace.properties={{"dropped","property"}};
  Event a;a.activity="A";a.activity_source_key="activity";a.activity_attribute=EventAttribute{"activity","A"};a.input_order=42;a.case_id="native event case";

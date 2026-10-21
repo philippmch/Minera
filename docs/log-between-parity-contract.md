@@ -116,14 +116,38 @@ endpoint/control combination. Row completion requires the final native suite,
 source binding, usable-workflow acceptance and a review of remaining ordinary
 native-domain gaps; the observation count alone does not establish closure.
 
+## Typed-selector continuation
+
+After the 169-outcome checkpoint, a separate 20-call bank examined naive and
+offset datetimes, finite and nonfinite float selectors, signed zero, empty and
+singleton frozensets, recursive tuple/frozenset selectors, nested mutable-key
+errors, NaT, typed result keys and ordinary separator errors. Root executed
+each complete receipt once after auditing all five earlier banks. Four calls
+returned complete logs and sixteen raised errors, with no mutations or module
+hash changes. The combined acceptance now contains **189 outcomes: 117 returns
+and 72 errors**, represented by 127 deduplicated complete native snapshots.
+
+Missing-key rendering retains datetime constructor notation and fixed offsets,
+shortest float notation including `-0.0`, NaN/inf, `NaT`, and recursive immutable
+key notation. The implementation reuses the existing native formatter for
+numeric values and nested datetime representation without changing that helper.
+Typed date/frozenset/NaN result keys remain explicit sidecar entries, and nested
+unhashable selectors still fail only when the corresponding lookup occurs.
+
+`docs/log-between-selector-public.json.gz` preserves the new prepared recipe,
+cases, full observations, complete pre-entry audit, durable intents and updated
+offline native-test generator. The earlier 169-outcome public archive remains
+unchanged so the previous checkpoint's source and evidence bindings stay intact.
+
 The canonical module remains partial. Although the complete annotated endpoint
 domain and the literal-string workspace controls are implemented, the public
-parameter dictionary admits other selector/separator shapes. Ordinary native
-date, float and frozenset selectors do not yet have complete diagnostic
-acceptance, and their exact missing-key representations must not be inferred
-from string or UUID selectors. Nonstring nested dictionary keys also remain a
-carrier boundary. These are separate from the retained typed result keys, which
-are represented explicitly rather than discarded.
+parameter dictionary admits other selector/separator shapes. The continuation
+establishes the observed ordinary date/float/frozenset diagnostics; it does not
+establish every timezone identity, runtime hash-order display of multi-element
+frozensets or every separator arithmetic combination. Nonstring nested
+dictionary keys also remain a carrier boundary. These are separate from the
+retained typed result keys, which are represented explicitly rather than
+discarded.
 
 The first native acceptance run hit Windows stack overflow in the generated
 monolithic test function. The generator now uses separate non-inlined case and
@@ -137,7 +161,7 @@ six fresh endpoint-equality observations established that original value
 equality governs reuse. The correction retains scalar/array distinctions,
 array order and duplicates; it does not convert endpoints to sets.
 
-Final coordinated acceptance passed all seven native suites in
+The 169-outcome checkpoint passed all seven native suites in
 `build/parity-closures/ctest-between-workflows-3.log`, including all 169 log
 outcomes and the independent storage controls. The fresh production server
 passed 33 HTTP requests in `build/parity-closures/between-production-http-2`,
@@ -146,3 +170,21 @@ and Vite checks passed; the complete frontend suite and its source bindings
 are recorded in the separate workflow acceptance archive. These checks do
 not establish rendered browser interaction or close the remaining parameter
 domains described above.
+
+The typed-selector continuation passed all **189** log outcomes and native
+storage controls in `native-current/log-between-selector-direct.log`. Final
+coordinated acceptance passed **14/14 native suites** in
+`build/parity-closures/native-current/ctest-between-ordinary.log`. The freshly
+built production server passed **37 cross-family HTTP checks** in
+`build/parity-closures/between-ordinary-production-http-2`; its executable hash
+is bound to those receipts, and the owned server exited afterward. The existing
+application was not replaced. The frontend's eight source/test hashes remain
+unchanged from the passing 9,711-test checkpoint, as recorded separately by the
+root acceptance audit; this continuation required no frontend edits or rerun.
+
+`docs/log-between-selector-checks.json.gz` binds the current helper/header,
+generated test, contract, generator and public continuation archive to these
+logs, the compiled helper/test objects, test executable and production server.
+Each embedded member retains its byte length and SHA-256. These are bounded
+acceptance results; the canonical module remains partial and rendered browser
+interaction remains unverified.
