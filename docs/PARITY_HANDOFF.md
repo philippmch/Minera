@@ -16,7 +16,7 @@ uncovered banks only in new output directories.
 
 ## Pushed checkpoints
 
-Seven functional continuation commits are pushed after `7849925b`:
+Eleven functional continuation commits are pushed after `7849925b`:
 
 - `7cfe40d9`: locale-independent OCEL annotation/conformance JSON, exact signed
   zero and int64 boundaries. The embedded writer is
@@ -44,6 +44,18 @@ Seven functional continuation commits are pushed after `7849925b`:
   length-preserving native carrier.
 - `a5e7de37`: usable pandas/Polars table modes and native table downloads,
   separate engine phases and binary byte target controls in log mode.
+- `71ce83af`: exact log between extraction, original endpoint equality,
+  zero-based case suffixes and a complete result for typed trace keys;
+  169 retained outcomes pass.
+- `e035671a`: pandas between extraction on complete tables, dtype-specific
+  missing cases, nanosecond equality, index/category/context preservation;
+  139 representable outcomes from 140 public calls pass.
+- `723f063e`: eager/lazy Polars between extraction with canonical timestamp
+  sorting, latest-start slices, lexical interval numbering and full diagnostic
+  phases/bytes; all 333 outcomes pass.
+- `dc1d36dc`: usable between controls in the log and table workspaces, complete
+  downloads, literal controls, correct reopening, actual HTTP acceptance and
+  final source/binary evidence bindings.
 
 The earlier seven functional commits after `e68e191d` remain relevant:
 
@@ -118,10 +130,69 @@ The filtering workspace offers separate native table modes with engine-specific
 examples, complete metadata/integer-storage transport and full result/response
 downloads. It does not convert those tables into logs. Log mode accepts typed
 bytes as hexadecimal target JSON and retains native JSON/XES/opening behavior.
-Earlier evidence archives are historical source snapshots; the latest workflow
-archive binds all 21 current implementation/test/CMake sources.
+Earlier evidence archives are historical source snapshots. The repetition
+workflow archive bound 21 sources at that checkpoint; the new between workflow
+archive binds 34 current implementation/test/contract/CMake sources.
+
+Between now has separate native log, pandas and Polars companions. Its banks
+contain 169, 140 and 333 distinct public calls respectively, with all 641
+representable native outcomes passing. The missing-required-argument pandas
+call is outside its C++ signature. Log boundary reuse depends on original
+endpoint equality: scalar versus singleton array differs, and array order and
+duplicates matter. Pandas keeps positional case blocks and the first open
+start; Polars sorts by selected case and canonical `time:timestamp`, keeps the
+latest start and ranks textual interval indexes lexically. Thus `10_11` can
+receive a lower number than `2_3`, while output stays in sorted row order.
+Complete output rows/context and the supported typed native carriers survive.
+
+Log nonstring result keys use an explicit typed sidecar; EventLog projection
+rejects a nonempty sidecar. The workspace exposes literal string selectors and
+offers complete result, native JSON, XES and response downloads. Table mode
+accepts genuine native EventTable JSON Files, raw string/array endpoints and
+literal case/activity/separator controls. It retains engine-specific errors
+and full table downloads without converting tables to logs. All three
+canonical rows remain partial; read their between contracts and
+`docs/table-between-filter-workflow.md`.
 
 ## Current final validation
+
+- **Seven assertion-enabled native suites pass**, including the three between
+  companions, log workbench/route and new table workbench/route:
+  `build/parity-closures/ctest-between-workflows-4.log`.
+- Final native/server build:
+  `build/parity-closures/build-between-workflows-4.log`.
+- Frontend **182 files / 9,711 tests**, TypeScript and Vite pass:
+  `build/parity-closures/frontend-between-final-{full,tsc,vite}.log`;
+  output: `frontend-between-final-dist`. Full tests used two workers and
+  `--testTimeout 30000`. An accidentally duplicated runner was stopped with
+  its own abort receipt; its output is not used as acceptance.
+- **33 final production requests pass** on an independently owned server:
+  `build/parity-closures/between-production-http-3`. It exited, and the existing
+  application was not replaced. Server SHA256 is
+  `3277e18249ed4129441023219f6d3ffc1608afab4a857bdc1e93fcdcf321eccc`.
+- Offline structural catalogue validation passes:
+  `build/parity-closures/catalog-between-final.log`. Counts remain 46/40
+  packages, 226/161 modules and 201 open strict units. No between row was
+  promoted from a finite bank.
+- `docs/between-filter-workflow-checks.jsonl.gz` retains 75 members, current
+  34-source bindings and six compiled bindings, verified by
+  `build/parity-closures/between-evidence-manifest.json`. Dedicated public/native
+  archives retain all three families' recipes, pre-entry dedup, complete
+  returned outputs and diagnostics. Older archives remain historical snapshots.
+
+The initial log compile needed an explicit Unicode helper include. The first
+combined native run found generated-log-test stack overflow and pandas list
+case-label formatting; the next isolated the log overlap/equality mismatch.
+Small non-inlined snapshot/case functions repaired the stack footprint without
+changing expected data. A fresh disjoint six-call public bank established the
+original endpoint-equality rule. All failures and successful later runs remain
+retained; no public calls were replayed. The Polars diagnostic's significant
+trailing spaces now live inside quoted source lines: an offline audit and
+native diagnostic tests establish identical 4,838 runtime bytes. All three
+large generated test targets use `/bigobj` in root CMake as in the validated
+focused project. Rendered browser interaction remains unverified.
+
+## Earlier repetition checkpoint validation
 
 - **Nine assertion-enabled native suites pass**, including all three repetition
   companions, the ordinary/literal continuations, old log workbench/route and
@@ -177,6 +248,15 @@ Rendered application interaction remains unverified.
 
 ## Next open requirements
 
+- Continue the between modules' declared boundaries. Log ordinary typed
+  selector/error representations have a prepared **unexecuted** 20-case bank:
+  `build/filtering-between-log-selectors-prepared-1`. Before root executes it,
+  add the newer equality bank to its prior-receipt audit: the recipe was
+  prepared before `build/filtering-between-log-equality-public-actual-1`.
+  Keep date/float/frozenset selectors, nested nonstring keys and typed-source
+  carrier limits explicit. Pandas nullable UInt64/Float64, float32 case
+  projections and nested temporal labels remain open. Polars warning emission,
+  unobserved dtypes/category dictionaries and physical plans remain open.
 - Continue the wider OCDFG gate. Reuse the retained 77-call bank at
   `build/parity-closures/ocdfg-performance-public-actual-1/capture.json`;
   all retained timing/discovery/aggregation/strict-selector outcomes now have
