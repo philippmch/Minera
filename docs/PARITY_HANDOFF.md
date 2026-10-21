@@ -14,6 +14,156 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Latest attributes checkpoint
+
+Four functional commits are pushed after `0af4187c`:
+
+- `00e60870`: log attributes companion, all eight public functions;
+  280 outcomes, 182 returns / 98 errors, source and parameter mutations.
+- `958bb6f7`: pandas attributes companion, all eight public functions;
+  448 outcomes, 335 complete tables / 113 diagnostics.
+- `5f933276`: Polars eager/lazy attributes companion, all nine public
+  functions; 726 outcomes, 455 exact frames, nine bounded cutoff frames,
+  52 complete unordered typed maps and 210 full diagnostics.
+- `823bdeab`: usable log/table attributes controls, genuine source and
+  auxiliary cache Files, complete artifacts and production acceptance.
+
+Read `docs/attributes-filter-workflow.md` and the three engine contracts.
+All **1,454 distinct public calls** have matched native outcomes within the
+explicit Polars tie/count-order boundaries. The three attributes rows remain
+partial; only evidence pointers changed. Full scope remains **86 packages /
+387 modules**, **46 complete / 40 partial packages**, **226 complete / 161
+partial modules**, **201 strict open units**. Full parity is not complete.
+
+Event-log controls retain source and caller-parameter mutations, including
+before errors. Converter results reconstruct cases and can add canonical IDs
+from selected custom event case cells. Numerical case selection uses an
+unprefixed trace key and separate lookup glue; event reconstruction uses the
+full event cell name. Maximum activities rewrites the literal attribute-key
+parameter even on unchanged-source returns or before a bad-bound error. Its
+equal-frequency ranking is stable first-seen. Relative omission uses event
+counts over **all traces**, including empty traces; true uses cases containing
+the value over all traces; false uses events over all events. Integer products
+use exact TokenInteger arithmetic. The threshold helper consumes supplied
+typed counts and actual cached full trace values independent of the variant
+key. A separate native-log File plus typed variant-to-offset mapping makes that
+cache genuine and downloadable. No cache is inferred from variant labels.
+
+pandas keeps exact integers, dtypes, categories, indexes and context. Both
+numeric whole-case stream predicates are active and ANDed. Supplied count
+dictionaries normalize equal keys with first position/last count, retaining
+nanosecond datetime distinctions. Supplied None differs from omission. An empty
+supplied counter can bypass activity-column lookup. The public valid integer
+activity-limit helper returns the complete unchanged frame; the UI states that
+captured behavior. Negative numeric event filtering retains missing values when
+requested; other matching modes add missing values before mask inversion.
+
+Polars counting has a typed value/count result, separate from filtered source
+rows. Omitted relative mode counts events over distinct case IDs; false uses
+events over events; true uses distinct case/value pairs over cases. Case keys
+are inactive for false relative mode and active for true counts. Integer case
+selectors form literal join groups and append the corresponding native literal
+column. Frequency-cutoff tie identity remains explicitly open: nine retained
+ambiguous outputs are accepted only by the bounded rule requiring every
+higher-frequency group, exactly k complete groups, cutoff-only remaining groups,
+all occurrences and original row order/schema/context. Count-map entry order
+is unclaimed. Original reference snapshots remain unchanged.
+
+Fresh public banks are **executed once and accepted; never replay them**:
+
+- LOG: `build/filtering-attributes-log-public-actual-1` (255),
+  `...log-boundaries-public-actual-1` (12),
+  `...log-parameters-public-actual-1` (4),
+  `...log-forwarding-public-actual-1` (4),
+  `...log-ranking-public-actual-1` (2), and
+  `...log-relative-public-actual-1` (3). Continuations reconstructed and asserted
+  all 255, 267, 271, 275 and 277 complete prior receipt hashes before entry.
+- pandas: `build/filtering-attributes-pandas-public-actual-1` (429), then
+  `...pandas-continuation-public-actual-1` (19), reconstructing all 429 first.
+- Polars: `build/filtering-attributes-polars-public-actual-1` (700),
+  `...polars-relative-public-actual-1` (18), then
+  `...polars-ties-discriminating-public-actual-1` (8), reconstructing all
+  700 and then 718 complete receipts before new entry.
+
+The metadata-only Polars eight-call recipe at
+`build/filtering-attributes-polars-ties-public-prepared-1` remains **unexecuted**
+with its NOT_EXECUTED reason. Its replacement changed actual activity values,
+orders, frequencies and limits. Never execute the rejected recipe. Every
+executed bank deduplicated all current calls and all full prior receipts before
+the first entry. No reference implementation source, AST, bytecode or private
+state was inspected. Opaque hashes and public calls/surfaces remain the boundary.
+
+Final acceptance passes **41 assertion-enabled native suites** in
+`build/parity-closures/native-current/ctest-attributes-final.log`, with build
+`build-attributes-final.log` and configuration
+`configure-attributes-workflows-first.log`. pandas passes all 335 complete
+results / 113 diagnostics; log all 280 outcomes plus native storage controls;
+Polars all 726 bounded outcomes. Failed prebuild/first-module/intermediate
+receipts and matching pre-repair source/compiled identities remain retained.
+The pandas INT64_MIN fixture repair changed literal representation only; all
+448 expected outcomes stayed unchanged. Log reconstruction/ranking/relative
+repairs and Polars literal-case/Greek-mu diagnostic repairs changed general
+implementation behavior; all earlier captured expectations remained unchanged.
+The Polars driver only gained an exception reporter to expose its original
+unhandled failure. Root manual missing-case HTTP fixture also required clearing
+its nonempty legacy case-ID fallback; original fixture and failure are retained.
+
+Production acceptance passes **95 actual HTTP checks** in
+`build/parity-closures/attributes-production-http-4`; its independently owned
+temporary server exits. Server SHA256:
+`1d6b11e78d1197130a162db0419df62ec62e906de4cbee1db60e26e74c54b1e3`.
+Both actual production routes cover genuine uploads, typed controls, complete
+source/result/cache artifacts, error mutations, native/XES reopening, strict
+multipart/query validation and empty-filename File presence. The existing
+application was not replaced. **Rendered browser interaction is unverified.**
+The first HTTP harness stopped after 64 checks because its count-result reader
+assumed the ordinary EventTable shape; the real count artifact used the valid
+complete raw-byte carrier. The repaired harness understands both carriers and
+reuploads the actual raw artifact. The original recipe, response, failure and
+server exit receipt remain retained. The second stopped after 82 because it
+compared threshold output against trace-filter properties, despite the captured
+threshold property reset. The third stopped after 85 because it assumed generic
+XES retained a custom native primary activity role. Final assertions clear only
+the documented threshold trace properties and pass the explicit original
+activity role on XES reupload, checking actual literal event attributes. Every
+failed recipe/response and owned-server exit remains preserved; no product
+changes were needed for these three harness corrections.
+
+Frontend acceptance passes **190 files /
+9809 tests** in
+`build/parity-closures/frontend-attributes-full-third-final.log`; focused 65,
+TypeScript and Vite also pass in the matching `*-third-final.log` receipts.
+Earlier full runs (9,808 then 9,809 tests) remain historical; final copy reflects
+the newly discriminated log relative default and negative numeric-event missing
+behavior. The offline declaration catalogue passes in
+`catalog-attributes-final.log`; it reads the retained declared catalogue, never
+reference implementation source. Initial missing project-root failure remains.
+
+The root archive `docs/attributes-filter-workflow-checks.jsonl.gz` has
+163 members; SHA256 `78a742fc4b00333d4807c50f1b5e69de24511e2c700879ba6637381e8d2f641e`.
+It binds 41 sources,
+100 compiled artifacts and all current acceptance
+receipts plus four engine archives. Run
+`build/parity-closures/verify-attributes-current-bindings.py` for independent
+post-commit source/compiled/receipt/archive and committed partial-row validation.
+Earlier variants proofs remain historical after shared source/server changes.
+
+Keep all 201 open units in scope. Useful next bounded attributes questions
+include pandas zero-count unused-category statistics mixed with missing values
+and activity limits near observed versus declared category counts. No such new
+reference calls have been made. Use genuinely new effective queries and full
+prior receipt barriers. Other remaining module families stay in the full
+catalogue; this checkpoint does not narrow the objective to filtering.
+
+Preserve inherited dirty comparison metadata in
+`docs/reference-2.7.22-coverage.json` (31 insertions / one deletion) and historical
+`docs/reference-2.7.22-parity.md` (one insertion / one deletion), plus untracked
+root node_modules and Python caches. No app replacement/browser workaround is
+authorized by the prior rejection. Root alone runs future reference recipes;
+workers prepare offline. User authorization for parallel subagents, clean
+logical commits and direct main pushes persists. Leave the full-parity goal
+active.
+
 ## Latest variants checkpoint
 
 Four functional commits are pushed after `e335a196`:
