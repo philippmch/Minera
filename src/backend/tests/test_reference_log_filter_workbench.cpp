@@ -161,6 +161,25 @@ void case_workflows() {
   for(const auto& operation:{"case_size","case_count","case_performance"}) assert(run(operation,{field("positive","true")}).status==400);
   assert(run("case_count",{field("minimum","2")}).status==400);assert(run("case_size",{field("timestamp_key","unused")}).status==400);
 }
+void paths_workflow() {
+  const std::string selected="case_id,activity,timestamp\nc1,A,2026-06-01T00:00:00\nc1,X,2026-06-01T00:00:01\nc1,B,2026-06-01T00:00:02\nc2,A,2026-06-01T00:00:03\nc2,B,2026-06-01T00:00:04\n";
+  auto result=run("paths",{field("paths_json","[[\"A\",\"B\"]]")},selected);assert(result.status==200);
+  has(result,"\"result\":{\"traces\":1,\"events\":2}");has(result,"\"filter_attribute_key\":\"activity\"");has(result,"\"activity_key\":\"activity\"");has(result,"\"source_unchanged\":true");
+  const auto projected_xes=artifact(result,"filtered_xes");
+  const auto reopened=run("paths",{field("paths_json","[[\"A\",\"B\"]]"),field("activity_key","activity")},projected_xes,"filtered.xes");assert(reopened.status==200);
+  has(reopened,"\"result\":{\"traces\":1,\"events\":2}");has(reopened,"\"activity_key\":\"activity\"");
+  result=run("paths",{field("paths_json","[[\"A\",\"B\"]]"),field("positive","false")},selected);assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":3}");
+  result=run("path_performance",{field("path_json","[\"A\",\"B\"]"),field("minimum","1"),field("maximum","1")},selected);assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":2}");
+  result=run("paths",{field("paths_json","[]"),field("positive","false")},selected);assert(result.status==200);has(result,"\"result\":{\"traces\":2,\"events\":5}");
+  const std::string key(" channel\n\0Ω ",14);const auto original=run("paths",{field("paths_json","[[\"A\",\"B\"]]")},selected);
+  auto native=parse_embedding_workbench_raw_log_json(artifact(original,"filtered_log_json"));native.attributes={{"kept","metadata"}};native.metadata.properties={{"kept","property"}};native.traces[0].properties={{"kept","trace property"}};
+  native.traces[0].events[0].attributes.push_back({key,"start"});native.traces[0].events[1].attributes.push_back({key,"end"});
+  result=run("paths",{field("paths_json","[[\"start\",\"end\"]]"),field("activity_key",key)},serialize_embedding_workbench_raw_log_json(native),"source.json");assert(result.status==200);
+  has(result,"\"filtered_log_json\":"+serialize_embedding_workbench_string_json(serialize_embedding_workbench_raw_log_json(native)));has(result,"\"activity_key\":\"activity\"");
+  assert(run("paths",{field("paths_json","[[\"A\"]]")},selected).status==400);
+  assert(run("path_performance",{field("path_json","[\"A\",\"B\"]"),field("paths_json","[]")},selected).status==400);
+  assert(run("paths",{field("paths_json","[]"),field("minimum","0")},selected).status==400);
+}
 void invalid_controls() {
   assert(run("unknown").status==400);
   assert(run("prefix").status==400);
@@ -174,4 +193,4 @@ void invalid_controls() {
   assert(execute_reference_log_filter({{"operation","","start",false},{"operation","","end",false}}).status==400);
 }
 }
-int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();case_workflows();invalid_controls();}
+int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();case_workflows();paths_workflow();invalid_controls();}

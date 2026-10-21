@@ -3,13 +3,14 @@ import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart"
 import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString, originalEmbeddingFilterStringBytes, originalEmbeddingFilterStringText, type OriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
 
-export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition", "between", "case_size", "case_count", "case_performance"] as const;
+export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition", "between", "case_size", "case_count", "case_performance", "paths", "path_performance"] as const;
 export type ReferenceLogFilterOperation = typeof REFERENCE_LOG_FILTER_OPERATIONS[number];
 export const REFERENCE_LOG_FILTER_LABELS: Record<ReferenceLogFilterOperation, string> = {
   traces: "Match an activity sequence", prefix: "Keep a prefix before an activity",
   suffix: "Keep a suffix after an activity", start: "Match the first activity",
   end: "Match the last activity", rework: "Find repeated activity", repetition: "Count an exact attribute value", between: "Extract subtraces between activities",
   case_size: "Filter by case event count", case_count: "Limit the number of cases", case_performance: "Filter by case duration",
+  paths: "Match adjacent activity pairs", path_performance: "Filter by adjacent-pair duration",
 };
 export const REFERENCE_LOG_FILTER_CSV_FIELDS = [
   ["case_id_column", "Case ID column", "case_id"], ["activity_column", "Activity column", "activity"],
@@ -25,6 +26,7 @@ export interface ReferenceLogFilterForm {
   admittedJson: string; patternsJson: string; minOccurrences: string;
   repetitionTargetJson: string; minRep: string; maxRep: string;
   minCaseSize: string; maxCaseSize: string; maxCases: string; minCaseSeconds: string; maxCaseSeconds: string;
+  pathsJson: string; pathJson: string; minPathSeconds: string; maxPathSeconds: string;
   timestampKeyMode: "default" | "custom"; timestampKey: string;
   betweenStartJson: string; betweenEndJson: string; betweenCaseKeyMode: "default" | "custom"; betweenCaseKey: string; betweenSeparatorMode: "default" | "custom"; betweenSeparator: string;
   csvOptions: boolean; csv: Record<ReferenceLogFilterCsvKey, string>; trimFields: boolean;
@@ -32,6 +34,7 @@ export interface ReferenceLogFilterForm {
 export function defaultReferenceLogFilterForm(operation: ReferenceLogFilterOperation = "rework"): ReferenceLogFilterForm {
   return {operation, sourceFormat: "auto", activity: "", activityKeyMode: "default", activityKey: "",
     minCaseSize: "2", maxCaseSize: "null", maxCases: "1000", minCaseSeconds: "0", maxCaseSeconds: "10000000000", timestampKeyMode: "default", timestampKey: "time:timestamp",
+    pathsJson: '[["A", "B"]]', pathJson: '["A", "B"]', minPathSeconds: "0", maxPathSeconds: "9223372036854775807",
     positive: true, strict: true, occurrence: "first", admittedJson: '["A"]', patternsJson: '[["A", "...", "B"]]',
     betweenStartJson: '"A"', betweenEndJson: '"B"', betweenCaseKeyMode: "default", betweenCaseKey: "concept:name", betweenSeparatorMode: "default", betweenSeparator: "##@@",
     minOccurrences: "2", repetitionTargetJson: '{"type":"string","value":"web"}', minRep: "2", maxRep: "9223372036854775807", csvOptions: false, csv: {case_id_column: "case_id", activity_column: "activity", timestamp_column: "timestamp", delimiter: ","}, trimFields: false};
@@ -60,12 +63,12 @@ function counts(v: unknown): v is ReferenceLogFilterCounts | null {
   });
 }
 export function isReferenceLogFilterEnvelope(v: unknown): v is ReferenceLogFilterEnvelope {
-  return object(v) && keys(v, ["family", "operation", "http_status", "phase", "source_format", "source", "result", "source_unchanged", "activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error", ...(v.operation === "repetition" ? ["filter_attribute_key"] : v.operation === "between" ? ["filter_attribute_key", "case_id_key", "full_result_json"] : [])])
+  return object(v) && keys(v, ["family", "operation", "http_status", "phase", "source_format", "source", "result", "source_unchanged", "activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error", ...(["repetition", "paths", "path_performance"].includes(String(v.operation)) ? ["filter_attribute_key"] : v.operation === "between" ? ["filter_attribute_key", "case_id_key", "full_result_json"] : [])])
     && v.family === "REFERENCE_LOG_FILTER" && (v.operation === null || typeof v.operation === "string")
     && (v.http_status === 200 || v.http_status === 400) && typeof v.phase === "string"
     && (v.source_format === null || typeof v.source_format === "string") && counts(v.source) && counts(v.result)
     && (v.source_unchanged === null || typeof v.source_unchanged === "boolean")
-    && (!["repetition", "between"].includes(String(v.operation)) || nullableString(v.filter_attribute_key))
+    && (!["repetition", "between", "paths", "path_performance"].includes(String(v.operation)) || nullableString(v.filter_attribute_key))
     && (v.operation !== "between" || nullableString(v.case_id_key) && nullableString(v.full_result_json))
     && ["activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error"].every(key => nullableString(v[key]));
 }
@@ -76,7 +79,14 @@ export function referenceLogFilterFields(form: ReferenceLogFilterForm): Array<[s
   if (!["default", "custom"].includes(form.activityKeyMode)) throw new Error("Choose an activity key mode.");
   const fields: Array<[string, string]> = [["operation", form.operation], ["source_format", form.sourceFormat]];
   if (form.activityKeyMode === "custom" && !form.operation.startsWith("case_")) fields.push(["activity_key", form.activityKey]);
-  if (form.operation === "case_count") fields.push(["max_cases", form.maxCases]);
+  if (form.operation === "paths" || form.operation === "path_performance") {
+    fields.push(["positive", String(form.positive)], [form.operation === "paths" ? "paths_json" : "path_json", form.operation === "paths" ? form.pathsJson : form.pathJson]);
+    if (form.operation === "path_performance") {
+      if (!["default", "custom"].includes(form.timestampKeyMode)) throw new Error("Choose a timestamp key mode.");
+      fields.push(["minimum", form.minPathSeconds], ["maximum", form.maxPathSeconds]);
+      if (form.timestampKeyMode === "custom") fields.push(["timestamp_key", form.timestampKey]);
+    }
+  } else if (form.operation === "case_count") fields.push(["max_cases", form.maxCases]);
   else if (form.operation === "case_size") fields.push(["minimum", form.minCaseSize], ["maximum", form.maxCaseSize]);
   else if (form.operation === "case_performance") {
     if (!["default", "custom"].includes(form.timestampKeyMode)) throw new Error("Choose a timestamp key mode.");
