@@ -40,6 +40,7 @@ add_library(minera_core
   src/backend/pandas_between_filter.cpp
   src/backend/polars_between_filter.cpp
   src/backend/table_between_filter_workbench.cpp
+  src/backend/pandas_case_filter.cpp
   src/backend/log_case_filter.cpp
   src/backend/pandas_attribute_repetition_filter.cpp
   src/backend/polars_attribute_repetition_filter.cpp
@@ -1049,7 +1050,7 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_polars_categorical_table_metadata_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_polars_categorical_table_metadata_tests COMMAND minera_polars_categorical_table_metadata_tests)
 
-  foreach(unit log_case_filter)
+  foreach(unit log_case_filter pandas_case_filter)
     add_executable(minera_${unit}_tests src/backend/tests/test_${unit}.cpp)
     target_link_libraries(minera_${unit}_tests PRIVATE minera::core Threads::Threads)
     target_include_directories(minera_${unit}_tests PRIVATE third_party)
