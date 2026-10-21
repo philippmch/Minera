@@ -2,7 +2,8 @@ import { OcpnDiscoveryControls } from "./OcpnDiscoveryControls";
 import { useState } from "react";
 import { type OcelDiscoveryResult } from "../types";
 import { type OcelDiscoveryOptions } from "../api";
-import { OCEL_MODEL_VARIANTS, DEFAULT_OCDFG_PERFORMANCE, ocelExplorerOptions, type OcelExplorerSettings } from "../ocel-explorer-options";
+import { OCEL_MODEL_VARIANTS, DEFAULT_OCDFG_PERFORMANCE, OCDFG_EDGE_METRIC_ROLES, defaultOcdfgEdgeMetricsSettings, ocelExplorerOptions, type OcelExplorerSettings, type OcdfgEdgeMetricsSettings } from "../ocel-explorer-options";
+import { OcdfgEdgeMetrics } from "./OcdfgEdgeMetrics";
 import { OcdfgModel } from "./OcdfgModel";
 import { OcelGraphModel } from "./OcelGraphModel";
 import { OcelNetModel } from "./OcelNetModel";
@@ -28,9 +29,26 @@ export function OcdfgPerformanceControls({settings,disabled,onChange}:{settings:
   </fieldset>;
 }
 
+export function OcdfgEdgeMetricsControls({settings,disabled,onChange}:{settings:OcdfgEdgeMetricsSettings;disabled:boolean;onChange:(settings:OcdfgEdgeMetricsSettings)=>void}) {
+  return <fieldset className="query-fields" disabled={disabled}>
+    <label className="ocel-check"><input type="checkbox" checked={settings.enabled} onChange={event=>onChange({...settings,enabled:event.target.checked})}/>Include edge association metrics</label>
+    {settings.enabled && <>
+      <p>Include the complete association report when applying discovery. Role overrides preserve literal names, including empty names and line breaks.</p>
+      <details><summary>Optional association role names</summary>{OCDFG_EDGE_METRIC_ROLES.map(role=>{
+        const selected=settings.roles[role.id];
+        const change=(next:{custom:boolean;key:string})=>onChange({...settings,roles:{...settings.roles,[role.id]:next}});
+        return <div key={role.id}>
+          <label className="ocel-check"><input type="checkbox" checked={selected.custom} onChange={event=>change({...selected,custom:event.target.checked})}/>Override association {role.label.toLowerCase()} key</label>
+          {selected.custom && <label className="query-text"><span>{role.label} key</span><textarea rows={2} spellCheck={false} aria-label={`Association ${role.id} key`} value={selected.key} onChange={event=>change({...selected,key:event.target.value})}/></label>}
+        </div>;
+      })}</details>
+    </>}
+  </fieldset>;
+}
+
 /** Discover and inspect all five object-centric model families from one upload. */
 export function OcelExplorer({ result, busy, onDiscover }: OcelExplorerProps) {
-  const [settings,setSettings] = useState<OcelExplorerSettings>({activityAttribute:"",objectTypeAttribute:"",annotated:true,replayDiagnostics:false,ocdfgPerformance:{...DEFAULT_OCDFG_PERFORMANCE}});
+  const [settings,setSettings] = useState<OcelExplorerSettings>({activityAttribute:"",objectTypeAttribute:"",annotated:true,replayDiagnostics:false,ocdfgPerformance:{...DEFAULT_OCDFG_PERFORMANCE},ocdfgEdgeMetrics:defaultOcdfgEdgeMetricsSettings()});
   const selected = result.variant;
   const hasSelectors = selected === "ocdfg" || selected === "ocpn" || selected === "saw";
   return (
@@ -66,6 +84,7 @@ export function OcelExplorer({ result, busy, onDiscover }: OcelExplorerProps) {
         <button className="btn-ghost" type="submit" disabled={busy}>Apply</button>
       </div>}
       {selected === "ocdfg" && <OcdfgPerformanceControls settings={settings.ocdfgPerformance ?? DEFAULT_OCDFG_PERFORMANCE} disabled={busy} onChange={ocdfgPerformance => setSettings({...settings,ocdfgPerformance})} />}
+      {selected === "ocdfg" && <OcdfgEdgeMetricsControls settings={settings.ocdfgEdgeMetrics ?? defaultOcdfgEdgeMetricsSettings()} disabled={busy} onChange={ocdfgEdgeMetrics=>setSettings({...settings,ocdfgEdgeMetrics})}/>}
       </form>
       {selected === "ocdfg" ? (
         <OcdfgModel result={result} />
@@ -74,6 +93,7 @@ export function OcelExplorer({ result, busy, onDiscover }: OcelExplorerProps) {
       ) : (
         <OcelGraphModel result={result} kind={selected} />
       )}
+      {selected === "ocdfg" && result.edge_metrics && <OcdfgEdgeMetrics report={result.edge_metrics}/>}
     </>
   );
 }

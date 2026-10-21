@@ -200,6 +200,8 @@ add_library(minera_core
   src/backend/ocel.cpp
   src/backend/ocdfg_edge_performance.cpp
   src/backend/ocdfg_performance_controls.cpp
+  src/backend/ocdfg_edge_metrics.cpp
+  src/backend/ocdfg_edge_metrics_json.cpp
   src/backend/ocel_csv.cpp
   src/backend/ocel_sqlite.cpp
   src/backend/ocel_filter.cpp
@@ -1867,6 +1869,19 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocel_objects_ot_count_module_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocel_objects_ot_count_module_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_objects_ot_count_module_tests COMMAND minera_ocel_objects_ot_count_module_tests)
+
+  add_executable(minera_ocdfg_edge_metrics_tests src/backend/tests/test_ocdfg_edge_metrics.cpp)
+  target_link_libraries(minera_ocdfg_edge_metrics_tests PRIVATE minera::core)
+  target_compile_features(minera_ocdfg_edge_metrics_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocdfg_edge_metrics_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocdfg_edge_metrics_tests COMMAND minera_ocdfg_edge_metrics_tests)
+
+  add_executable(minera_ocdfg_edge_metrics_controls_tests src/backend/tests/test_ocdfg_edge_metrics_controls.cpp)
+  target_link_libraries(minera_ocdfg_edge_metrics_controls_tests PRIVATE minera::core Threads::Threads)
+  target_include_directories(minera_ocdfg_edge_metrics_controls_tests PRIVATE third_party)
+  target_compile_features(minera_ocdfg_edge_metrics_controls_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocdfg_edge_metrics_controls_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocdfg_edge_metrics_controls_tests COMMAND minera_ocdfg_edge_metrics_controls_tests)
 
   add_executable(minera_ocel_conformance_json_numbers_tests src/backend/tests/test_ocel_conformance_json_numbers.cpp)
   target_link_libraries(minera_ocel_conformance_json_numbers_tests PRIVATE minera::core)

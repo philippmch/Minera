@@ -6196,6 +6196,12 @@ export async function requestRandomTree(options: RandomTreeOptions = {}): Promis
 
 export interface OcelDiscoveryOptions extends OcpnDiscoveryFlags {
   variant?: OcelDiscoveryVariant;
+  include_edge_metrics?: boolean;
+  ocdfg_edge_metrics_event_id_key?: string;
+  ocdfg_edge_metrics_object_id_key?: string;
+  ocdfg_edge_metrics_object_type_key?: string;
+  ocdfg_edge_metrics_activity_key?: string;
+  ocdfg_edge_metrics_timestamp_key?: string;
   compute_edges_performance?: boolean;
   ocdfg_business_hours?: boolean;
   ocdfg_business_hour_slots_json?: string;
@@ -6216,6 +6222,19 @@ export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
   const query = new URLSearchParams();
   appendOcpnDiscoveryFlags(query, options);
   if (options.variant !== undefined) query.set("variant", options.variant);
+  if ((options.variant ?? "ocdfg") === "ocdfg" && options.include_edge_metrics !== undefined) {
+    if (typeof options.include_edge_metrics !== "boolean") throw new Error("include_edge_metrics must be boolean");
+    query.set("include_edge_metrics", String(options.include_edge_metrics));
+    if (options.include_edge_metrics) {
+      for (const key of ["ocdfg_edge_metrics_event_id_key", "ocdfg_edge_metrics_object_id_key",
+        "ocdfg_edge_metrics_object_type_key", "ocdfg_edge_metrics_activity_key", "ocdfg_edge_metrics_timestamp_key"] as const) {
+        if (options[key] !== undefined) {
+          if (typeof options[key] !== "string") throw new Error(`${key} must be a string`);
+          query.set(key, options[key]);
+        }
+      }
+    }
+  }
   if (options.compute_edges_performance !== undefined) {
     query.set("compute_edges_performance", options.compute_edges_performance ? "true" : "false");
   }
