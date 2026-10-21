@@ -11761,8 +11761,39 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/ocel-object-attributes-parity-contract.md",
+      "artifacts": [
+        "include/minera/ocel_filter.hpp",
+        "src/backend/ocel_filter.cpp",
+        "src/backend/tests/test_ocel_object_attributes_module.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.ocel.object_attributes",
+        "implementation": [
+          {
+            "path": "src/backend/ocel_filter.cpp",
+            "symbol": "filter_ocel_object_attribute_exact"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_object_attributes_module.cpp",
+            "executable": "minera_ocel_object_attributes_module_tests",
+            "case": "retained_public_object_attribute_cases"
+          },
+          {
+            "path": "src/backend/tests/test_ocel_object_attributes_module.cpp",
+            "executable": "minera_ocel_object_attributes_module_tests",
+            "case": "retained_public_native_diagnostics"
+          },
+          {
+            "path": "src/backend/tests/test_ocel_object_attributes_module.cpp",
+            "executable": "minera_ocel_object_attributes_module_tests",
+            "case": "full_native_state"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.ocel.objects_ot_count",
