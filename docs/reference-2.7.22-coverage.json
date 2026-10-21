@@ -11710,7 +11710,7 @@
       "classification": "internal-variant",
       "selectors": [],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/log-variants-filter-parity-contract.md"
     },
     {
       "module": "algo.filtering.ocel.activity_type_matching",
