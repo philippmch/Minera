@@ -1,0 +1,61 @@
+{
+  "head": "365ecaf756579315320119061939b06b9d867f5b",
+  "archives": [
+    {
+      "path": "docs/log-ltl-filter-public.json.gz",
+      "bytes": 7592723,
+      "sha256": "2660b657d674d7d7bb621d994f1f4cf93d77fddea034384cdd4b9aafd4174173",
+      "members_verified": 90
+    },
+    {
+      "path": "docs/log-ltl-filter-checks.json.gz",
+      "bytes": 1478607,
+      "sha256": "a2bc768ff0d6e45296247ce1cee5e010c6593e0029782691fa769b4776a91f8e",
+      "members_verified": 88
+    },
+    {
+      "path": "docs/pandas-ltl-filter-public.json.gz",
+      "bytes": 8972301,
+      "sha256": "9f073d0be9b35661772538d4a81a8de206160c281d9da3c119e8b4a2b7bb77fd",
+      "members_verified": 209
+    },
+    {
+      "path": "docs/pandas-ltl-filter-checks.jsonl.gz",
+      "bytes": 1676201,
+      "sha256": "4cd3eba8d2507952459225ba8d69adc650b8eb1da2a1c0f2b391b70edd7b72fc",
+      "members_verified": 88
+    },
+    {
+      "path": "docs/polars-ltl-filter-public.json.gz",
+      "bytes": 610562,
+      "sha256": "6270a238dc204c126e80ee816e5790449ad0f5b23f7ccce9fb7f1e9ab7fd417b",
+      "members_verified": 0
+    },
+    {
+      "path": "docs/polars-ltl-filter-checks.jsonl.gz",
+      "bytes": 19263919,
+      "sha256": "d96dfa5cd3fb2bdaebbb4217d8ee3239f4a9103bed7d8838c18278d563b3f411",
+      "members_verified": 129
+    },
+    {
+      "path": "docs/ltl-filter-workflow-checks.jsonl.gz",
+      "bytes": 42325468,
+      "sha256": "0896ec41d54194638991d9ad1c88bd5501b85dbdc02de713050efbfa9164facc",
+      "members_verified": 8604
+    }
+  ],
+  "committed_sources_verified": 8479,
+  "compiled_artifacts_verified": 217,
+  "receipts_verified": 124,
+  "native_suites": 47,
+  "frontend_tests": 9829,
+  "production_http_checks": 73,
+  "reference_algorithm_calls": 0,
+  "regression_http_checks": 101,
+  "total_production_http_checks": 174,
+  "total_retained_public_outcomes": 1401,
+  "rendered_browser_verified": false,
+  "canonical_modules_remain_partial": true,
+  "scope_note": "Verification covers the integrated code commit named above. The following handoff-only checkpoint does not alter bound sources or binaries.",
+  "direct_public_capsule_note": "Polars public evidence stores 675 direct records instead of encoded file members; its committed archive bytes and saved module evidence hash are verified."
+}
