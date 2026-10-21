@@ -12123,7 +12123,7 @@
       "classification": "support",
       "selectors": [],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/polars-case-filter-parity-contract.md"
     },
     {
       "module": "algo.filtering.polars.consecutive_act_case_grouping.consecutive_act_case_grouping_filter",
