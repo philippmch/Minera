@@ -24,6 +24,14 @@ The native workflow and real multipart HTTP acceptance tests pass. All
 focused tests, TypeScript and production build also pass. See
 [reference-log-filter-workflow.md](reference-log-filter-workflow.md).
 
+The same workspace now counts exact typed attribute values within inclusive
+repetition bounds, including zero-match and empty traces, lazy bound errors,
+exact large integers and NativeNA truth errors. All 109 retained outcomes,
+seven native suites, fourteen production HTTP requests, 9,688 frontend tests,
+TypeScript and Vite pass. The canonical module remains partial for unsupported
+Python object shapes; see
+[log-attribute-repetition-parity-contract.md](log-attribute-repetition-parity-contract.md).
+
 The OCEL preparation workspace also exposes exact event and object membership,
 timestamp, activity/type matching and object-count filters, including typed NaT
 queries. Literal JSON controls retain integer

@@ -12,6 +12,7 @@ afterEach(() => vi.unstubAllGlobals());
 const source = () => new File([new Uint8Array([255, 0, 237, 160, 128])], 'original"Ω.json', {lastModified: 42});
 const envelope = (operation = "rework"): ReferenceLogFilterEnvelope => ({family: "REFERENCE_LOG_FILTER", operation, http_status: 200,
   phase: "complete", source_format: "native_log", source: {traces: 3, events: 8}, result: {traces: 1, events: 3},
+  ...(operation === "repetition" ? {filter_attribute_key: "channel"} : {}),
   source_unchanged: true, activity_key: "concept:name", filtered_log_json: '{"traces":[]}', filtered_xes: '<log/>', xes_error: null, error: null});
 function reply(value = envelope(), status: number = value.http_status) {
   const fetch = vi.fn(async () => new Response(nativeJson(value), {status})); vi.stubGlobal("fetch", fetch); return fetch;
@@ -28,9 +29,11 @@ describe("literal reference-log filter controls", () => {
       expect(fields.operation).toBe(operation); expect(fields).not.toHaveProperty("activity_key");
       expect(fields).not.toHaveProperty("case_id_column");
       if (operation === "prefix" || operation === "suffix") {expect(fields).toMatchObject({activity: "", strict: "true", occurrence: "first"}); expect(fields).not.toHaveProperty("positive");}
+      else if (operation === "repetition") {expect(fields).toMatchObject({target_json: form.repetitionTargetJson, min_rep: "2", max_rep: "9223372036854775807"}); expect(fields).not.toHaveProperty("positive"); expect(fields).not.toHaveProperty("activity");}
       else expect(fields.positive).toBe("true");
       expect(Object.hasOwn(fields, "patterns_json")).toBe(operation === "traces");
       expect(Object.hasOwn(fields, "admitted_json")).toBe(operation === "start" || operation === "end");
+      expect(Object.hasOwn(fields, "target_json")).toBe(operation === "repetition");
       expect(Object.hasOwn(fields, "min_occurrences")).toBe(operation === "rework");
       form.activityKeyMode = "custom"; form.activityKey = "";
       expect(referenceLogFilterFields(form)).toContainEqual(["activity_key", ""]);
@@ -68,6 +71,23 @@ describe("actual multipart request helper with unit-only HTTP doubles", () => {
     expect(body.get("activity_key")).toBe(""); expect(result.fields).toContainEqual(["activity", form.activity]);
     expect(new Uint8Array(await (body.get("source_file") as File).arrayBuffer())).toEqual(new Uint8Array(await file.arrayBuffer()));
   });
+  it("transports exact typed repetition targets and bounds and opens the original activity", async () => {
+    const value = envelope("repetition"); value.activity_key = "work"; value.filter_attribute_key = " channel\n";
+    const fetch = reply(value), form = defaultReferenceLogFilterForm("repetition");
+    form.activityKeyMode = "custom"; form.activityKey = " channel\n";
+    form.repetitionTargetJson = '\r\n{"type":"tuple","value":[{"type":"integer","value":9007199254740993},{"type":"null"}]}\n';
+    form.minRep = "-999999999999999999999999999999999999999"; form.maxRep = "2.0000000000000004";
+    const run = await requestReferenceLogFilter(source(), form), body = parts(fetch);
+    for (const [key, expected] of [["activity_key", form.activityKey], ["target_json", form.repetitionTargetJson], ["min_rep", form.minRep], ["max_rep", form.maxRep]]) expect(await field(body, key)).toEqual(nativeStringBytes(expected));
+    for (const key of ["positive", "activity", "min_occurrences", "patterns_json", "admitted_json", "strict"]) expect(body.has(key)).toBe(false);
+    expect(run.value.filter_attribute_key).toBe(form.activityKey);
+    const open = vi.fn(); openReferenceLogFilter(run, open);
+    expect(open.mock.calls[0][1]).toBe("work"); expect(await open.mock.calls[0][0].text()).toBe("<log/>");
+    expect(await referenceLogFilterArtifactFile(run, "json").text()).toBe(value.filtered_log_json);
+    expect(isReferenceLogFilterEnvelope({...value, filter_attribute_key: undefined})).toBe(false);
+    const {filter_attribute_key: ignored, ...missing} = value; void ignored;
+    expect(isReferenceLogFilterEnvelope(missing)).toBe(false);
+  });
   it("uses no client-side JSON normalization before native array validation", async () => {
     const fetch = reply(envelope("traces")), form = defaultReferenceLogFilterForm("traces"); form.patternsJson = '\r\n[[" A,B ", ""]]\r\n';
     await requestReferenceLogFilter(source(), form); expect(await field(parts(fetch), "patterns_json")).toEqual(nativeStringBytes(form.patternsJson));
@@ -78,6 +98,13 @@ describe("actual multipart request helper with unit-only HTTP doubles", () => {
     const run = await requestReferenceLogFilter(source(), defaultReferenceLogFilterForm());
     expect(run.value.error).toEqual(value.error); expect(run.value.source).toEqual({traces: 3, events: 8});
     expect(new TextDecoder().decode(run.responseBytes)).toBe(run.raw);
+  });
+  it("accepts repetition source-import failures with nullable counted-key metadata", async () => {
+    const value = envelope("repetition"); Object.assign(value, {http_status: 400, phase: "source_import", source: null, result: null, source_unchanged: null, activity_key: null, filter_attribute_key: null, filtered_log_json: null, filtered_xes: null, error: "Invalid source log"});
+    reply(value); const run = await requestReferenceLogFilter(source(), defaultReferenceLogFilterForm("repetition"));
+    expect(run.value.phase).toBe("source_import"); expect(run.value.filter_attribute_key).toBeNull();
+    expect(() => referenceLogFilterArtifactFile(run, "json")).toThrow(/unavailable/);
+    expect(isReferenceLogFilterEnvelope({...envelope(), filter_attribute_key: null})).toBe(false);
   });
   it("keeps native JSON downloadable when optional XES export fails", async () => {
     const value = envelope(); value.filtered_xes = null; value.xes_error = "Cannot represent the event value in XES"; reply(value);
@@ -145,7 +172,7 @@ describe("exact response artifacts and request lifetime", () => {
   it("invalidates every source/criteria/CSV change and rejects previous requests after edits/unmount", () => {
     const identity = {source: source(), form: defaultReferenceLogFilterForm()}, gate = new ReferenceLogFilterRequestGate(), first = gate.issue(identity);
     expect(gate.accepts(first, {source: identity.source, form: {...identity.form, csv: {...identity.form.csv}}})).toBe(true);
-    for (const patch of [{activity: "A"}, {positive: false}, {strict: false}, {occurrence: "last"}, {sourceFormat: "xes"}, {activityKeyMode: "custom"}, {activityKey: "" + "x"}, {minOccurrences: "NaN"}, {admittedJson: "[]"}, {patternsJson: "[]"}, {csvOptions: true}, {trimFields: true}, {csv: {...identity.form.csv, activity_column: ""}}])
+    for (const patch of [{activity: "A"}, {positive: false}, {strict: false}, {occurrence: "last"}, {sourceFormat: "xes"}, {activityKeyMode: "custom"}, {activityKey: "" + "x"}, {minOccurrences: "NaN"}, {minRep: "0"}, {maxRep: "1"}, {repetitionTargetJson: '{"type":"null"}'}, {admittedJson: "[]"}, {patternsJson: "[]"}, {csvOptions: true}, {trimFields: true}, {csv: {...identity.form.csv, activity_column: ""}}])
       expect(gate.accepts(first, {source: identity.source, form: {...identity.form, ...patch} as ReferenceLogFilterForm})).toBe(false);
     expect(gate.accepts(first, {...identity, source: source()})).toBe(false);
     const second = gate.issue(identity); expect(gate.accepts(first, identity)).toBe(false); expect(gate.accepts(second, identity)).toBe(true);

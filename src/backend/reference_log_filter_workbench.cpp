@@ -4,6 +4,7 @@
 #include "minera/literal_controls_json.hpp"
 #include "minera/log_boundary_filter.hpp"
 #include "minera/log_rework_filter.hpp"
+#include "minera/log_attribute_repetition_controls.hpp"
 #include "minera/log_segments_filter.hpp"
 #include "minera/log_trace_filter.hpp"
 #include "minera/xes_event_log_importer.hpp"
@@ -97,7 +98,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
   std::map<std::string,const DiscoveryWorkbenchPart*> fields;
   std::optional<EventLog> source,result;
   std::optional<std::string> source_before;
-  std::string operation,format,key,phase="control",error,export_error,raw_result,xes;
+  std::string operation,format,key,open_key,phase="control",error,export_error,raw_result,xes;
   std::optional<bool> unchanged;
   int status=200;
   const auto field=[&](const std::string& name,std::string fallback={}) {
@@ -113,12 +114,12 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     if(!transport_error.empty()) throw std::invalid_argument(std::string(transport_error));
     static const std::set<std::string> allowed={"operation","source_file","source_format",
       "activity_key","activity","positive","strict","occurrence","admitted_json","patterns_json",
-      "min_occurrences","case_id_column","activity_column","timestamp_column","delimiter","trim_fields"};
+      "min_occurrences","target_json","min_rep","max_rep","case_id_column","activity_column","timestamp_column","delimiter","trim_fields"};
     for(const auto* collection:{&query,&parts}) for(const auto& part:*collection) {
       if(!allowed.contains(part.name)) throw std::invalid_argument("unknown log filter control: "+part.name);
       if(!fields.emplace(part.name,&part).second) throw std::invalid_argument("duplicate log filter control: "+part.name);
     }
-    static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework"};
+    static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework","repetition"};
     operation=field("operation");
     if(!operations.contains(operation)) { operation.clear();throw std::invalid_argument("choose a supported log filter"); }
     const auto found=fields.find("source_file");
@@ -128,6 +129,13 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
       throw std::invalid_argument("source_file must be a multipart File");
     const bool segment=operation=="prefix" || operation=="suffix";
     const bool boundary=operation=="start" || operation=="end";
+    const bool repetition=operation=="repetition";
+    if(repetition && !fields.contains("target_json"))
+      throw std::invalid_argument("attribute repetition requires target_json");
+    if(!repetition && (fields.contains("target_json") || fields.contains("min_rep") || fields.contains("max_rep")))
+      throw std::invalid_argument("target_json/min_rep/max_rep require attribute repetition filtering");
+    if(repetition && fields.contains("positive"))
+      throw std::invalid_argument("positive is inapplicable to attribute repetition filtering");
     if((segment || operation=="rework") && !fields.contains("activity"))
       throw std::invalid_argument("this filter requires an activity (an empty label is valid)");
     if(operation=="traces" && !fields.contains("patterns_json"))
@@ -170,6 +178,20 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
         options.delimiter=delimiter.front();source=import_csv_event_log(input,options);
       }
     }
+    open_key=key;
+    if(repetition) {
+      open_key=format=="csv"?field("activity_column","activity"):"concept:name";
+      if(format=="native_log") {
+        bool found_activity=false;
+        for(const auto& trace:source->traces) {
+          for(const auto& event:trace.events) {
+            if(!event.activity_source_key.empty()) { open_key=event.activity_source_key; found_activity=true; break; }
+            if(event.activity_attribute) { open_key=event.activity_attribute->key; found_activity=true; break; }
+          }
+          if(found_activity) break;
+        }
+      }
+    }
     source_before=serialize_embedding_workbench_raw_log_json(*source);
     phase="filter";
     if(operation=="traces") result=filter_log_traces(*source,patterns(field("patterns_json")),{boolean("positive",true),key});
@@ -183,6 +205,11 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
       if(occurrence!="first" && occurrence!="last") throw std::invalid_argument("occurrence must be first or last");
       options.occurrence=occurrence=="first"?LogSegmentOccurrence::first:LogSegmentOccurrence::last;
       result=operation=="prefix"?filter_log_prefix(*source,field("activity"),options):filter_log_suffix(*source,field("activity"),options);
+    } else if(repetition) {
+      LogAttributeRepetitionOptions options;options.attribute_key=key;
+      if(fields.contains("min_rep")) options.minimum=parse_log_attribute_repetition_bound_json(field("min_rep"));
+      if(fields.contains("max_rep")) options.maximum=parse_log_attribute_repetition_bound_json(field("max_rep"));
+      result=filter_log_attribute_value_repetition(*source,parse_log_attribute_repetition_target_json(field("target_json")),options);
     } else {
       LogReworkFilterOptions options;options.activity_key=key;options.positive=boolean("positive",true);
       if(fields.contains("min_occurrences")) options.min_occurrences=minimum(field("min_occurrences"));
@@ -203,7 +230,8 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     ",\"http_status\":"+std::to_string(status)+",\"phase\":"+q(phase)+",\"source_format\":"+optional_text(format,!format.empty())+
     ",\"source\":"+(source?counts(*source):"null")+",\"result\":"+(result?counts(*result):"null")+
     ",\"source_unchanged\":"+(unchanged?(*unchanged?"true":"false"):"null")+
-    ",\"activity_key\":"+optional_text(key,source.has_value())+
+    ",\"activity_key\":"+optional_text(operation=="repetition"?open_key:key,source.has_value())+
+    (operation=="repetition"?",\"filter_attribute_key\":"+optional_text(key,source.has_value()):"")+
     ",\"filtered_log_json\":"+optional_text(raw_result,!raw_result.empty())+
     ",\"filtered_xes\":"+optional_text(xes,result.has_value() && export_error.empty() && error.empty())+
     ",\"xes_error\":"+optional_text(export_error,!export_error.empty())+

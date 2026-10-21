@@ -13,13 +13,23 @@ function result(): ReferenceLogFilterRun {
   const raw = nativeJson(value); return {value, raw, responseBytes: nativeStringBytes(raw), fields: [], sourceFile: new File([], "source.csv")};
 }
 describe("filter workspace SSR controls and results (no browser event/effect execution)", () => {
-  it("renders source then criteria, all six operations, and empty-label guidance without eager requests", () => {
+  it("renders source then criteria, all seven operations, and empty-label guidance without eager requests", () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch); const html = display(createElement(ReferenceLogFilterWorkspace));
     for (const label of ["Source", "Criteria", "Event log file", "Native log JSON", "Exact activity label", "Empty labels are valid", "Minimum occurrences", "Apply log filter"]) expect(html).toContain(label);
-    for (const value of ["traces", "prefix", "suffix", "start", "end", "rework"]) expect(html).toContain(`value="${value}"`);
+    for (const value of ["traces", "prefix", "suffix", "start", "end", "rework", "repetition"]) expect(html).toContain(`value="${value}"`);
     expect(html.indexOf("<legend>Source")).toBeLessThan(html.indexOf("<legend>Criteria")); expect(fetch).not.toHaveBeenCalled();
     expect(html).toContain("Choose a source file to apply this filter"); expect(html).toContain('disabled=""');
     expect(html).toContain('accept=".csv,.xes,.xes.gz,.json"'); expect(html).not.toContain(".tsv");
+  });
+  it("renders typed repetition, both inclusive bounds and a literal multiline key without unrelated controls", () => {
+    const initialForm = defaultReferenceLogFilterForm("repetition"); initialForm.activityKeyMode = "custom"; initialForm.activityKey = " channel\n";
+    const html = display(createElement(ReferenceLogFilterWorkspace, {initialForm}));
+    for (const text of ["Counted attribute", "Exact typed value as JSON", "Minimum repetitions", "Maximum repetitions", "Both bounds are inclusive", "Missing attributes do not count", "Zero counts and empty cases can match", "frozenset", "9007199254740993"]) expect(html).toContain(text);
+    expect(html).toContain('rows="2"'); expect(html).toContain(" channel\n");
+    for (const text of ["Exact activity label", "Minimum occurrences", "Keep matching cases", "First occurrence"]) expect(html).not.toContain(text);
+    const run = result(); run.value.operation = "repetition"; run.value.filter_attribute_key = "channel";
+    const inspected = display(createElement(ReferenceLogFilterInspection, {run}));
+    expect(inspected).toContain("Counted attribute: channel"); expect(inspected).toContain("activity attribute: activity");
   });
   it("shows strict and first/last controls only for prefix/suffix", () => {
     for (const operation of ["prefix", "suffix"] as const) {
