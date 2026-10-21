@@ -1042,6 +1042,12 @@ if(MINERA_BUILD_TESTS)
   endif()
   add_test(NAME minera_polars_between_filter_tests COMMAND minera_polars_between_filter_tests)
 
+  add_executable(minera_polars_categorical_table_metadata_tests src/backend/tests/test_polars_categorical_table_metadata.cpp)
+  target_link_libraries(minera_polars_categorical_table_metadata_tests PRIVATE minera::core)
+  target_compile_features(minera_polars_categorical_table_metadata_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_polars_categorical_table_metadata_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_polars_categorical_table_metadata_tests COMMAND minera_polars_categorical_table_metadata_tests)
+
   add_executable(minera_table_between_filter_workbench_tests src/backend/tests/test_table_between_filter_workbench.cpp)
   target_link_libraries(minera_table_between_filter_workbench_tests PRIVATE minera::core)
   target_compile_features(minera_table_between_filter_workbench_tests PRIVATE cxx_std_20)

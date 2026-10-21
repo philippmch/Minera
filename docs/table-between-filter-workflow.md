@@ -39,6 +39,17 @@ apply; lazy Polars schema and membership errors occur during collect. Import
 and control errors remain distinct. This route does not convert a table into
 an EventLog.
 
+Polars category dictionaries use one `categorical_dtypes` entry per column:
+`{"categories_dtype":"String","categories":[{"value":"unused"},{"value":"A"}],"ordered":false}`.
+Other columns use null entries. The declared dtype is `Categorical`, its named
+constructor text, or an `Enum(categories=[...])` declaration. Dictionary values
+must be ordinary strings; nulls, duplicates and nonstring values are rejected.
+Enum case columns require their complete dictionary because case sorting follows
+that declared order. Categorical cases sort lexically. Rewritten case columns
+become String and discard their former category descriptor; other dictionaries,
+including unused entries, survive. Named declarations remain in dtype text;
+runtime context aliasing and physical category codes remain outside this carrier.
+
 Native helper and HTTP tests cover complete artifact transport, both engines,
 literal controls, invalid sources and error phases. Frontend tests cover real
 FormData construction, response validation, exact integer/download bytes,
