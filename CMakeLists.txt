@@ -37,6 +37,7 @@ add_library(minera_core
   src/backend/log_attribute_repetition_filter.cpp
   src/backend/log_attribute_repetition_controls.cpp
   src/backend/log_between_filter.cpp
+  src/backend/pandas_between_filter.cpp
   src/backend/pandas_attribute_repetition_filter.cpp
   src/backend/polars_attribute_repetition_filter.cpp
   src/backend/ocel_exact_filter_controls.cpp
@@ -1020,6 +1021,15 @@ if(MINERA_BUILD_TESTS)
     target_compile_options(minera_log_between_filter_tests PRIVATE /bigobj)
   endif()
   add_test(NAME minera_log_between_filter_tests COMMAND minera_log_between_filter_tests)
+
+  add_executable(minera_pandas_between_filter_tests src/backend/tests/test_pandas_between_filter.cpp)
+  target_link_libraries(minera_pandas_between_filter_tests PRIVATE minera::core)
+  target_compile_features(minera_pandas_between_filter_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_pandas_between_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  if(MSVC)
+    target_compile_options(minera_pandas_between_filter_tests PRIVATE /bigobj)
+  endif()
+  add_test(NAME minera_pandas_between_filter_tests COMMAND minera_pandas_between_filter_tests)
 
   add_executable(minera_log_attribute_repetition_ordinary_tests src/backend/tests/test_log_attribute_repetition_ordinary.cpp)
   target_link_libraries(minera_log_attribute_repetition_ordinary_tests PRIVATE minera::core)
