@@ -2,6 +2,7 @@
 #include "minera/case_description_workbench_json.hpp"
 #include "minera/reference_log_filter_workbench.hpp"
 #include "minera/ocel_exact_filter_controls.hpp"
+#include "ocdfg_performance_route.hpp"
 #include "case_relations_input.hpp"
 #include "case_relations_typed_input.hpp"
 // Local application server: serves the built frontend and mines uploaded
@@ -2102,7 +2103,9 @@ void handle_ocel_discovery(const httplib::Request& request,
         "diagnostics_with_token_based_replay", "ocpn_disable_strict_sequence_cut",
         "ocpn_disable_fallthroughs", "ocpn_activity_attribute",
         "ocpn_object_type_attribute", "ocdfg_activity_attribute",
-        "ocdfg_object_type_attribute", "saw_activity_attribute",
+        "ocdfg_object_type_attribute", "ocdfg_business_hours",
+        "ocdfg_business_hour_slots_json", "ocdfg_event_id_attribute",
+        "ocdfg_timestamp_attribute", "ocdfg_workcalendar_json", "saw_activity_attribute",
         "saw_object_type_attribute"};
     for (const auto& [key, value] : request.params) {
       (void)value;
@@ -2183,6 +2186,8 @@ void handle_ocel_discovery(const httplib::Request& request,
       minera::OcdfgDiscoveryOptions options;
       options.compute_edges_performance =
           ocel_query_bool(request, "compute_edges_performance", true);
+      options.edge_performance_options =
+          ocdfg_performance_options_from_request(request);
       if (request.has_param("ocdfg_activity_attribute")) {
         options.activity_attribute = trim_text(
             request.get_param_value("ocdfg_activity_attribute"));

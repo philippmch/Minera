@@ -2,7 +2,7 @@ import { OcpnDiscoveryControls } from "./OcpnDiscoveryControls";
 import { useState } from "react";
 import { type OcelDiscoveryResult } from "../types";
 import { type OcelDiscoveryOptions } from "../api";
-import { OCEL_MODEL_VARIANTS, ocelExplorerOptions, type OcelExplorerSettings } from "../ocel-explorer-options";
+import { OCEL_MODEL_VARIANTS, DEFAULT_OCDFG_PERFORMANCE, ocelExplorerOptions, type OcelExplorerSettings } from "../ocel-explorer-options";
 import { OcdfgModel } from "./OcdfgModel";
 import { OcelGraphModel } from "./OcelGraphModel";
 import { OcelNetModel } from "./OcelNetModel";
@@ -13,9 +13,24 @@ interface OcelExplorerProps {
   onDiscover: (options: OcelDiscoveryOptions) => void;
 }
 
+export function OcdfgPerformanceControls({settings,disabled,onChange}:{settings:NonNullable<OcelExplorerSettings["ocdfgPerformance"]>;disabled:boolean;onChange:(settings:NonNullable<OcelExplorerSettings["ocdfgPerformance"]>)=>void}) {
+  return <fieldset className="query-fields" disabled={disabled}>
+    <label className="ocel-check"><input type="checkbox" checked={settings.enabled} onChange={event=>onChange({...settings,enabled:event.target.checked})}/>Configure edge performance timing</label>
+    {settings.enabled && <>
+      <label className="ocel-check"><input type="checkbox" checked={settings.businessHours} onChange={event=>onChange({...settings,businessHours:event.target.checked})}/>Count only working time</label>
+      {settings.businessHours && <>
+        <label className="filters-field"><span>Weekly working schedule</span><select value={settings.slotsMode} onChange={event=>onChange({...settings,slotsMode:event.target.value as "default"|"custom"})}><option value="default">Monday–Friday, 07:00–17:00</option><option value="custom">Custom weekly slots</option></select></label>
+        {settings.slotsMode === "custom" && <label className="query-text"><span>Weekly slots JSON</span><textarea spellCheck={false} rows={4} value={settings.slotsJson} onChange={event=>onChange({...settings,slotsJson:event.target.value})}/></label>}
+        <p>Slots are [start, end] seconds from Monday 00:00 in local wall time. Overlapping slots are merged. An empty list counts zero working seconds. Holiday calendars do not change these timings.</p>
+      </>}
+      <p>Apply to rediscover performance for the current OCEL. Disabling working time counts elapsed time.</p>
+    </>}
+  </fieldset>;
+}
+
 /** Discover and inspect all five object-centric model families from one upload. */
 export function OcelExplorer({ result, busy, onDiscover }: OcelExplorerProps) {
-  const [settings,setSettings] = useState<OcelExplorerSettings>({activityAttribute:"",objectTypeAttribute:"",annotated:true,replayDiagnostics:false});
+  const [settings,setSettings] = useState<OcelExplorerSettings>({activityAttribute:"",objectTypeAttribute:"",annotated:true,replayDiagnostics:false,ocdfgPerformance:{...DEFAULT_OCDFG_PERFORMANCE}});
   const selected = result.variant;
   const hasSelectors = selected === "ocdfg" || selected === "ocpn" || selected === "saw";
   return (
@@ -50,6 +65,7 @@ export function OcelExplorer({ result, busy, onDiscover }: OcelExplorerProps) {
         </>}
         <button className="btn-ghost" type="submit" disabled={busy}>Apply</button>
       </div>}
+      {selected === "ocdfg" && <OcdfgPerformanceControls settings={settings.ocdfgPerformance ?? DEFAULT_OCDFG_PERFORMANCE} disabled={busy} onChange={ocdfgPerformance => setSettings({...settings,ocdfgPerformance})} />}
       </form>
       {selected === "ocdfg" ? (
         <OcdfgModel result={result} />
