@@ -3,12 +3,12 @@ import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart"
 import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString, originalEmbeddingFilterStringBytes, originalEmbeddingFilterStringText, type OriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
 
-export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework"] as const;
+export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition"] as const;
 export type ReferenceLogFilterOperation = typeof REFERENCE_LOG_FILTER_OPERATIONS[number];
 export const REFERENCE_LOG_FILTER_LABELS: Record<ReferenceLogFilterOperation, string> = {
   traces: "Match an activity sequence", prefix: "Keep a prefix before an activity",
   suffix: "Keep a suffix after an activity", start: "Match the first activity",
-  end: "Match the last activity", rework: "Find repeated activity",
+  end: "Match the last activity", rework: "Find repeated activity", repetition: "Count an exact attribute value",
 };
 export const REFERENCE_LOG_FILTER_CSV_FIELDS = [
   ["case_id_column", "Case ID column", "case_id"], ["activity_column", "Activity column", "activity"],
@@ -22,17 +22,19 @@ export interface ReferenceLogFilterForm {
   activity: string; activityKeyMode: "default" | "custom"; activityKey: string;
   positive: boolean; strict: boolean; occurrence: "first" | "last";
   admittedJson: string; patternsJson: string; minOccurrences: string;
+  repetitionTargetJson: string; minRep: string; maxRep: string;
   csvOptions: boolean; csv: Record<ReferenceLogFilterCsvKey, string>; trimFields: boolean;
 }
 export function defaultReferenceLogFilterForm(operation: ReferenceLogFilterOperation = "rework"): ReferenceLogFilterForm {
   return {operation, sourceFormat: "auto", activity: "", activityKeyMode: "default", activityKey: "",
     positive: true, strict: true, occurrence: "first", admittedJson: '["A"]', patternsJson: '[["A", "...", "B"]]',
-    minOccurrences: "2", csvOptions: false, csv: {case_id_column: "case_id", activity_column: "activity", timestamp_column: "timestamp", delimiter: ","}, trimFields: false};
+    minOccurrences: "2", repetitionTargetJson: '{"type":"string","value":"web"}', minRep: "2", maxRep: "9223372036854775807", csvOptions: false, csv: {case_id_column: "case_id", activity_column: "activity", timestamp_column: "timestamp", delimiter: ","}, trimFields: false};
 }
 export interface ReferenceLogFilterCounts {traces: number; events: number;}
 export interface ReferenceLogFilterEnvelope {
   family: "REFERENCE_LOG_FILTER"; operation: string | null; http_status: 200 | 400; phase: string;
   source_format: string | null; source: ReferenceLogFilterCounts | null; result: ReferenceLogFilterCounts | null;
+  filter_attribute_key?: ReferenceLogFilterNativeString | null;
   source_unchanged: boolean | null; activity_key: ReferenceLogFilterNativeString | null;
   filtered_log_json: ReferenceLogFilterNativeString | null; filtered_xes: ReferenceLogFilterNativeString | null;
   xes_error: ReferenceLogFilterNativeString | null; error: ReferenceLogFilterNativeString | null;
@@ -51,11 +53,12 @@ function counts(v: unknown): v is ReferenceLogFilterCounts | null {
   });
 }
 export function isReferenceLogFilterEnvelope(v: unknown): v is ReferenceLogFilterEnvelope {
-  return object(v) && keys(v, ["family", "operation", "http_status", "phase", "source_format", "source", "result", "source_unchanged", "activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error"])
+  return object(v) && keys(v, ["family", "operation", "http_status", "phase", "source_format", "source", "result", "source_unchanged", "activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error", ...(v.operation === "repetition" ? ["filter_attribute_key"] : [])])
     && v.family === "REFERENCE_LOG_FILTER" && (v.operation === null || typeof v.operation === "string")
     && (v.http_status === 200 || v.http_status === 400) && typeof v.phase === "string"
     && (v.source_format === null || typeof v.source_format === "string") && counts(v.source) && counts(v.result)
     && (v.source_unchanged === null || typeof v.source_unchanged === "boolean")
+    && (v.operation !== "repetition" || nullableString(v.filter_attribute_key))
     && ["activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error"].every(key => nullableString(v[key]));
 }
 /** Fields remain literal; native validation owns JSON arrays and scalar tokens. */
@@ -68,6 +71,8 @@ export function referenceLogFilterFields(form: ReferenceLogFilterForm): Array<[s
   if (form.operation === "prefix" || form.operation === "suffix") {
     if (!["first", "last"].includes(form.occurrence)) throw new Error("Choose the first or last occurrence.");
     fields.push(["activity", form.activity], ["strict", String(form.strict)], ["occurrence", form.occurrence]);
+  } else if (form.operation === "repetition") {
+    fields.push(["target_json", form.repetitionTargetJson], ["min_rep", form.minRep], ["max_rep", form.maxRep]);
   } else {
     fields.push(["positive", String(form.positive)]);
     if (form.operation === "rework") fields.push(["activity", form.activity], ["min_occurrences", form.minOccurrences]);

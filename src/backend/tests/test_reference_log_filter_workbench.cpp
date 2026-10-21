@@ -1,6 +1,9 @@
 #include "minera/reference_log_filter_workbench.hpp"
 #include "minera/embedding_workbench_json.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/log_attribute_repetition_controls.hpp"
+#include <cmath>
+#include <stdexcept>
 #include <cassert>
 #include <sstream>
 
@@ -50,6 +53,59 @@ void native_literal_and_export_workflow() {
   result=run("traces",{field("patterns_json","[]")},serialize_embedding_workbench_raw_log_json(log),"original.json");
   assert(result.status==200);has(result,"\"error\":null");has(result,"\"filtered_xes\":null");assert(result.json.find("\"xes_error\":null")==std::string::npos);
 }
+void repetition_workflow_and_typed_controls() {
+  const std::string selected="case_id,activity,channel\nc1,A,web\nc1,B,web\nc2,C,mail\n";
+  const auto target=field("target_json",R"({"type":"string","value":"web"})");
+  auto result=run("repetition",{target,field("activity_key","channel")},selected);
+  assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":2}");
+  has(result,"\"filter_attribute_key\":\"channel\"");has(result,"\"activity_key\":\"activity\"");
+  has(result,"\"source_unchanged\":true");
+  result=run("repetition",{target,field("activity_key","channel"),field("min_rep","0"),field("max_rep","0")},selected);
+  assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":1}");
+  result=run("repetition",{target,field("activity_key","channel"),field("min_rep","3"),field("max_rep","2")},selected);
+  assert(result.status==200);has(result,"\"result\":{\"traces\":0,\"events\":0}");
+  result=run("repetition",{target,field("activity_key","channel"),field("min_rep","3"),field("max_rep","null")},selected);
+  assert(result.status==200);has(result,"\"result\":{\"traces\":0,\"events\":0}");
+  result=run("repetition",{target,field("activity_key","channel"),field("min_rep","null")},selected);
+  assert(result.status==400);has(result,"\"phase\":\"filter\"");has(result,"\"source_unchanged\":true");
+  EventLog log;Trace trace;Event event;event.activity="A";event.activity_source_key="work";
+  event.activity_attribute=EventAttribute{"work","A"};event.activity_state=FirstClassAttributeState::kPresent;
+  auto value=parse_log_attribute_repetition_target_json(R"({"type":"tuple","value":[{"type":"integer","value":"9007199254740993"},{"type":"null"}]})");
+  value.key=" selected\n";event.attributes={value};trace.events={event,event};log.traces={trace};
+  const auto raw=serialize_embedding_workbench_raw_log_json(log);
+  result=run("repetition",{field("activity_key",value.key),field("target_json",R"({"type":"tuple","value":[{"type":"integer","value":9007199254740993},{"type":"null"}]})")},raw,"source.json");
+  assert(result.status==200);has(result,"\"filtered_log_json\":"+serialize_embedding_workbench_string_json(raw));
+  has(result,"\"activity_key\":\"work\"");has(result,"\"filter_attribute_key\":\" selected\\n\"");
+  for(const auto& text:{R"({"type":"string","value":""})",R"({"type":"integer","value":"18446744073709551616"})",R"({"type":"decimal","value":"NaN"})",R"({"type":"decimal","value":"INF"})",R"({"type":"boolean","value":false})",R"({"type":"date","value":"2026-03-03T04:05:06.000000001Z"})",R"({"type":"map","value":{"x":{"type":"integer","value":1}}})",R"({"type":"set","value":[{"type":"integer","value":1}]})",R"({"type":"frozenset","value":[{"type":"integer","value":1}]})",R"({"type":"na"})"})
+    (void)parse_log_attribute_repetition_target_json(text);
+  for(const auto& text:{"-99999999999999999999999999999999999999","1.5","false","null","\"2\""," NaN ","INF","-INF"})
+    (void)parse_log_attribute_repetition_bound_json(text);
+  for(const auto& text:{R"({"type":"integer","value":"1.5"})",R"({"type":"null","value":false})",R"({"type":"date","value":"invalid"})",R"({"type":"set","value":[{"type":"list","value":[]}]})",R"({"type":"string","type":"string","value":"x"})",R"({"type":"string","value":"x","extra":0})",R"({"type":"string","value":"x"} trailing)",R"({"type":"decimal","value":"garbage"})"}) {
+    bool failed=false;try{(void)parse_log_attribute_repetition_target_json(text);}catch(const std::invalid_argument&){failed=true;}assert(failed);
+  }
+  Event special=event;special.attributes={EventAttribute{std::string("key\0",4),std::string("A\0B",3)}};
+  log.traces.front().events={special,special};
+  result=run("repetition",{field("activity_key",std::string("key\0",4)),field("target_json",R"({"type":"string","value":"A\u0000B"})")},serialize_embedding_workbench_raw_log_json(log),"source.json");
+  assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":2}");
+  auto nan=parse_log_attribute_repetition_target_json(R"({"type":"decimal","value":"NaN"})");nan.key="selected";
+  log.traces.front().events.front().attributes={nan};log.traces.front().events.back().attributes={nan};
+  result=run("repetition",{field("activity_key","selected"),field("target_json",R"({"type":"decimal","value":"NaN"})"),field("min_rep","0"),field("max_rep","0")},serialize_embedding_workbench_raw_log_json(log),"source.json");
+  assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":2}");
+  log.traces.front().events.front().attributes={make_native_na_attribute("selected")};
+  result=run("repetition",{field("activity_key","selected"),field("target_json",R"({"type":"na"})")},serialize_embedding_workbench_raw_log_json(log),"source.json");
+  assert(result.status==400);has(result,"boolean value of NA is ambiguous");has(result,"\"source_unchanged\":true");
+  auto nested=parse_log_attribute_repetition_target_json(R"({"type":"map","value":{"x":{"type":"list","value":[{"type":"na"}]}}})");nested.key="selected";
+  log.traces.front().events.front().attributes={nested};log.traces.front().events.back().attributes={nested};
+  result=run("repetition",{field("activity_key","selected"),field("target_json",R"({"type":"map","value":{"x":{"type":"list","value":[{"type":"na"}]}}})")},serialize_embedding_workbench_raw_log_json(log),"source.json");
+  assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":2}");
+  result=run("repetition",{target},"{invalid","source.json");
+  assert(result.status==400);has(result,"\"phase\":\"source_import\"");has(result,"\"activity_key\":null");has(result,"\"filter_attribute_key\":null");
+  assert(run("repetition").status==400);
+  assert(run("repetition",{target,field("positive","true")}).status==400);
+  assert(run("repetition",{target,field("activity","A")}).status==400);
+  assert(run("repetition",{target,field("min_rep","[]")}).status==400);
+  assert(run("rework",{field("activity","A"),target}).status==400);
+}
 void invalid_controls() {
   assert(run("unknown").status==400);
   assert(run("prefix").status==400);
@@ -63,4 +119,4 @@ void invalid_controls() {
   assert(execute_reference_log_filter({{"operation","","start",false},{"operation","","end",false}}).status==400);
 }
 }
-int main(){csv_filter_workflow();native_literal_and_export_workflow();invalid_controls();}
+int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();invalid_controls();}
