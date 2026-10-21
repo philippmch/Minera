@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from "react";
+import {LogAttributesFilterWorkspace} from "./LogAttributesFilterWorkspace";
 import {TableAttributeRepetitionWorkspace} from "./TableAttributeRepetitionWorkspace";
 import type {TableRepetitionEngine} from "../table-attribute-repetition";
 import {downloadQueryBlob} from "../log-query";
@@ -15,10 +16,12 @@ export interface ReferenceLogFilterWorkspaceProps {
   initialOperation?: ReferenceLogFilterOperation;
   initialForm?: ReferenceLogFilterForm;
   initialEngine?: "log" | TableRepetitionEngine;
+  initialLogFamily?: "existing" | "attributes";
 }
 export function ReferenceLogFilterWorkspace(props: ReferenceLogFilterWorkspaceProps) {
   const [engine, setEngine] = useState<"log" | TableRepetitionEngine>(props.initialEngine ?? "log");
-  return <><section className="panel query-workspace"><label className="filters-field"><span>Filter data model</span><select value={engine} onChange={event => setEngine(event.target.value as "log" | TableRepetitionEngine)}><option value="log">Event log</option><option value="pandas">pandas dataframe</option><option value="polars">Polars lazy dataframe</option></select></label></section>{engine === "log" ? <ReferenceLogFilterLogWorkspace {...props}/> : <TableAttributeRepetitionWorkspace key={engine} engine={engine}/>}</>;
+  const [logFamily,setLogFamily] = useState<"existing"|"attributes">(props.initialLogFamily ?? "existing");
+  return <><section className="panel query-workspace"><label className="filters-field"><span>Filter data model</span><select value={engine} onChange={event => setEngine(event.target.value as "log" | TableRepetitionEngine)}><option value="log">Event log</option><option value="pandas">pandas dataframe</option><option value="polars">Polars lazy dataframe</option></select></label>{engine === "log" && <label className="filters-field"><span>Event log filter family</span><select value={logFamily} onChange={event=>setLogFamily(event.target.value as "existing"|"attributes")}><option value="existing">Sequences, cases, paths, time and variants</option><option value="attributes">Event and trace attributes</option></select></label>}</section>{engine === "log" ? logFamily === "attributes" ? <LogAttributesFilterWorkspace onOpenLog={props.onOpenLog}/> : <ReferenceLogFilterLogWorkspace {...props}/> : <TableAttributeRepetitionWorkspace key={engine} engine={engine}/>}</>;
 }
 function ReferenceLogFilterLogWorkspace({onOpenLog, initialOperation = "rework", initialForm}: ReferenceLogFilterWorkspaceProps) {
   const [source, setSource] = useState<File | null>(null);
