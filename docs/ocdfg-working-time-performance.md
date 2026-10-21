@@ -117,3 +117,46 @@ results, frontend checks and six actual production-handler requests on an
 independently owned temporary server. The latter server exited after testing;
 the existing application was not replaced. Earlier failed native expectations
 and HTTP harness attempts remain in their original build directories.
+
+## Typed native adapter correction
+
+A followup review found a limitation in that checkpoint's native OCEL adapter:
+the direct typed-row calculation correctly distinguished missing datetimes and
+literal text, but the adapter treated the primary timestamp lexeme `"NaT"` as
+literal text and inferred datetimes from ISO-looking generic string values.
+It also read alternate canonical ID/timing roles through generic attributes,
+instead of their stored event fields. The earlier acceptance archive remains
+historical evidence; it did not cover those adapter distinctions.
+
+The adapter now reads canonical event ID, activity and timestamp fields in
+either supported string role. The primary timestamp has datetime semantics;
+generic timing selectors require a datetime declaration in the event type's
+attribute catalogue. A missing datetime (`"NaT"` or the existing empty primary
+timestamp representation) yields the retained zero elapsed result and raises
+the retained `ValueError` under working-time arithmetic. Scalar and undeclared
+generic strings remain literal, including `"NaT"`, empty strings and ISO-looking
+dates, and produce the retained text `TypeError` when used as timing cells.
+
+The offline native projection of the retained 77-call bank was corrected to
+preserve the `"NaT"` lexeme and its observed generic datetime dtype in native
+schema metadata. The 60 timing outcomes and eight discovery outcomes are the
+same observations; no reference calls were added or replayed. Additional
+native acceptance checks exercise adapter/discovery/reopening, both timing
+projections, shared-object multiplicity, scalar text errors and input
+preservation. The canonical timestamp-as-ID accessor check verifies native
+lexical string storage; it is not new public-reference evidence for typed
+datetime grouping identities. Alternate numeric/non-string ID columns remain
+outside this bounded string-identity companion.
+
+Final assertion-enabled native validation passes all nine affected suites in
+`build/parity-closures/native-current/ctest-matching-typedtime-final2.log` after
+the successful final build in `build-matching-route-final2.log`. Ten saved
+requests through the actual production handlers on an independently owned
+temporary server include canonical NaT elapsed-zero/working-time-error and
+canonical scalar-timing error cases; the same receipt also contains the
+separate activity/type matching route checks. The server exited after testing
+and the existing application was not replaced. The separate
+`docs/ocdfg-typed-timing-adapter-acceptance.json.gz` binds corrected sources,
+test vectors, the offline generator, object hashes, build/CTest logs and the
+actual HTTP receipt. Earlier failed build and fixture attempts remain saved;
+the whole OCDFG module and rendered-application evidence remain open.
