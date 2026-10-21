@@ -6,6 +6,22 @@ and support modules. Full parity is not complete.
 
 ## Closed in this pass
 
+Adjacent-path membership and duration filtering now have independent log,
+pandas and Polars companions, genuine table upload, literal role controls,
+complete downloads and log/XES reopening in the existing workspace. All 686
+distinct public outcomes have exact projected native acceptance: 182 log,
+266 pandas and 238 Polars. The engines retain their observed ordering,
+fractional/integral duration, target-column, metadata and diagnostic behavior.
+Twenty-four native suites, 44 production HTTP checks, 9,726 frontend tests,
+TypeScript and Vite pass. Earlier compiler/native/HTTP harness failures remain
+retained with unchanged expected outcomes. The HTTP harness now explicitly
+selects exported activity roles; native workbench regression coverage also
+handles custom XES reopening. All three canonical modules remain partial for
+their documented object, dtype, warning, temporal identity and execution-plan
+boundaries. See [paths-filter-workflow.md](paths-filter-workflow.md) and its
+three module contracts. The full catalogue remains in scope, with 201 strict
+open units. Rendered browser interaction remains unverified.
+
 Complete-case filtering now has separate log, pandas and Polars companions and
 usable event-count, case-limit and duration controls in the existing workspace.
 The 664 fresh public calls have native acceptance: 652 exact returned-value or
