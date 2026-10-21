@@ -79,8 +79,11 @@ The machine-readable source of truth is
 
 ## Active requirements
 
-- Complete OCDFG working-time integration; the wider OCDFG
-  performance/fidelity gate remains open.
+- The usable OCDFG working-time increment is delivered, with default/custom/empty
+  schedules, exact timing options and locale-independent signed-zero JSON.
+  Sixty retained timing cases, eight discovery outcomes and owned HTTP checks
+  pass. The wider OCDFG performance/fidelity gate remains open; see
+  [ocdfg-working-time-performance.md](ocdfg-working-time-performance.md).
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in
   the broader public captures, so it is not evidence of 28 incorrect models.

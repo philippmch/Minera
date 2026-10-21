@@ -199,6 +199,7 @@ add_library(minera_core
   src/backend/minimum_self_distance.cpp
   src/backend/ocel.cpp
   src/backend/ocdfg_edge_performance.cpp
+  src/backend/ocdfg_performance_controls.cpp
   src/backend/ocel_csv.cpp
   src/backend/ocel_sqlite.cpp
   src/backend/ocel_filter.cpp
@@ -1883,6 +1884,13 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocdfg_edge_performance_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocdfg_edge_performance_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocdfg_edge_performance_tests COMMAND minera_ocdfg_edge_performance_tests)
+
+  add_executable(minera_ocdfg_performance_controls_tests src/backend/tests/test_ocdfg_performance_controls.cpp)
+  target_link_libraries(minera_ocdfg_performance_controls_tests PRIVATE minera::core Threads::Threads)
+  target_include_directories(minera_ocdfg_performance_controls_tests PRIVATE third_party)
+  target_compile_features(minera_ocdfg_performance_controls_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocdfg_performance_controls_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocdfg_performance_controls_tests COMMAND minera_ocdfg_performance_controls_tests)
 
   add_executable(minera_ocel_event_attributes_module_tests src/backend/tests/test_ocel_event_attributes_module.cpp)
   target_link_libraries(minera_ocel_event_attributes_module_tests PRIVATE minera::core)

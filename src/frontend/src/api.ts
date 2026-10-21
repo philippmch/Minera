@@ -6197,6 +6197,11 @@ export async function requestRandomTree(options: RandomTreeOptions = {}): Promis
 export interface OcelDiscoveryOptions extends OcpnDiscoveryFlags {
   variant?: OcelDiscoveryVariant;
   compute_edges_performance?: boolean;
+  ocdfg_business_hours?: boolean;
+  ocdfg_business_hour_slots_json?: string;
+  ocdfg_event_id_attribute?: string;
+  ocdfg_timestamp_attribute?: string;
+  ocdfg_workcalendar_json?: string;
   ocdfg_activity_attribute?: string;
   ocdfg_object_type_attribute?: string;
   saw_activity_attribute?: string;
@@ -6214,6 +6219,12 @@ export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
   if (options.compute_edges_performance !== undefined) {
     query.set("compute_edges_performance", options.compute_edges_performance ? "true" : "false");
   }
+  if (options.ocdfg_business_hours !== undefined) {
+    if (typeof options.ocdfg_business_hours !== "boolean") throw new Error("ocdfg_business_hours must be boolean");
+    query.set("ocdfg_business_hours", String(options.ocdfg_business_hours));
+  }
+  for (const key of ["ocdfg_business_hour_slots_json", "ocdfg_event_id_attribute", "ocdfg_timestamp_attribute", "ocdfg_workcalendar_json"] as const)
+    if (options[key] !== undefined) query.set(key, options[key]);
   if (options.ocpn_annotation !== undefined) query.set("ocpn_annotation", options.ocpn_annotation);
   const addSelector = (key: string, value: string | undefined) => {
     if (value === undefined) return;
