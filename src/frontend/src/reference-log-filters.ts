@@ -3,7 +3,7 @@ import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart"
 import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString, originalEmbeddingFilterStringBytes, originalEmbeddingFilterStringText, type OriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
 
-export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition", "between", "case_size", "case_count", "case_performance", "paths", "path_performance"] as const;
+export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition", "between", "case_size", "case_count", "case_performance", "paths", "path_performance", "time_events", "time_contained", "time_intersecting", "time_starting", "time_completing", "time_attribute", "time_trace_attribute"] as const;
 export type ReferenceLogFilterOperation = typeof REFERENCE_LOG_FILTER_OPERATIONS[number];
 export const REFERENCE_LOG_FILTER_LABELS: Record<ReferenceLogFilterOperation, string> = {
   traces: "Match an activity sequence", prefix: "Keep a prefix before an activity",
@@ -11,6 +11,8 @@ export const REFERENCE_LOG_FILTER_LABELS: Record<ReferenceLogFilterOperation, st
   end: "Match the last activity", rework: "Find repeated activity", repetition: "Count an exact attribute value", between: "Extract subtraces between activities",
   case_size: "Filter by case event count", case_count: "Limit the number of cases", case_performance: "Filter by case duration",
   paths: "Match adjacent activity pairs", path_performance: "Filter by adjacent-pair duration",
+  time_events: "Keep events in a time window", time_contained: "Keep traces contained in a time window", time_intersecting: "Keep traces intersecting a time window",
+  time_starting: "Filter by first-event time", time_completing: "Filter by last-event time", time_attribute: "Match an attribute in a time window", time_trace_attribute: "Filter a trace timestamp attribute",
 };
 export const REFERENCE_LOG_FILTER_CSV_FIELDS = [
   ["case_id_column", "Case ID column", "case_id"], ["activity_column", "Activity column", "activity"],
@@ -27,6 +29,7 @@ export interface ReferenceLogFilterForm {
   repetitionTargetJson: string; minRep: string; maxRep: string;
   minCaseSize: string; maxCaseSize: string; maxCases: string; minCaseSeconds: string; maxCaseSeconds: string;
   pathsJson: string; pathJson: string; minPathSeconds: string; maxPathSeconds: string;
+  timeLower: string; timeUpper: string; timeAttributeKeyMode: "default" | "custom"; timeAttributeKey: string; timeTargetJson: string;
   timestampKeyMode: "default" | "custom"; timestampKey: string;
   betweenStartJson: string; betweenEndJson: string; betweenCaseKeyMode: "default" | "custom"; betweenCaseKey: string; betweenSeparatorMode: "default" | "custom"; betweenSeparator: string;
   csvOptions: boolean; csv: Record<ReferenceLogFilterCsvKey, string>; trimFields: boolean;
@@ -35,6 +38,7 @@ export function defaultReferenceLogFilterForm(operation: ReferenceLogFilterOpera
   return {operation, sourceFormat: "auto", activity: "", activityKeyMode: "default", activityKey: "",
     minCaseSize: "2", maxCaseSize: "null", maxCases: "1000", minCaseSeconds: "0", maxCaseSeconds: "10000000000", timestampKeyMode: "default", timestampKey: "time:timestamp",
     pathsJson: '[["A", "B"]]', pathJson: '["A", "B"]', minPathSeconds: "0", maxPathSeconds: "9223372036854775807",
+    timeLower: "2026-06-01 00:00:01", timeUpper: "2026-06-01 00:00:03", timeAttributeKeyMode: "default", timeAttributeKey: "concept:name", timeTargetJson: '{"type":"string","value":"A"}',
     positive: true, strict: true, occurrence: "first", admittedJson: '["A"]', patternsJson: '[["A", "...", "B"]]',
     betweenStartJson: '"A"', betweenEndJson: '"B"', betweenCaseKeyMode: "default", betweenCaseKey: "concept:name", betweenSeparatorMode: "default", betweenSeparator: "##@@",
     minOccurrences: "2", repetitionTargetJson: '{"type":"string","value":"web"}', minRep: "2", maxRep: "9223372036854775807", csvOptions: false, csv: {case_id_column: "case_id", activity_column: "activity", timestamp_column: "timestamp", delimiter: ","}, trimFields: false};
@@ -45,6 +49,8 @@ export interface ReferenceLogFilterEnvelope {
   source_format: string | null; source: ReferenceLogFilterCounts | null; result: ReferenceLogFilterCounts | null;
   filter_attribute_key?: ReferenceLogFilterNativeString | null;
   case_id_key?: ReferenceLogFilterNativeString | null; full_result_json?: ReferenceLogFilterNativeString | null;
+  timestamp_key?: ReferenceLogFilterNativeString; time_attribute_key?: ReferenceLogFilterNativeString;
+  source_log_json?: ReferenceLogFilterNativeString | null; source_after_log_json?: ReferenceLogFilterNativeString | null;
   source_unchanged: boolean | null; activity_key: ReferenceLogFilterNativeString | null;
   filtered_log_json: ReferenceLogFilterNativeString | null; filtered_xes: ReferenceLogFilterNativeString | null;
   xes_error: ReferenceLogFilterNativeString | null; error: ReferenceLogFilterNativeString | null;
@@ -63,13 +69,14 @@ function counts(v: unknown): v is ReferenceLogFilterCounts | null {
   });
 }
 export function isReferenceLogFilterEnvelope(v: unknown): v is ReferenceLogFilterEnvelope {
-  return object(v) && keys(v, ["family", "operation", "http_status", "phase", "source_format", "source", "result", "source_unchanged", "activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error", ...(["repetition", "paths", "path_performance"].includes(String(v.operation)) ? ["filter_attribute_key"] : v.operation === "between" ? ["filter_attribute_key", "case_id_key", "full_result_json"] : [])])
+  return object(v) && keys(v, ["family", "operation", "http_status", "phase", "source_format", "source", "result", "source_unchanged", "activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error", ...(["repetition", "paths", "path_performance"].includes(String(v.operation)) ? ["filter_attribute_key"] : v.operation === "between" ? ["filter_attribute_key", "case_id_key", "full_result_json"] : String(v.operation).startsWith("time_") ? ["timestamp_key", "time_attribute_key", "source_log_json", "source_after_log_json"] : [])])
     && v.family === "REFERENCE_LOG_FILTER" && (v.operation === null || typeof v.operation === "string")
     && (v.http_status === 200 || v.http_status === 400) && typeof v.phase === "string"
     && (v.source_format === null || typeof v.source_format === "string") && counts(v.source) && counts(v.result)
     && (v.source_unchanged === null || typeof v.source_unchanged === "boolean")
     && (!["repetition", "between", "paths", "path_performance"].includes(String(v.operation)) || nullableString(v.filter_attribute_key))
     && (v.operation !== "between" || nullableString(v.case_id_key) && nullableString(v.full_result_json))
+    && (!String(v.operation).startsWith("time_") || isOriginalEmbeddingFilterNativeString(v.timestamp_key) && isOriginalEmbeddingFilterNativeString(v.time_attribute_key) && nullableString(v.source_log_json) && nullableString(v.source_after_log_json))
     && ["activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error"].every(key => nullableString(v[key]));
 }
 /** Fields remain literal; native validation owns JSON arrays and scalar tokens. */
@@ -79,7 +86,16 @@ export function referenceLogFilterFields(form: ReferenceLogFilterForm): Array<[s
   if (!["default", "custom"].includes(form.activityKeyMode)) throw new Error("Choose an activity key mode.");
   const fields: Array<[string, string]> = [["operation", form.operation], ["source_format", form.sourceFormat]];
   if (form.activityKeyMode === "custom" && !form.operation.startsWith("case_")) fields.push(["activity_key", form.activityKey]);
-  if (form.operation === "paths" || form.operation === "path_performance") {
+  if (form.operation.startsWith("time_")) {
+    if (![form.timestampKeyMode, form.timeAttributeKeyMode].every(mode => mode === "default" || mode === "custom")) throw new Error("Choose default or literal timestamp attributes.");
+    fields.push(["lower", form.timeLower], ["upper", form.timeUpper]);
+    if (form.timestampKeyMode === "custom") fields.push(["timestamp_key", form.timestampKey]);
+    if (form.operation === "time_attribute") {
+      fields.push(["time_target_json", form.timeTargetJson]);
+      if (form.timeAttributeKeyMode === "custom") fields.push(["time_attribute_key", form.timeAttributeKey]);
+    }
+    if (form.operation === "time_starting" || form.operation === "time_completing") fields.push(["positive", String(form.positive)]);
+  } else if (form.operation === "paths" || form.operation === "path_performance") {
     fields.push(["positive", String(form.positive)], [form.operation === "paths" ? "paths_json" : "path_json", form.operation === "paths" ? form.pathsJson : form.pathJson]);
     if (form.operation === "path_performance") {
       if (!["default", "custom"].includes(form.timestampKeyMode)) throw new Error("Choose a timestamp key mode.");
@@ -133,6 +149,11 @@ export async function requestReferenceLogFilter(sourceFile: File, form: Referenc
 }
 export const referenceLogFilterStringBytes = originalEmbeddingFilterStringBytes;
 export const referenceLogFilterStringText = originalEmbeddingFilterStringText;
+export function referenceLogFilterSourceFile(run: ReferenceLogFilterRun, after = false): File {
+  const value = after ? run.value.source_after_log_json : run.value.source_log_json;
+  if (value === undefined || value === null) throw new Error("The complete parsed source artifact is unavailable.");
+  return new File([referenceLogFilterStringBytes(value)], after ? "timestamp-source-after.json" : "timestamp-source-before.json", {type: "application/json"});
+}
 export function referenceLogFilterArtifactFile(run: ReferenceLogFilterRun, kind: "json" | "xes"): File {
   const value = kind === "json" ? run.value.filtered_log_json : run.value.filtered_xes;
   if (run.value.http_status !== 200 || run.value.error !== null || value === null || kind === "xes" && run.value.xes_error !== null) throw new Error(`The filtered ${kind === "xes" ? "XES" : "native JSON"} is unavailable.`);

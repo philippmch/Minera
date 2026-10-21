@@ -6,6 +6,7 @@
 #include "minera/log_between_filter.hpp"
 #include "minera/log_case_filter.hpp"
 #include "minera/log_paths_filter.hpp"
+#include "minera/log_timestamp_filter.hpp"
 #include "minera/paths_filter_controls.hpp"
 #include "minera/case_filter_controls.hpp"
 #include "minera/log_rework_filter.hpp"
@@ -115,7 +116,8 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
   std::map<std::string,const DiscoveryWorkbenchPart*> fields;
   std::optional<EventLog> source,result;
   std::optional<std::string> source_before;
-  std::string operation,format,key,open_key,case_key,full_result,phase="control",error,export_error,raw_result,xes;
+  std::string operation,format,key,open_key,case_key,full_result,phase="control",error,export_error,raw_result,xes,
+      time_key="time:timestamp", time_attribute_key="concept:name", source_after;
   std::optional<bool> unchanged;
   int status=200;
   const auto field=[&](const std::string& name,std::string fallback={}) {
@@ -132,12 +134,14 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     static const std::set<std::string> allowed={"operation","source_file","source_format",
       "activity_key","activity","positive","strict","occurrence","admitted_json","patterns_json",
       "min_occurrences","target_json","min_rep","max_rep","act1_json","act2_json","case_id_key","subcase_concat_str","case_id_column","activity_column","timestamp_column","delimiter","trim_fields",
-      "minimum","maximum","max_cases","timestamp_key","paths_json","path_json"};
+      "minimum","maximum","max_cases","timestamp_key","paths_json","path_json",
+      "lower","upper","time_attribute_key","time_target_json"};
     for(const auto* collection:{&query,&parts}) for(const auto& part:*collection) {
       if(!allowed.contains(part.name)) throw std::invalid_argument("unknown log filter control: "+part.name);
       if(!fields.emplace(part.name,&part).second) throw std::invalid_argument("duplicate log filter control: "+part.name);
     }
-    static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework","repetition","between","case_size","case_count","case_performance","paths","path_performance"};
+    static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework","repetition","between","case_size","case_count","case_performance","paths","path_performance",
+      "time_events","time_contained","time_intersecting","time_starting","time_completing","time_attribute","time_trace_attribute"};
     operation=field("operation");
     if(!operations.contains(operation)) { operation.clear();throw std::invalid_argument("choose a supported log filter"); }
     const auto found=fields.find("source_file");
@@ -151,16 +155,22 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     const bool between=operation=="between";
     const bool cases=operation=="case_size" || operation=="case_count" || operation=="case_performance";
     const bool path_performance=operation=="path_performance", paths=operation=="paths" || path_performance;
+    const bool time=operation.starts_with("time_"), time_boundary=operation=="time_starting" || operation=="time_completing";
+    if(time && (!fields.contains("lower") || !fields.contains("upper"))) throw std::invalid_argument("timestamp filtering requires lower and upper endpoints");
+    if(!time && (fields.contains("lower") || fields.contains("upper"))) throw std::invalid_argument("lower/upper require timestamp filtering");
+    if(operation!="time_attribute" && (fields.contains("time_attribute_key") || fields.contains("time_target_json"))) throw std::invalid_argument("time attribute controls require time_attribute filtering");
+    if(operation=="time_attribute" && !fields.contains("time_target_json")) throw std::invalid_argument("time_attribute requires time_target_json");
+    if(time && !time_boundary && fields.contains("positive")) throw std::invalid_argument("positive requires starting/completing timestamp filtering");
     if(paths && !fields.contains(path_performance?"path_json":"paths_json")) throw std::invalid_argument(path_performance?"path performance filtering requires path_json":"paths filtering requires paths_json");
     if(paths && fields.contains(path_performance?"paths_json":"path_json")) throw std::invalid_argument("choose only the active path control");
     if(!paths && (fields.contains("paths_json") || fields.contains("path_json"))) throw std::invalid_argument("paths_json/path_json require path filtering");
     if(cases && fields.contains("activity_key")) throw std::invalid_argument("activity_key is inapplicable to case filtering");
-    if(!cases && !path_performance && (fields.contains("minimum") || fields.contains("maximum") || fields.contains("max_cases") || fields.contains("timestamp_key")))
-      throw std::invalid_argument("bounds and timestamp_key require case or path performance filtering");
+    if(!cases && !path_performance && (fields.contains("minimum") || fields.contains("maximum") || fields.contains("max_cases")))
+      throw std::invalid_argument("bounds require case or path performance filtering");
     if(cases && fields.contains("positive")) throw std::invalid_argument("positive is inapplicable to case filtering");
     if(operation=="case_count" && (fields.contains("minimum") || fields.contains("maximum"))) throw std::invalid_argument("minimum/maximum require size or performance filtering");
     if(operation!="case_count" && fields.contains("max_cases")) throw std::invalid_argument("max_cases requires case_count filtering");
-    if(operation!="case_performance" && !path_performance && fields.contains("timestamp_key")) throw std::invalid_argument("timestamp_key requires case or path performance filtering");
+    if(operation!="case_performance" && !path_performance && !time && fields.contains("timestamp_key")) throw std::invalid_argument("timestamp_key requires timestamp, case or path performance filtering");
     if(between && (!fields.contains("act1_json") || !fields.contains("act2_json")))
       throw std::invalid_argument("between filtering requires act1_json and act2_json");
     if(!between && (fields.contains("act1_json") || fields.contains("act2_json") || fields.contains("case_id_key") || fields.contains("subcase_concat_str")))
@@ -200,6 +210,10 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     }
     if(format!="native_log" && format!="csv" && format!="xes") { format.clear();throw std::invalid_argument("source_format must be auto, csv, xes or native_log"); }
     key=field("activity_key",format=="csv"?field("activity_column","activity"):"concept:name");
+    if(time) {
+      time_key=field("timestamp_key",operation=="time_trace_attribute"?"time:timestamp":format=="csv"?field("timestamp_column","timestamp"):"time:timestamp");
+      time_attribute_key=field("time_attribute_key",format=="csv"?field("activity_column","activity"):"concept:name");
+    }
     if(between) case_key=field("case_id_key",format=="csv"?field("case_id_column","case_id"):"concept:name");
     phase="source_import";
     if(format=="native_log") source=parse_embedding_workbench_raw_log_json(file.bytes);
@@ -216,7 +230,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
       }
     }
     open_key=key;
-    if(repetition || between || cases || paths) {
+    if(repetition || between || cases || paths || time) {
       open_key=format=="csv"?field("activity_column","activity"):"concept:name";
       if(format!="csv") {
         bool found_activity=false;
@@ -229,12 +243,32 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
         }
         // A custom-key XES projection can have no first-class activity role.
         // Its explicitly chosen path attribute supplies the opening role.
-        if(!found_activity && paths && fields.contains("activity_key")) open_key=key;
+        if(!found_activity && (paths || time) && fields.contains("activity_key")) open_key=key;
+      }
+    }
+    if(operation=="time_events" && format=="csv") {
+      // Prepare the conventional EventLog identity required by the public
+      // event-to-log converter while preserving the original CSV case role.
+      for(auto& trace:source->traces) if(trace.case_id_source_key!="concept:name" &&
+          std::none_of(trace.attributes.begin(),trace.attributes.end(),[](const EventAttribute& value){return value.key=="concept:name";})) {
+        EventAttribute canonical=trace.case_id_attribute.value_or(EventAttribute{"",trace.case_id});
+        canonical.key="concept:name";trace.attributes.push_back(std::move(canonical));
       }
     }
     source_before=serialize_embedding_workbench_raw_log_json(*source);
     phase="filter";
-    if(paths) {
+    if(time) {
+      LogTimestampFilterOptions options; options.timestamp_key=EventAttribute{"",time_key};
+      options.positive=parse_case_filter_bound(boolean("positive",true)?"true":"false");
+      const EventAttribute lower{"",field("lower")},upper{"",field("upper")};
+      if(operation=="time_events") result=filter_log_timestamp_events(*source,lower,upper,options);
+      else if(operation=="time_contained") result=filter_log_timestamp_contained(*source,lower,upper,options);
+      else if(operation=="time_intersecting") result=filter_log_timestamp_intersecting(*source,lower,upper,options);
+      else if(operation=="time_starting") result=filter_log_timestamp_starting(*source,lower,upper,options);
+      else if(operation=="time_completing") result=filter_log_timestamp_completing(*source,lower,upper,options);
+      else if(operation=="time_trace_attribute") result=filter_log_timestamp_trace_attribute(*source,lower,upper,options);
+      else result=filter_log_timestamp_attribute(*source,EventAttribute{"",time_attribute_key},parse_log_attribute_repetition_target_json(field("time_target_json")),lower,upper,options);
+    } else if(paths) {
       if(path_performance) {
         LogPathsPerformanceOptions options;options.attribute_key=EventAttribute{"",key};options.positive=parse_case_filter_bound(boolean("positive",true)?"true":"false");
         options.timestamp_key=EventAttribute{"",field("timestamp_key",format=="csv"?field("timestamp_column","timestamp"):"time:timestamp")};
@@ -281,6 +315,9 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     try { XesExportOptions options;options.preserve_nulls=true;xes=serialize_xes(*result,options); }
     catch(const std::exception& e) { export_error=e.what(); }
     phase="complete";
+  } catch(const LogTimestampFilterError& e) {
+    status=400;error=e.message;
+    if(source && source_before) unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source);
   } catch(const LogPathsFilterError& e) {
     status=400;error=e.message;
     if(source && source_before) unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source);
@@ -295,14 +332,17 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     if(source && source_before) try { unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source); }
       catch(const std::exception&) { unchanged.reset(); }
   }
+  if(operation.starts_with("time_") && source) try {source_after=serialize_embedding_workbench_raw_log_json(*source);} catch(const std::exception&) {}
   const auto optional_text=[&](const std::string& text,bool present) {return present?q(text):std::string("null");};
   std::string json="{\"family\":\"REFERENCE_LOG_FILTER\",\"operation\":"+optional_text(operation,!operation.empty())+
     ",\"http_status\":"+std::to_string(status)+",\"phase\":"+q(phase)+",\"source_format\":"+optional_text(format,!format.empty())+
     ",\"source\":"+(source?counts(*source):"null")+",\"result\":"+(result?counts(*result):"null")+
     ",\"source_unchanged\":"+(unchanged?(*unchanged?"true":"false"):"null")+
-    ",\"activity_key\":"+optional_text((operation=="repetition" || operation=="between" || operation.starts_with("case_") || operation=="paths" || operation=="path_performance")?open_key:key,source.has_value())+
+    ",\"activity_key\":"+optional_text((operation=="repetition" || operation=="between" || operation.starts_with("case_") || operation.starts_with("time_") || operation=="paths" || operation=="path_performance")?open_key:key,source.has_value())+
     ((operation=="repetition" || operation=="between" || operation=="paths" || operation=="path_performance")?",\"filter_attribute_key\":"+optional_text(key,source.has_value()):"")+
     (operation=="between"?",\"case_id_key\":"+optional_text(case_key,source.has_value())+",\"full_result_json\":"+optional_text(full_result,!full_result.empty()):"")+
+    (operation.starts_with("time_")?",\"timestamp_key\":"+q(time_key)+",\"time_attribute_key\":"+q(time_attribute_key)+
+      ",\"source_log_json\":"+(source_before?q(*source_before):"null")+",\"source_after_log_json\":"+optional_text(source_after,!source_after.empty()):"")+
     ",\"filtered_log_json\":"+optional_text(raw_result,!raw_result.empty())+
     ",\"filtered_xes\":"+optional_text(xes,result.has_value() && export_error.empty() && error.empty())+
     ",\"xes_error\":"+optional_text(export_error,!export_error.empty())+

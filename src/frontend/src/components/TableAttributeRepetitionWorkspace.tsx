@@ -7,12 +7,13 @@ import {TableRepetitionRequestGate, defaultTableRepetitionForm, requestTableRepe
 import {TableBetweenFilterWorkspace} from "./TableBetweenFilterWorkspace";
 import {TableCaseFilterWorkspace} from "./TableCaseFilterWorkspace";
 import {TablePathsFilterWorkspace} from "./TablePathsFilterWorkspace";
+import {TableTimestampFilterWorkspace} from "./TableTimestampFilterWorkspace";
 
 export function TableAttributeRepetitionWorkspace({engine, initialForm}: {engine: TableRepetitionEngine; initialForm?: TableRepetitionForm}) {
-  const [operation, setOperation] = useState<"repetition" | "between" | "cases" | "paths">("repetition");
+  const [operation, setOperation] = useState<"repetition" | "between" | "cases" | "paths" | "timestamp">("repetition");
   return <>
-    <label className="filters-field"><span>Table filter behavior</span><select value={operation} onChange={event => setOperation(event.target.value as "repetition" | "between" | "cases" | "paths")}><option value="repetition">Count an exact attribute value</option><option value="between">Extract intervals between activities</option><option value="cases">Filter complete cases</option><option value="paths">Match adjacent paths</option></select></label>
-    {operation === "paths" ? <TablePathsFilterWorkspace key={`${engine}-paths`} engine={engine}/> : operation === "cases" ? <TableCaseFilterWorkspace key={`${engine}-cases`} engine={engine}/> : operation === "between" ? <TableBetweenFilterWorkspace key={`${engine}-between`} engine={engine}/> : <TableAttributeRepetitionCriteria key={`${engine}-repetition`} engine={engine} initialForm={initialForm}/>}
+    <label className="filters-field"><span>Table filter behavior</span><select value={operation} onChange={event => setOperation(event.target.value as "repetition" | "between" | "cases" | "paths" | "timestamp")}><option value="repetition">Count an exact attribute value</option><option value="between">Extract intervals between activities</option><option value="cases">Filter complete cases</option><option value="paths">Match adjacent paths</option><option value="timestamp">Filter a time window</option></select></label>
+    {operation === "timestamp" ? <TableTimestampFilterWorkspace key={`${engine}-timestamp`} engine={engine}/> : operation === "paths" ? <TablePathsFilterWorkspace key={`${engine}-paths`} engine={engine}/> : operation === "cases" ? <TableCaseFilterWorkspace key={`${engine}-cases`} engine={engine}/> : operation === "between" ? <TableBetweenFilterWorkspace key={`${engine}-between`} engine={engine}/> : <TableAttributeRepetitionCriteria key={`${engine}-repetition`} engine={engine} initialForm={initialForm}/>}
   </>;
 }
 

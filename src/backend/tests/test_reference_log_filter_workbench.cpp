@@ -193,4 +193,35 @@ void invalid_controls() {
   assert(execute_reference_log_filter({{"operation","","start",false},{"operation","","end",false}}).status==400);
 }
 }
-int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();case_workflows();paths_workflow();invalid_controls();}
+namespace {
+void timestamp_workflows() {
+  const std::string timed="case_id,activity,timestamp\nc1,A,2026-06-01T00:00:00Z\nc1,X,2026-06-01T00:00:01Z\nc1,B,2026-06-01T00:00:02Z\nc2,A,2026-06-01T00:00:03Z\nc2,B,2026-06-01T00:00:04Z\n";
+  const std::vector<DiscoveryWorkbenchPart> bounds={field("lower","2026-06-01 00:00:01"),field("upper","2026-06-01 00:00:03")};
+  auto selected=run("time_events",bounds,timed);assert(selected.status==200);
+  has(selected,"\"result\":{\"traces\":2,\"events\":3}");has(selected,"\"source_unchanged\":false");
+  const auto before=artifact(selected,"source_log_json"),after=artifact(selected,"source_after_log_json");
+  assert(before!=after && after.find("case:concept:name")!=std::string::npos);
+  const auto native=parse_embedding_workbench_raw_log_json(artifact(selected,"filtered_log_json"));
+  assert(native.traces.size()==2 && native.traces[0].events.size()==2 && native.traces[1].events.size()==1);
+  has(selected,"\"activity_key\":\"activity\"");has(selected,"\"timestamp_key\":\"timestamp\"");
+  for(const auto& operation:{"time_starting","time_completing","time_intersecting"}) {
+    selected=run(operation,bounds,timed);assert(selected.status==200);has(selected,"\"source_unchanged\":true");
+    has(selected,operation==std::string("time_intersecting")?"\"result\":{\"traces\":2,\"events\":5}":operation==std::string("time_starting")?"\"result\":{\"traces\":1,\"events\":2}":"\"result\":{\"traces\":1,\"events\":3}");
+  }
+  auto attribute=bounds;attribute.push_back(field("time_target_json",R"({"type":"string","value":"A"})"));
+  selected=run("time_attribute",attribute,timed);assert(selected.status==200);has(selected,"\"result\":{\"traces\":1,\"events\":2}");
+  auto raw=parse_embedding_workbench_raw_log_json(before);
+  for(std::size_t i=0;i<raw.traces.size();++i) {
+    EventAttribute value{"trace time",i==0?"2026-06-01T00:00:02Z":"2026-06-01T00:00:05Z",AttributeKind::kDate};
+    value.typed_value=NativeDate{value.value};raw.traces[i].attributes.push_back(value);
+  }
+  auto trace_bounds=bounds;trace_bounds.push_back(field("timestamp_key","trace time"));
+  selected=run("time_trace_attribute",trace_bounds,serialize_embedding_workbench_raw_log_json(raw),"source.json");assert(selected.status==200);has(selected,"\"result\":{\"traces\":1,\"events\":3}");
+  auto contained=bounds;contained[0]=field("lower","2026-06-01 00:00:00");contained[1]=field("upper","2026-06-01 00:00:02");
+  selected=run("time_contained",contained,timed);assert(selected.status==200);has(selected,"\"result\":{\"traces\":1,\"events\":3}");
+  auto invalid=bounds;invalid.push_back(field("positive","false"));assert(run("time_events",invalid,timed).status==400);
+  invalid=bounds;invalid.push_back(field("minimum","0"));assert(run("time_starting",invalid,timed).status==400);
+  invalid=bounds;invalid.push_back(field("timestamp_key","missing"));selected=run("time_events",invalid,timed);assert(selected.status==400);has(selected,"\"source_unchanged\":false");assert(artifact(selected,"source_log_json")!=artifact(selected,"source_after_log_json"));
+}
+}
+int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();case_workflows();paths_workflow();invalid_controls();timestamp_workflows();}
