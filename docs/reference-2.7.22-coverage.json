@@ -11486,7 +11486,7 @@
       "classification": "support",
       "selectors": [],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/log-case-filter-parity-contract.md"
     },
     {
       "module": "algo.filtering.log.end_activities.end_activities_filter",
