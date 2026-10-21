@@ -40,6 +40,7 @@ add_library(minera_core
   src/backend/pandas_between_filter.cpp
   src/backend/polars_between_filter.cpp
   src/backend/table_between_filter_workbench.cpp
+  src/backend/pandas_timestamp_filter.cpp
   src/backend/log_timestamp_filter.cpp
   src/backend/case_filter_controls.cpp
   src/backend/log_case_filter.cpp
@@ -1071,7 +1072,7 @@ if(MINERA_BUILD_TESTS)
     add_test(NAME minera_${unit}_tests COMMAND minera_${unit}_tests)
   endforeach()
 
-  foreach(unit log_timestamp_filter)
+  foreach(unit log_timestamp_filter pandas_timestamp_filter)
     add_executable(minera_${unit}_tests src/backend/tests/test_${unit}.cpp)
     target_link_libraries(minera_${unit}_tests PRIVATE minera::core Threads::Threads)
     target_include_directories(minera_${unit}_tests PRIVATE third_party)
