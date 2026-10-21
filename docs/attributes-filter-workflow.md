@@ -99,3 +99,22 @@ The final build passes 41 assertion-enabled native suites, 95 actual production
 HTTP checks and 190 frontend files / 9,809 tests, plus 65 focused checks,
 TypeScript and Vite. The root workflow archive binds current sources, compiled
 artifacts, original failures, all four HTTP attempts and the engine archives.
+
+
+## Native multipart byte controls
+
+Literal controls with CR/LF or lone UTF-16 surrogates are sent by the frontend
+as byte-preserving Blob parts with the exact `<field>.txt` filename. Both
+attributes workbenches accept that canonical byte-field representation, as well
+as ordinary multipart text. Other File-shaped ordinary controls are rejected.
+The source and auxiliary log uploads still require actual Files, including an
+explicitly present empty filename. Native and owned HTTP regression checks
+exercise the same byte-field representation used by the frontend.
+
+
+The focused byte-control checkpoint passes all four assertion-enabled attributes
+workbench/owned-HTTP suites in
+`build/parity-closures/native-current/ctest-attributes-byte-controls-first.log`.
+Evidence is packaged in `docs/attributes-native-byte-controls-checks.jsonl.gz`.
+This focused proof does not claim a rebuilt production server or rendered
+browser acceptance. Full current-server acceptance follows the LTL integration.
