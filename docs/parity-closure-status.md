@@ -24,12 +24,13 @@ The native workflow and real multipart HTTP acceptance tests pass. All
 focused tests, TypeScript and production build also pass. See
 [reference-log-filter-workflow.md](reference-log-filter-workflow.md).
 
-The OCEL preparation workspace also exposes exact event membership,
-timestamp and object-count filters. Literal JSON controls retain integer
+The OCEL preparation workspace also exposes exact event and object membership,
+timestamp and object-count filters, including typed NaT queries. Literal JSON controls retain integer
 precision and timestamp kinds. Empty names and repeated relation rows
 survive exact input/output and ordinary reopening of marked outputs. Four
-affected native targets and the full 9,667-test frontend suite pass; focused
-handoff checks and the production build cover the final UI changes. See
+affected native targets passed at the earlier checkpoint. The current eight-suite
+native acceptance and 9,675-test frontend suite pass, with TypeScript and the
+production build. See
 [ocel-exact-filter-workflow.md](ocel-exact-filter-workflow.md).
 
 Quality-result JSON also preserves computed double values through parsing,
@@ -78,8 +79,8 @@ The machine-readable source of truth is
 
 ## Active requirements
 
-- Complete usable object-attribute controls and OCDFG working-time integration;
-  the wider OCDFG performance/fidelity gate remains open.
+- Complete OCDFG working-time integration; the wider OCDFG
+  performance/fidelity gate remains open.
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in
   the broader public captures, so it is not evidence of 28 incorrect models.

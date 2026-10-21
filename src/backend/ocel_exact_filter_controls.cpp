@@ -86,6 +86,11 @@ OcelEventAttributeFilterValue scalar(const Value& v){
   if(tag=="null"){
     const auto found=v.fields.find("value");if(found!=v.fields.end()&&found->second.kind!=Value::null)throw std::invalid_argument("Null exact OCEL value must be null");return nullptr;
   }
+  if(tag=="nat"){
+    const auto found=v.fields.find("value");
+    if(found!=v.fields.end()&&found->second.kind!=Value::null)throw std::invalid_argument("NaT exact OCEL value must omit value or use null");
+    return OcelAttributeNaT{};
+  }
   const auto& data=member(v,"value");
   if(tag=="string"&&data.kind==Value::string)return data.text;
   if(tag=="boolean"&&data.kind==Value::boolean)return data.text=="true";
