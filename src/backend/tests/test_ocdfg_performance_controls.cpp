@@ -66,6 +66,8 @@ void actual_working_time_http_controls() {
   Ocel source;
   source.events = {{"e1", "depart", "2027-02-05T16:30:00+01:00", {{"", std::string("2027-02-05T16:30:00+01:00")}}},
                    {"e2", "arrive", "2027-02-08T08:30:00+01:00", {{"", std::string("2027-02-08T08:30:00+01:00")}}}};
+  source.event_type_attributes["depart"][""] = "datetime";
+  source.event_type_attributes["arrive"][""] = "datetime";
   source.objects = {{"o", "Order", {}}};
   source.relations = {{"e1", "o", ""}, {"e2", "o", ""}};
   const auto before = serialize_ocel_json(source);

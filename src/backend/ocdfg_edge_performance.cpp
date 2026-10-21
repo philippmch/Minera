@@ -39,6 +39,28 @@ bool has_column(const Ocel& log,const std::string& key){
  return false;
 }
 const OcelValue* attribute(const OcelEvent& event,const std::string& key){for(const auto& item:event.attributes)if(item.key==key)return &item.value;return nullptr;}
+
+std::optional<std::string> selected_string(const OcelEvent& event,
+                                         const std::string& key) {
+ if(key=="ocel:eid")return event.id;
+ if(key=="ocel:activity")return event.activity;
+ if(key=="ocel:timestamp")return event.timestamp;
+ const auto* value=attribute(event,key);
+ if(const auto* text=value?std::get_if<std::string>(value):nullptr)return *text;
+ return std::nullopt;
+}
+
+bool datetime_column(const Ocel& log,const OcelEvent& event,
+                     const std::string& key) {
+ if(key=="ocel:timestamp")return true;
+ if(key=="ocel:eid"||key=="ocel:activity")return false;
+ const auto type=log.event_type_attributes.find(event.activity);
+ if(type==log.event_type_attributes.end())return false;
+ const auto field=type->second.find(key);
+ return field!=type->second.end()&&
+        (field->second.find("date")!=std::string::npos||
+         field->second.find("time")!=std::string::npos);
+}
 } // namespace
 std::vector<double> calculate_ocdfg_edge_performance(const std::vector<OcdfgPerformanceEvent>& events,const std::vector<std::pair<std::string,std::string>>& couples,const OcdfgEdgePerformanceOptions& options){
  std::map<std::string,const OcdfgPerformanceTimestamp*> times;for(const auto& event:events)times[event.id]=&event.timestamp;
@@ -64,12 +86,15 @@ std::vector<double> calculate_ocdfg_edge_performance(const Ocel& log,const std::
  if(!has_column(log,id_key))missing(id_key);if(!has_column(log,time_key))missing(time_key,true);
  std::vector<OcdfgPerformanceEvent> events;events.reserve(log.events.size());
  for(const auto& source:log.events){OcdfgPerformanceEvent event;event.id=source.id;
-  if(id_key!="ocel:eid"){const auto* value=attribute(source,id_key);const auto* text=value?std::get_if<std::string>(value):nullptr;if(!text)continue;event.id=*text;}
-  std::optional<std::string> text;
-  if(time_key=="ocel:timestamp")text=source.timestamp;
-  else if(const auto* value=attribute(source,time_key)){if(const auto* string=std::get_if<std::string>(value))text=*string;}
-  if(text&&!text->empty()){
-   if(const auto timestamp=parse_timestamp_exact(*text))event.timestamp=*timestamp;
+  const auto identifier=selected_string(source,id_key);
+  if(!identifier)continue;
+  event.id=*identifier;
+  const auto text=selected_string(source,time_key);
+  if(text){
+   const bool typed_datetime=datetime_column(log,source,time_key);
+   if(typed_datetime&&(text->empty()||*text=="NaT"))event.timestamp=std::monostate{};
+   else if(!typed_datetime)event.timestamp=*text;
+   else if(const auto timestamp=parse_timestamp_exact(*text))event.timestamp=*timestamp;
    else event.timestamp=*text;
   }
   events.push_back(std::move(event));

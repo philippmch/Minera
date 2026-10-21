@@ -11,6 +11,8 @@ namespace minera {
 // Separate datetime, missing/NaT and literal text cells. A native OCEL's
 // primary timestamp has datetime semantics; direct typed callers can retain
 // the original table cell kind without silently parsing ordinary text.
+// Generic timestamp selectors use the event type's datetime schema; other
+// columns retain literal strings, including ISO-looking text and "NaT".
 using OcdfgPerformanceTimestamp =
     std::variant<std::monostate, ParsedExactTimestamp, std::string>;
 struct OcdfgPerformanceEvent {
