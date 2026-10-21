@@ -96,6 +96,11 @@ The machine-readable source of truth is
 
 ## Active requirements
 
+- The Polars repetition companion passes 105 retained full outcomes, including
+  exact apply/collect diagnostics, literal columns and restartable lazy input.
+  The canonical row remains partial for unobserved dtype, dictionary and query
+  plan domains; see
+  [polars-attribute-repetition-parity-contract.md](polars-attribute-repetition-parity-contract.md).
 - The pandas repetition companion passes all 123 retained complete table
   projections and sixteen native diagnostics, preserving row order, source
   indices, dtypes, categorical declarations and attributes. The canonical row
