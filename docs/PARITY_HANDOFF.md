@@ -14,6 +14,118 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Latest variants checkpoint
+
+Four functional commits are pushed after `e335a196`:
+
+- `7c2bc9f2`: log variants companion, all seven public functions/helpers;
+  380 retained outcomes, 258 returns / 122 errors.
+- `374668fa`: pandas variants companion, genuine precomputed indexed
+  mappings and typed controls; 491 outcomes, 357 tables / 134 diagnostics.
+- `c3b5d97b`: Polars eager/lazy variants companion; 411 outcomes,
+  142 complete projected frames / 269 type/phase/message diagnostics.
+- `14e5be15`: usable log/table variants controls, genuine uploads,
+  complete artifacts, all four pandas mapping modes and production acceptance.
+
+Read `docs/variants-filter-workflow.md` and the three engine contracts. All
+**1,282 distinct public calls** have **1,282 matched projected native outcomes**.
+The three canonical variants rows remain partial; only evidence pointers changed.
+Full scope stays **86 packages / 387 modules**, **46 complete / 40 partial
+packages**, **226 complete / 161 partial modules**, **201 strict open units**.
+
+Membership explicitly distinguishes list and tuple sequences. Route omission
+keeps lists; UI defaults explicitly request tuples. Lists do not match log/
+pandas tuple variants; Polars joins inner sequences with commas and preserves
+encoding collisions. Log membership/rank/individual coverage emit first-seen
+variant groups; cumulative emits ranked groups including frequency ties and
+ignores positive. All trace/log context survives. Original activity roles are
+retained separately for XES reopening.
+
+pandas membership groups actual case rows; ranking/coverage statistics instead
+take contiguous slices starting at each case's first row, sized by total count.
+Timestamp controls are inert in all four functions. Genuine `variants_df`
+mapping is active in **all four** modes; the UI and route accept a separate
+indexed EventTable File. Statistical selection uses source variants then maps
+case identities through that supplied frame. Its complete source and unchanged
+check are downloadable.
+
+Polars membership always uses canonical time:timestamp. Top-k uses its selected
+timestamp for statistics, then canonical time for final membership. Top-k lazy
+construction scans at apply and returns a restartable membership result; errors
+retain apply/collect phases. Public from-list/auto helpers fail with unavailable
+DEFAULT_NAME_KEY; the UI offers working membership/top-k modes and documents
+that limitation. All 176 captured Python deprecation-warning observations and
+30 category snapshots remain retained; native Python warning emission is not
+implemented. This gap is explicit, not a closure claim.
+
+The following fresh banks are **executed and accepted; never replay them**:
+
+- `build/filtering-variants-log-public-actual-1`: 370 distinct from 375
+  candidates, five removals before entry;
+  `build/filtering-variants-log-boundaries-public-actual-1` adds 10,
+  reconstructing all 370 complete prior receipts first.
+- `build/filtering-variants-pandas-public-actual-1`: 439 distinct from 441
+  candidates, two removals before entry;
+  `build/filtering-variants-pandas-continuation-public-actual-1` adds 52,
+  reconstructing all 439 complete receipts first.
+- `build/filtering-variants-polars-public-actual-1`: 399 distinct;
+  `build/filtering-variants-polars-casts-public-actual-1` adds 12 after reconstructing
+  all 399 complete receipts. Public lazy plans and category-observer warnings
+  remain separate from actual collection outcomes.
+
+All new bank barriers reconstruct and assert saved full receipt hashes before
+entry and deduplicate the complete current bank. No overlaps, replays or source/
+control mutations were observed. No reference implementation source, AST,
+bytecode or private state was inspected. The earlier timestamp audit-timing
+correction below remains authoritative for those historical banks.
+
+Final acceptance passes **34 assertion-enabled native suites** in
+`build/parity-closures/native-current/ctest-variants-final.log`, with successful
+`build-variants-third.log` and `configure-variants-third.log`. The first build
+succeeded but first CTest passed 33/34: Polars top-k statistics alias resolution
+needed insertion order while final membership remained enum-preferred. The
+second successful build's direct Polars test reached eager 370 and caught eager
+missing-column errors carrying lazy plan context. General repairs separate
+statistics/member parameter resolution and eager/lazy error formatting. Expected
+vectors and generated tests remain byte-identical. Both earlier sources,
+compiled identities, build/failure receipts and repair audits are preserved in
+the Polars archive's initial-native and statistics-binding-native directories.
+
+Production acceptance passes **50 actual HTTP checks** in
+`build/parity-closures/variants-production-http-1`, then the owned server exits.
+Server SHA256: `e6037fea1b18de19e983595c1d7bf22281288496d3161d35e87936ea9441df90`.
+Tests cover tuple/list transport, complement/rank/coverage, all four real pandas
+mapping modes, exact integers, literal NUL/Unicode roles, native/XES reopening,
+captured unavailable helpers, error phases and strict multipart controls. The
+existing application was not replaced; rendered browser interaction is unverified.
+
+Frontend acceptance passes **186 files / 9,755 tests** with `--maxWorkers 2` in
+`variants-frontend-full-final.log`, plus 38 final focused tests, TypeScript and
+Vite (`variants-frontend-focused-final.log`, `variants-frontend-tsc-final.log`,
+`variants-frontend-vite-final.log`). Sources are frozen after these checks.
+The earlier focused failure preserves an old test assumption that admitted_json
+only applies to start/end; the operation-specific assertion was extended. Final
+catalogue declarations pass in `catalog-variants-final.log`; the first run's
+untracked-evidence failure remains retained in `catalog-variants-first.log`.
+
+`docs/variants-filter-workflow-checks.jsonl.gz` retains **108
+members**, **35 source bindings**, **79 compiled identities**;
+1,312,761 bytes, SHA256 `b73e3ade7c4ae84a885adf01101fe58b42594f0a6c17967755390e3529c846fa`.
+Manifest: `build/parity-closures/variants-workflow-evidence-manifest.json`.
+`verify-variants-current-bindings.py` verifies every current source, compiled
+identity, receipt, engine archive and embedded member, plus three committed
+partial evidence rows. Dedicated module archives retain all public observations,
+frozen recipes, complete outcomes, current sources and acceptance receipts.
+
+Remaining variants work includes unobserved dtype/value/selector combinations,
+mixed comparison/diagnostic orders, extension and custom object domains,
+warning emission, Python/category identity, physical lazy plans and performance.
+All earlier timestamp, paths, cases, between, repetition, OCDFG, connectors,
+platforms, solvers, rendered UI and other catalogue gaps remain in scope. There
+are no owned functional drafts. Preserve inherited comparison metadata in
+docs/reference-2.7.22-coverage.json and the historical parity-markdown edit, plus
+untracked root node_modules and Python caches.
+
 ## Latest timestamp checkpoint
 
 Four functional commits are pushed after `b8d32d3b`:
