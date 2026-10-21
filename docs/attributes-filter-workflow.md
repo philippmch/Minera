@@ -116,5 +116,21 @@ The focused byte-control checkpoint passes all four assertion-enabled attributes
 workbench/owned-HTTP suites in
 `build/parity-closures/native-current/ctest-attributes-byte-controls-first.log`.
 Evidence is packaged in `docs/attributes-native-byte-controls-checks.jsonl.gz`.
-This focused proof does not claim a rebuilt production server or rendered
-browser acceptance. Full current-server acceptance follows the LTL integration.
+This focused archive records the initial native acceptance. Additional evidence
+in `docs/attributes-native-byte-controls-production-checks.jsonl.gz` records 101
+passing actual production HTTP checks, including complete raw-byte log/table
+artifacts and canonical frontend Blob controls with CR/LF, NUL and lone
+surrogates. The test server was compiled from an unmodified copy of committed
+`src/backend/tools/minera_server.cpp` at `9b983512`, with the 58 unchanged current
+native objects and pinned frozen core. It used an independently owned temporary
+port and exited. Local unfinished LTL endpoint edits were excluded from this
+build. The server SHA256 is
+`22e6635a92e06bee3d97a7678572627093c007aecca0c1110072c78c19a18e1a`.
+
+The first two additional HTTP harness attempts stopped after 73 checks because
+the result reader assumed the ordinary log shape, then incorrectly expected a
+schema marker in the raw-byte log carrier. Both original scripts, responses,
+failures and owned-server exit receipts are retained. The third passed 101;
+the final fourth adds complete raw-byte filtered-log equality and also passes
+101. The product binary stayed unchanged throughout. Rendered browser
+interaction remains unverified. Full LTL acceptance is pending separately.
