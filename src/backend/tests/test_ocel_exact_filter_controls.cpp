@@ -113,6 +113,82 @@ void typed_nat_native_controls(){
   assert(filter_ocel_object_attribute_exact(source,"when",nat,true,OcelEventAttributeColumnKind::kScalar).objects.empty());
   assert(filter_ocel_object_attribute_exact(source,"when",nat,false).objects.at(0).id=="o2");
 }
+void matching_json_controls(){
+  const auto allowed=parse_ocel_exact_activity_type_correspondence_json(R"({"":[]," A,B:C;D|E ":[""," A,B:C;D|E ","","\u0000"],"constructor":["toString"]})");
+  assert(allowed.at("").empty());
+  assert(allowed.at(" A,B:C;D|E ")==std::vector<std::string>({""," A,B:C;D|E ","",std::string(1,'\0')}));
+  assert(allowed.at("constructor").at(0)=="toString");
+  assert(parse_ocel_exact_activity_type_correspondence_json("{}").empty());
+  for(const auto bad:{"[]","null",R"({"T":"A"})",R"({"T":[true]})",R"({"T":[null]})",R"({"T":[1]})",R"({"T":[] ,"T":["A"]})",R"({"T":["A",]})","{}x"}){
+    bool rejected=false;try{(void)parse_ocel_exact_activity_type_correspondence_json(bad);}catch(const std::invalid_argument&){rejected=true;}assert(rejected);
+  }
+}
+void actual_http_matching_controls(){
+  Ocel source;
+  source.events={{"e1","A,|&=+","2026-01-01T00:00:00Z",{}},{"e2","B","2026-01-01T00:00:01Z",{}}};
+  source.objects={{"","",{}},{"o2","U",{}},{"unused","",{}}};
+  source.relations={{"e1","","first"},{"e1","","duplicate"},{"e2","o2","q"}};
+  source.o2o={{"","","retained"},{"","o2","removed"}};
+  source.e2e={{"e1","e1","retained"},{"e1","e2","removed"}};
+  source.globals={{"source","original"}};
+  const auto before=serialize_ocel_json(source);
+  auto expected=parse_ocel_json_literal_names(before);
+  std::erase_if(expected.objects,[](const auto& value){return value.id!="";});
+  std::erase_if(expected.events,[](const auto& value){return value.id=="e2";});
+  std::erase_if(expected.relations,[](const auto& value){return value.event_id=="e2";});
+  std::erase_if(expected.o2o,[](const auto& value){return value.target_id=="o2";});
+  std::erase_if(expected.e2e,[](const auto& value){return value.target_id=="e2";});
+  httplib::Server server;
+  server.Post("/api/ocel/filter",[&](const httplib::Request& request,httplib::Response& response){
+    try{
+      const auto parsed=parse_ocel_json_literal_names(request.body);
+      const auto result=dispatch_ocel_exact_filter(parsed,request,request.get_param_value("variant"),true);
+      if(!result)throw std::invalid_argument("unsupported exact variant");
+      assert(result->variant=="ACTIVITY_TYPE_MATCHING_EXACT");
+      response.set_content(serialize_ocel_exact_filter_json(result->log),"application/json");
+    }catch(const std::exception& error){response.status=400;response.set_content(error.what(),"text/plain");}
+  });
+  const auto port=server.bind_to_any_port("127.0.0.1");assert(port>0);
+  std::thread worker([&]{server.listen_after_bind();});ServerGuard guard{server,worker};
+  const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+  while(!server.is_running()&&std::chrono::steady_clock::now()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  assert(server.is_running());httplib::Client client("127.0.0.1",port);client.set_read_timeout(3,0);
+  const auto encode=[](std::string_view value){
+    constexpr char hex[]="0123456789ABCDEF";
+    std::string result;
+    for(const unsigned char byte:value){
+      if((byte>='A'&&byte<='Z')||(byte>='a'&&byte<='z')||(byte>='0'&&byte<='9')||byte=='-'||byte=='_'||byte=='.'||byte=='~')result.push_back(static_cast<char>(byte));
+      else{result.push_back('%');result.push_back(hex[byte>>4]);result.push_back(hex[byte&15]);}
+    }
+    return result;
+  };
+  assert(encode(std::string("X\0&=+",5))=="X%00%26%3D%2B");
+  const auto post=[&](httplib::Params controls){
+    controls.emplace("variant","activity_type_matching_exact");
+    std::string query="/api/ocel/filter?";
+    for(const auto& [key,value]:controls)query+=encode(key)+'='+encode(value)+'&';
+    return client.Post(query,before,"application/json");
+  };
+  const auto check=[&](httplib::Params controls,const Ocel& wanted){
+    const auto response=post(std::move(controls));
+    if(!response||response->status!=200)throw std::runtime_error(response?response->body:"Matching HTTP request failed");
+    const auto reopened=parse_ocel_json(response->body);
+    if(serialize_ocel_json(reopened)!=serialize_ocel_json(wanted))throw std::runtime_error("Matching HTTP actual: "+serialize_ocel_json(reopened)+"\nExpected: "+serialize_ocel_json(wanted));
+  };
+  check({{"allowed_json",R"({"":["A,|&=+","A,|&=+"],"U":[]})"}},expected);
+  check({{"allowed_json",R"({"":["A,|&=+"]})"},{"activity_key","ocel:activity"},{"object_type_key","ocel:type"},{"temporary_separator",""},{"temporary_column",""}},expected);
+  auto cleared=expected;for(auto& relation:cleared.relations)relation.qualifier.clear();
+  check({{"allowed_json",R"({"":["A,|&=+"]})"},{"temporary_column","ocel:qualifier"}},cleared);
+  auto empty=expected;empty.events.clear();empty.objects.clear();empty.relations.clear();empty.o2o.clear();empty.e2e.clear();
+  check({{"allowed_json","{}"}},empty);
+  check({{"allowed_json",R"({"":["A,|&=+"]})"},{"temporary_separator",std::string("X\0",2)}},empty);
+  for(const auto& controls:std::vector<httplib::Params>{
+    {},{{"allowed_json",R"({"T":"A"})"}},{{"allowed_json",R"({"":["A,|&=+"]})"},{"activity_key","missing"}},
+    {{"allowed_json",R"({"":["A,|&=+"]})"},{"temporary_column","ocel:eid"}}}){
+    const auto response=post(controls);assert(response&&response->status==400);
+  }
+  assert(serialize_ocel_json(source)==before);
+}
 void actual_http_object_controls(){
   Ocel source;
   source.events={{"e1","A","2026-01-01T00:00:00Z",{}},{"e2","B","2026-01-01T00:00:01Z",{}}};
@@ -171,9 +247,11 @@ void actual_http_object_controls(){
 }
 int main(){const char* stage="parser_and_native_controls";try{
   parser_and_native_controls();
+  stage="matching_json_controls";matching_json_controls();
   stage="typed_nat_native_controls";typed_nat_native_controls();
   stage="literal_name_interchange";literal_name_interchange();
   stage="actual_http_controls";actual_http_controls();
   stage="actual_http_object_controls";actual_http_object_controls();
+  stage="actual_http_matching_controls";actual_http_matching_controls();
   std::cout<<"Exact OCEL JSON controls and real HTTP dispatch passed\n";
 }catch(const std::exception& error){std::cerr<<stage<<": "<<error.what()<<'\n';return 1;}}

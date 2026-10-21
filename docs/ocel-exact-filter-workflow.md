@@ -1,11 +1,15 @@
 # Exact OCEL filter controls
 
-The existing OCEL preparation workspace now exposes four additional filter
-choices: exact event and object attributes, exact timestamp bounds, and exact
-minimum object-type counts. The fifteen existing convenience variants retain their
+Final source/test snapshots and verification receipts are retained in
+`docs/ocel-exact-filter-workflow-checks.json.gz`, with per-member byte counts
+and SHA-256 hashes.
+
+The existing OCEL preparation workspace now exposes five additional filter
+choices: exact event and object attributes, exact timestamp bounds, exact
+minimum object-type counts, and exact activity/type matching. The fifteen existing convenience variants retain their
 controls. Results use the same inspection, download and opening workflow.
 
-All four use `POST /api/ocel/filter` with the original OCEL JSON source.
+All five use `POST /api/ocel/filter` with the original OCEL JSON source.
 The new query controls carry their literal JSON text without converting
 integers through JavaScript numbers or splitting labels on delimiters.
 
@@ -13,6 +17,7 @@ integers through JavaScript numbers or splitting labels on delimiters.
 | --- | --- |
 | `event_attribute_exact` | Required literal `attribute_key`, `attribute_values_json` typed scalar array, optional `positive` and `column_kind=auto\|scalar\|timestamp` |
 | `object_attribute_exact` | Required literal `attribute_key`, `attribute_values_json` typed scalar array, optional `positive` and `column_kind=auto\|scalar\|timestamp` |
+| `activity_type_matching_exact` | Required `allowed_json` object of string arrays; optional literal `activity_key`, `object_type_key`, `temporary_column`, `temporary_separator` |
 | `timestamp_exact` | Required `from_json`/`to_json` typed bounds and optional literal `timestamp_key` (default `ocel:timestamp`) |
 | `object_count_exact` | Required `minimum_counts_json` object with literal type names and signed integer, fractional, boolean or quoted nonfinite thresholds |
 
@@ -54,18 +59,37 @@ retain that representation. Unmarked input keeps the existing interchange
 reader's validation and behavior. This is a scoped opt-in transport, not a
 claim that every general OCEL importer/exporter is complete.
 
-Validation: four assertion-enabled native targets pass, including actual
-HTTP query/JSON dispatch for all four variants, wide integers, fractional
-relation counts, nanosecond bounds, metadata, literal names, repeated
-relations and ordinary reopening of marked output. Existing core OCEL,
-filtering and captured event-attribute checks pass. The entire frontend suite
-passed 9,667 tests before the final literal-name and timezone-hint checks;
-the final focused suites and production build are checked separately.
-The server translation unit is freshly compiled. Rendered browser
-interaction and replacement of the existing running app remain separate.
+Exact activity/type matching accepts empty mapping keys, empty activity names,
+empty allowed lists and `{}`. Correspondence JSON reaches native validation
+verbatim. Activity and object-type selectors default to `ocel:activity` and
+`ocel:type`; they can also address other stored native relation roles. Extra
+relation dataframe cells have no native value storage. Temporary controls use
+explicit Native default / Literal choices, preserving an omitted value versus
+a supplied empty string. A supplied temporary column is removed from the
+returned relation schema; reusing an identity can produce the retained native
+missing-ID error, while reusing the qualifier clears selected qualifiers.
+Matching retains selected relation order and multiplicity and propagates all
+six tables; unused events and objects are removed. The convenience matching
+variant retains its previous controls. See
+[ocel-activity-type-matching-parity-contract.md](ocel-activity-type-matching-parity-contract.md)
+for the retained public evidence and typed native boundary.
 
-Current extension validation is recorded with the implementation checkpoint: the
-controls target additionally exercises exact object HTTP selection, polarity,
-unused objects, repeated relationships and ordinary opening, plus typed NaT
-parsing and both membership APIs. Frontend protocol and SSR tests cover all four
-selectors; SSR and HTTP doubles do not establish rendered browser interaction.
+The final checkpoint passes all nine relevant assertion-enabled native suites,
+including core OCEL, exact JSON/HTTP controls, event/object membership, event
+NaT, activity/type matching, existing filtering and working-time checks. The
+controls target sends actual HTTP requests for all five exact variants,
+including literal empty names, wide integers, repeated relationships,
+opening marked outputs and activity/type temporary controls. Its byte-wise
+query encoder exercises NUL and &, =, + delimiters. The server translation
+unit is freshly compiled. A separate temporary instance of that production
+server also passed **ten real HTTP calls**, covering exact matching,
+download/open sources, literal NUL controls, and working-time missing/NaT
+elapsed-zero and working-time-error behavior. Its receipt is
+`build/parity-closures/owned-final-ocel-http-2/validation.json`; the owned
+server exited and the existing application was not replaced.
+
+The full frontend suite passes **9,677 tests across 179 files**. The final
+29 focused preparation tests, TypeScript check and Vite production build
+also pass. Protocol tests retain complete download/open/reupload sources
+and exact JSON; SSR verifies control markup. Rendered browser interaction
+and replacement of the existing running app remain unverified.

@@ -12,6 +12,18 @@ export function OcelExactFilterControls({filter,onChange}:{filter:OcelFilterForm
   <p>{'Use {"type":"nat"} to select missing datetime cells. Null and decimal "NaN" queries do not select datetime NaT. Choose timestamp interpretation when datetime metadata is unavailable.'}</p>
   {filter.variant==='object_attribute_exact'&&<p>Use ocel:oid or ocel:type for object IDs or types. Matching unused objects remain in the selection; related events and relationships are propagated.</p>}
  </>;
+ if(filter.variant==='activity_type_matching_exact')return <>
+  <label className="query-text"><span>Allowed activities by object type (exact JSON)</span><textarea rows={5} spellCheck={false} value={filter.allowed} onChange={event=>onChange('allowed',event.target.value)} placeholder={'{"Order":["Create order","Ship order"],"":[],"Item":[""]}'}/></label>
+  <div className="query-options"><label className="filters-field"><span>Relation activity selector</span><textarea rows={2} spellCheck={false} value={filter.matchingActivityKey} onChange={event=>onChange('matchingActivityKey',event.target.value)}/></label><label className="filters-field"><span>Relation object-type selector</span><textarea rows={2} spellCheck={false} value={filter.matchingObjectTypeKey} onChange={event=>onChange('matchingObjectTypeKey',event.target.value)}/></label></div>
+  <details><summary>Temporary matching controls</summary>
+    <label className="filters-field"><span>Temporary column</span><select value={filter.temporaryColumnMode} onChange={event=>onChange('temporaryColumnMode',event.target.value)}><option value="native">Native default</option><option value="literal">Literal column name</option></select></label>
+    {filter.temporaryColumnMode==='literal'&&<label className="filters-field"><span>Literal temporary column</span><textarea rows={2} spellCheck={false} value={filter.temporaryColumn} onChange={event=>onChange('temporaryColumn',event.target.value)}/></label>}
+    <label className="filters-field"><span>Temporary separator</span><select value={filter.temporarySeparatorMode} onChange={event=>onChange('temporarySeparatorMode',event.target.value)}><option value="native">Native default</option><option value="literal">Literal separator</option></select></label>
+    {filter.temporarySeparatorMode==='literal'&&<label className="filters-field"><span>Literal temporary separator</span><textarea rows={2} spellCheck={false} value={filter.temporarySeparator} onChange={event=>onChange('temporarySeparator',event.target.value)}/></label>}
+    <p>A supplied temporary column is removed from the returned relation schema. Reusing an identity column can produce a missing-ID error; reusing the qualifier clears selected qualifiers.</p>
+  </details>
+  <p>Empty type and activity names and empty allowed lists are valid. An empty map selects no relations. Repeated source relations retain their order and multiplicity; unused events and objects are removed. JSON text reaches native validation unchanged.</p>
+ </>;
  if(filter.variant==='timestamp_exact')return <>
   <label className="filters-field"><span>Exact timestamp attribute</span><input value={filter.timestampKey} onChange={event=>onChange('timestampKey',event.target.value)}/></label>
   <label className="query-text"><span>From bound (typed JSON)</span><textarea rows={3} spellCheck={false} value={filter.fromJson} onChange={event=>onChange('fromJson',event.target.value)}/></label>

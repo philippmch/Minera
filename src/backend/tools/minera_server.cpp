@@ -2,6 +2,7 @@
 #include "minera/case_description_workbench_json.hpp"
 #include "minera/reference_log_filter_workbench.hpp"
 #include "minera/ocel_exact_filter_controls.hpp"
+#include "minera/ocel_activity_type_matching.hpp"
 #include "ocdfg_performance_route.hpp"
 #include "case_relations_input.hpp"
 #include "case_relations_typed_input.hpp"
@@ -1706,7 +1707,8 @@ void handle_ocel_filter(const httplib::Request& request,
         "ids", "event_ids", "from", "to", "object_type", "activity",
         "minimum_counts", "level", "object_id", "min_size", "max_size",
         "allowed", "include_open_source", "attribute_values_json", "column_kind",
-        "timestamp_key", "from_json", "to_json", "minimum_counts_json"};
+        "timestamp_key", "from_json", "to_json", "minimum_counts_json",
+        "allowed_json", "activity_key", "object_type_key", "temporary_column", "temporary_separator"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key)) {
@@ -1719,7 +1721,7 @@ void handle_ocel_filter(const httplib::Request& request,
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     const bool exact_names=variant=="event_attribute_exact" || variant=="object_attribute_exact" ||
-        variant=="timestamp_exact" || variant=="object_count_exact";
+        variant=="timestamp_exact" || variant=="object_count_exact" || variant=="activity_type_matching_exact";
     const auto source = exact_names?minera::parse_ocel_json_literal_names(body):minera::parse_ocel_json(body);
     const bool positive = ocel_query_bool(request, "positive", true);
     const auto object_type = request.has_param("object_type")

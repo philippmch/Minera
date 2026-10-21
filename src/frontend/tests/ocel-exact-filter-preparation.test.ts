@@ -10,7 +10,7 @@ import {OcelExactFilterControls, OcelPreparationWorkspace} from "../src/componen
 import {classifyMiningJson} from "../src/active-mining-source";
 import {isOcelJsonDocument} from "../src/app-logic";
 
-const exactVariants = ["event_attribute_exact", "object_attribute_exact", "timestamp_exact", "object_count_exact"] as const;
+const exactVariants = ["event_attribute_exact", "object_attribute_exact", "timestamp_exact", "object_count_exact", "activity_type_matching_exact"] as const;
 const classic = '{"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2026-01-01T00:00:00.000000001Z","ocel:omap":["o1","o1"],"ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"first"},{"ocel:oid":"o1","ocel:qualifier":"second"}],"ocel:vmap":{"n":9223372036854775807}}},"ocel:objects":{"o1":{"ocel:type":"Item","ocel:ovmap":{},"ocel:o2o":[]}},"ocel:objectChanges":[],"ocel:e2e":[]}';
 const openLog = '{"ocelVersion":"2.0","objects":[{"id":"o1","type":"Item","attributes":[{"name":"n","value":9223372036854775807}]}],"events":[{"id":"e1","type":"A","time":"2026-01-01T00:00:00.000000001Z","attributes":[],"relationships":[{"objectId":"o1","qualifier":"first"},{"objectId":"o1","qualifier":"second"}]}]}';
 const response = (variant: string) => '{"family":"OCEL_FILTER","variant":' + JSON.stringify(variant.toUpperCase()) + ',"log":' + classic + ',"open_log":' + openLog + '}';
@@ -19,12 +19,12 @@ const display = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToSt
 afterEach(() => vi.unstubAllGlobals());
 
 describe("explicit exact OCEL filter protocol", () => {
-  it("retains all old selectors and adds the four implemented exact variants", () => {
+  it("retains all old selectors and adds the five implemented exact variants", () => {
     const selectors = OCEL_FILTERS.map(([id]) => id);
     for (const old of ["event_attribute", "object_attribute", "object_types", "objects", "events", "timestamp", "activity_type_matching", "object_count", "start_events", "end_events", "activities_object_type", "cc_object", "cc_length", "cc_object_type", "cc_activity"])
       expect(selectors).toContain(old);
     for (const exact of exactVariants) expect(selectors).toContain(exact);
-    expect(selectors).toHaveLength(19);
+    expect(selectors).toHaveLength(20);
   });
   it("passes exact typed membership JSON and literal empty keys unchanged", () => {
     const raw = '\r\n[{"type":"integer","value":9007199254740993},{"type":"decimal","value":"NaN"},{"type":"timestamp","value":"2026-01-01T00:00:00.000000001+00:00"},{"type":"string","value":" A,B:C;D|E "},{"type":"null"}]\r\n';
@@ -40,6 +40,17 @@ describe("explicit exact OCEL filter protocol", () => {
       expect(Object.fromEntries(new URLSearchParams(ocelPreparationFilterQuery(form)))).toEqual({variant: "object_attribute_exact", positive: "false", attribute_key: key, attribute_values_json: values, column_kind: "scalar"});
       expect(new URLSearchParams(ocelFilterQuery({variant: "object_attribute_exact", attribute_key: key, attribute_values_json: values, positive: false})).get("attribute_values_json")).toBe(values);
     }
+  });
+  it("keeps exact activity/type correspondence text, selectors and optional temporary controls literal", () => {
+    const raw=' \n{"":[]," Type,| ":[""," A,B:C;D|E ",""],"constructor":["toString"]}\r\n';
+    const form:OcelFilterForm={...DEFAULT_OCEL_FILTER,variant:"activity_type_matching_exact",allowed:raw,matchingActivityKey:"",matchingObjectTypeKey:" type ",temporaryColumnMode:"literal",temporaryColumn:"",temporarySeparatorMode:"literal",temporarySeparator:"X\u0000",positive:false,level:"999",values:"stale"};
+    expect(Object.fromEntries(new URLSearchParams(ocelPreparationFilterQuery(form)))).toEqual({variant:"activity_type_matching_exact",allowed_json:raw,activity_key:"",object_type_key:" type ",temporary_column:"",temporary_separator:"X\u0000"});
+    const normal=new URLSearchParams(ocelPreparationFilterQuery({...form,temporaryColumnMode:"native",temporarySeparatorMode:"native"}));
+    expect(normal.has("temporary_column")).toBe(false);expect(normal.has("temporary_separator")).toBe(false);expect(normal.has("positive")).toBe(false);
+    const api=new URLSearchParams(ocelFilterQuery({variant:"activity_type_matching_exact",allowed_json:raw,activity_key:"",object_type_key:" type ",temporary_column:"",temporary_separator:"X\u0000"}));
+    expect(api.get("allowed_json")).toBe(raw);expect(api.get("activity_key")).toBe("");expect(api.get("temporary_separator")).toBe("X\u0000");
+    for(const allowed of ["{}",'{"":[]}',"invalid JSON"])
+      expect(new URLSearchParams(ocelPreparationFilterQuery({...form,allowed})).get("allowed_json")).toBe(allowed);
   });
   it("preserves typed timestamp bound syntax, timezone awareness and all fractional digits", () => {
     const fromJson = '{"type":"string","value":"2026-01-01 00:00:00"}', toJson = '\n{"type":"timestamp","value":"2026-01-01T00:00:00.000000001+01:00"}\n';
@@ -89,7 +100,7 @@ describe("same-workspace exact OCEL results with unit-only HTTP doubles", () => 
     expect(isOcelFilterResult(parseNativeJson(response("unsupported_exact")))).toBe(false);
     expect(isOcelFilterResult({family: "OCEL_FILTER", variant: "TIMESTAMP_EXACT", log: {}})).toBe(false);
   });
-  it("uploads the original OCEL and preserves complete openable/downloadable same-run results for all four selectors", async () => {
+  it("uploads the original OCEL and preserves complete openable/downloadable same-run results for all five selectors", async () => {
     for (const variant of exactVariants) {
       const file = source(), raw = response(variant), fetch = vi.fn(async () => new Response(raw, {status: 200})); vi.stubGlobal("fetch", fetch);
       const form = {...DEFAULT_OCEL_FILTER, variant, values: '[{"type":"integer","value":9007199254740993}]', counts: '{"":-1,"Item":9007199254740993}'};
@@ -98,6 +109,7 @@ describe("same-workspace exact OCEL results with unit-only HTTP doubles", () => 
       expect(sent.get("include_open_source")).toBe("true"); expect(sent.get("variant")).toBe(variant);
       if (variant === "event_attribute_exact" || variant === "object_attribute_exact") expect(sent.get("attribute_values_json")).toBe(form.values);
       if (variant === "object_count_exact") expect(sent.get("minimum_counts_json")).toBe(form.counts);
+      if (variant === "activity_type_matching_exact") expect(sent.get("allowed_json")).toBe(form.allowed);
       expect(await ((init.body as FormData).get("log") as File).text()).toBe(await file.text());
       expect(run.raw).toBe(raw); expect(run.report_json).toContain('"response":' + raw);
       expect(run.outputs).toHaveLength(1); expect(run.outputs[0].tables.relations.count).toBe(2);
@@ -141,6 +153,14 @@ describe("existing OCEL preparation UI exact criteria (SSR only)", () => {
     expect(html).toContain("Literal object attribute name"); expect(html).toContain("Object column interpretation");
     expect(html).toContain("ocel:oid"); expect(html).toContain("ocel:type"); expect(html).toContain("Matching unused objects remain"); expect(html).toContain("9007199254740993");
     expect(html).toContain("type&quot;:&quot;nat"); expect(html).toContain("missing datetime cells");
+  });
+  it("offers literal exact correspondence and temporary controls in the existing workspace", () => {
+    const filter:OcelFilterForm={...DEFAULT_OCEL_FILTER,variant:"activity_type_matching_exact",allowed:'{"":[]," A,B ":["", "A"]}',temporaryColumnMode:"literal",temporaryColumn:"",temporarySeparatorMode:"literal",temporarySeparator:""};
+    const html=display(createElement(OcelExactFilterControls,{filter,onChange:vi.fn()}));
+    expect(html).toContain("Allowed activities by object type (exact JSON)");expect(html).toContain("Relation activity selector");expect(html).toContain("Relation object-type selector");
+    expect(html.match(/<textarea/g)).toHaveLength(5);
+    expect(html).toContain("Literal temporary column");expect(html).toContain("Literal temporary separator");expect(html).toContain("Empty type and activity names");
+    expect(html).toContain("empty allowed lists are valid");expect(html).toContain("unused events and objects are removed");expect(html).toContain("missing-ID error");
   });
   it("explains required bounds and UTC reinterpretation of the local clock", () => {
     const html = display(createElement(OcelExactFilterControls, {filter: {...DEFAULT_OCEL_FILTER, variant: "timestamp_exact"}, onChange: vi.fn()}));
