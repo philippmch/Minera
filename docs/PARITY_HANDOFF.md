@@ -14,7 +14,119 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Latest complete-case checkpoint
+## Latest adjacent-path checkpoint
+
+Four functional commits are pushed after `010ec3db`:
+
+- `6d9b1a85`: log paths membership/performance and public count/threshold/
+  dictionary helpers, with 182 complete outcomes and separate public/checks archives.
+- `54f02501`: pandas paths membership/performance, typed parameters, exact
+  complete table/index snapshots and 266 outcomes.
+- `35aa54ed`: Polars eager/lazy paths helpers, dictionaries and full diagnostics,
+  with 238 outcomes and retained EOF-only driver cleanup evidence.
+- `849d5487`: usable log/table paths controls, genuine upload, complete
+  artifacts, literal roles, XES reopening and actual production acceptance.
+
+Three independent native paths companions and usable log/table workflows now
+cover **686 distinct public calls**, with **686 exact projected outcomes**:
+182 log (118 returns / 64 errors), 266 pandas (155 tables / 111 errors), and
+238 Polars (153 frames / 85 full type/phase/message diagnostics). All three
+canonical rows remain partial; only their evidence pointers changed. The full
+catalogue remains **46 complete / 40 partial packages**, **226 complete / 161
+partial modules**, and **201 strict open units** across all 86 packages and
+387 modules. No finite bank is a claim of whole-module closure.
+
+Read `docs/paths-filter-workflow.md` and the three `*-paths-filter-parity-contract.md`
+contracts. Ordinary paths retain complete matching cases; performance paths use
+inclusive duration bounds. Log preserves original trace order; dataframe
+engines sort case/timestamp before adjacency. Pandas uses fractional elapsed
+seconds and Polars integral seconds. Comma-key collisions, split source/target
+columns, literal selectors, typed diagnostics, metadata/dictionaries/index and
+complete downloads have explicit acceptance. Performance ignores the native
+target-column parameter; the usable HTTP workflow rejects that inactive control.
+
+New banks are **executed and accepted; never replay them**:
+
+- `build/filtering-paths-log-public-actual-1`: 174 distinct calls;
+  `filtering-paths-log-temporal-public-actual-1`: four;
+  `filtering-paths-log-helper-edge-public-actual-1`: four. The latter bank
+  audited all 178 preceding full receipts before entry. All 182 log outcomes
+  have complete warning lists, with zero warnings and mutations.
+- `build/filtering-paths-pandas-public-actual-1`: 250 distinct calls after two
+  duplicate candidates were removed before entry;
+  `filtering-paths-pandas-continuation-public-actual-1`: 16 disjoint calls after
+  auditing the preceding 250 full receipts. The first bank's plain parameter
+  dictionaries deliberately retain nested tag dictionaries as actual values;
+  the continuation recursively decodes real NaN/infinity/Timestamp scalars.
+  Preserve both banks as observed. All 266 have zero warnings or mutations.
+- `build/filtering-paths-polars-public-actual-1`: 226 distinct calls;
+  `filtering-paths-polars-strings-public-actual-1`: twelve disjoint calls after
+  auditing the preceding 226 full receipts, with public unoptimized plans.
+  One algorithm warning and fifty dictionary-observer warnings remain
+  retained; native warning emission and physical plans remain open.
+
+Only public calls/signatures/docs/enums, public plan output and opaque hashes
+were used. Root executed all reference recipes; workers implemented offline.
+No algorithm call was replayed and no implementation source was inspected.
+
+Final acceptance passes **24 assertion-enabled native suites**, **44 actual
+production HTTP checks**, **184 frontend files / 9,726 tests**, TypeScript and
+Vite. Native receipts are under `build/parity-closures/native-current/`;
+frontend receipts are `paths-frontend-full-final.log`,
+`paths-frontend-tsc-final.log`, `paths-frontend-vite-final.log` under
+`build/parity-closures/`, with output `paths-frontend-final-dist`.
+HTTP acceptance is `build/parity-closures/paths-production-http-3`; server SHA256
+`4a2702f822276268827516bfbd46a691dc1f3d98e9f64f81ce2af76f08d3f825`.
+Every owned server exited; the existing application was not replaced.
+Rendered browser interaction remains unverified. Offline catalogue validation
+passes in `build/parity-closures/catalog-paths-final.log`.
+
+The successful coordinated build is `build-paths-final2.log`, with all 24
+suites in `ctest-paths-final2.log`. Final staged whitespace checking found one
+extra EOF newline in the Polars test driver. Its original driver and archive
+are retained under `build/parity-closures/polars-paths-filter-acceptance/pre-eof/`;
+the byte audit proves only that terminal LF was removed. The repaired target
+was rebuilt in `build-paths-eof-final.log`, then all 24 suites passed again in
+`ctest-paths-eof-final.log`. The final Polars and workflow archives bind that
+driver/object/executable/map. Log and pandas evidence remains bound to their
+unchanged final2 sources/binaries. No frontend or production server bytes
+changed during this cleanup.
+
+`docs/paths-filter-workflow-checks.jsonl.gz` retains **104 members**, **36 source
+bindings** and **57 compiled identities**. It is 1,005,938 bytes, SHA256
+`ac809026b42665a05b7aa6089c2019502e569f26af487b33ad3e0d71148b3a93`.
+Manifest: `build/parity-closures/paths-workflow-evidence-manifest.json`;
+packager: `package-paths-workflows.py`. The offline
+`verify-paths-current-bindings.py` verifies all **164 current bindings**, all
+104 embedded member hashes and the three committed partial ledger rows.
+Dedicated module archive hashes are:
+
+- Log public: `1e642d9d952c77ea333603268df2ed0a467f03ad91678216d14fcf156a81ddc7`;
+  log checks: `6598bdfa4fa2db698bc93efa4b68146ebd45a7740912e2c64b65f740c7b83b5f`.
+- Pandas checks: `27060361e64d87cf43d0d17360d73db20792a1d35bb38b54909a47b13c827925`.
+- Polars checks: `15a6e4e5f3cd41effb55605186669295c3de96222e887aea51f3deb7a9109bb9`.
+
+The first build's pandas private-function ADL collision and the initial three
+native failures remain retained. Repairs preserve dictionary-membership
+precedence in the log helper, project captured pandas Timestamp operands
+independently of precision, and distinguish Polars eager direct predicates
+from lazy cached predicates in complete temporal diagnostics. No expected
+outcome was rewritten. HTTP attempts one and two retain their original scripts,
+records and failures: their reopen calls omitted the exported activity selector.
+The third uses that selector explicitly for XES/native/context reopening.
+The workbench also discovers actual non-CSV roles, accepts the literal fallback
+when no first-class role exists, and has a CSV-to-XES reopening regression.
+
+Prior case, between, repetition and OCDFG evidence remains unchanged and
+historical. All their declared gaps remain in scope. Next paths work should
+use fresh discriminating banks for nullable/missing case IDs, equal timestamp
+ties across typed cases, extreme pandas index labels (use exact integer
+arithmetic), mixed temporal wrapper/zone domains, custom object protocols,
+extension dtypes, helper-column collisions, warnings and Polars physical
+plans/category identity. Do not infer exact log/pandas internal duration-limit
+sentinels from acceptance over the supported datetime calendar.
+
+## Previous complete-case checkpoint
 
 Four further functional commits are pushed after `fb1e0e7c`:
 
