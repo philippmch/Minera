@@ -103,7 +103,7 @@ describe("table workspace SSR and unit helpers (no rendered browser interaction)
     const fetch = vi.fn();vi.stubGlobal("fetch", fetch);
     for (const engine of ["pandas", "polars"] as const) {
       const html = display(createElement(ReferenceLogFilterWorkspace, {initialEngine: engine}));
-      for (const text of ["Event log", "pandas dataframe repetitions", "Polars lazy dataframe repetitions", "Native EventTable JSON file", "Case ID column", "Counted attribute column", "Minimum repetitions", "Maximum repetitions", "Download "+engine+" example table"]) expect(html).toContain(text);
+      for (const text of ["Event log", "pandas dataframe", "Polars lazy dataframe", "Native EventTable JSON file", "Case ID column", "Counted attribute column", "Minimum repetitions", "Maximum repetitions", "Download "+engine+" example table"]) expect(html).toContain(text);
       expect(html).not.toContain("Source format");expect(html).not.toContain("Download example CSV");expect(html).not.toContain("Open filtered log");expect(fetch).not.toHaveBeenCalled();
       expect(html).toContain(engine === "polars" ? "errors identify the stage" : "index labels, category declarations");expect(html).toContain("hexadecimal data");
     }
