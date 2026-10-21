@@ -12168,7 +12168,7 @@
       "classification": "support",
       "selectors": [],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/polars-paths-filter-parity-contract.md"
     },
     {
       "module": "algo.filtering.polars.polars_filtering_constants",
