@@ -11718,8 +11718,39 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/ocel-activity-type-matching-parity-contract.md",
+      "artifacts": [
+        "include/minera/ocel_activity_type_matching.hpp",
+        "src/backend/ocel_activity_type_matching.cpp",
+        "src/backend/tests/test_ocel_activity_type_matching_module.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.ocel.activity_type_matching",
+        "implementation": [
+          {
+            "path": "src/backend/ocel_activity_type_matching.cpp",
+            "symbol": "filter_ocel_activity_type_matching_exact"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_activity_type_matching_module.cpp",
+            "executable": "minera_ocel_activity_type_matching_module_tests",
+            "case": "retained_public_matching_cases"
+          },
+          {
+            "path": "src/backend/tests/test_ocel_activity_type_matching_module.cpp",
+            "executable": "minera_ocel_activity_type_matching_module_tests",
+            "case": "retained_public_matching_diagnostics"
+          },
+          {
+            "path": "src/backend/tests/test_ocel_activity_type_matching_module.cpp",
+            "executable": "minera_ocel_activity_type_matching_module_tests",
+            "case": "matching_native_state"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.ocel.event_attributes",
