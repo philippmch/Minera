@@ -4,6 +4,7 @@
 #include "minera/ocel_exact_filter_controls.hpp"
 #include "minera/ocel_activity_type_matching.hpp"
 #include "ocdfg_performance_route.hpp"
+#include "ocdfg_edge_metrics_route.hpp"
 #include "case_relations_input.hpp"
 #include "case_relations_typed_input.hpp"
 // Local application server: serves the built frontend and mines uploaded
@@ -2108,7 +2109,10 @@ void handle_ocel_discovery(const httplib::Request& request,
         "ocdfg_object_type_attribute", "ocdfg_business_hours",
         "ocdfg_business_hour_slots_json", "ocdfg_event_id_attribute",
         "ocdfg_timestamp_attribute", "ocdfg_workcalendar_json", "saw_activity_attribute",
-        "saw_object_type_attribute"};
+        "saw_object_type_attribute", "include_edge_metrics",
+        "ocdfg_edge_metrics_event_id_key", "ocdfg_edge_metrics_object_id_key",
+        "ocdfg_edge_metrics_object_type_key", "ocdfg_edge_metrics_activity_key",
+        "ocdfg_edge_metrics_timestamp_key"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -2122,9 +2126,13 @@ void handle_ocel_discovery(const httplib::Request& request,
       throw std::invalid_argument(
           "variant expects etot, ocdfg, ocpn, otg, or saw");
     }
+    const auto include_edge_metrics = ocel_query_bool(request, "include_edge_metrics", false);
+    if (include_edge_metrics && variant != "ocdfg")
+      throw std::invalid_argument("include_edge_metrics requires the ocdfg variant");
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
-    const auto log = minera::parse_ocel_json(body);
+    const auto log = include_edge_metrics ? minera::parse_ocel_json_literal_names(body)
+                                         : minera::parse_ocel_json(body);
     std::string payload;
     if (variant == "etot") {
       payload = minera::etot_json(minera::discover_etot_classic(log));
@@ -2207,8 +2215,12 @@ void handle_ocel_discovery(const httplib::Request& request,
       payload = minera::serialize_ocdfg_json(
           minera::discover_ocdfg_classic_with_options(log, options));
     }
-    response.set_content(ocel_discovery_response(variant, std::move(payload)),
-                         "application/json");
+    auto envelope = ocel_discovery_response(variant, std::move(payload));
+    if (include_edge_metrics) {
+      envelope.pop_back();
+      envelope += ",\"edge_metrics\":" + ocdfg_edge_metrics_report_from_request(log, request) + '}';
+    }
+    response.set_content(envelope, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

@@ -93,6 +93,13 @@ The machine-readable source of truth is
   Sixty retained timing cases, eight discovery outcomes and owned HTTP checks
   pass. The wider OCDFG performance/fidelity gate remains open; see
   [ocdfg-working-time-performance.md](ocdfg-working-time-performance.md).
+- The OCDFG explorer also exposes ordered edge associations and all three set
+  projections with literal column selectors and complete JSON download. All
+  seventy-seven retained timing, discovery and helper outcomes now have native
+  acceptance. Five native suites, thirty-six focused frontend tests, TypeScript,
+  Vite and eight production HTTP cases pass. These bounded results leave the
+  wider module and rendered browser gate open; see
+  [ocdfg-edge-metrics-parity-contract.md](ocdfg-edge-metrics-parity-contract.md).
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in
   the broader public captures, so it is not evidence of 28 incorrect models.

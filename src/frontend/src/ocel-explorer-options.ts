@@ -18,6 +18,21 @@ export interface OcdfgPerformanceSettings {
 export const DEFAULT_OCDFG_PERFORMANCE: OcdfgPerformanceSettings = {
   enabled: false, businessHours: true, slotsMode: "default", slotsJson: "[[25200,61200],[111600,147600],[198000,234000],[284400,320400],[370800,406800]]",
 };
+export const OCDFG_EDGE_METRIC_ROLES = [
+  {id:"eventId",label:"Event ID",key:"ocdfg_edge_metrics_event_id_key",canonical:"ocel:eid"},
+  {id:"objectId",label:"Object ID",key:"ocdfg_edge_metrics_object_id_key",canonical:"ocel:oid"},
+  {id:"objectType",label:"Object type",key:"ocdfg_edge_metrics_object_type_key",canonical:"ocel:type"},
+  {id:"activity",label:"Activity",key:"ocdfg_edge_metrics_activity_key",canonical:"ocel:activity"},
+  {id:"timestamp",label:"Timestamp (does not affect associations)",key:"ocdfg_edge_metrics_timestamp_key",canonical:"ocel:timestamp"},
+] as const;
+export interface OcdfgEdgeMetricsSettings {
+  enabled: boolean;
+  roles: Record<typeof OCDFG_EDGE_METRIC_ROLES[number]["id"], {custom:boolean; key:string}>;
+}
+export function defaultOcdfgEdgeMetricsSettings(): OcdfgEdgeMetricsSettings {
+  return {enabled:false,roles:{eventId:{custom:false,key:"ocel:eid"},objectId:{custom:false,key:"ocel:oid"},
+    objectType:{custom:false,key:"ocel:type"},activity:{custom:false,key:"ocel:activity"},timestamp:{custom:false,key:"ocel:timestamp"}}};
+}
 export interface OcelExplorerSettings {
   activityAttribute: string;
   objectTypeAttribute: string;
@@ -25,6 +40,7 @@ export interface OcelExplorerSettings {
   replayDiagnostics: boolean;
   ocpnDiscovery?: OcpnDiscoveryFlags;
   ocdfgPerformance?: OcdfgPerformanceSettings;
+  ocdfgEdgeMetrics?: OcdfgEdgeMetricsSettings;
 }
 export function ocelExplorerOptions(variant: OcelDiscoveryVariant, settings: OcelExplorerSettings): OcelDiscoveryOptions {
   const options: OcelDiscoveryOptions = { variant };
@@ -39,6 +55,13 @@ export function ocelExplorerOptions(variant: OcelDiscoveryVariant, settings: Oce
     if (activity) options.saw_activity_attribute = activity;
     if (type) options.saw_object_type_attribute = type;
   } else if (variant === "ocdfg") {
+    if (settings.ocdfgEdgeMetrics?.enabled) {
+      options.include_edge_metrics = true;
+      for (const role of OCDFG_EDGE_METRIC_ROLES) {
+        const selected = settings.ocdfgEdgeMetrics.roles[role.id];
+        if (selected.custom) options[role.key] = selected.key;
+      }
+    }
     if (settings.ocdfgPerformance?.enabled) {
       options.compute_edges_performance = true;
       options.ocdfg_business_hours = settings.ocdfgPerformance.businessHours;

@@ -1705,6 +1705,18 @@ export interface OcelDiscoveryResult {
   family: "OCEL_DISCOVERY";
   variant: OcelDiscoveryVariant;
   result: Record<string, unknown>;
+  edge_metrics?: OcdfgEdgeMetricsReport;
+}
+export interface OcdfgEdgeMetricsEdge {
+  source_activity: string;
+  target_activity: string;
+  associations: [string, string, string][];
+  event_couples: [string, string][];
+  total_objects: [string, string, string][];
+  unique_objects: string[];
+}
+export interface OcdfgEdgeMetricsReport {
+  object_types: { object_type: string; edges: OcdfgEdgeMetricsEdge[] }[];
 }
 export interface OcpnTokenReplayPlaceDiagnostics {
   m: number;
@@ -1863,6 +1875,17 @@ export function isOcelDiscoveryResult(value: unknown): value is OcelDiscoveryRes
   if (!isOcelRecord(value) || value.family !== "OCEL_DISCOVERY") return false;
   if (!["etot", "ocdfg", "ocpn", "otg", "saw"].includes(String(value.variant)) ||
       !isOcelRecord(value.result)) return false;
+  if (value.edge_metrics !== undefined) {
+    if (value.variant !== "ocdfg" || !isOcelRecord(value.edge_metrics) ||
+        !Array.isArray(value.edge_metrics.object_types)) return false;
+    const tuples = (rows: unknown, length: number) => Array.isArray(rows) && rows.every(row =>
+      Array.isArray(row) && row.length === length && row.every(cell => typeof cell === "string"));
+    if (!value.edge_metrics.object_types.every(type => isOcelRecord(type) &&
+        typeof type.object_type === "string" && Array.isArray(type.edges) && type.edges.every(edge =>
+          isOcelRecord(edge) && typeof edge.source_activity === "string" && typeof edge.target_activity === "string" &&
+          tuples(edge.associations, 3) && tuples(edge.event_couples, 2) && tuples(edge.total_objects, 3) &&
+          Array.isArray(edge.unique_objects) && edge.unique_objects.every(id => typeof id === "string")))) return false;
+  }
   if (value.variant !== "ocpn") return true;
   const tbr = value.result.tbr_results;
   const petriNets = value.result.petri_nets;
