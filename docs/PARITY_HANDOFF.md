@@ -16,7 +16,36 @@ uncovered banks only in new output directories.
 
 ## Pushed checkpoints
 
-Seven functional commits were pushed after `e68e191d`:
+Seven functional continuation commits are pushed after `7849925b`:
+
+- `7cfe40d9`: locale-independent OCEL annotation/conformance JSON, exact signed
+  zero and int64 boundaries. The embedded writer is
+  `write_ocpn_annotation_fields` (the previous next-step note named a nonexistent
+  `write_ocdfg_content`). See `docs/ocel-numeric-json-contract.md`.
+- `9c40cfa7`: ordered OCDFG edge associations, three set projections, literal
+  selectors and usable explorer tables/download. All seventy-seven retained
+  outcomes now have native acceptance across timing/discovery/helpers. Five
+  native suites, thirty-six focused frontend tests, TypeScript, Vite and eight
+  actual production-handler requests pass. The full module remains partial;
+  see `docs/ocdfg-edge-metrics-parity-contract.md`.
+- `3def003b`: typed attribute repetition in the existing log-filter workspace.
+  All 109 distinct retained outcomes, seven native suites, fourteen production
+  HTTP checks, 9,688 frontend tests, TypeScript and Vite pass. Full native JSON,
+  XES projection and reopening retain the correct activity selector. The new
+  companion preserves lazy bounds, zero-match/empty traces, exact integers and
+  NativeNA truth errors; its canonical row remains partial for unsupported
+  object domains. See `docs/log-attribute-repetition-parity-contract.md`.
+- `9a13274d`: pandas repetition companion, complete table/index/dtype/category
+  metadata and 139 retained native outcomes.
+- `c03443b0`: Polars eager/lazy repetition companion, 105 retained outcomes,
+  literal columns and exact apply/collect error type, phase and full message.
+- `7a207581`: 86 further log outcomes for ordinary value shapes/bytes and ten
+  exact escaped pandas missing-column errors. Complete error strings have a
+  length-preserving native carrier.
+- `a5e7de37`: usable pandas/Polars table modes and native table downloads,
+  separate engine phases and binary byte target controls in log mode.
+
+The earlier seven functional commits after `e68e191d` remain relevant:
 
 - `0d8e4399`: exact OCEL object attributes and shared typed NaT membership.
 - `c552c2db`: usable exact object/NaT preparation controls and HTTP dispatch.
@@ -68,7 +97,62 @@ is locale-independent and retains negative zero. See
 historical; the separate typed-adapter archive binds the corrected final
 sources and retained dtype projection. No new timing reference calls occurred.
 
-## Final validation
+The OCDFG explorer now exposes the other nine retained edge helper outcomes:
+ordered association triples and event-pair, full-triple and object-ID sets.
+Literal role overrides, paginated inspection and complete JSON download are
+available. All 77 retained OCDFG outcomes have native acceptance, but arbitrary
+relation cell/dtype domains and the performance gate remain open.
+
+Repetition now has separate log, pandas and Polars companions rather than a
+shared grouping approximation. The public banks contain 195 distinct log calls,
+150 pandas calls and 105 Polars calls. The native counterparts cover 195 log,
+149 pandas (missing-required-argument call excluded) and 105 Polars outcomes.
+Pandas/Polars consider cases observed among matching rows even at minimum zero;
+the log module can retain zero-match and empty traces. The companions preserve
+typed numeric/date/byte behavior, stored context and full returned rows.
+Their three canonical module rows remain partial for the documented remaining
+carrier/dtype/object domains. Read the three repetition contracts and
+`docs/table-attribute-repetition-workflow.md`.
+
+The filtering workspace offers separate native table modes with engine-specific
+examples, complete metadata/integer-storage transport and full result/response
+downloads. It does not convert those tables into logs. Log mode accepts typed
+bytes as hexadecimal target JSON and retains native JSON/XES/opening behavior.
+Earlier evidence archives are historical source snapshots; the latest workflow
+archive binds all 21 current implementation/test/CMake sources.
+
+## Current final validation
+
+- **Nine assertion-enabled native suites pass**, including all three repetition
+  companions, the ordinary/literal continuations, old log workbench/route and
+  both new table suites:
+  `build/parity-closures/native-current/ctest-ordinary-repetition-final.log`.
+- Final native/server build:
+  `build/parity-closures/native-current/build-ordinary-repetition-final.log`.
+- Frontend **181 files / 9,702 tests**, TypeScript and Vite pass:
+  `build/parity-closures/table-repetition-frontend-{full,tsc,vite}.log`.
+  One unrelated existing fixture exceeded its default five-second timeout
+  during concurrent compilation; that failed run is retained. The final full
+  run used `--testTimeout 30000`, with no test or production edit for the timeout.
+- **34 final production requests pass** on independently owned servers:
+  `build/parity-closures/table-repetition-production-http-2` (17) and
+  `build/parity-closures/repetition-production-http-3` (17). Their receipts bind
+  server SHA256 `1ba9fe6080c3f1cee06855e669b122fc26250485e9a2ca328b31c1b5d6c9ac7e`.
+  Both servers exited. Earlier owned HTTP attempts remain retained.
+- Offline structural catalogue validation passes:
+  `build/parity-closures/catalog-repetition-final.log`. Counts remain 46/40
+  packages, 226/161 modules and 201 open strict units. No repetition row was
+  promoted from a finite bounded bank.
+
+The first Polars test executable overflowed the Windows stack. Splitting
+generated frame/case functions repaired the test harness without raising the
+stack limit or changing expected data. The next run detected an omitted
+`failed` marker in a temporal diagnostic; the general formatter was corrected.
+Both failures and final success are retained in the Polars and workflow
+archives. No reference calls in this continuation were replayed. Rendered
+browser interaction remains unverified.
+
+## Earlier OCEL checkpoint validation
 
 - **Nine assertion-enabled native suites pass**, including original core,
   filters, events, objects, NaT, exact controls, matching and both timing suites:
@@ -95,13 +179,17 @@ Rendered application interaction remains unverified.
 
 - Continue the wider OCDFG gate. Reuse the retained 77-call bank at
   `build/parity-closures/ocdfg-performance-public-actual-1/capture.json`;
-  inspect remaining aggregation/strict-selector outcomes before designing
-  new disjoint inputs. Do not equate the 60+8 slice with whole-module closure.
-- Conformance embedding's `write_ocdfg_content` retains a separate inherited
-  locale boundary. The discovery serializer repair does not close it.
+  all retained timing/discovery/aggregation/strict-selector outcomes now have
+  acceptance. Design only new disjoint inputs for remaining domains. This
+  seventy-seven-outcome slice does not establish whole-module closure.
 - Keep arbitrary relation dataframe cells, dtype/storage domains, non-string
   grouping IDs and actual performance benchmarking explicit. The new timing
   companion supports string identities; do not silently coerce other domains.
+- Continue the three repetition modules' declared gaps. Ordinary log values,
+  byte targets, container/date/byte bounds, unhashable selectors and literal
+  pandas missing-key diagnostics now have disjoint acceptance. Custom equality
+  objects, wrapper storage/identity graphs, arbitrary table schemas/dtypes,
+  categorical dictionaries and Polars physical plans remain open as documented.
 - Resolve Alpha+ identity-dependent cleanup selection. Both returned graph
   shapes occur in broader captures; the old single-process 28/64 mismatch
   count does not establish 28 incorrect models.
