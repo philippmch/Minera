@@ -12078,7 +12078,7 @@
       "classification": "internal-variant",
       "selectors": [],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/pandas-variants-filter-parity-contract.md"
     },
     {
       "module": "algo.filtering.polars.activity_split.activity_split_filter",
