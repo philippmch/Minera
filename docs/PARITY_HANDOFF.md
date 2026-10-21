@@ -14,6 +14,51 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Current continuation: native byte controls and LTL preparation
+
+Commit `13f34f35be95c6a3d054b694ff9a528b400aa867` is pushed. Both attributes
+workbenches now accept the frontend's canonical `<field>.txt` byte-preserving
+Blob controls. Unrelated File-shaped ordinary controls remain rejected.
+All four focused assertion-enabled workbench/owned-HTTP suites pass in
+`build/parity-closures/native-current/ctest-attributes-byte-controls-first.log`.
+The evidence archive `docs/attributes-native-byte-controls-checks.jsonl.gz`
+has 32 members, 107,541 bytes and SHA256
+`86299c611832abbe9369dd40fad0e25e9a63fe7449a17f61709c1d754bdc3a5a`.
+Its 14 current source and 16 compiled bindings were checked after commit;
+Git source comparison normalizes CRLF/LF only, while actual compiled-source
+and archive hashes remain exact. This is a focused proof; the preceding
+production-server proof is historical after these shared changes. A new
+production-server acceptance is pending the LTL integration.
+
+LTL is the active next family across EventLog, pandas and Polars. Root captured
+only the public surface (zero algorithm calls) under
+`build/filtering-ltl-public-surface-actual-1`. **No LTL reference algorithms have
+been executed in this continuation yet.** Workers have prepared recipes under
+`build/filtering-ltl-{log,pandas,polars}-public-prepared-1`. Before any entry,
+require parsed completed audits with zero unclassified contexts and complete
+prior receipt reconstruction, plus whole-bank actual-input deduplication.
+The combined compressed inventory at
+`build/filtering-ltl-combined-retained-search-1` finished 3,897 archives,
+162,085,516,728 decompressed bytes and zero exact-module identity hits. Its
+original classifier exited zero with no retained actual receipts or plans.
+The final compressed audit still needs the completed combined flat audit at
+`build/filtering-ltl-retained-flat-search-1`; that original scan is still live.
+Do not restart/duplicate either scan or assert completion from file existence.
+Root alone runs reference algorithms. LOG includes both timestamp helpers;
+Polars next/four-eyes accept collections, unlike fixed operands in log/pandas.
+
+Local LTL headers, workbench/route, frontend controls and 18 focused passing
+frontend checks are uncommitted preparation. Native companions await root's
+retained capture. Neither native LTL nor production/browser acceptance is
+claimed. The attributes-only intermediate aggregate build failed because the
+new local server endpoint was present before its LTL implementation; original
+link diagnostics remain in `build-attributes-byte-controls-first.log`. A test
+variable collision and corrected pre-execution byte-key fixture are retained
+in `attributes-byte-controls-prepared-1`; the final four suites passed. The full
+LTL focused CMake draft has been restored but is not configured while native
+sources are absent. The production server must be rebuilt after integration;
+no existing application was replaced. All 201 strict open units remain open.
+
 ## Latest attributes checkpoint
 
 Four functional commits are pushed after `0af4187c`:
