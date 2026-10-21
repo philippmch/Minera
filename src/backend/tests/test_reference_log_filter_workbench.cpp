@@ -138,6 +138,29 @@ void between_workflow() {
   assert(run("between",{field("act1_json","[]"),field("act2_json","[]"),field("positive","true")}).status==400);
   assert(run("repetition",{field("target_json",R"({"type":"null"})"),field("case_id_key","case")}).status==400);
 }
+void case_workflows() {
+  auto result=run("case_size",{field("minimum","2"),field("maximum","null")});assert(result.status==200);
+  has(result,"\"result\":{\"traces\":1,\"events\":3}");has(result,"\"source_unchanged\":true");
+  result=run("case_count",{field("max_cases","-1")});assert(result.status==200);has(result,"\"result\":{\"traces\":2,\"events\":4}");
+  EventLog log;log.attributes={{"discarded","log context"}};log.metadata.properties={{"discarded","property"}};
+  Trace trace;trace.case_id="original";trace.attributes={{"retained","trace context"}};
+  Event event;event.activity="A";event.activity_state=FirstClassAttributeState::kPresent;event.activity_source_key="concept:name";
+  event.timestamp_state=FirstClassAttributeState::kMissing;
+  const std::string time_key(" time\n\0Ω ",11);
+  EventAttribute timestamp{time_key,"2026-06-01T00:00:00",AttributeKind::kDate};timestamp.typed_value=NativeDate{timestamp.value};
+  event.attributes={timestamp};trace.events={event,event};trace.events[1].attributes[0].value="2026-06-01T00:00:02";
+  trace.events[1].attributes[0].typed_value=NativeDate{"2026-06-01T00:00:02"};log.traces={trace};
+  auto expected=log;expected.attributes.clear();expected.metadata.properties.clear();
+  result=run("case_performance",{field("minimum","2"),field("maximum","2"),field("timestamp_key",time_key)},serialize_embedding_workbench_raw_log_json(log),"source.json");
+  assert(result.status==200);has(result,"\"filtered_log_json\":"+serialize_embedding_workbench_string_json(serialize_embedding_workbench_raw_log_json(expected)));
+  result=run("case_performance",{field("timestamp_key","missing")},serialize_embedding_workbench_raw_log_json(log),"source.json");
+  assert(result.status==400);has(result,"\"source_unchanged\":true");has(result,"\"phase\":\"filter\"");
+  const std::string time_csv="case,work,when\nc1,A,2026-06-01T00:00:00\nc1,B,2026-06-01T00:00:02\nc2,C,2026-06-01T00:00:03\n";
+  result=run("case_performance",{field("case_id_column","case"),field("activity_column","work"),field("timestamp_column","when"),field("minimum","2"),field("maximum","2")},time_csv);
+  assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":2}");has(result,"\"activity_key\":\"work\"");
+  for(const auto& operation:{"case_size","case_count","case_performance"}) assert(run(operation,{field("positive","true")}).status==400);
+  assert(run("case_count",{field("minimum","2")}).status==400);assert(run("case_size",{field("timestamp_key","unused")}).status==400);
+}
 void invalid_controls() {
   assert(run("unknown").status==400);
   assert(run("prefix").status==400);
@@ -151,4 +174,4 @@ void invalid_controls() {
   assert(execute_reference_log_filter({{"operation","","start",false},{"operation","","end",false}}).status==400);
 }
 }
-int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();invalid_controls();}
+int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();case_workflows();invalid_controls();}

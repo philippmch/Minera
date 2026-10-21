@@ -3,12 +3,13 @@ import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart"
 import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString, originalEmbeddingFilterStringBytes, originalEmbeddingFilterStringText, type OriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
 
-export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition", "between"] as const;
+export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition", "between", "case_size", "case_count", "case_performance"] as const;
 export type ReferenceLogFilterOperation = typeof REFERENCE_LOG_FILTER_OPERATIONS[number];
 export const REFERENCE_LOG_FILTER_LABELS: Record<ReferenceLogFilterOperation, string> = {
   traces: "Match an activity sequence", prefix: "Keep a prefix before an activity",
   suffix: "Keep a suffix after an activity", start: "Match the first activity",
   end: "Match the last activity", rework: "Find repeated activity", repetition: "Count an exact attribute value", between: "Extract subtraces between activities",
+  case_size: "Filter by case event count", case_count: "Limit the number of cases", case_performance: "Filter by case duration",
 };
 export const REFERENCE_LOG_FILTER_CSV_FIELDS = [
   ["case_id_column", "Case ID column", "case_id"], ["activity_column", "Activity column", "activity"],
@@ -23,11 +24,14 @@ export interface ReferenceLogFilterForm {
   positive: boolean; strict: boolean; occurrence: "first" | "last";
   admittedJson: string; patternsJson: string; minOccurrences: string;
   repetitionTargetJson: string; minRep: string; maxRep: string;
+  minCaseSize: string; maxCaseSize: string; maxCases: string; minCaseSeconds: string; maxCaseSeconds: string;
+  timestampKeyMode: "default" | "custom"; timestampKey: string;
   betweenStartJson: string; betweenEndJson: string; betweenCaseKeyMode: "default" | "custom"; betweenCaseKey: string; betweenSeparatorMode: "default" | "custom"; betweenSeparator: string;
   csvOptions: boolean; csv: Record<ReferenceLogFilterCsvKey, string>; trimFields: boolean;
 }
 export function defaultReferenceLogFilterForm(operation: ReferenceLogFilterOperation = "rework"): ReferenceLogFilterForm {
   return {operation, sourceFormat: "auto", activity: "", activityKeyMode: "default", activityKey: "",
+    minCaseSize: "2", maxCaseSize: "null", maxCases: "1000", minCaseSeconds: "0", maxCaseSeconds: "10000000000", timestampKeyMode: "default", timestampKey: "time:timestamp",
     positive: true, strict: true, occurrence: "first", admittedJson: '["A"]', patternsJson: '[["A", "...", "B"]]',
     betweenStartJson: '"A"', betweenEndJson: '"B"', betweenCaseKeyMode: "default", betweenCaseKey: "concept:name", betweenSeparatorMode: "default", betweenSeparator: "##@@",
     minOccurrences: "2", repetitionTargetJson: '{"type":"string","value":"web"}', minRep: "2", maxRep: "9223372036854775807", csvOptions: false, csv: {case_id_column: "case_id", activity_column: "activity", timestamp_column: "timestamp", delimiter: ","}, trimFields: false};
@@ -71,8 +75,14 @@ export function referenceLogFilterFields(form: ReferenceLogFilterForm): Array<[s
   if (!["auto", "csv", "xes", "native_log"].includes(form.sourceFormat)) throw new Error("Choose a source format.");
   if (!["default", "custom"].includes(form.activityKeyMode)) throw new Error("Choose an activity key mode.");
   const fields: Array<[string, string]> = [["operation", form.operation], ["source_format", form.sourceFormat]];
-  if (form.activityKeyMode === "custom") fields.push(["activity_key", form.activityKey]);
-  if (form.operation === "prefix" || form.operation === "suffix") {
+  if (form.activityKeyMode === "custom" && !form.operation.startsWith("case_")) fields.push(["activity_key", form.activityKey]);
+  if (form.operation === "case_count") fields.push(["max_cases", form.maxCases]);
+  else if (form.operation === "case_size") fields.push(["minimum", form.minCaseSize], ["maximum", form.maxCaseSize]);
+  else if (form.operation === "case_performance") {
+    if (!["default", "custom"].includes(form.timestampKeyMode)) throw new Error("Choose a timestamp key mode.");
+    fields.push(["minimum", form.minCaseSeconds], ["maximum", form.maxCaseSeconds]);
+    if (form.timestampKeyMode === "custom") fields.push(["timestamp_key", form.timestampKey]);
+  } else if (form.operation === "prefix" || form.operation === "suffix") {
     if (!["first", "last"].includes(form.occurrence)) throw new Error("Choose the first or last occurrence.");
     fields.push(["activity", form.activity], ["strict", String(form.strict)], ["occurrence", form.occurrence]);
   } else if (form.operation === "between") {

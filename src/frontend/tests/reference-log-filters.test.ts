@@ -31,13 +31,17 @@ describe("literal reference-log filter controls", () => {
       if (operation === "prefix" || operation === "suffix") {expect(fields).toMatchObject({activity: "", strict: "true", occurrence: "first"}); expect(fields).not.toHaveProperty("positive");}
       else if (operation === "between") {expect(fields).toMatchObject({act1_json: '"A"', act2_json: '"B"'}); for (const key of ["positive", "activity", "case_id_key", "subcase_concat_str"]) expect(fields).not.toHaveProperty(key);}
       else if (operation === "repetition") {expect(fields).toMatchObject({target_json: form.repetitionTargetJson, min_rep: "2", max_rep: "9223372036854775807"}); expect(fields).not.toHaveProperty("positive"); expect(fields).not.toHaveProperty("activity");}
+      else if (operation === "case_size") {expect(fields).toMatchObject({minimum: "2", maximum: "null"}); expect(fields).not.toHaveProperty("positive");}
+      else if (operation === "case_count") {expect(fields).toMatchObject({max_cases: "1000"}); expect(fields).not.toHaveProperty("positive");}
+      else if (operation === "case_performance") {expect(fields).toMatchObject({minimum: "0", maximum: "10000000000"}); expect(fields).not.toHaveProperty("positive"); expect(fields).not.toHaveProperty("timestamp_key");}
       else expect(fields.positive).toBe("true");
       expect(Object.hasOwn(fields, "patterns_json")).toBe(operation === "traces");
       expect(Object.hasOwn(fields, "admitted_json")).toBe(operation === "start" || operation === "end");
       expect(Object.hasOwn(fields, "target_json")).toBe(operation === "repetition");
       expect(Object.hasOwn(fields, "min_occurrences")).toBe(operation === "rework");
       form.activityKeyMode = "custom"; form.activityKey = "";
-      expect(referenceLogFilterFields(form)).toContainEqual(["activity_key", ""]);
+      if (operation.startsWith("case_")) expect(Object.fromEntries(referenceLogFilterFields(form))).not.toHaveProperty("activity_key");
+      else expect(referenceLogFilterFields(form)).toContainEqual(["activity_key", ""]);
     }
   });
   it("preserves exact unsigned/signed/fraction/NaN/INF minimum tokens without Number conversion", () => {
@@ -187,7 +191,7 @@ describe("exact response artifacts and request lifetime", () => {
   it("invalidates every source/criteria/CSV change and rejects previous requests after edits/unmount", () => {
     const identity = {source: source(), form: defaultReferenceLogFilterForm()}, gate = new ReferenceLogFilterRequestGate(), first = gate.issue(identity);
     expect(gate.accepts(first, {source: identity.source, form: {...identity.form, csv: {...identity.form.csv}}})).toBe(true);
-    for (const patch of [{activity: "A"}, {positive: false}, {strict: false}, {occurrence: "last"}, {sourceFormat: "xes"}, {activityKeyMode: "custom"}, {activityKey: "" + "x"}, {minOccurrences: "NaN"}, {minRep: "0"}, {maxRep: "1"}, {betweenStartJson: "[]"}, {betweenEndJson: "[]"}, {betweenCaseKeyMode: "custom"}, {betweenCaseKey: ""}, {betweenSeparatorMode: "custom"}, {betweenSeparator: ""}, {repetitionTargetJson: '{"type":"null"}'}, {admittedJson: "[]"}, {patternsJson: "[]"}, {csvOptions: true}, {trimFields: true}, {csv: {...identity.form.csv, activity_column: ""}}])
+    for (const patch of [{minCaseSize: "3"}, {maxCaseSize: "0"}, {maxCases: "-1"}, {minCaseSeconds: "1"}, {maxCaseSeconds: "NaN"}, {timestampKeyMode: "custom"}, {timestampKey: ""}, {activity: "A"}, {positive: false}, {strict: false}, {occurrence: "last"}, {sourceFormat: "xes"}, {activityKeyMode: "custom"}, {activityKey: "" + "x"}, {minOccurrences: "NaN"}, {minRep: "0"}, {maxRep: "1"}, {betweenStartJson: "[]"}, {betweenEndJson: "[]"}, {betweenCaseKeyMode: "custom"}, {betweenCaseKey: ""}, {betweenSeparatorMode: "custom"}, {betweenSeparator: ""}, {repetitionTargetJson: '{"type":"null"}'}, {admittedJson: "[]"}, {patternsJson: "[]"}, {csvOptions: true}, {trimFields: true}, {csv: {...identity.form.csv, activity_column: ""}}])
       expect(gate.accepts(first, {source: identity.source, form: {...identity.form, ...patch} as ReferenceLogFilterForm})).toBe(false);
     expect(gate.accepts(first, {...identity, source: source()})).toBe(false);
     const second = gate.issue(identity); expect(gate.accepts(first, identity)).toBe(false); expect(gate.accepts(second, identity)).toBe(true);

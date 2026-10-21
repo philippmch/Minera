@@ -5,12 +5,13 @@ import {TableRepetitionRequestGate, defaultTableRepetitionForm, requestTableRepe
   tableRepetitionArtifactFile, tableRepetitionCountText, tableRepetitionResponseFile,
   tableRepetitionSourceExample, type TableRepetitionEngine, type TableRepetitionForm, type TableRepetitionRun} from "../table-attribute-repetition";
 import {TableBetweenFilterWorkspace} from "./TableBetweenFilterWorkspace";
+import {TableCaseFilterWorkspace} from "./TableCaseFilterWorkspace";
 
 export function TableAttributeRepetitionWorkspace({engine, initialForm}: {engine: TableRepetitionEngine; initialForm?: TableRepetitionForm}) {
-  const [operation, setOperation] = useState<"repetition" | "between">("repetition");
+  const [operation, setOperation] = useState<"repetition" | "between" | "cases">("repetition");
   return <>
-    <label className="filters-field"><span>Table filter behavior</span><select value={operation} onChange={event => setOperation(event.target.value as "repetition" | "between")}><option value="repetition">Count an exact attribute value</option><option value="between">Extract intervals between activities</option></select></label>
-    {operation === "between" ? <TableBetweenFilterWorkspace key={`${engine}-between`} engine={engine}/> : <TableAttributeRepetitionCriteria key={`${engine}-repetition`} engine={engine} initialForm={initialForm}/>}
+    <label className="filters-field"><span>Table filter behavior</span><select value={operation} onChange={event => setOperation(event.target.value as "repetition" | "between" | "cases")}><option value="repetition">Count an exact attribute value</option><option value="between">Extract intervals between activities</option><option value="cases">Filter complete cases</option></select></label>
+    {operation === "cases" ? <TableCaseFilterWorkspace key={`${engine}-cases`} engine={engine}/> : operation === "between" ? <TableBetweenFilterWorkspace key={`${engine}-between`} engine={engine}/> : <TableAttributeRepetitionCriteria key={`${engine}-repetition`} engine={engine} initialForm={initialForm}/>}
   </>;
 }
 
