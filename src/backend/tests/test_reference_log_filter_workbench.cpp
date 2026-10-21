@@ -2,6 +2,8 @@
 #include "minera/embedding_workbench_json.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/log_attribute_repetition_controls.hpp"
+#include "minera/literal_controls_json.hpp"
+#include "minera/xes_event_log_importer.hpp"
 #include <cmath>
 #include <stdexcept>
 #include <cassert>
@@ -115,6 +117,27 @@ void repetition_workflow_and_typed_controls() {
   assert(run("repetition",{target,field("min_rep","[]")}).status==400);
   assert(run("rework",{field("activity","A"),target}).status==400);
 }
+std::string artifact(const DiscoveryWorkbenchResponse& response,const std::string& name) {
+  const auto token="\""+name+"\":";auto at=response.json.find(token);assert(at!=std::string::npos);at+=token.size();assert(response.json[at]=='"');const auto start=at++;bool escaped=false;
+  for(;at<response.json.size();++at){const char c=response.json[at];if(escaped)escaped=false;else if(c=='\\')escaped=true;else if(c=='"')return parse_literal_string_vector_json("["+response.json.substr(start,at-start+1)+"]").at(0);}
+  throw std::runtime_error("Unterminated artifact");
+}
+void between_workflow() {
+  auto result=run("between",{field("act1_json","\"A\""),field("act2_json","[\"B\"]")});assert(result.status==200);
+  has(result,"\"result\":{\"traces\":1,\"events\":2}");has(result,"\"case_id_key\":\"case_id\"");has(result,"\"activity_key\":\"activity\"");
+  const auto filtered=parse_embedding_workbench_raw_log_json(artifact(result,"filtered_log_json"));
+  assert(filtered.traces.size()==1&&filtered.traces[0].case_id=="c1##@@0"&&filtered.traces[0].events.size()==2);
+  assert(artifact(result,"full_result_json").find("log-between-result-v1")!=std::string::npos);
+  std::istringstream input(artifact(result,"filtered_xes"));const auto reopened=import_xes_event_log(input);
+  assert(reopened.traces.size()==1&&reopened.traces[0].case_id=="c1##@@0"&&reopened.traces[0].events.size()==2);
+  result=run("between",{field("act1_json","[\"A\"]"),field("act2_json","\"B\""),field("subcase_concat_str",""),field("case_id_column","case"),field("activity_column","work"),field("delimiter",";")},"case;work\nid;A\nid;B\nid;A\nid;B\n","source.csv");
+  assert(result.status==200);has(result,"\"result\":{\"traces\":2,\"events\":4}");has(result,"\"activity_key\":\"work\"");has(result,"\"case_id_key\":\"case\"");
+  const auto custom=parse_embedding_workbench_raw_log_json(artifact(result,"filtered_log_json"));assert(custom.traces[0].case_id=="id0"&&custom.traces[1].case_id=="id1");
+  result=run("between",{field("act1_json","[]"),field("act2_json","[]")});assert(result.status==200);has(result,"\"result\":{\"traces\":0,\"events\":0}");
+  assert(run("between").status==400);assert(run("between",{field("act1_json","\"A\""),field("act2_json","[1]")}).status==400);
+  assert(run("between",{field("act1_json","[]"),field("act2_json","[]"),field("positive","true")}).status==400);
+  assert(run("repetition",{field("target_json",R"({"type":"null"})"),field("case_id_key","case")}).status==400);
+}
 void invalid_controls() {
   assert(run("unknown").status==400);
   assert(run("prefix").status==400);
@@ -128,4 +151,4 @@ void invalid_controls() {
   assert(execute_reference_log_filter({{"operation","","start",false},{"operation","","end",false}}).status==400);
 }
 }
-int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();invalid_controls();}
+int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();invalid_controls();}

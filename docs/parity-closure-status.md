@@ -47,6 +47,21 @@ against the final server. The earlier timeout and native failures remain
 retained; see
 [table-attribute-repetition-workflow.md](table-attribute-repetition-workflow.md).
 
+Between-activity extraction now has independent log, pandas and Polars native
+companions, with complete result downloads and usable log/table controls.
+All 641 representable outcomes from 642 distinct public calls pass: 169 log,
+139 pandas and 333 Polars. The pandas missing-argument call is outside the C++
+signature. Acceptance preserves raw endpoint equality, dtype-specific missing
+cases, adjacent nanoseconds and Polars lexical segment numbering. Seven native
+suites, 9,711 frontend tests, TypeScript, Vite and 33 final production HTTP
+requests pass. Earlier failures and the byte-identical diagnostic literal
+repair remain retained. All three canonical rows remain partial for their
+documented typed-control, dtype, warning, object and physical-plan domains.
+See [log-between-parity-contract.md](log-between-parity-contract.md),
+[pandas-between-parity-contract.md](pandas-between-parity-contract.md),
+[polars-between-parity-contract.md](polars-between-parity-contract.md) and
+[table-between-filter-workflow.md](table-between-filter-workflow.md).
+
 The OCEL preparation workspace also exposes exact event and object membership,
 timestamp, activity/type matching and object-count filters, including typed NaT
 queries. Literal JSON controls retain integer

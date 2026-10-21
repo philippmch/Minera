@@ -3,12 +3,12 @@ import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart"
 import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString, originalEmbeddingFilterStringBytes, originalEmbeddingFilterStringText, type OriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
 
-export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition"] as const;
+export const REFERENCE_LOG_FILTER_OPERATIONS = ["traces", "prefix", "suffix", "start", "end", "rework", "repetition", "between"] as const;
 export type ReferenceLogFilterOperation = typeof REFERENCE_LOG_FILTER_OPERATIONS[number];
 export const REFERENCE_LOG_FILTER_LABELS: Record<ReferenceLogFilterOperation, string> = {
   traces: "Match an activity sequence", prefix: "Keep a prefix before an activity",
   suffix: "Keep a suffix after an activity", start: "Match the first activity",
-  end: "Match the last activity", rework: "Find repeated activity", repetition: "Count an exact attribute value",
+  end: "Match the last activity", rework: "Find repeated activity", repetition: "Count an exact attribute value", between: "Extract subtraces between activities",
 };
 export const REFERENCE_LOG_FILTER_CSV_FIELDS = [
   ["case_id_column", "Case ID column", "case_id"], ["activity_column", "Activity column", "activity"],
@@ -23,11 +23,13 @@ export interface ReferenceLogFilterForm {
   positive: boolean; strict: boolean; occurrence: "first" | "last";
   admittedJson: string; patternsJson: string; minOccurrences: string;
   repetitionTargetJson: string; minRep: string; maxRep: string;
+  betweenStartJson: string; betweenEndJson: string; betweenCaseKeyMode: "default" | "custom"; betweenCaseKey: string; betweenSeparatorMode: "default" | "custom"; betweenSeparator: string;
   csvOptions: boolean; csv: Record<ReferenceLogFilterCsvKey, string>; trimFields: boolean;
 }
 export function defaultReferenceLogFilterForm(operation: ReferenceLogFilterOperation = "rework"): ReferenceLogFilterForm {
   return {operation, sourceFormat: "auto", activity: "", activityKeyMode: "default", activityKey: "",
     positive: true, strict: true, occurrence: "first", admittedJson: '["A"]', patternsJson: '[["A", "...", "B"]]',
+    betweenStartJson: '"A"', betweenEndJson: '"B"', betweenCaseKeyMode: "default", betweenCaseKey: "concept:name", betweenSeparatorMode: "default", betweenSeparator: "##@@",
     minOccurrences: "2", repetitionTargetJson: '{"type":"string","value":"web"}', minRep: "2", maxRep: "9223372036854775807", csvOptions: false, csv: {case_id_column: "case_id", activity_column: "activity", timestamp_column: "timestamp", delimiter: ","}, trimFields: false};
 }
 export interface ReferenceLogFilterCounts {traces: number; events: number;}
@@ -35,6 +37,7 @@ export interface ReferenceLogFilterEnvelope {
   family: "REFERENCE_LOG_FILTER"; operation: string | null; http_status: 200 | 400; phase: string;
   source_format: string | null; source: ReferenceLogFilterCounts | null; result: ReferenceLogFilterCounts | null;
   filter_attribute_key?: ReferenceLogFilterNativeString | null;
+  case_id_key?: ReferenceLogFilterNativeString | null; full_result_json?: ReferenceLogFilterNativeString | null;
   source_unchanged: boolean | null; activity_key: ReferenceLogFilterNativeString | null;
   filtered_log_json: ReferenceLogFilterNativeString | null; filtered_xes: ReferenceLogFilterNativeString | null;
   xes_error: ReferenceLogFilterNativeString | null; error: ReferenceLogFilterNativeString | null;
@@ -53,12 +56,13 @@ function counts(v: unknown): v is ReferenceLogFilterCounts | null {
   });
 }
 export function isReferenceLogFilterEnvelope(v: unknown): v is ReferenceLogFilterEnvelope {
-  return object(v) && keys(v, ["family", "operation", "http_status", "phase", "source_format", "source", "result", "source_unchanged", "activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error", ...(v.operation === "repetition" ? ["filter_attribute_key"] : [])])
+  return object(v) && keys(v, ["family", "operation", "http_status", "phase", "source_format", "source", "result", "source_unchanged", "activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error", ...(v.operation === "repetition" ? ["filter_attribute_key"] : v.operation === "between" ? ["filter_attribute_key", "case_id_key", "full_result_json"] : [])])
     && v.family === "REFERENCE_LOG_FILTER" && (v.operation === null || typeof v.operation === "string")
     && (v.http_status === 200 || v.http_status === 400) && typeof v.phase === "string"
     && (v.source_format === null || typeof v.source_format === "string") && counts(v.source) && counts(v.result)
     && (v.source_unchanged === null || typeof v.source_unchanged === "boolean")
-    && (v.operation !== "repetition" || nullableString(v.filter_attribute_key))
+    && (!["repetition", "between"].includes(String(v.operation)) || nullableString(v.filter_attribute_key))
+    && (v.operation !== "between" || nullableString(v.case_id_key) && nullableString(v.full_result_json))
     && ["activity_key", "filtered_log_json", "filtered_xes", "xes_error", "error"].every(key => nullableString(v[key]));
 }
 /** Fields remain literal; native validation owns JSON arrays and scalar tokens. */
@@ -71,6 +75,11 @@ export function referenceLogFilterFields(form: ReferenceLogFilterForm): Array<[s
   if (form.operation === "prefix" || form.operation === "suffix") {
     if (!["first", "last"].includes(form.occurrence)) throw new Error("Choose the first or last occurrence.");
     fields.push(["activity", form.activity], ["strict", String(form.strict)], ["occurrence", form.occurrence]);
+  } else if (form.operation === "between") {
+    if (![form.betweenCaseKeyMode, form.betweenSeparatorMode].every(mode => mode === "default" || mode === "custom")) throw new Error("Choose default or literal between controls.");
+    fields.push(["act1_json", form.betweenStartJson], ["act2_json", form.betweenEndJson]);
+    if (form.betweenCaseKeyMode === "custom") fields.push(["case_id_key", form.betweenCaseKey]);
+    if (form.betweenSeparatorMode === "custom") fields.push(["subcase_concat_str", form.betweenSeparator]);
   } else if (form.operation === "repetition") {
     fields.push(["target_json", form.repetitionTargetJson], ["min_rep", form.minRep], ["max_rep", form.maxRep]);
   } else {
@@ -108,6 +117,11 @@ export function referenceLogFilterArtifactFile(run: ReferenceLogFilterRun, kind:
   const value = kind === "json" ? run.value.filtered_log_json : run.value.filtered_xes;
   if (run.value.http_status !== 200 || run.value.error !== null || value === null || kind === "xes" && run.value.xes_error !== null) throw new Error(`The filtered ${kind === "xes" ? "XES" : "native JSON"} is unavailable.`);
   return new File([referenceLogFilterStringBytes(value)], `filtered-${run.value.operation ?? "log"}.${kind}`, {type: kind === "xes" ? "application/xml" : "application/json"});
+}
+export function referenceLogFilterFullBetweenFile(run: ReferenceLogFilterRun): File {
+  const value = run.value.full_result_json;
+  if (run.value.operation !== "between" || run.value.http_status !== 200 || run.value.error !== null || value == null) throw new Error("The full between result is unavailable.");
+  return new File([referenceLogFilterStringBytes(value)], "filtered-between-full-result.json", {type: "application/json"});
 }
 export type ReferenceLogFilterOpenLog = (file: File, activityKey?: string) => void;
 export function referenceLogFilterOpenActivityKey(run: ReferenceLogFilterRun): string | undefined {
