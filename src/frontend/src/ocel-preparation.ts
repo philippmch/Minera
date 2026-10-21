@@ -6,7 +6,7 @@ import { isOcelJsonDocument } from "./app-logic";
 
 export const OCEL_PREPARATION_METHODS=[['filter','Filter OCEL'],['split','Split OCEL'],['enrich','Enrich relationships'],['flatten','Flatten to a classic log']] as const;
 export type OcelPreparationMethod=typeof OCEL_PREPARATION_METHODS[number][0];
-export const OCEL_FILTERS=[['event_attribute','Event attribute'],['event_attribute_exact','Event attribute membership (exact)'],['object_attribute','Object attribute'],['object_types','Object types'],['objects','Object IDs'],['events','Event IDs'],['timestamp','Event timestamp window'],['timestamp_exact','Timestamp window (exact bounds)'],['activity_type_matching','Activity/type matching'],['object_count','Object counts per event'],['object_count_exact','Object counts per event (exact thresholds)'],['start_events','Lifecycle starts by type'],['end_events','Lifecycle ends by type'],['activities_object_type','Activities connected to a type'],['cc_object','Component containing an object'],['cc_length','Component size'],['cc_object_type','Components with an object type'],['cc_activity','Components with an activity']] as const;
+export const OCEL_FILTERS=[['event_attribute','Event attribute'],['event_attribute_exact','Event attribute membership (exact)'],['object_attribute','Object attribute'],['object_attribute_exact','Object attribute membership (exact)'],['object_types','Object types'],['objects','Object IDs'],['events','Event IDs'],['timestamp','Event timestamp window'],['timestamp_exact','Timestamp window (exact bounds)'],['activity_type_matching','Activity/type matching'],['object_count','Object counts per event'],['object_count_exact','Object counts per event (exact thresholds)'],['start_events','Lifecycle starts by type'],['end_events','Lifecycle ends by type'],['activities_object_type','Activities connected to a type'],['cc_object','Component containing an object'],['cc_length','Component size'],['cc_object_type','Components with an object type'],['cc_activity','Components with an activity']] as const;
 export const PREPARATION_GRAPHS=[['object_interaction_graph','Interaction'],['object_descendants_graph','Descendants'],['object_inheritance_graph','Inheritance'],['object_cobirth_graph','Co-birth'],['object_codeath_graph','Co-death']] as const;
 export interface OcelFilterForm {variant:OcelFilterSelector;positive:boolean;key:string;values:string;names:string;level:string;from:string;to:string;type:string;id:string;activity:string;minimum:string;maximum:string;counts:string;allowed:string;columnKind:'auto'|'scalar'|'timestamp';timestampKey:string;fromJson:string;toJson:string;}
 export const DEFAULT_OCEL_FILTER:OcelFilterForm={variant:'object_types',positive:true,key:'',values:'[]',names:'[]',level:'1',from:'',to:'',type:'',id:'',activity:'',minimum:'0',maximum:'100',counts:'{}',allowed:'{}',columnKind:'auto',timestampKey:'ocel:timestamp',fromJson:'{"type":"timestamp","value":"2026-01-01T00:00:00Z"}',toJson:'{"type":"timestamp","value":"2026-01-02T00:00:00Z"}'};
@@ -16,9 +16,9 @@ export interface OcelEnrichmentForm {mode:'native'|'selected';graphs:Record<type
 export function defaultOcelEnrichment():OcelEnrichmentForm {return {mode:'native',graphs:Object.fromEntries(PREPARATION_GRAPHS.map(([id])=>[id,true])) as OcelEnrichmentForm['graphs'],lifecycle:'native'};}
 export interface OcelFlattenForm {type:string;activity:string;timestamp:string;}
 export const DEFAULT_OCEL_FLATTEN:OcelFlattenForm={type:'',activity:'',timestamp:''};
-export const polarityFilters=new Set<OcelFilterSelector>(['event_attribute','event_attribute_exact','object_attribute','object_types','objects','events','cc_object_type']);
+export const polarityFilters=new Set<OcelFilterSelector>(['event_attribute','event_attribute_exact','object_attribute_exact','object_attribute','object_types','objects','events','cc_object_type']);
 export const typeFilters=new Set<OcelFilterSelector>(['start_events','end_events','activities_object_type','cc_object_type']);
-export const attributeFilters=new Set<OcelFilterSelector>(['event_attribute','event_attribute_exact','object_attribute']);
+export const attributeFilters=new Set<OcelFilterSelector>(['event_attribute','event_attribute_exact','object_attribute_exact','object_attribute']);
 export const listFilters=new Set<OcelFilterSelector>(['object_types','objects','events']);
 const record=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const escape=(value:string)=>value.replaceAll('\\','\\\\').replaceAll(',','\\,').replaceAll(':','\\:').replaceAll(';','\\;').replaceAll('|','\\|');
@@ -39,7 +39,7 @@ export function typedOcelFilterValues(text:string):string {
 }
 export function ocelPreparationFilterQuery(form:OcelFilterForm):string {
  const q=new URLSearchParams({variant:form.variant});const variant=form.variant;if(polarityFilters.has(variant))q.set('positive',String(form.positive));
- if(variant==='event_attribute_exact'){q.set('attribute_key',form.key);q.set('attribute_values_json',form.values);q.set('column_kind',form.columnKind);}
+ if(variant==='event_attribute_exact'||variant==='object_attribute_exact'){q.set('attribute_key',form.key);q.set('attribute_values_json',form.values);q.set('column_kind',form.columnKind);}
  else if(attributeFilters.has(variant)){q.set('attribute_key',form.key);const values=typedOcelFilterValues(form.values);if(values)q.set('attribute_values',values);}
  if(listFilters.has(variant)){const list=names(parse(form.names,'Names'),'Names');if(list.length)q.set(variant==='object_types'?'types':variant==='objects'?'ids':'event_ids',list.map(escape).join(','));}
  if(variant==='object_types'||variant==='objects'){const level=size(form.level,'Neighborhood level');if(BigInt(level)>32n)throw new Error('Neighborhood level must be from 0 through 32.');q.set('level',level);}

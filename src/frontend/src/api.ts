@@ -6478,7 +6478,7 @@ export async function requestOcelFlatten(
 export type OcelFilterSelector =
   | "event_attribute" | "object_attribute" | "object_types" | "objects"
   | "events" | "timestamp" | "activity_type_matching" | "object_count"
-  | "event_attribute_exact" | "timestamp_exact" | "object_count_exact"
+  | "event_attribute_exact" | "object_attribute_exact" | "timestamp_exact" | "object_count_exact"
   | "start_events" | "end_events" | "activities_object_type" | "cc_object"
   | "cc_length" | "cc_object_type" | "cc_activity";
 export interface OcelFilterOptions {
@@ -6514,7 +6514,7 @@ export function ocelFilterQuery(options: OcelFilterOptions = {}): string {
   for (const key of ["attribute_values_json", "timestamp_key", "from_json", "to_json", "minimum_counts_json"] as const)
     if (options[key] !== undefined) query.set(key, options[key]);
   if (options.column_kind !== undefined) {
-    if (!["auto", "scalar", "timestamp"].includes(options.column_kind)) throw new Error("OCEL event column kind must be auto, scalar or timestamp");
+    if (!["auto", "scalar", "timestamp"].includes(options.column_kind)) throw new Error("OCEL attribute column kind must be auto, scalar or timestamp");
     query.set("column_kind", options.column_kind);
   }
   const escapePart = (value: string) => value.replaceAll("\\", "\\\\")

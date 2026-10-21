@@ -1717,7 +1717,7 @@ void handle_ocel_filter(const httplib::Request& request,
                                       : std::string("object_count"));
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
-    const bool exact_names=variant=="event_attribute_exact" ||
+    const bool exact_names=variant=="event_attribute_exact" || variant=="object_attribute_exact" ||
         variant=="timestamp_exact" || variant=="object_count_exact";
     const auto source = exact_names?minera::parse_ocel_json_literal_names(body):minera::parse_ocel_json(body);
     const bool positive = ocel_query_bool(request, "positive", true);

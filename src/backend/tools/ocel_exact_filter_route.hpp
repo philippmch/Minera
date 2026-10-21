@@ -8,11 +8,13 @@ std::optional<OcelExactFilterDispatch> dispatch_ocel_exact_filter(
     if(!request.has_param(name))throw std::invalid_argument(std::string(variant)+" requires "+name);
     return request.get_param_value(name);
   };
-  if(variant=="event_attribute_exact") {
+  if(variant=="event_attribute_exact" || variant=="object_attribute_exact") {
     const auto key=required("attribute_key");
     const auto values=minera::parse_ocel_event_filter_values_json(required("attribute_values_json"));
     const auto kind=minera::parse_ocel_event_attribute_column_kind(
         request.has_param("column_kind")?request.get_param_value("column_kind"):"auto");
+    if(variant=="object_attribute_exact")
+      return OcelExactFilterDispatch{minera::filter_ocel_object_attribute_exact(source,key,values,positive,kind),"OBJECT_ATTRIBUTE_EXACT"};
     return OcelExactFilterDispatch{minera::filter_ocel_event_attribute_exact(source,key,values,positive,kind),"EVENT_ATTRIBUTE_EXACT"};
   }
   if(variant=="timestamp_exact") {
