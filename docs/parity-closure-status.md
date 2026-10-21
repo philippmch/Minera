@@ -96,6 +96,11 @@ The machine-readable source of truth is
 
 ## Active requirements
 
+- The pandas repetition companion passes all 123 retained complete table
+  projections and sixteen native diagnostics, preserving row order, source
+  indices, dtypes, categorical declarations and attributes. The canonical row
+  remains partial for its remaining object/schema domains; see
+  [pandas-attribute-repetition-parity-contract.md](pandas-attribute-repetition-parity-contract.md).
 - The usable OCDFG working-time increment is delivered, with default/custom/empty
   schedules, exact timing options and locale-independent signed-zero JSON.
   Sixty retained timing cases, eight discovery outcomes and owned HTTP checks

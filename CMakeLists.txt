@@ -36,6 +36,7 @@ add_library(minera_core
   src/backend/log_rework_filter.cpp
   src/backend/log_attribute_repetition_filter.cpp
   src/backend/log_attribute_repetition_controls.cpp
+  src/backend/pandas_attribute_repetition_filter.cpp
   src/backend/ocel_exact_filter_controls.cpp
   src/backend/reference_log_filter_workbench.cpp
   src/backend/pripel_trace_distance.cpp
@@ -995,6 +996,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_log_boundary_filter_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_boundary_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_boundary_filter_tests COMMAND minera_log_boundary_filter_tests)
+
+  add_executable(minera_pandas_attribute_repetition_module_tests src/backend/tests/test_pandas_attribute_repetition_module.cpp)
+  target_link_libraries(minera_pandas_attribute_repetition_module_tests PRIVATE minera::core)
+  target_compile_features(minera_pandas_attribute_repetition_module_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_pandas_attribute_repetition_module_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_pandas_attribute_repetition_module_tests COMMAND minera_pandas_attribute_repetition_module_tests)
 
   add_executable(minera_log_attribute_repetition_module_tests src/backend/tests/test_log_attribute_repetition_module.cpp)
   target_link_libraries(minera_log_attribute_repetition_module_tests PRIVATE minera::core)
