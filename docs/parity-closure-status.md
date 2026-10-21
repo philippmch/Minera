@@ -6,6 +6,21 @@ and support modules. Full parity is not complete.
 
 ## Closed in this pass
 
+Complete-case filtering now has separate log, pandas and Polars companions and
+usable event-count, case-limit and duration controls in the existing workspace.
+The 664 fresh public calls have native acceptance: 652 exact returned-value or
+diagnostic projections and 12 explicitly admitted Polars count-tie projections.
+The latter use the retained public count-sort/slice/join plan; they are not
+claims of exact selected-case order. Log-level context removal, dataframe index
+and dictionary preservation, first/last versus min/max duration, engine-specific
+business-hour behavior and full error phases have explicit acceptance.
+Nineteen native suites, 42 production HTTP checks, 9,718 frontend tests,
+TypeScript and Vite pass. The initial root test compilation failure and the
+zero-call pandas observer attempt remain retained. All three case modules stay
+partial for the documented object, dtype, warning and execution boundaries.
+See [case-filter-workflow.md](case-filter-workflow.md) and the three case-filter
+contracts. Existing application/browser permission boundaries remain in force.
+
 Displayed diagrams, charts and tables now have direct PNG and raster PDF
 downloads. A single diagram also has styled SVG export. The controls are
 available in the dataset views and all 44 independent workspace branches.

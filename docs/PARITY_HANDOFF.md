@@ -14,7 +14,95 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Pushed checkpoints
+## Latest complete-case checkpoint
+
+Four further functional commits are pushed after `fb1e0e7c`:
+
+- `b6a0cc81`: public log size/count/performance helpers, explicit unavailable
+  generic entry points, typed predicate/error behavior and complete selected
+  traces with observed empty log-level context; 180 retained outcomes.
+- `e1988a54`: pandas case helpers, count-frequency selection, first/last
+  duration, business-hour controls and complete table/index/dictionary context;
+  259 retained outcomes, including 157 full tables and 102 exact diagnostics.
+- `57b6f280`: Polars eager/lazy case helpers, max-minus-min integral-second
+  duration, full apply/collect diagnostics and explicit count-tie acceptance;
+  225 calls have 134 exact frames, 79 full errors and 12 admitted tie projections.
+- `ce4898f8`: usable log and table size/count/duration controls, genuine table
+  upload, literal roles, complete downloads, correct log reopening and production
+  HTTP acceptance. Read `docs/case-filter-workflow.md` and the three case-filter
+  contracts. All three canonical case rows remain partial; only their evidence
+  pointers changed in the ledger. Counts remain 46/40 packages, 226/161 modules
+  and 201 strict open units. All 86 packages and 387 modules remain in scope.
+
+Final acceptance passes **19 assertion-enabled native suites** in
+`build/parity-closures/native-current/ctest-cases-final2.log`, including the
+689 representable between outcomes and both retained table repetition suites.
+The main successful build is `build-cases-final.log`; a trailing blank line in
+the Polars test driver was removed after diff checking, then that target was
+rebuilt in `build-cases-eof-final.log` and all 19 suites passed again. An offline
+byte audit retains both drivers and proves only terminal whitespace changed.
+The initial build's wrong `EventLog.properties` test field and its corrected
+`metadata.properties` form are documented; the failed build and first five-suite
+success remain retained. No product workaround was made for either test issue.
+
+The freshly rebuilt server passes **42 actual production HTTP checks** in
+`build/parity-closures/cases-production-http-1`, including all operations,
+custom/NUL roles, full integer storage, reopening, business hours and failure
+phases. Server SHA256:
+`44ad78e0753ef501a80a185dc32a74a0c65c359383f7f567b61e31ac558810b2`.
+The independently owned server exited; the existing application was not
+replaced. Rendered browser interaction remains unverified. Frontend acceptance
+passes **183 files / 9,718 tests**, TypeScript and Vite:
+`build/parity-closures/cases-frontend-full-final.log`,
+`cases-frontend-tsc-final2.log`, `cases-frontend-vite-final2.log`;
+output is `cases-frontend-final-dist`. No frontend sources changed afterward.
+Offline declaration checks pass in `catalog-cases-final.log`.
+
+`docs/case-filter-workflow-checks.jsonl.gz` retains **80 members**, **35 current
+source bindings** and **47 compiled identities** with all final/historical
+workflow receipts. Manifest: `build/parity-closures/case-workflow-evidence-manifest.json`;
+packager: `package-case-workflows.py`. The archive is 794,512 bytes, SHA256
+`a1207e5ed3e3718054f894662e87d8c6da3a766317b1f734657049bbe754485c`.
+Dedicated log, pandas and Polars archives retain full public inputs/results,
+dedup audits, generators, diagnostics and native evidence. Earlier between and
+repetition archives remain historical snapshots and are unchanged.
+
+The following new banks are **executed and accepted; never replay them**:
+
+- `build/filtering-cases-log-public-actual-1`: 180 distinct calls, 88 returns,
+  92 errors. Public `satisfy_perf` can return NativeNA; its native carrier is a
+  bool/NativeNA variant. Filtering then evaluates truth and can raise.
+- `build/filtering-cases-pandas-public-actual-2`: 259 distinct calls, 157 full
+  tables and 102 errors. Actual-1 stopped before any method entry because the
+  observer used the invalid encoding name `utf8-sig`. Prepared-2 changes only
+  that spelling to `utf-8-sig`; the original recipe and zero-call attempt remain.
+  Six emitted warnings lack per-call receipts; do not claim warning parity.
+- `build/filtering-cases-polars-public-actual-1`: 213 distinct calls, 134 frames
+  and 79 errors. `filtering-cases-polars-ncases-order-public-actual-1` adds twelve
+  disjoint successful calls and their public unoptimized plans, after auditing
+  all 213 earlier full receipts. Across both banks, 134 native returned frames
+  compare exactly and 12 count cutoff ties use explicitly admitted semantics;
+  do not claim exact captured tie choices. Ninety-six algorithm warnings and
+  separate dictionary-observer warnings remain retained, without native emission.
+
+All 664 new public calls have their declared native acceptance. Complete bank
+receipts were audited before algorithm entry; no prior direct case-filter calls
+were found and no algorithm calls were replayed. Only public calls/docs/enums,
+public plan output and opaque module identity hashes were used.
+
+Next case-filter work should target discriminating uncovered combinations:
+pandas categorical count ties, nullable numeric IDs with missing values,
+subsecond duration boundaries and unobserved typed parameter/extension/schema
+domains; log typed parameter adapters, mixed temporal class/resolution/timezone
+domains and object identities; Polars unstable cutoff choices, warnings,
+additional dtypes/selector expressions, category physical identity and execution
+plans. Native Polars uses encounter order among equal-frequency groups; the
+retained public plan permits other tie choices and a null group can consume a
+slot before disappearing in the join. Keep those limits explicit. All earlier
+OCDFG, repetition, between, platform/connector, solver and performance gates
+below also remain in scope. No owned functional drafts remain.
+
+## Earlier pushed checkpoints
 
 Fourteen functional continuation commits are pushed after `7849925b`:
 
@@ -178,7 +266,7 @@ and full table downloads without converting tables to logs. All three
 canonical rows remain partial; read their between contracts and
 `docs/table-between-filter-workflow.md`.
 
-## Current final validation
+## Prior ordinary-between validation
 
 - **Fourteen assertion-enabled native suites pass**: all between targets,
   new pandas ordinary cases, original EventData validation, category codec/lazy/
