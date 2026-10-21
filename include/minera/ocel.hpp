@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "minera/petri_net.hpp"
+#include "minera/ocdfg_edge_performance_options.hpp"
 #include "minera/token_integer.hpp"
 
 namespace minera {
@@ -186,6 +187,9 @@ struct OcdfgDiscoveryOptions {
   // Empty selectors use the canonical activity and object type fields.
   std::string activity_attribute;
   std::string object_type_attribute;
+  // Explicit options activate the faithful typed timing calculation. Omission
+  // preserves the legacy discovery timestamp projection for existing callers.
+  std::optional<OcdfgEdgePerformanceOptions> edge_performance_options;
 };
 
 OcdfgGraph discover_ocdfg_classic(const Ocel& log,
