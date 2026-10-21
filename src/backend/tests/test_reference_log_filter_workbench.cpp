@@ -224,4 +224,16 @@ void timestamp_workflows() {
   invalid=bounds;invalid.push_back(field("timestamp_key","missing"));selected=run("time_events",invalid,timed);assert(selected.status==400);has(selected,"\"source_unchanged\":false");assert(artifact(selected,"source_log_json")!=artifact(selected,"source_after_log_json"));
 }
 }
-int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();case_workflows();paths_workflow();invalid_controls();timestamp_workflows();}
+namespace {
+void variants_workflow() {
+  const std::string source="case_id,activity\nc1,A\nc1,X\nc1,B\nc2,A\nc2,B\n";
+  auto selected=run("variants",{field("admitted_json","[[\"A\",\"B\"]]"),field("sequence_kind","tuple")},source);
+  assert(selected.status==200);has(selected,"\"result\":{\"traces\":1,\"events\":2}");has(selected,"\"filter_attribute_key\":\"activity\"");has(selected,"\"source_unchanged\":true");
+  selected=run("variants",{field("admitted_json","[[\"A\",\"B\"]]")},source);assert(selected.status==200);has(selected,"\"result\":{\"traces\":0,\"events\":0}");
+  selected=run("variants_top_k",{field("criterion","1")},source);assert(selected.status==200);has(selected,"\"result\":{\"traces\":1,\"events\":3}");
+  for(const auto mode:{"variants_min_coverage","variants_max_coverage","variants_cumulative"}) {selected=run(mode,{field("criterion","0.5")},source);assert(selected.status==200);has(selected,"\"result\":{\"traces\":2,\"events\":5}");}
+  assert(run("variants_cumulative",{field("criterion","0.5"),field("positive","true")},source).status==400);
+  assert(run("variants",{field("admitted_json","[[1]]")},source).status==400);
+}
+}
+int main(){csv_filter_workflow();native_literal_and_export_workflow();repetition_workflow_and_typed_controls();between_workflow();case_workflows();paths_workflow();invalid_controls();timestamp_workflows();variants_workflow();}

@@ -50,9 +50,11 @@ add_library(minera_core
   src/backend/pandas_paths_filter.cpp
   src/backend/polars_paths_filter.cpp
   src/backend/table_paths_filter_workbench.cpp
+  src/backend/variants_filter_controls.cpp
   src/backend/log_variants_filter.cpp
   src/backend/pandas_variants_filter.cpp
   src/backend/polars_variants_filter.cpp
+  src/backend/table_variants_filter_workbench.cpp
   src/backend/log_timestamp_filter.cpp
   src/backend/pandas_timestamp_filter.cpp
   src/backend/polars_timestamp_filter.cpp
@@ -1065,7 +1067,7 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_polars_categorical_table_metadata_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_polars_categorical_table_metadata_tests COMMAND minera_polars_categorical_table_metadata_tests)
 
-  foreach(unit log_timestamp_filter pandas_timestamp_filter polars_timestamp_filter table_timestamp_filter_workbench table_timestamp_filter_route log_paths_filter pandas_paths_filter polars_paths_filter table_paths_filter_workbench table_paths_filter_route log_case_filter pandas_case_filter polars_case_filter table_case_filter_workbench table_case_filter_route log_variants_filter pandas_variants_filter polars_variants_filter)
+  foreach(unit log_variants_filter pandas_variants_filter polars_variants_filter table_variants_filter_workbench table_variants_filter_route log_timestamp_filter pandas_timestamp_filter polars_timestamp_filter table_timestamp_filter_workbench table_timestamp_filter_route log_paths_filter pandas_paths_filter polars_paths_filter table_paths_filter_workbench table_paths_filter_route log_case_filter pandas_case_filter polars_case_filter table_case_filter_workbench table_case_filter_route)
     add_executable(minera_${unit}_tests src/backend/tests/test_${unit}.cpp)
     target_link_libraries(minera_${unit}_tests PRIVATE minera::core Threads::Threads)
     target_include_directories(minera_${unit}_tests PRIVATE third_party)

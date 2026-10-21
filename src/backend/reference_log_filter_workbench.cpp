@@ -7,6 +7,8 @@
 #include "minera/log_case_filter.hpp"
 #include "minera/log_paths_filter.hpp"
 #include "minera/log_timestamp_filter.hpp"
+#include "minera/log_variants_filter.hpp"
+#include "minera/variants_filter_controls.hpp"
 #include "minera/paths_filter_controls.hpp"
 #include "minera/case_filter_controls.hpp"
 #include "minera/log_rework_filter.hpp"
@@ -135,13 +137,14 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
       "activity_key","activity","positive","strict","occurrence","admitted_json","patterns_json",
       "min_occurrences","target_json","min_rep","max_rep","act1_json","act2_json","case_id_key","subcase_concat_str","case_id_column","activity_column","timestamp_column","delimiter","trim_fields",
       "minimum","maximum","max_cases","timestamp_key","paths_json","path_json",
-      "lower","upper","time_attribute_key","time_target_json"};
+      "lower","upper","time_attribute_key","time_target_json","criterion","sequence_kind"};
     for(const auto* collection:{&query,&parts}) for(const auto& part:*collection) {
       if(!allowed.contains(part.name)) throw std::invalid_argument("unknown log filter control: "+part.name);
       if(!fields.emplace(part.name,&part).second) throw std::invalid_argument("duplicate log filter control: "+part.name);
     }
     static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework","repetition","between","case_size","case_count","case_performance","paths","path_performance",
-      "time_events","time_contained","time_intersecting","time_starting","time_completing","time_attribute","time_trace_attribute"};
+      "time_events","time_contained","time_intersecting","time_starting","time_completing","time_attribute","time_trace_attribute",
+      "variants","variants_top_k","variants_min_coverage","variants_max_coverage","variants_cumulative"};
     operation=field("operation");
     if(!operations.contains(operation)) { operation.clear();throw std::invalid_argument("choose a supported log filter"); }
     const auto found=fields.find("source_file");
@@ -153,6 +156,13 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     const bool boundary=operation=="start" || operation=="end";
     const bool repetition=operation=="repetition";
     const bool between=operation=="between";
+    const bool variants=operation=="variants" || operation.starts_with("variants_");
+    if(fields.contains("criterion")!=(variants && operation!="variants")) throw std::invalid_argument("criterion requires ranked or coverage variants filtering");
+    if(fields.contains("sequence_kind") && operation!="variants") throw std::invalid_argument("sequence_kind requires variants membership filtering");
+    const auto sequence_kind=field("sequence_kind","list");
+    if(sequence_kind!="list" && sequence_kind!="tuple") throw std::invalid_argument("sequence_kind must be list or tuple");
+    if(operation=="variants" && !fields.contains("admitted_json")) throw std::invalid_argument("variants filtering requires admitted_json");
+    if(operation=="variants_cumulative" && fields.contains("positive")) throw std::invalid_argument("positive is inapplicable to cumulative variants filtering");
     const bool cases=operation=="case_size" || operation=="case_count" || operation=="case_performance";
     const bool path_performance=operation=="path_performance", paths=operation=="paths" || path_performance;
     const bool time=operation.starts_with("time_"), time_boundary=operation=="time_starting" || operation=="time_completing";
@@ -193,7 +203,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     if(segment && fields.contains("positive")) throw std::invalid_argument("positive is inapplicable to prefix/suffix filtering");
     if(operation!="rework" && fields.contains("min_occurrences"))
       throw std::invalid_argument("min_occurrences requires rework filtering");
-    if(!boundary && fields.contains("admitted_json")) throw std::invalid_argument("admitted_json requires start/end filtering");
+    if(!boundary && operation!="variants" && fields.contains("admitted_json")) throw std::invalid_argument("admitted_json requires start/end or variants membership filtering");
     if(operation!="traces" && fields.contains("patterns_json")) throw std::invalid_argument("patterns_json requires trace filtering");
     if(!(segment || operation=="rework") && fields.contains("activity"))
       throw std::invalid_argument("activity requires prefix, suffix or rework filtering");
@@ -230,7 +240,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
       }
     }
     open_key=key;
-    if(repetition || between || cases || paths || time) {
+    if(repetition || between || cases || paths || time || variants) {
       open_key=format=="csv"?field("activity_column","activity"):"concept:name";
       if(format!="csv") {
         bool found_activity=false;
@@ -243,7 +253,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
         }
         // A custom-key XES projection can have no first-class activity role.
         // Its explicitly chosen path attribute supplies the opening role.
-        if(!found_activity && (paths || time) && fields.contains("activity_key")) open_key=key;
+        if(!found_activity && (paths || time || variants) && fields.contains("activity_key")) open_key=key;
       }
     }
     if(operation=="time_events" && format=="csv") {
@@ -257,7 +267,17 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     }
     source_before=serialize_embedding_workbench_raw_log_json(*source);
     phase="filter";
-    if(time) {
+    if(variants) {
+      LogVariantsFilterOptions options;options.activity_key=EventAttribute{"",key};options.positive=parse_case_filter_bound(boolean("positive",true)?"true":"false");
+      if(operation=="variants") result=filter_log_variants(*source,parse_variants_filter_admitted_json(field("admitted_json"),sequence_kind=="tuple"),options);
+      else {
+        const auto criterion=parse_case_filter_bound(field("criterion"));
+        if(operation=="variants_top_k") result=filter_log_variants_top_k(*source,criterion,options);
+        else if(operation=="variants_min_coverage") result=filter_log_variants_min_coverage(*source,criterion,options);
+        else if(operation=="variants_max_coverage") result=filter_log_variants_max_coverage(*source,criterion,options);
+        else result=filter_log_variants_cumulative(*source,criterion,options);
+      }
+    } else if(time) {
       LogTimestampFilterOptions options; options.timestamp_key=EventAttribute{"",time_key};
       options.positive=parse_case_filter_bound(boolean("positive",true)?"true":"false");
       const EventAttribute lower{"",field("lower")},upper{"",field("upper")};
@@ -315,6 +335,9 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     try { XesExportOptions options;options.preserve_nulls=true;xes=serialize_xes(*result,options); }
     catch(const std::exception& e) { export_error=e.what(); }
     phase="complete";
+  } catch(const LogVariantsFilterError& e) {
+    status=400;error=e.message;
+    if(source && source_before) unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source);
   } catch(const LogTimestampFilterError& e) {
     status=400;error=e.message;
     if(source && source_before) unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source);
@@ -338,8 +361,8 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     ",\"http_status\":"+std::to_string(status)+",\"phase\":"+q(phase)+",\"source_format\":"+optional_text(format,!format.empty())+
     ",\"source\":"+(source?counts(*source):"null")+",\"result\":"+(result?counts(*result):"null")+
     ",\"source_unchanged\":"+(unchanged?(*unchanged?"true":"false"):"null")+
-    ",\"activity_key\":"+optional_text((operation=="repetition" || operation=="between" || operation.starts_with("case_") || operation.starts_with("time_") || operation=="paths" || operation=="path_performance")?open_key:key,source.has_value())+
-    ((operation=="repetition" || operation=="between" || operation=="paths" || operation=="path_performance")?",\"filter_attribute_key\":"+optional_text(key,source.has_value()):"")+
+    ",\"activity_key\":"+optional_text((operation=="repetition" || operation=="between" || operation.starts_with("case_") || operation.starts_with("time_") || operation.starts_with("variants") || operation=="paths" || operation=="path_performance")?open_key:key,source.has_value())+
+    ((operation=="repetition" || operation=="between" || operation.starts_with("variants") || operation=="paths" || operation=="path_performance")?",\"filter_attribute_key\":"+optional_text(key,source.has_value()):"")+
     (operation=="between"?",\"case_id_key\":"+optional_text(case_key,source.has_value())+",\"full_result_json\":"+optional_text(full_result,!full_result.empty()):"")+
     (operation.starts_with("time_")?",\"timestamp_key\":"+q(time_key)+",\"time_attribute_key\":"+q(time_attribute_key)+
       ",\"source_log_json\":"+(source_before?q(*source_before):"null")+",\"source_after_log_json\":"+optional_text(source_after,!source_after.empty()):"")+
