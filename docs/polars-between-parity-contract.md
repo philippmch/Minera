@@ -56,7 +56,7 @@ Native attributes, metadata and field provenance survive independently.
 Rewritten native case cells become ordinary String/null scalars: old container,
 children and wrapper payloads are cleared. Field roles and literal source-key
 provenance remain, with an active role's presence state updated to Present or
-Null. Declared String/Categorical case columns use their stored literal value
+Null. Declared String/Categorical/Enum case columns use their stored literal value
 as the scalar projection, including when native source descriptors accompany it.
 
 `PolarsBetweenError` exposes `type`, `phase` and a length-carrying `message`.
@@ -71,15 +71,38 @@ that this representation change preserves all 4,838 runtime bytes exactly;
 the final native suite also compares the complete resulting diagnostics.
 
 Observed selected columns cover String, Int64, UInt64, Float64, Boolean, Null,
-Categorical, Date and naive microsecond Datetime; case and timestamp controls
+Categorical, Enum, Date and naive microsecond Datetime; case and timestamp controls
 also include UTC microsecond Datetime. Timestamp controls additionally cover
 lexical strings, exact signed/unsigned integers, floating NaN/infinity, Boolean,
 Categorical and all-null values. Metadata columns include UInt32 and arbitrary
 stored payload values. Native tables require unique string labels and declared
 dtypes, and reject dataframe index metadata.
 
-Categorical dictionaries, unused categories and physical identity were not
-observed. Physical lazy execution plans and arbitrary optimizer/streaming
+The fresh categorical continuation observes complete public label dictionaries,
+including unused labels and dictionary order, through `cat.get_categories()`;
+Enum declarations are also checked through their public `categories` property.
+The native `categorical_dtypes` descriptor carries these String labels and their
+order. Named and shared Categorical contexts retain their visible dictionaries
+through filtering, while Categorical case groups sort lexically. Enum case
+groups sort by declared dictionary order. Rewriting the selected case column to
+String removes its categorical descriptor, including for an empty result.
+Other columns retain their complete dictionaries, including unused categories.
+
+Selected native Enum case/timestamp sort columns require a dictionary descriptor;
+the adapter rejects an absent descriptor or a nonnull label outside it. This
+validation precedes sorting, so empty inputs cannot hide a missing descriptor
+and a single-row input cannot hide an unknown label. Each selected dictionary
+is indexed once per materialization; sort comparisons reuse its label ranks.
+These adapter guards are native storage controls, rather than additional public
+reference observations.
+
+The native descriptor does not carry Categorical namespace/context identity,
+physical dtype or physical category codes. Public names, namespaces and physical
+dtype metadata are retained in the raw evidence and explicitly excluded from
+the native projection. Physical codes were not observed and no equivalence is
+claimed. Metadata-observer deprecation warnings remain separate from warnings
+emitted by the algorithm itself. Physical lazy execution plans and arbitrary
+optimizer/streaming
 behavior are not reproduced. Nested/Object/Decimal columns, Duration/Time,
 nanosecond datetimes, other timezone identities, general column-selector
 expressions and complete diagnostic suggestion heuristics remain outside this
@@ -138,6 +161,49 @@ type/phase/message diagnostics. Its independent native storage, provenance,
 lazy collection and literal-diagnostic controls also pass. This includes the
 general lexical-numbering correction established by the final six observations.
 The final coordinated run passes all seven related native/workflow suites.
+
+## Complete label-dictionary continuation
+
+`build/filtering-between-polars-categorical-public-actual-1` contains ten fresh
+timestamp-complete successful calls. The observer reconstructs and verifies all
+333 previous actual-call receipts, checks each new complete source/endpoints/
+parameters/invocation receipt against them before entry, and additionally records
+an enriched receipt containing the public dictionary observables. Both new
+receipt sets are distinct, with no prior overlaps or mutations. The opaque
+implementation hash remains unchanged; no calls were replayed and no reference
+implementation was inspected.
+
+The ten cases cover global, named, independent and shared Categorical contexts;
+Categorical case/activity columns; Enum case/activity/context columns; unused
+labels; empty Enum frames; and literal empty, Unicode and NUL-bearing labels.
+The generator compares complete representable source/result projections: every
+row and declared dtype plus the full ordered String label dictionary of each
+categorical column. It preserves all 333 previous fixtures without rewriting
+their expected outcomes. The combined retained scope is **343 outcomes: 163
+projected returned frames and 180 complete diagnostics**. Ten returned-frame
+projections additionally compare all observed category-label dictionaries.
+
+The rebuilt assertion-enabled native target passes all **343 retained outcomes**,
+including the ten complete label-dictionary projections, plus the native missing
+dictionary, unknown-label, Enum order and lazy-source controls. The separate
+shared-carrier suite passes dictionary validation, lazy storage and complete
+JSON/workbench transport checks. All **14 coordinated native/workflow suites**
+pass, including existing EventData, table and repetition regressions affected by
+the shared validation extension. The freshly rebuilt production server passes
+**37 actual handler checks**, including dictionary transport. The first HTTP
+attempt stopped on a harness comparison of minimal upload fields with canonical
+export defaults; its script, records and failure explanation are retained. The
+corrected harness compares the result against the parsed canonical source and
+requires no production source change.
+
+The historical `docs/polars-between-checks.jsonl.gz` remains the unchanged proof
+for the earlier 333 outcomes. `docs/polars-between-categorical-checks.jsonl.gz` binds the
+fresh public receipts, explicit projection boundary, generated fixtures and
+current native sources to the coordinated acceptance logs, compiled object and
+binary identities, and actual production receipts. The ten calls emit no
+algorithm warnings; the 38 dictionary snapshots separately retain 38 public
+metadata-observer warning observations. Context identity, physical category
+representation and warning emission remain explicit unimplemented boundaries.
 
 `docs/polars-between-checks.jsonl.gz` retains all three public banks, complete
 warnings, recipes, generated fixtures, final source snapshots and native

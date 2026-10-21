@@ -79,6 +79,7 @@ LazyEventTable counted_source(const EventTable& table, std::size_t& scans) {
 }
 
 #include "polars_between_public_vectors.inc"
+#include "polars_between_categorical_public_vectors.inc"
 
 void native_lazy_sort_metadata_and_independent_result() {
   EventTable source;
@@ -157,14 +158,79 @@ void native_diagnostic_tokens_remain_literal() {
   same_frame(source, before, "native diagnostic interpolation source preservation");
 }
 
+void native_enum_case_requires_dictionary() {
+  EventTable source;
+  source.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  source.dtypes = {"Enum(categories=['z', 'a'])", "String", "Int64"};
+  source.rows = {{EventAttribute{source.columns[0], "a"}, EventAttribute{source.columns[1], "A"}, integer_value(source.columns[2], 1)},
+                 {EventAttribute{source.columns[0], "a"}, EventAttribute{source.columns[1], "B"}, integer_value(source.columns[2], 2)},
+                 {EventAttribute{source.columns[0], "z"}, EventAttribute{source.columns[1], "A"}, integer_value(source.columns[2], 3)},
+                 {EventAttribute{source.columns[0], "z"}, EventAttribute{source.columns[1], "B"}, integer_value(source.columns[2], 4)}};
+  const auto before = source;
+  const auto rejected = [](auto action, const std::string& message) {
+    bool caught = false;
+    try { action(); }
+    catch (const std::invalid_argument& error) {
+      caught = true;
+      assert(std::string(error.what()).find(message) != std::string::npos);
+    }
+    assert(caught);
+  };
+  const std::string missing_dictionary = "requires an Enum category dictionary";
+  rejected([&] { (void)filter_polars_between(source, EventAttribute{"", "A"}, EventAttribute{"", "B"}); }, missing_dictionary);
+  auto empty_missing_dictionary = source; empty_missing_dictionary.rows.clear();
+  rejected([&] { (void)filter_polars_between(empty_missing_dictionary, EventAttribute{"", "A"}, EventAttribute{"", "B"}); }, missing_dictionary);
+  std::size_t scans = 0;
+  const auto lazy = filter_polars_between(counted_source(source, scans), EventAttribute{"", "A"}, EventAttribute{"", "B"});
+  assert(scans == 0);
+  rejected([&] { (void)lazy.materialize(); }, missing_dictionary);
+  assert(scans == 1);
+  same_frame(source, before, "missing Enum dictionary source preservation");
+
+  EventTableCategoricalDtype dictionary;
+  dictionary.categories_dtype = "String"; dictionary.ordered = true;
+  dictionary.categories = {{"", "z"}, {"", "a"}};
+  source.categorical_dtypes.resize(source.columns.size()); source.categorical_dtypes[0] = dictionary;
+  auto expected = source;
+  expected.rows = {source.rows[2], source.rows[3], source.rows[0], source.rows[1]};
+  expected.dtypes[0] = "String"; expected.categorical_dtypes[0].reset();
+  for (auto& row : expected.rows) row[0]->value += "##@@1";
+  same_frame(filter_polars_between(source, EventAttribute{"", "A"}, EventAttribute{"", "B"}), expected,
+             "provided Enum dictionary determines case ordering and clears rewritten descriptor");
+
+  auto unknown_case = source; unknown_case.rows.resize(1);
+  unknown_case.rows[0][0]->value = "outside-dictionary";
+  const std::string unknown = "Enum cell is absent from its category dictionary";
+  rejected([&] { (void)filter_polars_between(unknown_case, EventAttribute{"", "A"}, EventAttribute{"", "B"}); }, unknown);
+  scans = 0;
+  const auto bad_case = filter_polars_between(counted_source(unknown_case, scans), EventAttribute{"", "A"}, EventAttribute{"", "B"});
+  assert(scans == 0);
+  rejected([&] { (void)bad_case.materialize(); }, unknown); assert(scans == 1);
+
+  auto unknown_time = unknown_case;
+  unknown_time.dtypes = {"String", "String", "Enum(categories=['early', 'late'])"};
+  unknown_time.categorical_dtypes[0].reset();
+  dictionary.categories = {{"", "early"}, {"", "late"}};
+  unknown_time.categorical_dtypes[2] = dictionary;
+  unknown_time.rows[0][0]->value = "case";
+  unknown_time.rows[0][2] = EventAttribute{"time:timestamp", "outside-time-dictionary"};
+  rejected([&] { (void)filter_polars_between(unknown_time, EventAttribute{"", "A"}, EventAttribute{"", "B"}); }, unknown);
+  scans = 0;
+  const auto bad_time = filter_polars_between(counted_source(unknown_time, scans), EventAttribute{"", "A"}, EventAttribute{"", "B"});
+  assert(scans == 0);
+  rejected([&] { (void)bad_time.materialize(); }, unknown); assert(scans == 1);
+}
+
 }  // namespace
 
 int main() {
   try {
     retained_polars_between_cases();
+    retained_polars_between_categorical_cases();
     native_lazy_sort_metadata_and_independent_result();
     native_diagnostic_tokens_remain_literal();
-    std::cout << "Polars between: 333 retained outcomes, 153 full returned frames and 180 complete diagnostics, native lazy sorting/context passed\n";
+    native_enum_case_requires_dictionary();
+    std::cout << "Polars between: 343 retained outcomes, 163 full projected returned frames and 180 complete diagnostics; 10 complete category-label dictionaries, native lazy sorting/context passed\n";
   } catch (const std::exception& error) {
     std::cerr << '\n' << error.what() << '\n'; return 1;
   }

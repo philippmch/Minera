@@ -6,6 +6,7 @@
 #include <numeric>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "minera/timestamp.hpp"
@@ -16,7 +17,15 @@ namespace minera {
 namespace {
 
 using Cell = std::optional<EventAttribute>;
-enum class Dtype { kString, kInteger, kFloat, kBoolean, kNull, kDate };
+using EnumRanks = std::unordered_map<std::string, std::size_t>;
+enum class Dtype { kString, kEnum, kInteger, kFloat, kBoolean, kNull, kDate };
+
+bool categorical_dtype(const std::string& value) {
+  return value == "Categorical" || (value.starts_with("Categorical(") && value.ends_with(')'));
+}
+bool enum_dtype(const std::string& value) {
+  return value.starts_with("Enum(") && value.ends_with(')');
+}
 
 [[noreturn]] void fail(std::string type, std::string phase, std::string message) {
   throw PolarsBetweenError(std::move(type), std::move(phase), std::move(message));
@@ -134,7 +143,8 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
 }
 
 Dtype dtype(const std::string& value) {
-  if (value == "String" || value == "Categorical") return Dtype::kString;
+  if (value == "String" || categorical_dtype(value)) return Dtype::kString;
+  if (enum_dtype(value)) return Dtype::kEnum;
   if (value == "Int64" || value == "UInt64" || value == "UInt32") return Dtype::kInteger;
   if (value == "Float64") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
@@ -224,7 +234,7 @@ std::string anchor_dtype(const EventAttribute& value) {
 bool compatible(const EventAttribute& query, Dtype kind) {
   for (const auto& value : anchors(query)) {
     if (null(value) || kind == Dtype::kNull) continue;
-    if (kind == Dtype::kString && text(value)) continue;
+    if ((kind == Dtype::kString || kind == Dtype::kEnum) && text(value)) continue;
     if (kind == Dtype::kDate && date(value)) continue;
     if ((kind == Dtype::kInteger || kind == Dtype::kFloat || kind == Dtype::kBoolean) &&
         (integer(value) || real(value) || boolean(value))) continue;
@@ -276,10 +286,22 @@ void validate_separator(const EventTable& source, const std::string& key, const 
   fail("InvalidOperationError", phase, message);
 }
 
-int compare(const Cell& left, const Cell& right, Dtype kind) {
+int compare(const Cell& left, const Cell& right, Dtype kind,
+            const EnumRanks* dictionary = nullptr) {
   const auto absent = [kind](const Cell& value) { return !value || null(*value) || kind == Dtype::kNull; };
   if (absent(left) || absent(right)) return absent(left) == absent(right) ? 0 : absent(left) ? -1 : 1;
   if (kind == Dtype::kString) return left->value < right->value ? -1 : right->value < left->value ? 1 : 0;
+  if (kind == Dtype::kEnum) {
+    if (!dictionary) throw std::invalid_argument("Native Polars between Enum ordering requires its category dictionary");
+    const auto position = [&](const std::string& value) {
+      const auto found = dictionary->find(value);
+      if (found == dictionary->end())
+        throw std::invalid_argument("Native Polars between Enum cell is absent from its category dictionary");
+      return found->second;
+    };
+    const auto a = position(left->value), b = position(right->value);
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
   if (kind == Dtype::kInteger || kind == Dtype::kBoolean) {
     const auto a = exact(*left), b = exact(*right); return a < b ? -1 : a > b ? 1 : 0;
   }
@@ -302,7 +324,7 @@ bool matches(const Cell& candidate, const EventAttribute& query, Dtype kind) {
   if (!candidate || null(*candidate) || kind == Dtype::kNull) return false;
   for (const auto& target : anchors(query)) {
     if (null(target)) continue;
-    if (kind == Dtype::kString && candidate->value == target.value) return true;
+    if ((kind == Dtype::kString || kind == Dtype::kEnum) && candidate->value == target.value) return true;
     if (kind == Dtype::kDate && compare(candidate, target, kind) == 0) return true;
     if (kind == Dtype::kFloat || real(target)) {
       const auto a = number(*candidate), b = number(target);
@@ -312,7 +334,7 @@ bool matches(const Cell& candidate, const EventAttribute& query, Dtype kind) {
   return false;
 }
 std::string string_cast(const EventAttribute& value, const std::string& declared = "") {
-  if (declared == "String" || declared == "Categorical") return value.value;
+  if (declared == "String" || categorical_dtype(declared) || enum_dtype(declared)) return value.value;
   if (text(value)) return value.value;
   if (boolean(value)) return static_cast<bool>(exact(value)) ? "true" : "false";
   if (integer(value)) return exact(value).decimal();
@@ -345,19 +367,37 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
   };
   const auto case_at = position(key, false), time_at = position("time:timestamp", false), activity_at = position(activity, true);
   const auto case_kind = dtype(source.dtypes[case_at]), time_kind = dtype(source.dtypes[time_at]), activity_kind = dtype(source.dtypes[activity_at]);
+  const auto enum_dictionary = [&](std::size_t at, Dtype kind) -> std::optional<EnumRanks> {
+    if (kind != Dtype::kEnum) return std::nullopt;
+    if (source.categorical_dtypes.empty() || !source.categorical_dtypes[at])
+      throw std::invalid_argument("Native Polars between requires an Enum category dictionary for selected column: " + source.columns[at]);
+    const auto& categories = source.categorical_dtypes[at]->categories;
+    EnumRanks ranks; ranks.reserve(categories.size());
+    for (std::size_t rank = 0; rank < categories.size(); ++rank) ranks.emplace(categories[rank].value, rank);
+    for (const auto& row : source.rows) {
+      const auto& cell = row[at];
+      if (cell && !null(*cell) && !ranks.contains(cell->value))
+        throw std::invalid_argument("Native Polars between Enum cell is absent from its category dictionary: " + source.columns[at]);
+    }
+    return ranks;
+  };
+  const auto case_ranks = enum_dictionary(case_at, case_kind);
+  const auto time_ranks = time_at == case_at ? std::optional<EnumRanks>{} : enum_dictionary(time_at, time_kind);
+  const auto* case_dictionary = case_ranks ? &*case_ranks : nullptr;
+  const auto* time_dictionary = time_at == case_at ? case_dictionary : time_ranks ? &*time_ranks : nullptr;
   validate_membership(source, activity_at, key, act1, act2, phase);
   validate_separator(source, key, activity, act1, act2, options.subcase_concat_str, phase);
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);
   std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) {
-    const auto by_case = compare(source.rows[a][case_at], source.rows[b][case_at], case_kind);
-    return by_case ? by_case < 0 : compare(source.rows[a][time_at], source.rows[b][time_at], time_kind) < 0;
+    const auto by_case = compare(source.rows[a][case_at], source.rows[b][case_at], case_kind, case_dictionary);
+    return by_case ? by_case < 0 : compare(source.rows[a][time_at], source.rows[b][time_at], time_kind, time_dictionary) < 0;
   });
   auto result = source; result.rows.clear(); result.dtypes[case_at] = "String";
   if (!result.categorical_dtypes.empty()) result.categorical_dtypes[case_at].reset();
   std::size_t begin = 0;
   while (begin < order.size()) {
     auto end = begin + 1;
-    while (end < order.size() && compare(source.rows[order[begin]][case_at], source.rows[order[end]][case_at], case_kind) == 0) ++end;
+    while (end < order.size() && compare(source.rows[order[begin]][case_at], source.rows[order[end]][case_at], case_kind, case_dictionary) == 0) ++end;
     if (source.rows[order[begin]][case_at] && !null(*source.rows[order[begin]][case_at])) {
       struct Segment { std::size_t first; std::size_t last; std::string identifier; };
       std::vector<Segment> segments;

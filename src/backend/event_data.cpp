@@ -362,13 +362,20 @@ void validate_table_metadata(const std::vector<std::string>& columns,
           "event table: categorical metadata requires declared dtypes");
     for (std::size_t column = 0; column < categorical_dtypes.size(); ++column) {
       if (!categorical_dtypes[column]) continue;
-      if (dtypes[column] != "category")
+      const auto& declared = dtypes[column];
+      const bool polars_dictionary = declared == "Categorical" ||
+          ((declared.starts_with("Categorical(") || declared.starts_with("Enum(")) &&
+           declared.ends_with(')'));
+      if (declared != "category" && !polars_dictionary)
         throw std::invalid_argument(
             "event table: categorical descriptor requires dtype category");
       const auto& descriptor = *categorical_dtypes[column];
       if (descriptor.categories_dtype.empty())
         throw std::invalid_argument(
             "event table: categorical categories dtype must not be empty");
+      if (polars_dictionary && descriptor.categories_dtype != "String")
+        throw std::invalid_argument(
+            "event table: Polars categorical dictionaries require String categories");
       std::unordered_map<std::string, std::vector<std::size_t>> category_buckets;
       category_buckets.reserve(descriptor.categories.size());
       for (std::size_t category = 0; category < descriptor.categories.size();
@@ -377,6 +384,13 @@ void validate_table_metadata(const std::vector<std::string>& columns,
             descriptor.categories[category],
             "category " + std::to_string(category) + " in column " +
                 columns[column]);
+        const auto& value = descriptor.categories[category];
+        if (polars_dictionary &&
+            (value.kind != AttributeKind::kString ||
+             value.container != AttributeContainerKind::kScalar ||
+             !std::holds_alternative<std::monostate>(value.typed_value)))
+          throw std::invalid_argument(
+              "event table: Polars categorical dictionaries require ordinary String values");
         auto& bucket = category_buckets[category_semantic_key(
             descriptor.categories[category])];
         for (const auto prior : bucket) {

@@ -50,7 +50,9 @@ struct EventTableIndex {
   bool operator==(const EventTableIndex&) const = default;
 };
 
-// Public pandas categorical metadata for one event-table column.  A null
+// Public pandas category or Polars Categorical/Enum dictionary for one column.
+// Polars dictionaries contain ordinary String categories in their public order.
+// Runtime context identity and physical storage are not represented here. A null
 // descriptor means that the column is known to be categorical from dtypes but
 // its category details were not supplied by the source.
 struct EventTableCategoricalDtype {
