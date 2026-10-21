@@ -198,6 +198,7 @@ add_library(minera_core
   src/backend/monte_carlo_json.cpp
   src/backend/minimum_self_distance.cpp
   src/backend/ocel.cpp
+  src/backend/ocdfg_edge_performance.cpp
   src/backend/ocel_csv.cpp
   src/backend/ocel_sqlite.cpp
   src/backend/ocel_filter.cpp
@@ -1876,6 +1877,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocel_event_nat_membership_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocel_event_nat_membership_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_event_nat_membership_tests COMMAND minera_ocel_event_nat_membership_tests)
+
+  add_executable(minera_ocdfg_edge_performance_tests src/backend/tests/test_ocdfg_edge_performance.cpp)
+  target_link_libraries(minera_ocdfg_edge_performance_tests PRIVATE minera::core)
+  target_compile_features(minera_ocdfg_edge_performance_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocdfg_edge_performance_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocdfg_edge_performance_tests COMMAND minera_ocdfg_edge_performance_tests)
 
   add_executable(minera_ocel_event_attributes_module_tests src/backend/tests/test_ocel_event_attributes_module.cpp)
   target_link_libraries(minera_ocel_event_attributes_module_tests PRIVATE minera::core)

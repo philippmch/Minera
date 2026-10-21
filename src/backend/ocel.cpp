@@ -1,4 +1,5 @@
 #include "minera/ocel.hpp"
+#include "minera/ocdfg_edge_performance.hpp"
 #include "minera/conformance.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
@@ -12,6 +13,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <limits>
+#include <locale>
 #include <map>
 #include <set>
 #include <sstream>
@@ -1571,7 +1573,18 @@ OcdfgGraph discover_ocdfg_classic_with_options(
     edge.performance.clear();
     edge.performance_event_couples.clear();
     edge.performance_total_objects.clear();
-    if (options.compute_edges_performance) {
+    if (options.compute_edges_performance && options.edge_performance_options) {
+      const auto& timing_options = *options.edge_performance_options;
+      edge.performance_event_couples = calculate_ocdfg_edge_performance(
+          log, edge.event_couples, timing_options);
+      std::vector<std::pair<std::string, std::string>> object_couples;
+      object_couples.reserve(edge.total_objects.size());
+      for (const auto& triple : edge.total_objects)
+        object_couples.emplace_back(std::get<0>(triple), std::get<1>(triple));
+      edge.performance_total_objects = calculate_ocdfg_edge_performance(
+          log, object_couples, timing_options);
+      edge.performance = edge.performance_total_objects;
+    } else if (options.compute_edges_performance) {
       for (const auto& couple : edge.event_couples) {
         const auto from = parse_timestamp(timestamp[couple.first]);
         const auto to = parse_timestamp(timestamp[couple.second]);
@@ -1596,6 +1609,13 @@ OcdfgGraph discover_ocdfg_classic_with_options(
 
 std::string serialize_ocdfg_json(const OcdfgGraph& graph) {
   std::ostringstream out;
+  out.imbue(std::locale::classic());
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
+  const auto performance_number = [&](double value) {
+    // A bare -0 is an integer token and loses its sign when read as JSON.
+    if (value == 0.0 && std::signbit(value)) out << "-0.0";
+    else out << value;
+  };
   const auto strings = [&](const std::vector<std::string>& values) {
     out << '[';
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -1725,19 +1745,19 @@ std::string serialize_ocdfg_json(const OcdfgGraph& graph) {
       for (std::size_t i = 0; i < edge.performance.size(); ++i) {
         if (i != 0) out << ',';
         out.precision(17);
-        out << edge.performance[i];
+        performance_number(edge.performance[i]);
       }
       out << "],\"performance_event_couples\":[";
       for (std::size_t i = 0; i < edge.performance_event_couples.size(); ++i) {
         if (i != 0) out << ',';
         out.precision(17);
-        out << edge.performance_event_couples[i];
+        performance_number(edge.performance_event_couples[i]);
       }
       out << "],\"performance_total_objects\":[";
       for (std::size_t i = 0; i < edge.performance_total_objects.size(); ++i) {
         if (i != 0) out << ',';
         out.precision(17);
-        out << edge.performance_total_objects[i];
+        performance_number(edge.performance_total_objects[i]);
       }
       out << "]}";
     }
