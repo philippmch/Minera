@@ -1,4 +1,4 @@
-# Full parity continuation — 2026-10-21
+# Full parity continuation — 2026-10-21–22
 
 Resume in `C:/Users/pmoch/Documents/Minera`, branch `main`.
 
@@ -14,7 +14,7 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: native byte controls and LTL preparation
+## Current continuation: native byte controls and LTL filtering
 
 Commit `13f34f35be95c6a3d054b694ff9a528b400aa867` is pushed. Both attributes
 workbenches now accept the frontend's canonical `<field>.txt` byte-preserving
@@ -43,34 +43,127 @@ artifact equality and passed 101. All owned server processes exited. No product
 changes were needed for those reader corrections. Rendered browser acceptance
 remains unverified; LTL integration still requires its own rebuilt server.
 
-LTL is the active next family across EventLog, pandas and Polars. Root captured
-only the public surface (zero algorithm calls) under
-`build/filtering-ltl-public-surface-actual-1`. **No LTL reference algorithms have
-been executed in this continuation yet.** Workers have prepared recipes under
-`build/filtering-ltl-{log,pandas,polars}-public-prepared-1`. Before any entry,
-require parsed completed audits with zero unclassified contexts and complete
-prior receipt reconstruction, plus whole-bank actual-input deduplication.
-The combined compressed inventory at
-`build/filtering-ltl-combined-retained-search-1` finished 3,897 archives,
-162,085,516,728 decompressed bytes and zero exact-module identity hits. Its
-original classifier exited zero with no retained actual receipts or plans.
-The final compressed audit still needs the completed combined flat audit at
-`build/filtering-ltl-retained-flat-search-1`; that original scan is still live.
-Do not restart/duplicate either scan or assert completion from file existence.
-Root alone runs reference algorithms. LOG includes both timestamp helpers;
-Polars next/four-eyes accept collections, unlike fixed operands in log/pandas.
+The LTL family is implemented across LOG, pandas and Polars through native
+companions and `POST /api/reference-ltl-filter`. The workbench exposes genuine
+source Files, literal/typed activities and selectors, active timestamp and
+performer controls, source-free typed interval helpers, complete source/result
+artifacts, XES export/reopening and cancellation. Existing convenience LTL
+behavior remains separate. Read `docs/ltl-filter-workflow.md` and the three
+`docs/{log,pandas,polars}-ltl-filter-parity-contract.md` files.
 
-Local LTL headers, workbench/route, frontend controls and 18 focused passing
-frontend checks are uncommitted preparation. Native companions await root's
-retained capture. Neither native LTL nor production/browser acceptance is
-claimed. The attributes-only intermediate aggregate build failed because the
-new local server endpoint was present before its LTL implementation; original
-link diagnostics remain in `build-attributes-byte-controls-first.log`. A test
-variable collision and corrected pre-execution byte-key fixture are retained
-in `attributes-byte-controls-prepared-1`; the final four suites passed. The full
-LTL focused CMake draft has been restored but is not configured while native
-sources are absent. The production server must be rebuilt after integration;
-no existing application was replaced. All 201 strict open units remain open.
+Final validation passes:
+- **47 assertion-enabled native suites**, including every retained engine
+  outcome and both workbench/owned HTTP suites:
+  `build/parity-closures/native-current/ctest-ltl-final2.log`.
+- Server and CLI build from current overrides:
+  `build/parity-closures/native-current/build-ltl-sixth-final.log`.
+  Giant module test drivers alone use `/Od`; production helpers remain Release.
+- **192 frontend files / 9,829 tests**, TypeScript and Vite:
+  `build/parity-closures/frontend-ltl-full-final.log`,
+  `frontend-ltl-tsc-final-second.log`, `frontend-ltl-vite-final.log`;
+  retained output `frontend-ltl-dist-final`.
+- **73 actual LTL HTTP checks plus 101 attributes regressions** against the same
+  final production binary, SHA256
+  `be6f9e6b656cb157575554d0d2e4a11fa3984a4d935b04938dba903f3a944445`:
+  `build/parity-closures/ltl-production-http-4` and
+  `build/parity-closures/ltl-attributes-production-http-2`.
+  Both owned server processes exited; the existing application was not replaced.
+  Rendered browser acceptance remains unverified.
+
+Both original retained-data audits are parsed complete, with no failures or
+unclassified contexts. Do not restart those scans. Flat audit SHA256:
+`3e3a284c043f295631a11a3ac09ab9c73d4cedf65b13aef19b1326ac4847763a`;
+compressed audit SHA256:
+`9da8061363d9ce92c8965e02b48a81f9df12568ef80e939e04439ae950a4245b`.
+Root alone ran reference algorithms. All **1,401 distinct outcomes** are retained
+and matched: LOG297, pandas429, Polars675. No source/control mutations or
+warnings were observed. **Never replay these banks**:
+
+- LOG: `build/filtering-ltl-log-public-actual-1` (253),
+  `...log-helper-public-actual-1` (31), `...log-boundaries-public-actual-1` (4),
+  `...log-witness-public-actual-1` (4), `...log-multibounds-public-actual-1` (3),
+  `...log-indexing-public-actual-1` (2).
+- pandas: `build/filtering-ltl-pandas-public-actual-1` (386),
+  `...pandas-continuation-public-actual-1` (27),
+  `...pandas-time-activation-public-actual-1` (6),
+  `...pandas-temporal-witness-public-actual-1` (1),
+  `...pandas-case-identity-public-actual-1` (3),
+  `...pandas-next-terminal-public-actual-1` (1),
+  `...pandas-resource-pairs-public-actual-1` (2),
+  `...pandas-resource-identity-public-actual-1` (2),
+  `...pandas-resource-union-public-actual-1` (1).
+- Polars: `build/filtering-ltl-polars-public-actual-1` (675).
+
+Every continuation reconstructed and asserted all complete prior receipt hashes
+before entry, then deduplicated the entire current bank on actual input,
+arguments, kwargs and call shape. The failed pandas resource-pair rehearsal
+made zero algorithm calls; its original prepared/preentry1 and corrected
+prepared2/preentry2 remain archived. Do not infer call absence from filenames.
+
+Preserve the observed engine differences. LOG eventually uses the first forward
+activity subsequence, but enabled nonempty timing bounds read consecutive raw
+prefix events 0..patternLength-1, independently of matched activity positions.
+Its interval helpers compare each difference against inclusive lower/upper
+endpoints. pandas supplied nonempty intervals auto-enable time only when the
+flag is omitted; explicit false disables it. pandas NEXT uses final B/C
+occurrences and original global row adjacency. Four Eyes forms resource sets
+per typed case group, then later Python-equal groups replace earlier membership
+classifications. Polars eventual/NEXT order by the selected timestamp even
+without an enable flag; all difference-bound controls are inert there.
+
+Independent integration review found no actionable transport/UI issue. Evidence
+review found two binding gaps; committed archive/manifest anchoring, module
+archive hash checks, CLI-object/transitive-recipe bindings and exact tested-unit
+sets were added and rechecked. Review receipts are retained in
+`build/parity-closures/ltl-independent-reviews.json`.
+
+Retain all failed builds/tests/readers. Initial pandas optional-cell compilation,
+NEXT and Four Eyes mixed-case mismatches, LOG witness models and raw-byte helper/
+XES reader mistakes remain separate historical evidence. The final expectations
+are the original public values; the pandas runner aggregates mismatches and
+still fails on any mismatch or count difference. Historical compiled-source
+snapshots and map/object identity manifests remain under `build/parity-closures`.
+
+Public evidence archives are immutable:
+- LOG: `docs/log-ltl-filter-public.json.gz`, 7,592,723 bytes,
+  SHA256 `2660b657d674d7d7bb621d994f1f4cf93d77fddea034384cdd4b9aafd4174173`.
+- pandas: `docs/pandas-ltl-filter-public.json.gz`, 8,972,301 bytes,
+  SHA256 `9f073d0be9b35661772538d4a81a8de206160c281d9da3c119e8b4a2b7bb77fd`.
+- Polars: `docs/polars-ltl-filter-public.json.gz`, 610,562 bytes,
+  SHA256 `6270a238dc204c126e80ee816e5790449ad0f5b23f7ccce9fb7f1e9ab7fd417b`.
+
+Current native evidence:
+- LOG: `docs/log-ltl-filter-checks.json.gz`, 1,478,607 bytes / 88 members,
+  SHA256 `a2bc768ff0d6e45296247ce1cee5e010c6593e0029782691fa769b4776a91f8e`.
+- pandas: `docs/pandas-ltl-filter-checks.jsonl.gz`, 1,676,201 bytes / 88 members
+  plus one acceptance record,
+  SHA256 `4cd3eba8d2507952459225ba8d69adc650b8eb1da2a1c0f2b391b70edd7b72fc`.
+- Polars: `docs/polars-ltl-filter-checks.jsonl.gz`, 19,263,919 bytes / 129 members,
+  SHA256 `d96dfa5cd3fb2bdaebbb4217d8ee3239f4a9103bed7d8838c18278d563b3f411`.
+
+The combined workflow capsule `docs/ltl-filter-workflow-checks.jsonl.gz` contains
+8,604 verified members, 42,325,468 bytes, SHA256
+`0896ec41d54194638991d9ad1c88bd5501b85dbdc02de713050efbfa9164facc`.
+Its authoritative manifest is extracted from committed archive bytes. Verification
+checks all seven docs archives against HEAD, 8,479 committed source bindings,
+217 compiled identities, 124 receipt bindings and both module-evidence arrays.
+Git comparisons normalize CRLF/LF only; actual source/artifact hashes remain exact.
+The Git blob reader batches queries while retaining full byte comparisons.
+
+Clean functional commits:
+- `b4020165`: LOG public LTL and typed interval helpers;
+- `d586b082`: pandas LTL with exact case/index behavior;
+- `18ab8954`: eager/lazy Polars LTL;
+- `365ecaf7`: workbench, production route, complete artifacts and workflow proof.
+
+`docs/ltl-filter-commit-verification.json` records postcommit verification of the
+integrated code commit. The following handoff checkpoint changes documentation
+only. No owned functional drafts remain. Inherited coverage comparison metadata,
+historical journal edit and untracked dependency/cache folders remain untouched.
+
+All three canonical module rows remain partial. Full scope remains **86 packages /
+387 modules**, **46 complete / 40 partial packages**, **226 complete / 161 partial
+modules**, **201 strict open units**. Do not mark the full-parity goal complete.
 
 ## Latest attributes checkpoint
 
@@ -955,6 +1048,13 @@ URLSearchParams and server decoding passed actual NUL transport acceptance.
 Rendered application interaction remains unverified.
 
 ## Next open requirements
+
+- Keep all LTL declared gaps open. Reuse the 16 executed banks above; never replay
+  them. Arbitrary Python objects/identity graphs, unobserved dtypes and selector
+  combinations, physical lazy plans/category context, warnings and group-order
+  diagnostics remain separate gates. The offline catalogue-wide receipt-index
+  plan at `build/parity-closures/retained-public-receipt-index-plan.json` is
+  archived with Polars checks; it is a design, not a completed new receipt audit.
 
 - Continue the between modules' declared boundaries. The 20-case log-selector
   bank is now **executed and accepted**, with the equality bank explicitly
