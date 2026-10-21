@@ -14,7 +14,137 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Latest adjacent-path checkpoint
+## Latest timestamp checkpoint
+
+Four functional commits are pushed after `b8d32d3b`:
+
+- `9851f4e1`: log timestamp filters and public predicates/stubs, including
+  faithful event-converter source mutations; 342 retained outcomes.
+- `abdd64e1`: pandas timestamp filters, exact min/max nanoseconds, typed
+  parameters and exact large index labels; 861 retained outcomes.
+- `83248582`: Polars eager/lazy timestamp filters, strict intersection,
+  complete diagnostics/dictionaries and exact integer epoch boundaries;
+  732 retained outcomes.
+- `fa6baa70`: usable timestamp controls, complete before/after source snapshots,
+  genuine table uploads, log/XES reopening and production HTTP acceptance.
+
+Read `docs/timestamp-filter-workflow.md` and the three timestamp contracts.
+All **1,935 distinct public calls** have **1,935 exact projected native outcomes**:
+342 log (183 returns / 159 errors), 861 pandas (302 tables / 559 errors), and
+732 Polars (229 frames / 503 full type/phase/message diagnostics). All three
+canonical rows remain partial; only their evidence pointers changed. Counts
+remain **46 complete / 40 partial packages**, **226 complete / 161 partial
+modules**, and **201 strict open units** across all 86 packages / 387 modules.
+
+String endpoints use the strict public `YYYY-MM-DD HH:mm:ss` parser and UTC
+normalization. Typed bounds retain their separately observed behavior. Log
+trace windows use first/last source positions and inclusive intersection;
+dataframe trace windows use min/max timestamps and preserve row order. pandas
+uses strict overlap; Polars has three strict clauses and excludes a trace
+exactly spanning the window. Only log/pandas start/completion modes use
+`positive`; pandas additionally supports its missing-time control. Polars has
+no public start/completion API. Generic `apply`/`apply_auto_filter` entry points
+raise the captured unavailable-method exceptions; do not invent implementations.
+
+The log event filter injects trace attributes into source events before some
+errors, then reconstructs selected traces. All **38 source/control mutations**
+are asserted. Native const overloads explicitly copy; the mutable overload
+retains the public effect. CSV workflow preparation separately adds the
+conventional canonical trace identity while preserving the original case
+column. Native JSON/XES inputs retain their actual stored keys and can raise
+missing-canonical-ID errors. The public filter does **not** forward the tested
+case-key parameter. Complete parsed source snapshots before and after filtering
+are available even on later native errors.
+
+The following new banks are **executed and accepted; never replay them**:
+
+- `build/filtering-timestamp-log-public-actual-1`: 326 calls, 176 returns /
+  150 errors, 25 mutations. `filtering-timestamp-log-converter-public-actual-1`
+  adds twelve calls (seven returns / five errors, nine mutations).
+  `filtering-timestamp-log-forwarding-public-actual-1` adds four errors and four
+  mutations. All three banks have zero emitted warnings.
+- `build/filtering-timestamp-pandas-public-actual-1`: 484 calls, 24 tables /
+  460 errors. `filtering-timestamp-pandas-canonical-public-actual-1` adds
+  377 disjoint calls, 278 tables / 99 errors, after reconstructing all 484
+  previous unique full receipts. The first bank's rejected ISO `T` strings
+  remain authoritative; the second changes actual arguments to canonical space
+  strings, preserving the original fixtures. Both have zero mutations/warnings.
+- `build/filtering-timestamp-polars-public-actual-1`: 360 calls, two frames /
+  358 errors, including strict-parser and naive/UTC dtype diagnostics.
+  `filtering-timestamp-polars-utc-public-actual-1` adds 360 disjoint calls,
+  215 frames / 145 errors, after reconstructing all 360 preceding receipts.
+  `filtering-timestamp-polars-numeric-public-actual-1` adds twelve returned
+  frames after reconstructing all 720 preceding receipts. It distinguishes
+  exact Int64/UInt64 epoch microseconds above 2^53 from Float64 rounding.
+  Public unoptimized plans remain separate from physical execution claims.
+
+**Audit timing correction:** the original log recipe preparation note overstates
+its full-prior reconstruction. Before entry, it hashed complete new actual
+receipts and compared against saved full-call hashes, including all 338 prior
+hashes before the four forwarding calls. Root independently reconstructed the
+first 326 full receipts before the twelve-call continuation, but reconstructed
+those next twelve only **after** the forwarding run. The original recipes and
+preparation notes remain preserved with `audit-timing-correction.json` and the
+after-entry proof. Independent reconstruction found no duplicate or replay.
+Do not claim all 338 were reconstructed before that run. Future continuations
+must reconstruct every retained full receipt before any new entry. pandas and
+Polars continuations already enforce that barrier.
+
+Final acceptance passes **29 assertion-enabled native suites** in
+`build/parity-closures/native-current/ctest-timestamp-second.log`; the matching
+successful build is `build-timestamp-second.log`. The first build succeeded,
+but its first native run passed 27/29: log intersection fetched the final
+timestamp too late, and pandas date extrema collapsed adjacent nanoseconds
+through the general microsecond scalar comparator. General repairs eagerly
+read both log intersection endpoints and compare exact instants in pandas
+date aggregation; containment retains its observed lazy access. The immutable
+expected fixtures are unchanged. Original sources, compiled hashes, direct
+failures and the first 29-suite failure remain retained in dedicated archives.
+
+Production acceptance passes **50 actual HTTP checks** in
+`build/parity-closures/timestamp-production-http-2`, then the owned server exits.
+Server SHA256:
+`a90c0d6f519386992266bdabc8fddd70fdf27b85cad723ec4d70c49e95253b4f`.
+The first HTTP run stopped at request 44: the harness supplied EventTable date
+JSON inside a raw native-log attribute. Its original script/records/failure
+remain preserved; the second uses the existing raw attribute schema. No product
+workaround was made. The existing application was not replaced; rendered
+browser interaction remains unverified.
+
+Frontend acceptance passes **185 files / 9,737 tests** in
+`build/parity-closures/timestamp-frontend-full-final2.log`, with `--maxWorkers 2`.
+The first default-pool full run retains 9,736 passes and one existing 5-second
+timeout while native compilation was active. A focused first run caught the
+old all-operation test's assumption that every new time mode sends `positive`;
+the updated operation-specific assertions pass in the second 60-test focused
+run. TypeScript and Vite pass in `timestamp-frontend-tsc-final.log` and
+`timestamp-frontend-vite-final.log`; output is `timestamp-frontend-final-dist`.
+No frontend sources changed after those checks. Offline declaration checks
+pass in `catalog-timestamp-final.log` with unchanged full catalogue counts.
+
+`docs/timestamp-filter-workflow-checks.jsonl.gz` retains **100 members**, **34
+source bindings** and **68 compiled identities**. It is 1,475,036 bytes, SHA256
+`23994de0c2d3736719c4da8cfbf660665f3f993aee1eb1e32c04786813316c52`.
+Manifest: `build/parity-closures/timestamp-workflow-evidence-manifest.json`;
+packager: `package-timestamp-workflows.py`. The offline
+`verify-timestamp-current-bindings.py` verifies **171 current bindings**, all
+100 embedded member hashes and the three committed partial ledger rows.
+Dedicated module archive hashes are:
+
+- Log public: `5bf07e1c85251d670fc22f9cd10acc6b1f4d0c3c0a5b2a5226a558fe4d8b3ee7`;
+  log checks: `57629131321c6b323a968ef78c1677a34c34cad08a3da341e1d102db71537987`.
+- Pandas checks: `6c3247f8a5310ada91d37cc6964a47e620cf7c69e5a71687fdcc7a036988c8d0`.
+- Polars checks: `87d84557b34d39d6e3f41e4dea5c79a0f0fd54d6454b50d2215532871f2ef404`.
+
+Next timestamp work should discriminate remaining parser/locale/year domains,
+mixed temporal wrapper/zone identities, extension/object dtypes, unobserved
+group/cast/internal-column domains, warnings and category/physical lazy plans.
+All earlier paths, case, between, repetition, OCDFG, connectors/platforms,
+solvers, rendered UI and performance gates remain in scope. No owned functional
+drafts remain. Only public calls/docs/enums/plans and opaque hashes were used;
+no reference implementation source, AST, bytecode or private state was inspected.
+
+## Previous adjacent-path checkpoint
 
 Four functional commits are pushed after `010ec3db`:
 

@@ -6,6 +6,21 @@ and support modules. Full parity is not complete.
 
 ## Closed in this pass
 
+Timestamp filtering now has independent log, pandas and Polars companions and
+usable event-window, complete-case and attribute-in-window controls. All 1,935
+distinct retained public outcomes pass exactly in their declared projections:
+342 log, 861 pandas and 732 Polars. Acceptance preserves 38 real source mutations,
+engine-specific window boundaries, nanosecond min/max, exact large indices,
+numeric epoch comparisons above 2^53, full table/log metadata and diagnostics.
+Twenty-nine native suites, 50 production HTTP checks, 9,737 frontend tests,
+TypeScript and Vite pass. Original native, frontend and HTTP harness failures
+remain retained with unchanged native expected outcomes. The log recipe's
+overstated prior-receipt audit timing is explicitly corrected and preserved;
+independent reconstruction found no replay. The three canonical modules remain
+partial with 201 strict open units across the full catalogue. See
+[timestamp-filter-workflow.md](timestamp-filter-workflow.md) and its contracts.
+Rendered browser interaction remains unverified.
+
 Adjacent-path membership and duration filtering now have independent log,
 pandas and Polars companions, genuine table upload, literal role controls,
 complete downloads and log/XES reopening in the existing workspace. All 686
