@@ -11925,7 +11925,7 @@
       "classification": "support",
       "selectors": [],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/pandas-attributes-filter-parity-contract.md"
     },
     {
       "module": "algo.filtering.pandas.between.between_filter",
