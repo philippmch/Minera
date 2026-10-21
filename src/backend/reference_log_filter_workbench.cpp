@@ -4,6 +4,8 @@
 #include "minera/literal_controls_json.hpp"
 #include "minera/log_boundary_filter.hpp"
 #include "minera/log_between_filter.hpp"
+#include "minera/log_case_filter.hpp"
+#include "minera/case_filter_controls.hpp"
 #include "minera/log_rework_filter.hpp"
 #include "minera/log_attribute_repetition_controls.hpp"
 #include "minera/log_segments_filter.hpp"
@@ -127,12 +129,13 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     if(!transport_error.empty()) throw std::invalid_argument(std::string(transport_error));
     static const std::set<std::string> allowed={"operation","source_file","source_format",
       "activity_key","activity","positive","strict","occurrence","admitted_json","patterns_json",
-      "min_occurrences","target_json","min_rep","max_rep","act1_json","act2_json","case_id_key","subcase_concat_str","case_id_column","activity_column","timestamp_column","delimiter","trim_fields"};
+      "min_occurrences","target_json","min_rep","max_rep","act1_json","act2_json","case_id_key","subcase_concat_str","case_id_column","activity_column","timestamp_column","delimiter","trim_fields",
+      "minimum","maximum","max_cases","timestamp_key"};
     for(const auto* collection:{&query,&parts}) for(const auto& part:*collection) {
       if(!allowed.contains(part.name)) throw std::invalid_argument("unknown log filter control: "+part.name);
       if(!fields.emplace(part.name,&part).second) throw std::invalid_argument("duplicate log filter control: "+part.name);
     }
-    static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework","repetition","between"};
+    static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework","repetition","between","case_size","case_count","case_performance"};
     operation=field("operation");
     if(!operations.contains(operation)) { operation.clear();throw std::invalid_argument("choose a supported log filter"); }
     const auto found=fields.find("source_file");
@@ -144,6 +147,14 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     const bool boundary=operation=="start" || operation=="end";
     const bool repetition=operation=="repetition";
     const bool between=operation=="between";
+    const bool cases=operation=="case_size" || operation=="case_count" || operation=="case_performance";
+    if(cases && fields.contains("activity_key")) throw std::invalid_argument("activity_key is inapplicable to case filtering");
+    if(!cases && (fields.contains("minimum") || fields.contains("maximum") || fields.contains("max_cases") || fields.contains("timestamp_key")))
+      throw std::invalid_argument("case bounds and timestamp_key require case filtering");
+    if(cases && fields.contains("positive")) throw std::invalid_argument("positive is inapplicable to case filtering");
+    if(operation=="case_count" && (fields.contains("minimum") || fields.contains("maximum"))) throw std::invalid_argument("minimum/maximum require size or performance filtering");
+    if(operation!="case_count" && fields.contains("max_cases")) throw std::invalid_argument("max_cases requires case_count filtering");
+    if(operation!="case_performance" && fields.contains("timestamp_key")) throw std::invalid_argument("timestamp_key requires case_performance filtering");
     if(between && (!fields.contains("act1_json") || !fields.contains("act2_json")))
       throw std::invalid_argument("between filtering requires act1_json and act2_json");
     if(!between && (fields.contains("act1_json") || fields.contains("act2_json") || fields.contains("case_id_key") || fields.contains("subcase_concat_str")))
@@ -199,7 +210,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
       }
     }
     open_key=key;
-    if(repetition || between) {
+    if(repetition || between || cases) {
       open_key=format=="csv"?field("activity_column","activity"):"concept:name";
       if(format=="native_log") {
         bool found_activity=false;
@@ -214,7 +225,12 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     }
     source_before=serialize_embedding_workbench_raw_log_json(*source);
     phase="filter";
-    if(between) {
+    if(operation=="case_size") result=filter_log_on_case_size(*source,parse_case_filter_bound(field("minimum","2")),parse_case_filter_bound(field("maximum","null")));
+    else if(operation=="case_count") result=filter_log_on_ncases(*source,parse_case_filter_bound(field("max_cases","1000")));
+    else if(operation=="case_performance") {
+      LogCasePerformanceOptions options; options.timestamp_key=EventAttribute{"",field("timestamp_key",format=="csv"?field("timestamp_column","timestamp"):"time:timestamp")};
+      result=filter_log_on_case_performance(*source,parse_case_filter_bound(field("minimum","0")),parse_case_filter_bound(field("maximum","10000000000")),options);
+    } else if(between) {
       LogBetweenFilterOptions options;options.activity_key=EventAttribute{"",key};options.case_id_key=EventAttribute{"",case_key};
       if(fields.contains("subcase_concat_str")) options.subcase_separator=EventAttribute{"",field("subcase_concat_str")};
       const auto complete=filter_log_between_result(*source,endpoint(field("act1_json")),endpoint(field("act2_json")),options);
@@ -245,6 +261,9 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     try { XesExportOptions options;options.preserve_nulls=true;xes=serialize_xes(*result,options); }
     catch(const std::exception& e) { export_error=e.what(); }
     phase="complete";
+  } catch(const LogCaseFilterError& e) {
+    status=400;error=e.message;
+    if(source && source_before) unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source);
   } catch(const LogBetweenFilterError& e) {
     status=400;error=e.message;
     if(source && source_before) unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source);
@@ -258,7 +277,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     ",\"http_status\":"+std::to_string(status)+",\"phase\":"+q(phase)+",\"source_format\":"+optional_text(format,!format.empty())+
     ",\"source\":"+(source?counts(*source):"null")+",\"result\":"+(result?counts(*result):"null")+
     ",\"source_unchanged\":"+(unchanged?(*unchanged?"true":"false"):"null")+
-    ",\"activity_key\":"+optional_text((operation=="repetition" || operation=="between")?open_key:key,source.has_value())+
+    ",\"activity_key\":"+optional_text((operation=="repetition" || operation=="between" || operation.starts_with("case_"))?open_key:key,source.has_value())+
     ((operation=="repetition" || operation=="between")?",\"filter_attribute_key\":"+optional_text(key,source.has_value()):"")+
     (operation=="between"?",\"case_id_key\":"+optional_text(case_key,source.has_value())+",\"full_result_json\":"+optional_text(full_result,!full_result.empty()):"")+
     ",\"filtered_log_json\":"+optional_text(raw_result,!raw_result.empty())+
