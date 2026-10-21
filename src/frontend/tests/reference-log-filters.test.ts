@@ -34,6 +34,7 @@ describe("literal reference-log filter controls", () => {
       else if (operation === "case_size") {expect(fields).toMatchObject({minimum: "2", maximum: "null"}); expect(fields).not.toHaveProperty("positive");}
       else if (operation === "case_count") {expect(fields).toMatchObject({max_cases: "1000"}); expect(fields).not.toHaveProperty("positive");}
       else if (operation === "case_performance") {expect(fields).toMatchObject({minimum: "0", maximum: "10000000000"}); expect(fields).not.toHaveProperty("positive"); expect(fields).not.toHaveProperty("timestamp_key");}
+      else if (operation.startsWith("time_")) {expect(fields).toMatchObject({lower: form.timeLower, upper: form.timeUpper}); expect(Object.hasOwn(fields, "positive")).toBe(operation === "time_starting" || operation === "time_completing"); expect(Object.hasOwn(fields, "time_target_json")).toBe(operation === "time_attribute");}
       else expect(fields.positive).toBe("true");
       expect(Object.hasOwn(fields, "patterns_json")).toBe(operation === "traces");
       expect(Object.hasOwn(fields, "admitted_json")).toBe(operation === "start" || operation === "end");

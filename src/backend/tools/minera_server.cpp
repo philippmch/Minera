@@ -5,6 +5,7 @@
 #include "minera/table_between_filter_workbench.hpp"
 #include "minera/table_case_filter_workbench.hpp"
 #include "minera/table_paths_filter_workbench.hpp"
+#include "minera/table_timestamp_filter_workbench.hpp"
 #include "minera/ocel_exact_filter_controls.hpp"
 #include "minera/ocel_activity_type_matching.hpp"
 #include "ocdfg_performance_route.hpp"
@@ -4132,6 +4133,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "table_between_filter_route.hpp"
 #include "table_case_filter_route.hpp"
 #include "table_paths_filter_route.hpp"
+#include "table_timestamp_filter_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
 #include "original_decision_route.hpp"
@@ -10778,6 +10780,7 @@ int main(int argc, char** argv) {
   server.Post("/api/reference-table-between", handle_table_between_filter);
   server.Post("/api/reference-table-cases", handle_table_case_filter);
   server.Post("/api/reference-table-paths", handle_table_paths_filter);
+  server.Post("/api/reference-table-timestamp", handle_table_timestamp_filter);
   server.Options("/api/emd-workbench", preflight);
   server.Post("/api/emd-workbench", handle_original_emd_workbench);
   server.Options("/api/object-centric-playout-workbench", preflight);
