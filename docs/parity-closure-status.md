@@ -32,6 +32,12 @@ TypeScript and Vite pass. The canonical module remains partial for unsupported
 Python object shapes; see
 [log-attribute-repetition-parity-contract.md](log-attribute-repetition-parity-contract.md).
 
+A disjoint continuation adds 86 complete log outcomes for byte values,
+container/date/byte bounds and typed selectors, plus ten exact pandas
+missing-column diagnostics. All 344 retained log/pandas native outcomes pass;
+the first combined Polars diagnostic failure is preserved alongside the final
+nine-suite success. These continuations keep both canonical modules partial.
+
 The OCEL preparation workspace also exposes exact event and object membership,
 timestamp, activity/type matching and object-count filters, including typed NaT
 queries. Literal JSON controls retain integer

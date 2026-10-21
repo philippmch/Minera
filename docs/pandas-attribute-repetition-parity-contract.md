@@ -68,7 +68,9 @@ Root attempted planning once at
 `build/filtering-attribute-repetition-pandas-public-actual-1`. The observer
 rejected a NumPy boolean while snapshotting a nullable-boolean column, before
 any algorithm entry: **zero public algorithm calls**. The original observer,
-failure receipt and hashes are preserved. Boolean/string NumPy scalars were
+failure receipt and hashes are preserved. A separate context note attributes
+the original error description to root's retained tool output; no disk stderr
+or stack-trace log is claimed. Boolean/string NumPy scalars were
 then normalized explicitly in the observer, with existing integral/real
 normalization retained.
 
@@ -97,3 +99,32 @@ and compiled source/test/object/binary/link bindings. Each member has a byte
 length and SHA-256. The opaque module identity remains pinned to PM4Py 2.7.22
 commit `0715c31f3f1d85924107d6aa5329806db69df899`. No reference implementation,
 AST, bytecode or private state was inspected.
+
+
+## Literal missing-column diagnostic continuation
+
+A fresh, separately fingerprinted bank at
+`build/filtering-attribute-repetition-pandas-literal-errors-public-actual-1`
+adds **10 distinct calls**, all observed `KeyError` diagnostics, with no overlap
+with the prior 140 calls and no input/target/parameter mutations. Seven missing
+attribute names and three missing case names cover literal empty strings,
+embedded NUL, newline, backslash, single quote, double quote and both quotes.
+All observations were executed once; no prior calls were rerun.
+
+The native diagnostic now uses the observed Python string representation:
+control bytes are escaped, backslashes are doubled and quote choice avoids an
+unnecessary escape when possible. The error carrier retains a full-length
+`message` string independently of `what()`, so a caller can preserve complete
+diagnostics containing embedded NUL. The new test
+`test_pandas_attribute_repetition_literal_errors.cpp` compares all ten complete
+messages and error kinds and verifies unchanged full source tables. Its offline
+generator and public/native acceptance are preserved in the separate archive
+`docs/attribute-repetition-ordinary-checks.jsonl.gz`. The original pandas archive
+above remains historical. The assertion-enabled new diagnostic suite passes
+**10/10**, and the original pandas suite still passes all **139** native
+outcomes. The first combined run includes a separate Polars diagnostic failure;
+acceptance here refers to the named pandas suites. The final combined run
+passes **9/9**, and both build/test attempts remain in the evidence. Final
+acceptance binds the accepted objects and binaries. This diagnostic
+continuation does not widen dtype,
+column-index or custom-object parity claims.

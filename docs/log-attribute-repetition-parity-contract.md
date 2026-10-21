@@ -24,10 +24,14 @@ Keys preserve empty strings, spaces, delimiters, newlines, NUL and Unicode.
 native fields retain their actual source key and explicit missing/null state.
 Valid legacy optional fields remain present even when their default state
 marker was not populated. Nonstring primitive selectors in the C++ option
-variant find no cell in the native string-key carrier.
+variant find no cell in the native string-key carrier. Appended typed selector
+values also admit hashable tuples, frozensets, bytes, dates and NativeNA. Mutable
+list/map/set selectors raise their observed unhashable-type diagnostic only at
+event lookup: empty logs and empty traces perform no lookup, but an empty event
+still does.
 
 Targets support null, booleans, exact integers, binary64 numbers, strings,
-datetimes, lists, tuples, string-key maps, sets, frozensets and NativeNA in
+datetimes, bytes, lists, tuples, string-key maps, sets, frozensets and NativeNA in
 ordinary native value carriers. Bool/integer/float equality is numeric without
 rounding an integer through binary64. Numeric strings remain strings. Direct
 NaN equality is false. Datetimes remain distinct from ISO-looking strings;
@@ -35,11 +39,15 @@ native datetime comparison preserves nanoseconds and offset-equivalent
 instants, and distinguishes naive from aware values. Lists and tuples are
 distinct. Maps compare keys and values; set and frozenset values can compare
 equal. NativeNA versus null is false. Direct NativeNA scalar comparison
-otherwise raises `boolean value of NA is ambiguous`; nested matching singleton
+otherwise raises `boolean value of NA is ambiguous`; bytes remain distinct from
+strings and compare by their raw contents, including inside ordinary containers.
+Nested matching singleton
 NA values use the observed container identity behavior.
 
 Bounds retain arbitrary decimal `TokenInteger` integers, bool, binary64,
-null, string and NativeNA. Null and string comparisons report their exact
+null, string and NativeNA. Appended ordinary `EventAttribute` alternatives also
+carry bytes, datetimes and list/tuple/map/set/frozenset bounds. Their comparisons
+report the captured type error only when reached. Null and string comparisons report their exact
 observed type-error text through `std::invalid_argument`; NativeNA reports its
 ambiguous-truth message. These errors occur only when their comparison is
 reached. NaN comparisons are false; infinity and fractional thresholds retain
@@ -87,12 +95,12 @@ activity-key preservation and validation receipts.
 ## Remaining boundary
 
 The C++ key and bound variants intentionally do not represent arbitrary Python
-objects, container-valued bounds or unhashable selectors. Ordinary typed
-container targets are supported; arbitrary custom equality objects, scalar
+objects. Ordinary typed container targets, bounds and selectors are supported
+within the captured lazy comparison/lookup rules; arbitrary custom equality
+objects, scalar
 wrapper/children-list storage and arbitrary nonstring dictionary keys are
-outside this contract. Other adapter representations, object-identity graphs,
-bytes-specific equality and unobserved exotic scalar combinations are not
-promoted by this finite bank. Pandas and Polars entrypoints require independent
+outside this contract. Other adapter representations, object-identity graphs
+and unobserved exotic scalar combinations are not promoted by this finite bank. Pandas and Polars entrypoints require independent
 observations and companions; log grouping intuition does not establish their
 behavior. The package and canonical module remain partial until their
 remaining declared domains are resolved.
@@ -102,4 +110,35 @@ The deterministic public archive has 17 UTF-8 members, **79,579 bytes**, SHA-256
 The workflow acceptance archive has 28 members, **43,166 bytes**, SHA-256
 `767e428f8ba73c6044bbbd4819cb45ceb3557e6fde996d930c0f2dae842de74a`.
 Each member records its original byte count and SHA-256; eleven direct native
-and frontend source/test files are bound to the accepted current contents.
+and frontend source/test files are bound to their accepted checkpoint contents.
+
+
+## Ordinary native-value continuation
+
+A fresh bank at `build/filtering-attribute-repetition-log-ordinary-public-actual-1`
+adds **86 distinct calls**, **56 complete returned logs** and **30 errors**.
+Before all entries, complete source/typed-target/parameter/invocation receipts
+were re-fingerprinted against the prior 109 calls: no overlaps or duplicate
+candidates were found. The observer retains raw bytes in metadata and selected
+cells, and source/target/parameters remained unchanged. The pinned opaque module
+hash also remained unchanged. No retained calls were rerun.
+
+The new bank covers lower/upper ordinary container/date/bytes bounds, skipped
+upper comparisons, empty-log/trace behavior, mutable versus immutable selectors,
+standalone bytes/string separation and nested byte targets. Its offline generator
+embeds all 86 outcomes using 18 complete native snapshots in
+`test_log_attribute_repetition_ordinary.cpp`. This continuation resolves these
+ordinary native-value gaps; the custom-object and other remaining boundaries
+above still keep the canonical module partial.
+
+The assertion-enabled `minera_log_attribute_repetition_ordinary_tests` passes
+all **86/86** retained outcomes; the unchanged original suite still passes
+**109/109**. The first combined run passes all four log/pandas suites but also
+contains a separate Polars diagnostic failure. Those named successes do not
+claim that the entire first combined run passed. The repaired final combined
+run passes **9/9**; both the first and final build/test receipts are retained.
+Final acceptance binds the accepted source/test objects and binaries.
+
+The continuation acceptance and compiled bindings are retained separately in
+`docs/attribute-repetition-ordinary-checks.jsonl.gz`; the two earlier archives
+above remain historical checkpoint evidence.

@@ -25,8 +25,10 @@ struct PandasAttributeRepetitionOptions {
 class PandasAttributeRepetitionError : public std::invalid_argument {
  public:
   PandasAttributeRepetitionError(std::string type, std::string message)
-      : std::invalid_argument(std::move(message)), type(std::move(type)) {}
+      : std::invalid_argument(message), type(std::move(type)), message(std::move(message)) {}
   const std::string type;
+  // The complete native diagnostic may contain embedded NUL bytes.
+  const std::string message;
 };
 
 // Filter complete source rows by the count of matching values in their case.

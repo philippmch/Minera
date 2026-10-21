@@ -139,6 +139,28 @@ bool equal(const EventAttribute& left, const EventAttribute& right,
   return root_cause_scalar_keys_equal(left, right);
 }
 
+std::string ordinary_type(const EventAttribute& value) {
+  if (value.is_null) return "NoneType";
+  switch (value.container) {
+    case AttributeContainerKind::kList: return "list";
+    case AttributeContainerKind::kContainer: return "dict";
+    case AttributeContainerKind::kTuple: return "tuple";
+    case AttributeContainerKind::kSet: return "set";
+    case AttributeContainerKind::kFrozenSet: return "frozenset";
+    case AttributeContainerKind::kScalar: break;
+  }
+  if (value.kind == AttributeKind::kDate ||
+      std::holds_alternative<NativeDate>(value.typed_value)) return "datetime.datetime";
+  if (value.kind == AttributeKind::kBytes) return "bytes";
+  return "str";
+}
+
+[[noreturn]] void bound_error(const std::string& type, bool lower) {
+  throw std::invalid_argument(lower
+      ? "'<=' not supported between instances of '" + type + "' and 'int'"
+      : "'<=' not supported between instances of 'int' and '" + type + "'");
+}
+
 bool bound_accepts(std::uint64_t count,
                    const LogAttributeRepetitionBound& bound, bool lower) {
   return std::visit([&](const auto& value) -> bool {
@@ -146,9 +168,28 @@ bool bound_accepts(std::uint64_t count,
     if constexpr (std::is_same_v<T, std::nullptr_t> ||
                   std::is_same_v<T, std::string>) {
       const auto type = std::is_same_v<T, std::nullptr_t> ? "NoneType" : "str";
-      throw std::invalid_argument(lower
-          ? std::string("'<=' not supported between instances of '") + type + "' and 'int'"
-          : std::string("'<=' not supported between instances of 'int' and '") + type + "'");
+      bound_error(type, lower);
+    } else if constexpr (std::is_same_v<T, EventAttribute>) {
+      if (value.scalar_wrapper || value.scalar_children_list)
+        throw std::invalid_argument("attribute repetition bounds require ordinary values");
+      if (value.is_null) bound_error("NoneType", lower);
+      if (value.container != AttributeContainerKind::kScalar)
+        bound_error(ordinary_type(value), lower);
+      if (is_native_na_attribute(value))
+        throw std::invalid_argument("boolean value of NA is ambiguous");
+      if (const auto* number = std::get_if<std::int64_t>(&value.typed_value))
+        return bound_accepts(count, TokenInteger(*number), lower);
+      if (const auto* number = std::get_if<std::uint64_t>(&value.typed_value))
+        return bound_accepts(count, TokenInteger(*number), lower);
+      if (const auto* number = std::get_if<double>(&value.typed_value))
+        return bound_accepts(count, *number, lower);
+      if (const auto* boolean = std::get_if<bool>(&value.typed_value))
+        return bound_accepts(count, *boolean, lower);
+      if (value.kind == AttributeKind::kInt)
+        return bound_accepts(count, TokenInteger(value.value), lower);
+      if (value.kind == AttributeKind::kFloat || value.kind == AttributeKind::kBoolean)
+        return bound_accepts(count, native_attribute_number(value), lower);
+      bound_error(ordinary_type(value), lower);
     } else if constexpr (std::is_same_v<T, NativeNA>) {
       throw std::invalid_argument("boolean value of NA is ambiguous");
     } else if constexpr (std::is_same_v<T, TokenInteger>) {
@@ -170,6 +211,17 @@ bool bound_accepts(std::uint64_t count,
   }, bound);
 }
 
+void validate_lookup_key(const EventAttribute& value) {
+  if (root_cause_key_is_hashable(value)) return;
+  if (value.container == AttributeContainerKind::kTuple ||
+      value.container == AttributeContainerKind::kFrozenSet) {
+    for (const auto& child : value.children) validate_lookup_key(child);
+  }
+  if (value.scalar_wrapper || value.scalar_children_list)
+    throw std::invalid_argument("attribute repetition selectors require ordinary values");
+  throw std::invalid_argument("unhashable type: '" + ordinary_type(value) + "'");
+}
+
 }  // namespace
 
 EventLog filter_log_attribute_value_repetition(
@@ -179,12 +231,22 @@ EventLog filter_log_attribute_value_repetition(
   copy_event_log_context(source, result);
   result.traces.reserve(source.traces.size());
   const auto* key = std::get_if<std::string>(&options.attribute_key);
+  const auto* typed_key = std::get_if<EventAttribute>(&options.attribute_key);
+  if (typed_key && !typed_key->is_null &&
+      typed_key->container == AttributeContainerKind::kScalar &&
+      (typed_key->kind == AttributeKind::kString || typed_key->kind == AttributeKind::kId) &&
+      std::holds_alternative<std::monostate>(typed_key->typed_value))
+    key = &typed_key->value;
   for (const auto& trace : source.traces) {
     std::uint64_t count = 0;
-    if (key)
-      for (const auto& event : trace.events)
+    for (const auto& event : trace.events) {
+      // Public dictionary lookup hashes even a missing key in an empty event,
+      // but neither an empty trace nor an empty log performs a lookup.
+      if (typed_key) validate_lookup_key(*typed_key);
+      if (key)
         if (const auto candidate = selected(event, *key);
             candidate && equal(*candidate, target)) ++count;
+    }
     if (bound_accepts(count, options.minimum, true) &&
         bound_accepts(count, options.maximum, false))
       result.traces.push_back(trace);
