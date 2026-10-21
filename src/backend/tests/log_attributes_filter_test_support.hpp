@@ -29,6 +29,11 @@ inline EventLog output(const DiscoveryWorkbenchResponse& response){
 }
 inline void workflows(const std::function<DiscoveryWorkbenchResponse(const std::vector<DiscoveryWorkbenchPart>&)>& run){
   const auto source=source_log();const auto raw=serialize_embedding_workbench_raw_log_json(source);
+  const std::string byte_literal(" literal\n\0Ω ",13);auto byte_source=source;
+  for(auto& trace:byte_source.traces)for(auto& event:trace.events){event.activity_source_key=byte_literal;event.activity_attribute->key=byte_literal;}
+  auto byte_request=request_log(byte_source,"traces",{{"attribute_key","attribute_key.txt",byte_literal,true},field("values_json","[\"A\"]")});
+  require(output(run(byte_request)).traces.size()==2,"canonical byte log attribute role rejected");
+  byte_request[2].filename="unrelated.json";require(run(byte_request).status==400,"unrelated log attributes File accepted as a byte field");
   for(const auto operation:{"traces","events"}){
     const auto answer=run(request_log(source,operation,{field("attribute_key","work"),field("values_json","[\"A\"]")}));const auto filtered=output(answer);
     require(filtered.traces.size()==2,"categorical case selection differs");require(text(answer.json,"source_log_json")==raw,"full source changed before apply");

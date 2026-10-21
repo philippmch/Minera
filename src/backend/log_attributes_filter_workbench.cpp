@@ -46,7 +46,7 @@ DiscoveryWorkbenchResponse execute_log_attributes_filter(const std::vector<Disco
     static const std::set<std::string> allowed={"operation","source_file","source_format","case_id_column","activity_column","timestamp_column","delimiter","trim_fields","activity_key","attribute_key","positive","values_json","typed_values_json","lower","upper","criterion","case_id_key","case_id_glue","keep_once_per_case","stream_filter_key1","stream_filter_value1_json","stream_filter_key2","stream_filter_value2_json","counts_json","variants_file","variant_traces_json","variant_counts_json"};
     for(const auto* collection:{&query,&parts})for(const auto& part:*collection){
       if(!allowed.contains(part.name))throw std::invalid_argument("unknown log attributes control: "+part.name);
-      if(part.file && part.name!="source_file" && part.name!="variants_file")throw std::invalid_argument("ordinary log attributes controls must be text fields: "+part.name);
+      if(part.file && part.name!="source_file" && part.name!="variants_file" && part.filename!=part.name+".txt")throw std::invalid_argument("ordinary log attributes controls must be text or canonical byte fields: "+part.name);
       if(!fields.emplace(part.name,&part).second)throw std::invalid_argument("duplicate log attributes control: "+part.name);
     }
     operation=field("operation");

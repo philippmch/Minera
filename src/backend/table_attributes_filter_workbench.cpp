@@ -26,7 +26,7 @@ DiscoveryWorkbenchResponse execute_table_attributes_filter(const std::vector<Dis
     static const std::set<std::string> allowed={"engine","operation","source_file","values_json","typed_values_json","lower","upper","criterion","positive","keep_nan_values","keep_once_per_case","case_id_key","attribute_key","activity_key","stream_filter_key1","stream_filter_value1_json","stream_filter_key2","stream_filter_value2_json","counts_json","counts_value_json","most_common_json"};
     for(const auto* collection:{&query,&parts})for(const auto& part:*collection){
       if(!allowed.contains(part.name))throw std::invalid_argument("unknown table attributes control: "+part.name);
-      if(part.file && part.name!="source_file")throw std::invalid_argument("ordinary table attributes controls must be text fields: "+part.name);
+      if(part.file && part.name!="source_file" && part.filename!=part.name+".txt")throw std::invalid_argument("ordinary table attributes controls must be text or canonical byte fields: "+part.name);
       if(!fields.emplace(part.name,&part).second)throw std::invalid_argument("duplicate table attributes control: "+part.name);
     }
     engine=field("engine");if(engine!="pandas" && engine!="polars"){engine.clear();throw std::invalid_argument("choose pandas or polars attributes filtering");}

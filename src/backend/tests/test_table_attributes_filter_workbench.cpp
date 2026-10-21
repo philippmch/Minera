@@ -60,6 +60,9 @@ inline void workflows(const std::function<DiscoveryWorkbenchResponse(const Parts
   table_success(run(attributes_request(engine,source,"relative",{field("keep_once_per_case","true")})),source,subset(source,{1,3}),engine);
   auto custom=source;const std::string key(" literal\n\0Ω ",13);custom.columns[0]="";custom.columns[1]=key;for(auto& row:custom.rows){row[0]->key="";row[1]->key=key;}
   table_success(run(attributes_request(engine,custom,"traces",{field("case_id_key",""),field("attribute_key",key)})),custom,subset(custom,{0,2,3}),engine);
+  auto byte_request=attributes_request(engine,custom,"traces",{{"case_id_key","case_id_key.txt","",true},{"attribute_key","attribute_key.txt",key,true}});
+  table_success(run(byte_request),custom,subset(custom,{0,2,3}),engine);
+  byte_request.back().filename="unrelated.json";require(run(byte_request).status==400,"unrelated attributes File accepted as a byte field");
   const auto missing=run(attributes_request(engine,source,"events",{field("attribute_key","missing")}));require(missing.status==400,"missing matched column accepted");contains(missing,"\"source_unchanged\":true");require(text(missing.json,"source_after_table_json")==serialize_embedding_workbench_table_json(source),"failure mutated source");
   if(engine=="pandas"){
    table_success(run(attributes_request(engine,source,"threshold",{field("counts_value_json",R"({"type":"map","value":{"A":{"type":"integer","value":"100"},"B":{"type":"integer","value":"0"}}})")})),source,subset(source,{0,2}),engine);
