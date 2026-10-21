@@ -2063,6 +2063,10 @@ namespace {
 
 void write_ocpn_annotation_fields(std::ostringstream& out,
                                   const OcdfgGraph& graph) {
+  const auto performance_number = [&](double value) {
+    if (value == 0.0 && std::signbit(value)) out << "-0.0";
+    else out << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
+  };
   const auto strings = [&](const std::vector<std::string>& values) {
     out << '[';
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -2197,20 +2201,17 @@ void write_ocpn_annotation_fields(std::ostringstream& out,
       out << ",\"performance\":[";
       for (std::size_t i = 0; i < edge.performance.size(); ++i) {
         if (i != 0) out << ',';
-        out.precision(17);
-        out << edge.performance[i];
+        performance_number(edge.performance[i]);
       }
       out << "],\"performance_event_couples\":[";
       for (std::size_t i = 0; i < edge.performance_event_couples.size(); ++i) {
         if (i != 0) out << ',';
-        out.precision(17);
-        out << edge.performance_event_couples[i];
+        performance_number(edge.performance_event_couples[i]);
       }
       out << "],\"performance_total_objects\":[";
       for (std::size_t i = 0; i < edge.performance_total_objects.size(); ++i) {
         if (i != 0) out << ',';
-        out.precision(17);
-        out << edge.performance_total_objects[i];
+        performance_number(edge.performance_total_objects[i]);
       }
       out << "]}";
     }
@@ -2224,6 +2225,7 @@ void write_ocpn_annotation_fields(std::ostringstream& out,
 
 std::string serialize_ocpn_json(const OcpnGraph& graph) {
   std::ostringstream out;
+  out.imbue(std::locale::classic());
   const auto strings = [&](const std::vector<std::string>& values) {
     out << '[';
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -2631,7 +2633,10 @@ void write_conformance_number(std::ostringstream& out, double value) {
     out << "null";
     return;
   }
-  out << std::setprecision(17) << value;
+  // A bare -0 is an integer JSON token and discards the floating sign in
+  // readers that distinguish integers from reals.
+  if (value == 0.0 && std::signbit(value)) out << "-0.0";
+  else out << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
 }
 
 template <typename T>
@@ -2899,6 +2904,7 @@ OcdfgConformanceResult compare_ocdfg(
 
 std::string etot_conformance_json(const EtotConformanceResult& result) {
   std::ostringstream out;
+  out.imbue(std::locale::classic());
   const auto strings = [&](const std::vector<std::string>& values) {
     out << '[';
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -2954,6 +2960,7 @@ std::string etot_conformance_json(const EtotConformanceResult& result) {
 
 std::string otg_conformance_json(const OtgConformanceResult& result) {
   std::ostringstream out;
+  out.imbue(std::locale::classic());
   const auto strings = [&](const std::vector<std::string>& values) {
     out << '[';
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -3009,6 +3016,7 @@ std::string otg_conformance_json(const OtgConformanceResult& result) {
 
 std::string ocdfg_conformance_json(const OcdfgConformanceResult& result) {
   std::ostringstream out;
+  out.imbue(std::locale::classic());
   const auto strings = [&](const std::vector<std::string>& values) {
     out << '[';
     for (std::size_t i = 0; i < values.size(); ++i) {

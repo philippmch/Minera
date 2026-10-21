@@ -41,6 +41,12 @@ numeric regression and affected core/evaluation checks pass. Its precise scope
 is recorded in [quality-numeric-json-contract.md](quality-numeric-json-contract.md);
 this output repair does not itself promote an algorithm module.
 
+OCPN's embedded OCDFG annotations and ETOT/OTG/OCDFG conformance results now
+emit locale-independent JSON and retain negative zero. Fourteen scalar states,
+exact integer counts and all three embedded performance arrays pass independent
+numeric checks, alongside original OCEL and timing regressions. This is a
+transport repair; see [ocel-numeric-json-contract.md](ocel-numeric-json-contract.md).
+
 PNML imports now retain mixed ordinary/reset/inhibitor and parallel extended
 arcs sharing an endpoint. Exact arc weights, IDs and occurrence inventories
 survive export/reimport. Five affected native suites pass; see
