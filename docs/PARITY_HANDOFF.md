@@ -26,9 +26,22 @@ has 32 members, 107,541 bytes and SHA256
 `86299c611832abbe9369dd40fad0e25e9a63fe7449a17f61709c1d754bdc3a5a`.
 Its 14 current source and 16 compiled bindings were checked after commit;
 Git source comparison normalizes CRLF/LF only, while actual compiled-source
-and archive hashes remain exact. This is a focused proof; the preceding
-production-server proof is historical after these shared changes. A new
-production-server acceptance is pending the LTL integration.
+and archive hashes remain exact. Additional production acceptance now passes
+**101 actual HTTP checks** in
+`build/parity-closures/attributes-byte-controls-production-http-4`. The separate
+server was compiled from an unmodified committed server-source copy at
+`9b983512` plus 58 unchanged current native objects and the pinned frozen core;
+local unfinished LTL endpoint edits were excluded. Its SHA256 is
+`22e6635a92e06bee3d97a7678572627093c007aecca0c1110072c78c19a18e1a`.
+The new archive `docs/attributes-native-byte-controls-production-checks.jsonl.gz`
+has 95 members, 2,167,133 bytes and SHA256
+`df468440cb7261ba0c144223eb2e4e7b8de5b182182b0dde0c7cb1af07b3bf7e`.
+It binds 59 sources and 62 compiled artifacts, all four HTTP attempts and the
+prior focused archive. First two harness attempts misread the valid raw-byte
+log wrapper; third passed 101 and final fourth added complete raw-byte log
+artifact equality and passed 101. All owned server processes exited. No product
+changes were needed for those reader corrections. Rendered browser acceptance
+remains unverified; LTL integration still requires its own rebuilt server.
 
 LTL is the active next family across EventLog, pandas and Polars. Root captured
 only the public surface (zero algorithm calls) under
