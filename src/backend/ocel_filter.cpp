@@ -445,6 +445,52 @@ bool event_filter_instant_equal(const ParsedExactTimestamp& left,
          left.seconds == right.seconds && left.nanoseconds == right.nanoseconds;
 }
 
+bool object_filter_column_exists(const Ocel& log, std::string_view key) {
+  if (key == "ocel:oid" || key == "ocel:type") return true;
+  if (log.table_columns.objects)
+    return std::find(log.table_columns.objects->begin(),
+                     log.table_columns.objects->end(), key) !=
+           log.table_columns.objects->end();
+  for (const auto& object : log.objects)
+    for (const auto& attribute : object.attributes)
+      if (attribute.key == key) return true;
+  return false;
+}
+
+OcelValue object_filter_scalar(const OcelObject& object, std::string_view key) {
+  if (key == "ocel:oid") return object.id;
+  if (key == "ocel:type") return object.type;
+  for (const auto& attribute : object.attributes)
+    if (attribute.key == key) return attribute.value;
+  return std::numeric_limits<double>::quiet_NaN();
+}
+
+bool object_filter_timestamp_column(const Ocel& log, const OcelObject& object,
+                                    std::string_view key,
+                                    OcelObjectAttributeColumnKind kind) {
+  if (kind != OcelObjectAttributeColumnKind::kAutomatic)
+    return kind == OcelObjectAttributeColumnKind::kTimestamp;
+  const auto type = log.object_type_attributes.find(object.type);
+  if (type == log.object_type_attributes.end()) return false;
+  const auto attribute = type->second.find(std::string(key));
+  return attribute != type->second.end() &&
+         (attribute->second.find("date") != std::string::npos ||
+          attribute->second.find("time") != std::string::npos);
+}
+
+bool attribute_filter_datetime_equal(
+    const OcelValue& candidate, const OcelEventAttributeFilterValue& value) {
+  const auto* text = std::get_if<std::string>(&candidate);
+  if (std::holds_alternative<OcelAttributeNaT>(value)) {
+    if (std::holds_alternative<std::nullptr_t>(candidate)) return true;
+    if (const auto* real = std::get_if<double>(&candidate)) return std::isnan(*real);
+    return text && *text == "NaT";
+  }
+  const auto* other = std::get_if<ParsedExactTimestamp>(&value);
+  const auto instant = text ? parse_timestamp_exact(*text) : std::nullopt;
+  return other && instant && event_filter_instant_equal(*instant, *other);
+}
+
 bool event_filter_timestamp_column(const Ocel& log, const OcelEvent& event,
                                    std::string_view key,
                                    OcelEventAttributeColumnKind kind) {
@@ -524,12 +570,8 @@ Ocel filter_ocel_event_attribute_exact(
     bool matches = false;
     const auto candidate = event_filter_scalar(event, attribute_key);
     if (event_filter_timestamp_column(log, event, attribute_key, column_kind)) {
-      const auto* text = std::get_if<std::string>(&candidate);
-      if (const auto instant = text ? parse_timestamp_exact(*text) : std::nullopt) {
-        for (const auto& value : values)
-          if (const auto* other = std::get_if<ParsedExactTimestamp>(&value))
-            matches = matches || event_filter_instant_equal(*instant, *other);
-      }
+      for (const auto& value : values)
+        matches = matches || attribute_filter_datetime_equal(candidate, value);
     } else {
       for (const auto& value : values)
         matches = matches || event_filter_scalar_equal(candidate, value);
@@ -572,6 +614,26 @@ Ocel filter_ocel_object_attribute(const Ocel& log,
     const bool matches =
         has_attribute_value(object.attributes, attribute_key, values);
     return positive ? matches : !matches;
+  });
+  return propagate_object_filter(std::move(filtered));
+}
+
+Ocel filter_ocel_object_attribute_exact(
+    const Ocel& log, std::string_view attribute_key,
+    const std::vector<OcelObjectAttributeFilterValue>& values, bool positive,
+    OcelObjectAttributeColumnKind column_kind) {
+  if (!object_filter_column_exists(log, attribute_key))
+    throw std::out_of_range("'" + std::string(attribute_key) + "'");
+  Ocel filtered = log;
+  filter_records(filtered.objects, [&](const OcelObject& object) {
+    const auto candidate = object_filter_scalar(object, attribute_key);
+    const bool datetime =
+        object_filter_timestamp_column(log, object, attribute_key, column_kind);
+    const bool matches = std::any_of(values.begin(), values.end(), [&](const auto& value) {
+      return datetime ? attribute_filter_datetime_equal(candidate, value)
+                      : event_filter_scalar_equal(candidate, value);
+    });
+    return matches == positive;
   });
   return propagate_object_filter(std::move(filtered));
 }

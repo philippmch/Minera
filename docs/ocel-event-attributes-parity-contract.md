@@ -28,7 +28,11 @@ a typed datetime query from a literal string query, even when the string
 spells that datetime.
 
 `OcelEventAttributeFilterValue` carries scalar values and
-`ParsedExactTimestamp` queries. `OcelEventAttributeColumnKind` preserves the
+`ParsedExactTimestamp` queries and the distinct `OcelAttributeNaT` sentinel.
+Typed NaT selects missing datetime cells; null and numeric NaN queries do not.
+The additional twelve complete public outcomes are recorded in
+[ocel-event-nat-membership.md](ocel-event-nat-membership.md).
+`OcelEventAttributeColumnKind` preserves the
 source column's semantic kind. `kTimestamp` selects datetime equality for any
 chosen column; `kScalar` preserves literal scalar equality. `kAutomatic` uses
 the canonical timestamp role or existing event activity/type declarations

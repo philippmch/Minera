@@ -18,9 +18,11 @@ namespace minera {
 
 // Public categorical filtering preserves the distinction between a timestamp
 // value and a literal string, and compares bool/integer/real scalars numerically.
+// A typed datetime missing value is distinct from both null and numeric NaN.
+struct OcelAttributeNaT {};
 using OcelEventAttributeFilterValue =
     std::variant<std::nullptr_t, bool, std::int64_t, double, std::string,
-                 ParsedExactTimestamp>;
+                 ParsedExactTimestamp, OcelAttributeNaT>;
 enum class OcelEventAttributeColumnKind { kAutomatic, kScalar, kTimestamp };
 [[nodiscard]] Ocel filter_ocel_event_attribute_exact(
     const Ocel& log, std::string_view attribute_key,
@@ -40,6 +42,16 @@ using OcelEventTimestampBound = std::variant<std::string, ParsedExactTimestamp>;
 [[nodiscard]] Ocel filter_ocel_object_attribute(
     const Ocel& log, std::string_view attribute_key,
     const std::vector<OcelValue>& values, bool positive = true);
+
+using OcelObjectAttributeFilterValue = OcelEventAttributeFilterValue;
+using OcelObjectAttributeColumnKind = OcelEventAttributeColumnKind;
+using OcelObjectAttributeNaT = OcelAttributeNaT;
+[[nodiscard]] Ocel filter_ocel_object_attribute_exact(
+    const Ocel& log, std::string_view attribute_key,
+    const std::vector<OcelObjectAttributeFilterValue>& values,
+    bool positive = true,
+    OcelObjectAttributeColumnKind column_kind =
+        OcelObjectAttributeColumnKind::kAutomatic);
 
 [[nodiscard]] Ocel filter_ocel_object_types(
     const Ocel& log, const std::vector<std::string>& types,
