@@ -71,12 +71,21 @@ remain in the evidence archive.
 
 ## Retained public evidence and native acceptance
 
-Root executed two finite, disjoint public banks exactly once:
+Root executed each of two finite public banks once:
 
 - `build/ocel-activity-type-matching-focused-public-actual-1`: 138 calls,
   127 returned full logs and 11 errors.
 - `build/ocel-activity-type-matching-continuation-public-actual-1`: 30 new
   calls, 28 returned full logs and two errors.
+
+An offline receipt audit found one duplicate inside the focused bank:
+`mapping-subset-1` and `mapping-key-domain-7` have identical source,
+parameters, correspondence and invocation mode. Both observations are retained.
+The continuation is disjoint from the focused bank. The **168 total calls**
+therefore contain **167 distinct explicit call receipts**; the **155 returned
+logs** contain **154 distinct successful call receipts**. No capture was
+rerun to replace the duplicate. The duplicate audit and its fingerprint rule
+are retained in the evidence archive.
 
 All 168 observations preserve inputs, correspondence mappings and parameter
 dictionaries, and all successful returns are independent log objects. The
@@ -87,7 +96,8 @@ The continuation follows the first bank's observed temporary controls without
 replaying its recipes.
 
 `test_ocel_activity_type_matching_module.cpp` embeds all **155 full ordered
-native returned snapshots** and **eight native missing-column diagnostics**
+native returned snapshots**, including the duplicate receipt, and
+**eight native missing-column diagnostics**
 directly from those records. Five public errors lie outside the native typed
 signature. The assertion-enabled native target is
 `minera_ocel_activity_type_matching_module_tests`; `main` directly invokes
@@ -101,5 +111,6 @@ opaque module pins, native recipes/sources/tests and verification bindings.
 Every archived member retains its original byte length and SHA-256.
 The opaque reference identities match PM4Py 2.7.22 commit
 `0715c31f3f1d85924107d6aa5329806db69df899` before and after the public runs.
-No reference implementation, AST, bytecode or private state was inspected,
-and no captured algorithm call was replayed.
+No reference implementation, AST, bytecode or private state was inspected.
+The within-bank duplicate above is preserved and disclosed; neither capture
+was rerun, and the continuation repeats no focused-bank receipt.

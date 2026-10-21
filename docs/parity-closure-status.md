@@ -25,12 +25,14 @@ focused tests, TypeScript and production build also pass. See
 [reference-log-filter-workflow.md](reference-log-filter-workflow.md).
 
 The OCEL preparation workspace also exposes exact event and object membership,
-timestamp and object-count filters, including typed NaT queries. Literal JSON controls retain integer
+timestamp, activity/type matching and object-count filters, including typed NaT
+queries. Literal JSON controls retain integer
 precision and timestamp kinds. Empty names and repeated relation rows
 survive exact input/output and ordinary reopening of marked outputs. Four
-affected native targets passed at the earlier checkpoint. The current eight-suite
-native acceptance and 9,675-test frontend suite pass, with TypeScript and the
-production build. See
+affected native targets passed at the earlier checkpoint. The current nine-suite
+native acceptance and 9,677-test frontend suite pass, with TypeScript and the
+production build. Ten actual production-handler requests also pass on an owned
+temporary server. See
 [ocel-exact-filter-workflow.md](ocel-exact-filter-workflow.md).
 
 Quality-result JSON also preserves computed double values through parsing,

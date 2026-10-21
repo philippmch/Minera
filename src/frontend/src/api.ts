@@ -6488,7 +6488,7 @@ export async function requestOcelFlatten(
 
 export type OcelFilterSelector =
   | "event_attribute" | "object_attribute" | "object_types" | "objects"
-  | "events" | "timestamp" | "activity_type_matching" | "object_count"
+  | "events" | "timestamp" | "activity_type_matching" | "activity_type_matching_exact" | "object_count"
   | "event_attribute_exact" | "object_attribute_exact" | "timestamp_exact" | "object_count_exact"
   | "start_events" | "end_events" | "activities_object_type" | "cc_object"
   | "cc_length" | "cc_object_type" | "cc_activity";
@@ -6497,6 +6497,11 @@ export interface OcelFilterOptions {
   attribute_key?: string;
   attribute_values?: Array<string | number | boolean | null>;
   attribute_values_json?: string;
+  allowed_json?: string;
+  activity_key?: string;
+  object_type_key?: string;
+  temporary_column?: string;
+  temporary_separator?: string;
   column_kind?: "auto" | "scalar" | "timestamp";
   timestamp_key?: string;
   from_json?: string;
@@ -6522,7 +6527,7 @@ export function ocelFilterQuery(options: OcelFilterOptions = {}): string {
   const query = new URLSearchParams();
   if (options.variant !== undefined) query.set("variant", options.variant);
   if (options.attribute_key !== undefined) query.set("attribute_key", options.attribute_key);
-  for (const key of ["attribute_values_json", "timestamp_key", "from_json", "to_json", "minimum_counts_json"] as const)
+  for (const key of ["attribute_values_json", "timestamp_key", "from_json", "to_json", "minimum_counts_json", "allowed_json", "activity_key", "object_type_key", "temporary_column", "temporary_separator"] as const)
     if (options[key] !== undefined) query.set(key, options[key]);
   if (options.column_kind !== undefined) {
     if (!["auto", "scalar", "timestamp"].includes(options.column_kind)) throw new Error("OCEL attribute column kind must be auto, scalar or timestamp");

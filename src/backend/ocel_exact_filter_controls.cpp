@@ -123,6 +123,20 @@ std::map<std::string,OcelObjectTypeCountThreshold> parse_ocel_exact_minimum_coun
     else throw std::invalid_argument("Exact OCEL counts require numbers, booleans, NaN, INF or -INF");
   }return result;
 }
+std::map<std::string,std::vector<std::string>> parse_ocel_exact_activity_type_correspondence_json(std::string_view input){
+  const auto root=Reader(input).read();
+  if(root.kind!=Value::object)throw std::invalid_argument("Exact OCEL activity/type correspondence must be a JSON object");
+  std::map<std::string,std::vector<std::string>> result;
+  for(const auto& [key,values]:root.fields){
+    if(values.kind!=Value::array)throw std::invalid_argument("Exact OCEL activity/type correspondence values must be string arrays");
+    auto& target=result[key];
+    for(const auto& value:values.items){
+      if(value.kind!=Value::string)throw std::invalid_argument("Exact OCEL activity/type correspondence activities must be strings");
+      target.push_back(value.text);
+    }
+  }
+  return result;
+}
 OcelEventAttributeColumnKind parse_ocel_event_attribute_column_kind(std::string_view text){
   if(text=="auto")return OcelEventAttributeColumnKind::kAutomatic;
   if(text=="scalar")return OcelEventAttributeColumnKind::kScalar;
