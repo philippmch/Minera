@@ -1,6 +1,7 @@
 #include "minera/pandas_between_filter.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <map>
 #include <limits>
@@ -121,12 +122,36 @@ std::string date_string(const EventAttribute& value, bool numpy) {
   return result;
 }
 
+std::string date_representation(const EventAttribute& value) {
+  const auto* native = std::get_if<NativeDate>(&value.typed_value);
+  if (native && native->resolution == NativeDateResolution::kNanosecond) {
+    auto body = date_string(value, false);
+    if (date_instant(value).timezone_aware) {
+      const auto offset = body.find_last_of("+-");
+      if (offset != std::string::npos && offset >= 19 &&
+          offset + 3 < body.size() && body[offset + 3] == ':') body.erase(offset + 3, 1);
+    }
+    std::string result = "Timestamp(" + string_key_repr(body);
+    if (native->timezone) result += ", tz=" + string_key_repr(*native->timezone);
+    return result + ')';
+  }
+  // The established native tuple formatter requests a nested scalar repr,
+  // including normalized negative/second/microsecond timezone offsets.
+  EventAttribute wrapper{"", ""};
+  wrapper.container = AttributeContainerKind::kTuple;
+  wrapper.children.push_back(value);
+  const auto result = root_cause_attribute_category(wrapper);
+  if (result.size() < 3 || !result.ends_with(",)"))
+    error("ValueError", "pandas between cannot encode nested datetime");
+  return result.substr(1, result.size() - 3);
+}
+
 std::string ordinary_string(const EventAttribute& value, bool nested = false) {
   if (value.is_null) return value.kind == AttributeKind::kDate ? "NaT" : "None";
   if (value.scalar_wrapper || value.scalar_children_list)
     error("ValueError", "pandas between labels require ordinary values");
   if (string_value(value)) return nested ? string_key_repr(value.value) : value.value;
-  if (date_value(value) && !nested) return date_string(value, false);
+  if (date_value(value)) return nested ? date_representation(value) : date_string(value, false);
   if (value.container == AttributeContainerKind::kScalar)
     return root_cause_attribute_category(value);
   std::vector<const EventAttribute*> children;
@@ -160,6 +185,21 @@ std::string representation(const EventAttribute& value) {
   return ordinary_string(value, true);
 }
 
+std::string float32_string(const EventAttribute& value) {
+  const auto number = static_cast<float>(native_attribute_number(value));
+  if (std::isnan(number)) return "nan";
+  if (std::isinf(number)) return number < 0 ? "-inf" : "inf";
+  const auto magnitude = std::abs(static_cast<double>(number));
+  const auto format = magnitude == 0 || (magnitude >= 1e-4 && magnitude < 1e6)
+      ? std::chars_format::fixed : std::chars_format::scientific;
+  char buffer[128];
+  const auto encoded = std::to_chars(buffer, buffer + sizeof(buffer), number, format);
+  if (encoded.ec != std::errc{}) error("ValueError", "pandas between cannot encode float32 case label");
+  std::string result(buffer, encoded.ptr);
+  if (result.find_first_of(".e") == std::string::npos) result += ".0";
+  return result;
+}
+
 std::optional<std::size_t> column(const EventTable& source, const EventAttribute& key,
                                 bool grouping) {
   if (string_value(key)) {
@@ -180,9 +220,10 @@ EventAttribute cell(const EventTable& source, std::size_t row, std::size_t col) 
   EventAttribute missing{"", ""}; missing.is_null = true; return missing;
 }
 
-bool value_equal(const EventAttribute& a, const EventAttribute& b) {
+bool value_equal(const EventAttribute& a, const EventAttribute& b, bool nested = false) {
   if (a.is_null || b.is_null) {
-    if (a.kind == AttributeKind::kDate || b.kind == AttributeKind::kDate) return false;
+    if (a.kind == AttributeKind::kDate || b.kind == AttributeKind::kDate)
+      return nested && a.is_null && b.is_null && a.kind == AttributeKind::kDate && b.kind == AttributeKind::kDate;
     return a.is_null && b.is_null;
   }
   if (is_native_na_attribute(a) || is_native_na_attribute(b))
@@ -197,7 +238,7 @@ bool value_equal(const EventAttribute& a, const EventAttribute& b) {
     if (left.size() != right.size()) return false;
     for (const auto* x : left)
       if (std::none_of(right.begin(), right.end(), [&](const auto* y) {
-            return value_equal(*x, *y);
+            return value_equal(*x, *y, true);
           })) return false;
     return true;
   }
@@ -209,14 +250,14 @@ bool value_equal(const EventAttribute& a, const EventAttribute& b) {
     if (left.size() != right.size()) return false;
     for (const auto& [key, x] : left) {
       const auto found = right.find(key);
-      if (found == right.end() || !value_equal(*x, *found->second)) return false;
+      if (found == right.end() || !value_equal(*x, *found->second, true)) return false;
     }
     return true;
   }
   if (a.container != AttributeContainerKind::kScalar) {
     if (a.children.size() != b.children.size()) return false;
     for (std::size_t i = 0; i < a.children.size(); ++i)
-      if (!value_equal(a.children[i], b.children[i])) return false;
+      if (!value_equal(a.children[i], b.children[i], true)) return false;
     return true;
   }
   for (const auto* v : {&a, &b}) {
@@ -242,6 +283,7 @@ struct CaseValues {
   std::vector<EventAttribute> values;
   bool numeric_array = false;
   bool numpy_dates = false;
+  bool float32_array = false;
 };
 
 CaseValues case_values(const EventTable& source, std::size_t key) {
@@ -250,14 +292,16 @@ CaseValues case_values(const EventTable& source, std::size_t key) {
   for (std::size_t row = 0; row < source.rows.size(); ++row)
     result.values.push_back(cell(source, row, key));
   const auto dtype = source.dtypes.empty() ? std::string() : source.dtypes[key];
-  result.numeric_array = dtype == "float64";
-  if (dtype == "Int64" && std::any_of(result.values.begin(), result.values.end(), [](const auto& v) {
+  result.float32_array = dtype == "float32";
+  result.numeric_array = dtype == "float64" || dtype == "Float64" || result.float32_array;
+  if ((dtype == "Int64" || dtype == "UInt64") && std::any_of(result.values.begin(), result.values.end(), [](const auto& v) {
         return v.is_null || is_native_na_attribute(v);
       })) result.numeric_array = true;
   if (result.numeric_array) {
     for (auto& value : result.values) {
-      const double number = value.is_null || is_native_na_attribute(value)
+      double number = value.is_null || is_native_na_attribute(value)
           ? std::numeric_limits<double>::quiet_NaN() : native_attribute_number(value);
+      if (result.float32_array) number = static_cast<float>(number);
       value = EventAttribute{"", "", AttributeKind::kFloat};
       value.typed_value = number;
     }
@@ -288,7 +332,7 @@ int case_compare(const EventAttribute& a, const EventAttribute& b,
   if (a.is_null || b.is_null) return unsupported();
   if ((a.container == AttributeContainerKind::kList || a.container == AttributeContainerKind::kTuple) && a.container == b.container) {
     for (std::size_t i = 0; i < std::min(a.children.size(), b.children.size()); ++i) {
-      if (value_equal(a.children[i], b.children[i])) continue;
+      if (value_equal(a.children[i], b.children[i], true)) continue;
       return case_compare(a.children[i], b.children[i]);
     }
     return a.children.size() < b.children.size() ? -1 : a.children.size() > b.children.size() ? 1 : 0;
@@ -420,7 +464,9 @@ EventTable filter_pandas_between(const EventTable& source, const EventAttribute&
         if (contains(act1, value)) opening = row;
       } else if (contains(act2, value)) {
         const auto& case_value = cases.values[sorted[first]];
-        const auto label = (cases.numpy_dates ? date_string(case_value, true) : ordinary_string(case_value)) + separator(options.subcase_concat_str) + std::to_string(subcase++);
+        const auto label = (cases.numpy_dates ? date_string(case_value, true)
+                           : cases.float32_array ? float32_string(case_value)
+                           : ordinary_string(case_value)) + separator(options.subcase_concat_str) + std::to_string(subcase++);
         for (std::size_t kept = *opening; kept <= row; ++kept) marks[kept] = label;
         opening = value_equal(act1, act2) ? std::optional<std::size_t>(row) : std::nullopt;
       }

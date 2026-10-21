@@ -142,8 +142,8 @@ arbitrary pandas extension dtypes, nonstring/duplicate column labels,
 custom Python objects, all timezone identities, arbitrary NumPy mixed-object
 sort/comparison orders, scalar-wrapper/children-list payloads, nonstring
 nested dictionary keys or all mutable selected-cell equality combinations.
-Nullable UInt64/Float64 and float32 case projections, and typed datetime
-values nested in container-valued case labels, remain uncovered ordinary
-domains. Undeclared dtypes and other native-only input encodings remain separate adapter
+The later bounded ordinary-dtype/temporal continuation is documented in
+`pandas-between-ordinary-parity-contract.md`, with separate evidence. The
+archive and source bindings above remain historical checkpoint contents. Undeclared dtypes and other native-only input encodings remain separate adapter
 boundaries. No Polars or log between-filter behavior is inferred from these
 pandas observations. These limits keep the canonical module partial.
