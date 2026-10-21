@@ -1,4 +1,6 @@
 import {useEffect, useRef, useState} from "react";
+import {TableAttributeRepetitionWorkspace} from "./TableAttributeRepetitionWorkspace";
+import type {TableRepetitionEngine} from "../table-attribute-repetition";
 import {downloadQueryBlob} from "../log-query";
 import {REFERENCE_LOG_FILTER_CSV_FIELDS, REFERENCE_LOG_FILTER_LABELS, REFERENCE_LOG_FILTER_OPERATIONS,
   ReferenceLogFilterRequestGate, defaultReferenceLogFilterForm, referenceLogFilterArtifactFile,
@@ -12,8 +14,13 @@ export interface ReferenceLogFilterWorkspaceProps {
   onOpenLog?: ReferenceLogFilterOpenLog;
   initialOperation?: ReferenceLogFilterOperation;
   initialForm?: ReferenceLogFilterForm;
+  initialEngine?: "log" | TableRepetitionEngine;
 }
-export function ReferenceLogFilterWorkspace({onOpenLog, initialOperation = "rework", initialForm}: ReferenceLogFilterWorkspaceProps) {
+export function ReferenceLogFilterWorkspace(props: ReferenceLogFilterWorkspaceProps) {
+  const [engine, setEngine] = useState<"log" | TableRepetitionEngine>(props.initialEngine ?? "log");
+  return <><section className="panel query-workspace"><label className="filters-field"><span>Filter data model</span><select value={engine} onChange={event => setEngine(event.target.value as "log" | TableRepetitionEngine)}><option value="log">Event log</option><option value="pandas">pandas dataframe repetitions</option><option value="polars">Polars lazy dataframe repetitions</option></select></label></section>{engine === "log" ? <ReferenceLogFilterLogWorkspace {...props}/> : <TableAttributeRepetitionWorkspace key={engine} engine={engine}/>}</>;
+}
+function ReferenceLogFilterLogWorkspace({onOpenLog, initialOperation = "rework", initialForm}: ReferenceLogFilterWorkspaceProps) {
   const [source, setSource] = useState<File | null>(null);
   const [form, setForm] = useState(() => initialForm ?? defaultReferenceLogFilterForm(initialOperation));
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
@@ -64,7 +71,7 @@ export function ReferenceLogFilterWorkspace({onOpenLog, initialOperation = "rewo
           {form.activityKeyMode === "custom" && <label className="filters-field"><span>{form.operation === "repetition" ? "Exact attribute key" : "Exact activity key"}</span><textarea rows={2} value={form.activityKey} onChange={event => change("activityKey", event.target.value)}/></label>}
         </div>
         {form.operation === "repetition" && <>
-          <label className="query-text"><span>Exact typed value as JSON</span><textarea rows={5} spellCheck={false} value={form.repetitionTargetJson} onChange={event => change("repetitionTargetJson", event.target.value)}/><small>{'For example {"type":"string","value":"web"}, {"type":"integer","value":"9007199254740993"}, or {"type":"null"}. Use {"type":"na"} for native missing values; scalar NA comparison reports an error. Also supports decimal, boolean, date, list, tuple, map, set and frozenset. Container members are typed objects.'}</small></label>
+          <label className="query-text"><span>Exact typed value as JSON</span><textarea rows={5} spellCheck={false} value={form.repetitionTargetJson} onChange={event => change("repetitionTargetJson", event.target.value)}/><small>{'For example {"type":"string","value":"web"}, {"type":"integer","value":"9007199254740993"}, or {"type":"null"}. Use {"type":"bytes","value":"ff00"} for hexadecimal bytes and {"type":"na"} for native missing values; scalar NA comparison reports an error. Also supports decimal, boolean, date, list, tuple, map, set and frozenset. Container members are typed objects.'}</small></label>
           <div className="query-options"><label className="filters-field"><span>Minimum repetitions</span><input value={form.minRep} spellCheck={false} onChange={event => change("minRep", event.target.value)}/></label><label className="filters-field"><span>Maximum repetitions</span><input value={form.maxRep} spellCheck={false} onChange={event => change("maxRep", event.target.value)}/></label></div>
           <p>Both bounds are inclusive. Missing attributes do not count. Zero counts and empty cases can match; a minimum above the maximum retains no cases. Bounds accept exact integers, fractions, booleans, NaN, INF and -INF.</p>
         </>}

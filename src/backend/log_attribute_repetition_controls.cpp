@@ -95,6 +95,22 @@ EventAttribute target(const JsonValue& value, std::string key = {}) {
   if (payload == value.fields.end()) throw std::invalid_argument("Repetition target requires value");
   const auto& data = payload->second;
   if (type == "string" && data.kind == JsonValue::string) { result.value = data.text; return result; }
+  if (type == "bytes" && data.kind == JsonValue::string) {
+    const auto digit=[](char c) -> int {
+      if(c>='0' && c<='9') return c-'0';
+      if(c>='a' && c<='f') return c-'a'+10;
+      if(c>='A' && c<='F') return c-'A'+10;
+      return -1;
+    };
+    if(data.text.size()%2) throw std::invalid_argument("Repetition bytes require an even-length hexadecimal string");
+    std::string bytes;bytes.reserve(data.text.size()/2);
+    for(std::size_t i=0;i<data.text.size();i+=2) {
+      const int high=digit(data.text[i]),low=digit(data.text[i+1]);
+      if(high<0 || low<0) throw std::invalid_argument("Repetition bytes require hexadecimal digits");
+      bytes.push_back(static_cast<char>(16*high+low));
+    }
+    return make_bytes_attribute(result.key,bytes);
+  }
   if (type == "integer" && (data.kind == JsonValue::number || data.kind == JsonValue::string)) {
     const TokenInteger integer(data.text); result.value = integer.decimal(); result.kind = AttributeKind::kInt;
     try { result.typed_value = static_cast<std::int64_t>(integer); }

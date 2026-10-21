@@ -100,6 +100,15 @@ void repetition_workflow_and_typed_controls() {
   assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":2}");
   result=run("repetition",{target},"{invalid","source.json");
   assert(result.status==400);has(result,"\"phase\":\"source_import\"");has(result,"\"activity_key\":null");has(result,"\"filter_attribute_key\":null");
+  const auto byte_value=parse_log_attribute_repetition_target_json(R"({"type":"bytes","value":"FF00"})");
+  assert(byte_value==make_bytes_attribute("",std::string("\xff\0",2)));
+  log.traces.front().events.front().attributes={make_bytes_attribute("selected",std::string("\xff\0",2))};
+  log.traces.front().events.back().attributes=log.traces.front().events.front().attributes;
+  result=run("repetition",{field("activity_key","selected"),field("target_json",R"({"type":"bytes","value":"ff00"})")},serialize_embedding_workbench_raw_log_json(log),"source.json");
+  assert(result.status==200);has(result,"\"result\":{\"traces\":1,\"events\":2}");
+  for(const auto* invalid:{R"({"type":"bytes","value":"f"})",R"({"type":"bytes","value":"gg"})"}) {
+    bool failed=false;try{(void)parse_log_attribute_repetition_target_json(invalid);}catch(const std::invalid_argument&){failed=true;}assert(failed);
+  }
   assert(run("repetition").status==400);
   assert(run("repetition",{target,field("positive","true")}).status==400);
   assert(run("repetition",{target,field("activity","A")}).status==400);
