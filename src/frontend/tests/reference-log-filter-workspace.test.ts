@@ -13,10 +13,10 @@ function result(): ReferenceLogFilterRun {
   const raw = nativeJson(value); return {value, raw, responseBytes: nativeStringBytes(raw), fields: [], sourceFile: new File([], "source.csv")};
 }
 describe("filter workspace SSR controls and results (no browser event/effect execution)", () => {
-  it("renders source then criteria, all seven operations, and empty-label guidance without eager requests", () => {
+  it("renders source then criteria, all eight operations, and empty-label guidance without eager requests", () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch); const html = display(createElement(ReferenceLogFilterWorkspace));
     for (const label of ["Source", "Criteria", "Event log file", "Native log JSON", "Exact activity label", "Empty labels are valid", "Minimum occurrences", "Apply log filter"]) expect(html).toContain(label);
-    for (const value of ["traces", "prefix", "suffix", "start", "end", "rework", "repetition"]) expect(html).toContain(`value="${value}"`);
+    for (const value of ["traces", "prefix", "suffix", "start", "end", "rework", "repetition", "between"]) expect(html).toContain(`value="${value}"`);
     expect(html.indexOf("<legend>Source")).toBeLessThan(html.indexOf("<legend>Criteria")); expect(fetch).not.toHaveBeenCalled();
     expect(html).toContain("Choose a source file to apply this filter"); expect(html).toContain('disabled=""');
     expect(html).toContain('accept=".csv,.xes,.xes.gz,.json"'); expect(html).not.toContain(".tsv");
@@ -30,6 +30,14 @@ describe("filter workspace SSR controls and results (no browser event/effect exe
     const run = result(); run.value.operation = "repetition"; run.value.filter_attribute_key = "channel";
     const inspected = display(createElement(ReferenceLogFilterInspection, {run}));
     expect(inspected).toContain("Counted attribute: channel"); expect(inspected).toContain("activity attribute: activity");
+  });
+  it("shows between endpoint JSON, literal separator/case selectors and full-result downloads", () => {
+    const initialForm = defaultReferenceLogFilterForm("between"); initialForm.betweenCaseKeyMode = "custom"; initialForm.betweenCaseKey = ""; initialForm.betweenSeparatorMode = "custom"; initialForm.betweenSeparator = " \n";
+    const html = display(createElement(ReferenceLogFilterWorkspace, {initialForm}));
+    for (const text of ["Start activities as JSON", "End activities as JSON", "Subcase ID attribute", "Subcase ID separator", "zero-based suffix", "Trace attributes survive; trace properties reset", "even if it never closes", "Literal subcase separator", "same JSON shape and equal values", "array order and duplicates matter"]) expect(html).toContain(text);
+    for (const text of ["Exact activity label", "Keep matching cases", "Minimum repetitions", "First occurrence"]) expect(html).not.toContain(text);
+    const run = result();run.value.operation = "between";run.value.full_result_json = '{"schema":"log-between-result-v1"}';run.value.case_id_key = "case";run.value.filter_attribute_key = "work";
+    const inspected = display(createElement(ReferenceLogFilterInspection, {run}));expect(inspected).toContain("Download full between result");expect(inspected).toContain("Subcase ID attribute: case");expect(inspected).toContain("Filtered attribute: work");
   });
   it("shows strict and first/last controls only for prefix/suffix", () => {
     for (const operation of ["prefix", "suffix"] as const) {

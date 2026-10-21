@@ -104,3 +104,21 @@ examples, lazy collection errors and table downloads are documented in
 retain their existing behavior. Typed repetition targets additionally accept
 `{"type":"bytes","value":"ff00"}` hexadecimal data, including empty bytes;
 odd-length/nonhex encodings are rejected.
+
+
+Between extraction adds `operation=between`, required `act1_json` / `act2_json`
+as a raw JSON string or array of strings, and optional literal `case_id_key`
+and `subcase_concat_str`. The CSV default case key is the actual configured
+case-ID column; XES/native defaults to `concept:name`. Omitted versus explicit
+empty separators/keys remain distinct. No positive/negative selection applies.
+The UI explains inclusive boundaries, closing-event reuse only for equal
+original endpoint values (including JSON shape, array order and duplicates), zero-based suffixes,
+missing-case fallback, dropped trace properties and errors when a cut opens.
+
+Only the between envelope adds `full_result_json`, `filter_attribute_key` and
+`case_id_key`. Its `activity_key` remains the original source activity role
+for normal reopening. Users can download the full typed between result,
+EventLog projection, XES projection or original response bytes. The C++ full
+result can preserve nonstring trace keys with an explicit sidecar; this UI
+accepts literal string selectors and does not silently coerce typed keys.
+See `log-between-parity-contract.md` for the full carrier and evidence boundary.

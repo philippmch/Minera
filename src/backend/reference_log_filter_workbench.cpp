@@ -3,6 +3,7 @@
 #include "minera/embedding_workbench_json.hpp"
 #include "minera/literal_controls_json.hpp"
 #include "minera/log_boundary_filter.hpp"
+#include "minera/log_between_filter.hpp"
 #include "minera/log_rework_filter.hpp"
 #include "minera/log_attribute_repetition_controls.hpp"
 #include "minera/log_segments_filter.hpp"
@@ -58,6 +59,18 @@ std::vector<std::vector<std::string>> patterns(std::string_view raw) {
   space(); if (at!=raw.size()) throw std::invalid_argument("patterns_json has trailing content");
   return result;
 }
+EventAttribute endpoint(std::string_view raw) {
+  const auto at=raw.find_first_not_of(" \r\n\t");
+  if(at!=std::string_view::npos && raw[at]=='"') {
+    const auto values=parse_literal_string_vector_json("["+std::string(raw)+"]");
+    if(values.size()!=1) throw std::invalid_argument("between endpoint requires one string or an array of strings");
+    return EventAttribute{"",values.front()};
+  }
+  EventAttribute result{"",""};result.container=AttributeContainerKind::kList;
+  const auto values=parse_literal_string_vector_json(raw);
+  for(std::size_t i=0;i<values.size();++i) result.children.push_back({std::to_string(i),values[i]});
+  return result;
+}
 LogReworkMinimum minimum(std::string_view raw) {
   if(raw=="null") return std::monostate{};
   if(raw=="true") return true;
@@ -98,7 +111,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
   std::map<std::string,const DiscoveryWorkbenchPart*> fields;
   std::optional<EventLog> source,result;
   std::optional<std::string> source_before;
-  std::string operation,format,key,open_key,phase="control",error,export_error,raw_result,xes;
+  std::string operation,format,key,open_key,case_key,full_result,phase="control",error,export_error,raw_result,xes;
   std::optional<bool> unchanged;
   int status=200;
   const auto field=[&](const std::string& name,std::string fallback={}) {
@@ -114,12 +127,12 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     if(!transport_error.empty()) throw std::invalid_argument(std::string(transport_error));
     static const std::set<std::string> allowed={"operation","source_file","source_format",
       "activity_key","activity","positive","strict","occurrence","admitted_json","patterns_json",
-      "min_occurrences","target_json","min_rep","max_rep","case_id_column","activity_column","timestamp_column","delimiter","trim_fields"};
+      "min_occurrences","target_json","min_rep","max_rep","act1_json","act2_json","case_id_key","subcase_concat_str","case_id_column","activity_column","timestamp_column","delimiter","trim_fields"};
     for(const auto* collection:{&query,&parts}) for(const auto& part:*collection) {
       if(!allowed.contains(part.name)) throw std::invalid_argument("unknown log filter control: "+part.name);
       if(!fields.emplace(part.name,&part).second) throw std::invalid_argument("duplicate log filter control: "+part.name);
     }
-    static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework","repetition"};
+    static const std::set<std::string> operations={"traces","prefix","suffix","start","end","rework","repetition","between"};
     operation=field("operation");
     if(!operations.contains(operation)) { operation.clear();throw std::invalid_argument("choose a supported log filter"); }
     const auto found=fields.find("source_file");
@@ -130,6 +143,12 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     const bool segment=operation=="prefix" || operation=="suffix";
     const bool boundary=operation=="start" || operation=="end";
     const bool repetition=operation=="repetition";
+    const bool between=operation=="between";
+    if(between && (!fields.contains("act1_json") || !fields.contains("act2_json")))
+      throw std::invalid_argument("between filtering requires act1_json and act2_json");
+    if(!between && (fields.contains("act1_json") || fields.contains("act2_json") || fields.contains("case_id_key") || fields.contains("subcase_concat_str")))
+      throw std::invalid_argument("act1_json/act2_json/case_id_key/subcase_concat_str require between filtering");
+    if(between && fields.contains("positive")) throw std::invalid_argument("positive is inapplicable to between filtering");
     if(repetition && !fields.contains("target_json"))
       throw std::invalid_argument("attribute repetition requires target_json");
     if(!repetition && (fields.contains("target_json") || fields.contains("min_rep") || fields.contains("max_rep")))
@@ -164,6 +183,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     }
     if(format!="native_log" && format!="csv" && format!="xes") { format.clear();throw std::invalid_argument("source_format must be auto, csv, xes or native_log"); }
     key=field("activity_key",format=="csv"?field("activity_column","activity"):"concept:name");
+    if(between) case_key=field("case_id_key",format=="csv"?field("case_id_column","case_id"):"concept:name");
     phase="source_import";
     if(format=="native_log") source=parse_embedding_workbench_raw_log_json(file.bytes);
     else {
@@ -179,7 +199,7 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
       }
     }
     open_key=key;
-    if(repetition) {
+    if(repetition || between) {
       open_key=format=="csv"?field("activity_column","activity"):"concept:name";
       if(format=="native_log") {
         bool found_activity=false;
@@ -194,7 +214,12 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     }
     source_before=serialize_embedding_workbench_raw_log_json(*source);
     phase="filter";
-    if(operation=="traces") result=filter_log_traces(*source,patterns(field("patterns_json")),{boolean("positive",true),key});
+    if(between) {
+      LogBetweenFilterOptions options;options.activity_key=EventAttribute{"",key};options.case_id_key=EventAttribute{"",case_key};
+      if(fields.contains("subcase_concat_str")) options.subcase_separator=EventAttribute{"",field("subcase_concat_str")};
+      const auto complete=filter_log_between_result(*source,endpoint(field("act1_json")),endpoint(field("act2_json")),options);
+      full_result=serialize_log_between_filter_result_json(complete);result=complete.project_event_log();
+    } else if(operation=="traces") result=filter_log_traces(*source,patterns(field("patterns_json")),{boolean("positive",true),key});
     else if(boundary) {
       const auto admitted=parse_literal_string_vector_json(field("admitted_json"));
       LogBoundaryFilterOptions options{key,boolean("positive",true)};
@@ -220,6 +245,9 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     try { XesExportOptions options;options.preserve_nulls=true;xes=serialize_xes(*result,options); }
     catch(const std::exception& e) { export_error=e.what(); }
     phase="complete";
+  } catch(const LogBetweenFilterError& e) {
+    status=400;error=e.message;
+    if(source && source_before) unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source);
   } catch(const std::exception& e) {
     status=400;error=e.what();
     if(source && source_before) try { unchanged=*source_before==serialize_embedding_workbench_raw_log_json(*source); }
@@ -230,8 +258,9 @@ DiscoveryWorkbenchResponse execute_reference_log_filter(
     ",\"http_status\":"+std::to_string(status)+",\"phase\":"+q(phase)+",\"source_format\":"+optional_text(format,!format.empty())+
     ",\"source\":"+(source?counts(*source):"null")+",\"result\":"+(result?counts(*result):"null")+
     ",\"source_unchanged\":"+(unchanged?(*unchanged?"true":"false"):"null")+
-    ",\"activity_key\":"+optional_text(operation=="repetition"?open_key:key,source.has_value())+
-    (operation=="repetition"?",\"filter_attribute_key\":"+optional_text(key,source.has_value()):"")+
+    ",\"activity_key\":"+optional_text((operation=="repetition" || operation=="between")?open_key:key,source.has_value())+
+    ((operation=="repetition" || operation=="between")?",\"filter_attribute_key\":"+optional_text(key,source.has_value()):"")+
+    (operation=="between"?",\"case_id_key\":"+optional_text(case_key,source.has_value())+",\"full_result_json\":"+optional_text(full_result,!full_result.empty()):"")+
     ",\"filtered_log_json\":"+optional_text(raw_result,!raw_result.empty())+
     ",\"filtered_xes\":"+optional_text(xes,result.has_value() && export_error.empty() && error.empty())+
     ",\"xes_error\":"+optional_text(export_error,!export_error.empty())+
