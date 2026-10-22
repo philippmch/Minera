@@ -108,6 +108,56 @@ category namespace/identity, physical storage, dataframe object identity/index,
 Python NaN-key object identity, exact lazy plans and public warning emission are
 not supplied by the native table ABI. Those remain open boundaries.
 
+## Original typed calls in the table workbench
+
+`POST /api/reference-table-attributes` accepts original Polars calls through the
+same genuine native EventTable File used by friendly mode. The four exclusive
+fields are `engine=polars`, `operation`, `source_file` and exact `call_json`.
+Presence of call text selects original mode even if empty or malformed; the
+backend controls validation and preserves the captured text. The editor never
+parses and reserializes an imported call.
+
+The descriptor is `minera-polars-attributes-original-call-v1` with required
+`input_kind` (`DataFrame` or `LazyFrame`) and ordered `keyword_entries`, an array
+of `{key,value}` entries. It has no positional args array: the original source
+alone was positional. Examples cover all nine methods and use the actual public
+keyword names (`values`, `int1`/`int2`, `thresh`, `max_no_activities`,
+`min_relative_stake`, or `attribute_key` as appropriate). Required keyword
+omission remains available for the native public binding diagnostics.
+
+The optional `parameters` keyword accepts an ordinary raw typed value or
+`{type:"parameter_entries",entries:[{key,enum_key,value},...]}`. Ordered entries
+retain literal versus enum identity and inactive supplied values. Omitted,
+explicit null and empty entries are separate states. In `act_count0`, an
+ordinary string-key typed map stays the original raw native value union; the
+bank establishes no typed-count-cache arm input. Returned attribute counts are
+complete typed key/count data with unordered mapping scope.
+
+The private codec retains the immutable Polars oracle's scalar and container
+constructors: integer precision, decimal double bits and native display string,
+microsecond date carrier, empty sequence child keys and ordered literal map
+keys. It establishes no UUID, NaT, pandas Timestamp, frozenset or arbitrary
+object domain. The complete source File retains its own original native field
+and temporal/category context; it is not rewritten to fit the call editor.
+
+The unchanged 23-field envelope records exact raw call text and full actual
+native call state before/after, including input kind, keyword order, every
+native argument optional, options/defaults, parameter state and count union.
+An omitted optional differs from a present null-valued cell artifact. Apply
+versus collect errors follow the actual eager/lazy overload. Complete source,
+source-after, parsed controls, filtered tables or true counts and response bytes
+remain downloadable after applicable errors. Filtered result Files can be used
+as the next source; count tables are not offered as filtered-source reuse.
+
+The full transport acceptance scope is all 726 unchanged original calls,
+including 455 exact frames, all nine existing bounded cutoff predicates,
+52 unordered typed maps and 210 full class/phase/message diagnostics. Native,
+direct and owned HTTP acceptance remain separate from browser examples.
+Implementation preparation adds no public queries or module promotion; current
+execution results belong to root's checkpoint evidence. Warning emission,
+public plans, error.args, Python aliases and runtime category namespace identity
+remain outside this transport claim.
+
 ## Evidence and acceptance
 
 The zero-call public surface pins reference commit
