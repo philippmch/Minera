@@ -74,10 +74,23 @@ UTC metadata. The uniform 23-field table response adds original call identity
 and complete actual native controls before/after, including after errors.
 The editor preserves UTF8 imports and integer tokens, discards stale responses
 and imports, and downloads full controls and table artifacts. **Use filtered
-table as source** passes the complete result File to the next request. Polars
-continues to use friendly controls. See
+table as source** passes the complete result File to the next request. See
 [the pandas contract](pandas-attributes-filter-parity-contract.md#original-typed-calls-in-the-table-workbench)
 for exact binding shapes, descriptor grammar and evidence limits.
+
+Polars also offers **Original typed call** for all nine methods. Schema
+`minera-polars-attributes-original-call-v1` requires `input_kind` (`DataFrame`
+or `LazyFrame`) and ordered `keyword_entries`; the source alone is positional.
+The `parameters` keyword takes a raw typed value or a `parameter_entries` value
+containing ordered literal/enum identities. Missing keywords, explicit null and
+empty mappings remain distinct. The method examples use the appropriate engine
+schema and keyword names, including a genuine `attribute_key` for counts.
+Imported text is forwarded byte-for-byte, including malformed calls for native
+control diagnostics. Native parsed controls, complete source-after and errors
+remain downloadable in the same 23-field envelope. Counts stay a separate typed
+artifact and cannot be reused as a filtered source table. See
+[the Polars contract](polars-attributes-filter-parity-contract.md#original-typed-calls-in-the-table-workbench)
+for the descriptor and remaining fidelity boundaries.
 
 Literal string lists, explicit typed collections, exact numeric bounds, two
 whole-case stream conditions and supplied count dictionaries are supported.

@@ -22,7 +22,7 @@ it("rejects unrelated call bytes, modes, projected selectors and incomplete cont
  }
  for(const patch of [{controls_before_json:12},{controls_after_json:{}},{controls_unchanged:"true"},{call_mode:"other"},{call_json:null},{extra:true}])expect(isTableAttributesEnvelope({...envelope(call),...patch})).toBe(false);
  const {controls_unchanged:_ignored,...missing}=envelope(call);expect(isTableAttributesEnvelope(missing)).toBe(false);
- expect(()=>tableAttributesFields({...form(),engine:"polars"})).toThrow("require pandas");
+ expect(tableAttributesFields({...form(),engine:"polars"})).toEqual([["engine","polars"],["operation","top_activities"],["call_json",call]]);
 });
 it("imports UTF8 without changing BOM, CRLF, whitespace or large integer tokens",async()=>{
  expect(await tableAttributesCallFileText(new File([Uint8Array.of(239,187,191),call],"call.json"))).toBe("\ufeff"+call);
@@ -34,7 +34,7 @@ it("offers an original editor for all eight pandas methods while friendly contro
   for(const text of ["Complete original pandas attributes call JSON","Import original pandas attributes call JSON file","parameter_entries","keyword_entries"])expect(html).toContain(text);
   for(const text of ["Admitted attribute values as JSON","Lower numeric bound","Include missing values in matching","Frequency activity column"])expect(html).not.toContain(text);
  }
- expect(renderToStaticMarkup(createElement(TableAttributesFilterWorkspace,{engine:"polars"}))).not.toContain("Table attributes call mode");
+ const polars=renderToStaticMarkup(createElement(TableAttributesFilterWorkspace,{engine:"polars"}));expect(polars).toContain("Table attributes call mode");expect(polars).not.toContain("Complete original polars attributes call JSON");
 });
 it("keeps complete controls and exact call downloads available after a native error",async()=>{
  const value=envelope(call),run:TableAttributesRun={value,sourceFile:new File(["source"],"source.json"),fields:[],raw:"",responseBytes:new Uint8Array()};

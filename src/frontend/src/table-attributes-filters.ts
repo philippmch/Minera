@@ -24,13 +24,22 @@ export interface TableAttributesForm {
   countsMode: "computed" | "supplied" | "value"; countsJson: string; mostCommonMode: "omitted" | "supplied"; mostCommonJson: string;
 }
 export function defaultTableAttributesForm(engine: TableRepetitionEngine): TableAttributesForm {
-  return {engine,operation:"traces",callMode:"friendly",callJson:tableAttributesOriginalExample("traces"),valuesKind:"strings",valuesJson:'["A"]',lower:"9007199254740992",upper:"9007199254740994",maxActivities:"2",threshold:"2",minRelative:"0.5",positive:true,keepMissing:false,keepOnceMode:"default",
+  return {engine,operation:"traces",callMode:"friendly",callJson:tableAttributesOriginalExample("traces",engine),valuesKind:"strings",valuesJson:'["A"]',lower:"9007199254740992",upper:"9007199254740994",maxActivities:"2",threshold:"2",minRelative:"0.5",positive:true,keepMissing:false,keepOnceMode:"default",
     streamOne:false,streamOneKey:"concept:name",streamOneValueJson:'{"type":"string","value":"A"}',streamTwo:false,streamTwoKey:"concept:name",streamTwoValueJson:'{"type":"string","value":"B"}',
     caseKeyMode:"default",caseKey:"case:concept:name",attributeKeyMode:"default",attributeKey:"concept:name",activityKeyMode:"default",activityKey:"concept:name",countsMode:"computed",
     countsJson:'{"type":"list","value":[{"type":"tuple","value":[{"type":"string","value":"A"},{"type":"integer","value":"3"}]}]}',mostCommonMode:"omitted",mostCommonJson:'{"type":"list","value":[{"type":"string","value":"A"}]}'};
 }
-export function tableAttributesOriginalExample(operation:TableAttributesOperation):string {
+export function tableAttributesOriginalExample(operation:TableAttributesOperation,engine:TableRepetitionEngine="pandas"):string {
   const integer=(value:string)=>({type:"integer",value});
+  if(engine==="polars"){
+    const string=(value:string)=>({type:"string",value}),members={type:"list",value:[string("A")]};
+    const keyword_entries=operation.startsWith("numeric_")?
+      [{key:"int1",value:integer("9007199254740992")},{key:"int2",value:integer("9007199254740994")},
+        {key:"parameters",value:{type:"parameter_entries",entries:[{key:"pm4py:param:attribute_key",enum_key:false,value:string("signed")}]}}]:
+      operation==="threshold"?[{key:"thresh",value:integer("2")}]:operation==="top_activities"?[{key:"max_no_activities",value:integer("2")}]:
+      operation==="relative"?[{key:"min_relative_stake",value:{type:"decimal",value:"0.5"}}]:operation==="counts"?[{key:"attribute_key",value:string("concept:name")}]:[{key:"values",value:members}];
+    return JSON.stringify({schema:"minera-polars-attributes-original-call-v1",input_kind:"LazyFrame",keyword_entries},null,2);
+  }
   const args=operation.startsWith("numeric_")?[integer("0"),integer("100")]:operation==="top_activities"?[]:operation==="threshold"?[integer("2")]:operation==="relative"?[{type:"decimal",value:"0.5"}]:[{type:"list",value:[{type:"string",value:"A"}]}];
   return JSON.stringify({schema:"minera-pandas-attributes-original-call-v1",args},null,2);
 }
@@ -62,7 +71,6 @@ export function tableAttributesFields(form:TableAttributesForm):Array<[string,st
   if(!["pandas","polars"].includes(form.engine) || !tableAttributesOperations(form.engine).includes(form.operation))throw new Error("Choose an available attribute operation.");
   if(form.callMode!=="friendly"&&form.callMode!=="original")throw new Error("Choose friendly controls or an original typed call.");
   if(form.callMode==="original"){
-    if(form.engine!=="pandas")throw new Error("Original typed attributes calls require pandas.");
     return [["engine",form.engine],["operation",form.operation],["call_json",form.callJson]];
   }
   if(![form.caseKeyMode,form.attributeKeyMode,form.activityKeyMode].every(mode=>mode==="default" || mode==="custom"))throw new Error("Choose default or literal columns.");
