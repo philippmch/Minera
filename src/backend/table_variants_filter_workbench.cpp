@@ -4,6 +4,7 @@
 #include "minera/embedding_workbench_json.hpp"
 #include "minera/pandas_variants_filter.hpp"
 #include "minera/polars_variants_filter.hpp"
+#include "pandas_variants_original_call_workbench.hpp"
 #include <map>
 #include <optional>
 #include <set>
@@ -14,6 +15,8 @@ std::string counts(const EventTable& table) {return "{\"rows\":"+std::to_string(
 }
 DiscoveryWorkbenchResponse execute_table_variants_filter(const std::vector<DiscoveryWorkbenchPart>& parts,
     const std::vector<DiscoveryWorkbenchPart>& query,std::string_view transport_error) {
+  for(const auto* collection:{&query,&parts})for(const auto& part:*collection)if(part.name=="call_json")
+    return execute_pandas_variants_original_call(parts,query,transport_error);
   std::map<std::string,const DiscoveryWorkbenchPart*> fields;
   std::optional<EventTable> source,result; std::optional<std::string> before,variants_before;
   std::optional<bool> unchanged,variants_unchanged;

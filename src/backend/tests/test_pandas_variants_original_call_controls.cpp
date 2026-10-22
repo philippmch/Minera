@@ -1,0 +1,33 @@
+#include "../pandas_variants_original_call_parser.hpp"
+#include <bit>
+#include <iostream>
+namespace {
+namespace o=minera::pandas_variants_original_call_detail;
+using namespace minera;
+void require(bool v,const char* m){if(!v)throw std::runtime_error(m);}
+std::string call(const std::string& arg,const std::string& keywords="[]"){return "{\"schema\":\"minera-pandas-variants-original-call-v1\",\"args\":["+arg+"],\"keyword_entries\":"+keywords+'}';}
+EventAttribute value(const std::string& text){return o::packed(text,o::shared::Reader(text).read());}
+void check(){
+  const auto wide=value(R"({"type":"int","value":18446744073709551615})");require(std::get<std::uint64_t>(wide.typed_value)==UINT64_MAX,"uint64 changed");
+  const auto lexical=value(R"({"type":"int","value":-9999999999999999999999999999})");require(lexical.value=="-9999999999999999999999999999"&&std::holds_alternative<std::monostate>(lexical.typed_value),"lexical integer changed");
+  const auto nested=value(R"({"type":"tuple","values":[{"type":"float","hex":"-0x0.0p+0"},{"type":"list","values":[{"type":"int","value":9007199254740993}]}]})");
+  require(nested.children[0].key=="0"&&nested.children[1].children[0].key=="0","child keys changed");
+  require(nested.children[0].value=="-0.000000"&&std::bit_cast<std::uint64_t>(std::get<double>(nested.children[0].typed_value))==std::bit_cast<std::uint64_t>(-0.0),"double display/bits changed");
+  for(const auto& unit:{"s","ms","us","ns"}){const std::string text="{\"type\":\"pandas.Timestamp\",\"iso\":\"2026-06-01T00:00:00+00:00\",\"resolution\":\""+std::string(unit)+"\",\"timezone\":\"UTC\"}";const auto date=value(text);const auto& native=std::get<NativeDate>(date.typed_value);require(native.timezone=="UTC"&&native.resolution==(unit==std::string("ns")?NativeDateResolution::kNanosecond:NativeDateResolution::kMicrosecond),"Timestamp metadata changed");}
+  const auto nonutc=value(R"({"type":"pandas.Timestamp","iso":"2026-06-01T00:00:00+02:00","resolution":"ms","timezone":"Europe/Berlin"})");const auto& nonutc_date=std::get<NativeDate>(nonutc.typed_value);require(nonutc_date.value=="2026-06-01T00:00:00+02:00"&&nonutc_date.timezone=="Europe/Berlin"&&nonutc_date.resolution==NativeDateResolution::kMicrosecond,"non-UTC metadata was converted or rejected");
+  for(const auto& malformed_zone:{R"({"type":"pandas.Timestamp","iso":"2026-06-01T00:00:00+00:00","resolution":"us","timezone":""})",R"({"type":"pandas.Timestamp","iso":"2026-06-01T00:00:00","resolution":"s","timezone":"Europe/Berlin"})"}){bool rejected=false;try{(void)value(malformed_zone);}catch(const std::invalid_argument&){rejected=true;}require(rejected,"contradictory/empty timezone metadata accepted");}
+  require(is_native_na_attribute(value(R"({"type":"pandas.NA"})")),"NA lost");require(std::get<NativeDate>(value(R"({"type":"pandas.NaT"})").typed_value).resolution==NativeDateResolution::kNanosecond,"NaT lost");
+  require(decode_bytes_attribute(value(R"({"type":"bytes","hex":"00ff0a"})"))==std::string("\0\xff\n",3),"bytes lost");
+  const auto omitted=o::parse(call(R"({"type":"int","value":1})"),"top_k");require(omitted.raw_parameters.is_null&&!omitted.parameters&&omitted.parameter_state=="omitted","omitted actual null changed");
+  const auto typed_nat=o::parse(call(R"({"type":"int","value":1})",R"([{"key":"parameters","value":{"type":"pandas.NaT"}}])"),"top_k");const auto explicit_null=o::parse(call(R"({"type":"int","value":1})",R"([{"key":"parameters","value":{"type":"NoneType","value":null}}])"),"top_k");require(typed_nat.parameter_state=="raw"&&typed_nat.raw_parameters.is_null&&std::holds_alternative<NativeDate>(typed_nat.raw_parameters.typed_value)&&explicit_null.parameter_state=="null"&&explicit_null.raw_parameters.is_null,"typed NaT caller state conflated with NoneType");
+  const auto empty=o::parse(call(R"({"type":"int","value":1})",R"([{"key":"parameters","value":{"type":"dict","items":[]}}])"),"top_k");require(!empty.parameters&&empty.raw_parameters.container==AttributeContainerKind::kContainer&&empty.parameter_state=="entries","literal dictionary incorrectly selects vector");
+  const auto entries=o::parse(call(R"({"type":"int","value":1})",R"([{"key":"parameters","value":{"type":"dict","items":[[{"type":"enum","module":"pm4py.algo.filtering.pandas.variants.variants_filter","name":"POSITIVE","value":{"type":"str","value":"positive"}},{"type":"bool","value":false}],[{"type":"str","value":"positive"},{"type":"bool","value":true}]]}}])"),"top_k");
+  require(entries.parameters&&entries.parameters->size()==2&&entries.parameters->at(0).enum_key&&!entries.parameters->at(1).enum_key&&entries.parameters->at(1).value.key=="positive","ordered identity vector changed");
+  const auto actual=o::shared::Reader(o::controls_json(entries)).read();require(actual.fields.size()==6&&o::at(actual,"parameter_native_arm").text=="ordered_parameter_entries"&&o::at(actual,"native_options_present").kind==o::Node::kBoolean&&!o::at(actual,"native_options_present").boolean,"actual union artifact changed");
+  const auto mapping=o::parse(call(R"({"type":"dict","items":[[{"type":"tuple","values":[{"type":"str","value":"A"}]},{"type":"int","value":9007199254740993}]]})"),"membership");require(mapping.admission&&mapping.admission->entries[0].second.value=="9007199254740993","ignored mapping value lost");
+  const auto framed=o::parse(call(R"({"type":"list","values":[]})",R"([{"key":"parameters","value":{"type":"dict","items":[[{"type":"str","value":"variants_df"},{"type":"pandas.DataFrame","file":"variants_file"}]]}}])"),"membership");require(framed.frame_entry==0&&framed.parameters&&framed.parameters->at(0).value.is_null&&framed.parameters->at(0).value.key=="variants_df","direct table union placeholder changed");
+  const auto bom=o::parse(std::string("\xef\xbb\xbf",3)+"\r\n"+call(R"({"type":"int","value":9007199254740993})"),"top_k");require(bom.criterion.value=="9007199254740993","BOM changed raw number slice");
+  for(const auto& bad:std::vector<std::string>{R"({"type":"str","value":"a","\u0076alue":"b"})",R"({"type":"int","value":1.0})",R"({"type":"float","hex":"0.1"})",R"({"type":"pandas.Timestamp","iso":"2026-01-01T00:00:00+00:00","resolution":"ns","timezone":null})",R"({"type":"pandas.DataFrame","file":"variants_file"})",R"({"type":"enum","module":"wrong","name":"POSITIVE","value":{"type":"str","value":"positive"}})"}){bool rejected=false;try{(void)value(bad);}catch(const std::invalid_argument&){rejected=true;}require(rejected,"malformed packed control accepted");}
+}
+}
+int main(){try{check();std::cout<<"private pandas variants exact carriers and actual controls passed\n";}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}return 0;}
