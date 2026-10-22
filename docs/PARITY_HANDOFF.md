@@ -14,7 +14,89 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: UTF8 history metadata and hardened gates — 2026-10-22
+## Current continuation: logical-member metadata and scope guards — 2026-10-22
+
+`64cd994e` adds the discovery-only
+`name-data-base64-four-field-members-v1` profile. The accepted parser SHA256 is
+`a9685b98c47dfcaf5728cece2b450f09cc7abfbdffaac17cd5e5c2247336bf03`;
+tests SHA256 is `b7101f0d397f55167a7ba362798d7b46b6374776b8f6abd9b5eb33b708b24d73`.
+All **73 receipt-tool tests** pass, plus **44 independent synthetic checks**.
+The earlier private nested-key materialization failure and its frozen draft
+remain preserved. The new lexical skip applies only to this explicit profile.
+
+Root output: `build/parity-closures/streaming-four-field-root-acceptance-1/`.
+The bounded actual metadata run finished terminal0/drained as direct exec chunk
+**41130a** (no ongoing session handle). Exact source/producer/sidecar/review
+bindings were checked before preparation and after completion. It recovers all
+**776 unique names and logical size declarations**, comprising **733 ordinary
+logical members and 43 binary slices**. Header/count/name uniqueness checks
+pass, but **one header/summary/binary-mapping gap remains unadmitted**. No
+payload was decoded. Raw events: 674,530 bytes, SHA256
+`0582bc65315f3c98d230d7bdf90f3dec7f7a3c3651b0d39ea23af77d12b54b29`.
+The one-hit cache replay matches every event after removing only `cache_hit`.
+
+Independent review matches all 776 original source/ordinal/declared-SHA edges,
+650 source-name SHA mappings, and all 43 binary-slice names/counts/sizes against
+eight sidecar series. The **733 ordinary member sizes remain declarations**;
+the sidecar has no complete ordinary-size inventory. No member byte/hash or
+whole-file mapping was freshly verified. Review:
+`four-field-actual-metadata-independent-review-1/review.json`, SHA256
+`4d7fd164b9266a775ede3ff96e31aa58f3e8cd054d40e0a752a083041b24d0c5`.
+
+Both fresh regression runs are terminal0/drained: LTL session **90351** preserves
+all **1,401** original receipt identities in three verified sets with zero gaps;
+UTF8 session **67744** preserves 12,313 members and all 52 boundary gaps. Both event files
+are byte-identical to accepted parser196 outputs. Read
+`streaming-four-field-root-acceptance-1/final-regression-validation.json`.
+
+**Never run the old projector17f6 on logical-member events.** The new reviewed
+helper is `full-member-projection-scope-guard-1/revision-2/project-declared-full-member-candidates.py`,
+SHA256 `0031b63eca56737ff8468ac5a3d44875b7bc9483efeb933aafb523efb7988e8e`.
+It refuses the known four-field schema even with missing/false logical flags,
+and also refuses explicit logical/slice/unavailable-source identities. All
+eight tests pass, including six synthetic CLI projections and exact old/new
+six-table/view comparison for prior unscoped declarations. The first guard's
+schema bypass and its preserved counterexamples remain evidence, not acceptance.
+
+Actual scope projection is terminal0 in `four-field-scope-projection-root-1/`.
+It retains all **776 original member-metadata edges and 776 refusal gaps**, with
+`identity_id=NULL`, `full_declaration=0`, zero full-file keys and zero flat
+matches. The wide header gap also remains. SQLite: 2,150,400 bytes, SHA256
+`e86dbd21d70e099098a7438674d7922c519f380ab85722182ec731c7f987fb97`.
+Independent input/output/event/SQL review found no issues:
+`four-field-scope-projection-independent-review-1/review.json`, SHA256
+`c3cc42dc4b2827f3c867573aeaf681e26d370a5b1f19b6e703bd52434e737306`.
+
+Preserved in `303193c6`: `docs/retained-public-observation-four-field-checkpoint.jsonl.gz`,
+**108 members / 1,490,413 bytes**, SHA256
+`dbf900c80daa06d8f44a782124d965bd45f92014acc682bcb549106082d0ceb9`.
+Root checked every member against its original exact UTF8 bytes. Eleven external
+metadata bindings retain caches/databases/baselines/full sidecars without
+embedding them; original archives are only declaration-bound and unopened by
+the packager. The capsule includes all failed drafts and independent reviews.
+
+The next key-wrapper review identifies two exact sources with **416 file rows
+and three public report/cases wrappers**. Some keys are logical aliases such as
+`final-source/` or `head-source/`; `origin_path` is provenance only and must
+never be followed. The wrappers preserve partial historical observations,
+including saved error/graph aliases, not complete canonical receipts. Keep
+values opaque and gapped; producer counts do not establish absence. Review:
+`grouping-history-key-wrapper-schema-review-1/report.json`, SHA256
+`7df2a2270cbc8740749bea3b4044d86a195cb2d17dd9115342674757776a3b02`.
+An isolated adapter/review is in progress under
+`streaming-key-wrapper-{development,independent-review}-1/`; it has not changed
+the accepted parser or run against real archives. Future projection must also
+guard the new schema explicitly before use.
+
+All **86 packages / 387 modules** remain in scope, with **46 packages and 226
+modules complete; 201 strict open units**. This checkpoint calls no reference
+algorithms, admits no public members, and issues no new-family entry certificate.
+The six banks remain 565 unentered logical queries. Continue complete relevant
+flat/archive provenance, original full-receipt reconstruction and whole-bank
+dedup before entering new calls. No catalogue row is promoted by metadata alone.
+Do not restart the completed 2,844-source discovery or replay retained calls.
+
+## Previous checkpoint: UTF8 history metadata and hardened gates — 2026-10-22
 
 `ec8a792f` adds discovery-only `utf8-name-text-members-v1` and prevents direct
 chunk admission before parser construction. `f94eb500` preserves hardened
