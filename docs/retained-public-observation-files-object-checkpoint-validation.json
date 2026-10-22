@@ -1,0 +1,1375 @@
+{
+  "kind": "validation",
+  "schema": "minera-retained-public-observation-files-object-checkpoint-v1",
+  "capsule_contents_metadata_only": true,
+  "source_commit_reported_by_root": "ed4dfdbe",
+  "final_parser_sha256": "4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106",
+  "final_tests_sha256": "a660b8742b34c6468514472e2a66380ca65cc7482a5669b6f9d772cd4f450bd7",
+  "embedded_members": 199,
+  "source_bindings": [
+    {
+      "path": "build/parity-closures/adopt-files-object-reviewed-parser-1.py",
+      "bytes": 2462,
+      "sha256": "e0d6ce09aa4075ac1e2fe1ebcd67f9aba0e22db3f49d2f0fb91ddfa0d7b96ee1"
+    },
+    {
+      "path": "build/parity-closures/check-and-bind-files-object-terminal-1.py",
+      "bytes": 5956,
+      "sha256": "c9fdf86b10d712eca2491b0668fae8e4bbfbceb824771d1b5be4208b9309bb21"
+    },
+    {
+      "path": "build/parity-closures/check-files-object-regression-final-1.py",
+      "bytes": 3542,
+      "sha256": "f8c4f19069ebee9ae150b4ef4e49bebda8407164d6ad7558f93471ee52e0e04d"
+    },
+    {
+      "path": "build/parity-closures/check-streaming-positive-receipts.py",
+      "bytes": 1914,
+      "sha256": "51563bdcd726a6cec411f6931fe357033277e11804c6e569068b0e5646790254"
+    },
+    {
+      "path": "build/parity-closures/files-object-actual-metadata-independent-review-1/new-289-member-metadata-declarations.jsonl",
+      "bytes": 146805,
+      "sha256": "22374ae9840da235bbb7c006acb78b0cc5e0ce8db7c73e32d570e2b1b88ee4a1"
+    },
+    {
+      "path": "build/parity-closures/files-object-actual-metadata-independent-review-1/review.json",
+      "bytes": 13614,
+      "sha256": "5e44e4de6035760a75c8dcc5901199d05c2926c5afa131193d00a559bd64215d"
+    },
+    {
+      "path": "build/parity-closures/files-object-actual-metadata-independent-review-1/review.py",
+      "bytes": 13825,
+      "sha256": "3a294241a5ca76a50f1b591a9c2888b8374cdf76348d370ec52738e9d82d94c0"
+    },
+    {
+      "path": "build/parity-closures/files-object-checkpoint-package-plan-1.json",
+      "bytes": 64750,
+      "sha256": "97b5508b2384d5ffbd070542d13e9d36b707cb37d49f1d4bd74f9abbca8007b9"
+    },
+    {
+      "path": "build/parity-closures/files-object-handoff-independent-review-1/review.json",
+      "bytes": 6543,
+      "sha256": "d7089018cab98727b5075ba04c468187613875f9abcc48c058448edcc8939525"
+    },
+    {
+      "path": "build/parity-closures/files-object-handoff-independent-review-1/review.py",
+      "bytes": 9741,
+      "sha256": "c0355e630fc4b5b082a9abdfecc26a18b34277cdab7811940ca20221d124e2fb"
+    },
+    {
+      "path": "build/parity-closures/files-object-handoff-independent-review-1/reviewed-current-section.md",
+      "bytes": 5712,
+      "sha256": "b58467a0a0e075db82b6ca6d6d5f82ce310d5514daef1b422f9ca75a3cfd8b45"
+    },
+    {
+      "path": "build/parity-closures/files-object-scope-projection-independent-review-1/independent-guard-tests-15.json",
+      "bytes": 2641,
+      "sha256": "a9b892c6bae9446ea7229b2be18af2bdebfe1eb37de462c36f7fe75200faed94"
+    },
+    {
+      "path": "build/parity-closures/files-object-scope-projection-independent-review-1/review.json",
+      "bytes": 5163,
+      "sha256": "65eea4eb712b01dcb99e04009e8d5f949a58a12e027582cab34902dbbd88cee0"
+    },
+    {
+      "path": "build/parity-closures/files-object-scope-projection-independent-review-1/review.py",
+      "bytes": 12449,
+      "sha256": "159755ed393b3e90b2f5b5ef1bc6c0f89219748a31aa7eb9ea26dc6be6555188"
+    },
+    {
+      "path": "build/parity-closures/files-object-scope-projection-independent-review-1/reviewed-guard-diff.patch",
+      "bytes": 2340,
+      "sha256": "1b2267a4c81c0f0bb554fb5a42ae879cae82baadbc73b6370626519b3783666f"
+    },
+    {
+      "path": "build/parity-closures/files-object-scope-projection-independent-review-1/reviewed-queries.sql",
+      "bytes": 1041,
+      "sha256": "e3af3b7162ba6d89b7e941f0c3acb6e5412c80da85ace48ca02f4206bd3d020b"
+    },
+    {
+      "path": "build/parity-closures/files-object-scope-projection-root-1/queries.sql",
+      "bytes": 339,
+      "sha256": "1969ac35baefa24681d08212104b62d278dba287abac027eaf60adbe68ba8837"
+    },
+    {
+      "path": "build/parity-closures/files-object-scope-projection-root-1/validation.json",
+      "bytes": 3140,
+      "sha256": "9b20b908c5284bcb3d891f3b7a312bf5d8494de74c1944f9bf63b17d1212a940"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/design.json",
+      "bytes": 2004,
+      "sha256": "2302318637515d3c2696a02b0bc51f6568a0832c71c717cee6dd97174d3ace0b"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/freeze-1.json",
+      "bytes": 1334,
+      "sha256": "fbbf30f0b6422731444f421b1533f5dd860b8bc728e407ca78aea74b60cedd4d"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/frozen-original-projector-17f6.py",
+      "bytes": 17494,
+      "sha256": "17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/preserved-input.json",
+      "bytes": 220,
+      "sha256": "352f5329275aeda9064dd7e4fc6385047021220d69d8fd9fd80d07d77a3fa57d"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/project-declared-full-member-candidates.py",
+      "bytes": 18823,
+      "sha256": "fecb780f17f41471d3802b33ca99124241b876601e351b05c6547ad1183cf6e3"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/design.json",
+      "bytes": 2623,
+      "sha256": "b06fa54ba967e6f1940e7af0eb88ff5bc9c62464d5814e80654d7d6e4a0f1f68"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/freeze-1.json",
+      "bytes": 1334,
+      "sha256": "fbbf30f0b6422731444f421b1533f5dd860b8bc728e407ca78aea74b60cedd4d"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/freeze-2.json",
+      "bytes": 3266,
+      "sha256": "ee127fcc15de316a54b054e395c34bbc33feae421e5d7be44ac4e297e1ee3460"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/frozen-original-projector-17f6.py",
+      "bytes": 17494,
+      "sha256": "17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/preserved-input.json",
+      "bytes": 220,
+      "sha256": "352f5329275aeda9064dd7e4fc6385047021220d69d8fd9fd80d07d77a3fa57d"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/prior-revision-bindings.json",
+      "bytes": 1289,
+      "sha256": "2401d08f3b5d75afb232511697afbfeedaa210b12ae86b2e5a17c88bcd73dd95"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/project-declared-full-member-candidates.py",
+      "bytes": 19052,
+      "sha256": "0031b63eca56737ff8468ac5a3d44875b7bc9483efeb933aafb523efb7988e8e"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/synthetic-suite-final-2.txt",
+      "bytes": 106,
+      "sha256": "431e8b0aad46c063e844e6b865cbfa8102fc34da82ed74f75ead27d68fb9e7ab"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/test_projection_scope_guard.py",
+      "bytes": 12687,
+      "sha256": "558ed26cfdb3183be969ecac88db480f95b77eb56d5d6a8dd495409929f120e1"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/validate-frozen-revision.py",
+      "bytes": 1809,
+      "sha256": "e198656a0c178bf2888283e2a04ac722e4a8956793c5a665722edd125658fe32"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/validation-final-2.json",
+      "bytes": 1071,
+      "sha256": "5bd63bd3b8e99208a43e976f812ba1adc7206e4f3205c98970c4f9c900d048f3"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/design.json",
+      "bytes": 2076,
+      "sha256": "fbde4757d6a723c768026f8eeb8caec25b8afe3fca1b997c66ec7b9695fb4e36"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/freeze-3-corrected-1.json",
+      "bytes": 3155,
+      "sha256": "6bff9e7d07339b0606f30b38ff308ce0ff89a2bc5d94d50e04aa620bcc151fef"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/frozen-original-projector-17f6.py",
+      "bytes": 17494,
+      "sha256": "17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/frozen-revision-2-design.json",
+      "bytes": 2623,
+      "sha256": "b06fa54ba967e6f1940e7af0eb88ff5bc9c62464d5814e80654d7d6e4a0f1f68"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/frozen-revision-2-freeze.json",
+      "bytes": 3266,
+      "sha256": "ee127fcc15de316a54b054e395c34bbc33feae421e5d7be44ac4e297e1ee3460"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/frozen-revision-2-projector-0031.py",
+      "bytes": 19052,
+      "sha256": "0031b63eca56737ff8468ac5a3d44875b7bc9483efeb933aafb523efb7988e8e"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/frozen-revision-2-tests-558e.py",
+      "bytes": 12687,
+      "sha256": "558ed26cfdb3183be969ecac88db480f95b77eb56d5d6a8dd495409929f120e1"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/project-declared-full-member-candidates.py",
+      "bytes": 19112,
+      "sha256": "d50727b7cb0d36d5081cff018e3df6115dee0c611ceb8b80ba8da88741005e51"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/reviewed-revision2-diff.patch",
+      "bytes": 2230,
+      "sha256": "abaeda95a4ef08a1bc478ecd91207e4cc71d0f56946bf3127b68c86e5a4f886a"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/synthetic-tests-1.json",
+      "bytes": 2147,
+      "sha256": "e47364f76e3f12a11bdf110704681265b353d56cdce1db2dd55c0510ee4bea8b"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/corrected-1/test_projection_scope_guard.py",
+      "bytes": 18090,
+      "sha256": "b22eb96f22b3f512907b58ef0ae6ade96d7872bb25c7de8cebe65674e554b00a"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/design.json",
+      "bytes": 1601,
+      "sha256": "860b0eaf6329c2c9ab27f293c9587cdeb18ff686a3a801a388eddcf56517b2af"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/freeze-3.json",
+      "bytes": 2920,
+      "sha256": "5ed43098b656280e71c717d07c957493814c1e0a2618bee55db9f7b1c8fb41f6"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/frozen-original-projector-17f6.py",
+      "bytes": 17494,
+      "sha256": "17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/frozen-revision-2-design.json",
+      "bytes": 2623,
+      "sha256": "b06fa54ba967e6f1940e7af0eb88ff5bc9c62464d5814e80654d7d6e4a0f1f68"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/frozen-revision-2-freeze.json",
+      "bytes": 3266,
+      "sha256": "ee127fcc15de316a54b054e395c34bbc33feae421e5d7be44ac4e297e1ee3460"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/frozen-revision-2-projector-0031.py",
+      "bytes": 19052,
+      "sha256": "0031b63eca56737ff8468ac5a3d44875b7bc9483efeb933aafb523efb7988e8e"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/frozen-revision-2-tests-558e.py",
+      "bytes": 12687,
+      "sha256": "558ed26cfdb3183be969ecac88db480f95b77eb56d5d6a8dd495409929f120e1"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/project-declared-full-member-candidates.py",
+      "bytes": 19112,
+      "sha256": "79fca5d0b607f4e3a2e0e7d9189e37693957a5a8d7bcaf33275eafa6555346ff"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/reviewed-revision2-diff.patch",
+      "bytes": 2220,
+      "sha256": "39296352589e1f002d8e2bf0f7a2010f8c0b43926fd148aa765706f1459e70c0"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/synthetic-tests-1.json",
+      "bytes": 2328,
+      "sha256": "bbf58252bcdd0f28287dec9c220c7b05031de17e5854c12b784c858634528c78"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-3/test_projection_scope_guard.py",
+      "bytes": 17550,
+      "sha256": "482c441d4d3b5e96b9751ae15092ddfad1dafd5fbda72802a6ef176d8f60a75e"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/design.json",
+      "bytes": 2594,
+      "sha256": "f33c5a09e13e328140fdec9914b2506d16cc015e63816fd26e23d434bf229d6b"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/failed-synthetic-1/failure.json",
+      "bytes": 550,
+      "sha256": "22c6011578d8ab981ae322e6218c4f832e56dac345676b48beb1f8697e13167c"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/failed-synthetic-1/project-declared-full-member-candidates.py",
+      "bytes": 19314,
+      "sha256": "261e46800114540b3372357bdbd96f2c548ba8460c0e3d304121e72ac70ecac7"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/failed-synthetic-1/test_projection_scope_guard.py",
+      "bytes": 23719,
+      "sha256": "209c40e79d8800e6bce1de34e096357dedd64331a6ec192c4fe3667ebcc3c4e4"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/freeze-4.json",
+      "bytes": 5884,
+      "sha256": "773173c3efe88f55f5535979d395f51cc5fb5ee084fda37dd2c615113caaf5f0"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/frozen-corrected-3-design.json",
+      "bytes": 2076,
+      "sha256": "fbde4757d6a723c768026f8eeb8caec25b8afe3fca1b997c66ec7b9695fb4e36"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/frozen-corrected-3-freeze.json",
+      "bytes": 3155,
+      "sha256": "6bff9e7d07339b0606f30b38ff308ce0ff89a2bc5d94d50e04aa620bcc151fef"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/frozen-corrected-3-projector-d507.py",
+      "bytes": 19112,
+      "sha256": "d50727b7cb0d36d5081cff018e3df6115dee0c611ceb8b80ba8da88741005e51"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/frozen-corrected-3-test-log.json",
+      "bytes": 2147,
+      "sha256": "e47364f76e3f12a11bdf110704681265b353d56cdce1db2dd55c0510ee4bea8b"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/frozen-corrected-3-tests.py",
+      "bytes": 18090,
+      "sha256": "b22eb96f22b3f512907b58ef0ae6ade96d7872bb25c7de8cebe65674e554b00a"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/frozen-original-projector-17f6.py",
+      "bytes": 17494,
+      "sha256": "17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/frozen-revision-2-projector-0031.py",
+      "bytes": 19052,
+      "sha256": "0031b63eca56737ff8468ac5a3d44875b7bc9483efeb933aafb523efb7988e8e"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/previous-bindings.json",
+      "bytes": 1691,
+      "sha256": "9ffa47fd09354908afa251b91dba147655ddea17a3570ab74f73cc3226bf695c"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/project-declared-full-member-candidates.py",
+      "bytes": 19314,
+      "sha256": "261e46800114540b3372357bdbd96f2c548ba8460c0e3d304121e72ac70ecac7"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/reviewed-d507-diff.patch",
+      "bytes": 2364,
+      "sha256": "b7824a78e02bed9f462cf91d7f7ac412ba8a3b11a0f8f5817dd0981418019f33"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/synthetic-tests-1.json",
+      "bytes": 2636,
+      "sha256": "11f2e25be07bc49519326098d414cfdcabe1031430f9934a724800331fd4bac1"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-4/test_projection_scope_guard.py",
+      "bytes": 23587,
+      "sha256": "8caa4ce76be897c67b200c982fdd2be043e063633f06908823dbd35fc9fbcac8"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/synthetic-suite-final-1.txt",
+      "bytes": 103,
+      "sha256": "082453ab6d6aea0ed355d9907f5d6b32712cbaf5a755f9b83b430ffa6c8e0efb"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/test_projection_scope_guard.py",
+      "bytes": 8990,
+      "sha256": "0dd4ccc357ac62216ad723cdadc2043b9c019f6f947477e2246f0855af254222"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/validate-frozen-draft.py",
+      "bytes": 1756,
+      "sha256": "6c0ab7c2c0278de3eca369acb1c923bdf9a083db10fbfbc4c61966bb2adf3595"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/validation-final-1.json",
+      "bytes": 1299,
+      "sha256": "2400485ce756f08b0f3e3cf98723b7d7a57954ffef37ac98666d0458dc49fcd7"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-object-wrapper-schema-review-1/prepare-review.py",
+      "bytes": 17604,
+      "sha256": "04a9078e8ba2c78c623144ecdf2e450fa69fb5bdc6eef14c58df0fc2996c45be"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-object-wrapper-schema-review-1/report.json",
+      "bytes": 73664,
+      "sha256": "59de627eab160ba29089e07edd8b0048eca88c0204e344d9e60b20bb3ffc5cc9"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-object-wrapper-schema-review-1/selected-producer-sidecar-metadata.json",
+      "bytes": 18693,
+      "sha256": "2c98a4e6d8c6834900ab339119e3ba7e16b867b6b6f24ce0bb82e1f6188d74d8"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-object-wrapper-schema-review-1/source-classification-map.json",
+      "bytes": 150812,
+      "sha256": "21d974d997b18154d7c507bf816eec15cf8dcf95d5608da28ab9e5ce351d95b5"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-object-wrapper-schema-review-1/source-metadata-map.json",
+      "bytes": 188441,
+      "sha256": "dea4069d3cb355754bdfc70d76aaa9e0c4895ef0d79023748222be248d4b0977"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-object-wrapper-schema-review-1/validate-review.py",
+      "bytes": 3045,
+      "sha256": "a89b14aa32c8b184f0e8ea24ced12b7b957212573589ed6507abf54974601a41"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-object-wrapper-schema-review-1/validation.json",
+      "bytes": 1175,
+      "sha256": "05451441c88567c2289bbd145979f53cf54687c1a4ba72f49f931611ac19cb72"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-independent-review-1/mapping-relations.json",
+      "bytes": 6141,
+      "sha256": "7c20058d7545535426d71e0d94b16d23af01cfea3a45c3eeccec4bb83344dc48"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-independent-review-1/next-narrow-audit.json",
+      "bytes": 2273,
+      "sha256": "44509819be8a2143dcb6020fee4f2d1466d201f399e8c4678334b44174d4a750"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-independent-review-1/review.json",
+      "bytes": 5500,
+      "sha256": "29765d14d8c8ce66106ab84b2d17c0f0f3b2014ddc6c0e08e0f8ae14cec9af0c"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-independent-review-1/review.py",
+      "bytes": 11398,
+      "sha256": "be18a9e739ec0cd988a20e071326b424b42e03a1a22b03a635e57459d92a85f1"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-prepared-1/manifest.json",
+      "bytes": 6913,
+      "sha256": "d233556542203e29db3c8ee9992cfacb7cb016c808ec00a03e5d578b9c660e32"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-prepared-1/preparation.json",
+      "bytes": 6642,
+      "sha256": "9ac276f6ae28f2cf855aaf627de758ef1c650e7a2937844503865722afef0fc2"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-prepared-1/prepare.py",
+      "bytes": 8673,
+      "sha256": "7935727fa3bd0fa4213122b70fd619243d718bfdd0ce55bb44ccd3e7f7a18bc8"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-prepared-1/verify-root-only.py",
+      "bytes": 10600,
+      "sha256": "94be9186ef93984918d76093451d5a9ade5831c03d12ffd9cf2b361e1067fd56"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-root-1/report.json",
+      "bytes": 7972,
+      "sha256": "15deb2e99cfdccf6b88fcfc9c06bfff3b3d9800aa98207a2a0fddf41b35133ca"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-root-1/source-01.json",
+      "bytes": 1060,
+      "sha256": "3b35b113cb640060023c0352a274de2f97d7ef3bd19215e8c5584dc8a39522bb"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-root-1/source-02.json",
+      "bytes": 1075,
+      "sha256": "e9df98998e60653aa961ae78c88cf56af517054f83c9d1ed07a5610e6769c8a6"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-root-1/source-03.json",
+      "bytes": 1047,
+      "sha256": "04aa7a19cca22cf049fbba38a7b3cc2c10b318364f459aaf46e306ba175ae75d"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-root-1/source-04.json",
+      "bytes": 1068,
+      "sha256": "d08998a7b05224f6f07fa522cfc423d27b8a0a8f36c2e10de85f61001b959345"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-root-1/source-05.json",
+      "bytes": 1115,
+      "sha256": "bcafbb309b2d3b565db4d45d2b45472dc0d9742d2f5752295b346c77b3f33f30"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-opaque-uncompressed-root-1/terminal-receipt.json",
+      "bytes": 590,
+      "sha256": "9bec4dbe8c4b2e2a6003b3645bc0cf7c6d985b1b60c3facf7bab9d68fabab04e"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/exact-source-bindings.json",
+      "bytes": 57860,
+      "sha256": "5c0e4903def83e9bce41010c8e67cf7c7e73aa0f64ed4a78885eec0418dfc0b2"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/mismatch-and-unmatched-corrections.json",
+      "bytes": 60,
+      "sha256": "04e1675fa749c9dd17cd43fedb8edb7cad4dde8f061392363c766ac33c2cac81"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/original-gap-events.jsonl",
+      "bytes": 7646038,
+      "sha256": "ad41e273921ed10cb709d75c59f60c831680f16c2954a84668b4ed862c433982"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/original-path-gap-overlay-relations.jsonl",
+      "bytes": 58305348,
+      "sha256": "7eb72204e36e24840df1514629eb6613e8688ef13e0c60b56ff75d2ec804ed55"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/report.json",
+      "bytes": 10902,
+      "sha256": "bbe3d6e74100b6edce2bd40b4d6d1ba01da10431483b6453495210b0557b7b62"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/residual49-metadata.json",
+      "bytes": 168665,
+      "sha256": "5c38df98841bf215018a3df2fa85e0150a7297c3e524e8b117c836ebc09aacd5"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/review.py",
+      "bytes": 16683,
+      "sha256": "630d8d5cb9cd3db7fdbdeb2462bb9f61ca28720bfb440c6bb5623e9353af5dae"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/validate.py",
+      "bytes": 4582,
+      "sha256": "1acf223fb0ceefcffa5c5c15cfac805911e81cdefe744683be83ba2ec93af57d"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-path-gap-overlay-review-1/validation.json",
+      "bytes": 2021,
+      "sha256": "508732b591eed1c45607bedf001b0d7358e71c850c8445d24776433055e47745"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-residual-root-schema-review-1/report.json",
+      "bytes": 8806,
+      "sha256": "c0a453d45da8deb1cff8d3bc8ae5502ea52af71b18a2992096092729eda9b529"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-residual-root-schema-review-1/review.py",
+      "bytes": 15216,
+      "sha256": "c8f6bfa3458ed8204f1dc6da90cafa4bfd892c6da88b9e7b80c222c7cea4c9dd"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-residual-root-schema-review-1/selected-metadata.json",
+      "bytes": 37093,
+      "sha256": "6adcb3035a3948a07ceecc61315bb74aed8206c398910d1cc0685a7298db8e41"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-residual-root-schema-review-1/validate.py",
+      "bytes": 3812,
+      "sha256": "2df52a8fb636ab0555fad3cad497ef7a26aa7f28d48366d86d23136f952463eb"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-residual-root-schema-review-1/validation.json",
+      "bytes": 2280,
+      "sha256": "01a7079db4d992bb783a50496079a8f1412751fcedee5a337c8a3ecca35695ce"
+    },
+    {
+      "path": "build/parity-closures/package-retained-public-observation-files-object-checkpoint.py",
+      "bytes": 18853,
+      "sha256": "f7e9e3c8044a4ef0919010b221e061fd06dac87598f014c11bfd0ef7e70ed68a"
+    },
+    {
+      "path": "build/parity-closures/prepare-files-object-regression-1.py",
+      "bytes": 763,
+      "sha256": "3f38c2af83f57807f20cb244a4ecd411568a12c2d3dd97a015ce44d8b771fa23"
+    },
+    {
+      "path": "build/parity-closures/prepare-files-object-root-inputs-1.py",
+      "bytes": 4359,
+      "sha256": "d02e69654ceb6a96314adab9d12bc6bb57e38c283481d150eed49af56124d362"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/final-revision-2-review.json",
+      "bytes": 3693,
+      "sha256": "45e2e422251efafd683fe81616d8521ae7dd00d082e15143d95a26891c4bb6d0"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/final-revision-2-review.py",
+      "bytes": 5339,
+      "sha256": "7ee0c7d0a37e379e9583311a3faeefdfa758cf645904bfafb2c050e0fedf30d7"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/initial-fecb-review.json",
+      "bytes": 1991,
+      "sha256": "4b2dd5fba7a9e6f967c18d03e0f4e06b944a3b00dcf419245eb592b2a78b252b"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/initial-fecb-review.py",
+      "bytes": 2370,
+      "sha256": "ec3919716cc1fd15076e1d57e88976bf78baee6dbecaadc2606c01c9f0e8753f"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/reviewed-revision2-vs-fecb.diff",
+      "bytes": 2108,
+      "sha256": "efd66b1b3a254cf720ca6d41772086be500abfa91516260674261a875b03d460"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/design.json",
+      "bytes": 17696,
+      "sha256": "253804420c9679c1deb5eff433609b01f325f0a6d1c3a1601534564d7173434a"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/freeze-1.json",
+      "bytes": 2285,
+      "sha256": "02fa317deea579fd0bde104455e86e24f17832d56da8a255ead9f3197ccc94d6"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/frozen-parser-2dacc.py",
+      "bytes": 73024,
+      "sha256": "2dacc29e9cb14cfab370a953d28d0cd1640bf0aa352934db6b0cbace4b9f6061"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/frozen-tests-e832.py",
+      "bytes": 63328,
+      "sha256": "e832a5452c5a93b83c766f19983742e92d1924cab2bdb8465962b2f221c78c4b"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/initial-draft-1/retained_public_observation_inventory.py",
+      "bytes": 86550,
+      "sha256": "4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/initial-draft-1/test_retained_public_observation_inventory.py",
+      "bytes": 79619,
+      "sha256": "a660b8742b34c6468514472e2a66380ca65cc7482a5669b6f9d772cd4f450bd7"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/preserved-inputs.json",
+      "bytes": 582,
+      "sha256": "df40bc00b3f092044a0a85a0294b42130ca27eeb4f99d9133ec44bc996131c75"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/retained_public_observation_inventory.py",
+      "bytes": 86550,
+      "sha256": "4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/synthetic-suite-final-1.txt",
+      "bytes": 164,
+      "sha256": "8b28ea1d773cd1237f59abf40ad87004e94c0d706fea9ef1de549d875b48c12d"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/tests/test_retained_public_observation_inventory.py",
+      "bytes": 79619,
+      "sha256": "a660b8742b34c6468514472e2a66380ca65cc7482a5669b6f9d772cd4f450bd7"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/validate-frozen-draft.py",
+      "bytes": 1879,
+      "sha256": "94f0f6b14502e0bf8d5a7ee81f97e805550cf56a331b670e53ddf032d58211ea"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-development-1/validation-final-1.json",
+      "bytes": 1472,
+      "sha256": "9bee11c7d1cb7457779070413997053f3695a05af7c3de7ec12c0d3f7ac2f036"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/correct-independent-harness.py",
+      "bytes": 1328,
+      "sha256": "7c6458781bbd52e26a10dee6316edc836d8de110c516c432f9a3500df14e439b"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/final-review.json",
+      "bytes": 6736,
+      "sha256": "7e6a36c28c715b3c45583179a18933bbbcc8c7a9220177c29513df379d54af75"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/independent-synthetic-checks-failed-1.py",
+      "bytes": 13731,
+      "sha256": "66e48b471f9c529f5c226b4946acf53592b5a05b15590300e537dc37822fbb0b"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/independent-synthetic-checks.py",
+      "bytes": 13909,
+      "sha256": "7a3d58aa5527edcb6086d1c2a98bec4535bb57496cb99e93c179e7702e44c249"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/producer-design-review.json",
+      "bytes": 12777,
+      "sha256": "0763da547f01dc0f3d41526b49d066035356f7d1d03f05c192b5aee3f8083347"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/producer-design-review.py",
+      "bytes": 5644,
+      "sha256": "56c6eb5675cbdeadfcbe6f855a7191ca3ab342a1215da28b1abcd930e8d40dd7"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/save-final-review-2.py",
+      "bytes": 6674,
+      "sha256": "638d745347f8b2d245cdc4287ef60f7e2c4a2b76ba24490ee98c76fdcf67471c"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/save-final-review.py",
+      "bytes": 6675,
+      "sha256": "16b61a448ee5956a4530ba43943f618611dc153dc6b6bbd346f0ebbc40b5c771"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/synthetic-checks-1/failure.json",
+      "bytes": 446,
+      "sha256": "5d2c3265d7ffa69a5937fdce77e4dd7b4d5e159cbdb8452a331b0dce916848fc"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/synthetic-checks-2/draft-suite-65.json",
+      "bytes": 11310,
+      "sha256": "dee751b86439b951f71e0543efb869b86a24397ed7b003c48069a091e6381b56"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/synthetic-checks-2/results.json",
+      "bytes": 12428,
+      "sha256": "b3da6efe65aacc0ca1822684d06e11574797b7c02385121067e0ff227c3c55ce"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-independent-review-1/synthetic-checks-2/reviewed-base-diff.patch",
+      "bytes": 17602,
+      "sha256": "f107b9b52a24e7dfcd2e26043f34d29893518c1ba4ebe53478e768d14d1ba750"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/combined-tests-first.log",
+      "bytes": 18076,
+      "sha256": "d0b051458c7b2e0f95c4d85272da839e1ad71ccd6f436b731aa1b5728124b63f"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-cache-events.jsonl",
+      "bytes": 307579,
+      "sha256": "37efcb3915d5aece7ae9e8e968936d2750c23851b7f672f05ca56919f43f575e"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-cache-report.json",
+      "bytes": 1093,
+      "sha256": "de5d6495a586eff7be41ceda685124d8626d53bbabc5451f1ccd88d077d0a7ca"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-cache.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-events.jsonl",
+      "bytes": 306413,
+      "sha256": "c86307f9f19579bab91e43c508497bc133b9a65de34f35de9b2bd69fa23f0fe1"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-manifest.json",
+      "bytes": 11029,
+      "sha256": "b0fcf051538884b89311d0c25f6e4c27779a25dccb6099115bab5a7f3234524a"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-report.json",
+      "bytes": 1073,
+      "sha256": "9c60646138116c48bf3b5102699a947c43b2fcf71a98c05674e97a3970456ec6"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-root-check.json",
+      "bytes": 1461,
+      "sha256": "2a8a408405a9c1385f17d4f9d56ee48971ed376090850a94c1daaeba40650fe6"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/files-object-terminal-receipt.json",
+      "bytes": 1396,
+      "sha256": "9bc8a1fb6997e65305fd4c085e780bd950e895fc7d88832d2cf97e80a8eb13f9"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/final-regression-validation.json",
+      "bytes": 2818,
+      "sha256": "b2ac9d70c869dd4ef9391ae299da27e7f63949b50e59ac40419b805d44cb6582"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/frozen-parser.py",
+      "bytes": 86550,
+      "sha256": "4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/frozen-tests.py",
+      "bytes": 79619,
+      "sha256": "a660b8742b34c6468514472e2a66380ca65cc7482a5669b6f9d772cd4f450bd7"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/key-wrapper-events.jsonl",
+      "bytes": 485784,
+      "sha256": "0b407279fae0926979552cefdadbcfb23d46869296c55c4daa86a20150827608"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/key-wrapper-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/key-wrapper-manifest.json",
+      "bytes": 3534,
+      "sha256": "a101d84b13b4da95a247882780b5dc92f53a24b5d3093bdfc1b0af56c2f9a0c1"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/key-wrapper-report.json",
+      "bytes": 1091,
+      "sha256": "82868132a7f63b9fa9440c7ddc93c3b54d5e7b1b3b7d90aa0e853143865520a7"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/preparation.json",
+      "bytes": 4943,
+      "sha256": "283cfdeb1862a3e27e8269d701b7897ce3ba55f13566f49e060d329af20dd8f4"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/projection-first.log",
+      "bytes": 254,
+      "sha256": "023f6c5a617a9fdec21cc33717b6370a849ff6621a7733474269fd831a46c11b"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/projection-guard-tests-first.log",
+      "bytes": 2867,
+      "sha256": "6095eaae4b267c3cf0dfa64a06fedb486efc1dec1e0fe0822635882ed68f5927"
+    },
+    {
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/root-adoption.json",
+      "bytes": 564,
+      "sha256": "9b86ceea1413b02a6649f91b9935797d18d05987e27280dcd21b06962454a8c4"
+    },
+    {
+      "path": "build/parity-closures/streaming-key-wrapper-root-acceptance-1/final-regression-validation.json",
+      "bytes": 4386,
+      "sha256": "5a7e5eae2364de675e6619375e1ac23f8126b8422fd686ece29351d85adec61f"
+    },
+    {
+      "path": "build/parity-closures/streaming-key-wrapper-root-acceptance-1/frozen-parser.py",
+      "bytes": 73024,
+      "sha256": "2dacc29e9cb14cfab370a953d28d0cd1640bf0aa352934db6b0cbace4b9f6061"
+    },
+    {
+      "path": "build/parity-closures/streaming-key-wrapper-root-acceptance-1/positive-receipt-identity-check.json",
+      "bytes": 894,
+      "sha256": "06b603b6f971acb63e43b915acaec7cb99a6b43171be4ec69ca781766426c4c7"
+    },
+    {
+      "path": "build/parity-closures/verify-utf8-checkpoint-capsules-root.py",
+      "bytes": 3140,
+      "sha256": "7520eedf195b85ba371c4518e568b0f5d94f5d8e32bbe1e90c805503c6049047"
+    },
+    {
+      "path": "build/plusplus-petri-naming-saver-self-test/check-saver.py",
+      "bytes": 12323,
+      "sha256": "a87e9a32117c15df62506774ca6c6d16ca64fc2f00e46733af6fc89e8cbe4a78"
+    },
+    {
+      "path": "build/probe-enabled-transition-cycles.py",
+      "bytes": 2736,
+      "sha256": "a020c12e2b5afa136a663999d9181af3fe6f1b3866ba2a994ccd972ae837602c"
+    },
+    {
+      "path": "build/save-alpha-plus-process-law-evidence.py",
+      "bytes": 24167,
+      "sha256": "ace78c90bab93030417eea77b9305479d19da9442040e00c932929e741a784f2"
+    },
+    {
+      "path": "build/save-enabled-transition-evidence.py",
+      "bytes": 3799,
+      "sha256": "13d61e14b708d5e4b1f8942ee1f98d803425339ac65cab298ac485ca3099b8aa"
+    },
+    {
+      "path": "build/save-heuristic-and-validation.py",
+      "bytes": 3728,
+      "sha256": "966cbdffc00ebedfb36460f008ee1fc5e2f21c5ed5be30dddbbc31dad2669723"
+    },
+    {
+      "path": "build/save-heuristic-classic-flat-timestamps.py",
+      "bytes": 4081,
+      "sha256": "abaf29259dd50184a485e2ccea2f24fd63aff1381402979085469f4b16712af0"
+    },
+    {
+      "path": "build/save-heuristic-count-ratios-validation.py",
+      "bytes": 3893,
+      "sha256": "55f286c60749eed897ce767416d9265b7d736c81050f24e15df77601aed0fa3e"
+    },
+    {
+      "path": "build/save-heuristic-inferred-counts-validation.py",
+      "bytes": 3820,
+      "sha256": "25c88a4a0829a7ac60fe49cb7ea07de0e79fea499e6cc58199c0839faf7456cb"
+    },
+    {
+      "path": "build/save-heuristic-matrix-validation.py",
+      "bytes": 4555,
+      "sha256": "934cfe33cef0be947e9c3c90c91c1ffa08ee9695875d3cb7d99d04358fc9a9bf"
+    },
+    {
+      "path": "build/save-heuristic-structured-validation.py",
+      "bytes": 3061,
+      "sha256": "daed4fd5a2ede5bf47bac6b96a2ba714b6c2763b00974be06adf274656fcbf5a"
+    },
+    {
+      "path": "build/save-heuristic-subsecond-validation.py",
+      "bytes": 2873,
+      "sha256": "f66941fcb374dd0d63796667da0118f7e941850243a4d18963dd0186638f604b"
+    },
+    {
+      "path": "build/save-plusplus-and-label-evidence.py",
+      "bytes": 23561,
+      "sha256": "43da63b2e45d95b9fbd48cdbaab88c603a38d99cca512556f345b6f01372af85"
+    },
+    {
+      "path": "build/save-plusplus-carrier-converter-evidence.py",
+      "bytes": 29796,
+      "sha256": "7847a240a6aacb6a5edba14f8324e9a03bf7dab3d3dd627a336c843a6a7a78d5"
+    },
+    {
+      "path": "build/save-plusplus-converter-parameter-evidence.py",
+      "bytes": 21159,
+      "sha256": "1883a2d26eaee2b00a9fc7eb7e20dcc76c89db3aaf9624a7aa987af1a3cd67b3"
+    },
+    {
+      "path": "build/save-plusplus-dataframe-and-route-evidence.py",
+      "bytes": 25552,
+      "sha256": "41861eb5e6e04b0cd981c037025a221ccb609c25bc28242221d961c054cc7522"
+    },
+    {
+      "path": "build/save-plusplus-petri-naming-evidence.py",
+      "bytes": 22450,
+      "sha256": "fc853f7b919e3e28865c20546784606d34493e9aec52b15c2bc1e30a8bf8269d"
+    },
+    {
+      "path": "build/save-token-backwards-controls-reference.py",
+      "bytes": 2470,
+      "sha256": "c2c7e3a7f9fd028b535142d95885da63d310ea45d92d78cd0d03519719995cf1"
+    },
+    {
+      "path": "build/save-token-backwards-parameters-after.py",
+      "bytes": 5020,
+      "sha256": "45bb1e6b6792fef000156458e5980ce56d0c71a2830cc01f5f80c3c3fcabd409"
+    },
+    {
+      "path": "build/save-token-backwards-parameters-baseline.py",
+      "bytes": 4300,
+      "sha256": "53994e15c7baf15bb0ab90a4904b31feabe99466c800b5f3568432c06cd6a63f"
+    },
+    {
+      "path": "build/save-token-backwards-parameters-reference.py",
+      "bytes": 3516,
+      "sha256": "336b5f0ead006daf74cd5c3bb6a989938c88f69f4889a58c61d516280770c385"
+    },
+    {
+      "path": "build/save-token-backwards-weighted-routing.py",
+      "bytes": 6167,
+      "sha256": "b8256f9300b1c782639ec18cc9f0c58377cf8e0cf7f310774ebbfd045eb79932"
+    },
+    {
+      "path": "build/save-token-backwards-zero-reference.py",
+      "bytes": 2620,
+      "sha256": "757ce3aeb45a38cac5c3180277a3ba8d95fd9cfb21c4d71f4cd07e04fe60425c"
+    },
+    {
+      "path": "scripts/capture-petri-element-usage-reference.py",
+      "bytes": 10030,
+      "sha256": "e7ee4907a4ee650fa6a5ee7e791984230ae56036e822bc8efd276442b27b0c14"
+    },
+    {
+      "path": "scripts/capture-token-replay-reference.py",
+      "bytes": 10541,
+      "sha256": "5ae78775f957f041c0338ba2338cdc772c5b2379b1a13421ac19c056e496343a"
+    },
+    {
+      "path": "scripts/retained_public_observation_inventory.py",
+      "bytes": 86550,
+      "sha256": "4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106"
+    },
+    {
+      "path": "scripts/retained_public_receipt_index.py",
+      "bytes": 26808,
+      "sha256": "885d16b3935a95d51d90fc09abd085dde3e46bf8732915bb25f520a0ac8ff613"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_observation_inventory.py",
+      "bytes": 79619,
+      "sha256": "a660b8742b34c6468514472e2a66380ca65cc7482a5669b6f9d772cd4f450bd7"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_receipt_index.py",
+      "bytes": 15393,
+      "sha256": "6a2a0f2f69fb3b4ccec31b2c410439d91c60bd1165d289a25ec43728a39e0a60"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_receipt_ltl_archives.py",
+      "bytes": 3317,
+      "sha256": "3058b5fd0b8a0e84579fc559154777ae5e9ae28e7ccba95eee09ea5bf4db6a38"
+    }
+  ],
+  "omitted_artifact_bindings": [
+    {
+      "bytes": 6003,
+      "sha256": "93a587982acc628f33628081ee60013395dacb8c33665dc7930b15033c3584b9",
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/cache/039cec5703f77eef34aafb15e5a0528db1222b34c939b0ab0014a6dd8ea79cba.jsonl",
+      "disposition": "cache metadata omitted, exact opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 105447,
+      "sha256": "af84388b89b13202fb1be5045c91df15074b6a3075d963d6fd199d1df5ef6d8f",
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/cache/0b0cd40042d51f8e5eb4891ea2d5bc9b055aff656ca1df8ae976ab5fc2108653.jsonl",
+      "disposition": "cache metadata omitted, exact opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 7044,
+      "sha256": "a83c08b36878450f6b0d36199d2e8fd917c1fbde635a64c2634bca6782f3026d",
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/cache/66ee593d31046457a5627a8b7385ad37a31da7f14de5a47c75d5da08c3a2963c.jsonl",
+      "disposition": "cache metadata omitted, exact opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 12088,
+      "sha256": "af78002df1f16781e31877e366fb4de9b160dd7353e4e29c7a29895b530633fa",
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/cache/cb6014fc7eebe974b4c5df0cbd930082e6965ec0ace9f10920bef2eacb0478c9.jsonl",
+      "disposition": "cache metadata omitted, exact opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 4222,
+      "sha256": "e8f63164b286bf988069d187dd4da56f76398d92fc72c43744f3ceeb012235e2",
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/cache/cb8a86cfc9a2395f158f8bb80d5c1cdccd821c0facf8b901073cc7f92091ad30.jsonl",
+      "disposition": "cache metadata omitted, exact opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 56699,
+      "sha256": "35d12c30ceca9c1f56ad71a7fdcbced6c6b78333a0e05e1ddfffe84283fa9ab6",
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/cache/d64f5cb3fbbd9b52736923aaad025c8b050befa16b56e6c0bf37ce01225466b9.jsonl",
+      "disposition": "cache metadata omitted, exact opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 95802,
+      "sha256": "c6efe1d13b04b8f6bd72cc3331744baa21332052222d738350d7491d947a73eb",
+      "path": "build/parity-closures/streaming-files-object-root-acceptance-1/cache/d6db4118e4ae007511142adec516e82a9b4a9b7bf1045e56a1b00864c47958ef.jsonl",
+      "disposition": "cache metadata omitted, exact opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 970752,
+      "sha256": "2838b9cabd8625613bb0189b53d38007a9201e2b7689cc515690cef36b215b81",
+      "path": "build/parity-closures/files-object-scope-projection-root-1/declared-full-member-candidates.sqlite",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 234065920,
+      "sha256": "06407901a4dea497f23b78cee48eef7c087c796a347bfb2d7c3f94813abff806",
+      "path": "build/parity-closures/grouping-history-content-inventory-1/bindings.sqlite",
+      "disposition": "projection metadata input external, exact opaque hash/size",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 211046,
+      "sha256": "9b0aea39e4b3bbf226094917fe1a27bd47666fc9c087bd6fdb0fa4e4f75eb82a",
+      "path": "docs/heuristic-matrix-native-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 151859,
+      "sha256": "c640c03331e28a7cb289c58b3e94921de96645b5755e5c9cabf603704a6fb7a7",
+      "path": "docs/heuristic-structured-native-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 134163,
+      "sha256": "e2a4369cb9188d00ba0529cd225c4fe73b2655f12b0f3e73adaaa58c7803fd3a",
+      "path": "docs/heuristic-and-native-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 50026,
+      "sha256": "ec67dee8369ac3fabe00209b718a0b4b4d2706462973dee966aca78bc089740f",
+      "path": "docs/heuristic-subsecond-native-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 758,
+      "sha256": "d95e21b28c1a0109a68f665746f2a1867f68af4f19411d89061318c99e6b7872",
+      "path": "docs/token-replay-enabled-transition-cycle-reference.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 5996,
+      "sha256": "9c97511fbf03ba2cb3b7dae4212a0fbc028441ee3d6b5520bbb6428036135e63",
+      "path": "docs/heuristic-matrix-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 4939,
+      "sha256": "f5c7c6709c1dc6d36713b05b78eaa7791db32f58440c9406668607d50874feb8",
+      "path": "docs/heuristic-structured-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 5274,
+      "sha256": "0b2112ffa751649ef9eed643f146da58d284d0cc451a21d0199f927114da65b4",
+      "path": "docs/heuristic-and-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 7960,
+      "sha256": "fdfa37bb825498f4cb884a3efccfd2b5bd63c0fbf4ffc6b2cb2c96ee622a65ed",
+      "path": "docs/heuristic-subsecond-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 12032,
+      "sha256": "281fe7f6851232ac41f5346d03eef3a24a78b6ae4a3419601be8a3c310c697e0",
+      "path": "docs/token-backwards-controls-capture-evidence.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 1263,
+      "sha256": "afdf8cabb8d76738c6f9f6d9cedc94f7354e2e995adec04694cedbac7e407922",
+      "path": "docs/token-backwards-controls-reference-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 90497,
+      "sha256": "59aafbea339757d4cfc2636b3e228871b7b30d9c40d6896dea6d0716328eca38",
+      "path": "docs/heuristic-classic-flat-timestamps-capture-evidence.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 693,
+      "sha256": "b2b7e126eb0c186c312877fcb5c6d5a91d2e548f611fa2871f1e685833cccfe3",
+      "path": "docs/heuristic-classic-flat-timestamps-reference-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 26752,
+      "sha256": "62ecc5e416c886103e8744687857cc8fb0d3e0f48206f0ca6357cdd727f4b88c",
+      "path": "docs/token-backwards-parameters-capture-evidence.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 1277,
+      "sha256": "2d15ecfb2f9b322901022bfc17cf81d4e7ba25322e5687c2c81823967c510258",
+      "path": "docs/token-backwards-parameters-reference-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 36541,
+      "sha256": "71e775dd1c1453fc14bff1f2b4cc67290ae744aaf4c6d569d48366f22a3f92c9",
+      "path": "docs/token-backwards-zero-capture-evidence.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 1067,
+      "sha256": "2a323b892ea6528ddc46d9bf7c4ce2633dee9a985872584878ee6df1f6a20d30",
+      "path": "docs/token-backwards-zero-reference-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 1072604,
+      "sha256": "63f41507a43a86b97a2edf06e6661b7d2dc7fb52f6622364b7ae6b8fada357fe",
+      "path": "docs/token-backwards-parameters-baseline-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 1035,
+      "sha256": "09402b63df3f08b000c22e10cca7bd9c7a94e390c4b9098b633aded5469a2232",
+      "path": "docs/token-backwards-parameters-baseline-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 1176088,
+      "sha256": "8cee358c02a15ad01af00f2e0f017caaff36b4f3d5a90071f175cea1a205abc3",
+      "path": "docs/token-backwards-parameters-after-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 1028,
+      "sha256": "98ac1b00abc93a4f89d8729068c4bbe629131e65963fa4e25516b0cb5d4b907b",
+      "path": "docs/token-backwards-parameters-after-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 1003806,
+      "sha256": "aee458ffb4cb99f000fbe2497fd3b5212ac5b346e8f72dfe953e2a3c263353d4",
+      "path": "docs/token-backwards-weighted-routing-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 947,
+      "sha256": "089ce271f8b1799fcc34cb829ea9bcd8cc0d5674d18e98c4a94040adb656e770",
+      "path": "docs/token-backwards-weighted-routing-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 1073174,
+      "sha256": "39a017095f710fc64a2226d60e80e5c6d8d03a4da6fd6fbcb293c1d4b17cd28c",
+      "path": "docs/heuristic-count-ratios-native-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 1559,
+      "sha256": "ae4e1f93083c4afd3b6c43986417d6d13e1f8a89b971a798a0f869f708b58206",
+      "path": "docs/heuristic-count-ratios-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 1927324,
+      "sha256": "f63aafef8379e792fd762c8c5803df1d1caa9ccd3d13a3b923d2fbdf4d339a82",
+      "path": "docs/heuristic-inferred-counts-native-checks.json.gz",
+      "disposition": "original archive stays unopened by packaging; prior saved declaration only",
+      "opaque_hash_reverified_by_packager": false
+    },
+    {
+      "bytes": 1508,
+      "sha256": "e6f079bf8f597001b1a6f3435a0052f58b1dc869616daac55cbc94692d1f4c97",
+      "path": "docs/heuristic-inferred-counts-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 4076,
+      "sha256": "19d1a10df54578097a2c5858276bc3e3cb30fb12d22866e0effbf913ef089cae",
+      "path": "docs/token-replay-enabled-transition-validation.json",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    },
+    {
+      "bytes": 879497216,
+      "sha256": "54872a06b90ed21541ddb9773f02edb3355c1847b62410dfce18586cb087638c",
+      "path": "build/parity-closures/grouping-member-projection-root-1/declared-full-member-candidates.sqlite",
+      "disposition": "full original sidecar/metadata database external, opaque hash/size only",
+      "opaque_hash_reverified_by_packager": true
+    }
+  ],
+  "included_folders": [
+    "streaming-files-object-development-1",
+    "streaming-files-object-independent-review-1",
+    "streaming-files-object-root-acceptance-1",
+    "full-member-projection-scope-guard-1",
+    "files-object-actual-metadata-independent-review-1",
+    "files-object-scope-projection-root-1",
+    "files-object-scope-projection-independent-review-1",
+    "projection-scope-guard-independent-review-1",
+    "grouping-history-object-wrapper-schema-review-1",
+    "grouping-history-path-gap-overlay-review-1",
+    "grouping-history-residual-root-schema-review-1",
+    "grouping-history-opaque-uncompressed-prepared-1",
+    "grouping-history-opaque-uncompressed-root-1",
+    "grouping-history-opaque-uncompressed-independent-review-1",
+    "files-object-handoff-independent-review-1"
+  ],
+  "tests_passed": {
+    "combined": 91,
+    "independent_synthetic": 90,
+    "projection_guard": 15
+  },
+  "logical_declarations": {
+    "sources": 7,
+    "members": 289,
+    "declared_sized_unverified": 281,
+    "original_size_unknown": 8,
+    "opaque_branch_gaps": 10,
+    "unknown_external_file_count_gaps": 7,
+    "retained_stream_gaps": 17,
+    "full_file_identities": 0,
+    "flat_matches": 0,
+    "old_nested_member_equivalence_established": false,
+    "producer_self_hash_declarations_metadata_only": 7
+  },
+  "cache": {
+    "raw_hits": 7,
+    "raw_event_bytes_exact_after_removing_only_hit_rows": true,
+    "event_fields_normalized": []
+  },
+  "regressions": {
+    "key_wrapper_event_bytes_identical_to_accepted_2dacc": true,
+    "full_original_ltl_archive_integration_test_passed": true,
+    "fresh_current_parser_ltl_streaming_run": false,
+    "prior_ltl_streaming_acceptance": {
+      "path": "build/parity-closures/streaming-key-wrapper-root-acceptance-1/final-regression-validation.json",
+      "bytes": 4386,
+      "sha256": "5a7e5eae2364de675e6619375e1ac23f8126b8422fd686ece29351d85adec61f"
+    }
+  },
+  "path_gap_overlay": {
+    "original_relations": 30638,
+    "corrected_member_declaration_joins": 30589,
+    "residual_rows": 49,
+    "reclassified_but_still_gapped": 38,
+    "original_gaps_not_erased": true
+  },
+  "prior_root_opaque_hash_operation": {
+    "original_archives_opened": 5,
+    "gzip_decompression_attempts": 5,
+    "exact_compressed_uncompressed_hash_mappings": 5,
+    "uncompressed_bytes_used_only_for_count_and_sha": true,
+    "archive_json_or_unicode_parsing": false,
+    "member_payload_decode_or_display": false,
+    "original_uncompressed_sizes_remain_null": 5,
+    "new_observed_byte_counts_are_not_original_size_declarations": true,
+    "older_uncompressed_only_provenance_limits_superseded_for_exact_five_mappings": true,
+    "full_receipt_or_admission_authority": false
+  },
+  "packaging_original_archive_files_opened": 0,
+  "packaging_original_member_or_flat_result_payloads_opened": 0,
+  "reference_imports_by_packager": 0,
+  "reference_algorithm_calls": 0,
+  "public_provenance_admitted": false,
+  "historical_audit_complete": false,
+  "admission_complete": false,
+  "reference_call_absence_established": false,
+  "root_entry_certificate": false,
+  "canonical_parity_status": "partial; no catalogue unit closed",
+  "limits": [
+    "All289 member SHA/size entries are unverified logical payload declarations,8 original sizes remain unknown.",
+    "All7 external file counts remain unavailable; observed EOF inventories and7 producer-self SHA declarations are metadata only.",
+    "No original289 nested-edge equivalence or complete original receipts are established by this checkpoint.",
+    "All10 scope/summary/binary branches remain opaque gaps, plus7 unknown-count gaps.",
+    "No fresh4b966 LTL streaming run is claimed; only archive integration tests and prior exact scoped acceptance evidence.",
+    "Opaque hashing was an earlier root-only operation that opened5 originals; packaging opens0 originals and embeds only own metadata/tools.",
+    "Five exact opaque mapping hashes strengthen provenance only; observed lengths never rewrite null original sizes or establish receipts.",
+    "All path-gap relations, failed drafts and review corrections are retained; no history completeness, absence or entry certificate follows."
+  ],
+  "complete": true,
+  "archive": {
+    "path": "docs/retained-public-observation-files-object-checkpoint.jsonl.gz",
+    "bytes": 8460106,
+    "sha256": "ba2a58505568f593204aa610e01538835cc15999b137a2e7468aca5f201e3f5b",
+    "members": 199,
+    "uncompressed_bytes": 76152396,
+    "uncompressed_sha256": "bce427f64c8fa381ef723f7205adc477affc140ed436259ce55456269516c690"
+  },
+  "exact_utf8_roundtrips": true,
+  "all_embedded_members_match_current_source_bytes": true,
+  "source_bindings_reverified_after_packaging": true
+}
