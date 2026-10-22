@@ -4,8 +4,14 @@ import {referenceLogFilterPickedFile, referenceLogFilterStringText} from "../ref
 import {tableRepetitionCountText, type TableRepetitionEngine} from "../table-attribute-repetition";
 import {defaultTableVariantsForm, requestTableVariants, tableVariantsArtifactFile, tableVariantsResponseFile, tableVariantsSourceExample,
   tableVariantsOperations, tableVariantsMappingExample, TABLE_VARIANTS_LABELS, TableVariantsRequestGate, type TableVariantsForm, type TableVariantsRun} from "../table-variants-filters";
+import {PandasVariantsOriginalCallWorkspace} from "./PandasVariantsOriginalCallWorkspace";
 
-export function TableVariantsFilterWorkspace({engine, initialForm}: {engine: TableRepetitionEngine; initialForm?: TableVariantsForm}) {
+export function TableVariantsFilterWorkspace({engine,initialForm,initialCallMode="friendly"}:{engine:TableRepetitionEngine;initialForm?:TableVariantsForm;initialCallMode?:"friendly"|"original"}){
+  const [mode,setMode]=useState(initialCallMode);
+  useEffect(()=>{setMode(initialCallMode);},[engine,initialCallMode]);
+  return <>{engine==="pandas"&&<section className="panel query-workspace"><label className="filters-field"><span>Pandas variants call mode</span><select value={mode} onChange={event=>setMode(event.target.value as "friendly"|"original")}><option value="friendly">Choose variants with form controls</option><option value="original">Use an original typed call</option></select></label></section>}{engine==="pandas"&&mode==="original"?<PandasVariantsOriginalCallWorkspace/>:<TableVariantsFriendlyWorkspace key={engine} engine={engine} initialForm={initialForm}/>}</>;
+}
+function TableVariantsFriendlyWorkspace({engine, initialForm}: {engine: TableRepetitionEngine; initialForm?: TableVariantsForm}) {
   const [variants, setVariants] = useState<File | null>(null);
   const [source, setSource] = useState<File | null>(null), [form, setForm] = useState(() => initialForm ?? defaultTableVariantsForm(engine));
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null), [run, setRun] = useState<TableVariantsRun | null>(null);
