@@ -1,0 +1,909 @@
+{
+  "schema": "minera-retained-public-receipt-manifest-v1",
+  "root": ".",
+  "scope": "The three explicitly admitted committed LTL public archives and listed observation/plan/intent members only. Unlisted members and all other paths remain outside this inventory; this grants no authority to enter a reference algorithm.",
+  "inventory_complete": true,
+  "modules": [
+    "pm4py.algo.filtering.log.ltl.ltl_checker",
+    "pm4py.algo.filtering.pandas.ltl.ltl_checker",
+    "pm4py.algo.filtering.polars.ltl.ltl_checker"
+  ],
+  "sources": [
+    {
+      "path": "docs/log-ltl-filter-public.json.gz",
+      "bytes": 7592723,
+      "sha256": "2660b657d674d7d7bb621d994f1f4cf93d77fddea034384cdd4b9aafd4174173",
+      "provenance": "own-public-observation",
+      "format": "gzip-envelope-json",
+      "records_key": "members",
+      "members": [
+        {
+          "path": "build/filtering-ltl-log-boundaries-public-actual-1/call-intents.jsonl",
+          "bytes": 946,
+          "sha256": "038fbbb2bec5a2be45fcd8c92c5d7bea2a169757993734c0a4552f80b333affe",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "intents",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-boundaries-public-actual-1/records.jsonl",
+          "bytes": 129539,
+          "sha256": "14c5db7b4369a763c2e15e763e9c8985b87d3d2fb9a1daac25e98d3664297635",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "observations",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-helper-public-actual-1/call-intents.jsonl",
+          "bytes": 7451,
+          "sha256": "d5b53452629ebb3ab0ad6cbc37d38618490861a1641f6c1ed8bf0fbfff46a966",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "intents",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-helper-public-actual-1/records.jsonl",
+          "bytes": 243682,
+          "sha256": "317adbbc07e87666026dc79c8929066cfe0a10b255f3f9bd115bc3dc639c67ae",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "observations",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-indexing-public-actual-1/call-intents.jsonl",
+          "bytes": 454,
+          "sha256": "3834e0970b19dda75c9f5027a833aed7f7fb8fe90b316fb4a93aa00cf806ba95",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "intents",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-indexing-public-actual-1/records.jsonl",
+          "bytes": 109211,
+          "sha256": "603edbf459a2bcf6afbb97b1b26958cd2cb2673e998b7331b97fececa14f5896",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "observations",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-multibounds-public-actual-1/call-intents.jsonl",
+          "bytes": 673,
+          "sha256": "8eb9ee803d36e1d0e1ab977bf3a70118e99e89ccd24518f6b384270f76cc6bc7",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "intents",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-multibounds-public-actual-1/records.jsonl",
+          "bytes": 131423,
+          "sha256": "2b97ce226fd01b723ca0358df9980949a4975e57ff23e8d3c0b52ba3a6e98222",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "observations",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-public-actual-1/call-intents.jsonl",
+          "bytes": 62539,
+          "sha256": "a1c57c08bc413fc8eed7f805ae8b12f545d7143fefe5019833407da36637a2f4",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "intents",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-public-actual-1/records.jsonl",
+          "bytes": 52579062,
+          "sha256": "432cd58f508d7787ced3e47eea79b724cfb7374e69fb759cefbaef813afba92e",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "observations",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-witness-public-actual-1/call-intents.jsonl",
+          "bytes": 882,
+          "sha256": "023695bcb16b5dc9b851a0dbf079579da0640ba464c42ff8819da32b8a99fd49",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "intents",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        },
+        {
+          "path": "build/filtering-ltl-log-witness-public-actual-1/records.jsonl",
+          "bytes": 226080,
+          "sha256": "78f8289f8748aa88d3afc247e4bad106110a1297ad62d9b87916c1282cf03c02",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "receipt-v1",
+          "role": "observations",
+          "receipt_schema": "minera-log-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "e26b5675d1ee354a185cd41b9e7bafd481dfa684",
+            "normalized_sha256": "bc9764f4bc59d9fb1e62239af985b328b4fe320f4c89d659c64dbdb0634c0b5f"
+          },
+          "runtime": {
+            "version": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+            "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "local_timezone": [
+              "W. Europe Standard Time",
+              "W. Europe Summer Time"
+            ],
+            "standard_utc_offset_seconds": -3600,
+            "naive_witness_epoch": 1781248320.0
+          }
+        }
+      ]
+    },
+    {
+      "path": "docs/pandas-ltl-filter-public.json.gz",
+      "bytes": 8972301,
+      "sha256": "9f073d0be9b35661772538d4a81a8de206160c281d9da3c119e8b4a2b7bb77fd",
+      "provenance": "own-public-observation",
+      "format": "gzip-envelope-json",
+      "records_key": "members",
+      "members": [
+        {
+          "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/call-intents.jsonl",
+          "bytes": 666,
+          "sha256": "922f5288ccf0448872e4dcc4737efcbd3bde64d8153aba5e7b36d3e10c74f54c",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/call-plan.jsonl",
+          "bytes": 27383,
+          "sha256": "4c8cfbd8a3a1aeb8d199bbcc314f88ca95552e18e1aa26e679abf0bce2757fea",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/records.jsonl",
+          "bytes": 67113,
+          "sha256": "96850f5021e660056894440620f9d0bfa1d978457e4b069d83c059f8e476b0b9",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-continuation-public-actual-1/call-intents.jsonl",
+          "bytes": 6791,
+          "sha256": "d62217aad80f9a56c84f93bc7fe687d2829a3698e43fda8617ec1ba1d3082320",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-continuation-public-actual-1/call-plan.jsonl",
+          "bytes": 772617,
+          "sha256": "6b1673c99d20797e981be5e511e76da198cc79ab701bbec20a0d00bda4b091a8",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-continuation-public-actual-1/records.jsonl",
+          "bytes": 1798265,
+          "sha256": "8bca6bf90705f1a42bc263ca5e0c4a81469d26b9c04242c778ff7e0606453db5",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/call-intents.jsonl",
+          "bytes": 231,
+          "sha256": "6da807f4429061536f7e441080686ba888030f2f6ffd189acb5c1357c9698f65",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/call-plan.jsonl",
+          "bytes": 20514,
+          "sha256": "1bf72a2e7d80977b6ebfd8156656d2f8d62c7716a4b9d77e25aacb6e55c32399",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/records.jsonl",
+          "bytes": 56471,
+          "sha256": "f132105f5e8cf6048ff631f7279b9cf9aa690d4004fe65e73038bef17c017e2d",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-public-actual-1/call-intents.jsonl",
+          "bytes": 95828,
+          "sha256": "081f1929bfcaed352c14fa7b598bac741383f084b3d5f0e4004531977370398f",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-public-actual-1/call-plan.jsonl",
+          "bytes": 10868801,
+          "sha256": "3eabbb0f9c22ac18ec61c301a0ba10b044eeaf068792079d487f0e07977be0df",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-public-actual-1/records.jsonl",
+          "bytes": 24781954,
+          "sha256": "fe24ce67cf6f0a5f6be2f96fd2498873f7b887a89fe2069d93409edcd46855c7",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/call-intents.jsonl",
+          "bytes": 464,
+          "sha256": "439ec0b06e93ec99bf169c8224915098c0420774c4e4c584d1c430e44646a6ec",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/call-plan.jsonl",
+          "bytes": 37645,
+          "sha256": "e62f1410c0191847af83245111978990a95ee2449976aa5a430d0439389d34b7",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/records.jsonl",
+          "bytes": 91432,
+          "sha256": "ea0739c6ebe51ac89b2150beac7096ec37545fbb6c2715de47b8ea72353ea756",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/call-intents.jsonl",
+          "bytes": 459,
+          "sha256": "232ea6465af224dcb71c3294170d640143b295ba57b5c1b337d76e5457ec2b43",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/call-plan.jsonl",
+          "bytes": 23150,
+          "sha256": "3c499f8a5e0a0bb1c8bdd1321831039b47d881d3e739c8a68a11b36f758b2e08",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/records.jsonl",
+          "bytes": 57989,
+          "sha256": "c3000bccc4f8cbd068f84045a4c981696ed2918d926e960239a1b7307a83534b",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/call-intents.jsonl",
+          "bytes": 235,
+          "sha256": "8f23901e1a42cf0e4f283dd0e6f0f813710f5849bf6c5b30f563a0acd6acbb57",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/call-plan.jsonl",
+          "bytes": 4612,
+          "sha256": "f9f49c9b5eb3af0db8890d6e01c2cd766ff0d5e3a8a1e5b6cf8980c9ace47c91",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/records.jsonl",
+          "bytes": 11071,
+          "sha256": "2a1711275812de2baca859c921c20e3af3c5b9e8bf645cb67c44aacb0b9a8fe1",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/call-intents.jsonl",
+          "bytes": 240,
+          "sha256": "65239ee42c123eb238b24ab4cc15686d4d42645a2b2151e19da23efffedd120d",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/call-plan.jsonl",
+          "bytes": 28923,
+          "sha256": "0b56befecce32fe10937facab346489b96865cbe90713adec2124912bf243d77",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/records.jsonl",
+          "bytes": 68206,
+          "sha256": "fa7ebc2d32e7fcebf3cf95030884497b9adc267b172e244ccd6c0fa8b1140c8e",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/call-intents.jsonl",
+          "bytes": 1356,
+          "sha256": "f7123eb5170bae45b98159c6eacfe6f8f533b1624db4ce262b5a7f40ca6b9225",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "intents",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/call-plan.jsonl",
+          "bytes": 153254,
+          "sha256": "d02d5ee4144a7abb8b4d42ec6453505c4d0022e8f84f325ed0f6c3ece2c54d5f",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "plans",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        },
+        {
+          "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/records.jsonl",
+          "bytes": 378722,
+          "sha256": "5b1fe22d631418ce56a8d5953f730570f7b1775ba4c72249de9db789f6c39ad9",
+          "provenance": "own-public-observation",
+          "format": "jsonl",
+          "adapter": "pandas-before-v1",
+          "role": "observations",
+          "receipt_schema": "minera-pandas-ltl-observer-receipt-v1",
+          "reference": {
+            "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+            "git_blob": "058a30141942e352afe8c05d825b720edc953ec5",
+            "normalized_sha256": "4f5d67a8f5d9737116c9cf9cefeebcd0f0a7b458fe8927d262ce7abe5bc6fa3b"
+          },
+          "runtime": {
+            "pandas": "3.0.6",
+            "pm4py": "2.7.22",
+            "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]"
+          }
+        }
+      ]
+    },
+    {
+      "path": "docs/polars-ltl-filter-public.json.gz",
+      "bytes": 610562,
+      "sha256": "6270a238dc204c126e80ee816e5790449ad0f5b23f7ccce9fb7f1e9ab7fd417b",
+      "provenance": "own-public-observation",
+      "format": "gzip-json",
+      "adapter": "polars-receipt-v1",
+      "role": "observations",
+      "receipt_schema": "minera-polars-ltl-observer-receipt-v1",
+      "reference": {
+        "reference_commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+        "git_blob": "ae32f76834406a3daf9121b788c157c0eba782b0",
+        "normalized_sha256": "722b8abcf77c244e99c97a3afacc1609892c25e7b33ddcbcf79a85241696280e"
+      },
+      "runtime": {
+        "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+        "executable": "C:\\Users\\pmoch\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "pm4py_version": "2.7.22",
+        "pm4py_package": "C:\\Users\\pmoch\\Documents\\Minera\\build\\heuristic-subsecond-reference-runtime\\pm4py\\__init__.py",
+        "polars_version": "1.44.1",
+        "polars_package": "C:\\Users\\pmoch\\Documents\\Minera\\build\\rust-xes-probe-deps\\polars\\__init__.py"
+      },
+      "records_key": "records"
+    }
+  ]
+}

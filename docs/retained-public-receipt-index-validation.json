@@ -1,0 +1,24 @@
+{
+  "schema": "minera-retained-public-receipt-index-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/retained-public-receipt-index-checks.jsonl.gz",
+    "bytes": 94095,
+    "sha256": "1b4d4ee521a2fe622d59b546d34add67b0ceeef323b732f3b75e43e5025fb369",
+    "members": 28
+  },
+  "implementation_commit": "1eb692e7f88ba2a503b7d2a111e354e53b502e3c",
+  "parser_sha256": "885d16b3935a95d51d90fc09abd085dde3e46bf8732915bb25f520a0ac8ff613",
+  "synthetic_tests": 25,
+  "committed_archive_integration_tests": 1,
+  "original_receipts": {
+    "log": 297,
+    "pandas": 429,
+    "polars": 675
+  },
+  "reference_imports": 0,
+  "reference_algorithm_calls": 0,
+  "catalogue_audit_complete": false,
+  "parity_status_changes": 0,
+  "notes": "No product/frontend sources changed. Existing native/frontend/HTTP acceptance remains the earlier LTL checkpoint, not a new run."
+}
