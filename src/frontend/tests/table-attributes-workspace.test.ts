@@ -9,6 +9,7 @@ function workspace(engine: "pandas" | "polars", patch: Partial<TableAttributesFo
 }
 function run(patch: Partial<TableAttributesEnvelope> = {}): TableAttributesRun {
   const value: TableAttributesEnvelope = {family: "TABLE_ATTRIBUTES_FILTER", engine: "polars", operation: "events", http_status: 200,
+    call_mode:"friendly",call_json:null,controls_before_json:null,controls_after_json:null,controls_unchanged:null,
     phase: "complete", apply_returned: true, source: {rows: 12, columns: 9}, result: {rows: 4, columns: 9},
     source_unchanged: true, case_id_key: "case:concept:name", attribute_key: "literal selected role", source_table_json: '{"complete":"source"}',
     source_after_table_json: '{"complete":"after"}', filtered_table_json: '{"complete":"filtered"}', counts_table_json: null,
