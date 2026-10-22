@@ -7,6 +7,7 @@
 #include "minera/polars_ltl_filter.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
+#include "polars_ltl_original_call_parser.hpp"
 #include <algorithm>
 #include <cctype>
 #include <map>
@@ -25,18 +26,22 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
   std::map<std::string,const DiscoveryWorkbenchPart*> fields;
   std::optional<EventLog> log,result_log;std::optional<EventTable> table,result_table;
   std::optional<std::string> before,after;std::optional<bool> unchanged;
-  std::string engine,operation,kind,format,input_kind,phase="control",open_key="concept:name",case_key="case:concept:name",attribute_key="concept:name",resource_key="org:resource",timestamp_key="time:timestamp";
+  std::optional<std::string> original_call_text;
+  std::optional<PolarsLtlFilterCall> original_call;
+  std::string engine,operation,kind,format,input_kind,call_mode,phase="control",open_key="concept:name",case_key="case:concept:name",attribute_key="concept:name",resource_key="org:resource",timestamp_key="time:timestamp";
   std::string result_json,xes,xes_error,helper_result,error_type,error;int status=200;bool apply_returned=false;
   const auto field=[&](const std::string& name,std::string fallback={}){const auto found=fields.find(name);return found==fields.end()?fallback:found->second->bytes;};
   const auto boolean=[&](const std::string& name,std::string fallback){const auto value=field(name,std::move(fallback));if(value!="true" && value!="false")throw std::invalid_argument(name+" must be true or false");return EventAttribute{"",value,AttributeKind::kBoolean};};
   try {
     if(!transport_error.empty())throw std::invalid_argument(std::string(transport_error));
-    static const std::set<std::string> allowed={"engine","operation","input_kind","source_file","source_format","case_id_column","activity_column","timestamp_column","resource_column","delimiter","trim_fields","activity_key","case_id_key","attribute_key","resource_key","timestamp_key","positive","enable_timestamp","timestamp_diff_boundaries_json","values_json","typed_values_json","a_json","b_json","c_json","target_json","helper_a_json","helper_b_json"};
+    static const std::set<std::string> allowed={"engine","operation","input_kind","call_json","source_file","source_format","case_id_column","activity_column","timestamp_column","resource_column","delimiter","trim_fields","activity_key","case_id_key","attribute_key","resource_key","timestamp_key","positive","enable_timestamp","timestamp_diff_boundaries_json","values_json","typed_values_json","a_json","b_json","c_json","target_json","helper_a_json","helper_b_json"};
     for(const auto* collection:{&query,&parts})for(const auto& part:*collection){
       if(!allowed.contains(part.name))throw std::invalid_argument("unknown relationship control: "+part.name);
       if(part.file && part.name!="source_file" && part.filename!=part.name+".txt")throw std::invalid_argument("ordinary relationship controls must be text or canonical byte fields: "+part.name);
       if(!fields.emplace(part.name,&part).second)throw std::invalid_argument("duplicate relationship control: "+part.name);
     }
+    call_mode=fields.contains("call_json")?"original":"friendly";
+    if(call_mode=="original")original_call_text=field("call_json");
     engine=field("engine");if(engine!="log" && engine!="pandas" && engine!="polars"){engine.clear();throw std::invalid_argument("choose log, pandas or polars relationship filtering");}
     if(engine=="polars"){
       const auto selected_kind=field("input_kind","LazyFrame");
@@ -46,6 +51,13 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
     operation=field("operation");static const std::set<std::string> modes={"eventually","next","four_eyes","different_persons","timestamp_ge","timestamp_le"};
     if(!modes.contains(operation)){operation.clear();throw std::invalid_argument("choose a supported relationship operation");}
     const bool helper=operation.starts_with("timestamp_"),collection=operation=="eventually" || (engine=="polars" && (operation=="next" || operation=="four_eyes")),social=operation=="four_eyes" || operation=="different_persons";
+    if(call_mode=="original"){
+      if(engine!="polars")throw std::invalid_argument("call_json requires the polars engine");
+      if(helper)throw std::invalid_argument("original Polars calls require a relationship operation");
+      for(const auto& [name,value]:fields){(void)value;if(name!="engine" && name!="operation" && name!="input_kind" && name!="source_file" && name!="call_json")throw std::invalid_argument("friendly control conflicts with original call_json: "+name);}
+      original_call=polars_ltl_original_call_detail::parse(*original_call_text);
+      original_call->operation=operation=="eventually"?PolarsLtlFilterOperation::kEventuallyFollows:operation=="next"?PolarsLtlFilterOperation::kNext:operation=="four_eyes"?PolarsLtlFilterOperation::kFourEyes:PolarsLtlFilterOperation::kDifferentPersons;
+    }
     if(helper && engine!="log")throw std::invalid_argument("timestamp list helpers require the event-log engine");
     if(helper){
       for(const auto& [name,value]:fields){(void)value;if(name!="engine" && name!="operation" && name!="helper_a_json" && name!="helper_b_json")throw std::invalid_argument("inactive timestamp-helper control: "+name);}
@@ -55,6 +67,8 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
       helper_result=helper_json(operation=="timestamp_ge"?log_ltl_timestamp_list_is_ge(a,b):log_ltl_timestamp_list_is_le(a,b));
       apply_returned=true;kind="helper";phase="complete";
     }else {
+      EventAttribute enabled{"","false",AttributeKind::kBoolean};
+      if(call_mode=="friendly"){
       if(fields.contains("helper_a_json") || fields.contains("helper_b_json"))throw std::invalid_argument("timestamp helper operands require a helper operation");
       const auto value_fields=static_cast<unsigned>(fields.contains("values_json"))+static_cast<unsigned>(fields.contains("typed_values_json"));
       if(value_fields!=(collection?1U:0U))throw std::invalid_argument("supply exactly one active collection representation");
@@ -64,18 +78,23 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
       if(fields.contains("case_id_key") && engine=="log")throw std::invalid_argument("case_id_key requires a table engine");
       if(fields.contains("resource_key") && !social)throw std::invalid_argument("resource_key requires a performer rule");
       if(fields.contains("enable_timestamp") && (operation!="eventually" || engine=="polars"))throw std::invalid_argument("timestamp difference constraints require log or pandas eventual filtering");
-      const auto enabled=boolean("enable_timestamp","false");
+      enabled=boolean("enable_timestamp","false");
       const bool timestamp_order=engine=="polars" && (operation=="eventually" || operation=="next"),difference_bounds=engine!="polars" && operation=="eventually";
       if(fields.contains("timestamp_key") && !(timestamp_order || difference_bounds && (enabled.value=="true" || engine=="pandas" && !fields.contains("enable_timestamp") && fields.contains("timestamp_diff_boundaries_json"))))throw std::invalid_argument("timestamp_key requires Polars sequence ordering or enabled timestamp differences");
       if(fields.contains("timestamp_diff_boundaries_json") && !difference_bounds)throw std::invalid_argument("timestamp difference boundaries require log or pandas eventual filtering");
       if(engine!="log")for(const auto& name:{"source_format","activity_key","case_id_column","activity_column","timestamp_column","resource_column","delimiter","trim_fields"})if(fields.contains(name))throw std::invalid_argument("log source control requires the event-log engine: "+std::string(name));
+      }
       const auto uploaded=fields.find("source_file");if(uploaded==fields.end() || !uploaded->second->file)throw std::invalid_argument("source_file requires an actual multipart File");
       for(const auto& part:query)if(part.name=="source_file")throw std::invalid_argument("source_file must be a multipart File");
-      const auto values=collection?parse_attributes_filter_values_json(field(fields.contains("typed_values_json")?"typed_values_json":"values_json"),fields.contains("typed_values_json")):EventAttribute{};
-      const auto target=operation=="different_persons"?parse_attributes_filter_values_json(field("target_json"),true):EventAttribute{};
-      const auto a=named?parse_attributes_filter_values_json(field("a_json"),true):EventAttribute{},b=named?parse_attributes_filter_values_json(field("b_json"),true):EventAttribute{},c=named && operation=="next"?parse_attributes_filter_values_json(field("c_json"),true):EventAttribute{};
-      const auto positive=boolean("positive","true");std::optional<EventAttribute> boundaries;
-      if(fields.contains("timestamp_diff_boundaries_json"))boundaries=parse_attributes_filter_values_json(field("timestamp_diff_boundaries_json"),true);
+      EventAttribute values,target,a,b,c,positive;std::optional<EventAttribute> boundaries;
+      if(call_mode=="friendly"){
+        const bool named=!collection && operation!="different_persons";
+        if(collection)values=parse_attributes_filter_values_json(field(fields.contains("typed_values_json")?"typed_values_json":"values_json"),fields.contains("typed_values_json"));
+        if(operation=="different_persons")target=parse_attributes_filter_values_json(field("target_json"),true);
+        if(named){a=parse_attributes_filter_values_json(field("a_json"),true);b=parse_attributes_filter_values_json(field("b_json"),true);if(operation=="next")c=parse_attributes_filter_values_json(field("c_json"),true);}
+        positive=boolean("positive","true");
+        if(fields.contains("timestamp_diff_boundaries_json"))boundaries=parse_attributes_filter_values_json(field("timestamp_diff_boundaries_json"),true);
+      }
       if(engine=="log"){
         format=field("source_format","auto");if(format=="auto"){
           auto name=uploaded->second->filename;std::transform(name.begin(),name.end(),name.begin(),[](unsigned char ch){return static_cast<char>(std::tolower(ch));});
@@ -116,11 +135,12 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
         }else {
           PolarsLtlFilterOptions options;options.case_id_key={"",case_key};options.attribute_key={"",attribute_key};options.resource_key={"",resource_key};options.timestamp_key={"",timestamp_key};options.positive=positive;options.enable_timestamp=enabled;options.timestamp_diff_boundaries=boundaries;
           if(input_kind=="DataFrame"){
-            result_table=operation=="eventually"?filter_polars_ltl_eventually_follows(*table,values,options):operation=="next"?filter_polars_ltl_next(*table,values,options):operation=="four_eyes"?filter_polars_ltl_four_eyes(*table,values,options):filter_polars_ltl_different_persons(*table,target,options);
+            if(original_call)result_table=invoke_polars_ltl_filter(*table,*original_call);
+            else result_table=operation=="eventually"?filter_polars_ltl_eventually_follows(*table,values,options):operation=="next"?filter_polars_ltl_next(*table,values,options):operation=="four_eyes"?filter_polars_ltl_four_eyes(*table,values,options):filter_polars_ltl_different_persons(*table,target,options);
             apply_returned=true;
           }else{
             const auto lazy=LazyEventTable::from_table(*table);
-            const auto selected=operation=="eventually"?filter_polars_ltl_eventually_follows(lazy,values,options):operation=="next"?filter_polars_ltl_next(lazy,values,options):operation=="four_eyes"?filter_polars_ltl_four_eyes(lazy,values,options):filter_polars_ltl_different_persons(lazy,target,options);
+            const auto selected=original_call?invoke_polars_ltl_filter(lazy,*original_call):operation=="eventually"?filter_polars_ltl_eventually_follows(lazy,values,options):operation=="next"?filter_polars_ltl_next(lazy,values,options):operation=="four_eyes"?filter_polars_ltl_four_eyes(lazy,values,options):filter_polars_ltl_different_persons(lazy,target,options);
             apply_returned=true;phase="collect";result_table=selected.materialize();
           }
         }
@@ -136,10 +156,12 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
   const auto text=[&](const std::string& value,bool present){return present?q(value):std::string("null");};
   const auto optional_text=[&](const std::optional<std::string>& value){return value?q(*value):std::string("null");};
   const bool imported=log.has_value() || table.has_value();
+  const bool friendly_roles=imported && call_mode!="original";
   return {status,"{\"family\":\"REFERENCE_LTL_FILTER\",\"engine\":"+text(engine,!engine.empty())+",\"operation\":"+text(operation,!operation.empty())+",\"result_kind\":"+text(kind,!kind.empty())+
     ",\"http_status\":"+std::to_string(status)+",\"phase\":"+q(phase)+",\"apply_returned\":"+(apply_returned?"true":"false")+",\"source_format\":"+text(format,!format.empty())+",\"input_kind\":"+text(input_kind,!input_kind.empty())+
+    ",\"call_mode\":"+text(call_mode,!call_mode.empty())+",\"call_json\":"+optional_text(original_call_text)+
     ",\"source\":"+(log?counts(*log):table?counts(*table):"null")+",\"result\":"+(result_log?counts(*result_log):result_table?counts(*result_table):"null")+",\"source_unchanged\":"+(unchanged?(*unchanged?"true":"false"):"null")+
-    ",\"activity_key\":"+text(open_key,log.has_value())+",\"case_id_key\":"+text(case_key,table.has_value())+",\"attribute_key\":"+text(attribute_key,imported)+",\"resource_key\":"+text(resource_key,imported)+",\"timestamp_key\":"+text(timestamp_key,imported)+
+    ",\"activity_key\":"+text(open_key,log.has_value())+",\"case_id_key\":"+text(case_key,table.has_value() && friendly_roles)+",\"attribute_key\":"+text(attribute_key,friendly_roles)+",\"resource_key\":"+text(resource_key,friendly_roles)+",\"timestamp_key\":"+text(timestamp_key,friendly_roles)+
     ",\"source_json\":"+optional_text(before)+",\"source_after_json\":"+optional_text(after)+",\"result_json\":"+text(result_json,!result_json.empty())+",\"filtered_xes\":"+text(xes,result_log.has_value() && xes_error.empty() && error.empty())+
     ",\"xes_error\":"+text(xes_error,!xes_error.empty())+",\"helper_result_json\":"+text(helper_result,!helper_result.empty())+",\"error_type\":"+text(error_type,!error_type.empty())+",\"error\":"+text(error,!error.empty())+'}'};
 }
