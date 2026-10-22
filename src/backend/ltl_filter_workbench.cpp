@@ -9,6 +9,7 @@
 #include "minera/xes_export.hpp"
 #include "polars_ltl_original_call_parser.hpp"
 #include "pandas_ltl_original_call_parser.hpp"
+#include "log_ltl_original_call_parser.hpp"
 #include <algorithm>
 #include <cctype>
 #include <map>
@@ -30,6 +31,7 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
   std::optional<std::string> original_call_text;
   std::optional<PolarsLtlFilterCall> original_call;
   std::optional<pandas_ltl_original_call_detail::Call> original_pandas_call;
+  std::optional<log_ltl_original_call_detail::Call> original_log_call;
   std::string engine,operation,kind,format,input_kind,call_mode,phase="control",open_key="concept:name",case_key="case:concept:name",attribute_key="concept:name",resource_key="org:resource",timestamp_key="time:timestamp";
   std::string result_json,xes,xes_error,helper_result,error_type,error;int status=200;bool apply_returned=false;
   const auto field=[&](const std::string& name,std::string fallback={}){const auto found=fields.find(name);return found==fields.end()?fallback:found->second->bytes;};
@@ -54,10 +56,12 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
     if(!modes.contains(operation)){operation.clear();throw std::invalid_argument("choose a supported relationship operation");}
     const bool helper=operation.starts_with("timestamp_"),collection=operation=="eventually" || (engine=="polars" && (operation=="next" || operation=="four_eyes")),social=operation=="four_eyes" || operation=="different_persons";
     if(call_mode=="original"){
-      if(engine=="log")throw std::invalid_argument("call_json requires the pandas or polars engine");
-      if(helper)throw std::invalid_argument(engine=="polars"?"original Polars calls require a relationship operation":"original pandas calls require a relationship operation");
+      if(helper && engine!="log")throw std::invalid_argument(engine=="polars"?"original Polars calls require a relationship operation":"original pandas calls require a relationship operation");
       for(const auto& [name,value]:fields){(void)value;if(name!="engine" && name!="operation" && name!="input_kind" && name!="source_file" && name!="call_json")throw std::invalid_argument("friendly control conflicts with original call_json: "+name);}
-      if(engine=="pandas")original_pandas_call=pandas_ltl_original_call_detail::parse(*original_call_text,operation=="next"?3U:operation=="four_eyes"?2U:1U);
+      if(engine=="log"){
+        if(helper && fields.contains("source_file"))throw std::invalid_argument("original timestamp helpers forbid source_file by presence");
+        original_log_call=log_ltl_original_call_detail::parse(*original_call_text,helper?2U:operation=="next"?3U:operation=="four_eyes"?2U:1U,helper);
+      }else if(engine=="pandas")original_pandas_call=pandas_ltl_original_call_detail::parse(*original_call_text,operation=="next"?3U:operation=="four_eyes"?2U:1U);
       else {
         original_call=polars_ltl_original_call_detail::parse(*original_call_text);
         original_call->operation=operation=="eventually"?PolarsLtlFilterOperation::kEventuallyFollows:operation=="next"?PolarsLtlFilterOperation::kNext:operation=="four_eyes"?PolarsLtlFilterOperation::kFourEyes:PolarsLtlFilterOperation::kDifferentPersons;
@@ -65,9 +69,13 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
     }
     if(helper && engine!="log")throw std::invalid_argument("timestamp list helpers require the event-log engine");
     if(helper){
+      EventAttribute a,b;
+      if(original_log_call){a=original_log_call->args[0];b=original_log_call->args[1];}
+      else{
       for(const auto& [name,value]:fields){(void)value;if(name!="engine" && name!="operation" && name!="helper_a_json" && name!="helper_b_json")throw std::invalid_argument("inactive timestamp-helper control: "+name);}
       if(!fields.contains("helper_a_json") || !fields.contains("helper_b_json"))throw std::invalid_argument("both typed timestamp operands are required");
-      const auto a=parse_attributes_filter_values_json(field("helper_a_json"),true),b=parse_attributes_filter_values_json(field("helper_b_json"),true);
+      a=parse_attributes_filter_values_json(field("helper_a_json"),true);b=parse_attributes_filter_values_json(field("helper_b_json"),true);
+      }
       phase="apply";
       helper_result=helper_json(operation=="timestamp_ge"?log_ltl_timestamp_list_is_ge(a,b):log_ltl_timestamp_list_is_le(a,b));
       apply_returned=true;kind="helper";phase="complete";
@@ -101,7 +109,7 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
         if(fields.contains("timestamp_diff_boundaries_json"))boundaries=parse_attributes_filter_values_json(field("timestamp_diff_boundaries_json"),true);
       }
       if(engine=="log"){
-        format=field("source_format","auto");if(format=="auto"){
+        format=original_log_call?"native_log":field("source_format","auto");if(format=="auto"){
           auto name=uploaded->second->filename;std::transform(name.begin(),name.end(),name.begin(),[](unsigned char ch){return static_cast<char>(std::tolower(ch));});
           const auto first=uploaded->second->bytes.find_first_not_of(" \r\n\t");
           if(name.ends_with(".csv"))format="csv";else if(name.ends_with(".json"))format="native_log";else if(name.ends_with(".xes") || name.ends_with(".xes.gz"))format="xes";
@@ -120,7 +128,13 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
         }}
         if(format!="csv" && !fields.contains("activity_key")){bool found=false;for(const auto& trace:log->traces){for(const auto& event:trace.events){if(!event.activity_source_key.empty()){open_key=event.activity_source_key;found=true;break;}if(event.activity_attribute){open_key=event.activity_attribute->key;found=true;break;}}if(found)break;}}
         before=serialize_embedding_workbench_raw_log_json(*log);phase="apply";
-        LogLtlFilterOptions options;options.attribute_key={"",attribute_key};options.resource_key={"",resource_key};options.timestamp_key={"",timestamp_key};options.positive=positive;options.enable_timestamp=enabled;options.timestamp_diff_boundaries=boundaries;
+        LogLtlFilterOptions options;
+        if(original_log_call){
+          options=original_log_call->options;
+          if(operation=="eventually")values=original_log_call->args[0];
+          else if(operation=="different_persons")target=original_log_call->args[0];
+          else {a=original_log_call->args[0];b=original_log_call->args[1];if(operation=="next")c=original_log_call->args[2];}
+        }else {options.attribute_key={"",attribute_key};options.resource_key={"",resource_key};options.timestamp_key={"",timestamp_key};options.positive=positive;options.enable_timestamp=enabled;options.timestamp_diff_boundaries=boundaries;}
         if(operation=="eventually")result_log=filter_log_ltl_eventually_follows(*log,values,options);
         else if(operation=="next")result_log=filter_log_ltl_next(*log,a,b,c,options);
         else if(operation=="four_eyes")result_log=filter_log_ltl_four_eyes(*log,a,b,options);

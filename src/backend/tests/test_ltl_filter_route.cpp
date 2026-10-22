@@ -43,6 +43,8 @@ int main(){try{
  require(duplicate_call.status==400 && !text(duplicate_call.json,"call_mode") && !native_text(duplicate_call.json,"call_json"),"duplicate HTTP query/multipart original call accepted or captured");contains(duplicate_call,"\"phase\":\"control\"");
  const auto duplicate_pandas_call=send(client,original_pandas_request("invalid native source","{}"),std::string(route)+"?call_json=%7B%7D");
  require(duplicate_pandas_call.status==400 && !text(duplicate_pandas_call.json,"call_mode") && !native_text(duplicate_pandas_call.json,"call_json"),"duplicate HTTP query/multipart pandas original call accepted or captured");contains(duplicate_pandas_call,"\"phase\":\"control\"");
+ const auto duplicate_log_call=send(client,original_log_request("invalid source","{}"),std::string(route)+"?call_json=%7B%7D");
+ require(duplicate_log_call.status==400 && !text(duplicate_log_call.json,"call_mode") && !native_text(duplicate_log_call.json,"call_json"),"duplicate HTTP query/multipart LOG original call accepted or captured");contains(duplicate_log_call,"\"phase\":\"control\"");
  const auto ordinary=received(client.Post(route,"not multipart","text/plain"));require(ordinary.status==400,"nonmultipart relationship request accepted");
  const auto malformed=client.Post(route,"missing delimiters","multipart/form-data; boundary=broken");require(malformed && malformed->status==400,"malformed relationship multipart accepted");
  owned.stop();require(owned.listened,"owned relationship server listen failed");std::cout<<"owned relationship HTTP workflows and strict actual Files passed\n";
