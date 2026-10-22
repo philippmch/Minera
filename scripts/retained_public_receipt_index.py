@@ -8,7 +8,8 @@ sha256, provenance='own-public-observation', format ('json', 'jsonl',
 'gzip-json', 'gzip-jsonl', 'gzip-envelope-json', 'gzip-envelope-jsonl'), adapter
 ('receipt-v1', 'pandas-before-v1', 'polars-receipt-v1', 'log-attributes-packed-v1',
 'pandas-attributes-before-v1', 'polars-attributes-receipt-v1',
-'log-variants-packed-v1', 'pandas-variants-before-v1', or 'digest-plan-v1'),
+'log-variants-packed-v1', 'pandas-variants-before-v1',
+'polars-variants-receipt-v1', or 'digest-plan-v1'),
 receipt_schema, reference, runtime, and role
 ('observations', 'plans', or 'intents'). JSON object wrappers require records_key;
 otherwise JSON must be one record or an array of records. Envelope sources also
@@ -53,6 +54,7 @@ SCHEMAS = {
     'polars-attributes-receipt-v1': ('minera-polars-attributes-observer-receipt-v1', 'source_positional_all_options_keyword'),
     'log-variants-packed-v1': ('minera-log-variants-observer-receipt-v1', 'positional_args_keyword_controls'),
     'pandas-variants-before-v1': ('minera-pandas-variants-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
+    'polars-variants-receipt-v1': ('minera-polars-variants-observer-receipt-v1', 'source_positional_all_options_keyword'),
 }
 LOG_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.log.attributes.attributes_filter'
 LOG_ATTRIBUTES_ARITIES = {
@@ -1430,6 +1432,363 @@ def _polars_attributes_adapt(row, spec):
     return receipt['module'], receipt['function'], raw, digest, status
 
 
+POLARS_VARIANTS_MODULE = 'pm4py.algo.filtering.polars.variants.variants_filter'
+POLARS_VARIANTS_KEYWORDS = {
+    'apply': {'admitted_variants', 'parameters'},
+    'apply_from_variant_list': {'variants', 'parameters'},
+    'filter_variants_top_k': {'k', 'parameters'},
+    'apply_auto_filter': {'parameters'},
+}
+POLARS_VARIANTS_ENUMS = {'CASE_ID_KEY': 'pm4py:param:case_id_key',
+                         'ACTIVITY_KEY': 'pm4py:param:activity_key', 'POSITIVE': 'positive'}
+POLARS_VARIANTS_BASE = {
+    'index', 'module', 'case', 'receipt', 'receipt_sha256', 'input_before',
+    'input_categories_before', 'kwargs_before', 'phase', 'apply_returned',
+    'warnings', 'input_after', 'input_categories_after', 'kwargs_after',
+    'input_values_unchanged', 'input_categories_unchanged', 'input_unchanged', 'kwargs_unchanged',
+}
+POLARS_VARIANTS_TERMINALS = {
+    'result', 'error', 'result_kind', 'result_value', 'value_result', 'output',
+    'return', 'returned', 'exception', 'error_type',
+}
+POLARS_VARIANTS_PLAN = {'receipt', 'receipt_sha256', 'case'}
+POLARS_VARIANTS_ENTRY = POLARS_VARIANTS_BASE | {
+    'result_type', 'returned_input_identity', 'public_unoptimized_plan',
+    'public_plan_error', 'public_plan_warnings',
+}
+
+
+def _polars_variants_need(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def _polars_variants_exact(value, fields, message):
+    _polars_variants_need(type(value) is dict and set(value) == set(fields), message)
+
+
+def _polars_variants_packed(value, expected=None, depth=0):
+    _polars_variants_need(depth < 192 and type(value) is dict and type(value.get('type')) is str,
+                          'Polars variants packed value absent/too deep')
+    kind = value['type']
+    _polars_variants_need(expected is None or kind == expected, 'Polars variants packed kind mismatch')
+    if kind in {'NoneType', 'str', 'bool', 'int'}:
+        _polars_variants_exact(value, {'type', 'value'}, 'unknown Polars variants scalar fields')
+        _polars_variants_need(type(value['value']) is {'NoneType': type(None), 'str': str, 'bool': bool, 'int': int}[kind],
+                              'Polars variants scalar type mismatch')
+    elif kind == 'float':
+        _polars_variants_exact(value, {'type', 'hex'}, 'unknown Polars variants float fields')
+        try:
+            _polars_variants_need(type(value['hex']) is str and float.fromhex(value['hex']).hex() == value['hex'],
+                                  'noncanonical Polars variants float hex')
+        except (ValueError, OverflowError):
+            raise ValueError('invalid Polars variants float hex') from None
+    elif kind in {'datetime', 'date'}:
+        _polars_variants_exact(value, {'type', 'iso', 'fold', 'offset_seconds'} if kind == 'datetime' else {'type', 'iso'},
+                               'unknown Polars variants temporal fields')
+        _polars_variants_need(type(value['iso']) is str, 'Polars variants temporal ISO absent')
+        try:
+            parsed = (datetime.datetime if kind == 'datetime' else datetime.date).fromisoformat(value['iso'])
+            _polars_variants_need(parsed.isoformat() == value['iso'], 'noncanonical Polars variants temporal ISO')
+        except (ValueError, OverflowError):
+            raise ValueError('invalid Polars variants temporal ISO') from None
+        if kind == 'datetime':
+            offset = parsed.utcoffset()
+            _polars_variants_need(type(value['fold']) is int and value['fold'] in {0, 1}, 'Polars variants datetime fold mismatch')
+            _polars_variants_need(value['offset_seconds'] is None if offset is None else
+                                  type(value['offset_seconds']) is float and math.isfinite(value['offset_seconds']) and
+                                  value['offset_seconds'] == offset.total_seconds(), 'Polars variants datetime offset mismatch')
+    elif kind == 'enum':
+        _polars_variants_exact(value, {'type', 'module', 'name', 'value'}, 'unknown Polars variants enum fields')
+        _polars_variants_need(value['module'] == POLARS_VARIANTS_MODULE and type(value['name']) is str and
+                              value['name'] in POLARS_VARIANTS_ENUMS and
+                              value['value'] == {'type': 'str', 'value': POLARS_VARIANTS_ENUMS[value['name']]},
+                              'unknown Polars variants enum module/name/value')
+    elif kind in {'list', 'tuple', 'set'}:
+        _polars_variants_exact(value, {'type', 'values'}, 'unknown Polars variants sequence fields')
+        _polars_variants_need(type(value['values']) is list, 'Polars variants sequence absent')
+        for child in value['values']:
+            _polars_variants_packed(child, depth=depth + 1)
+        if kind == 'set':
+            _polars_variants_need(value['values'] == sorted(value['values'], key=lambda item: json.dumps(item, sort_keys=True)),
+                                  'Polars variants producer set order differs')
+    elif kind == 'dict':
+        _polars_variants_exact(value, {'type', 'items'}, 'unknown Polars variants dictionary fields')
+        _polars_variants_need(type(value['items']) is list, 'Polars variants ordered dictionary entries absent')
+        for pair in value['items']:
+            _polars_variants_need(type(pair) is list and len(pair) == 2, 'Polars variants dictionary pair absent')
+            for child in pair:
+                _polars_variants_packed(child, depth=depth + 1)
+    else:
+        raise ValueError('unknown Polars variants observer packed type')
+
+
+def _polars_variants_frame(frame):
+    _polars_variants_exact(frame, {'columns', 'dtypes', 'shape', 'rows'}, 'unknown/incomplete Polars variants frame')
+    _polars_variants_need(type(frame['columns']) is list and all(type(x) is str for x in frame['columns']) and
+                          len(set(frame['columns'])) == len(frame['columns']), 'Polars variants columns invalid')
+    width = len(frame['columns'])
+    _polars_variants_need(type(frame['dtypes']) is list and len(frame['dtypes']) == width and
+                          all(type(x) is str and x for x in frame['dtypes']), 'Polars variants dtype cardinality mismatch')
+    _polars_variants_need(type(frame['shape']) is list and len(frame['shape']) == 2 and
+                          all(type(x) is int and x >= 0 for x in frame['shape']) and type(frame['rows']) is list and
+                          frame['shape'] == [len(frame['rows']), width], 'Polars variants frame dimensions mismatch')
+    for row in frame['rows']:
+        _polars_variants_packed(row, 'tuple')
+        _polars_variants_need(len(row['values']) == width, 'Polars variants row width mismatch')
+
+
+def _polars_variants_messages(messages):
+    _polars_variants_need(type(messages) is list, 'Polars variants complete warning array absent')
+    for message in messages:
+        _polars_variants_exact(message, {'type', 'message'}, 'unknown/incomplete Polars variants warning')
+        _polars_variants_need(type(message['type']) is str and '.' in message['type'] and
+                              type(message['message']) is str, 'Polars variants qualified warning/message absent')
+
+
+def _polars_variants_series(series):
+    _polars_variants_exact(series, {'name', 'dtype', 'length', 'values'}, 'unknown/incomplete Polars variants category Series')
+    _polars_variants_need(type(series['name']) is str and type(series['dtype']) is str and series['dtype'] and
+                          type(series['length']) is int and series['length'] >= 0 and type(series['values']) is list and
+                          len(series['values']) == series['length'], 'Polars variants category Series shape mismatch')
+    for value in series['values']:
+        _polars_variants_packed(value)
+
+
+def _polars_variants_categories(categories, frame):
+    _polars_variants_need(type(categories) is list, 'Polars variants category observables absent')
+    indices = []
+    for category in categories:
+        _polars_variants_need(type(category) is dict and category.get('kind') in {'Categorical', 'Enum'},
+                              'unknown Polars variants category kind')
+        fields = {'column_index', 'column', 'kind', 'dtype', 'get_categories', 'observation_warnings'}
+        fields |= {'declared_categories'} if category['kind'] == 'Enum' else {'context', 'ordering'}
+        _polars_variants_exact(category, fields, 'unknown/incomplete Polars variants category fields')
+        index = category['column_index']; indices.append(index)
+        _polars_variants_need(type(index) is int and 0 <= index < len(frame['columns']) and
+                              category['column'] == frame['columns'][index] and category['dtype'] == frame['dtypes'][index] and
+                              category['dtype'].startswith(category['kind']), 'Polars variants category column/dtype mismatch')
+        _polars_variants_series(category['get_categories'])
+        _polars_variants_messages(category['observation_warnings'])
+        if category['kind'] == 'Enum':
+            _polars_variants_series(category['declared_categories'])
+            _polars_variants_need(category['declared_categories']['values'] == category['get_categories']['values'],
+                                  'Polars variants full declared Enum categories differ')
+        else:
+            context = category['context']
+            _polars_variants_exact(context, {'name', 'namespace', 'physical_dtype', 'is_global'},
+                                   'unknown/incomplete Polars variants category context')
+            _polars_variants_need((context['name'] is None or type(context['name']) is str) and
+                                  (context['namespace'] is None or type(context['namespace']) is str) and
+                                  type(context['physical_dtype']) is str and context['physical_dtype'] and
+                                  type(context['is_global']) is bool and type(category['ordering']) is str,
+                                  'Polars variants category context/order types invalid')
+    _polars_variants_need(indices == sorted(set(indices)), 'Polars variants category order/uniqueness mismatch')
+    _polars_variants_need(indices == [i for i, dtype in enumerate(frame['dtypes']) if dtype.startswith(('Categorical', 'Enum'))],
+                          'Polars variants category metadata missing/extraneous')
+
+
+def _polars_variants_kwargs(kwargs, function):
+    _polars_variants_packed(kwargs, 'dict')
+    seen = set()
+    for key, value in kwargs['items']:
+        _polars_variants_need(key['type'] == 'str' and key['value'] in POLARS_VARIANTS_KEYWORDS[function] and
+                              key['value'] not in seen, 'unknown/duplicate Polars variants keyword')
+        seen.add(key['value'])
+
+
+def _polars_variants_receipt(receipt):
+    _polars_variants_exact(receipt, {'module', 'function', 'input', 'category_observables', 'kwargs', 'call_shape', 'input_kind'},
+                           'unknown/incomplete Polars variants original seven-field receipt')
+    _polars_variants_need(receipt['module'] == POLARS_VARIANTS_MODULE and type(receipt['function']) is str and
+                          receipt['function'] in POLARS_VARIANTS_KEYWORDS and
+                          receipt['call_shape'] == 'source_positional_all_options_keyword' and
+                          receipt['input_kind'] in {'DataFrame', 'LazyFrame'}, 'unreviewed Polars variants call identity')
+    _polars_variants_frame(receipt['input'])
+    _polars_variants_categories(receipt['category_observables'], receipt['input'])
+    _polars_variants_kwargs(receipt['kwargs'], receipt['function'])
+
+
+def _polars_variants_case(case, receipt):
+    _polars_variants_need(type(case) is dict and {'name', 'function', 'fixture', 'kwargs'} <= set(case) and
+                          not set(case) - {'name', 'function', 'fixture', 'kwargs', 'eager', 'parameters', 'parameters_literal'},
+                          'unknown/incomplete Polars variants saved case recipe')
+    _polars_variants_need(type(case['name']) is str and case['name'] and case['function'] == receipt['function'] and
+                          type(case['fixture']) is dict and type(case['kwargs']) is dict and
+                          ('eager' not in case or type(case['eager']) is bool) and
+                          case.get('eager', False) == (receipt['input_kind'] == 'DataFrame') and
+                          ('parameters_literal' not in case or type(case['parameters_literal']) is bool),
+                          'Polars variants case/function/source kind mismatch')
+
+
+def _polars_variants_returned(row):
+    _polars_variants_need(type(row.get('result_type')) is str and row['result_type'] in
+                          {'polars.lazyframe.frame.LazyFrame', 'polars.dataframe.frame.DataFrame'} and
+                          type(row.get('returned_input_identity')) is bool, 'Polars variants returned class/identity absent')
+    plans = {'public_unoptimized_plan', 'public_plan_error', 'public_plan_warnings'} & set(row)
+    lazy = row['result_type'] == 'polars.lazyframe.frame.LazyFrame'
+    _polars_variants_need((lazy and 'public_plan_warnings' in plans and
+                           len(plans & {'public_unoptimized_plan', 'public_plan_error'}) == 1) or
+                          (not lazy and not plans), 'Polars variants public plan/error/warnings boundary mismatch')
+    if 'public_unoptimized_plan' in row:
+        _polars_variants_need(type(row['public_unoptimized_plan']) is str, 'Polars variants full public plan text absent')
+    if 'public_plan_error' in row:
+        _polars_variants_exact(row['public_plan_error'], {'type', 'message'}, 'Polars variants full public-plan error absent')
+        _polars_variants_need(type(row['public_plan_error']['type']) is str and '.' in row['public_plan_error']['type'] and
+                              type(row['public_plan_error']['message']) is str, 'Polars variants qualified public-plan error absent')
+    if 'public_plan_warnings' in row:
+        _polars_variants_messages(row['public_plan_warnings'])
+    return plans
+
+
+def _polars_variants_outcome(row, receipt):
+    _polars_variants_need(type(row.get('apply_returned')) is bool, 'Polars variants apply-returned state absent')
+    fields = set(POLARS_VARIANTS_BASE)
+    returned = row['apply_returned']; error = 'error' in row
+    if returned:
+        fields |= {'result_type', 'returned_input_identity'} | _polars_variants_returned(row)
+    if error:
+        fields.add('error')
+        _polars_variants_exact(row['error'], {'type', 'message', 'args', 'phase'}, 'Polars variants complete error absent')
+        _polars_variants_need(type(row['error']['type']) is str and '.' in row['error']['type'] and
+                              type(row['error']['message']) is str and row['error']['phase'] == row.get('phase') ==
+                              ('collect' if returned else 'apply'), 'Polars variants error phase/qualified type/message mismatch')
+        _polars_variants_need(not returned or row['result_type'] == 'polars.lazyframe.frame.LazyFrame',
+                              'Polars variants collect error has nonlazy returned class')
+        _polars_variants_packed(row['error']['args'], 'tuple')
+    else:
+        fields |= {'result_kind', 'result', 'result_categories'}
+        _polars_variants_need(returned and row.get('phase') == 'complete' and row.get('result_kind') == 'frame',
+                              'unknown Polars variants terminal result/phase')
+        _polars_variants_frame(row['result'])
+        _polars_variants_categories(row['result_categories'], row['result'])
+    _polars_variants_exact(row, fields, 'unknown/mixed/incomplete Polars variants observation fields')
+    _polars_variants_need(type(row['index']) is int and row['index'] > 0 and row['module'] == POLARS_VARIANTS_MODULE,
+                          'Polars variants actual index/module mismatch')
+    _polars_variants_case(row['case'], receipt)
+    _polars_variants_need(canonical(row['input_before']) == canonical(receipt['input']) and
+                          canonical(row['input_categories_before']) == canonical(receipt['category_observables']) and
+                          canonical(row['kwargs_before']) == canonical(receipt['kwargs']), 'Polars variants before/receipt snapshots differ')
+    _polars_variants_frame(row['input_after'])
+    _polars_variants_categories(row['input_categories_after'], row['input_after'])
+    _polars_variants_kwargs(row['kwargs_after'], receipt['function'])
+    _polars_variants_need(canonical([pair[0] for pair in row['kwargs_before']['items']]) ==
+                          canonical([pair[0] for pair in row['kwargs_after']['items']]), 'Polars variants outer keyword shape changed')
+    for field, before, after in [('input_values_unchanged', 'input_before', 'input_after'),
+                                  ('input_categories_unchanged', 'input_categories_before', 'input_categories_after'),
+                                  ('kwargs_unchanged', 'kwargs_before', 'kwargs_after')]:
+        _polars_variants_need(type(row[field]) is bool and row[field] == (canonical(row[before]) == canonical(row[after])),
+                              'Polars variants mutation flag mismatch')
+    _polars_variants_need(type(row['input_unchanged']) is bool and
+                          row['input_unchanged'] == (row['input_values_unchanged'] and row['input_categories_unchanged']),
+                          'Polars variants aggregate source mutation flag mismatch')
+    _polars_variants_messages(row['warnings'])
+    if row.get('returned_input_identity'):
+        expected = 'polars.dataframe.frame.DataFrame' if receipt['input_kind'] == 'DataFrame' else 'polars.lazyframe.frame.LazyFrame'
+        _polars_variants_need(row['result_type'] == expected, 'Polars variants returned identity source class mismatch')
+        if not error:
+            _polars_variants_need(canonical(row['result']) == canonical(row['input_after']) and
+                                  canonical(row['result_categories']) == canonical(row['input_categories_after']),
+                                  'Polars variants identity result/source-after mismatch')
+
+
+def _polars_variants_audit(data, spec):
+    _polars_variants_need(spec.get('adapter') == 'polars-variants-receipt-v1' and spec.get('role') == 'plans' and
+                          spec.get('format') == 'json' and spec.get('records_key') == 'receipts',
+                          'Polars variants full audit requires explicit planned provenance')
+    audit = load_json(data)
+    _polars_variants_exact(audit, {'planned', 'prior_receipts_verified', 'duplicates', 'prior_overlaps', 'receipts'},
+                           'unknown/incomplete Polars variants full audit wrapper')
+    _polars_variants_need(type(audit['planned']) is int and audit['planned'] >= 0 and
+                          type(audit['prior_receipts_verified']) is int and audit['prior_receipts_verified'] >= 0 and
+                          type(audit['receipts']) is list and len(audit['receipts']) == audit['planned'] and
+                          audit['duplicates'] == [] and audit['prior_overlaps'] == [],
+                          'Polars variants audit candidate/prior partition mismatch')
+    seen = set(); names = set()
+    for row in audit['receipts']:
+        _polars_variants_exact(row, POLARS_VARIANTS_PLAN, 'unknown Polars variants full audit plan fields')
+        _polars_variants_need(type(row['case']) is str and row['case'] and row['case'] not in names and
+                              type(row['receipt_sha256']) is str and re.fullmatch('[0-9a-f]{64}', row['receipt_sha256']) and
+                              row['receipt_sha256'] not in seen, 'Polars variants audit name/digest uniqueness mismatch')
+        _polars_variants_receipt(row['receipt'])
+        _polars_variants_need(sha(canonical(row['receipt'])) == row['receipt_sha256'], 'Polars variants full audit receipt hash mismatch')
+        seen.add(row['receipt_sha256']); names.add(row['case'])
+
+
+def _polars_variants_adapt(row, spec):
+    role = spec['role']; adapter = spec['adapter']
+    _polars_variants_need(adapter == 'polars-variants-receipt-v1', 'Polars variants requires full closed adapter')
+    digest = row.get('receipt_sha256')
+    _polars_variants_need(type(digest) is str and re.fullmatch('[0-9a-f]{64}', digest), 'Polars variants original receipt digest absent')
+    if 'receipt' not in row:
+        _polars_variants_exact(row, {'index', 'case', 'function', 'receipt_sha256'},
+                               'Polars variants module-free light intent has unknown/entry/terminal fields')
+        _polars_variants_need(role == 'intents' and spec.get('provenance') == 'own-public-observation' and
+                              spec.get('reference') and spec.get('runtime') and type(row['index']) is int and row['index'] > 0 and
+                              type(row['case']) is str and row['case'] and type(row['function']) is str and
+                              row['function'] in POLARS_VARIANTS_KEYWORDS, 'Polars variants light intent lacks closed provenance')
+        return POLARS_VARIANTS_MODULE, row['function'], None, digest, 'entered_without_outcome'
+    receipt = row['receipt']; _polars_variants_receipt(receipt)
+    raw = canonical(receipt)
+    _polars_variants_need(sha(raw) == digest, 'Polars variants seven-field canonical SHA mismatch')
+    if set(row) & POLARS_VARIANTS_TERMINALS:
+        _polars_variants_outcome(row, receipt)
+        status = 'actual_outcome'
+    elif set(row) == POLARS_VARIANTS_PLAN:
+        _polars_variants_need(role in {'plans', 'intents'} and type(row['case']) is str and row['case'],
+                              'Polars variants full plan lacks explicit provenance/case')
+        status = 'planned_only' if role == 'plans' else 'entered_without_outcome'
+    else:
+        _polars_variants_need(not set(row) - POLARS_VARIANTS_ENTRY and
+                              any(key in row for key in ('apply_returned', 'input_after', 'input_categories_after',
+                                                         'kwargs_after', 'public_unoptimized_plan', 'public_plan_error', 'public_plan_warnings')),
+                              'unknown/incomplete Polars variants entry evidence')
+        _polars_variants_entry(row, receipt)
+        status = 'entered_without_outcome'
+    return POLARS_VARIANTS_MODULE, receipt['function'], raw, digest, status
+
+
+def _polars_variants_entry(row, receipt):
+    if 'module' in row:
+        _polars_variants_need(row['module'] == POLARS_VARIANTS_MODULE, 'partial Polars variants module conflict')
+    if 'index' in row:
+        _polars_variants_need(type(row['index']) is int and row['index'] > 0, 'partial Polars variants index invalid')
+    if 'case' in row:
+        _polars_variants_case(row['case'], receipt)
+    for field, key in [('input_before', 'input'), ('input_categories_before', 'category_observables'), ('kwargs_before', 'kwargs')]:
+        if field in row:
+            _polars_variants_need(canonical(row[field]) == canonical(receipt[key]), 'partial Polars variants before/receipt mismatch')
+    for field in ('apply_returned', 'returned_input_identity', 'input_values_unchanged', 'input_categories_unchanged', 'input_unchanged', 'kwargs_unchanged'):
+        if field in row:
+            _polars_variants_need(type(row[field]) is bool, 'partial Polars variants entry boolean invalid')
+    if 'phase' in row:
+        _polars_variants_need(row['phase'] in {'apply', 'collect', 'complete'}, 'partial Polars variants phase invalid')
+    if 'input_after' in row or 'input_categories_after' in row:
+        _polars_variants_need('input_after' in row and 'input_categories_after' in row, 'partial Polars variants source/category pair absent')
+        _polars_variants_frame(row['input_after']); _polars_variants_categories(row['input_categories_after'], row['input_after'])
+    if 'kwargs_after' in row:
+        _polars_variants_kwargs(row['kwargs_after'], receipt['function'])
+    checks = [('input_values_unchanged', 'input_after', 'input'),
+              ('input_categories_unchanged', 'input_categories_after', 'category_observables'),
+              ('kwargs_unchanged', 'kwargs_after', 'kwargs')]
+    for flag, after, before in checks:
+        if flag in row:
+            _polars_variants_need(after in row and row[flag] == (canonical(row[after]) == canonical(receipt[before])),
+                                  'partial Polars variants mutation flag mismatch')
+    if 'input_unchanged' in row:
+        _polars_variants_need('input_after' in row and 'input_categories_after' in row and
+                              row['input_unchanged'] == (canonical(row['input_after']) == canonical(receipt['input']) and
+                                                         canonical(row['input_categories_after']) == canonical(receipt['category_observables'])),
+                              'partial Polars variants aggregate mutation mismatch')
+    if row.get('apply_returned'):
+        _polars_variants_returned(row)
+    else:
+        _polars_variants_need(not set(row) & {'result_type', 'returned_input_identity', 'public_unoptimized_plan',
+                                             'public_plan_error', 'public_plan_warnings'}, 'partial Polars variants returned metadata lacks entry state')
+    if 'warnings' in row:
+        _polars_variants_messages(row['warnings'])
+
+
 def adapt(row, spec):
     if not isinstance(row, dict):
         raise ValueError('record must be an object')
@@ -1445,6 +1804,8 @@ def adapt(row, spec):
         raise ValueError('unknown original receipt schema for adapter')
     if spec.get('receipt_schema') == SCHEMAS['pandas-variants-before-v1'][0]:
         return _pandas_variants_adapt(row, spec)
+    if spec.get('receipt_schema') == SCHEMAS['polars-variants-receipt-v1'][0]:
+        return _polars_variants_adapt(row, spec)
     if spec.get('receipt_schema') == SCHEMAS['log-variants-packed-v1'][0]:
         return _log_variants_adapt(row, spec)
     if spec.get('receipt_schema') == SCHEMAS['polars-attributes-receipt-v1'][0]:
@@ -1613,6 +1974,8 @@ class Index:
             partition = canonical([spec['reference'], spec['runtime']]).decode()
             if spec['receipt_schema'] == SCHEMAS['pandas-variants-before-v1'][0] and spec.get('records_key') is not None:
                 _pandas_variants_audit(data, spec)
+            if spec['receipt_schema'] == SCHEMAS['polars-variants-receipt-v1'][0] and spec.get('records_key') is not None:
+                _polars_variants_audit(data, spec)
             if spec['receipt_schema'] == SCHEMAS['log-variants-packed-v1'][0] and spec.get('records_key') is not None:
                 _log_variants_audit(data, spec)
             if spec['receipt_schema'] == SCHEMAS['polars-attributes-receipt-v1'][0] and spec.get('records_key') is not None:
@@ -1631,6 +1994,12 @@ class Index:
                         if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
                             hints.append(row['receipt']['module'])
                         if any(hint != PANDAS_VARIANTS_PROFILE['module'] for hint in hints):
+                            gap_row = None
+                    if spec['receipt_schema'] == SCHEMAS['polars-variants-receipt-v1'][0] and isinstance(row, dict):
+                        hints = [row['module']] if 'module' in row else []
+                        if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
+                            hints.append(row['receipt']['module'])
+                        if any(hint != POLARS_VARIANTS_MODULE for hint in hints):
                             gap_row = None
                     if spec['receipt_schema'] == SCHEMAS['pandas-attributes-before-v1'][0] and isinstance(row, dict):
                         # A legacy row can lack an embedded module. Conflicting
