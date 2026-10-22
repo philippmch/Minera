@@ -70,6 +70,25 @@ The old full-member projector must not consume these events. A reviewed scope
 guard must retain them as unresolved provenance edges with no full-file keys or
 flat matches.
 
+The explicit `key-origin-size-base64-members-v1` profile is JSONL **discovery
+only** for two reviewed producer layouts. `key_wrapper_metadata` requires the
+exact schema-review hash, `producer_profile`, nonnegative integer
+`expected_file_count`, and the exact `expected_wrapper_count` and
+`expected_wrapper_sequence` of kind/key pairs. Both entry paths reject invalid
+admission, transport, provenance or controls before source reads/parser creation.
+Root must separately bind the exact reviewed source, producer and sidecar.
+
+Exact file rows contain `kind="file"`, `key`, `origin_path`, `size_bytes`,
+`sha256`, `encoding="base64"` and `data`. The key identifies a logical alias;
+`origin_path` is provenance only and is never followed or used as identity.
+File events retain logical-member scope and unavailable source-file identity.
+The report/public-cases wrappers stay opaque candidates with gaps, including
+known valid wrappers: they can preserve partial historical outcomes without
+complete canonical receipts. Data, values and nested keys are skipped
+lexically. EOF checks validate metadata, counts, order and name uniqueness;
+nonfinite JSON remains an error. Downstream projection must explicitly refuse
+this schema independently of logical flags before it can consume these events.
+
 Two explicit chunk schemas support **discovery only**:
 
 | Schema | Declared identity |
