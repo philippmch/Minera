@@ -1,0 +1,455 @@
+{
+  "schema": "minera-filtering-polars-case-grouping-preparation-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/filtering-polars-case-grouping-preparation.json.gz",
+    "bytes": 119294,
+    "sha256": "36b41c9f5c1e5c33f3c858466d3d4b405dd9fb8c6bd77026931ee3f04f426511",
+    "members": 80,
+    "uncompressed_bytes": 1687116,
+    "uncompressed_sha256": "56e4c60e0e1f1569f8efc3f2dabda8180159aadf411e6952201e5e53500e8765"
+  },
+  "prepared_full_receipts": 205,
+  "families": [
+    {
+      "family": "consecutive",
+      "module": "pm4py.algo.filtering.polars.consecutive_act_case_grouping.consecutive_act_case_grouping_filter",
+      "prepared_receipts": 92,
+      "input_kinds": {
+        "LazyFrame": 85,
+        "DataFrame": 7
+      },
+      "ordered_receipts_sha256": "7129bccc6efff8c525362e16a47c321f1e9b5fe13e4b04eae068831176f13b86"
+    },
+    {
+      "family": "timestamp",
+      "module": "pm4py.algo.filtering.polars.timestamp_case_grouping.timestamp_case_grouping_filter",
+      "prepared_receipts": 113,
+      "input_kinds": {
+        "LazyFrame": 105,
+        "DataFrame": 8
+      },
+      "ordered_receipts_sha256": "c940655e9985eca531cf291ff3c9a6660264dc7b6360fa6c6b103937759998e0"
+    }
+  ],
+  "target_algorithm_calls": 0,
+  "source_collect_calls": 0,
+  "preentry_source_collect_calls": 0,
+  "result_collect_calls": 0,
+  "public_surface_modules": 6,
+  "all_original_canonical_receipt_hashes_verified": true,
+  "strict_complete_saved_receipt_validation": true,
+  "both_ordered_receipt_list_hashes_verified": true,
+  "frozen_script_cases_recipe_and_surface_verified": true,
+  "all_member_utf8_bytes_hashes_round_trip_verified": true,
+  "all_source_bindings_rechecked_after_round_trip": true,
+  "independent_extracted_checks": 30,
+  "synthetic_phase_boundary_checks": 4,
+  "failed_harness_and_generator_attempts_preserved": true,
+  "prior_barrier_validated": false,
+  "root_entry_certificate_issued": false,
+  "module_status_changes": 0,
+  "source_bindings": [
+    {
+      "path": "build/filtering-case-grouping-polars-consecutive-public-preentry-1/call-plan.jsonl",
+      "bytes": 196797,
+      "sha256": "f665a1aea6cf4241bde0a787f8adc5cf3fd626d5a16988d6f5e7a3f13edef189"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-consecutive-public-preentry-1/dedup-audit.json",
+      "bytes": 14179,
+      "sha256": "57a0fe9fda4ddd2e484a20de0be84989906498695712ddba3a9733aa2ab07d89"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-consecutive-public-preentry-1/executed-cases.json",
+      "bytes": 233741,
+      "sha256": "31c181d79d719995030400460cfc41e534de96fd8cae54c675adf0935df31896"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-consecutive-public-preentry-1/executed-script.py",
+      "bytes": 31610,
+      "sha256": "2d495dc82a135cde7d2c5c5b1c8694aa0ec6714a084062be1777b7346a1d9d21"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-consecutive-public-preentry-1/executed-source-recipe.json",
+      "bytes": 337,
+      "sha256": "449030e773f5a9b9a34a9001d35013a70b504f867405dd99557a7cd679b99a43"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-consecutive-public-preentry-1/prior-receipt-search.json",
+      "bytes": 138,
+      "sha256": "bb561d0eb09c8771f39f610f27ebab7c812a639399efe6d24bbbfd3209f30d70"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-consecutive-public-preentry-1/validation.json",
+      "bytes": 1310,
+      "sha256": "8be612a0056823fbeca382b27313c2bad38a210be361420b82aa995bc0131f00"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-timestamp-public-preentry-1/call-plan.jsonl",
+      "bytes": 236534,
+      "sha256": "d8d99e4716a2bd2b3b255ace39842ffc28dfbb5f7c28c2be20a1e7deca3b7e42"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-timestamp-public-preentry-1/dedup-audit.json",
+      "bytes": 17244,
+      "sha256": "00dccbafe98be422e16c7e7987023e50c53a958f6a2ac0b04c8ccf8e09f036e0"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-timestamp-public-preentry-1/executed-cases.json",
+      "bytes": 233741,
+      "sha256": "31c181d79d719995030400460cfc41e534de96fd8cae54c675adf0935df31896"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-timestamp-public-preentry-1/executed-script.py",
+      "bytes": 31610,
+      "sha256": "2d495dc82a135cde7d2c5c5b1c8694aa0ec6714a084062be1777b7346a1d9d21"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-timestamp-public-preentry-1/executed-source-recipe.json",
+      "bytes": 337,
+      "sha256": "449030e773f5a9b9a34a9001d35013a70b504f867405dd99557a7cd679b99a43"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-timestamp-public-preentry-1/prior-receipt-search.json",
+      "bytes": 138,
+      "sha256": "bb561d0eb09c8771f39f610f27ebab7c812a639399efe6d24bbbfd3209f30d70"
+    },
+    {
+      "path": "build/filtering-case-grouping-polars-timestamp-public-preentry-1/validation.json",
+      "bytes": 1298,
+      "sha256": "29755e15f8cd0ff9092208002c58ef158b3e1e7dd6585e18ff5d130750695335"
+    },
+    {
+      "path": "build/grouping-public-surface-actual-1/capture.json",
+      "bytes": 22696,
+      "sha256": "f6bc24786f614d0391052235684949b5e4a227f0c42c660e43a0e8963e3b4c66"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-next-review/fixture-bank-spec.json",
+      "bytes": 10549,
+      "sha256": "f6f0cbc6e4867341661328069116acf448db45ed7d3f659dc74d3835a0424279"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-next-review/review.json",
+      "bytes": 7266,
+      "sha256": "e92d0a5fa9faca5512bd363b7e148f3e8f29b166afbf7db6760bc64d51ece6ff"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/capture-public.py",
+      "bytes": 31610,
+      "sha256": "2d495dc82a135cde7d2c5c5b1c8694aa0ec6714a084062be1777b7346a1d9d21"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/cases.json",
+      "bytes": 233741,
+      "sha256": "31c181d79d719995030400460cfc41e534de96fd8cae54c675adf0935df31896"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/consecutive-root-prepare-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/freeze-1.json",
+      "bytes": 2655,
+      "sha256": "ac39d3fcc52507a29db375bc6a7182304b8076d5a1753b7a2603d0e06df4d300"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-1/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-1/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-1/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-1/synthetic-audit.json",
+      "bytes": 820,
+      "sha256": "9b1ad9839104be8174e0a573e2979b850811434ed5fc95d1e29f4c759490e322"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-2/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-2/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-2/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-2/synthetic-audit.json",
+      "bytes": 820,
+      "sha256": "9b1ad9839104be8174e0a573e2979b850811434ed5fc95d1e29f4c759490e322"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-3/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-3/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-3/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-audit-gate-fixtures-3/synthetic-audit.json",
+      "bytes": 820,
+      "sha256": "9b1ad9839104be8174e0a573e2979b850811434ed5fc95d1e29f4c759490e322"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-final-test-audit-gate-offline.py",
+      "bytes": 3801,
+      "sha256": "31bded27cb5429673a5ff96e562b005f958bea8f7d035345a1cc94012d915dbf"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-final-test-hardening-offline.py",
+      "bytes": 6965,
+      "sha256": "f7f6ff2b2b5f754c9098a883d0840ebd47cd25840109219138f238ebe116e54d"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-final3-test-audit-gate-offline.py",
+      "bytes": 3801,
+      "sha256": "54527f336a5f3482f9c2966190940a6fc091e1e1960d5178f2d542b26ebef235"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-final3-test-hardening-offline.py",
+      "bytes": 6965,
+      "sha256": "9033dab059819be1066a7e7536b192f2b3a59f07467dd7751aaba82983744136"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-1/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "f353586dd4cf9c9d4f0a2369d31cdaae27d50d6657454660bd75526e33c6bc48"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-1/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-1/results.json",
+      "bytes": 2280,
+      "sha256": "b7f77a336da41fd1961f9a426b48d3e1c6541f835fb973a4c5d435452fe6f20c"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-2/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "79a02efab6d32ee572febeb9375a49eb6635439ff4fa2567a2bfe05ab40a4f83"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-2/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-2/results.json",
+      "bytes": 2280,
+      "sha256": "eb8dd84e32f44c826adaa7513e8ab320a6d72b8304716e73631c63b2182ac38d"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-3/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "5a298ff2cd482600dd851df9592eed6d0d6e38418023e41456e649f72a9610d9"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-3/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-hardening-checks-3/results.json",
+      "bytes": 2280,
+      "sha256": "c52c14223a5f296892f862a8e3ccc029728783ace05cbe79f8dbc586fad7197d"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-review-checks-1/failure.json",
+      "bytes": 508,
+      "sha256": "b499fef8f6feba2cfb2f04185c5991860ad1b96b9abaaf41c488bb3f8384bd54"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-review-checks-1.py",
+      "bytes": 6179,
+      "sha256": "feba363256de212ef74e0808f0d3625b85cf69b7e74a7f08737d9ced3c93ebee"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-review-checks-2/failure.json",
+      "bytes": 544,
+      "sha256": "2e146b9bf96d260ea9c0bdaca7a73e33e1dcad18501ab3eee41f8422202dda5b"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-review-checks-2.py",
+      "bytes": 6333,
+      "sha256": "b6fc094915d7bd003dc1f323986675de54b9cabc16bdf323e1666db69cd6815c"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-review-checks-3/validation.json",
+      "bytes": 2093,
+      "sha256": "ba62de47271dbba9b78c088bbbc6d0ea84b7dfb97324c7d7a122b21c22ca15e9"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-review-checks-3.py",
+      "bytes": 6369,
+      "sha256": "09d49b108317bb6915ee196ba75ece301a9db84259f6c055aa777300938ea606"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-review-final-1.json",
+      "bytes": 7042,
+      "sha256": "b94b968eaaf14e8ee7376bd5e68a8badcce1b1aa889475e7f321e6f5787a965e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-test-audit-gate-offline.py",
+      "bytes": 3801,
+      "sha256": "f12c1e4a4531a39d9ffb51c8204f32a37e409802aa1a1daf0c2fb80a56bea031"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/independent-test-hardening-offline.py",
+      "bytes": 6965,
+      "sha256": "26fac7bc0ef31e4e4cf51e56cb7742a5676274a7547311185ec31b438a80cdd1"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/offline-audit-gate-test-fixtures-1/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/offline-audit-gate-test-fixtures-1/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/offline-audit-gate-test-fixtures-1/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/offline-audit-gate-test-fixtures-1/synthetic-audit.json",
+      "bytes": 820,
+      "sha256": "9b1ad9839104be8174e0a573e2979b850811434ed5fc95d1e29f4c759490e322"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/offline-bank-shape-validation.json",
+      "bytes": 1159,
+      "sha256": "5a81507a3b13d1061223446f181fd0d103d11213a27b9f0a5f65ccd46401839c"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/offline-hardening-checks-1/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "b461926ad7995f7828e4dabeeeedcc6e1f86af52f954ff6b06e8bebfc5e02ad5"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/offline-hardening-checks-1/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/offline-hardening-checks-1/results.json",
+      "bytes": 2280,
+      "sha256": "54f08576594835d843340beeb1fd10eba4782719553b171a3f77a989a138917f"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/prepare-independent-review-checks-2.py",
+      "bytes": 918,
+      "sha256": "32a0c03917e90a78c69637ce275da01f67402df39b8860aed556f0a8d66f5ed4"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/prepare-independent-review-checks-3.py",
+      "bytes": 879,
+      "sha256": "bd6a4e057544a69977b7a6196bdef9ec7dd812ff0b23c71cc4313128e0118ad8"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/README.md",
+      "bytes": 6761,
+      "sha256": "af0a7b86bc4773bb0af6c75f0931b577d9ed7d3a08774c0e3c87447fdabefedb"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/saved-plan-verifier-generation-failure-1.json",
+      "bytes": 565,
+      "sha256": "720bbdfbe0509c005935d4e688bddfcf6d585b8a57ecd7e5553ab87d41960b5c"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/saved-plan-verifier-generation-failure-2.json",
+      "bytes": 636,
+      "sha256": "631a25b087c54994dadb209cd0a0908c6df67c24742553b324f12dc41aea9db4"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/source-constructor-recipe.json",
+      "bytes": 337,
+      "sha256": "449030e773f5a9b9a34a9001d35013a70b504f867405dd99557a7cd679b99a43"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/source-fixture-bank-spec.json",
+      "bytes": 10549,
+      "sha256": "f6f0cbc6e4867341661328069116acf448db45ed7d3f659dc74d3835a0424279"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/test-audit-gate-offline.py",
+      "bytes": 3802,
+      "sha256": "e773fdfe4cc27ffa88b58ffc4f60e7a48bb3be91abef2ea7c48336aa85cb0b5b"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/test-hardening-offline.py",
+      "bytes": 6884,
+      "sha256": "c2ea474c9a6d4d01d2048238c1985fc226af7d6f6004b66320db5a1ed78ae2ca"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/timestamp-root-prepare-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-root-plan-review-1/validation.json",
+      "bytes": 6589,
+      "sha256": "3e069ef9915bd08f8989a1eed45d4ad62cd58d4844496adf96b1f67cdaa1d649"
+    },
+    {
+      "path": "build/parity-closures/derive-polars-case-grouping-saved-plan-verifier-original-failed-1.py",
+      "bytes": 2955,
+      "sha256": "2fc76ac96972fae7bc9bad3d85e7f9150d5ae7463916ee82717b9ef55fd88124"
+    },
+    {
+      "path": "build/parity-closures/derive-polars-case-grouping-saved-plan-verifier.py",
+      "bytes": 3031,
+      "sha256": "93ef31a122acfa7ba1f097d0d2e6d19aecaf191ff08ea3c39c0382dcbfd80617"
+    },
+    {
+      "path": "build/parity-closures/grouping-public-surface-prepared-1/observe-public-surface.py",
+      "bytes": 3512,
+      "sha256": "c4dcf097890e40e6f15a329bc3637d833108e2f5385bbf448a783ae2e521f047"
+    },
+    {
+      "path": "build/parity-closures/package-polars-case-grouping-preparation.py",
+      "bytes": 7482,
+      "sha256": "a51a04ae4b6f09f50175b593e119da1baf045670df065f239f5315554d57a7c6"
+    },
+    {
+      "path": "build/parity-closures/verify-pandas-case-grouping-saved-plans.py",
+      "bytes": 7351,
+      "sha256": "c2b4d7844f8493b39fc169d6c2c2363a3f923fba0bf3e96494bae1874fae5c94"
+    },
+    {
+      "path": "build/parity-closures/verify-polars-case-grouping-saved-plans.py",
+      "bytes": 6977,
+      "sha256": "b988ca109e64d338728bf9191f804b29329b6f9ab1fbaca2606b0474a69b74b2"
+    }
+  ],
+  "limitations": "Capsule completeness covers only these own preparation artifacts; historical completeness, target behavior and parity are not asserted."
+}
