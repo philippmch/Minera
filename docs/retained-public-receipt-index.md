@@ -23,6 +23,48 @@ later writes require another inventory and validation generation.
 
 ## Supported evidence
 
+The distinct `polars-variants-receipt-v1` adapter requires schema
+`minera-polars-variants-observer-receipt-v1`. Its original canonical receipt has
+exactly seven fields: `module`, `function`, `input`, `category_observables`,
+`kwargs`, `call_shape`, and `input_kind`. It is closed to `apply`,
+`apply_from_variant_list`, `filter_variants_top_k`, and `apply_auto_filter`, with
+the original eager/lazy source identity and ordered typed keyword/parameter
+entries. Sharing the Polars LTL or attributes call shape grants no admission.
+
+Full terminal observations retain complete input/result frames, before/after
+categories and controls, all mutation flags, qualified errors and typed error
+arguments, apply/collect phase, returned-input identity, algorithm warnings and
+the separate public unoptimized-plan observer's plan/error/warnings. Category
+metadata retains unused dictionary values, Enum declarations, Categorical
+context name/namespace/physical type/global state/ordering and observer warnings.
+An observer plan error is distinct from an algorithm error. Unknown or mixed
+terminal fields and incomplete captured entry evidence remain blocking gaps.
+
+The full dedup audit is planned evidence: each element retains the complete
+original receipt and hash, and its wrapper requires exact candidate counts with
+no duplicates or prior overlaps. It supplies no separate digest-only plan. The
+producer's light intent has exactly `index`, `function`, `case`, and
+`receipt_sha256`; its omitted module is supplied only by this explicit closed
+schema, adapter and own-observer/reference/runtime provenance. An intent still
+has no reconstructed operands and resolves only against a matching terminal
+receipt in the same schema and reference/runtime partition.
+
+Root's bounded census reconstructed all 411 original receipts (399 + 12): 142
+complete returned frames, 258 apply errors, 11 collect errors, 176 algorithm
+warning observations, 35 DataFrame and 376 LazyFrame inputs. Its 528 unique
+projected source/result frame-and-category snapshots contain 30 nonempty category
+dictionaries; that number does not prove the definition of the legacy saved
+dictionary counter. The sorted original IDs joined by LF without a trailing LF
+have SHA-256
+`1e3b6c30324bdac74bbcf8660e1db4ddc46791c50b3f73de8f9bcbca6c986759`.
+The new synthetic module is
+`scripts.tests.test_retained_public_receipt_polars_variants`; root must separately
+execute these tests and the prepared full411 index/cache acceptance. Source
+preparation is not a runtime pass. This extends neither the committed LTL archive
+inventory nor historical completeness, catalogue status or reference-call
+authority. Full parity remains open with 201 strict units and 565 unentered
+grouping queries.
+
 The distinct `pandas-variants-before-v1` adapter requires schema
 `minera-pandas-variants-observer-receipt-v1`. It reconstructs the original six
 fields `module`, `method`, `input`, `args`, `kwargs`, and `call_shape`, preserving
