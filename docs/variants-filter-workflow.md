@@ -1,5 +1,68 @@
 # Complete activity-variant filtering
 
+## Original LOG calls: complete 380-call API and UI acceptance
+
+The event-log family chooser now has **Original activity-variant calls**, alongside
+the existing friendly workflow. It exposes all seven LOG variants functions through
+`POST /api/reference-log-variants`. The new route requires exactly `operation`, a
+genuine native EventLog `source_file`, and complete `call_json`. Every operation
+requires its source, including the scalar automatic-threshold helper. The existing
+25-operation friendly log route, CSV/XES imports and defaults remain available.
+
+The descriptor has schema `minera-log-variants-original-call-v1`, ordered `args`
+excluding the source, and ordered `keyword_entries` with exact `key`/`value` pairs.
+It uses the original Packed tags: strings are `{"type":"str","value":"A"}`,
+integers have `type:int` and an exact JSON integer token, floats use `type:float`
+and hexadecimal `hex`, sequences use `values`, and dictionaries use ordered
+`items` pairs. For example, membership in a tuple variant is:
+
+```json
+{"schema":"minera-log-variants-original-call-v1","args":[{"type":"list","values":[{"type":"tuple","values":[{"type":"str","value":"A"},{"type":"str","value":"B"}]}]}],"keyword_entries":[]}
+```
+
+Parameters are supplied through their original keyword entry. An omitted keyword,
+explicit None, empty dictionary and raw value remain distinct. Public enum keys
+retain their exact module/name/underlying value; enum and literal keys remain
+separate ordered entries. Typed tuple-key dictionaries retain their full keys.
+Supplied variant trace lists use `{"type":"trace_ref","source_trace_index":0}`;
+each reference copies the complete actual source trace. No auxiliary trace file
+or guessed index is substituted. The seven built-in call examples match the
+downloadable three-trace native source example.
+
+The raw editor and strict UTF8 File importer preserve the complete text, including
+CRLF, BOM and large integer tokens. The client does not parse and reserialize the
+call. Native validation owns malformed JSON and unsupported controls. Editing the
+source, operation or call clears results and invalidates pending HTTP and File
+imports; switching families unmounts and cancels the workflow.
+
+The closed response has 21 fields. Inspection offers exact raw-call, complete
+parsed source before/after, and actual call controls before/after downloads, even
+on native errors. Controls include resolved native options and materialized
+dictionary entry boundaries, full trace values and ordinary values; raw echo is
+not substituted for those snapshots. Errors retain short native type and complete
+message. Original Python error.args, warnings and alias identity remain external;
+the route's phases are its own workbench phases.
+
+Log results provide complete native JSON, an optional XES projection, and **Use
+filtered native log as source**, which sends that actual File on the next request.
+The scalar helper instead provides a complete typed floating-point artifact and
+has no filtered-File or reuse action. XES export failure preserves the successful
+native result. No source-opening selector is invented for the new 21-field route.
+
+The complete retained 380 bank passes original native, direct and owned HTTP
+acceptance: 226 logs, 32 full native scalar artifacts and 122 full type/message
+diagnostics, with complete source/control artifacts and all 704 supplied trace
+copies checked. Independent mapping covers all 70 complete snapshots. All 197
+frontend files / 9,898 tests, 48 focused tests, TypeScript and Vite pass. The owned
+rendered-browser run passes 16 checks with all seven examples, 14 completed HTTP
+outcomes plus one held actual response, and ten exact downloads. It verifies BOM,
+CRLF and large-integer imports, both cancellation paths and actual filtered File
+reuse. These rendered examples are separate from the complete 380-call fixture;
+historical acceptance below describes the older friendly workflow.
+All 201 strict open units and 565 unentered grouping logical queries remain open.
+
+## Existing friendly workflow and historical acceptance
+
 The log-filter workspace supports exact variant membership, top-k, individual
 minimum/maximum coverage and cumulative coverage. The dataframe workspace adds
 membership, top-k and pandas individual coverage filters. Upload genuine CSV,

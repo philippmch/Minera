@@ -1,5 +1,57 @@
 # Log variants filter parity contract
 
+## Original-call product acceptance
+
+A separate original-call workflow exposes all seven LOG functions through
+`POST /api/reference-log-variants` using the root-frozen
+`minera-log-variants-original-call-v1` descriptor. It requires an actual native
+EventLog File for every function, including `find_auto_threshold`, plus ordered
+typed positional operands excluding source and ordered keyword entries. Complete
+raw text is forwarded and echoed without client JSON normalization. The existing
+friendly five-mode variants workflow remains unchanged.
+
+Root has separately admitted the complete 370+10 retained observations and unchanged
+own native oracle. Independent reconstruction matched all 380 original receipt IDs,
+all 70 complete native snapshots and every complete original case body. The full
+set is 226 log returns, 32 scalar values and 122 errors; all 704 packed trace references
+were bound to complete source trace values. This source-text mapping is not new
+runtime acceptance. The immutable native predicate/header/oracle and shared typed
+codecs remain unchanged.
+
+The new transport uses a private constructor codec matching the original own
+generator: numeric sequence child keys, ordered ordinary maps, exact integer
+storage, std::to_string float display with retained double bits, native datetime
+defaults, NaT/NA/bytes/UUID kinds, dedicated typed admission dictionaries and
+ordered supplied variant entries. Ignored admission/parameter values, enum
+identities, raw/empty arms and resolved native defaults are included in complete
+actual before/after control artifacts. Source-trace references copy complete
+actual traces; no foreign trace or Python object-alias graph is claimed.
+
+Its closed 21-field response distinguishes complete log results from typed double
+helper artifacts, retains full source/control snapshots on errors and exact native
+error type/full message, and separates secondary XES errors. Original error.args,
+warnings, qualified Python class identity and reference alias identity remain in
+the external receipts. Own control/source-import/filter/export phases do not
+reproduce observer invocation phases that were never captured.
+
+The UI exposes all seven examples, exact UTF8/CRLF/BOM imports and full-byte
+downloads. Source/form edits, unmount and deferred import generations invalidate
+stale results. A filtered native File can become the next actual source; scalar
+results cannot become a filtered source. Full-bank acceptance passes all 380
+original native cases, all 380 direct calls and all 380 owned HTTP calls, comparing
+complete logs, native double artifacts, error type/message, actual controls,
+source-after, exact raw calls and reopened artifacts. The full frontend suite
+passes 197 files / 9,898 tests; 48 focused tests, TypeScript and Vite pass. An owned
+rendered-browser run passes all seven examples and 16 checks, with 14 completed
+HTTP outcomes plus one held actual response and ten exact downloads. Its BOM,
+CRLF, large-token imports, stale HTTP/File-import cancellation and actual filtered
+File reuse checks supplement the full fixture. Root verified listener ownership,
+viewed success/error screenshots and stopped both owned processes with stdio
+drained. The prior acceptance below remains historical evidence, and the module/catalogue
+stay partial with 201 strict open units and 565 unentered grouping logical queries.
+
+## Existing native contract and historical acceptance
+
 This native companion implements the seven public functions of `pm4py.algo.filtering.log.variants.variants_filter` from PM4Py 2.7.22, pinned commit `0715c31f3f1d85924107d6aa5329806db69df899`. Only public signatures, docs, enums, complete public calls and opaque module hashes were used. Reference implementation source, AST, bytecode and private state were not inspected. The closed convenience `filter_log_variants_percentage` is unchanged; the new typed cumulative entry point is `filter_log_variants_cumulative`.
 
 The native API in `include/minera/log_variants_filter.hpp` exposes membership, cumulative coverage, minimum individual coverage, maximum individual coverage, top-k, dictionary-percentage filtering and automatic threshold finding. Criteria and activity selectors use typed ordinary `EventAttribute` values. `LogVariantsDictionary` retains ordered typed variant keys, full trace values, and ordinary non-trace values for public length diagnostics. A separate typed dictionary-admission carrier retains tuple keys that the generic string-key attribute dictionary cannot encode.
