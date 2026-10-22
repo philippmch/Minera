@@ -14,7 +14,104 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: all297 original LOG calls reach API/UI — 2026-10-22
+## Current continuation: all 280 original LOG attributes calls reach API/UI — 2026-10-22
+
+`e581af39` retains the checkpoint in `docs/retained-public-observation-log-attributes-original-call-checkpoint.jsonl.gz`
+(321,141 bytes; SHA256 `e95b0c8700f30461fdb040796ec1590e78b18c6fe156e9bcff115692372adf37`). Its validation sidecar is
+`docs/retained-public-observation-log-attributes-original-call-checkpoint.validation.json`. Root independently checked all 93 own text members
+against current bytes and exact UTF8 round trips. There are 41
+external declarations. Original banks/archives, original full native oracle,
+generated vector payload, binaries, raw browser responses and screenshots remain
+external. The three next-candidate metadata files are embedded by literal names;
+they admit no candidate payload. Root facts are embedded from
+`build/parity-closures/log-attributes-original-call-finalization-1/root-facts.json`.
+
+Four focused source commits implement this checkpoint: `2f70df9a` adds the distinct
+closed receipt adapter and integrity tests; `d5ef3752` adds backend transport and
+controls; `8aaed322` adds complete native/direct/HTTP acceptance; `120d311d` adds the
+editor, exact imports/downloads and workflow contract. Root verified all fifteen
+owned source paths against committed Git bytes, normalizing CRLF/LF only, while
+preserving the inherited two tracked coverage edits.
+
+Root reviewed all six own capture producers, reconstructed their original
+whole-file declarations from retained metadata and freshly verified all six
+record files before explicit bounded public-observation parsing. Both closed
+census implementations reconstruct all 280 canonical receipts, sorted SHA256
+`ec5330eb47c1a4611d4790d94a02178cde7e914b48d6f5be6c9b93a5fe88a597`.
+All eight methods remain intact: 182 full logs / 98 full errors / zero warnings,
+162 source changes and 165 aggregate control changes. Sixteen maximum calls change
+caller dictionaries, including three without a source change. The final index
+resolves all 280 exact intents with zero gaps and twelve rehashed source cache hits.
+All 41 integrity tests pass; two return-identity consistency gaps found in independent
+review were fixed without changing any original receipt. Earlier parser generations
+and review pin-refusal evidence remain preserved.
+
+`call_json` selects `minera-log-attributes-original-call-v1` on the existing
+attributes endpoint. Original mode requires a complete native EventLog File and
+exclusive ordered typed args. It preserves omitted parameters, raw typed values
+and ordered string/enum entries, including actual mutable maximum-activity writes.
+Membership/relative take one operand, numeric operations two, maximum zero or one,
+and threshold four or five. Threshold dictionaries retain typed count keys/values
+and full source/external trace handles; auxiliary File presence is exact. The fixed
+30-field envelope adds call mode/exact call bytes and complete actual cache before/
+after snapshots, including raw/dictionary union tags, entry boundaries, all traces,
+vc and typed selector. It distinguishes 202 actual parameter dictionaries, four raw
+NA values and 44 omissions. All 30 full caches and five external-trace calls are checked.
+Original error.args and Python identity metadata remain external; wire errors expose
+type/full message. Unobserved ordinary cache values and repeated underlying parameter
+names reject explicitly, without claiming arbitrary object or alias-graph fidelity.
+
+The native header/predicate/oracle and shared LOG codec remain byte-identical.
+The original oracle is 3,481,841 bytes, SHA256
+`657b5ab0e92b78de2e85adc685c1f6e949623f12390ddbeca382cc72a61a2e7c`.
+All 153 complete snapshot constructors and all 280 original case bodies were
+independently reconstructed; the wrapper invokes original cases/storage controls
+directly and never calls its renamed unused main. All 280 calls pass direct API and
+all 280 pass owned HTTP with complete result/error/source-after/parameter/cache checks.
+Four native/control/transport targets pass (terminal 0/drained `65408a`, 53.78 seconds;
+full public target 50.26 seconds). All 193 frontend files / 9,865 tests, 35 focused tests,
+final TypeScript (`69385f`) and production build pass. Final server SHA256 is
+`03e8dc387a26a69fb4390e30b68d7ce7bc0255567cde1f8f2fbe095859e6af08`.
+
+Rendered browser terminal 0/drained `915dba` passes 17 checks, 15 attributes requests
+plus one actual mine reopen and 11 byte-exact downloads. It covers all eight operations,
+external caches, caller-only mutation on error, raw NA, exact integer/CRLF imports,
+held actual HTTP response cancellation and deferred own File import cancellation.
+Complete XES and the independent imported activity role pass unchanged to native
+fetch, followed by actual mine response/navigation. Raw encoded multipart body
+inspection is not claimed. Listener PID ownership was verified and both new owned
+processes closed with stdio drained. Root viewed success/error screenshots.
+
+Preserved attempts include sandbox Vitest EPERM before any test, an interrupted
+sandbox native-current build after its banner, two browser help-label locator
+failures and two 11th-download burst timeouts. An isolated first XES download passed;
+spacing complete-harness downloads passed all assertions on the same product server.
+No product or expected-result change was needed for those harness corrections.
+Historical native source/object hashes match old acceptance, while old EXE/MAP
+hashes differ; no historical binary equivalence is claimed. Fresh product builds
+provided current runtime acceptance. Independent backend, index, fixture, frontend,
+browser and packager reviews are retained with their exact scopes and failures.
+
+Full scope stays 86 packages / 387 modules, 46 complete packages / 226 complete modules,
+201 strict open units and 565 unentered logical grouping queries across six banks.
+No new/replayed reference calls, catalogue promotion, full-history completeness,
+absence proof, root-entry certificate or full parity follows from this checkpoint.
+
+Next bounded metadata plan is
+`build/parity-closures/pandas-attributes-next-product-metadata-review-1/report.json`,
+SHA256 `7bebc66a6503a995ce7427cf7e43e5d6607498b5efb1871f53add99067c38be1`.
+It identifies the **complete 448-call pandas attributes bank / all eight methods**.
+335 tables / 113 diagnostics / 150 snapshots are prior accepted declarations, not a
+new canonical census. Two record hashes and the native oracle have flat historical
+bindings. Root must review producer/schema/provenance, fresh opaque file bindings
+and explicitly admit those exact observations/oracle before parsing. Then add its
+distinct closed observer adapter, reconstruct all 448 IDs and complete native mapping,
+and only then freeze full original-call API/UI transport. Five parameter-based
+wrappers and three direct helpers need distinct operand handling. No next-candidate
+record, oracle or archive payload was opened or hashed by that plan; do not narrow
+it to convenient parameter/cache subsets.
+
+## Previous checkpoint: all297 original LOG calls reach API/UI — 2026-10-22
 
 `fcb9d598` retains the checkpoint in
 `docs/retained-public-observation-log-original-call-checkpoint.jsonl.gz`
