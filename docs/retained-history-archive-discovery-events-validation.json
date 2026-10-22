@@ -1,0 +1,50 @@
+{
+  "schema": "minera-retained-history-archive-discovery-events-validation-v1",
+  "archive": {
+    "path": "docs/retained-history-archive-discovery-events.jsonl.gz",
+    "bytes": 24135968,
+    "sha256": "0e3e637eda6fc29d22232c556034f2cf53a86a4b990b330f91b6a4f274e9dbb9"
+  },
+  "original": {
+    "path": "build/parity-closures/grouping-history-archive-discovery-final-2/events.jsonl",
+    "bytes": 370502511,
+    "sha256": "4fea0b765f5a83825d86b1c26bd38ce7c844199b0bbcfabda832ccd7cfa4b42e"
+  },
+  "roundtrip_exact_raw_bytes_verified": true,
+  "event_lines": 645283,
+  "selected_distinct_own_archive_contents": 2844,
+  "process_finished_successfully": true,
+  "original_session_terminal_drained": 5107,
+  "counts": {
+    "chunk": 490419,
+    "container_structure": 227,
+    "gap": 30814,
+    "header_candidate": 60,
+    "member": 123763
+  },
+  "unresolved_metadata_gaps": 30814,
+  "fully_interpreted_metadata_inventory": false,
+  "parser_sha256": "db75974c2c3166d0a8d7303997b11654e8d7dc123b0ec30e1ebd59154c2b1d55",
+  "report": {
+    "path": "build/parity-closures/grouping-history-archive-discovery-final-2/report.json",
+    "bytes": 1121,
+    "sha256": "f93c53ffcb2ed96e06c2cae621314147a89448f5b9936bb1a39d979d80d5703c"
+  },
+  "terminal_binding": {
+    "path": "build/parity-closures/grouping-history-archive-discovery-final-2/terminal-receipt.json",
+    "bytes": 1706,
+    "sha256": "7728641d67bbeef982407d934823779bc1aa07cadd35523746371c5b40dbdac0"
+  },
+  "reference_algorithm_calls": 0,
+  "original_payloads_decoded_or_admitted": 0,
+  "historical_audit_complete": false,
+  "admission_complete": false,
+  "reference_call_absence_established": false,
+  "parity_status_changes": 0,
+  "own_packager": {
+    "path": "build/parity-closures/save-wide-discovery-events.py",
+    "bytes": 3112,
+    "sha256": "7a0f4d6a8c74340b58abfad10e208f0d4ab2a7aab54b46e776824f7138f087e5"
+  },
+  "note": "All selected metadata scan attempts finished. Unknown envelope/header/public-record schemas and incomplete/unverified chunks remain explicit. This archive contains metadata events only, never original member payloads or complete canonical public call receipts."
+}

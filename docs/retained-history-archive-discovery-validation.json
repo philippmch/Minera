@@ -1,0 +1,237 @@
+{
+  "schema": "minera-completed-wide-metadata-discovery-validation-v1",
+  "archive": {
+    "path": "docs/retained-history-archive-discovery-checks.json.gz",
+    "bytes": 2776071,
+    "sha256": "b223f318d3e3bd072ba82e616aad73e39480e09918c45c968e7b51c5e9313b76",
+    "members": 37
+  },
+  "all_own_member_bytes_roundtrip_and_source_bindings_verified": true,
+  "wide_session_terminal_drained": 5107,
+  "selected_distinct_own_archive_contents": 2844,
+  "wide_counts": {
+    "chunk": 490419,
+    "container_structure": 227,
+    "gap": 30814,
+    "header_candidate": 60,
+    "member": 123763
+  },
+  "wide_metadata_gaps_retained": 30814,
+  "raw_events_archive": {
+    "path": "docs/retained-history-archive-discovery-events.jsonl.gz",
+    "bytes": 24135968,
+    "sha256": "0e3e637eda6fc29d22232c556034f2cf53a86a4b990b330f91b6a4f274e9dbb9"
+  },
+  "projection_summary": {
+    "unique_declared_identity_keys": 172697,
+    "candidate_json_jsonl_full_hashes": 34997,
+    "candidate_json_jsonl_paths": 223533,
+    "member_chunk_provenance_edges": 614182,
+    "output_database": {
+      "bytes": 879497216,
+      "path": "build\\parity-closures\\grouping-member-projection-root-1\\declared-full-member-candidates.sqlite",
+      "sha256": "54872a06b90ed21541ddb9773f02edb3355c1847b62410dfce18586cb087638c"
+    }
+  },
+  "projection_independent_sql_invariants": 11,
+  "projection_synthetic_tests": 7,
+  "legacy_correction_session_terminal_drained": 15285,
+  "legacy_recovered_names_verified_against_baseline": 17084,
+  "legacy_correction_remaining_header_gaps": 8,
+  "parser_sha256": "db75974c2c3166d0a8d7303997b11654e8d7dc123b0ec30e1ebd59154c2b1d55",
+  "reference_algorithm_calls": 0,
+  "original_payloads_decoded_or_admitted": 0,
+  "historical_audit_complete": false,
+  "admission_complete": false,
+  "reference_call_absence_established": false,
+  "root_entry_certificate_issued": false,
+  "parity_status_changes": 0,
+  "source_bindings": [
+    {
+      "path": "build/parity-closures/bind-legacy-correction-terminal.py",
+      "bytes": 2080,
+      "sha256": "f9c3790e31d580a4d17358d545f27e409a894f434b25cf2f1e0f790e1e558f51"
+    },
+    {
+      "path": "build/parity-closures/bind-wide-discovery-terminal.py",
+      "bytes": 2313,
+      "sha256": "4ccda7a0e231795a7377440190e5f5a452861981e41450484f00f9ff03a3cd27"
+    },
+    {
+      "path": "build/parity-closures/check-pandas-grouping-capsule-root.py",
+      "bytes": 3085,
+      "sha256": "09633de6579b46e4ef9e6e8d6375f892149918f34928b712948e8a6ae210fbae"
+    },
+    {
+      "path": "build/parity-closures/check-polars-grouping-capsule-root.py",
+      "bytes": 3259,
+      "sha256": "d3ad3dd81b8d276157547ab288c87641fcb1244f5c211fd733164a72bfcf1f5c"
+    },
+    {
+      "path": "build/parity-closures/check-streaming-checkpoint-owned-git.py",
+      "bytes": 2537,
+      "sha256": "77899fc6ea19dafa41c3cf2c284b6e8e11ca88aed57ba69a221dca35a9a1469b"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-archive-discovery-final-2/manifest.json",
+      "bytes": 981981,
+      "sha256": "05ef77cd8c8fd03bba4202ebf724cc8752b5311b47bf831895df08f1cf2fca20"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-archive-discovery-final-2/metadata-summary.json",
+      "bytes": 93221,
+      "sha256": "f054ec225aacec13893bdafb13d2772fc4b20169419034838d1a230bf7bdd83f"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-archive-discovery-final-2/projection-first.log",
+      "bytes": 257,
+      "sha256": "e741b5add7e47d8e0128ecd4132588b0219a37e970b0309f46fc3fc252a21f78"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-archive-discovery-final-2/report.json",
+      "bytes": 1121,
+      "sha256": "f93c53ffcb2ed96e06c2cae621314147a89448f5b9936bb1a39d979d80d5703c"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-archive-discovery-final-2/run-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-archive-discovery-final-2/terminal-receipt.json",
+      "bytes": 1706,
+      "sha256": "7728641d67bbeef982407d934823779bc1aa07cadd35523746371c5b40dbdac0"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/project-declared-full-member-candidates.py",
+      "bytes": 17494,
+      "sha256": "17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-legacy-discovery-correction-1/events.jsonl",
+      "bytes": 8448920,
+      "sha256": "f407170e0f7a0e036d8a7e1d9473a21460c16ea9ef21269e4374f940befae23f"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-legacy-discovery-correction-1/independent-review.json",
+      "bytes": 4543,
+      "sha256": "e83397e13cbe5d893c2741159d21c7be3941fb0edcc552e2081205f1c2a6dfc5"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-legacy-discovery-correction-1/report.json",
+      "bytes": 988,
+      "sha256": "8ba2eae82e8ed7818d8ab4973fb13f02034e872c6e46c4ce90181a588e91f889"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-legacy-discovery-correction-1/run-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-legacy-discovery-correction-1/terminal-receipt.json",
+      "bytes": 1386,
+      "sha256": "f30e07e41ca0394459189f6cc87012109b841536d8eb6d2ebc81abea732bc356"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-independent-review-1/legacy-correction-source-provenance.json",
+      "bytes": 6215,
+      "sha256": "aeee502c18c004ac572aa15bb17253c605dfa76d6e914a297e42cf3a1288f6d6"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-independent-review-1/legacy-exact-member-correction-manifest.json",
+      "bytes": 3682,
+      "sha256": "a02a261c78d7e6debf5785831b7ea22acf41c98104c7fc281babd4eae1f6b1cd"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-independent-review-1/legacy-exact-member-selection.jsonl",
+      "bytes": 10700904,
+      "sha256": "89e25fc813691c382ac29a21e93dff0efbc6de1f14b574497e8ac581cb9050ff"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-independent-review-1/projection-source-provenance.json",
+      "bytes": 474979,
+      "sha256": "c64990214a972d7d21286d4b41144436c060d0a8700e3c69551f0b02d0a12caa"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-independent-review-1/review.json",
+      "bytes": 2942,
+      "sha256": "a3181dffcdbee5c9a3fa2f49295b3506e899a9295947ace584988a39cdfa86fd"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-root-1/queries.sql",
+      "bytes": 339,
+      "sha256": "1969ac35baefa24681d08212104b62d278dba287abac027eaf60adbe68ba8837"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-root-1/validation.json",
+      "bytes": 3077,
+      "sha256": "2ae34fb783018f893c9ab1ba0cee186a7b4119ed1ea4f5901094878e0e96d39c"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-synthetic-1/helper-draft-f356e077.py",
+      "bytes": 16241,
+      "sha256": "f356e07796d2cfe78d9d010d250986b9657633659b3b1fdf2fcfb13661334248"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-synthetic-1/synthetic-validation.json",
+      "bytes": 677,
+      "sha256": "b3f1552618ab64da2ba0ed1b4691b3b58014f8ec01880383c2848b59aa29d6b0"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-synthetic-1/validate-synthetic.py",
+      "bytes": 10457,
+      "sha256": "8d2788af2e15f9c85b5d884fbd35228375946fc4e49913dbb684832b63b481e9"
+    },
+    {
+      "path": "build/parity-closures/pandas-grouping-capsule-root-check.json",
+      "bytes": 658,
+      "sha256": "f2a305c28e45376295a29e438e3930ea91026671eafb7f8bf7c15ee53a9fc2e5"
+    },
+    {
+      "path": "build/parity-closures/polars-grouping-capsule-root-check.json",
+      "bytes": 718,
+      "sha256": "b6bc4a84220e966561c98e5ab747565d38294b56dd64c1188a4b4d73f0cbf542"
+    },
+    {
+      "path": "build/parity-closures/prepare-streaming-checkpoint-git-validation.py",
+      "bytes": 1133,
+      "sha256": "f369621419279d7309a35e44d3410ba5dc374aefa09aaefc3d10f0d444aa4181"
+    },
+    {
+      "path": "build/parity-closures/save-wide-discovery-checks.py",
+      "bytes": 6264,
+      "sha256": "2314ef889df0dfa282f8910d06fc84632c6812bfc356e0cee899be7ea5e0ff31"
+    },
+    {
+      "path": "build/parity-closures/save-wide-discovery-events.py",
+      "bytes": 3112,
+      "sha256": "7a0f4d6a8c74340b58abfad10e208f0d4ab2a7aab54b46e776824f7138f087e5"
+    },
+    {
+      "path": "build/parity-closures/streaming-checkpoint-git-validation-1/declared-catalog.log",
+      "bytes": 118,
+      "sha256": "5bc7fba02db3ffe05393751b450024371aea45b375a3ceb8ee56b5ae8fe263cc"
+    },
+    {
+      "path": "build/parity-closures/streaming-checkpoint-git-validation-1/owned-final.json",
+      "bytes": 4377,
+      "sha256": "ecdbca49177692551cfeea50a504ed68f5fbb63fb7389ea8e3699e0e657f8e48"
+    },
+    {
+      "path": "build/parity-closures/streaming-checkpoint-git-validation-1/validation.json",
+      "bytes": 344,
+      "sha256": "a6bbe04dc21a0097325ce898bd680c4a4708bbfb28e90503e6073a9b5b992087"
+    },
+    {
+      "path": "build/parity-closures/summarize-wide-discovery-metadata.py",
+      "bytes": 3185,
+      "sha256": "8ddd1f9c0f4b0ffb49e7769849271ff72bd81f0b419d86d511908dc9a28d085d"
+    },
+    {
+      "path": "docs/retained-history-archive-discovery-events-validation.json",
+      "bytes": 2198,
+      "sha256": "57ef1b0f2cec86aaa87d0c98e0444b822e49cbf0dc77f966c99d93902bce4487"
+    }
+  ],
+  "note": "The correction is separate bounded interpretation evidence; it does not overwrite the first wide inventory or its unresolved gaps. Flat matches remain unverified candidate locations. SQLite output is regenerable from preserved metadata and is not included as a binary artifact."
+}
