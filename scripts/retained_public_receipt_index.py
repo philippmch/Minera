@@ -6,7 +6,8 @@ The v1 manifest declares root, inventory_complete, scope (a human-readable bound
 inventory description), modules, and sources. Each source declares path, bytes,
 sha256, provenance='own-public-observation', format ('json', 'jsonl',
 'gzip-json', 'gzip-jsonl', 'gzip-envelope-json', 'gzip-envelope-jsonl'), adapter
-('receipt-v1', 'pandas-before-v1', 'polars-receipt-v1', or 'digest-plan-v1'),
+('receipt-v1', 'pandas-before-v1', 'polars-receipt-v1', 'log-attributes-packed-v1',
+'pandas-attributes-before-v1', or 'digest-plan-v1'),
 receipt_schema, reference, runtime, and role
 ('observations', 'plans', or 'intents'). JSON object wrappers require records_key;
 otherwise JSON must be one record or an array of records. Envelope sources also
@@ -22,7 +23,7 @@ it never certifies a directory tree, all archives, or reference parity. Missing
 schemas/operands/pins remain gaps, never reconstructed by guessing. Cache hits
 still require a fresh full container hash. Database history is append-only.
 The closed receipt adapters admit the three versioned LTL observer schemas and
-the separate LOG attributes observer listed in SCHEMAS. New families require an explicit
+the separate LOG/pandas attributes observers listed in SCHEMAS. New families require an explicit
 adapter/schema addition with operand-form and canonicalization validation.
 """
 
@@ -47,6 +48,7 @@ SCHEMAS = {
     'pandas-before-v1': ('minera-pandas-ltl-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
     'polars-receipt-v1': ('minera-polars-ltl-observer-receipt-v1', 'source_positional_all_options_keyword'),
     'log-attributes-packed-v1': ('minera-log-attributes-observer-receipt-v1', 'positional_args_keyword_controls'),
+    'pandas-attributes-before-v1': ('minera-pandas-attributes-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
 }
 LOG_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.log.attributes.attributes_filter'
 LOG_ATTRIBUTES_ARITIES = {
@@ -366,6 +368,193 @@ def _attributes_outcome(row, receipt, source):
                 raise ValueError('LOG attributes event alias snapshot mismatch')
 
 
+PANDAS_ATTRIBUTES_PROFILE = {'module': 'pm4py.algo.filtering.pandas.attributes.attributes_filter',
+ 'call_shape': 'dataframe-positional-plus-explicit-args-and-keywords',
+ 'frame_kind': 'pandas.DataFrame',
+ 'arities': {'apply': [1],
+             'apply_events': [1],
+             'apply_numeric': [2],
+             'apply_numeric_events': [2],
+             'filter_df_relative_occurrence_event_attribute': [1],
+             'filter_df_keeping_activ_exc_thresh': [1],
+             'filter_df_keeping_spno_activities': [0],
+             'filter_df_on_attribute_values': [1]},
+ 'keywords': {'apply': ['parameters'],
+              'apply_events': ['parameters'],
+              'apply_numeric': ['parameters'],
+              'apply_numeric_events': ['parameters'],
+              'filter_df_relative_occurrence_event_attribute': ['parameters'],
+              'filter_df_keeping_activ_exc_thresh': ['act_count0',
+                                                     'activity_key',
+                                                     'most_common_variant'],
+              'filter_df_keeping_spno_activities': ['activity_key', 'max_no_activities'],
+              'filter_df_on_attribute_values': ['case_id_glue',
+                                                'attribute_key',
+                                                'positive',
+                                                'keep_nan_values']},
+ 'enum_values': {'ATTRIBUTE_KEY': {'type': 'str', 'value': 'pm4py:param:attribute_key'},
+                 'ACTIVITY_KEY': {'type': 'str', 'value': 'pm4py:param:activity_key'},
+                 'CASE_ID_KEY': {'type': 'str', 'value': 'pm4py:param:case_id_key'},
+                 'DECREASING_FACTOR': {'type': 'str', 'value': 'decreasingFactor'},
+                 'POSITIVE': {'type': 'str', 'value': 'positive'},
+                 'STREAM_FILTER_KEY1': {'type': 'str', 'value': 'stream_filter_key1'},
+                 'STREAM_FILTER_VALUE1': {'type': 'str', 'value': 'stream_filter_value1'},
+                 'STREAM_FILTER_KEY2': {'type': 'str', 'value': 'stream_filter_key2'},
+                 'STREAM_FILTER_VALUE2': {'type': 'str', 'value': 'stream_filter_value2'},
+                 'KEEP_ONCE_PER_CASE': {'type': 'str', 'value': 'keep_once_per_case'},
+                 'KEEP_NAN_VALUES': {'type': 'str', 'value': 'keep_nan_values'}}}
+
+
+def _pandas_attributes_need(value, message):
+    if not value:
+        raise ValueError(message)
+
+
+def _pandas_attributes_exact(value, fields, label):
+    _pandas_attributes_need(type(value) is dict and set(value) == set(fields), label)
+
+
+def _pandas_attributes_packed(value, profile, tags, depth=0, expected=None):
+    _pandas_attributes_need(depth < 192 and type(value) is dict and (type(value.get('type')) is str), 'packed value absent/too deep')
+    kind = value['type']
+    tags[kind] = tags.get(kind, 0) + 1
+    _pandas_attributes_need(expected is None or kind == expected, 'packed container kind mismatch')
+    if kind in {'NoneType', 'str', 'bool', 'int'}:
+        _pandas_attributes_exact(value, ['type', 'value'], 'unknown scalar descriptor fields')
+        _pandas_attributes_need(type(value['value']) is {'NoneType': type(None), 'str': str, 'bool': bool, 'int': int}[kind], 'typed scalar payload mismatch')
+    elif kind == 'float':
+        _pandas_attributes_exact(value, ['type', 'hex'], 'unknown float descriptor fields')
+        try:
+            _pandas_attributes_need(type(value['hex']) is str and float.fromhex(value['hex']).hex() == value['hex'], 'noncanonical packed float hex')
+        except (ValueError, OverflowError):
+            raise ValueError('invalid packed float hex') from None
+    elif kind == 'bytes':
+        _pandas_attributes_exact(value, ['type', 'hex'], 'unknown bytes descriptor fields')
+        _pandas_attributes_need(type(value['hex']) is str and re.fullmatch('(?:[0-9a-f]{2})*', value['hex']), 'invalid packed bytes hex')
+    elif kind in {'pandas.NA', 'pandas.NaT'}:
+        _pandas_attributes_exact(value, ['type'], 'unknown pandas special-value fields')
+    elif kind in {'datetime', 'pandas.Timestamp'}:
+        _pandas_attributes_exact(value, ['type', 'iso'] if kind == 'datetime' else ['type', 'iso', 'resolution', 'timezone'], 'unknown timestamp descriptor fields')
+        _pandas_attributes_need(type(value['iso']) is str, 'timestamp iso absent')
+        try:
+            datetime.datetime.fromisoformat(value['iso'])
+        except (ValueError, OverflowError):
+            raise ValueError('invalid timestamp iso') from None
+        if kind == 'pandas.Timestamp':
+            _pandas_attributes_need(value['resolution'] in {'s', 'ms', 'us', 'ns'} and (value['timezone'] is None or type(value['timezone']) is str), 'timestamp resolution/timezone absent')
+    elif kind == 'enum':
+        _pandas_attributes_exact(value, ['type', 'module', 'name', 'value'], 'unknown enum descriptor fields')
+        _pandas_attributes_need(value['module'] == profile['module'] and type(value['name']) is str and (value['name'] in profile['enum_values']) and (value['value'] == profile['enum_values'][value['name']]), 'unknown enum module/name/value identity')
+    elif kind in {'list', 'tuple', 'set', 'frozenset'}:
+        _pandas_attributes_exact(value, ['type', 'values'], 'unknown sequence descriptor fields')
+        _pandas_attributes_need(type(value['values']) is list, 'packed sequence array absent')
+        for child in value['values']:
+            _pandas_attributes_packed(child, profile, tags, depth + 1)
+        if kind in {'set', 'frozenset'}:
+            _pandas_attributes_need(value['values'] == sorted(value['values'], key=lambda x: json.dumps(x, sort_keys=True)), 'original producer set order differs')
+    elif kind == 'dict':
+        _pandas_attributes_exact(value, ['type', 'items'], 'unknown dictionary descriptor fields')
+        _pandas_attributes_need(type(value['items']) is list, 'ordered typed dictionary entries absent')
+        for pair in value['items']:
+            _pandas_attributes_need(type(pair) is list and len(pair) == 2, 'typed key/value pair absent')
+            for child in pair:
+                _pandas_attributes_packed(child, profile, tags, depth + 1)
+    elif kind == 'pandas.DataFrame':
+        _pandas_attributes_exact(value, ['type', 'frame'], 'unknown packed DataFrame fields')
+        _pandas_attributes_frame(value['frame'], profile, tags, depth + 1)
+    else:
+        raise ValueError('unknown packed observer value kind')
+
+
+def _pandas_attributes_frame(value, profile, tags, depth=0):
+    _pandas_attributes_need(depth < 192, 'frame nesting too deep')
+    _pandas_attributes_exact(value, ['kind', 'columns', 'column_names', 'dtypes', 'categorical_dtypes', 'index', 'attrs', 'rows'], 'unknown/incomplete frame snapshot')
+    _pandas_attributes_need(value['kind'] == profile['frame_kind'], 'unreviewed frame class')
+    _pandas_attributes_packed(value['columns'], profile, tags, depth + 1, 'list')
+    _pandas_attributes_packed(value['column_names'], profile, tags, depth + 1, 'list')
+    _pandas_attributes_packed(value['attrs'], profile, tags, depth + 1, 'dict')
+    width = len(value['columns']['values'])
+    _pandas_attributes_need(type(value['dtypes']) is list and len(value['dtypes']) == width and all((type(x) is str for x in value['dtypes'])), 'frame dtype cardinality mismatch')
+    categories = value['categorical_dtypes']
+    _pandas_attributes_need(type(categories) is list and len(categories) == width, 'frame categorical metadata cardinality mismatch')
+    for dtype, category in zip(value['dtypes'], categories):
+        _pandas_attributes_need((dtype == 'category') == (category is not None), 'categorical dtype/metadata mismatch')
+        if category is not None:
+            _pandas_attributes_exact(category, ['categories', 'categories_dtype', 'ordered'], 'unknown categorical metadata')
+            _pandas_attributes_need(type(category['categories_dtype']) is str and type(category['ordered']) is bool, 'incomplete categorical metadata')
+            _pandas_attributes_packed(category['categories'], profile, tags, depth + 1, 'list')
+    index = value['index']
+    _pandas_attributes_exact(index, ['kind', 'dtype', 'names', 'labels'], 'unknown/incomplete index snapshot')
+    _pandas_attributes_need(index['kind'] in {'RangeIndex', 'Index', 'MultiIndex'} and type(index['dtype']) is str, 'unreviewed index kind/dtype')
+    _pandas_attributes_packed(index['names'], profile, tags, depth + 1, 'list')
+    _pandas_attributes_packed(index['labels'], profile, tags, depth + 1, 'list')
+    _pandas_attributes_need(type(value['rows']) is list and len(value['rows']) == len(index['labels']['values']), 'row/index cardinality mismatch')
+    for row in value['rows']:
+        _pandas_attributes_packed(row, profile, tags, depth + 1, 'list')
+        _pandas_attributes_need(len(row['values']) == width, 'row/column cardinality mismatch')
+    _pandas_attributes_need(len(index['names']['values']) >= 1, 'index names absent')
+    if index['kind'] == 'MultiIndex':
+        for label in index['labels']['values']:
+            _pandas_attributes_need(label['type'] == 'tuple' and len(label['values']) == len(index['names']['values']), 'multi-index label/name arity mismatch')
+    else:
+        _pandas_attributes_need(len(index['names']['values']) == 1, 'ordinary index name arity mismatch')
+
+
+def _pandas_attributes_receipt_of(row):
+    return {'module': row['module'], 'method': row['method'], 'input': row['input_before'], 'args': row['args_before'], 'kwargs': row['kwargs_before'], 'call_shape': row['call_shape']}
+
+
+def _pandas_attributes_receipt(receipt, profile, tags):
+    _pandas_attributes_exact(receipt, ['module', 'method', 'input', 'args', 'kwargs', 'call_shape'], 'unknown/incomplete original receipt')
+    _pandas_attributes_need(receipt['module'] == profile['module'] and type(receipt['method']) is str and (receipt['method'] in profile['arities']) and (receipt['call_shape'] == profile['call_shape']), 'unreviewed module/method/call shape')
+    _pandas_attributes_frame(receipt['input'], profile, tags)
+    _pandas_attributes_packed(receipt['args'], profile, tags, expected='list')
+    _pandas_attributes_packed(receipt['kwargs'], profile, tags, expected='dict')
+    _pandas_attributes_need(len(receipt['args']['values']) in profile['arities'][receipt['method']], 'positional operand arity mismatch')
+    seen = set()
+    for key, _ in receipt['kwargs']['items']:
+        _pandas_attributes_need(key['type'] == 'str' and key['value'] in profile['keywords'][receipt['method']] and (key['value'] not in seen), 'unreviewed/duplicate method keyword')
+        seen.add(key['value'])
+
+
+def _pandas_attributes_outcome(row, profile):
+    _pandas_attributes_need(type(row) is dict, 'record is not an object')
+    _pandas_attributes_need(any((k in row for k in ['result', 'error', 'value_result', 'result_value', 'output', 'returned', 'exception'])), 'record has no actual terminal outcome')
+    base = {'index', 'case', 'module', 'method', 'receipt_sha256', 'input_before', 'args_before', 'kwargs_before', 'call_shape', 'warnings', 'input_after', 'args_after', 'kwargs_after', 'input_unchanged', 'arguments_unchanged'}
+    success = 'error' not in row
+    _pandas_attributes_exact(row, base | ({'result', 'returned_input_identity'} if success else {'error'}), 'unknown/mixed/incomplete observation fields')
+    _pandas_attributes_need(type(row['index']) is int and row['index'] > 0, 'actual observer index must be a positive integer')
+    receipt = _pandas_attributes_receipt_of(row)
+    tags = {}
+    _pandas_attributes_receipt(receipt, profile, tags)
+    case = row['case']
+    _pandas_attributes_exact(case, ['name', 'method', 'shape', 'args', 'kwargs'], 'unknown/incomplete saved case recipe')
+    _pandas_attributes_need(type(case['name']) is str and type(case['shape']) is str and (case['method'] == row['method']) and type(case['args']) is list and type(case['kwargs']) is dict, 'case/method identity mismatch')
+    _pandas_attributes_frame(row['input_after'], profile, tags)
+    _pandas_attributes_packed(row['args_after'], profile, tags, expected='list')
+    _pandas_attributes_packed(row['kwargs_after'], profile, tags, expected='dict')
+    _pandas_attributes_need(len(row['args_after']['values']) == len(row['args_before']['values']) and [pair[0] for pair in row['kwargs_after']['items']] == [pair[0] for pair in row['kwargs_before']['items']], 'outer argument/keyword shape changed outside captured operands')
+    _pandas_attributes_need(type(row['input_unchanged']) is bool and row['input_unchanged'] == (row['input_before'] == row['input_after']), 'source mutation flag mismatch')
+    same_arguments = row['args_before'] == row['args_after'] and row['kwargs_before'] == row['kwargs_after']
+    _pandas_attributes_need(type(row['arguments_unchanged']) is bool and row['arguments_unchanged'] == same_arguments, 'argument mutation flag mismatch')
+    _pandas_attributes_need(type(row['warnings']) is list, 'full warnings array absent')
+    for warning in row['warnings']:
+        _pandas_attributes_exact(warning, ['category', 'message', 'filename', 'lineno'], 'unknown/incomplete warning metadata')
+        _pandas_attributes_need(all((type(warning[k]) is str for k in ['category', 'message', 'filename'])) and type(warning['lineno']) is int, 'warning metadata type mismatch')
+    if success:
+        _pandas_attributes_frame(row['result'], profile, tags)
+        _pandas_attributes_need(type(row['returned_input_identity']) is bool, 'returned input identity absent')
+        _pandas_attributes_need(not row['returned_input_identity'] or row['result'] == row['input_after'], 'returned input identity/result mismatch')
+    else:
+        _pandas_attributes_exact(row['error'], ['type', 'message', 'args'], 'unknown/incomplete full error')
+        _pandas_attributes_need(type(row['error']['type']) is str and row['error']['type'] and (type(row['error']['message']) is str), 'full error type/message absent')
+        _pandas_attributes_packed(row['error']['args'], profile, tags, expected='tuple')
+    encoded = canonical(receipt)
+    digest = sha(encoded)
+    _pandas_attributes_need(type(row['receipt_sha256']) is str and re.fullmatch('[0-9a-f]{64}', row['receipt_sha256']) and (row['receipt_sha256'] == digest), 'original canonical receipt SHA mismatch')
+    return
+
+
 def adapt(row, spec):
     if not isinstance(row, dict):
         raise ValueError('record must be an object')
@@ -385,9 +574,23 @@ def adapt(row, spec):
             raise ValueError('unreviewed LOG attributes intent/plan identity')
         if adapter == 'digest-plan-v1' and any(key in row for key in ['result_kind', 'result_value', 'output', 'return', 'returned', 'exception', 'apply_returned', 'input_after', 'controls_after']):
             raise ValueError('LOG attributes digest-only plan contains possible entry/outcome')
+    pandas_attributes_schema = spec.get('receipt_schema') == SCHEMAS['pandas-attributes-before-v1'][0]
+    pandas_attributes_full = any(key in row for key in ['receipt', 'input_before', 'args_before', 'kwargs_before', 'call_shape',
+        'result', 'error', 'result_value', 'value_result', 'output', 'return', 'returned', 'exception', 'result_kind',
+        'input_after', 'args_after', 'kwargs_after', 'apply_returned', 'returned_input_identity'])
+    if pandas_attributes_schema:
+        if row.get('module', PANDAS_ATTRIBUTES_PROFILE['module']) != PANDAS_ATTRIBUTES_PROFILE['module']:
+            raise ValueError('pandas attributes module conflict')
+        hints = [row[key] for key in ('method', 'function') if key in row]
+        if any(type(value) is not str or value not in PANDAS_ATTRIBUTES_PROFILE['arities'] for value in hints) or len(set(hints)) > 1:
+            raise ValueError('pandas attributes method identity conflict')
+        if adapter == 'digest-plan-v1' and (pandas_attributes_full or set(row) - {'index', 'case', 'module', 'method', 'function', 'receipt_sha256'}):
+            raise ValueError('pandas attributes digest-only plan contains full/unknown entry evidence')
+        if spec.get('role') == 'intents' and not pandas_attributes_full and set(row) - {'index', 'case', 'module', 'method', 'function', 'receipt_sha256', 'entered'}:
+            raise ValueError('pandas attributes lightweight intent has unknown fields')
     if adapter == 'digest-plan-v1' and any(key in row for key in ['result', 'error', 'value_result', 'receipt']):
         raise ValueError('digest-only plan contains full receipt or outcome; explicit full adapter required')
-    if adapter == 'digest-plan-v1' or (spec.get('role') == 'intents' and 'receipt' not in row):
+    if adapter == 'digest-plan-v1' or (spec.get('role') == 'intents' and 'receipt' not in row and not (pandas_attributes_schema and pandas_attributes_full)):
         if adapter == 'digest-plan-v1' and spec.get('role') != 'plans':
             raise ValueError('digest-plan adapter requires planned-only provenance')
         digest = row.get('receipt_sha256')
@@ -397,7 +600,7 @@ def adapt(row, spec):
                 digest, 'digest_only_plan' if adapter == 'digest-plan-v1' else 'entered_without_outcome')
     if adapter in {'receipt-v1', 'polars-receipt-v1', 'log-attributes-packed-v1'}:
         receipt = row.get('receipt')
-    elif adapter == 'pandas-before-v1':
+    elif adapter in {'pandas-before-v1', 'pandas-attributes-before-v1'}:
         if 'receipt' in row:
             receipt = row['receipt']
         else:
@@ -410,6 +613,8 @@ def adapt(row, spec):
     if not isinstance(receipt, dict):
         raise ValueError('full original receipt absent; possible entry remains unresolved')
     attributes_source = _attributes_receipt(receipt) if adapter == 'log-attributes-packed-v1' else None
+    if adapter == 'pandas-attributes-before-v1':
+        _pandas_attributes_receipt(receipt, PANDAS_ATTRIBUTES_PROFILE, {})
     required = ['module', 'kwargs', 'call_shape']
     required += ['input', 'category_observables', 'input_kind'] if adapter == 'polars-receipt-v1' else ['args']
     for field in required:
@@ -461,6 +666,11 @@ def adapt(row, spec):
         if any(key in row for key in ['result', 'error', 'value_result', 'result_value', 'result_kind', 'output', 'return', 'returned', 'exception']):
             _attributes_outcome(row, receipt, attributes_source)
         elif any(key in row for key in ['input_after', 'controls_after', 'apply_returned']):
+            return module, function, raw, digest, 'entered_without_outcome'
+    if adapter == 'pandas-attributes-before-v1':
+        if any(key in row for key in ['result', 'error', 'value_result', 'result_value', 'result_kind', 'output', 'return', 'returned', 'exception']):
+            _pandas_attributes_outcome(row, PANDAS_ATTRIBUTES_PROFILE)
+        elif any(key in row for key in ['input_after', 'args_after', 'kwargs_after', 'apply_returned', 'returned_input_identity']):
             return module, function, raw, digest, 'entered_without_outcome'
     # Outcome FIRST: modern records have both full receipt and result/error.
     if any(key in row for key in ['result', 'error', 'value_result']):
@@ -525,7 +735,16 @@ class Index:
                         (key, member, ordinal, sha(raw), module, function,
                          spec['receipt_schema'], partition, digest, full, status))
                 except (ValueError, KeyError, TypeError) as error:
-                    self.gap(key, member, ordinal, row, str(error))
+                    gap_row = row
+                    if spec['receipt_schema'] == SCHEMAS['pandas-attributes-before-v1'][0] and isinstance(row, dict):
+                        # A legacy row can lack an embedded module. Conflicting
+                        # outer identities must not certify this closed scope.
+                        hints = [row['module']] if 'module' in row else []
+                        if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
+                            hints.append(row['receipt']['module'])
+                        if any(hint != PANDAS_ATTRIBUTES_PROFILE['module'] for hint in hints):
+                            gap_row = None
+                    self.gap(key, member, ordinal, gap_row, str(error))
         except (ValueError, KeyError, TypeError, UnicodeError) as error:
             self.gap(key, member, 0, None, 'member parsing: ' + str(error))
 
