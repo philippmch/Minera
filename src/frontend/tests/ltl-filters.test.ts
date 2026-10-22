@@ -1,7 +1,7 @@
 import {afterEach,expect,it,vi} from "vitest";
-import {defaultLtlFilterForm,ltlFilterFields,ltlFilterOperations,isLtlFilterEnvelope,requestLtlFilter,ltlFilterArtifactFile,ltlFilterResponseFile,LtlFilterRequestGate,openLtlFilteredLog,type LtlFilterEnvelope,type LtlFilterRun} from "../src/ltl-filters";
+import {defaultLtlFilterForm,ltlFilterFields,ltlFilterOperations,ltlOriginalCallJson,ltlOriginalCallFileText,isLtlFilterEnvelope,requestLtlFilter,ltlFilterArtifactFile,ltlFilterResponseFile,LtlFilterRequestGate,openLtlFilteredLog,type LtlFilterEnvelope,type LtlFilterRun} from "../src/ltl-filters";
 const file=()=>new File(['{"complete":"source"}'],"source.json",{lastModified:123});
-function envelope(patch:Partial<LtlFilterEnvelope>={}):LtlFilterEnvelope{return {family:"REFERENCE_LTL_FILTER",engine:"polars",input_kind:patch.engine&&patch.engine!=="polars"?null:"LazyFrame",operation:"eventually",result_kind:"table",http_status:200,phase:"complete",apply_returned:true,source_format:"native_table",source:{rows:4,columns:5},result:{rows:2,columns:5},source_unchanged:true,activity_key:null,case_id_key:"case:concept:name",attribute_key:"concept:name",resource_key:"org:resource",timestamp_key:"time:timestamp",source_json:'{"all":"before"}',source_after_json:'{"all":"after"}',result_json:'{"large":9007199254740993,"unsigned":18446744073709551615,"zero":-0.0}',filtered_xes:null,xes_error:null,helper_result_json:null,error_type:null,error:null,...patch};}
+function envelope(patch:Partial<LtlFilterEnvelope>={}):LtlFilterEnvelope{return {family:"REFERENCE_LTL_FILTER",call_mode:"friendly",call_json:null,engine:"polars",input_kind:patch.engine&&patch.engine!=="polars"?null:"LazyFrame",operation:"eventually",result_kind:"table",http_status:200,phase:"complete",apply_returned:true,source_format:"native_table",source:{rows:4,columns:5},result:{rows:2,columns:5},source_unchanged:true,activity_key:null,case_id_key:"case:concept:name",attribute_key:"concept:name",resource_key:"org:resource",timestamp_key:"time:timestamp",source_json:'{"all":"before"}',source_after_json:'{"all":"after"}',result_json:'{"large":9007199254740993,"unsigned":18446744073709551615,"zero":-0.0}',filtered_xes:null,xes_error:null,helper_result_json:null,error_type:null,error:null,...patch};}
 function run(value=envelope()):LtlFilterRun{const raw=JSON.stringify(value);return {value,raw,responseBytes:new TextEncoder().encode(raw),sourceFile:file(),fields:[]};}
 const fields=(engine:"log"|"pandas"|"polars",operation:"eventually"|"next"|"four_eyes"|"different_persons"|"timestamp_ge"|"timestamp_le"="eventually")=>Object.fromEntries(ltlFilterFields(defaultLtlFilterForm(engine,operation)));
 afterEach(()=>vi.unstubAllGlobals());
@@ -90,4 +90,87 @@ it("invalidates pending results when the Polars input type changes",()=>{
  const gate=new LtlFilterRequestGate(),identity={source:file(),form:defaultLtlFilterForm("polars")};
  const ticket=gate.issue(identity);
  expect(gate.accepts(ticket,{...identity,form:{...identity.form,polarsInputKind:"DataFrame"}})).toBe(false);
+});
+
+const originalForm=()=>({...defaultLtlFilterForm("polars"),callMode:"original"as const});
+it("keeps original calls exclusive and distinguishes omitted from explicit null operands",()=>{
+ const form={...originalForm(),originalOperand:"omitted"as const,positive:false,attributeKeyMode:"custom"as const,attributeKey:"inert"};
+ expect(Object.fromEntries(ltlFilterFields(form))).toEqual({engine:"polars",operation:"eventually",input_kind:"LazyFrame",call_json:'{"schema":"minera-polars-ltl-original-call-v1"}'});
+ expect(ltlOriginalCallJson({...form,originalOperand:"provided",originalOperandJson:'{"type":"null"}'})).toBe('{"schema":"minera-polars-ltl-original-call-v1","values":{"type":"null"}}');
+ for(const engine of ["log","pandas"]as const)expect(()=>ltlFilterFields({...form,engine})).toThrow("require the Polars");
+ expect(()=>ltlFilterFields({...form,callMode:"unknown"as never})).toThrow("call");
+ expect(()=>ltlOriginalCallJson({...form,originalOperand:"unknown"as never})).toThrow("operand and parameter modes");
+});
+
+it("retains original editor fragments and ordered enum/string entries without rewriting numbers",()=>{
+ const operand=' \r\n{"type":"integer","value":9007199254740993} ',raw=' {"type":"boolean","value":false}\n';
+ const entries='[ {"key":"positive","enum_key":false,"value":{"type":"integer","value":"0"}}, {"key":"positive","enum_key":true,"value":{"type":"integer","value":"1"}} ]';
+ const form={...originalForm(),originalOperandJson:operand,originalParameters:"raw"as const,originalParameterJson:raw};
+ expect(ltlOriginalCallJson(form)).toBe(`{"schema":"minera-polars-ltl-original-call-v1","values":${operand},"parameter_value":${raw}}`);
+ expect(ltlOriginalCallJson({...form,originalParameters:"entries",originalEntriesJson:entries})).toBe(`{"schema":"minera-polars-ltl-original-call-v1","values":${operand},"parameter_entries":${entries}}`);
+ expect(ltlOriginalCallJson({...form,originalParameters:"entries",originalEntriesJson:"[]"})).toContain('"parameter_entries":[]');
+ expect(ltlOriginalCallJson({...form,originalParameters:"omitted"})).not.toContain('"parameter_');
+ const malformed=' {"schema":"minera-polars-ltl-original-call-v1","values":9007199254740993,"values":null}\r\n';
+ expect(ltlOriginalCallJson({...form,originalEditor:"json",originalCallJson:malformed})).toBe(malformed);
+ expect(ltlOriginalCallJson({...form,originalEditor:"json",originalCallJson:""})).toBe("");
+});
+
+it("imports original JSON Files with exact UTF8 text and rejects replacement decoding",async()=>{
+ const bytes=new Uint8Array([0xef,0xbb,0xbf,...new TextEncoder().encode(' {"values":9007199254740993}\r\n')]);
+ expect(await ltlOriginalCallFileText(new File([bytes],"original.json"))).toBe('\ufeff {"values":9007199254740993}\r\n');
+ await expect(ltlOriginalCallFileText(new File([new Uint8Array([0xff])],"invalid.json"))).rejects.toThrow("valid UTF-8");
+ await expect(ltlOriginalCallFileText({name:"fake"}as File)).rejects.toThrow("actual");
+});
+
+it("uploads only original call controls with canonical byte fields and exact response identity",async()=>{
+ const call='\r\n{"schema":"minera-polars-ltl-original-call-v1","values":{"type":"integer","value":9007199254740993}}\n';
+ const form={...originalForm(),originalEditor:"json"as const,originalCallJson:call};
+ let value=envelope({call_mode:"original",call_json:call});
+ vi.stubGlobal("fetch",vi.fn(async(_url:string,init:RequestInit)=>{
+  const body=init.body as FormData,control=body.get("call_json")as File;
+  expect(control).toBeInstanceOf(File);expect(control.name).toBe("call_json.txt");expect(await control.text()).toBe(call);
+  expect([...body.keys()].sort()).toEqual(["call_json","engine","input_kind","operation","source_file"]);
+  return new Response(JSON.stringify(value),{status:value.http_status});
+ }));
+ expect((await requestLtlFilter(file(),form)).value.call_json).toBe(call);
+ value=envelope();await expect(requestLtlFilter(file(),form)).rejects.toThrow("another call mode");
+ value=envelope({call_mode:"original",call_json:call.trim()});await expect(requestLtlFilter(file(),form)).rejects.toThrow("another original call");
+ value=envelope({call_mode:"original",call_json:call,http_status:400,phase:"control",result:null,result_json:null,error:"invalid original call"});
+ expect((await requestLtlFilter(file(),form)).value.error).toBe("invalid original call");
+ value=envelope({call_mode:null,call_json:null,http_status:400,phase:"control",result:null,result_json:null,error:"early rejection"});
+ expect((await requestLtlFilter(file(),form)).value.error).toBe("early rejection");
+});
+
+it("requires the complete27field envelope and rejects cross-mode/error call echoes",async()=>{
+ const call=ltlOriginalCallJson(originalForm()),valid=envelope({call_mode:"original",call_json:call});
+ expect(isLtlFilterEnvelope(valid)).toBe(true);expect(Object.keys(valid)).toHaveLength(27);
+ for(const patch of [{call_mode:"unknown"},{call_json:undefined},{call_mode:"original",call_json:null},{call_mode:"friendly",call_json:call},{call_mode:null,call_json:call},{engine:"pandas",input_kind:null}])expect(isLtlFilterEnvelope({...valid,...patch})).toBe(false);
+ const {call_mode:_mode,...old}=valid;expect(isLtlFilterEnvelope(old)).toBe(false);
+ let value=valid;vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify(value),{status:value.http_status})));
+ await expect(requestLtlFilter(file(),defaultLtlFilterForm("polars"))).rejects.toThrow("another call mode");
+ value=envelope({call_mode:null,http_status:400,phase:"apply",result:null,result_json:null,error:"lost mode"});
+ await expect(requestLtlFilter(file(),originalForm())).rejects.toThrow("another call mode");
+ value=envelope({call_mode:"original",call_json:call+" ",http_status:400,phase:"apply",result:null,result_json:null,error:"wrong call"});
+ await expect(requestLtlFilter(file(),originalForm())).rejects.toThrow("another original call");
+});
+
+it("keeps original call downloads available on failure and invalidates all original editor changes",async()=>{
+ const call=' {"schema":"minera-polars-ltl-original-call-v1"}\r\n';
+ const failed=run(envelope({call_mode:"original",call_json:call,http_status:400,phase:"apply",error:"missing operand",result:null,result_json:null}));
+ expect(await ltlFilterArtifactFile(failed,"call_json").text()).toBe(call);
+ expect(()=>ltlFilterArtifactFile(failed,"result_json")).toThrow("unavailable");
+ const gate=new LtlFilterRequestGate(),identity={source:file(),form:originalForm()},ticket=gate.issue(identity);
+ for(const patch of [{callMode:"friendly"as const},{originalEditor:"json"as const},{originalOperand:"omitted"as const},{originalOperandJson:'{"type":"null"}'},{originalParameters:"raw"as const},{originalParameterJson:'{"type":"boolean","value":false}'},{originalEntriesJson:'[ ]'},{originalCallJson:'{}'}])expect(gate.accepts(ticket,{...identity,form:{...identity.form,...patch}})).toBe(false);
+});
+
+it("compares and downloads original native byte echoes without replacement text",async()=>{
+ const form={...originalForm(),originalEditor:"json"as const,originalCallJson:"\ud800"};
+ const value=envelope({call_mode:"original",call_json:{native_bytes:"hex-v1",data:"eda080"},http_status:400,phase:"control",result:null,result_json:null,error:"invalid JSON"});
+ vi.stubGlobal("fetch",vi.fn(async(_url:string,init:RequestInit)=>{
+  const control=(init.body as FormData).get("call_json")as File;
+  expect(control.name).toBe("call_json.txt");expect([...new Uint8Array(await control.arrayBuffer())]).toEqual([0xed,0xa0,0x80]);
+  return new Response(JSON.stringify(value),{status:400});
+ }));
+ const result=await requestLtlFilter(file(),form);
+ expect([...new Uint8Array(await ltlFilterArtifactFile(result,"call_json").arrayBuffer())]).toEqual([0xed,0xa0,0x80]);
 });
