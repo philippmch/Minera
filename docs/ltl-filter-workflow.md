@@ -49,7 +49,7 @@ Interleaved cases interrupt a match.
 
 ## Source and artifacts
 
-Event logs accept actual CSV, XES, compressed XES or native log JSON Files.
+Friendly event-log controls accept actual CSV, XES, compressed XES or native log JSON Files.
 CSV import exposes case, activity, timestamp and performer columns, delimiter
 and explicit whitespace trimming. Tables accept actual native EventTable JSON
 Files with declared types and supported index/category/context metadata.
@@ -64,8 +64,8 @@ row order; ordinary eager consecutive filtering returns the retained apply-time
 input type on success and native errors.
 
 `POST /api/reference-ltl-filter` accepts multipart controls and an actual
-`source_file` for filtering. Timestamp helpers accept only engine, operation and
-their two typed operands. Unknown, duplicate, inactive and unrelated File-shaped
+`source_file` for filtering. Friendly timestamp helpers accept engine, operation and
+their two typed operands; original helpers use the source-less call below. Unknown, duplicate, inactive and unrelated File-shaped
 controls are rejected. Native byte fields use the exact `<field>.txt` filename
 sent by the frontend to retain newlines and lone surrogate bytes. Query and
 multipart fields share one duplicate check.
@@ -85,10 +85,10 @@ engines and errors before a type was validated. The frontend checks it against
 the requested type, including source/apply/collect failures. For a Polars request,
 a null type is accepted only for an early HTTP 400 control error.
 
-## Original typed table calls
+## Original typed calls
 
-Both pandas and Polars offer **Friendly controls** by default and an exclusive
-**Original typed call** mode. Original mode keeps the same source File and
+All three engines offer **Friendly controls** by default and an exclusive
+**Original typed call** mode. Table original mode keeps the same source File and
 relationship operation. Polars also keeps its DataFrame/LazyFrame choice.
 Its operand-presence selector distinguishes an
 omitted argument from a supplied typed null. Parameters can be omitted, supplied
@@ -133,7 +133,7 @@ control errors.
 Polars original requests contain only `engine=polars`, the existing `operation`,
 optional `input_kind`, actual `source_file` and `call_json`. Friendly operands,
 selectors, flags and unrelated source controls are forbidden alongside
-`call_json`. pandas uses its own schema below; EventLog rejects this control.
+`call_json`. pandas and EventLog use their own schemas below.
 Shape/JSON/control failures occur before
 source import. Missing operands and valid typed values retain native semantic
 diagnostics and apply/collect timing.
@@ -208,7 +208,7 @@ retain the shared 27 fields, exact original call echo, null `input_kind` and nul
 original-mode selector fields. Pandas is eager: recognized native failures are
 apply errors with apply_returned false; there is no Polars collect boundary.
 Cross-engine schemas and friendly/original control mixtures are rejected before
-source import. EventLog remains outside this original typed-call mode.
+source import.
 
 Full 429 pandas native/direct/owned-HTTP comparisons, 675 Polars regression,
 frontend checks and rendered browser acceptance are required for this extension.
@@ -217,6 +217,88 @@ limits still apply: string keys only, lexical operand-map order and value-level
 temporal/NaN provenance. Original receipts and expected native outcomes stay
 unchanged; the wider catalogue, 201 strict open units and 565 unentered grouping
 queries are not promoted or authorized by this interface.
+
+### EventLog filters and timestamp helpers
+
+The **Event-log call mode** selector enables original calls for all six public
+operations. The fields editor uses **Original ordered arguments JSON**. The
+four filter arities are the same one/three/two/one ordered arguments as pandas;
+each timestamp helper requires exactly two arguments, differences followed by
+lower/upper intervals. Operation changes retain editor text and update guidance;
+they do not silently rewrite argument arrays. All 297 admitted LOG calls supply
+every operand, so short, missing and extra arrays reject as transport controls.
+A typed null remains supplied and reaches native semantics.
+
+Original LOG filters require an actual complete native EventLog JSON File.
+CSV/XES import settings remain in friendly mode. For example, a friendly CSV
+run can download its complete parsed source, which can then be uploaded as
+native JSON for an original call. Original mode retains the imported activity
+role for reopening independently of the typed matching attribute. Source format,
+CSV columns, friendly selectors and Boolean controls are hidden and are never
+mixed into the original request.
+
+An original helper call needs no source:
+
+```json
+{
+  "schema": "minera-log-ltl-original-call-v1",
+  "args": [
+    {"type":"list","value":[{"type":"integer","value":"1"}]},
+    {"type":"list","value":[{"type":"tuple","value":[{"type":"integer","value":"0"},{"type":"integer","value":"2"}]}]}
+  ]
+}
+```
+
+Helpers hide source and parameter controls. Their fields editor omits stale
+filter parameter state; a complete-call editor still submits the exact text,
+and a supplied parameter field is rejected by the backend. Helpers return the
+existing complete typed one-cell table artifact or a full native apply error.
+They have no source/count/source-after/result-log artifacts or reopening role.
+
+Filters allow omitted parameters, a raw typed non-mapping `parameter_value`, or
+ordered `parameter_entries`, exclusively by presence. Known literal and enum
+keys are `pm4py:param:attribute_key`, `pm4py:param:resource_key`,
+`pm4py:param:timestamp_key`, `positive`, `enable_timestamp` and
+`timestamp_diff_boundaries`. The backend assigns their typed values to existing
+native options without converting selectors to strings or flags to Booleans.
+Unknown keys and repeated underlying names, including a literal/enum pair, are
+rejected. The retained LOG bank contains no such collision; pandas/Polars enum
+precedence is not borrowed for LOG.
+
+LOG's private recursive typed decoder additionally accepts exact `{"type":"nat"}`
+and `{"type":"uuid","value":"12345678-1234-5678-1234-567812345678"}`.
+NaT keeps its native null/date/NativeDate state and UUID keeps its native ID
+kind. These tags also work inside typed containers. They remain distinct from
+null, `na` and ordinary strings. Existing bytes, exact integers, decimals,
+dates, sequences and supported lexical string-key maps retain their carriers.
+This extension does not change the shared pandas/Polars typed codec.
+
+Original LOG requests contain only `engine=log`, operation, exact `call_json`
+and, for filters only, actual `source_file`. Helpers forbid source and parameters;
+all operations forbid `input_kind` and friendly controls. The existing 27-field
+response keeps null typed selector roles and null input kind. Filters separately
+retain the actual source-opening `activity_key`, complete native source before
+and after processing, complete result and optional XES projection. The frontend
+checks exact mode/call bytes and rejects invented friendly selector roles or
+source artifacts on original helper responses. Downloads and filtered-log
+reopening use the complete returned artifacts.
+
+Complete-call import, exact raw fragments, numeric tokens, CR/LF, strict UTF-8,
+canonical byte fields, cancellation and full-form identity use the same workflow
+as table engines. Every source, operation, mode, editor and import edit clears
+stale results and aborts pending work. Browser textarea editing can normalize
+newlines; an imported call submitted without editing retains its original bytes.
+
+Full **297 LOG calls** remain the runtime acceptance requirement: **227 filters**
+with **191 complete logs / 36 diagnostics**, and **70 helpers** with **23 complete
+typed values / 47 diagnostics**. All original native comparisons and direct/owned
+HTTP transport must pass, including six NaT and four UUID receipts. This frontend
+implementation does not claim those executions or the full bank from a browser
+sample. Root runtime, pandas429/Polars675 regressions, frontend/build and rendered
+browser validation are pending for this extension. Original receipts and oracle
+outcomes remain unchanged. Python temporal/alias provenance, arbitrary keys,
+map order and NaN payload limits remain explicit; no catalogue or history closure
+or new reference-call authority follows.
 
 Native strings can use the existing raw-byte carrier. Downloads preserve their
 complete bytes. The complete response is downloadable with original numeric
@@ -228,7 +310,7 @@ Changing a file or criterion cancels an outstanding request and invalidates its
 identity. Late responses cannot replace the result for a different file or
 form. There is no automatic request on workspace render.
 
-## Original typed-call acceptance
+## Polars original typed-call acceptance
 
 All **675 admitted Polars calls** pass through the original typed-call mode,
 first through the direct workbench and then through an independently owned HTTP
