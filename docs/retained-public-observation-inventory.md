@@ -49,6 +49,27 @@ candidates and gaps; metadata validity does not verify member payload hashes.
 Both the command entry and direct `Inventory.parse` reject non-discovery
 layouts or member admission before constructing the parser.
 
+The explicit `name-data-base64-four-field-members-v1` profile supports JSONL
+**discovery only** for reviewed `name`, `sha256`, `byte_count`, `data_base64`
+rows. It requires `four_field_metadata` with the exact reviewed
+`schema_review_sha256`, `expected_header_type="archive_header"` and a
+nonnegative integer `expected_member_count`. Root must separately bind the exact
+reviewed source, producer and sidecar; a schema-review hash alone grants no
+provenance authority for another source. Both entry paths reject admission,
+other transports and missing controls before parser construction.
+
+The first header and EOF checks validate declared count and name uniqueness.
+The header remains a gap. Summary, binary mappings, source-binding values and
+their nested keys stay lexically opaque; duplicate checks cover enclosing
+envelopes, without claiming semantic validation of opaque nested objects.
+Member events declare `identity_scope="logical-member"` and
+`source_file_identity_unavailable=true`. Binary-prefixed aliases are marked
+`logical_member_kind="binary-slice"`; their hashes can describe slices of a
+larger binary. No source-file identity, reassembly or payload verification follows.
+The old full-member projector must not consume these events. A reviewed scope
+guard must retain them as unresolved provenance edges with no full-file keys or
+flat matches.
+
 Two explicit chunk schemas support **discovery only**:
 
 | Schema | Declared identity |

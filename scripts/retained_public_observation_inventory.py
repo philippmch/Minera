@@ -24,6 +24,16 @@ without it, identities are scoped only to the individual container.
 The explicit utf8-name-text-members-v1 schema is discovery-only: name and
 byte_count declare a full-member path and byte length, while text stays opaque.
 Its header and tail are unadmitted metadata candidates and remain gaps.
+The explicit name-data-base64-four-field-members-v1 schema is JSONL discovery
+only. Exact name/sha256/byte_count/data_base64 rows declare logical-member
+identity; binary/* rows may be slices. No row establishes original source-file
+identity. data_base64, summary and binary_chunks remain lexically opaque.
+four_field_metadata must bind the reviewed schema report SHA and explicitly
+name expected_header_type='archive_header' and expected_member_count. EOF checks
+one first-row header, member count and uniqueness; the header still remains a
+gap. These controls check declared metadata, never payload or history completion.
+Root must separately bind the reviewed source/sidecar; review SHA alone does not
+establish provenance authority for another source.
 
 Discovery validates JSON structure and inventories metadata without unescaping
 or decoding archive payload strings. An unlisted payload remains opaque even
@@ -61,6 +71,8 @@ EXCLUDED = {'pm4py', 'site-packages', 'reference-runtime',
             '.git', '.aws'}
 PAYLOAD_KEYS = {'utf8', 'data', 'base64'}
 CHUNK_SCHEMAS = {'offset-full-member-base64-chunks-v1', 'indexed-base64-chunks-v1'}
+FOUR_FIELD_SCHEMA = 'name-data-base64-four-field-members-v1'
+FOUR_FIELD_REVIEW_SHA256 = '7838dca3aaa3b0eb18676ce476a2126d1a04ab7c1a9ee9f3814d5af320bfef08'
 CHUNK_SIZE = 8 * 1024 * 1024
 POSSIBLE_CALL_KEYS = {'receipt', 'receipt_sha256', 'function', 'method', 'module',
                       'result', 'error', 'value_result', 'result_value', 'output',
@@ -69,6 +81,23 @@ POSSIBLE_CALL_KEYS = {'receipt', 'receipt_sha256', 'function', 'method', 'module
 SPECIAL = re.compile(rb'["\\\x00-\x1f]')
 STRING_RUN = re.compile(rb'(?:[^"\\\x00-\x1f]+|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*')
 NUMBER = re.compile(rb'-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\Z')
+
+
+def require_four_field_spec(spec):
+    if spec.get('envelope_schema') != FOUR_FIELD_SCHEMA:
+        return
+    if spec.get('layout') != 'discover' or spec.get('members'):
+        raise ValueError('four-field schema is metadata discovery only; member admission is unavailable')
+    if spec.get('format') not in {'jsonl', 'gzip-jsonl'}:
+        raise ValueError('four-field schema requires JSONL transport')
+    control = spec.get('four_field_metadata')
+    if (not isinstance(control, dict)
+            or set(control) != {'schema_review_sha256', 'expected_header_type', 'expected_member_count'}
+            or control.get('schema_review_sha256') != FOUR_FIELD_REVIEW_SHA256
+            or control.get('expected_header_type') != 'archive_header'
+            or type(control.get('expected_member_count')) is not int
+            or control['expected_member_count'] < 0):
+        raise ValueError('four-field schema requires explicit reviewed header/count metadata controls')
 
 
 def canonical(value):
@@ -233,6 +262,40 @@ class Parser:
             elif escaped not in b'"\\/bfnrt':
                 raise ValueError('invalid JSON escape')
         return json.loads(raw.getvalue()) if raw is not None else None
+
+    def opaque_value(self, depth=0):
+        # Lexical structure only: even keys inside private nested values stay opaque.
+        # Duplicate checks apply to the enclosing reviewed envelope, not private values.
+        if depth > 128:
+            raise ValueError('JSON nesting exceeds supported depth')
+        self.r.whitespace()
+        token = self.r.peek()
+        if token == 34:
+            self.string()
+            return
+        if token not in {123, 91}:
+            self.value(False, depth)
+            return
+        is_object = token == 123
+        close = 125 if is_object else 93
+        self.r.byte()
+        self.r.whitespace()
+        if self.r.peek() == close:
+            self.r.byte()
+            return
+        while True:
+            if is_object:
+                self.string()
+                self.r.whitespace()
+                self.r.expect(58)
+            self.opaque_value(depth + 1)
+            self.r.whitespace()
+            sep = self.r.byte()
+            if sep == close:
+                return
+            if sep != 44:
+                raise ValueError('missing JSON separator')
+            self.r.whitespace()
 
     def value(self, materialize=True, depth=0):
         if depth > 128:
@@ -547,9 +610,72 @@ class Inventory:
         for reason in reasons:
             self.gap(reason, ordinal=ordinal, member=name)
 
+    def four_field_metadata(self, ordinal, spec, metadata, keys, payload_types):
+        # This describes a logical row, never an assembled original source file.
+        state = self.four_field_state
+        if 'name' not in keys and metadata.get('type') == 'archive_header':
+            state['headers'] += 1
+            valid = (ordinal == 1 and state['headers'] == 1
+                     and keys == {'type', 'parent_head', 'reference_commit', 'member_count',
+                                  'summary', 'binary_chunks', 'repository_source_bindings'}
+                     and type(metadata.get('member_count')) is int
+                     and metadata['member_count'] == spec['four_field_metadata']['expected_member_count'])
+            state['header_valid'] = valid and state['headers'] == 1
+            self.event('header_candidate', ordinal=ordinal, envelope_schema=FOUR_FIELD_SCHEMA,
+                       envelope_keys=sorted(keys), declared_metadata={
+                           'type': metadata.get('type'), 'member_count': metadata.get('member_count')},
+                       metadata_valid=valid, admitted=False, payload_hash_verified=False,
+                       possible_call_fields=sorted(keys & POSSIBLE_CALL_KEYS))
+            self.gap('four-field header/summary/binary_chunks remain unadmitted', ordinal=ordinal)
+            if not valid:
+                self.gap('four-field first header keys/type/count do not match explicit manifest controls', ordinal=ordinal)
+            return
+        state['rows'] += 1
+        name = metadata.get('path')
+        reasons = []
+        disposition = 'unknown'
+        if isinstance(name, str):
+            try:
+                safe_path(name)
+                disposition = 'safe-relative-path'
+            except ValueError as error:
+                disposition = 'excluded-path' if 'excluded' in str(error) else 'unsafe-path'
+                if disposition == 'unsafe-path':
+                    reasons.append('unsafe four-field logical member path')
+        else:
+            reasons.append('four-field logical member name absent or not a string')
+        seen = self.seen_members.setdefault(self.context.get('source'), set())
+        if isinstance(name, str):
+            if name in seen:
+                reasons.append('duplicate four-field logical member path')
+            seen.add(name)
+            state['names'].add(name)
+        if keys != {'name', 'sha256', 'byte_count', 'data_base64'}:
+            reasons.append('four-field member fields do not match exact producer schema')
+        if payload_types != {'data_base64': 'string'}:
+            reasons.append('four-field data_base64 must remain an opaque string')
+        size, sha = metadata.get('bytes'), metadata.get('sha256')
+        if type(size) is not int or size < 0:
+            reasons.append('four-field logical-member byte_count must be a nonnegative integer')
+        if not isinstance(sha, str) or not re.fullmatch('[0-9a-f]{64}', sha):
+            reasons.append('four-field logical-member SHA-256 declaration absent')
+        if keys & POSSIBLE_CALL_KEYS:
+            reasons.append('four-field member has unexpected call/entry evidence')
+        self.event('member', ordinal=ordinal, path=name, bytes=size, sha256=sha,
+                   envelope_schema=FOUR_FIELD_SCHEMA, envelope_keys=sorted(keys),
+                   payload_fields=payload_types, path_disposition=disposition,
+                   admitted=False, payload_hash_verified=False, metadata_valid=not reasons,
+                   original_size_unavailable=type(size) is not int, identity_scope='logical-member',
+                   declared_logical_member_bytes=size, declared_logical_member_sha256=sha,
+                   whole_source_file_binding_verified=False, whole_source_file_mapping_complete=False,
+                   logical_member_kind='binary-slice' if isinstance(name, str) and name.startswith('binary/') else 'logical-member',
+                   source_file_identity_unavailable=True)
+        for reason in reasons:
+            self.gap(reason, ordinal=ordinal, member=name)
+
     def envelope(self, parser, ordinal, spec, discovery=False):
         if parser.r.peek() != 123:
-            parser.value(False)
+            parser.opaque_value() if spec.get('envelope_schema') == FOUR_FIELD_SCHEMA else parser.value(False)
             self.gap('archive envelope member is not an object', ordinal=ordinal)
             return
         parser.r.byte()
@@ -560,7 +686,8 @@ class Inventory:
         legacy = spec.get('envelope_schema') == 'legacy-name-data-base64-v1'
         chunk_schema = spec.get('envelope_schema') in CHUNK_SCHEMAS
         utf8_schema = spec.get('envelope_schema') == 'utf8-name-text-members-v1'
-        payload_keys = PAYLOAD_KEYS | ({'data_base64'} if legacy else set()) | ({'text'} if utf8_schema else set())
+        four_field = spec.get('envelope_schema') == FOUR_FIELD_SCHEMA
+        payload_keys = PAYLOAD_KEYS | ({'data_base64'} if legacy or four_field else set()) | ({'text'} if utf8_schema else set())
         admitted = {member['path']: member for member in spec.get('members', [])}
         try:
             parser.r.whitespace()
@@ -575,30 +702,30 @@ class Inventory:
                     parser.r.whitespace()
                     if key in payload_keys:
                         payload_types[key] = 'string' if parser.r.peek() == 34 else 'nested-json'
-                        preserve = not discovery and not utf8_schema and ('path' not in metadata or metadata.get('path') in admitted)
+                        preserve = not discovery and not utf8_schema and not four_field and ('path' not in metadata or metadata.get('path') in admitted)
                         if parser.r.peek() == 34:
                             raw = tempfile.SpooledTemporaryFile(max_size=65536) if preserve else None
                             if raw is not None:
                                 payloads[key] = raw
                             parser.string(sink=raw)
                         else:
-                            parser.value(False)
-                    elif key in {'path', 'sha256', 'encoding', 'schema', 'kind'} or ((legacy or utf8_schema) and key == 'name') or (chunk_schema and key in {'member', 'file_sha256'}) or (utf8_schema and key in {'group', 'inventory_sha256'}):
-                        metadata_key = 'path' if (legacy or utf8_schema) and key == 'name' or chunk_schema and key == 'member' else key
+                            parser.opaque_value() if four_field else parser.value(False)
+                    elif key in {'path', 'sha256', 'encoding', 'schema', 'kind'} or ((legacy or utf8_schema or four_field) and key == 'name') or (chunk_schema and key in {'member', 'file_sha256'}) or (utf8_schema and key in {'group', 'inventory_sha256'}) or (four_field and key == 'type'):
+                        metadata_key = 'path' if (legacy or utf8_schema or four_field) and key == 'name' or chunk_schema and key == 'member' else key
                         if parser.r.peek() == 34:
                             metadata[metadata_key] = parser.string(materialize=True)
                         else:
-                            parser.value(False)
+                            parser.opaque_value() if four_field else parser.value(False)
                             metadata[metadata_key] = None
-                    elif key == 'bytes' or (legacy and key == 'schema_version') or (chunk_schema and key in {'offset', 'chunk', 'chunks'}) or (utf8_schema and key in {'byte_count', 'version', 'members', 'member_count', 'total_member_bytes'}):
-                        metadata_key = 'bytes' if utf8_schema and key == 'byte_count' else key
+                    elif key == 'bytes' or (legacy and key == 'schema_version') or (chunk_schema and key in {'offset', 'chunk', 'chunks'}) or (utf8_schema and key in {'byte_count', 'version', 'members', 'member_count', 'total_member_bytes'}) or (four_field and key in {'byte_count', 'member_count'}):
+                        metadata_key = 'bytes' if (utf8_schema or four_field) and key == 'byte_count' else key
                         if parser.r.peek() in b'-0123456789' if parser.r.peek() is not None else False:
                             metadata[metadata_key] = parser.value()
                         else:
-                            parser.value(False)
+                            parser.opaque_value() if four_field else parser.value(False)
                             metadata[metadata_key] = None
                     else:
-                        parser.value(False)
+                        parser.opaque_value() if four_field else parser.value(False)
                     parser.r.whitespace()
                     sep = parser.r.byte()
                     if sep == 125:
@@ -609,6 +736,9 @@ class Inventory:
             else:
                 parser.r.byte()
             name = metadata.get('path')
+            if four_field:
+                self.four_field_metadata(ordinal, spec, metadata, keys, payload_types)
+                return
             if chunk_schema:
                 self.chunk_metadata(ordinal, spec, metadata, keys, payload_types)
                 return
@@ -804,6 +934,10 @@ class Inventory:
             self.gap('unknown top-level object structure; no automatic admission')
 
     def parse(self, stream, spec):
+        require_four_field_spec(spec)
+        four_field = spec.get('envelope_schema') == FOUR_FIELD_SCHEMA
+        if four_field:
+            self.four_field_state = {'headers': 0, 'header_valid': False, 'rows': 0, 'names': set()}
         if spec.get('envelope_schema') in CHUNK_SCHEMAS and (spec.get('layout') != 'discover' or spec.get('members')):
             raise ValueError('chunk schema is metadata discovery only; explicit reassembly is unavailable')
         if spec.get('envelope_schema') == 'utf8-name-text-members-v1' and (spec.get('layout') != 'discover' or spec.get('members')):
@@ -841,6 +975,18 @@ class Inventory:
                     parser.r.byte()
                 elif parser.r.peek() is not None:
                     raise ValueError('JSONL values must be separated by a newline')
+            if four_field:
+                state = self.four_field_state
+                expected = spec['four_field_metadata']['expected_member_count']
+                valid = (state['headers'] == 1 and state['header_valid']
+                         and state['rows'] == expected and len(state['names']) == expected)
+                self.event('container_structure', envelope_schema=FOUR_FIELD_SCHEMA,
+                           declared_expected_member_count=expected, observed_member_rows=state['rows'],
+                           observed_unique_member_names=len(state['names']), observed_header_rows=state['headers'],
+                           declared_count_and_uniqueness_valid=valid, admitted=False,
+                           historical_audit_complete=False, payload_hash_verified=False)
+                if not valid:
+                    self.gap('four-field EOF header/member count or uniqueness mismatch')
             return
         parser.r.whitespace()
         token = parser.r.peek()
@@ -992,7 +1138,8 @@ def run(manifest, emit, chunk_size=65536, max_record_bytes=64 * 1024 * 1024, cac
     for spec in manifest['sources']:
         try:
             members = spec.get('members', [])
-            if spec.get('envelope_schema') not in {None, 'legacy-name-data-base64-v1', 'utf8-name-text-members-v1'} | CHUNK_SCHEMAS:
+            require_four_field_spec(spec)
+            if spec.get('envelope_schema') not in {None, 'legacy-name-data-base64-v1', 'utf8-name-text-members-v1', FOUR_FIELD_SCHEMA} | CHUNK_SCHEMAS:
                 raise ValueError('unknown explicit envelope schema')
             if spec.get('envelope_schema') in CHUNK_SCHEMAS and (spec.get('layout') != 'discover' or members):
                 raise ValueError('chunk schema is metadata discovery only; explicit reassembly is unavailable')
