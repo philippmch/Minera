@@ -8,7 +8,7 @@ sha256, provenance='own-public-observation', format ('json', 'jsonl',
 'gzip-json', 'gzip-jsonl', 'gzip-envelope-json', 'gzip-envelope-jsonl'), adapter
 ('receipt-v1', 'pandas-before-v1', 'polars-receipt-v1', 'log-attributes-packed-v1',
 'pandas-attributes-before-v1', 'polars-attributes-receipt-v1',
-'log-variants-packed-v1', or 'digest-plan-v1'),
+'log-variants-packed-v1', 'pandas-variants-before-v1', or 'digest-plan-v1'),
 receipt_schema, reference, runtime, and role
 ('observations', 'plans', or 'intents'). JSON object wrappers require records_key;
 otherwise JSON must be one record or an array of records. Envelope sources also
@@ -52,6 +52,7 @@ SCHEMAS = {
     'pandas-attributes-before-v1': ('minera-pandas-attributes-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
     'polars-attributes-receipt-v1': ('minera-polars-attributes-observer-receipt-v1', 'source_positional_all_options_keyword'),
     'log-variants-packed-v1': ('minera-log-variants-observer-receipt-v1', 'positional_args_keyword_controls'),
+    'pandas-variants-before-v1': ('minera-pandas-variants-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
 }
 LOG_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.log.attributes.attributes_filter'
 LOG_ATTRIBUTES_ARITIES = {
@@ -872,6 +873,260 @@ def _pandas_attributes_outcome(row, profile):
     return
 
 
+PANDAS_VARIANTS_PROFILE = {'module': 'pm4py.algo.filtering.pandas.variants.variants_filter',
+ 'frame_kind': 'pandas.DataFrame',
+ 'call_shape': 'dataframe-positional-plus-explicit-args-and-keywords',
+ 'arities': {'apply': [1],
+             'filter_variants_top_k': [1],
+             'filter_variants_by_coverage_percentage': [1],
+             'filter_variants_by_maximum_coverage_percentage': [1]},
+ 'keywords': {'apply': ['parameters'],
+              'filter_variants_top_k': ['parameters'],
+              'filter_variants_by_coverage_percentage': ['parameters'],
+              'filter_variants_by_maximum_coverage_percentage': ['parameters']},
+ 'enum_values': {'CASE_ID_KEY': {'type': 'str', 'value': 'pm4py:param:case_id_key'},
+                 'ACTIVITY_KEY': {'type': 'str', 'value': 'pm4py:param:activity_key'},
+                 'DECREASING_FACTOR': {'type': 'str', 'value': 'decreasingFactor'},
+                 'POSITIVE': {'type': 'str', 'value': 'positive'}}}
+
+
+def _pandas_variants_need(value, message):
+    if not value:
+        raise ValueError(message)
+
+
+def _pandas_variants_exact(value, fields, label):
+    _pandas_variants_need(type(value) is dict and set(value) == set(fields), label)
+
+
+def _pandas_variants_packed(value, profile, tags, depth=0, expected=None):
+    _pandas_variants_need(depth < 192 and type(value) is dict and (type(value.get('type')) is str), 'packed value absent/too deep')
+    kind = value['type']
+    tags[kind] = tags.get(kind, 0) + 1
+    _pandas_variants_need(expected is None or kind == expected, 'packed container kind mismatch')
+    if kind in {'NoneType', 'str', 'bool', 'int'}:
+        _pandas_variants_exact(value, ['type', 'value'], 'unknown scalar descriptor fields')
+        _pandas_variants_need(type(value['value']) is {'NoneType': type(None), 'str': str, 'bool': bool, 'int': int}[kind], 'typed scalar payload mismatch')
+    elif kind == 'float':
+        _pandas_variants_exact(value, ['type', 'hex'], 'unknown float descriptor fields')
+        try:
+            _pandas_variants_need(type(value['hex']) is str and float.fromhex(value['hex']).hex() == value['hex'], 'noncanonical packed float hex')
+        except (ValueError, OverflowError):
+            raise ValueError('invalid packed float hex') from None
+    elif kind == 'bytes':
+        _pandas_variants_exact(value, ['type', 'hex'], 'unknown bytes descriptor fields')
+        _pandas_variants_need(type(value['hex']) is str and re.fullmatch('(?:[0-9a-f]{2})*', value['hex']), 'invalid packed bytes hex')
+    elif kind in {'pandas.NA', 'pandas.NaT'}:
+        _pandas_variants_exact(value, ['type'], 'unknown pandas special-value fields')
+    elif kind in {'datetime', 'pandas.Timestamp'}:
+        _pandas_variants_exact(value, ['type', 'iso'] if kind == 'datetime' else ['type', 'iso', 'resolution', 'timezone'], 'unknown timestamp descriptor fields')
+        _pandas_variants_need(type(value['iso']) is str, 'timestamp iso absent')
+        try:
+            datetime.datetime.fromisoformat(value['iso'])
+        except (ValueError, OverflowError):
+            raise ValueError('invalid timestamp iso') from None
+        if kind == 'pandas.Timestamp':
+            _pandas_variants_need(value['resolution'] in {'s', 'ms', 'us', 'ns'} and (value['timezone'] is None or type(value['timezone']) is str), 'timestamp resolution/timezone absent')
+    elif kind == 'enum':
+        _pandas_variants_exact(value, ['type', 'module', 'name', 'value'], 'unknown enum descriptor fields')
+        _pandas_variants_need(value['module'] == profile['module'] and type(value['name']) is str and (value['name'] in profile['enum_values']) and (value['value'] == profile['enum_values'][value['name']]), 'unknown enum module/name/value identity')
+    elif kind in {'list', 'tuple', 'set', 'frozenset'}:
+        _pandas_variants_exact(value, ['type', 'values'], 'unknown sequence descriptor fields')
+        _pandas_variants_need(type(value['values']) is list, 'packed sequence array absent')
+        for child in value['values']:
+            _pandas_variants_packed(child, profile, tags, depth + 1)
+        if kind in {'set', 'frozenset'}:
+            _pandas_variants_need(value['values'] == sorted(value['values'], key=lambda x: json.dumps(x, sort_keys=True)), 'original producer set order differs')
+    elif kind == 'dict':
+        _pandas_variants_exact(value, ['type', 'items'], 'unknown dictionary descriptor fields')
+        _pandas_variants_need(type(value['items']) is list, 'ordered typed dictionary entries absent')
+        for pair in value['items']:
+            _pandas_variants_need(type(pair) is list and len(pair) == 2, 'typed key/value pair absent')
+            for child in pair:
+                _pandas_variants_packed(child, profile, tags, depth + 1)
+    elif kind == 'pandas.DataFrame':
+        _pandas_variants_exact(value, ['type', 'frame'], 'unknown packed DataFrame fields')
+        _pandas_variants_frame(value['frame'], profile, tags, depth + 1)
+    else:
+        raise ValueError('unknown packed observer value kind')
+
+
+def _pandas_variants_frame(value, profile, tags, depth=0):
+    _pandas_variants_need(depth < 192, 'frame nesting too deep')
+    _pandas_variants_exact(value, ['kind', 'columns', 'column_names', 'dtypes', 'categorical_dtypes', 'index', 'attrs', 'rows'], 'unknown/incomplete frame snapshot')
+    _pandas_variants_need(value['kind'] == profile['frame_kind'], 'unreviewed frame class')
+    _pandas_variants_packed(value['columns'], profile, tags, depth + 1, 'list')
+    _pandas_variants_packed(value['column_names'], profile, tags, depth + 1, 'list')
+    _pandas_variants_packed(value['attrs'], profile, tags, depth + 1, 'dict')
+    width = len(value['columns']['values'])
+    _pandas_variants_need(type(value['dtypes']) is list and len(value['dtypes']) == width and all((type(x) is str for x in value['dtypes'])), 'frame dtype cardinality mismatch')
+    categories = value['categorical_dtypes']
+    _pandas_variants_need(type(categories) is list and len(categories) == width, 'frame categorical metadata cardinality mismatch')
+    for dtype, category in zip(value['dtypes'], categories):
+        _pandas_variants_need((dtype == 'category') == (category is not None), 'categorical dtype/metadata mismatch')
+        if category is not None:
+            _pandas_variants_exact(category, ['categories', 'categories_dtype', 'ordered'], 'unknown categorical metadata')
+            _pandas_variants_need(type(category['categories_dtype']) is str and type(category['ordered']) is bool, 'incomplete categorical metadata')
+            _pandas_variants_packed(category['categories'], profile, tags, depth + 1, 'list')
+    index = value['index']
+    _pandas_variants_exact(index, ['kind', 'dtype', 'names', 'labels'], 'unknown/incomplete index snapshot')
+    _pandas_variants_need(index['kind'] in {'RangeIndex', 'Index', 'MultiIndex'} and type(index['dtype']) is str, 'unreviewed index kind/dtype')
+    _pandas_variants_packed(index['names'], profile, tags, depth + 1, 'list')
+    _pandas_variants_packed(index['labels'], profile, tags, depth + 1, 'list')
+    _pandas_variants_need(type(value['rows']) is list and len(value['rows']) == len(index['labels']['values']), 'row/index cardinality mismatch')
+    for row in value['rows']:
+        _pandas_variants_packed(row, profile, tags, depth + 1, 'list')
+        _pandas_variants_need(len(row['values']) == width, 'row/column cardinality mismatch')
+    _pandas_variants_need(len(index['names']['values']) >= 1, 'index names absent')
+    if index['kind'] == 'MultiIndex':
+        for label in index['labels']['values']:
+            _pandas_variants_need(label['type'] == 'tuple' and len(label['values']) == len(index['names']['values']), 'multi-index label/name arity mismatch')
+    else:
+        _pandas_variants_need(len(index['names']['values']) == 1, 'ordinary index name arity mismatch')
+
+
+def _pandas_variants_receipt_of(row):
+    return {'module': row['module'], 'method': row['method'], 'input': row['input_before'], 'args': row['args_before'], 'kwargs': row['kwargs_before'], 'call_shape': row['call_shape']}
+
+
+def _pandas_variants_receipt(receipt, profile, tags):
+    _pandas_variants_exact(receipt, ['module', 'method', 'input', 'args', 'kwargs', 'call_shape'], 'unknown/incomplete original receipt')
+    _pandas_variants_need(receipt['module'] == profile['module'] and type(receipt['method']) is str and (receipt['method'] in profile['arities']) and (receipt['call_shape'] == profile['call_shape']), 'unreviewed module/method/call shape')
+    _pandas_variants_frame(receipt['input'], profile, tags)
+    _pandas_variants_packed(receipt['args'], profile, tags, expected='list')
+    _pandas_variants_packed(receipt['kwargs'], profile, tags, expected='dict')
+    _pandas_variants_need(len(receipt['args']['values']) in profile['arities'][receipt['method']], 'positional operand arity mismatch')
+    seen = set()
+    for key, _ in receipt['kwargs']['items']:
+        _pandas_variants_need(key['type'] == 'str' and key['value'] in profile['keywords'][receipt['method']] and (key['value'] not in seen), 'unreviewed/duplicate method keyword')
+        seen.add(key['value'])
+
+
+def _pandas_variants_outcome(row, profile):
+    _pandas_variants_need(type(row) is dict, 'record is not an object')
+    _pandas_variants_need(any((k in row for k in ['result', 'error', 'value_result', 'result_value', 'output', 'returned', 'exception'])), 'record has no actual terminal outcome')
+    base = {'index', 'case', 'module', 'method', 'receipt_sha256', 'input_before', 'args_before', 'kwargs_before', 'call_shape', 'warnings', 'input_after', 'args_after', 'kwargs_after', 'input_unchanged', 'arguments_unchanged'}
+    success = 'error' not in row
+    _pandas_variants_exact(row, base | ({'result', 'returned_input_identity'} if success else {'error'}), 'unknown/mixed/incomplete observation fields')
+    _pandas_variants_need(type(row['index']) is int and row['index'] > 0, 'actual observer index must be a positive integer')
+    receipt = _pandas_variants_receipt_of(row)
+    tags = {}
+    _pandas_variants_receipt(receipt, profile, tags)
+    case = row['case']
+    _pandas_variants_exact(case, ['name', 'method', 'shape', 'args', 'kwargs'], 'unknown/incomplete saved case recipe')
+    _pandas_variants_need(type(case['name']) is str and case['name'] and type(case['shape']) is str and (case['method'] == row['method']) and type(case['args']) is list and type(case['kwargs']) is dict, 'case/method identity mismatch')
+    _pandas_variants_frame(row['input_after'], profile, tags)
+    _pandas_variants_packed(row['args_after'], profile, tags, expected='list')
+    _pandas_variants_packed(row['kwargs_after'], profile, tags, expected='dict')
+    _pandas_variants_need(len(row['args_after']['values']) == len(row['args_before']['values']) and canonical([pair[0] for pair in row['kwargs_after']['items']]) == canonical([pair[0] for pair in row['kwargs_before']['items']]), 'outer argument/keyword shape changed outside captured operands')
+    _pandas_variants_need(type(row['input_unchanged']) is bool and row['input_unchanged'] == (canonical(row['input_before']) == canonical(row['input_after'])), 'source mutation flag mismatch')
+    same_arguments = canonical(row['args_before']) == canonical(row['args_after']) and canonical(row['kwargs_before']) == canonical(row['kwargs_after'])
+    _pandas_variants_need(type(row['arguments_unchanged']) is bool and row['arguments_unchanged'] == same_arguments, 'argument mutation flag mismatch')
+    _pandas_variants_need(type(row['warnings']) is list, 'full warnings array absent')
+    for warning in row['warnings']:
+        _pandas_variants_exact(warning, ['category', 'message', 'filename', 'lineno'], 'unknown/incomplete warning metadata')
+        _pandas_variants_need(all((type(warning[k]) is str for k in ['category', 'message', 'filename'])) and type(warning['lineno']) is int, 'warning metadata type mismatch')
+    if success:
+        _pandas_variants_frame(row['result'], profile, tags)
+        _pandas_variants_need(type(row['returned_input_identity']) is bool, 'returned input identity absent')
+        _pandas_variants_need(not row['returned_input_identity'] or canonical(row['result']) == canonical(row['input_after']), 'returned input identity/result mismatch')
+    else:
+        _pandas_variants_exact(row['error'], ['type', 'message', 'args'], 'unknown/incomplete full error')
+        _pandas_variants_need(type(row['error']['type']) is str and '.' in row['error']['type'] and (type(row['error']['message']) is str), 'full error type/message absent')
+        _pandas_variants_packed(row['error']['args'], profile, tags, expected='tuple')
+    encoded = canonical(receipt)
+    digest = sha(encoded)
+    _pandas_variants_need(type(row['receipt_sha256']) is str and re.fullmatch('[0-9a-f]{64}', row['receipt_sha256']) and (row['receipt_sha256'] == digest), 'original canonical receipt SHA mismatch')
+    return
+
+
+PANDAS_VARIANTS_TERMINALS = {'result', 'error', 'value_result', 'result_value', 'result_kind', 'output', 'return', 'returned', 'exception', 'error_type'}
+PANDAS_VARIANTS_ENTRY_FIELDS = {'input_after', 'args_after', 'kwargs_after', 'input_unchanged', 'arguments_unchanged', 'apply_returned', 'returned_input_identity', 'warnings'}
+
+
+def _pandas_variants_plan_metadata(row):
+    _pandas_variants_need(type(row['index']) is int and row['index'] > 0 and type(row['case']) is str and row['case'], 'pandas variants plan/intent index or case invalid')
+
+
+def _pandas_variants_audit(data, spec):
+    _pandas_variants_need(spec.get('format') == 'json' and spec.get('records_key') == 'receipts' and spec.get('adapter') == 'digest-plan-v1' and spec.get('role') == 'plans', 'unknown pandas variants audit wrapper admission')
+    audit = load_json(data)
+    _pandas_variants_exact(audit, {'candidates', 'prior_rows_read', 'removed_duplicates', 'removed_prior_overlaps', 'receipts'}, 'unknown/incomplete pandas variants audit wrapper')
+    _pandas_variants_need(type(audit['candidates']) is int and audit['candidates'] >= 0 and type(audit['prior_rows_read']) is int and audit['prior_rows_read'] >= 0 and type(audit['receipts']) is list and type(audit['removed_duplicates']) is list and audit['removed_prior_overlaps'] == [], 'pandas variants audit counters/arrays invalid')
+    names = {}; digests = set()
+    for row in audit['receipts']:
+        _pandas_variants_exact(row, {'case', 'receipt_sha256'}, 'unknown pandas variants digest audit row')
+        _pandas_variants_need(type(row['case']) is str and row['case'] and row['case'] not in names and type(row['receipt_sha256']) is str and re.fullmatch('[0-9a-f]{64}', row['receipt_sha256']) and row['receipt_sha256'] not in digests, 'pandas variants audit case/digest uniqueness mismatch')
+        names[row['case']] = row['receipt_sha256']; digests.add(row['receipt_sha256'])
+    removed = set()
+    for duplicate in audit['removed_duplicates']:
+        _pandas_variants_exact(duplicate, {'first', 'removed', 'receipt_sha256'}, 'unknown pandas variants removed candidate link')
+        _pandas_variants_need(type(duplicate['first']) is str and duplicate['first'] in names and duplicate['receipt_sha256'] == names[duplicate['first']] and type(duplicate['removed']) is str and duplicate['removed'] and duplicate['removed'] not in names and duplicate['removed'] not in removed, 'pandas variants removed candidate target/hash/name mismatch')
+        removed.add(duplicate['removed'])
+    _pandas_variants_need(audit['candidates'] == len(names) + len(removed), 'pandas variants complete candidate count mismatch')
+
+
+def _pandas_variants_adapt(row, spec):
+    role = spec['role']; adapter = spec['adapter']; profile = PANDAS_VARIANTS_PROFILE
+    # A terminal-bearing row is never downgraded by its declared plans/intents role.
+    if set(row) & PANDAS_VARIANTS_TERMINALS:
+        _pandas_variants_outcome(row, profile)
+        receipt = _pandas_variants_receipt_of(row)
+        raw = canonical(receipt)
+        return receipt['module'], receipt['method'], raw, sha(raw), 'actual_outcome'
+    digest = row.get('receipt_sha256')
+    _pandas_variants_need(type(digest) is str and re.fullmatch('[0-9a-f]{64}', digest), 'pandas variants original digest absent')
+    if adapter == 'digest-plan-v1':
+        _pandas_variants_exact(row, {'case', 'receipt_sha256'}, 'pandas variants digest plan has unknown/full/entry fields')
+        _pandas_variants_need(role == 'plans' and type(row['case']) is str and row['case'], 'pandas variants digest plan role/case invalid')
+        return None, None, None, digest, 'digest_only_plan'
+    if 'receipt' not in row:
+        _pandas_variants_exact(row, {'index', 'case', 'module', 'method', 'receipt_sha256'}, 'pandas variants light intent has unknown/before-only/entry fields')
+        _pandas_variants_plan_metadata(row)
+        _pandas_variants_need(role == 'intents' and row['module'] == profile['module'] and type(row['method']) is str and row['method'] in profile['arities'], 'pandas variants intent role/module/method invalid')
+        return row['module'], row['method'], None, digest, 'entered_without_outcome'
+    receipt = row['receipt']; _pandas_variants_receipt(receipt, profile, {})
+    raw = canonical(receipt)
+    _pandas_variants_need(sha(raw) == digest, 'pandas variants full original canonical digest mismatch')
+    base = {'index', 'case', 'receipt', 'receipt_sha256'}
+    _pandas_variants_need(base <= set(row), 'pandas variants full plan metadata incomplete')
+    _pandas_variants_plan_metadata(row)
+    if set(row) & PANDAS_VARIANTS_ENTRY_FIELDS:
+        _pandas_variants_need(not set(row) - (base | PANDAS_VARIANTS_ENTRY_FIELDS), 'pandas variants entry has unknown evidence fields')
+        _pandas_variants_need(any(key in row for key in ('input_after', 'args_after', 'kwargs_after', 'apply_returned')), 'pandas variants partial entry lacks captured entry evidence')
+        for key in ('input_unchanged', 'arguments_unchanged', 'apply_returned', 'returned_input_identity'):
+            if key in row:
+                _pandas_variants_need(type(row[key]) is bool, 'pandas variants entry boolean invalid')
+        if 'input_after' in row:
+            _pandas_variants_frame(row['input_after'], profile, {})
+            if 'input_unchanged' in row:
+                _pandas_variants_need(row['input_unchanged'] == (canonical(row['input_after']) == canonical(receipt['input'])), 'pandas variants partial source flag mismatch')
+        for key, kind in (('args_after', 'list'), ('kwargs_after', 'dict')):
+            if key in row:
+                _pandas_variants_packed(row[key], profile, {}, expected=kind)
+        if 'args_after' in row:
+            _pandas_variants_need(len(row['args_after']['values']) == len(receipt['args']['values']), 'pandas variants partial outer args changed')
+        if 'kwargs_after' in row:
+            _pandas_variants_need(canonical([x[0] for x in row['kwargs_after']['items']]) == canonical([x[0] for x in receipt['kwargs']['items']]), 'pandas variants partial outer kwargs changed')
+        if 'arguments_unchanged' in row:
+            _pandas_variants_need('args_after' in row and 'kwargs_after' in row and row['arguments_unchanged'] == (canonical(row['args_after']) == canonical(receipt['args']) and canonical(row['kwargs_after']) == canonical(receipt['kwargs'])), 'pandas variants partial control flag mismatch')
+        if 'warnings' in row:
+            _pandas_variants_warnings(row['warnings'])
+        status = 'entered_without_outcome'
+    else:
+        _pandas_variants_exact(row, base, 'pandas variants full plan has unknown evidence fields')
+        _pandas_variants_need(role in {'plans', 'intents'}, 'pandas variants full plan lacks role provenance')
+        status = 'planned_only' if role == 'plans' else 'entered_without_outcome'
+    return receipt['module'], receipt['method'], raw, digest, status
+
+
+def _pandas_variants_warnings(warnings):
+    _pandas_variants_need(type(warnings) is list, 'pandas variants complete warnings array absent')
+    for warning in warnings:
+        _pandas_variants_exact(warning, {'category', 'message', 'filename', 'lineno'}, 'pandas variants incomplete warning')
+        _pandas_variants_need(all(type(warning[k]) is str for k in ('category', 'message', 'filename')) and type(warning['lineno']) is int, 'pandas variants warning types invalid')
+
+
 POLARS_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.polars.attributes.attributes_filter'
 POLARS_ATTRIBUTES_KEYWORDS = {
     'apply': {'values', 'parameters'}, 'apply_events': {'values', 'parameters'},
@@ -1188,6 +1443,8 @@ def adapt(row, spec):
             raise ValueError('unknown original receipt schema')
     elif spec.get('receipt_schema') != SCHEMAS[adapter][0]:
         raise ValueError('unknown original receipt schema for adapter')
+    if spec.get('receipt_schema') == SCHEMAS['pandas-variants-before-v1'][0]:
+        return _pandas_variants_adapt(row, spec)
     if spec.get('receipt_schema') == SCHEMAS['log-variants-packed-v1'][0]:
         return _log_variants_adapt(row, spec)
     if spec.get('receipt_schema') == SCHEMAS['polars-attributes-receipt-v1'][0]:
@@ -1354,6 +1611,8 @@ class Index:
                 if not spec.get(field):
                     raise ValueError('missing declared ' + field)
             partition = canonical([spec['reference'], spec['runtime']]).decode()
+            if spec['receipt_schema'] == SCHEMAS['pandas-variants-before-v1'][0] and spec.get('records_key') is not None:
+                _pandas_variants_audit(data, spec)
             if spec['receipt_schema'] == SCHEMAS['log-variants-packed-v1'][0] and spec.get('records_key') is not None:
                 _log_variants_audit(data, spec)
             if spec['receipt_schema'] == SCHEMAS['polars-attributes-receipt-v1'][0] and spec.get('records_key') is not None:
@@ -1367,6 +1626,12 @@ class Index:
                          spec['receipt_schema'], partition, digest, full, status))
                 except (ValueError, KeyError, TypeError) as error:
                     gap_row = row
+                    if spec['receipt_schema'] == SCHEMAS['pandas-variants-before-v1'][0] and isinstance(row, dict):
+                        hints = [row['module']] if 'module' in row else []
+                        if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
+                            hints.append(row['receipt']['module'])
+                        if any(hint != PANDAS_VARIANTS_PROFILE['module'] for hint in hints):
+                            gap_row = None
                     if spec['receipt_schema'] == SCHEMAS['pandas-attributes-before-v1'][0] and isinstance(row, dict):
                         # A legacy row can lack an embedded module. Conflicting
                         # outer identities must not certify this closed scope.
