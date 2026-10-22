@@ -1,6 +1,9 @@
 #include "table_attribute_repetition_test_support.hpp"
 #include "minera/table_attributes_filter_workbench.hpp"
 #include "minera/pandas_attributes_filter.hpp"
+#include "../pandas_attributes_original_call_parser.hpp"
+#include <bit>
+#include <cstdint>
 #include <iostream>
 
 namespace {
@@ -18,6 +21,25 @@ void result_is(const DiscoveryWorkbenchResponse& answer,const EventTable& expect
 EventTable operands(const DiscoveryWorkbenchResponse& answer){const auto state=text(answer.json,"controls_before_json");require(state.has_value(),"missing controls snapshot");const auto artifact=text(*state,"args_json");require(artifact.has_value(),"missing actual operand artifact");return parse_embedding_workbench_table_json(*artifact);}
 void controls(){
   const auto source=source_table("pandas");
+  // Match the unchanged public-oracle native constructor's lexical field as
+  // well as its double bits; raw original-call text remains independent.
+  const auto native_float=[](std::string key,double value){EventAttribute a{std::move(key),std::to_string(value),AttributeKind::kFloat};a.typed_value=value;return a;};
+  const auto same_float=[&](const EventAttribute& actual,const std::string& key,double value){
+    const auto expected=native_float(key,value);require(actual==expected,"complete decimal native constructor differs");
+    require(std::bit_cast<std::uint64_t>(std::get<double>(actual.typed_value))==std::bit_cast<std::uint64_t>(value),"decimal double bits changed");
+  };
+  const auto decimal_json="\r\n "+call(R"([{"type":"decimal","value":"-0.0"},{"type":"decimal","value":1.0}])",R"(,"parameter_entries":[{"key":"pm4py:param:attribute_key","enum_key":false,"value":{"type":"string","value":"signed"}}])")+"\r\n";
+  const auto decimal_answer=run(source,"numeric_events",decimal_json);require(decimal_answer.status==200,"decimal operands failed");preserved(decimal_answer,source);
+  require(text(decimal_answer.json,"call_json")==decimal_json,"decimal normalization rewrote raw call");
+  const auto decimal_args=operands(decimal_answer);same_float(*decimal_args.rows[0][0],"",-0.0);same_float(*decimal_args.rows[0][1],"",1.0);
+  EventTable expected_decimal_args;expected_decimal_args.columns={"0","1"};expected_decimal_args.dtypes={"object","object"};expected_decimal_args.rows={{native_float("",-0.0),native_float("",1.0)}};
+  require(text(*text(decimal_answer.json,"controls_before_json"),"args_json")==serialize_embedding_workbench_table_json(expected_decimal_args),"full decimal operand artifact differs");
+  namespace original=pandas_attributes_original_call_detail;
+  const auto recursive=original::parse(call(R"([{"type":"list","value":[{"type":"decimal","value":"-0.0"},{"type":"tuple","value":[{"type":"decimal","value":"0.33333333333333331"},{"type":"decimal","value":"1e-7"}]}]}])",R"(,"parameter_entries":[{"key":"decreasingFactor","enum_key":false,"value":{"type":"decimal","value":"0.5"}}])"),"events");
+  same_float(recursive.args[0].children[0],"0",-0.0);same_float(recursive.args[0].children[1].children[0],"0",1.0/3.0);same_float(recursive.args[0].children[1].children[1],"1",1e-7);
+  same_float(recursive.parameters->at(0).value,"decreasingFactor",0.5);
+  const auto decimal_counts=original::parse(call(R"([{"type":"decimal","value":"0.0"}])",R"(,"keyword_entries":[{"key":"act_count0","value":{"type":"attribute_counts","entries":[[{"type":"decimal","value":"-0.0"},{"type":"decimal","value":"2.5"}]]}},{"key":"most_common_variant","value":{"type":"tuple","value":[{"type":"decimal","value":"0.33333333333333331"}]}}])"),"threshold");
+  same_float(decimal_counts.args[0],"",0.0);const auto& decimal_pair=decimal_counts.keywords[0].count_dictionary->entries[0];same_float(decimal_pair.first,"",-0.0);same_float(decimal_pair.second,"",2.5);same_float(decimal_counts.keywords[1].value.children[0],"0",1.0/3.0);
   const std::string members=R"([{"type":"list","value":[{"type":"string","value":"A"}]}])";
   for(const auto& [mode,tail]:std::vector<std::pair<std::string,std::string>>{{"omitted",""},{"raw",R"(,"parameter_value":{"type":"null"})"},{"raw",R"(,"parameter_value":{"type":"list","value":[]})"},{"entries",R"(,"parameter_entries":[])"}}){
     const auto json=call(members,tail);const auto answer=run(source,"events",json);PandasAttributesFilterOptions options;EventAttribute values;values.container=AttributeContainerKind::kList;values.children={{"0","A"}};
