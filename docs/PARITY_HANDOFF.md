@@ -1,4 +1,4 @@
-# Full parity continuation — 2026-10-21–22
+# Full parity continuation — 2026-10-21–23
 
 Resume in `C:/Users/pmoch/Documents/Minera`, branch `main`.
 
@@ -14,7 +14,160 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: full 491-call pandas API acceptance and rendered UI checks — 2026-10-22
+## Current continuation: full 411-call Polars variants API acceptance and rendered UI checks — 2026-10-23
+
+Four focused source commits descend from `20cfd7f9`: `8f4c70f8` adds the closed
+Polars receipt index, `eca48a77` adds exact native original-call controls,
+`804e112e` adds full411 native/direct/HTTP acceptance, and `66c2336b` adds the
+editor, downloads, genuine filtered File reuse and workflow contracts. Root
+source proof (`046338`) compares all19 own paths against their committed bytes,
+normalizing CRLF/LF only. It is
+`polars-variants-original-call-finalization-1/source-equality.json`, SHA256
+`eb0968ac6ee1dce75e7b8691b2ef04d2619a0f3610c4b608a3cf30ad4678d03a`.
+Source push `5bfb8f` and actual remote readback `be3a8f` verify main at
+`66c2336b0b55b86245878a86a991c9796c0511ed`. The inherited two tracked coverage
+edits remain unstaged. Original native header, kernel, driver, vectors and
+shared codecs remain unchanged.
+
+The entire original bank is **399+12=411**: apply120, from-list104, top-k107 and
+auto80;142 complete frames and269 full diagnostics (258apply/11collect), with35
+eager and376 lazy inputs. All528 complete frame/category constructors and all411
+whole native cases/driver/vector are independently mapped (`1da673`), report
+SHA256 `23cba3b2f3c8625744334ed120e1487eca6eeb366af7c4cca0706292f53d2e32`.
+Actual invocation arms are274 raw /134 ordered /3 missing-required defaults;
+constructed parameter arms are277 raw /134 ordered. All three unused objects
+are raw. The original seven fields are module/function/input/
+category_observables/kwargs/call_shape/input_kind, with
+`source_positional_all_options_keyword`. Sorted canonical IDs joined by LF,
+**without a trailing LF**, have SHA256
+`1e3b6c30324bdac74bbcf8660e1db4ddc46791c50b3f73de8f9bcbca6c986759`.
+
+The distinct `polars-variants-receipt-v1` index resolves all411 outcomes, all411
+full audit plans and all411 light intents:1233 complete raw slices and six
+freshly rehashed cache hits (`c8ca4d`). All146 integrity tests pass (`766f92`).
+Independent source review retains all eight earlier profiles exactly after
+removing only the additive new gates. Incomplete entries, unknown terminal
+fields and unresolved intents remain conservative gaps, with no history,
+absence, catalogue or new-call authority.
+
+`POST /api/reference-table-variants` now dispatches original mode by the unique
+engine. Polars takes exactly engine=polars, membership/from_list/top_k/auto,
+genuine native source_file and exact raw call_json. Descriptor schema is
+`minera-polars-variants-original-call-v1`, with authoritative DataFrame/LazyFrame
+input_kind and ordered keyword_entries. There is no fabricated args array or
+header/auxiliary upload. Required operands may be absent and reach the exact
+native `(source,std::nullopt)` overload; the constructed parameters remain
+inspectable but are not passed. Explicit None, raw values, omission and ordered
+enum/string identities remain distinct. All twelve producer Packed types use
+the proven Polars carriers: int64/uint64, exact double bits/std::to_string,
+Microsecond/null-zone NativeDate and empty sequence child keys.
+
+The Polars original response has25 fields, retaining complete source before/
+after, actual eight-field caller controls before/after, raw call and successful
+filtered native data. Native diagnostic phase and actual invocation-returned
+state are separate. Returned metadata is exactly kind,row_count_known,row_count,
+table_context_json, captured from the actual eager/lazy object before collection
+without an extra scan. The whole unchanged table codec string preserves complete
+context and its raw fallback/schema marker, with empty rows explicitly serving
+as header context. This artifact is downloadable and is never reusable source
+data. Collect errors retain it after a returned lazy object; genuine successful
+filtered File bytes alone can be reused. Friendly18 and pandas original24 retain
+their existing contracts, including ambiguous-engine early diagnostics.
+
+Root generation (`065d7b`) rechecks the complete528/411 basis before emitting
+the separate external transport include
+`src/backend/tests/polars_variants_workbench_public_vectors.inc` (3,118,026 bytes;
+SHA256 `5dbfb0b6538fc0cb57851193a7e2349f9537198b32b8bfa0c50a385a08a9a475`).
+The original generator and capture producers were never executed/imported.
+Generation report SHA256 is
+`b61b73e6924a8867bea5873e81fb9275aa78a910d8f840847705064fd0975aee` at
+`admitted-polars-variants-original-call-transport-1/generation-report.json`.
+The corrected full411 target passes (`bac2d2`,67.91seconds): unchanged original
+411 cases plus two extra native regressions,411 direct and411 owned HTTP cases,
+all25 fields, actual caller objects, returned metadata and complete native
+source/result/control/context artifact reopen. Expected controls and returned
+flags come from independent actual native invocations, not the product parser.
+
+Nine focused native and prior pandas491/friendly regression suites pass
+(`bfd48d`,55.84seconds). Frontend checks pass57 focused tests (`3f55e9`), all201
+files /9937 tests (`83aa6b`) and TypeScript/Vite (`f8239b`). The corrected owned
+headless browser passes18 bounded checks,16 HTTP requests including two held
+responses, and nine byte-exact downloads (`a191bb`). Independently expected whole
+native sources/results/header contexts include exact uint64 maximum values.
+All four operations, eager/lazy errors, missing versus None, unused/raw/ordered
+parameters, BOM/CRLF import, cancellation and genuine filtered File reuse pass.
+Both screenshots were inspected (`c72fb6`). Listener PID ownership was checked;
+owned server15932 and Chrome39736 stopped with stdio drained. These18 UI checks
+supplement the complete411 API gate.
+
+Failures remain preserved. The initial native baseline was NotRun (`173aea`)
+because the executable was absent, then built and passed (`bfddd5`). A focused
+frontend metadata preflight used the wrong working directory; all57 product
+tests passed and all eight own pins were separately verified (`a7f52b`). The
+first full411 fixture compile (`937714`) omitted a public codec include in the
+test wrapper. Adding only that include fixed it (`006bda`); its original frozen
+source and failure receipt remain. The first browser run (`57ab2a`) passed all16
+requests and nine downloads before its final pandas navigation missed the reset
+table-filter choice. The corrected recipe explicitly reselects variants, with
+a fresh output directory. Neither correction changed product behavior, native
+kernel or oracle data.
+
+Root final facts (`41833f`) are
+`polars-variants-original-call-finalization-1/root-facts.json` (34,265 bytes;
+SHA256 `7ad00c55031e48e70066555996df4ef031d6cbf6b2966ccc9822179c09348ad5`),
+with19 own source bindings,91 freshly verified external bindings and all actual
+terminal counts. The sealed checkpoint is
+`docs/retained-public-observation-polars-variants-original-call-checkpoint.jsonl.gz`,
+1,103,489 bytes, SHA256
+`c8ea289366ee57ff03ec74ca155d24a9f399929e846058ff6a5fe1774f210cb2`.
+Root writer `1bae52` succeeds after explicit scope freeze `c4d689` and root scope
+review. It retains155 exact OWN members,91 external bindings and12 inert
+historical declarations. Its sidecar is471,355 bytes, SHA256
+`360ad762c38d30598c38ba0969385fcae6884009a7489e3c0571c3c353054bd9`.
+Independent source review is11,205 bytes, SHA256
+`890e190151da3cf9a8477271681ce1773d169532e72448dac7bc63504c05a10b`;
+its first null-only report serialization is separately preserved and disclosed.
+Standalone independent readback `3d261e` passes all155 current member bytes,
+whole canonical header/JSONL/sidecar and987 nested declaration dispositions:
+`polars-variants-original-call-checkpoint-independent-readback-1/validation.json`,
+1,432 bytes, SHA256
+`20f0819451109c0a5153c4fc64431464fcb0c946ac5a8f2ff1f5dd64365ee31b`.
+No external/historical target was followed or opened during packaging. Exact
+scope is72,860 bytes, SHA256
+`9c213690bef074859f395e1cbd21dc9f6e00cfee6a06dacb06f56fe5cfa3358b`.
+Final handoff and later readback receipt are excluded to avoid hash cycles.
+Evidence commit is `b5584f0105173d82e9866ad7cf7ec89b3e2fe2c4`; source and
+evidence are separate clean commits. Readback predates this evidence commit,
+with no capsule member changed afterwards.
+
+No original archive was opened for this Polars continuation. Root separately
+admitted exact flat observations and native oracle parsing before use. The
+unchanged integrity regression uses three previous LTL archive containers.
+Python qualified errors/args, warnings, identity, public explain plans and
+physical categorical context remain external. Separate datetime fold/offset
+metadata remains in original receipts, with no fabricated native fields.
+
+Committed catalogue scope remains86 packages (46 complete /40 partial),387
+modules (226 complete /161 partial), **201 strict open units**, six grouping
+banks and **565 unentered logical queries**. Next candidate is the complete342
+LOG timestamp bank, all13 functions including183 returns,159 errors and38 real
+source/control mutations. Its exactly five-file metadata-only plan is
+`polars-variants-next-log-timestamp-metadata-plan-1/`, report SHA256
+`adb5fe04f5f2db3bf597d5626f9e6a3533df3cb86fb0e060b239057cb4cd1b68`.
+Root verifies only these five own files (`cde2b9`), with no original reads:
+`polars-variants-next-log-timestamp-metadata-root-review-1/report.json`, SHA256
+`51d0da627b3d7e86b92da292ee6dfa37e3606266e24bb392fdd78b4e8dcf39d9`.
+Ten whole original bindings remain missing (three records/intents/digest audits
+and oldGEN). Admission is pending; the saved28-member public archive pin is
+only a declaration, requiring separate root IO review before recovery. Preserve
+the prior326/338 audit-timing correction and the distinction between source
+mutations inside controls and independent kwargs mutations. The worker's
+overbroad initial docs search (`0eab6b`) and truncated, unclassified potential
+embedded-payload exposure are disclosed in validation; no zero-exposure claim
+or authority follows. This next plan is separate from the current Polars capsule.
+The following pandas/LOG/attributes checkpoints are historical.
+
+## Previous checkpoint: full 491-call pandas API acceptance and rendered UI checks — 2026-10-22
 
 The four source commits descend from `019946ea`: `674ca179` adds the closed
 pandas variants receipt profile; `a5f670dd` implements original backend controls;
@@ -146,11 +299,33 @@ no trailing LF have SHA256
 The census derives20 before /20 after /10 result category observations and30
 unique projected category-bearing snapshots; the legacy30 counter's original
 definition remains explicitly unproven. Native driver/vector/generator were
-opaque only in these steps. Full528-constructor and411-case native mapping still
-needs its own subsequent semantic admission; no Polars product change or runtime
-acceptance is claimed yet. These later Polars receipts are separate from the
-pandas capsule. The older next pandas instructions below are historical and
-superseded by this checkpoint.
+opaque only in these census steps. Root subsequently admitted native oracle
+parsing separately and passed the complete528-constructor/411-case mapping
+(`1da673`), including the whole unchanged vector and retained driver. Its report
+is `polars-variants-full-native-mapping-actual-1/report.json`, SHA256
+`23cba3b2f3c8625744334ed120e1487eca6eeb366af7c4cca0706292f53d2e32`.
+Actual invocation arms are274 raw /134 ordered /3 missing-required default-options;
+constructed parameter arms are277 raw /134 ordered, with three unused objects.
+The unchanged native411 bank and two extra regressions pass (`bfddd5`) after
+building the previously absent executable; the initial NotRun (`173aea`) remains
+preserved. No Polars API/UI acceptance is claimed yet.
+
+Focused commit `8f4c70f8` adds the distinct closed Polars variants receipt profile,
+25 synthetic cases and guide. All146 receipt integrity tests pass (`766f92`).
+Full411 index acceptance passes (`c8ca4d`):411 outcomes,411 complete plans and411
+intents,1233 exact raw slices, six rehashed cache hits and no gaps. Independent
+source review preserves all eight previous profiles exactly after removing only
+additive new gates; report SHA256 is
+`a43e28981f4a578e01871ec947acfcf3114925270960de2a86596476b0df8d8a` at
+`polars-variants-index-independent-review-1/report.json`. Push `10412b` and fresh
+remote readback `b032c9` verify main at
+`8f4c70f84168970e23e7ab77a605fa57a7a8e3c7`.
+
+These later Polars receipts are separate from the pandas capsule. Next implement
+and validate genuine eager/lazy original calls, complete caller snapshots and
+returned-table metadata, then full411 direct/HTTP acceptance and rendered UI.
+Catalogue and query counts remain201/565. The older next pandas instructions
+below are historical and superseded by this checkpoint.
 
 ## Previous checkpoint: all 380 original LOG variants calls reach API/UI — 2026-10-22
 
