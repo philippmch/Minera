@@ -97,7 +97,7 @@ it("keeps original calls exclusive and distinguishes omitted from explicit null 
  const form={...originalForm(),originalOperand:"omitted"as const,positive:false,attributeKeyMode:"custom"as const,attributeKey:"inert"};
  expect(Object.fromEntries(ltlFilterFields(form))).toEqual({engine:"polars",operation:"eventually",input_kind:"LazyFrame",call_json:'{"schema":"minera-polars-ltl-original-call-v1"}'});
  expect(ltlOriginalCallJson({...form,originalOperand:"provided",originalOperandJson:'{"type":"null"}'})).toBe('{"schema":"minera-polars-ltl-original-call-v1","values":{"type":"null"}}');
- expect(()=>ltlFilterFields({...form,engine:"log"})).toThrow("table engine");
+ expect(Object.fromEntries(ltlFilterFields({...form,engine:"log"})).call_json).toBe(`{"schema":"minera-log-ltl-original-call-v1","args":${form.originalArgsJson}}`);
  expect(()=>ltlFilterFields({...form,callMode:"unknown"as never})).toThrow("call");
  expect(()=>ltlOriginalCallJson({...form,originalOperand:"unknown"as never})).toThrow("operand and parameter modes");
 });
@@ -144,7 +144,7 @@ it("uploads only original call controls with canonical byte fields and exact res
 it("requires the complete27field envelope and rejects cross-mode/error call echoes",async()=>{
  const call=ltlOriginalCallJson(originalForm()),valid=envelope({call_mode:"original",call_json:call});
  expect(isLtlFilterEnvelope(valid)).toBe(true);expect(Object.keys(valid)).toHaveLength(27);
- for(const patch of [{call_mode:"unknown"},{call_json:undefined},{call_mode:"original",call_json:null},{call_mode:"friendly",call_json:call},{call_mode:null,call_json:call},{engine:"log",input_kind:null}])expect(isLtlFilterEnvelope({...valid,...patch})).toBe(false);
+ for(const patch of [{call_mode:"unknown"},{call_json:undefined},{call_mode:"original",call_json:null},{call_mode:"friendly",call_json:call},{call_mode:null,call_json:call}])expect(isLtlFilterEnvelope({...valid,...patch})).toBe(false);
  const {call_mode:_mode,...old}=valid;expect(isLtlFilterEnvelope(old)).toBe(false);
  let value=valid;vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify(value),{status:value.http_status})));
  await expect(requestLtlFilter(file(),defaultLtlFilterForm("polars"))).rejects.toThrow("another call mode");
@@ -219,4 +219,61 @@ it("preserves complete pandas call JSON and invalidates argument and operation e
  expect(Object.fromEntries(ltlFilterFields(form)).call_json).toBe(raw);
  const identity={source:file(),form},gate=new LtlFilterRequestGate(),ticket=gate.issue(identity);
  for(const patch of [{originalArgsJson:'[{"type":"na"}]'},{operation:"next"as const},{engine:"polars"as const},{callMode:"friendly"as const},{originalCallJson:raw.trim()}])expect(gate.accepts(ticket,{...identity,form:{...form,...patch}})).toBe(false);
+});
+
+it("composes all six LOG original argument shapes without friendly import controls",()=>{
+ for(const [operation,arity]of [["eventually",1],["next",3],["four_eyes",2],["different_persons",1],["timestamp_ge",2],["timestamp_le",2]]as const){
+  const form={...defaultLtlFilterForm("log",operation),callMode:"original"as const,csvOptions:true,activityKeyMode:"custom"as const,activityKey:"opening",attributeKeyMode:"custom"as const,attributeKey:"matched",polarsInputKind:"DataFrame"as const};
+  const fields=Object.fromEntries(ltlFilterFields(form)),call=JSON.parse(fields.call_json);
+  expect(Object.keys(fields)).toEqual(["engine","operation","call_json"]);expect(call.schema).toBe("minera-log-ltl-original-call-v1");expect(call.args).toHaveLength(arity);
+  expect(JSON.parse(form.originalCallJson).args).toHaveLength(arity);
+  expect(call).not.toHaveProperty("values");expect(call).not.toHaveProperty("parameter_value");expect(call).not.toHaveProperty("parameter_entries");
+ }
+});
+
+it("retains LOG nested NaT, UUID, raw integers and entry order as exact editor text",()=>{
+ const args=' \r\n[{"type":"tuple","value":[{"type":"nat"},{"type":"uuid","value":"12345678-1234-5678-1234-567812345678"},{"type":"na"},{"type":"null"},{"type":"integer","value":9007199254740993}]}] ';
+ const entries='[ {"key":"positive","enum_key":true,"value":{"type":"integer","value":"0"}}, {"key":"pm4py:param:attribute_key","enum_key":false,"value":{"type":"null"}} ]';
+ const form={...defaultLtlFilterForm("log"),callMode:"original"as const,originalArgsJson:args,originalParameters:"entries"as const,originalEntriesJson:entries};
+ expect(ltlOriginalCallJson(form)).toBe(`{"schema":"minera-log-ltl-original-call-v1","args":${args},"parameter_entries":${entries}}`);
+ expect(ltlOriginalCallJson({...form,originalParameters:"raw",originalParameterJson:' {"type":"integer","value":9007199254740993} '})).toBe(`{"schema":"minera-log-ltl-original-call-v1","args":${args},"parameter_value": {"type":"integer","value":9007199254740993} }`);
+ const malformed='\r\n{"schema":"minera-log-ltl-original-call-v1","args":[],"args":null}\r\n';
+ expect(ltlOriginalCallJson({...form,originalEditor:"json",originalCallJson:malformed})).toBe(malformed);
+});
+
+it("keeps original helpers source-less and omits stale filter parameters",async()=>{
+ const form={...defaultLtlFilterForm("log","timestamp_ge"),callMode:"original"as const,originalParameters:"raw"as const,originalParameterJson:'{"type":"integer","value":"4"}',originalArgsJson:'[{"type":"list","value":[{"type":"nat"}]},{"type":"list","value":[]}]'};
+ const call=ltlOriginalCallJson(form);expect(JSON.parse(call)).not.toHaveProperty("parameter_value");
+ const helper='{"columns":["value"],"rows":[[{"value":"true","kind":"boolean","typed_value":true}]]}';
+ let value=envelope({engine:"log",operation:"timestamp_ge",result_kind:"helper",call_mode:"original",call_json:call,source_format:null,source:null,result:null,source_unchanged:null,activity_key:null,case_id_key:null,attribute_key:null,resource_key:null,timestamp_key:null,source_json:null,source_after_json:null,result_json:null,helper_result_json:helper});
+ vi.stubGlobal("fetch",vi.fn(async(_url:string,init:RequestInit)=>{const body=init.body as FormData;expect([...body.keys()].sort()).toEqual(["call_json","engine","operation"]);expect(body.get("call_json")).toBe(call);return new Response(JSON.stringify(value),{status:value.http_status});}));
+ const success=await requestLtlFilter(file(),form);expect(success.sourceFile).toBeNull();expect(await ltlFilterArtifactFile(success,"helper_result_json").text()).toBe(helper);
+ value={...value,http_status:400,phase:"apply",apply_returned:false,result_kind:null,helper_result_json:null,error_type:"TypeError",error:"complete native helper error"};
+ const failed=await requestLtlFilter(null,form);expect(await ltlFilterArtifactFile(failed,"call_json").text()).toBe(call);expect(()=>ltlFilterArtifactFile(failed,"helper_result_json")).toThrow("unavailable");
+ value={...value,source_json:"invented source"};await expect(requestLtlFilter(null,form)).rejects.toThrow("source-less timestamp response");
+});
+
+it("uploads original LOG native sources and reopens using the independent opening role",async()=>{
+ const form={...defaultLtlFilterForm("log"),callMode:"original"as const,originalParameters:"entries"as const,originalEntriesJson:'[{"key":"pm4py:param:attribute_key","enum_key":false,"value":{"type":"string","value":"kind"}}]'};
+ const call=ltlOriginalCallJson(form),source=file();
+ let value=envelope({engine:"log",result_kind:"log",source_format:"native_log",call_mode:"original",call_json:call,source:{traces:2,events:6},result:{traces:1,events:3},activity_key:"opening role",case_id_key:null,attribute_key:null,resource_key:null,timestamp_key:null,filtered_xes:"<log>complete filtered log</log>"});
+ vi.stubGlobal("fetch",vi.fn(async(_url:string,init:RequestInit)=>{const body=init.body as FormData;expect([...body.keys()].sort()).toEqual(["call_json","engine","operation","source_file"]);expect(await(body.get("source_file")as File).text()).toBe(await source.text());return new Response(JSON.stringify(value),{status:value.http_status});}));
+ const selected=await requestLtlFilter(source,form),open=vi.fn();openLtlFilteredLog(selected,open);expect(open).toHaveBeenCalledOnce();expect(open.mock.calls[0][1]).toBe("opening role");expect(await(open.mock.calls[0][0]as File).text()).toBe(value.filtered_xes);
+ value={...value,attribute_key:"kind"};await expect(requestLtlFilter(source,form)).rejects.toThrow("friendly selector roles");
+ value={...value,attribute_key:null,call_json:call+" "};await expect(requestLtlFilter(source,form)).rejects.toThrow("another original call");
+});
+
+it("imports exact LOG helper calls and retains canonical byte-field failure echoes",async()=>{
+ const raw='\r\n{"schema":"minera-log-ltl-original-call-v1","args":[{"type":"list","value":[{"type":"nat"}]},{"type":"integer","value":9007199254740993}]}\r\n';
+ const imported=await ltlOriginalCallFileText(new File([new TextEncoder().encode(raw)],"log-call.json"));expect(imported).toBe(raw);
+ const form={...defaultLtlFilterForm("log","timestamp_le"),callMode:"original"as const,originalEditor:"json"as const,originalCallJson:imported};
+ const value=envelope({engine:"log",operation:"timestamp_le",result_kind:null,http_status:400,phase:"apply",apply_returned:false,source_format:null,call_mode:"original",call_json:raw,source:null,result:null,source_unchanged:null,activity_key:null,case_id_key:null,attribute_key:null,resource_key:null,timestamp_key:null,source_json:null,source_after_json:null,result_json:null,error_type:"TypeError",error:"exact helper error"});
+ vi.stubGlobal("fetch",vi.fn(async(_url:string,init:RequestInit)=>{const control=(init.body as FormData).get("call_json")as File;expect(control.name).toBe("call_json.txt");expect(await control.text()).toBe(raw);return new Response(JSON.stringify(value),{status:400});}));
+ const selected=await requestLtlFilter(null,form);expect(await ltlFilterArtifactFile(selected,"call_json").text()).toBe(raw);expect(await ltlFilterResponseFile(selected).text()).toBe(JSON.stringify(value));
+});
+
+it("invalidates LOG filter/helper transitions and every original form edit",()=>{
+ const form={...defaultLtlFilterForm("log"),callMode:"original"as const},identity={source:file(),form},gate=new LtlFilterRequestGate(),ticket=gate.issue(identity);
+ for(const patch of [{operation:"timestamp_ge"as const},{originalArgsJson:'[{"type":"nat"}]'},{originalParameters:"entries"as const},{originalEntriesJson:"[ ]"},{originalParameterJson:'{"type":"integer","value":"0"}'},{originalEditor:"json"as const},{originalCallJson:"{}"},{sourceFormat:"native_log"as const},{activityKey:"new opening"}])expect(gate.accepts(ticket,{...identity,form:{...form,...patch}})).toBe(false);
+ expect(gate.accepts(ticket,{...identity,source:null})).toBe(false);gate.invalidate();expect(gate.accepts(ticket,identity)).toBe(false);
 });

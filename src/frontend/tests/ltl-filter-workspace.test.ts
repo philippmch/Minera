@@ -33,13 +33,14 @@ it("offers eager and lazy Polars inputs and reports the effective type on errors
  expect(inspection).toContain("Polars input type: DataFrame.");expect(inspection).not.toContain("Download complete filtered result");
 });
 
-it("keeps friendly controls as the default and exposes original mode only for table engines",()=>{
+it("keeps friendly controls as the default and offers each engine's original mode",()=>{
  const polars=display(createElement(LtlFilterWorkspace,{engine:"polars"}));
  expect(polars).toContain("Polars call mode");expect(polars).toContain('<option value="friendly" selected="">');
  expect(polars).toContain("Ordered activities as JSON");expect(polars).not.toContain("Original operand presence");
  for(const engine of ["log","pandas"]as const)expect(display(createElement(LtlFilterWorkspace,{engine}))).not.toContain("Polars call mode");
  expect(display(createElement(LtlFilterWorkspace,{engine:"pandas"}))).toContain("pandas call mode");
  expect(display(createElement(LtlFilterWorkspace,{engine:"log"}))).not.toContain("pandas call mode");
+ expect(display(createElement(LtlFilterWorkspace,{engine:"log"}))).toContain("Event-log call mode");
 });
 
 it("shows exclusive omitted, raw and ordered original controls with explicit fidelity limits",()=>{
@@ -79,4 +80,33 @@ it("retains pandas complete-call text and original error downloads",()=>{
  const failed=run(true);failed.value.engine="pandas";failed.value.call_mode="original";failed.value.call_json=call;
  const inspection=display(createElement(LtlFilterInspection,{run:failed}));
  expect(inspection).toContain("Call mode: Original typed call.");expect(inspection).toContain("Download exact original call");expect(inspection).not.toContain("Polars input type");expect(inspection).not.toContain("Download complete filtered result");
+});
+
+it("offers LOG original filters with native sources and typed keys only",()=>{
+ const form={...defaultLtlFilterForm("log","next"),callMode:"original"as const,originalParameters:"entries"as const};
+ const html=display(createElement(LtlFilterWorkspace,{engine:"log",initialForm:form}));
+ for(const label of ["Event-log call mode","Original ordered arguments JSON","exactly three typed arguments","Ordered parameter entries JSON","minera-log-ltl-original-call-v1","Known LOG keys","repeated underlying names","LOG typed nat","Typed uuid","independently of typed matching selectors","complete native EventLog JSON File"])expect(html).toContain(label);
+ for(const label of ["Relationship source format","CSV columns and delimiter","Download relationship example CSV","Relationship selection","Matched activity attribute","Original operand presence","Polars input type","pm4py:param:case_id_key"])expect(html).not.toContain(label);
+ expect(html).toContain('accept=".json"');
+});
+
+it("offers source-less original LOG helper editors without filter parameters",()=>{
+ for(const operation of ["timestamp_ge","timestamp_le"]as const){
+  const form={...defaultLtlFilterForm("log",operation),callMode:"original"as const,originalParameters:"entries"as const};
+  const html=display(createElement(LtlFilterWorkspace,{engine:"log",initialForm:form}));
+  for(const label of ["Original ordered arguments JSON","exactly two typed arguments","Helpers accept no source or parameters","Import complete original call JSON","Check timestamp difference bounds"])expect(html).toContain(label);
+  for(const label of ["Relationship event log file","Original parameters mode","Ordered parameter entries JSON","Typed timestamp differences","Relationship source format"])expect(html).not.toContain(label);
+  expect(html).not.toContain('disabled=""');
+  const complete=display(createElement(LtlFilterWorkspace,{engine:"log",initialForm:{...form,originalEditor:"json",originalCallJson:'{"schema":"minera-log-ltl-original-call-v1","args":[{"type":"nat"},{"type":"null"}]}'}}));
+  expect(complete).toContain("Complete original call JSON");expect(complete).not.toContain("Original ordered arguments JSON");
+ }
+});
+
+it("shows LOG original opening roles separately and keeps helper error artifacts",()=>{
+ const selected=run();selected.value.call_mode="original";selected.value.call_json='{"schema":"minera-log-ltl-original-call-v1","args":[]}';selected.value.attribute_key=null;selected.value.resource_key=null;selected.value.timestamp_key=null;
+ const html=display(createElement(LtlFilterInspection,{run:selected,onOpenLog:vi.fn()}));
+ expect(html).toContain("Activity role for reopening:");expect(html).toContain("independent of typed matching selectors");expect(html).toContain("Open filtered relationship log");
+ const failed=run(true);Object.assign(failed.value,{operation:"timestamp_ge",call_mode:"original",call_json:selected.value.call_json,source:null,result:null,source_json:null,source_after_json:null,activity_key:null});
+ const error=display(createElement(LtlFilterInspection,{run:failed,onOpenLog:vi.fn()}));
+ expect(error).toContain("Download exact original call");expect(error).toContain("Download relationship response");expect(error).not.toContain("Download complete parsed source");expect(error).not.toContain("Open filtered relationship log");
 });
