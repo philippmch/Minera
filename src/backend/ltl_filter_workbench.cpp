@@ -8,6 +8,7 @@
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
 #include "polars_ltl_original_call_parser.hpp"
+#include "pandas_ltl_original_call_parser.hpp"
 #include <algorithm>
 #include <cctype>
 #include <map>
@@ -28,6 +29,7 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
   std::optional<std::string> before,after;std::optional<bool> unchanged;
   std::optional<std::string> original_call_text;
   std::optional<PolarsLtlFilterCall> original_call;
+  std::optional<pandas_ltl_original_call_detail::Call> original_pandas_call;
   std::string engine,operation,kind,format,input_kind,call_mode,phase="control",open_key="concept:name",case_key="case:concept:name",attribute_key="concept:name",resource_key="org:resource",timestamp_key="time:timestamp";
   std::string result_json,xes,xes_error,helper_result,error_type,error;int status=200;bool apply_returned=false;
   const auto field=[&](const std::string& name,std::string fallback={}){const auto found=fields.find(name);return found==fields.end()?fallback:found->second->bytes;};
@@ -52,11 +54,14 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
     if(!modes.contains(operation)){operation.clear();throw std::invalid_argument("choose a supported relationship operation");}
     const bool helper=operation.starts_with("timestamp_"),collection=operation=="eventually" || (engine=="polars" && (operation=="next" || operation=="four_eyes")),social=operation=="four_eyes" || operation=="different_persons";
     if(call_mode=="original"){
-      if(engine!="polars")throw std::invalid_argument("call_json requires the polars engine");
-      if(helper)throw std::invalid_argument("original Polars calls require a relationship operation");
+      if(engine=="log")throw std::invalid_argument("call_json requires the pandas or polars engine");
+      if(helper)throw std::invalid_argument(engine=="polars"?"original Polars calls require a relationship operation":"original pandas calls require a relationship operation");
       for(const auto& [name,value]:fields){(void)value;if(name!="engine" && name!="operation" && name!="input_kind" && name!="source_file" && name!="call_json")throw std::invalid_argument("friendly control conflicts with original call_json: "+name);}
-      original_call=polars_ltl_original_call_detail::parse(*original_call_text);
-      original_call->operation=operation=="eventually"?PolarsLtlFilterOperation::kEventuallyFollows:operation=="next"?PolarsLtlFilterOperation::kNext:operation=="four_eyes"?PolarsLtlFilterOperation::kFourEyes:PolarsLtlFilterOperation::kDifferentPersons;
+      if(engine=="pandas")original_pandas_call=pandas_ltl_original_call_detail::parse(*original_call_text,operation=="next"?3U:operation=="four_eyes"?2U:1U);
+      else {
+        original_call=polars_ltl_original_call_detail::parse(*original_call_text);
+        original_call->operation=operation=="eventually"?PolarsLtlFilterOperation::kEventuallyFollows:operation=="next"?PolarsLtlFilterOperation::kNext:operation=="four_eyes"?PolarsLtlFilterOperation::kFourEyes:PolarsLtlFilterOperation::kDifferentPersons;
+      }
     }
     if(helper && engine!="log")throw std::invalid_argument("timestamp list helpers require the event-log engine");
     if(helper){
@@ -126,11 +131,24 @@ DiscoveryWorkbenchResponse execute_ltl_filter_workbench(const std::vector<Discov
         format="native_table";case_key=field("case_id_key",case_key);attribute_key=field("attribute_key",attribute_key);resource_key=field("resource_key",resource_key);timestamp_key=field("timestamp_key",timestamp_key);
         phase="source_import";table=parse_embedding_workbench_table_json(uploaded->second->bytes);before=serialize_embedding_workbench_table_json(*table);phase="apply";
         if(engine=="pandas"){
+          if(original_pandas_call){
+            const auto& call=*original_pandas_call;
+            const auto invoke=[&](const auto& parameters){
+              if(operation=="eventually")return filter_pandas_ltl_eventually_follows(*table,call.args[0],parameters);
+              if(operation=="next")return filter_pandas_ltl_next(*table,call.args[0],call.args[1],call.args[2],parameters);
+              if(operation=="four_eyes")return filter_pandas_ltl_four_eyes(*table,call.args[0],call.args[1],parameters);
+              return filter_pandas_ltl_different_persons(*table,call.args[0],parameters);
+            };
+            if(call.parameter_value)result_table=invoke(*call.parameter_value);
+            else if(call.parameter_entries)result_table=invoke(*call.parameter_entries);
+            else result_table=invoke(PandasLtlFilterOptions{});
+          }else{
           PandasLtlFilterOptions options;options.case_id_key={"",case_key};options.attribute_key={"",attribute_key};options.resource_key={"",resource_key};options.timestamp_key={"",timestamp_key};options.positive=positive;if(fields.contains("enable_timestamp"))options.enable_timestamp=enabled;options.timestamp_diff_boundaries=boundaries;
           if(operation=="eventually")result_table=filter_pandas_ltl_eventually_follows(*table,values,options);
           else if(operation=="next")result_table=filter_pandas_ltl_next(*table,a,b,c,options);
           else if(operation=="four_eyes")result_table=filter_pandas_ltl_four_eyes(*table,a,b,options);
           else result_table=filter_pandas_ltl_different_persons(*table,target,options);
+          }
           apply_returned=true;
         }else {
           PolarsLtlFilterOptions options;options.case_id_key={"",case_key};options.attribute_key={"",attribute_key};options.resource_key={"",resource_key};options.timestamp_key={"",timestamp_key};options.positive=positive;options.enable_timestamp=enabled;options.timestamp_diff_boundaries=boundaries;
