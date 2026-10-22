@@ -1,0 +1,735 @@
+{
+  "schema": "minera-retained-public-observation-four-field-checkpoint-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/retained-public-observation-four-field-checkpoint.jsonl.gz",
+    "bytes": 1490413,
+    "sha256": "dbf900c80daa06d8f44a782124d965bd45f92014acc682bcb549106082d0ceb9",
+    "members": 108
+  },
+  "member_utf8_bytes_hashes_round_trip_verified": true,
+  "total_member_bytes": 12209232,
+  "uncompressed_sha256": "8aec206bc093bbb21623554b4fc2dde79fe5dfd15960322aad9ed55396a36ff4",
+  "inventory_sha256": "34cb0bb9952d12775e0a856680f1d47df5e52b5d11df27c968afc82a042addc6",
+  "all_embedded_source_bindings_revalidated": true,
+  "all_external_metadata_hashes_bytes_revalidated": true,
+  "source_bindings": [
+    {
+      "path": "build/compare-plusplus-computed-broad-petri.py",
+      "bytes": 43760,
+      "sha256": "d5dab78dc66d2b9a09c5f834f726f3dc9e4ed0d9db4a238ccb33409c50c28306"
+    },
+    {
+      "path": "build/compare-plusplus-presented-petri.py",
+      "bytes": 34877,
+      "sha256": "d3f6b83b443372c5a79f2f879c1fa9da86bf23d027c62435840759cf528a852c"
+    },
+    {
+      "path": "build/document-simplicity-structure.py",
+      "bytes": 7442,
+      "sha256": "93297c224836a71986ffaff857b228e53497ab1c88d28087883db647fb457244"
+    },
+    {
+      "path": "build/parity-closures/adopt-four-field-reviewed-parser-1.py",
+      "bytes": 2392,
+      "sha256": "08ba78e84a2795ec4b394fc515432b3790fe8cd0e2c46b617c895baff0e11999"
+    },
+    {
+      "path": "build/parity-closures/check-and-bind-four-field-terminal-1.py",
+      "bytes": 4471,
+      "sha256": "af478297ef6b9a600c62baa946593c8875888f15395cd5718efc6b4f3fc0178b"
+    },
+    {
+      "path": "build/parity-closures/check-four-field-regressions-final-1.py",
+      "bytes": 3588,
+      "sha256": "fa3acd1582fdc3cf54c6da43d933e166a7f956ca36ba6edc0010e470e72aa17d"
+    },
+    {
+      "path": "build/parity-closures/check-streaming-positive-receipts.py",
+      "bytes": 1914,
+      "sha256": "51563bdcd726a6cec411f6931fe357033277e11804c6e569068b0e5646790254"
+    },
+    {
+      "path": "build/parity-closures/four-field-actual-metadata-independent-review-1/input-binding-supplement.json",
+      "bytes": 725,
+      "sha256": "424cc3b7a7e11d50fa943a835b1b04f5cc360d57f97f907e7ad19012e28af145"
+    },
+    {
+      "path": "build/parity-closures/four-field-actual-metadata-independent-review-1/review.json",
+      "bytes": 8600,
+      "sha256": "4d7fd164b9266a775ede3ff96e31aa58f3e8cd054d40e0a752a083041b24d0c5"
+    },
+    {
+      "path": "build/parity-closures/four-field-actual-metadata-independent-review-1/selected-sidecar-identity-metadata.json",
+      "bytes": 76392,
+      "sha256": "889fcbc20939d376a118b8a2e60280c850c7193678d91f80513ff1105522dde4"
+    },
+    {
+      "path": "build/parity-closures/four-field-actual-metadata-independent-review-1/verified-metadata-edge-relations.json",
+      "bytes": 322537,
+      "sha256": "fbe89a6ebca8ccb5a9fdb6097e940fd5b11bc96b82ca1e8718c2d20b75d8c3bb"
+    },
+    {
+      "path": "build/parity-closures/four-field-actual-metadata-independent-review-1/verify.py",
+      "bytes": 14325,
+      "sha256": "e01f48b2538f3c933fad43d4ea7d7aa1cb37215a851724617f825b9d96c9a196"
+    },
+    {
+      "path": "build/parity-closures/four-field-scope-projection-independent-review-1/review.json",
+      "bytes": 3566,
+      "sha256": "c3cc42dc4b2827f3c867573aeaf681e26d370a5b1f19b6e703bd52434e737306"
+    },
+    {
+      "path": "build/parity-closures/four-field-scope-projection-independent-review-1/review.py",
+      "bytes": 8593,
+      "sha256": "8addcddb3385074b8c440078d88104ccb079425d57721104bee575e7310d22e7"
+    },
+    {
+      "path": "build/parity-closures/four-field-scope-projection-independent-review-1/reviewed-queries.sql",
+      "bytes": 899,
+      "sha256": "9df7196a3ef688c7aad60475f17802f81bbea71fe1b41d70760eada0065c9cd1"
+    },
+    {
+      "path": "build/parity-closures/four-field-scope-projection-root-1/queries.sql",
+      "bytes": 339,
+      "sha256": "1969ac35baefa24681d08212104b62d278dba287abac027eaf60adbe68ba8837"
+    },
+    {
+      "path": "build/parity-closures/four-field-scope-projection-root-1/validation.json",
+      "bytes": 3091,
+      "sha256": "c2e1508f4fe645780752e15694dc5ce58877b21db4be072ee7ff662eddc879f8"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/design.json",
+      "bytes": 2004,
+      "sha256": "2302318637515d3c2696a02b0bc51f6568a0832c71c717cee6dd97174d3ace0b"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/freeze-1.json",
+      "bytes": 1334,
+      "sha256": "fbbf30f0b6422731444f421b1533f5dd860b8bc728e407ca78aea74b60cedd4d"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/frozen-original-projector-17f6.py",
+      "bytes": 17494,
+      "sha256": "17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/preserved-input.json",
+      "bytes": 220,
+      "sha256": "352f5329275aeda9064dd7e4fc6385047021220d69d8fd9fd80d07d77a3fa57d"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/project-declared-full-member-candidates.py",
+      "bytes": 18823,
+      "sha256": "fecb780f17f41471d3802b33ca99124241b876601e351b05c6547ad1183cf6e3"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/design.json",
+      "bytes": 2623,
+      "sha256": "b06fa54ba967e6f1940e7af0eb88ff5bc9c62464d5814e80654d7d6e4a0f1f68"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/freeze-1.json",
+      "bytes": 1334,
+      "sha256": "fbbf30f0b6422731444f421b1533f5dd860b8bc728e407ca78aea74b60cedd4d"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/freeze-2.json",
+      "bytes": 3266,
+      "sha256": "ee127fcc15de316a54b054e395c34bbc33feae421e5d7be44ac4e297e1ee3460"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/frozen-original-projector-17f6.py",
+      "bytes": 17494,
+      "sha256": "17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/preserved-input.json",
+      "bytes": 220,
+      "sha256": "352f5329275aeda9064dd7e4fc6385047021220d69d8fd9fd80d07d77a3fa57d"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/prior-revision-bindings.json",
+      "bytes": 1289,
+      "sha256": "2401d08f3b5d75afb232511697afbfeedaa210b12ae86b2e5a17c88bcd73dd95"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/project-declared-full-member-candidates.py",
+      "bytes": 19052,
+      "sha256": "0031b63eca56737ff8468ac5a3d44875b7bc9483efeb933aafb523efb7988e8e"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/synthetic-suite-final-2.txt",
+      "bytes": 106,
+      "sha256": "431e8b0aad46c063e844e6b865cbfa8102fc34da82ed74f75ead27d68fb9e7ab"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/test_projection_scope_guard.py",
+      "bytes": 12687,
+      "sha256": "558ed26cfdb3183be969ecac88db480f95b77eb56d5d6a8dd495409929f120e1"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/validate-frozen-revision.py",
+      "bytes": 1809,
+      "sha256": "e198656a0c178bf2888283e2a04ac722e4a8956793c5a665722edd125658fe32"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/revision-2/validation-final-2.json",
+      "bytes": 1071,
+      "sha256": "5bd63bd3b8e99208a43e976f812ba1adc7206e4f3205c98970c4f9c900d048f3"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/synthetic-suite-final-1.txt",
+      "bytes": 103,
+      "sha256": "082453ab6d6aea0ed355d9907f5d6b32712cbaf5a755f9b83b430ffa6c8e0efb"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/test_projection_scope_guard.py",
+      "bytes": 8990,
+      "sha256": "0dd4ccc357ac62216ad723cdadc2043b9c019f6f947477e2246f0855af254222"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/validate-frozen-draft.py",
+      "bytes": 1756,
+      "sha256": "6c0ab7c2c0278de3eca369acb1c923bdf9a083db10fbfbc4c61966bb2adf3595"
+    },
+    {
+      "path": "build/parity-closures/full-member-projection-scope-guard-1/validation-final-1.json",
+      "bytes": 1299,
+      "sha256": "2400485ce756f08b0f3e3cf98723b7d7a57954ffef37ac98666d0458dc49fcd7"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-archive-discovery-final-2/manifest.json",
+      "bytes": 981981,
+      "sha256": "05ef77cd8c8fd03bba4202ebf724cc8752b5311b47bf831895df08f1cf2fca20"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-archive-discovery-final-2/metadata-summary.json",
+      "bytes": 93221,
+      "sha256": "f054ec225aacec13893bdafb13d2772fc4b20169419034838d1a230bf7bdd83f"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/key-report-member-producer-schema.json",
+      "bytes": 8391,
+      "sha256": "092242f1d42608ed6eaadbf6de3af79a73f2073cfaf42fc906431cea38241406"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/other-envelope-key-metadata.json",
+      "bytes": 2291,
+      "sha256": "d38f60869df0db150a4a5d37e9c0f5f0e57a626bfd5b36a4aa78a22e7b4c3c1f"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-key-wrapper-schema-review-1/indexed-wrapper-provenance.jsonl",
+      "bytes": 258213,
+      "sha256": "68364de3924e0e4442d9aae3ca0dc1f23ed20f887d6bae348a7106efff50312b"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-key-wrapper-schema-review-1/prepare-review.py",
+      "bytes": 15799,
+      "sha256": "db99bf09bd28a94139ac1f554fd7ea879fde2d67a288b80ffa50015411e5b12a"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-key-wrapper-schema-review-1/producer-self-binding-check.json",
+      "bytes": 1724,
+      "sha256": "7a29a77d98787239460d211b18bdbdc091bdb060200880eba270d968c083de79"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-key-wrapper-schema-review-1/report.json",
+      "bytes": 9715,
+      "sha256": "7df2a2270cbc8740749bea3b4044d86a195cb2d17dd9115342674757776a3b02"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-key-wrapper-schema-review-1/selected-sidecar-metadata.json",
+      "bytes": 3716,
+      "sha256": "c0c9462c8da9408b79eb891ea1608ec5465b241e4b30ee3dd488c6dcdc4b1946"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-schema-review-2/name-data-base64-four-field-schema.json",
+      "bytes": 9562,
+      "sha256": "7838dca3aaa3b0eb18676ce476a2126d1a04ab7c1a9ee9f3814d5af320bfef08"
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-root-1/validation.json",
+      "bytes": 3077,
+      "sha256": "2ae34fb783018f893c9ab1ba0cee186a7b4119ed1ea4f5901094878e0e96d39c"
+    },
+    {
+      "path": "build/parity-closures/package-retained-public-observation-four-field-checkpoint.py",
+      "bytes": 15110,
+      "sha256": "21bc97b8c6432bfd826ede8a8f2657a53605563d6c6983c4c85a58da6ed2820a"
+    },
+    {
+      "path": "build/parity-closures/prepare-four-field-regressions-1.py",
+      "bytes": 953,
+      "sha256": "f52bce7025ce9a8137f45e5f2fb0444e88671e164ead33544e47cd1e2da45436"
+    },
+    {
+      "path": "build/parity-closures/prepare-four-field-root-acceptance-1.py",
+      "bytes": 3659,
+      "sha256": "208696740a2e240fbc5fde8552b2a4fe08cbf741db09f148aba04c337f4aab43"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/final-revision-2-review.json",
+      "bytes": 3693,
+      "sha256": "45e2e422251efafd683fe81616d8521ae7dd00d082e15143d95a26891c4bb6d0"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/final-revision-2-review.py",
+      "bytes": 5339,
+      "sha256": "7ee0c7d0a37e379e9583311a3faeefdfa758cf645904bfafb2c050e0fedf30d7"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/initial-fecb-review.json",
+      "bytes": 1991,
+      "sha256": "4b2dd5fba7a9e6f967c18d03e0f4e06b944a3b00dcf419245eb592b2a78b252b"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/initial-fecb-review.py",
+      "bytes": 2370,
+      "sha256": "ec3919716cc1fd15076e1d57e88976bf78baee6dbecaadc2606c01c9f0e8753f"
+    },
+    {
+      "path": "build/parity-closures/projection-scope-guard-independent-review-1/reviewed-revision2-vs-fecb.diff",
+      "bytes": 2108,
+      "sha256": "efd66b1b3a254cf720ca6d41772086be500abfa91516260674261a875b03d460"
+    },
+    {
+      "path": "build/parity-closures/streaming-envelope-root-acceptance-3/frozen/retained_public_observation_inventory.py",
+      "bytes": 54224,
+      "sha256": "19623eb61014c866bc6a241b532adefbe985aa64ae00f2bda04a7988d4b64837"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/design.json",
+      "bytes": 3984,
+      "sha256": "5d952ae040bebe588e9279ba38b426fdf9d073e6b2d9d4f8b2aa2a15f4d82b17"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/failed-synthetic-1/failure.json",
+      "bytes": 298,
+      "sha256": "11009c8aa988801a5301f005d84509eaaa6b8bd2b35d0533d3866329479641ee"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/failed-synthetic-1/retained_public_observation_inventory.py",
+      "bytes": 61768,
+      "sha256": "14bb942ce64d3b43e0299153657a0377bb774edb92b5d22faa2b76b8487a4184"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/failed-synthetic-1/test_retained_public_observation_inventory.py",
+      "bytes": 47753,
+      "sha256": "b7101f0d397f55167a7ba362798d7b46b6374776b8f6abd9b5eb33b708b24d73"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/freeze-1.json",
+      "bytes": 2504,
+      "sha256": "9a13f87c2d4961ca09f8ac51e4a1a1cc23fb811d4a3f27b8af9d4b78588a09ac"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/frozen-parser-196.py",
+      "bytes": 54224,
+      "sha256": "19623eb61014c866bc6a241b532adefbe985aa64ae00f2bda04a7988d4b64837"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/frozen-tests-c4d4.py",
+      "bytes": 35233,
+      "sha256": "c4d4c3c746038007358658ba7c2d26c19dfbf326e3598998696604582de5457a"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/preserved-inputs.json",
+      "bytes": 307,
+      "sha256": "c5754fa4f00d977fe437284ad569ef8ad0c2109086a8ab790614be6f810768f4"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/retained_public_observation_inventory.py",
+      "bytes": 63175,
+      "sha256": "a9685b98c47dfcaf5728cece2b450f09cc7abfbdffaac17cd5e5c2247336bf03"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/synthetic-suite-final-1.txt",
+      "bytes": 146,
+      "sha256": "2fdd278e4abe7961d1923db5ac64bf7458f2ae70d8b817c3905a7aab048b9bde"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/tests/test_retained_public_observation_inventory.py",
+      "bytes": 47753,
+      "sha256": "b7101f0d397f55167a7ba362798d7b46b6374776b8f6abd9b5eb33b708b24d73"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/validate-frozen-draft.py",
+      "bytes": 2288,
+      "sha256": "71133987dc1d5d92db56f0a04016be9e00ff49452b8f33639080d6def892254b"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-development-1/validation-final-1.json",
+      "bytes": 1728,
+      "sha256": "87ac2696175828051b98bdae4eb5f59a3223741bed11b04896f00b551821a716"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-independent-review-1/final-review.json",
+      "bytes": 6436,
+      "sha256": "b077c2a6753ad9f4c55f7643e0d6f6894df4e7bba24d986719b17ec6dd3738d5"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-independent-review-1/independent-synthetic-checks.py",
+      "bytes": 10165,
+      "sha256": "15443652bb900c8299ff6c25803e6715930fe3eae0a2fcee015586c0ab7dfb19"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-independent-review-1/producer-design-review.json",
+      "bytes": 5312,
+      "sha256": "88866a615af23ee407bfc71a78186038f35066b6f70d042881bffcae221b31a1"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-independent-review-1/producer-design-review.py",
+      "bytes": 5110,
+      "sha256": "81196a49e8be1b6b4f74a7f020d0a9d0ec5e19ba5eb4a7ebd3922e8a83dc6832"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-independent-review-1/reviewed-draft.diff",
+      "bytes": 16755,
+      "sha256": "3c5d6e485da996b6f06c40810082cc737980838d631f184c531e7c0dab3b0aa6"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-independent-review-1/save-final-review.py",
+      "bytes": 7826,
+      "sha256": "05b1d2f1836325d697b188f726e0d1326bd02002d5c56f7892164ace6f2b0c8d"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-independent-review-1/synthetic-checks-1/results.json",
+      "bytes": 5658,
+      "sha256": "3c74f923ab1590f90dd9d3ac8a6233e7805f870b25752931a7e2f2f9b9c6e759"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/admitted-ltl-events.jsonl",
+      "bytes": 685238,
+      "sha256": "54ee058ad44b228a1ad6e9c6756b19fc69f22233883b83d8c4044db310600adc"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/admitted-ltl-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/admitted-ltl-manifest.json",
+      "bytes": 7064,
+      "sha256": "211208f4ebc9d312f9ca981b6d2a83123e0d2b6ec465d5c18ff085740a521287"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/admitted-ltl-report.json",
+      "bytes": 932,
+      "sha256": "a685c9fd4796238b8fd8db8bf6bc151f2a5423435b23b7a86f3242d817929501"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/combined-tests-first.log",
+      "bytes": 14188,
+      "sha256": "a2034d86718d1fab75df67af38eeb401db115f39c21198b2c4deb1ab95f3ace7"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/final-regression-validation.json",
+      "bytes": 3728,
+      "sha256": "659525e09af0341d16692130c42039ae09f0bb68f3e44464bfbe151e9a622218"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-cache-events.jsonl",
+      "bytes": 674683,
+      "sha256": "494a24335fb2499c64ffe33bc31de64637bc50261ded3122743f720e9041d020"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-cache-report.json",
+      "bytes": 1069,
+      "sha256": "ffc061c90193c377af458ec7640a9cf74ce207426421119c6a8e1674d237ef4f"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-cache.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-events.jsonl",
+      "bytes": 674530,
+      "sha256": "0582bc65315f3c98d230d7bdf90f3dec7f7a3c3651b0d39ea23af77d12b54b29"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-manifest.json",
+      "bytes": 1880,
+      "sha256": "d94a123a93b04ca6b7ef985d12713106f695250292b0a7423367f15627407d56"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-report.json",
+      "bytes": 1049,
+      "sha256": "8193d7aeca3c73c6cc83970ffe109384b19e9ff4a3953cdb23e07ac7994d61e1"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-root-check.json",
+      "bytes": 919,
+      "sha256": "a8748aa273b01277abedb133fd777ccccc51162913b055afc6d6479188cb8d29"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/four-field-terminal-receipt.json",
+      "bytes": 1379,
+      "sha256": "ef1362f4deb0121a5c10b56094e1beb6e1478cd0ad18c5386d78958152b193d8"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/frozen-parser.py",
+      "bytes": 63175,
+      "sha256": "a9685b98c47dfcaf5728cece2b450f09cc7abfbdffaac17cd5e5c2247336bf03"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/frozen-tests.py",
+      "bytes": 47753,
+      "sha256": "b7101f0d397f55167a7ba362798d7b46b6374776b8f6abd9b5eb33b708b24d73"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/positive-receipt-identity-check.json",
+      "bytes": 894,
+      "sha256": "06b603b6f971acb63e43b915acaec7cb99a6b43171be4ec69ca781766426c4c7"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/preparation.json",
+      "bytes": 1586,
+      "sha256": "bc3117ac3df04dd9f7926756550779752d96d2e0330fb644702b9c4b2aefdd4d"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/projection-first.log",
+      "bytes": 250,
+      "sha256": "a2ae0c7b1f0412668e8195ab09c606d829f467614c14195e637f4e7b53713794"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/root-adoption.json",
+      "bytes": 602,
+      "sha256": "ad00be46f587cd2ebf01a809354cbcb6079f93ce1ded706e664db6e79dff953b"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/utf8-events.jsonl",
+      "bytes": 7454999,
+      "sha256": "f124a1ec5e65565e4110a15ab9baf658e0ba5cb73ee308e2a7c084177e4e3fb6"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/utf8-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/utf8-manifest.json",
+      "bytes": 9559,
+      "sha256": "4cb27fe26d40784931d968f5f30a8f6bfa81519a606dbb9fb0121ec609b49e79"
+    },
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/utf8-report.json",
+      "bytes": 902,
+      "sha256": "cd69d19992e6c8d4bb3aacc117ed030a86f733be8cdd0fd700ff27b72b0c2a07"
+    },
+    {
+      "path": "build/parity-closures/verify-utf8-checkpoint-capsules-root.py",
+      "bytes": 3140,
+      "sha256": "7520eedf195b85ba371c4518e568b0f5d94f5d8e32bbe1e90c805503c6049047"
+    },
+    {
+      "path": "build/prepare-simplicity-structure-evidence-retry.py",
+      "bytes": 1464,
+      "sha256": "6fecaac303cd743be65d5490617c5dcfb723d348d3d0afded8027b71d78f9543"
+    },
+    {
+      "path": "build/save-heuristic-pandas-dispatch-evidence.py",
+      "bytes": 10869,
+      "sha256": "9e79a0028c0cc9caf4846c05b20f4353456baa90bd63cc53e0fea3d2d4bdde6b"
+    },
+    {
+      "path": "build/save-plusplus-petri-producer-evidence.py",
+      "bytes": 13631,
+      "sha256": "427ca29db3fb4dc6042a5c373456152c72eeb3cc62f592e6227d878eb42a22cd"
+    },
+    {
+      "path": "build/save-simplicity-structure-evidence-retry.py",
+      "bytes": 13985,
+      "sha256": "ca2c6a0cfff02435fe1ad51f7de23a516b8803bd1b7900b453ed4565491b5682"
+    },
+    {
+      "path": "build/save-simplicity-structure-evidence.py",
+      "bytes": 13719,
+      "sha256": "2a10cf6fb2f51e2f3e5b7568a7417ba1d93bab12cef49b17efff5a030ef098d6"
+    }
+  ],
+  "external_metadata_bindings": [
+    {
+      "path": "build/parity-closures/streaming-four-field-root-acceptance-1/cache/877b107f4a55eda37d796c2c4d38f37aea1e4bf09b9d7168de81945def161c60.jsonl",
+      "bytes": 633542,
+      "sha256": "59d8c93db35c66cc9fd78a816600732ed77d4cca2e4a2a75623ee0c2b78cabbf",
+      "embedded": false,
+      "roles": [
+        "omitted-cache-metadata"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "build/parity-closures/four-field-scope-projection-root-1/declared-full-member-candidates.sqlite",
+      "bytes": 2150400,
+      "sha256": "e86dbd21d70e099098a7438674d7922c519f380ab85722182ec731c7f987fb97",
+      "embedded": false,
+      "roles": [
+        "guarded-projection-output-database",
+        "omitted-metadata-projection-database"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "docs/simplicity-structure-validation.json",
+      "bytes": 90959,
+      "sha256": "e26bc0206b5905bc60a213b1aeb57f7d10e5264ec866f0ca279d401d81878571",
+      "embedded": false,
+      "roles": [
+        "original-own-producer-sidecar-metadata-selected-fields-embedded-in-reviews"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "docs/heuristic-pandas-dispatch-validation.json",
+      "bytes": 39139,
+      "sha256": "c1cf86c09f49a16a590155a8bdb5dfca1802c043b186fcf9de3b5b5f276fb65a",
+      "embedded": false,
+      "roles": [
+        "original-own-producer-sidecar-metadata-selected-fields-embedded-in-reviews"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "docs/heuristic-plusplus-petri-producer-validation.json",
+      "bytes": 364512,
+      "sha256": "9914af8595e9f8a98bd4d955f0997a1bc78fbeb331229fdabd867db116c5410a",
+      "embedded": false,
+      "roles": [
+        "original-own-producer-sidecar-metadata-selected-fields-embedded-in-reviews"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "build/parity-closures/grouping-member-projection-root-1/declared-full-member-candidates.sqlite",
+      "bytes": 879497216,
+      "sha256": "54872a06b90ed21541ddb9773f02edb3355c1847b62410dfce18586cb087638c",
+      "embedded": false,
+      "roles": [
+        "read-only-original-metadata-projection-baseline"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "build/parity-closures/grouping-history-content-inventory-1/bindings.sqlite",
+      "bytes": 234065920,
+      "sha256": "06407901a4dea497f23b78cee48eef7c087c796a347bfb2d7c3f94813abff806",
+      "embedded": false,
+      "roles": [
+        "read-only-opaque-flat-bindings-baseline"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "build/parity-closures/streaming-envelope-root-acceptance-3/admitted-ltl-events.jsonl",
+      "bytes": 685238,
+      "sha256": "54ee058ad44b228a1ad6e9c6756b19fc69f22233883b83d8c4044db310600adc",
+      "embedded": false,
+      "roles": [
+        "accepted-196-byte-identical-regression-metadata-baseline"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "build/parity-closures/streaming-envelope-root-acceptance-3/admitted-ltl-manifest.json",
+      "bytes": 7064,
+      "sha256": "211208f4ebc9d312f9ca981b6d2a83123e0d2b6ec465d5c18ff085740a521287",
+      "embedded": false,
+      "roles": [
+        "accepted-196-byte-identical-regression-metadata-baseline"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "build/parity-closures/streaming-envelope-root-acceptance-3/utf8-events.jsonl",
+      "bytes": 7454999,
+      "sha256": "f124a1ec5e65565e4110a15ab9baf658e0ba5cb73ee308e2a7c084177e4e3fb6",
+      "embedded": false,
+      "roles": [
+        "accepted-196-byte-identical-regression-metadata-baseline"
+      ],
+      "opaque_hash_reverified": true
+    },
+    {
+      "path": "build/parity-closures/streaming-envelope-root-acceptance-3/utf8-manifest.json",
+      "bytes": 9559,
+      "sha256": "4cb27fe26d40784931d968f5f30a8f6bfa81519a606dbb9fb0121ec609b49e79",
+      "embedded": false,
+      "roles": [
+        "accepted-196-byte-identical-regression-metadata-baseline"
+      ],
+      "opaque_hash_reverified": true
+    }
+  ],
+  "unopened_original_archive_bindings": [
+    {
+      "path": "docs/simplicity-structure-checks.jsonl.gz",
+      "bytes": 63456521,
+      "sha256": "bf9a1a0f1031782e21af3e31d2c022250d1aa3a5109cdc642ea8b1147cc288ff",
+      "embedded": false,
+      "opened_by_packager": false,
+      "binding_basis": "root exact-source preparation and independently reviewed metadata"
+    },
+    {
+      "path": "docs/heuristic-pandas-dispatch-checks.jsonl.gz",
+      "bytes": 645546,
+      "sha256": "bbc8cbe45fa4765c269a159ef8f04e374370dacdc9738b519fdd2ab0c8184f08",
+      "embedded": false,
+      "opened_by_packager": false,
+      "binding_basis": "reviewed original manifest declaration only; not rehashed by packager"
+    },
+    {
+      "path": "docs/heuristic-plusplus-petri-producer-checks.jsonl.gz",
+      "bytes": 4394149,
+      "sha256": "f4b335d4e0ffdb99636ea228d477a2c5f406bd6d4248a47471f94b6a505f0f55",
+      "embedded": false,
+      "opened_by_packager": false,
+      "binding_basis": "reviewed original manifest declaration only; not rehashed by packager"
+    }
+  ],
+  "checkpoint_summary": {
+    "ordinary_logical_members": 733,
+    "binary_logical_slices": 43,
+    "retained_unadmitted_header_gaps": 1,
+    "combined_synthetic_tests": 73,
+    "independent_synthetic_checks": 44,
+    "scope_guard_tests": 8,
+    "exact_cache_hits": 1,
+    "cache_event_fields_normalized": [],
+    "original_receipt_identities_unchanged": 1401,
+    "prior_utf8_metadata_events_byte_identical": true,
+    "guarded_unprojected_edges_and_gap_edges": 776,
+    "guarded_full_source_identities": 0,
+    "guarded_flat_matches": 0,
+    "ordinary_logical_sizes_unverified": 733,
+    "source_sha_matches_are_metadata_only": 650,
+    "binary_slice_count_and_size_arithmetic_metadata_only": 43,
+    "payload_hashes_verified": false,
+    "new_target_algorithm_calls": 0,
+    "new_public_member_admissions": 0,
+    "historical_audit_complete": false,
+    "root_entry_certificate_issued": false
+  },
+  "metadata_only": true,
+  "original_archive_files_opened": 0,
+  "original_member_or_flat_payload_files_opened": 0,
+  "reference_imports": 0,
+  "reference_algorithm_calls": 0,
+  "new_public_member_admissions": 0,
+  "historical_audit_complete": false,
+  "absence_established": false,
+  "algorithm_entry_authority": false,
+  "root_entry_certificate_issued": false,
+  "helper": {
+    "path": "build/parity-closures/package-retained-public-observation-four-field-checkpoint.py",
+    "bytes": 15110,
+    "sha256": "21bc97b8c6432bfd826ede8a8f2657a53605563d6c6983c4c85a58da6ed2820a"
+  }
+}
