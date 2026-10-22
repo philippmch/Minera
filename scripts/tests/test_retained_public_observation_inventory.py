@@ -936,5 +936,196 @@ class ObservationInventoryTests(unittest.TestCase):
             self.assertGreater(M.run(manifest, self.events.append, 1, cache_dir=cache)['gaps'], 0)
 
 
+
+    def files_value(self, sized=True):
+        row = {'bytes_base64': 'FORBIDDEN_FILE_BYTES Ω\\u0041\\n', 'sha256': 'a' * 64}
+        if sized: row['size_bytes'] = 3
+        return row
+
+    def files_controls(self, profile):
+        schema, _, sized = M.FILES_OBJECT_PROFILES[profile]
+        return {'schema_review_sha256': M.FILES_OBJECT_REVIEW_SHA256, 'producer_profile': profile,
+                'expected_root_keys': ['files','scope'] if schema == M.FILES_SCOPE_SCHEMA else ['binary_hashes_only','files','summary'],
+                'expected_member_fields': ['bytes_base64','sha256','size_bytes'] if sized else ['bytes_base64','sha256'],
+                'expected_file_count': None, 'file_count_authority': 'not-saved-in-reviewed-sidecar'}
+
+    def files_root(self, profile, files=None):
+        schema, _, sized = M.FILES_OBJECT_PROFILES[profile]
+        files = {'own/public.json': self.files_value(sized)} if files is None else files
+        if schema == M.FILES_SCOPE_SCHEMA:
+            return {'files': files, 'scope': 'FORBIDDEN_SCOPE_PAYLOAD'}
+        return {'summary': {'FORBIDDEN_SUMMARY_KEY': {'result':'FORBIDDEN_PUBLIC_RESULT'}},
+                'binary_hashes_only': {'FORBIDDEN_BINARY_KEY': {'source':'FORBIDDEN_PRIVATE_PATH','sha256':'a'*64,'size_bytes':999}}, 'files':files}
+
+    def files_spec(self, profile='token-backwards-controls-capture-v1', value=None, raw=None, gzip_transport=False, **changes):
+        schema,path,_ = M.FILES_OBJECT_PROFILES[profile]
+        raw = M.canonical(self.files_root(profile) if value is None else value) if raw is None else raw
+        data = gzip.compress(raw) if gzip_transport else raw
+        target=self.root/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
+        return {'path':path,'bytes':len(data),'sha256':M.digest(data),'format':'gzip-json' if gzip_transport else 'json',
+                'layout':'discover','provenance':'own-container','envelope_schema':schema,
+                'files_object_metadata':self.files_controls(profile),**changes}
+
+    def test_files_object_all_seven_profiles_one_byte_data_and_nested_keys_opaque(self):
+        original=M.json.loads
+        def loads(raw,*args,**kwargs):
+            if b'FORBIDDEN' in (raw.encode() if isinstance(raw,str) else raw):raise AssertionError('opaque value unescaped')
+            return original(raw,*args,**kwargs)
+        for profile, (schema,_,sized) in M.FILES_OBJECT_PROFILES.items():
+            self.events.clear()
+            with self.subTest(profile=profile),patch.object(M.json,'loads',loads),patch.object(M,'decode_payload',side_effect=AssertionError('decode')),patch.object(M.tempfile,'SpooledTemporaryFile',side_effect=AssertionError('spool')):
+                report=self.run_source(self.files_spec(profile),1)
+            self.assertEqual(report['gaps'],2 if schema==M.FILES_SCOPE_SCHEMA else 3)
+            self.assertNotIn('FORBIDDEN',json.dumps(self.events))
+            member=next(e for e in self.events if e['kind']=='member')
+            self.assertTrue(member['metadata_valid']);self.assertEqual(member['bytes'],3 if sized else None)
+            self.assertEqual(member['original_size_unavailable'],not sized)
+            self.assertEqual(member['identity_scope'],'logical-member');self.assertTrue(member['source_file_identity_unavailable'])
+            self.assertFalse(member['admitted']);self.assertFalse(member['payload_hash_verified']);self.assertFalse(member['whole_source_file_binding_verified'])
+            summary=next(e for e in self.events if e['kind']=='container_structure')
+            self.assertEqual(summary['observed_file_rows'],1);self.assertEqual(summary['observed_unique_member_names'],1)
+            self.assertTrue(summary['observed_metadata_valid']);self.assertTrue(summary['observed_names_unique'])
+            self.assertIsNone(summary['independently_expected_file_count']);self.assertFalse(summary['external_file_count_verified'])
+            self.assertFalse(summary['independent_file_count_available']);self.assertTrue(summary['original_file_count_unavailable'])
+            self.assertFalse(report['admission_complete']);self.assertFalse(report['catalogue_audit_complete'])
+
+    def test_files_object_guards_reject_before_parser_or_every_source_read(self):
+        base=self.files_spec();controls=base['files_object_metadata']
+        variants=[{'layout':'envelope'},{'layout':'records'},{'members':[{'path':'own/x.json'}]},{'members':None},
+                  {'members_key':'files'},{'records_key':'records'},{'format':'jsonl'},{'format':'gzip-jsonl'},
+                  {'path':'docs/unreviewed.json.gz'},{'files_object_metadata':{}},{'provenance':'unknown'}]
+        variants += [{'files_object_metadata':controls|v} for v in [{'schema_review_sha256':'0'*64},{'producer_profile':'unknown'},
+            {'producer_profile':[]},{'expected_root_keys':['files']},{'expected_member_fields':['sha256','size_bytes','bytes_base64']},
+            {'expected_file_count':0},{'expected_file_count':1},{'expected_file_count':True},
+            {'file_count_authority':'verified'},{'extra':1}]]
+        for change in variants:
+            with self.subTest(change=change),patch.object(M,'Parser',side_effect=AssertionError('parser constructed')),patch.object(M,'hash_file',side_effect=AssertionError('source hashed')),patch.object(M.Inventory,'source',side_effect=AssertionError('source entered')):
+                bad=base|change
+                with self.assertRaises(ValueError):M.Inventory(self.events.append).parse(io.BytesIO(b'FORBIDDEN'),bad)
+                self.assertGreater(self.run_source(bad)['gaps'],0)
+        sized=self.files_spec('token-backwards-parameters-capture-v1')
+        wrong=sized|{'files_object_metadata':sized['files_object_metadata']|{'producer_profile':'token-backwards-controls-capture-v1'}}
+        with patch.object(M,'Parser',side_effect=AssertionError('parser constructed')):
+            with self.assertRaises(ValueError):M.Inventory(self.events.append).parse(io.BytesIO(b''),wrong)
+
+    def test_files_object_strict_member_fields_types_aliases_and_missing_size(self):
+        for profile in ['token-backwards-controls-capture-v1','token-backwards-parameters-capture-v1']:
+            sized=M.FILES_OBJECT_PROFILES[profile][2];value=self.files_value(sized)
+            changes=[{'sha256':None},{'sha256':'A'*64},{'sha256':'bad'},{'sha256':{'FORBIDDEN_SHA_KEY':'opaque'}},
+                     {'bytes_base64':{'FORBIDDEN_NESTED_KEY':'opaque'}},{'bytes_base64':1},{'data':'FORBIDDEN_DATA'},
+                     {'source':{'FORBIDDEN_SOURCE_KEY':'opaque'}},{'path':'alias.json'},{'bytes':3},{'kind':'member'},
+                     {'name':'alias.json'},{'module':MODULE,'apply_returned':True},{'chunk':0,'chunks':1}]
+            changes += [{'size_bytes':True},{'size_bytes':-1},{'size_bytes':1.5},{'size_bytes':'3'}] if sized else [{'size_bytes':3}]
+            rows=[value|v for v in changes]+[{k:v for k,v in value.items() if k!=field} for field in value]
+            for row_value in rows:
+                self.events.clear()
+                with self.subTest(profile=profile,row=row_value),patch.object(M,'decode_payload',side_effect=AssertionError('decode')),patch.object(M.tempfile,'SpooledTemporaryFile',side_effect=AssertionError('spool')):
+                    report=self.run_source(self.files_spec(profile,self.files_root(profile,{'own/a.json':row_value})),1)
+                self.assertGreater(report['gaps'],2)
+                event=next(e for e in self.events if e['kind']=='member');self.assertFalse(event['metadata_valid'])
+                if not sized:self.assertIsNone(event['bytes']);self.assertTrue(event['original_size_unavailable'])
+                self.assertFalse(next(e for e in self.events if e['kind']=='container_structure')['observed_metadata_valid'])
+
+    def test_files_object_paths_duplicates_and_no_path_following(self):
+        profile='token-backwards-controls-capture-v1';value=self.files_value(False)
+        for path in ['', '../x','/x','C:/x','own\\x']:
+            self.events.clear()
+            with self.subTest(path=path):
+                self.assertGreater(self.run_source(self.files_spec(profile,self.files_root(profile,{path:value})),1)['gaps'],2)
+                self.assertFalse(next(e for e in self.events if e['kind']=='member')['metadata_valid'])
+        self.events.clear()
+        forbidden=str(self.root/'DO-NOT-OPEN-source.py');old_open=Path.open
+        def opened(path,*args,**kwargs):
+            if str(path)==forbidden:raise AssertionError('logical/source path followed')
+            return old_open(path,*args,**kwargs)
+        root=self.files_root(profile,{'reference-runtime/pm4py/private.py':value|{'source':forbidden}})
+        with patch.object(Path,'open',opened):report=self.run_source(self.files_spec(profile,root),1)
+        self.assertGreater(report['gaps'],2)
+        event=next(e for e in self.events if e['kind']=='member');self.assertEqual(event['path_disposition'],'excluded-path');self.assertFalse(event['admitted'])
+        self.events.clear()
+        raw=b'{"files":{"own/a.json":'+M.canonical(value)+b',"own/a\\u002ejson":'+M.canonical(value)+b'},"scope":"opaque"}'
+        self.assertGreater(self.run_source(self.files_spec(profile,raw=raw),1)['gaps'],2)
+        members=[e for e in self.events if e['kind']=='member'];self.assertEqual(len(members),2);self.assertFalse(members[-1]['metadata_valid'])
+        summary=next(e for e in self.events if e['kind']=='container_structure')
+        self.assertEqual((summary['observed_file_rows'],summary['observed_unique_member_names']),(2,1));self.assertFalse(summary['observed_names_unique'])
+
+    def test_files_object_unknown_roots_malformed_maps_and_envelopes_stay_opaque(self):
+        profile='token-backwards-parameters-capture-v1'
+        roots=[{'files':'FORBIDDEN_FILES','scope':'FORBIDDEN_SCOPE'},
+               {'files':{'own/a.json':{'FORBIDDEN_UNKNOWN_ENVELOPE_KEY':{'FORBIDDEN_NESTED_PRIVATE_KEY':'secret'}}},'scope':'opaque'},
+               {'files':{'own/a.json':['FORBIDDEN_ENVELOPE']},'scope':'opaque'},
+               {'files':{},'scope':{'FORBIDDEN_SCOPE_KEY':'secret'}},
+               {'files':{},'scope':'opaque','records':[{'FORBIDDEN_RECORD_KEY':'secret'}]},
+               {'files':{},'scope':'opaque','data':{'FORBIDDEN_DATA_KEY':'secret'}},
+               {'scope':'opaque'},{}]
+        for root in roots:
+            self.events.clear()
+            with self.subTest(root=root),patch.object(M.tempfile,'SpooledTemporaryFile',side_effect=AssertionError('spool')):
+                report=self.run_source(self.files_spec(profile,root),1)
+            self.assertGreater(report['gaps'],1);self.assertNotIn('record',report['counts']);self.assertNotIn('secret',json.dumps(self.events))
+            self.assertFalse(next(e for e in self.events if e['kind']=='container_structure')['observed_metadata_valid'])
+
+    def test_files_object_observed_counts_never_become_independently_verified(self):
+        profile='token-backwards-parameters-baseline-v1'
+        for count in [0,1,237]:
+            self.events.clear();files={f'own/{i}.json':self.files_value(True) for i in range(count)}
+            report=self.run_source(self.files_spec(profile,self.files_root(profile,files)),1)
+            self.assertEqual(report['gaps'],3)
+            summary=next(e for e in self.events if e['kind']=='container_structure')
+            self.assertEqual((summary['observed_file_rows'],summary['observed_unique_member_names']),(count,count))
+            self.assertTrue(summary['observed_metadata_valid']);self.assertFalse(summary['external_file_count_verified'])
+            self.assertIsNone(summary['independently_expected_file_count']);self.assertFalse(report['explicit_inventory_parsed'])
+
+    def test_files_object_json_strictness_duplicates_trailing_and_nonfinite(self):
+        profile='token-backwards-controls-capture-v1';file=M.canonical(self.files_value(False))
+        bad=[b'[]',b'null',b'"FORBIDDEN"',b'{',b'{"files":{},"scope":"bad\\q"}',
+             b'{"files":{},"scope":"x","scope":"x"}',b'{"files":{"a":{"sha256":"a","sha256":"a","bytes_base64":"FORBIDDEN"}},"scope":"x"}',
+             b'{"files":{},"scope":"x"} trailing',b'{"files":{"a":'+file+b',},"scope":"x"}',
+             b'{"files":{},"scope":["FORBIDDEN",]}']
+        for scalar in [b'NaN',b'Infinity',b'-Infinity',b'1e999']:
+            bad += [b'{"files":{},"scope":{"FORBIDDEN_PRIVATE_KEY":'+scalar+b'}}',
+                    b'{"files":{"a":{"sha256":"a","bytes_base64":{"FORBIDDEN_PRIVATE_KEY":'+scalar+b'}}},"scope":"x"}']
+        for raw in bad:
+            with self.subTest(raw=raw[:80]),patch.object(M,'decode_payload',side_effect=AssertionError('decode')),patch.object(M.tempfile,'SpooledTemporaryFile',side_effect=AssertionError('spool')):
+                self.assertGreater(self.run_source(self.files_spec(profile,raw=raw),1)['gaps'],0)
+        summary_profile='token-backwards-parameters-baseline-v1'
+        for branch in ['summary','binary_hashes_only']:
+            raw=(b'{"files":{},"summary":{},"binary_hashes_only":{}}').replace(('"'+branch+'":{}').encode(),('"'+branch+'":{"FORBIDDEN":1e999}').encode())
+            self.assertGreater(self.run_source(self.files_spec(summary_profile,raw=raw),1)['gaps'],0)
+
+    def test_files_object_cache_one_byte_exact_events_and_source_controls_bound(self):
+        owned=Path(__file__).resolve().parents[1]/'test-work';owned.mkdir(exist_ok=True)
+        temp=tempfile.TemporaryDirectory(prefix='files-cache-',dir=owned);self.addCleanup(temp.cleanup);cache=Path(temp.name)/'cache'
+        for profile in ['token-backwards-controls-capture-v1','token-backwards-parameters-baseline-v1']:
+            self.events.clear();spec=self.files_spec(profile,gzip_transport=True)
+            manifest={'schema':M.MANIFEST,'root':str(self.root),'scope':'synthetic files object cache','sources':[spec]}
+            first=M.run(manifest,self.events.append,1,cache_dir=cache);original=list(self.events);self.events.clear()
+            with patch.object(M.Inventory,'parse',side_effect=AssertionError('cache miss')):
+                second=M.run(manifest,self.events.append,1,cache_dir=cache)
+            self.assertEqual(first['gaps'],second['gaps']);self.assertEqual(original,[e for e in self.events if e['kind']!='cache_hit'])
+            self.assertEqual(second['counts']['cache_hit'],1)
+            for cached in cache.glob('*.jsonl'):self.assertNotIn('FORBIDDEN',cached.read_text())
+            changed=spec|{'files_object_metadata':spec['files_object_metadata']|{'expected_file_count':1}}
+            self.events.clear();manifest['sources']=[changed]
+            with patch.object(M,'hash_file',side_effect=AssertionError('bad controls read source')):
+                refused=M.run(manifest,self.events.append,1,cache_dir=cache)
+            self.assertNotIn('cache_hit',refused['counts'])
+            manifest['sources']=[spec];(self.root/spec['path']).write_bytes(b'changed')
+            with patch.object(M.Inventory,'parse',side_effect=AssertionError('changed source parsed')):
+                self.assertGreater(M.run(manifest,self.events.append,1,cache_dir=cache)['gaps'],0)
+
+    def test_files_object_large_data_stream_bounded_reads_and_memory(self):
+        profile='token-backwards-controls-capture-v1';controls=self.files_controls(profile)
+        payload=b'FORBIDDEN\\n\\u0041'*250000
+        raw=b'{"files":{"own/a.json":{"bytes_base64":"'+payload+b'","sha256":"'+b'a'*64+b'"}},"scope":"opaque"}'
+        stream=BoundedStream(raw,4096);self.events.clear();inventory=M.Inventory(self.events.append,chunk_size=4096)
+        spec={'path':M.FILES_OBJECT_PROFILES[profile][1],'layout':'discover','format':'json','provenance':'own-container','envelope_schema':M.FILES_SCOPE_SCHEMA,'files_object_metadata':controls}
+        with patch.object(M,'decode_payload',side_effect=AssertionError('decode')),patch.object(M.tempfile,'SpooledTemporaryFile',side_effect=AssertionError('spool')):
+            tracemalloc.start()
+            try:inventory.parse(stream,spec);peak=tracemalloc.get_traced_memory()[1]
+            finally:tracemalloc.stop()
+        self.assertLess(peak,2*1024*1024);self.assertLessEqual(stream.largest,4096);self.assertNotIn('FORBIDDEN',json.dumps(self.events))
+
+
 if __name__ == '__main__':
     unittest.main()
