@@ -672,6 +672,8 @@ def adapt(row, spec):
             _pandas_attributes_outcome(row, PANDAS_ATTRIBUTES_PROFILE)
         elif any(key in row for key in ['input_after', 'args_after', 'kwargs_after', 'apply_returned', 'returned_input_identity']):
             return module, function, raw, digest, 'entered_without_outcome'
+        elif 'receipt' not in row or set(row) - {'receipt', 'receipt_sha256', 'index', 'case', 'module', 'method', 'function'}:
+            raise ValueError('pandas attributes full plan requires embedded receipt and exact reviewed metadata fields')
     # Outcome FIRST: modern records have both full receipt and result/error.
     if any(key in row for key in ['result', 'error', 'value_result']):
         status = 'actual_outcome'

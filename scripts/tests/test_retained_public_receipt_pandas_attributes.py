@@ -191,6 +191,15 @@ class PandasAttributesAdapterTests(unittest.TestCase):
         for key in ('input_after', 'args_after', 'kwargs_after', 'apply_returned'):
             candidate = {**plan, key: True}
             self.assertEqual(M.adapt(candidate, spec('plans'))[-1], 'entered_without_outcome')
+        for marker in ('controls_after', 'error_type', 'unknown_entry'):
+            for role in ('plans', 'intents', 'observations'):
+                with self.subTest(marker=marker, role=role), self.assertRaises(ValueError):
+                    M.adapt({**plan, marker: True}, spec(role))
+        legacy_before_only = {key: value for key, value in original.items()
+                              if key not in {'result', 'input_after', 'args_after', 'kwargs_after', 'returned_input_identity'}}
+        for role in ('plans', 'intents', 'observations'):
+            with self.subTest(legacy_before_only=role), self.assertRaises(ValueError):
+                M.adapt(legacy_before_only, spec(role))
 
     def test_digest_plans_and_unknown_light_intents_do_not_hide_outcomes(self):
         digest = row_for()['receipt_sha256']; config = {**spec('plans'), 'adapter': 'digest-plan-v1'}
