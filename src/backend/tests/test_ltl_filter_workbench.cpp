@@ -33,8 +33,51 @@ inline Parts request(const std::string& engine,const std::string& source,const s
  parts.insert(parts.end(),extra.begin(),extra.end());return parts;
 }
 inline EventTable subset(EventTable source,const std::vector<std::size_t>& indices){const auto original=source;source.rows.clear();if(source.index)source.index->labels.clear();for(auto i:indices){source.rows.push_back(original.rows.at(i));if(source.index)source.index->labels.push_back(original.index->labels.at(i));}return source;}
-inline void common_success(const DiscoveryWorkbenchResponse& answer,const std::string& source,const std::string& expected,const std::string& engine){
+inline void common_success(const DiscoveryWorkbenchResponse& answer,const std::string& source,const std::string& expected,const std::string& engine,const std::string& input_kind="LazyFrame"){
  require(answer.status==200,"relationship success expected: "+answer.json);contains(answer,"\"family\":\"REFERENCE_LTL_FILTER\"");contains(answer,"\"phase\":\"complete\"");contains(answer,"\"apply_returned\":true");contains(answer,"\"source_unchanged\":true");require(text(answer.json,"engine")==engine,"relationship engine changed");require(text(answer.json,"source_json")==source,"relationship full parsed source changed");require(text(answer.json,"source_after_json")==source,"relationship full source-after changed");require(text(answer.json,"result_json")==expected,"relationship complete result mismatch");require(!text(answer.json,"error"),"relationship unexpected diagnostic");
+ require(text(answer.json,"input_kind")== (engine=="polars"?std::optional<std::string>{input_kind}:std::nullopt),"relationship effective Polars input kind changed");
+}
+inline void polars_input_kinds(const std::function<DiscoveryWorkbenchResponse(const Parts&)>& run){
+ auto table=sample_table("polars");
+ // The retained ordinary eager/lazy pair distinguishes case-sorted output from
+ // original row order. This independent transport fixture has the same split.
+ for(std::size_t i=0;i<6;++i)table.rows[i][0]->value=i<3?"z":"a";
+ const auto source=serialize_embedding_workbench_table_json(table);
+ const auto sequence=[&](Parts extra){auto parts=request("polars",source,"eventually",std::move(extra));for(auto& part:parts)if(part.name=="values_json")part.bytes="[\"A\",\"B\"]";return parts;};
+ const auto lazy_expected=serialize_embedding_workbench_table_json(subset(table,{0,1,2,3,4,5}));
+ const auto eager_expected=serialize_embedding_workbench_table_json(subset(table,{3,4,5,0,1,2}));
+ const auto implicit=run(sequence({})),explicit_lazy=run(sequence({field("input_kind","LazyFrame")}));
+ common_success(implicit,source,lazy_expected,"polars");common_success(explicit_lazy,source,lazy_expected,"polars");
+ require(implicit.json==explicit_lazy.json,"explicit lazy selection changed default response bytes");
+ common_success(run(sequence({field("input_kind","DataFrame")})),source,eager_expected,"polars","DataFrame");
+ common_success(run(sequence({{"input_kind","input_kind.txt","DataFrame",true}})),source,eager_expected,"polars","DataFrame");
+ const auto ordinary=serialize_embedding_workbench_table_json(sample_table("polars"));
+ for(const std::string operation:{"four_eyes","different_persons"}){
+  const auto selected=operation=="different_persons"?std::vector<std::size_t>{6,7}:std::vector<std::size_t>{0,1,2};
+  common_success(run(request("polars",ordinary,operation,{field("input_kind","DataFrame")})),ordinary,serialize_embedding_workbench_table_json(subset(sample_table("polars"),selected)),"polars","DataFrame");
+ }
+ const auto eager_next=run(request("polars",ordinary,"next",{field("input_kind","DataFrame")}));
+ require(eager_next.status==400,"eager Polars NEXT silently converted to lazy input");contains(eager_next,"\"phase\":\"apply\"");contains(eager_next,"\"apply_returned\":false");contains(eager_next,"\"source_unchanged\":true");
+ require(text(eager_next.json,"input_kind")=="DataFrame" && text(eager_next.json,"error_type")=="AttributeError" && text(eager_next.json,"error")=="'DataFrame' object has no attribute 'collect'","eager Polars NEXT exact apply diagnostic changed");
+ require(text(eager_next.json,"source_json")==ordinary && text(eager_next.json,"source_after_json")==ordinary && !text(eager_next.json,"result_json"),"eager apply error lost complete source or fabricated result");
+ const auto lazy_next=run(request("polars",ordinary,"next",{field("input_kind","LazyFrame")}));require(lazy_next.status==200 && text(lazy_next.json,"input_kind")=="LazyFrame","lazy NEXT no longer succeeds");
+ for(const std::string kind:{"DataFrame","LazyFrame"}){
+  const auto answer=run(request("polars",ordinary,"eventually",{field("input_kind",kind),field("attribute_key","missing")}));
+  require(answer.status==400 && text(answer.json,"input_kind")==kind,"native diagnostic lost effective input kind");contains(answer,kind=="DataFrame"?"\"phase\":\"apply\"":"\"phase\":\"collect\"");contains(answer,kind=="DataFrame"?"\"apply_returned\":false":"\"apply_returned\":true");
+  require(text(answer.json,"source_json")==ordinary && text(answer.json,"source_after_json")==ordinary,"typed failure lost source snapshots");
+  auto malformed=request("polars","not native table JSON","eventually",{field("input_kind",kind)});const auto imported=run(malformed);
+  require(imported.status==400 && text(imported.json,"input_kind")==kind,"source import error lost validated input kind");contains(imported,"\"phase\":\"source_import\"");
+ }
+ for(const std::string invalid:{"","eager","lazy","dataframe","DataFrame\n"}){
+  const auto answer=run(request("polars","not native table JSON","eventually",{field("input_kind",invalid)}));
+  require(answer.status==400 && !text(answer.json,"input_kind"),"invalid Polars input kind accepted or reported effective");contains(answer,"\"phase\":\"control\"");require(text(answer.json,"error")=="input_kind must be LazyFrame or DataFrame","invalid input kind did not reject before source import");
+ }
+ for(const std::string engine:{"log","pandas"}){
+  const auto answer=run(request(engine,"not native source JSON","eventually",{field("input_kind","DataFrame")}));
+  require(answer.status==400 && !text(answer.json,"input_kind"),"inactive input kind accepted for non-Polars engine");contains(answer,"\"phase\":\"control\"");require(text(answer.json,"error")=="input_kind requires the polars engine","inactive input kind reached source import");
+ }
+ const auto duplicate=run(request("polars",ordinary,"eventually",{field("input_kind","DataFrame"),field("input_kind","LazyFrame")}));require(duplicate.status==400 && !text(duplicate.json,"input_kind"),"duplicate input kind accepted");contains(duplicate,"\"phase\":\"control\"");
+ const auto wrong_file=run(sequence({{"input_kind","wrong.txt","DataFrame",true}}));require(wrong_file.status==400 && !text(wrong_file.json,"input_kind"),"noncanonical input-kind File accepted");
 }
 inline void workflows(const std::function<DiscoveryWorkbenchResponse(const Parts&)>& run){
  for(const std::string engine:{"log","pandas","polars"}){
@@ -76,12 +119,14 @@ inline void workflows(const std::function<DiscoveryWorkbenchResponse(const Parts
   const auto answer=run({field("engine","log"),field("operation",operation),field("helper_a_json",differences),field("helper_b_json",intervals)});
   require(answer.status==200,"nonempty interval helper failed: "+answer.json);const auto result=parse_embedding_workbench_table_json(*text(answer.json,"helper_result_json"));require(result.rows.size()==1 && result.rows[0].size()==1 && result.rows[0][0] && result.rows[0][0]->kind==AttributeKind::kBoolean && result.rows[0][0]->value=="true","inclusive helper interval endpoints changed");
  }
+ polars_input_kinds(run);
 }
 }
 #ifndef MINERA_LTL_ROUTE_TEST
 int main(){try{using namespace ltl_workbench_test;workflows([](const auto& parts){return execute_ltl_filter_workbench(parts);});const auto source=serialize_embedding_workbench_table_json(sample_table("polars"));
  for(const auto& invalid:Parts{field("unknown","x"),field("engine","polars"),field("positive","yes"),field("resource_key","inactive"),field("timestamp_key","inactive"),field("a_json","inactive"),field("helper_a_json","inactive"),field("source_format","native_log")})require(execute_ltl_filter_workbench(request("polars",source,"eventually",{invalid})).status==400,"invalid/inactive relationship control accepted");
  require(execute_ltl_filter_workbench(request("polars",source),{field("engine","polars")}).status==400,"duplicate query/multipart relationship control accepted");
+ const auto duplicate_kind=execute_ltl_filter_workbench(request("polars",source,"eventually",{field("input_kind","DataFrame")}),{field("input_kind","LazyFrame")});require(duplicate_kind.status==400 && !text(duplicate_kind.json,"input_kind"),"duplicate query/multipart input kind accepted");
  auto scalar=request("polars",source);scalar[2].file=false;require(execute_ltl_filter_workbench(scalar).status==400,"plain source text accepted as File");
  std::cout<<"full relationship artifacts and strict control validation passed\n";
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

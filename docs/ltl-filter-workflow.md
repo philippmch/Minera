@@ -54,6 +54,14 @@ and explicit whitespace trimming. Tables accept actual native EventTable JSON
 Files with declared types and supported index/category/context metadata.
 Downloadable examples contain both ordered activities and performer values.
 
+Polars relationship filters offer a **Polars input type** selector. `LazyFrame`
+is the default; `DataFrame` invokes the native eager overload. The choice can
+change result order and error timing. For example, retained eager eventual
+filtering returns timestamp/case-sorted rows while lazy filtering restores source
+row order; ordinary eager consecutive filtering returns the retained apply-time
+`AttributeError` for missing `collect`. The result inspection shows the effective
+input type on success and native errors.
+
 `POST /api/reference-ltl-filter` accepts multipart controls and an actual
 `source_file` for filtering. Timestamp helpers accept only engine, operation and
 their two typed operands. Unknown, duplicate, inactive and unrelated File-shaped
@@ -61,13 +69,20 @@ controls are rejected. Native byte fields use the exact `<field>.txt` filename
 sent by the frontend to retain newlines and lone surrogate bytes. Query and
 multipart fields share one duplicate check.
 An explicitly present empty filename remains a File.
+For Polars, optional `input_kind` accepts exactly `LazyFrame` or `DataFrame`;
+omission selects `LazyFrame`. Other engines reject this control. Invalid or
+duplicate values reject before source import.
 
-Every response has the same 24-field envelope. It records the selected engine
+Every response has the same 25-field envelope. It records the selected engine
 and operation, HTTP status, stage, whether apply returned, source format,
 complete source/result counts, actual selectors, full parsed source before and
 after processing, complete filtered result, XES projection/error, helper value
 and complete native error type/message. A public Polars apply return is distinct
 from subsequent collection success.
+`input_kind` records the validated effective Polars type, or null for other
+engines and errors before a type was validated. The frontend checks it against
+the requested type, including source/apply/collect failures. For a Polars request,
+a null type is accepted only for an early HTTP 400 control error.
 
 Native strings can use the existing raw-byte carrier. Downloads preserve their
 complete bytes. The complete response is downloadable with original numeric
@@ -79,7 +94,25 @@ Changing a file or criterion cancels an outstanding request and invalidates its
 identity. Late responses cannot replace the result for a different file or
 form. There is no automatic request on workspace render.
 
-## Acceptance boundary
+## Polars input-type acceptance
+
+The input-type checkpoint passes three assertion-enabled native suites: all
+**675 retained Polars outcomes** (516 complete frames and 159 full diagnostics),
+the relationship workbench, and its owned HTTP route. The frontend passes
+**192 files / 9,833 tests**, TypeScript and the production build. Independent
+review verifies all 675 original receipt hashes and 16 eager/lazy pairs, plus
+208 transport-condition checks. The original oracle remains unchanged.
+
+Rendered browser checks use the final rebuilt server on a fresh owned loopback
+port. They cover public navigation, both input types, complete six-row ordering
+and table context, source preservation, stale-result clearing, exact result and
+HTTP-response downloads, and the eager consecutive-rule error with complete
+source/source-after/response downloads. Both the owned server and isolated
+browser close with their output drained. Existing application processes are
+not replaced. This bounded product check does not close a catalogue unit or
+authorize new reference calls.
+
+## Earlier integrated acceptance boundary
 
 The integrated checkpoint passes **47 assertion-enabled native suites**,
 including all **1,401 distinct retained public outcomes**: 297 LOG, 429 pandas
@@ -91,7 +124,7 @@ The final production server passes **73 relationship requests and 101 attributes
 regression requests** on independently owned temporary servers. They share
 binary SHA256 `be6f9e6b656cb157575554d0d2e4a11fa3984a4d935b04938dba903f3a944445`.
 Both processes exited. The existing application was not replaced. Rendered
-browser interaction remains unverified.
+browser interaction was unverified at that earlier checkpoint.
 
 `docs/ltl-filter-workflow-checks.jsonl.gz` binds current sources, exact native
 units, compiled artifacts, the frontend output and complete actual HTTP

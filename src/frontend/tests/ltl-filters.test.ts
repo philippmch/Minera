@@ -1,7 +1,7 @@
 import {afterEach,expect,it,vi} from "vitest";
 import {defaultLtlFilterForm,ltlFilterFields,ltlFilterOperations,isLtlFilterEnvelope,requestLtlFilter,ltlFilterArtifactFile,ltlFilterResponseFile,LtlFilterRequestGate,openLtlFilteredLog,type LtlFilterEnvelope,type LtlFilterRun} from "../src/ltl-filters";
 const file=()=>new File(['{"complete":"source"}'],"source.json",{lastModified:123});
-function envelope(patch:Partial<LtlFilterEnvelope>={}):LtlFilterEnvelope{return {family:"REFERENCE_LTL_FILTER",engine:"polars",operation:"eventually",result_kind:"table",http_status:200,phase:"complete",apply_returned:true,source_format:"native_table",source:{rows:4,columns:5},result:{rows:2,columns:5},source_unchanged:true,activity_key:null,case_id_key:"case:concept:name",attribute_key:"concept:name",resource_key:"org:resource",timestamp_key:"time:timestamp",source_json:'{"all":"before"}',source_after_json:'{"all":"after"}',result_json:'{"large":9007199254740993,"unsigned":18446744073709551615,"zero":-0.0}',filtered_xes:null,xes_error:null,helper_result_json:null,error_type:null,error:null,...patch};}
+function envelope(patch:Partial<LtlFilterEnvelope>={}):LtlFilterEnvelope{return {family:"REFERENCE_LTL_FILTER",engine:"polars",input_kind:patch.engine&&patch.engine!=="polars"?null:"LazyFrame",operation:"eventually",result_kind:"table",http_status:200,phase:"complete",apply_returned:true,source_format:"native_table",source:{rows:4,columns:5},result:{rows:2,columns:5},source_unchanged:true,activity_key:null,case_id_key:"case:concept:name",attribute_key:"concept:name",resource_key:"org:resource",timestamp_key:"time:timestamp",source_json:'{"all":"before"}',source_after_json:'{"all":"after"}',result_json:'{"large":9007199254740993,"unsigned":18446744073709551615,"zero":-0.0}',filtered_xes:null,xes_error:null,helper_result_json:null,error_type:null,error:null,...patch};}
 function run(value=envelope()):LtlFilterRun{const raw=JSON.stringify(value);return {value,raw,responseBytes:new TextEncoder().encode(raw),sourceFile:file(),fields:[]};}
 const fields=(engine:"log"|"pandas"|"polars",operation:"eventually"|"next"|"four_eyes"|"different_persons"|"timestamp_ge"|"timestamp_le"="eventually")=>Object.fromEntries(ltlFilterFields(defaultLtlFilterForm(engine,operation)));
 afterEach(()=>vi.unstubAllGlobals());
@@ -14,7 +14,7 @@ it("uses each public operand shape and keeps helpers exclusive to logs",()=>{
 it("preserves exact typed operands and literal selectors with active controls only",()=>{
  const typed='{"type":"list","value":[{"type":"integer","value":"9007199254740993"},{"type":"null"}]}';
  const form={...defaultLtlFilterForm("polars"),valuesKind:"typed"as const,typedValuesJson:typed,attributeKeyMode:"custom"as const,attributeKey:" \r\nΩ\0 ",caseKeyMode:"custom"as const,caseKey:"",resourceKeyMode:"custom"as const,resourceKey:"inactive",timestampKeyMode:"custom"as const,timestampKey:"inactive"};
- expect(Object.fromEntries(ltlFilterFields(form))).toEqual({engine:"polars",operation:"eventually",positive:"true",typed_values_json:typed,attribute_key:form.attributeKey,case_id_key:"",timestamp_key:"inactive"});
+ expect(Object.fromEntries(ltlFilterFields(form))).toEqual({engine:"polars",operation:"eventually",input_kind:"LazyFrame",positive:"true",typed_values_json:typed,attribute_key:form.attributeKey,case_id_key:"",timestamp_key:"inactive"});
  const helper={...form,engine:"log"as const,operation:"timestamp_ge"as const};expect(Object.keys(Object.fromEntries(ltlFilterFields(helper)))).toEqual(["engine","operation","helper_a_json","helper_b_json"]);
 });
 it("keeps omission and explicit timestamp boundaries distinct",()=>{
@@ -62,4 +62,32 @@ it("rejects unsafe UTF-8 and malformed JSON before accepting response artifacts"
 it("exposes Polars timestamp ordering and ignores inert difference options",()=>{
  for(const operation of ["eventually","next"]as const){const selected=Object.fromEntries(ltlFilterFields({...defaultLtlFilterForm("polars",operation),timestampKeyMode:"custom",timestampKey:" exact\n\0 ",enableTimestamp:"true",boundariesMode:"supplied"}));expect(selected.timestamp_key).toBe(" exact\n\0 ");expect(selected).not.toHaveProperty("enable_timestamp");expect(selected).not.toHaveProperty("timestamp_diff_boundaries_json");}
  const social=Object.fromEntries(ltlFilterFields({...defaultLtlFilterForm("polars","four_eyes"),timestampKeyMode:"custom",timestampKey:"inactive"}));expect(social).not.toHaveProperty("timestamp_key");
+});
+
+it("transports the selected Polars input type and ignores it for other engines",()=>{
+ expect(fields("polars").input_kind).toBe("LazyFrame");
+ const eager={...defaultLtlFilterForm("polars"),polarsInputKind:"DataFrame"as const};
+ expect(Object.fromEntries(ltlFilterFields(eager)).input_kind).toBe("DataFrame");
+ for(const engine of ["log","pandas"]as const)expect(Object.fromEntries(ltlFilterFields({...eager,engine}))).not.toHaveProperty("input_kind");
+ expect(()=>ltlFilterFields({...eager,polarsInputKind:"invalid"as never})).toThrow("Polars DataFrame or LazyFrame");
+});
+
+it("rejects a response from the other input type on success or apply failure",async()=>{
+ const eager={...defaultLtlFilterForm("polars"),polarsInputKind:"DataFrame"as const};
+ let value=envelope({input_kind:"DataFrame"});
+ vi.stubGlobal("fetch",vi.fn(async(_url:string,init:RequestInit)=>{expect((init.body as FormData).get("input_kind")).toBe("DataFrame");return new Response(JSON.stringify(value),{status:value.http_status});}));
+ expect((await requestLtlFilter(file(),eager)).value.input_kind).toBe("DataFrame");
+ value=envelope();await expect(requestLtlFilter(file(),eager)).rejects.toThrow("another Polars input type");
+ value=envelope({http_status:400,phase:"apply",input_kind:"LazyFrame",error_type:"AttributeError",error:"other input",result:null,result_json:null});
+ await expect(requestLtlFilter(file(),eager)).rejects.toThrow("another Polars input type");
+ value=envelope({http_status:400,phase:"control",input_kind:null,error_type:"native_error",error:"control failure",result:null,result_json:null});
+ expect((await requestLtlFilter(file(),eager)).value.error).toBe("control failure");
+ expect(isLtlFilterEnvelope(envelope({input_kind:"other"as never}))).toBe(false);
+ expect(isLtlFilterEnvelope(envelope({engine:"pandas",input_kind:"DataFrame"}))).toBe(false);
+});
+
+it("invalidates pending results when the Polars input type changes",()=>{
+ const gate=new LtlFilterRequestGate(),identity={source:file(),form:defaultLtlFilterForm("polars")};
+ const ticket=gate.issue(identity);
+ expect(gate.accepts(ticket,{...identity,form:{...identity.form,polarsInputKind:"DataFrame"}})).toBe(false);
 });
