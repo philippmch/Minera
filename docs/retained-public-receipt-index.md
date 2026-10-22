@@ -49,6 +49,27 @@ after-state evidence remains reserved as an entry. Matching intents resolve only
 against exact validated receipts in the same schema and reference/runtime
 partition. This adapter grants no new observation provenance or reference entry.
 
+The distinct `pandas-attributes-before-v1` adapter requires schema
+`minera-pandas-attributes-observer-receipt-v1`. It reconstructs the original
+six-field receipt from module, method, input-before, arguments-before,
+keywords-before and call shape. The complete frame is separate from positional
+operands. Sharing a call-shape string with pandas LTL grants no schema admission.
+The closed pandas attributes module has five parameter wrappers and three
+direct helpers, with separate method/arity/keyword domains and exact public
+enum identities. Full frames use the observed class tag `pandas.DataFrame`;
+the initial incorrect core-module class assumption and failed census are
+preserved. Typed rows, index labels/names, dtypes, categorical metadata, attrs,
+nanosecond Timestamp strings/resolution/timezone and ordered map entries stay
+unchanged in canonical bytes. Unknown nested forms remain gaps.
+
+Complete terminal records validate source and arguments before and after, actual
+mutation flags, returned-input identity, full errors including typed arguments,
+and warnings including filename and line number. A terminal row under an intent
+or plan role remains an actual observation. Conflicting schema/module identities
+block bounded certificates, including when the legacy row has no embedded
+receipt. Full original plans, digest-only plans and entered intents retain
+separate provenance; possible entry/outcome fields cannot be hidden as plans.
+
 JSON, JSONL, gzip JSON/JSONL and explicitly allowlisted archive members are
 supported. Recognized members carry either base64 or retained UTF-8 text plus
 exact size and SHA-256. Unlisted members are recorded without decoding and are
@@ -103,6 +124,18 @@ test and 15 attributes tests). A fresh flat-bank index reconstructs all 280
 canonical receipts, resolves all 280 exact intents and reports zero gaps. A
 second generation rehashes all twelve sources and reports twelve cache hits.
 This acceptance covers only those explicitly admitted flat files.
+
+Root also admitted two complete flat pandas attributes banks. The corrected
+offline census reconstructed all 448 distinct original hashes: 335 full returned
+frames, 113 errors, zero source/argument mutations and zero warnings. Its frame
+snapshot count is 150 in the original generator's scope; that count alone does
+not prove native constructors or oracle mappings. The sorted receipt-set SHA-256
+is `4c833bf5516f0170a47ade0d1b1959054e2b7574fe9ea9914ee69c867a55cfdf`.
+The new test module is
+`scripts.tests.test_retained_public_receipt_pandas_attributes`; synthetic tests
+and a proposed full-bank index/cache runner remain separately reviewed
+acceptance steps. These admissions extend neither the committed LTL archive
+manifest nor historical completeness, catalogue status or reference-call authority.
 
 Twenty-five synthetic integrity tests and one committed-archive integration test
 pass. The integration test checks all original digest sets, canonical bytes,
