@@ -1,6 +1,7 @@
 #include "table_attribute_repetition_test_support.hpp"
 #include "minera/ltl_filter_workbench.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "../log_ltl_original_call_parser.hpp"
 #include <functional>
 #include <iostream>
 #include <sstream>
@@ -102,7 +103,7 @@ inline void original_polars_calls(const std::function<DiscoveryWorkbenchResponse
   auto parts=original_request("invalid native source",call(""));parts.push_back(field(name,""));const auto answer=run(parts);original_echo(answer,call(""));require(answer.status==400 && !text(answer.json,"source_json"),"empty friendly control accepted with original call");contains(answer,"\"phase\":\"control\"");
  }
  for(const std::string engine:{"log","pandas"}){
-  auto parts=original_request("invalid native source",call(""));parts[0].bytes=engine;parts.erase(parts.begin()+2);const auto answer=run(parts);original_echo(answer,call(""));require(answer.status==400 && !text(answer.json,"source_json"),"inactive original schema reached source import");contains(answer,"\"phase\":\"control\"");if(engine=="log")require(text(answer.json,"error")=="call_json requires the pandas or polars engine","log original mode accepted");else require(text(answer.json,"error")=="original pandas call_json: unknown call field","pandas did not reject the Polars values field before source import");
+  auto parts=original_request("invalid native source",call(""));parts[0].bytes=engine;parts.erase(parts.begin()+2);const auto answer=run(parts);original_echo(answer,call(""));require(answer.status==400 && !text(answer.json,"source_json"),"inactive original schema reached source import");contains(answer,"\"phase\":\"control\"");require(text(answer.json,"error")==(engine=="log"?"original LOG call_json: unknown call field":"original pandas call_json: unknown call field"),"other engine did not reject the Polars values field before source import");
  }
  auto wrong=original_request(source,call(""));wrong.back()={"call_json","wrong.txt",call(""),true};const auto wrong_answer=run(wrong);require(wrong_answer.status==400 && !text(wrong_answer.json,"call_mode") && !native_text(wrong_answer.json,"call_json"),"noncanonical original File accepted or captured");
  auto duplicate=original_request(source,call(""));duplicate.push_back(field("call_json",call("")));require(run(duplicate).status==400,"duplicate original call accepted");
@@ -171,6 +172,60 @@ inline void original_pandas_calls(const std::function<DiscoveryWorkbenchResponse
  const std::string wrong_polars_schema=R"({"schema":"minera-pandas-ltl-original-call-v1","values":{"type":"list","value":[]}})";
  const auto wrong_polars=run(original_request("invalid native source",wrong_polars_schema));original_echo(wrong_polars,wrong_polars_schema);require(wrong_polars.status==400 && text(wrong_polars.json,"phase")=="control" && text(wrong_polars.json,"error")=="original Polars call_json: unsupported or missing schema","Polars schema guard accepted the pandas schema with valid Polars fields");
  const auto helper=run(original_pandas_request("invalid native source",raw,"timestamp_ge"));original_echo(helper,raw);require(helper.status==400 && !text(helper.json,"source_json"),"pandas original accepted helper operation");
+}
+inline Parts original_log_request(const std::string& source,const std::string& raw,const std::string& operation="eventually"){
+ Parts parts={field("engine","log"),field("operation",operation),field("call_json",raw)};
+ if(!operation.starts_with("timestamp_"))parts.push_back({"source_file","original-source.json",source,true});
+ return parts;
+}
+inline void original_log_calls(const std::function<DiscoveryWorkbenchResponse(const Parts&)>& run){
+ const auto log=sample_log();const auto source=serialize_embedding_workbench_raw_log_json(log);
+ const std::string schema=R"("schema":"minera-log-ltl-original-call-v1")",a=R"({"type":"string","value":"A"})",b=R"({"type":"string","value":"B"})",c=R"({"type":"string","value":"C"})";
+ const auto call=[&](const std::string& args,const std::string& extra=""){return "{"+schema+",\"args\":"+args+extra+"}";};
+ const auto sequence="[{\"type\":\"list\",\"value\":["+a+","+b+","+c+"]}]";
+ auto selected=log;selected.traces={log.traces[0]};const auto expected=serialize_embedding_workbench_raw_log_json(selected);
+ const auto success=[&](const DiscoveryWorkbenchResponse& answer,const std::string& raw,const std::string& original,const std::string& result){
+  require(answer.status==200,"LOG original success expected: "+answer.json);original_echo(answer,raw);require(text(answer.json,"engine")=="log" && !text(answer.json,"input_kind") && text(answer.json,"source_format")=="native_log","LOG original source kind changed");contains(answer,"\"phase\":\"complete\"");contains(answer,"\"apply_returned\":true");contains(answer,"\"source_unchanged\":true");require(text(answer.json,"source_json")==original && text(answer.json,"source_after_json")==original && text(answer.json,"result_json")==result && !text(answer.json,"error"),"LOG original complete source/result artifacts changed");
+ };
+ for(const std::string operation:{"eventually","next","four_eyes","different_persons"}){
+  const auto args=operation=="eventually"?sequence:operation=="next"?"["+a+","+b+","+c+"]":operation=="four_eyes"?"["+a+","+b+"]":"["+a+"]";const auto raw=call(args);
+  auto different=log;different.traces={log.traces[2]};success(run(original_log_request(source,raw,operation)),raw,source,operation=="different_persons"?serialize_embedding_workbench_raw_log_json(different):expected);
+ }
+ for(const std::string extra:{std::string(",\"parameter_value\":{\"type\":\"null\"}"),std::string(",\"parameter_value\":{\"type\":\"list\",\"value\":[]}"),std::string(",\"parameter_entries\":[]")}){
+  const auto raw=call(sequence,extra);success(run(original_log_request(source,raw)),raw,source,expected);
+ }
+ const auto raw_integer=call(sequence,R"(,"parameter_value":{"type":"integer","value":"0"})");const auto failed=run(original_log_request(source,raw_integer));original_echo(failed,raw_integer);require(failed.status==400 && text(failed.json,"error_type")=="TypeError" && text(failed.json,"error")=="'int' object is not iterable","LOG raw integer parameters were coerced");contains(failed,"\"phase\":\"apply\"");contains(failed,"\"apply_returned\":false");require(text(failed.json,"source_json")==source && text(failed.json,"source_after_json")==source,"LOG native failure lost full source");
+ const auto negative=call(sequence,R"(,"parameter_entries":[{"key":"positive","enum_key":true,"value":{"type":"integer","value":"0"}}])");auto complement=log;complement.traces={log.traces[1],log.traces[2]};success(run(original_log_request(source,negative)),negative,source,serialize_embedding_workbench_raw_log_json(complement));
+ // A native source remains native JSON regardless of the uploaded filename.
+ auto native_name=original_log_request(source,call(sequence));native_name.back().filename="misleading.csv";success(run(native_name),call(sequence),source,expected);
+ // Preserve the independent opening role while typed selector names stay null.
+ const std::string literal("literal\r\n\0",10);auto custom=log;for(auto& trace:custom.traces)for(auto& event:trace.events){event.activity_source_key=literal;event.activity_attribute->key=literal;}const auto custom_source=serialize_embedding_workbench_raw_log_json(custom);auto custom_selected=custom;custom_selected.traces={custom.traces[0]};
+ const auto literal_call="{\r\n"+schema+",\"args\":"+sequence+",\"parameter_entries\":[{\"key\":\"pm4py:param:attribute_key\",\"enum_key\":true,\"value\":{\"type\":\"string\",\"value\":"+serialize_embedding_workbench_string_json(literal)+"}}]\r\n}";
+ auto literal_parts=original_log_request(custom_source,literal_call);literal_parts[2]={"call_json","call_json.txt",literal_call,true};const auto literal_result=run(literal_parts);success(literal_result,literal_call,custom_source,serialize_embedding_workbench_raw_log_json(custom_selected));require(native_text(literal_result.json,"activity_key")==literal,"LOG original lost independent source-opening activity role");
+ const std::string differences=R"({"type":"list","value":[{"type":"integer","value":"1"},{"type":"integer","value":"4"}]})",bounds=R"({"type":"list","value":[{"type":"tuple","value":[{"type":"integer","value":"1"},{"type":"integer","value":"2"}]},{"type":"tuple","value":[{"type":"integer","value":"3"},{"type":"integer","value":"4"}]}]})";
+ for(const std::string operation:{"timestamp_ge","timestamp_le"}){
+  const auto raw=call("["+differences+","+bounds+"]");const auto answer=run(original_log_request("",raw,operation));original_echo(answer,raw);require(answer.status==200 && !text(answer.json,"source_json") && !text(answer.json,"source_after_json") && !text(answer.json,"activity_key"),"source-less LOG helper fabricated source");contains(answer,"\"source\":null");contains(answer,"\"source_unchanged\":null");const auto helper=parse_embedding_workbench_table_json(*text(answer.json,"helper_result_json"));require(helper.rows.size()==1 && helper.rows[0][0] && helper.rows[0][0]->kind==AttributeKind::kBoolean && helper.rows[0][0]->value=="true","LOG original helper lost complete typed Boolean");
+  const auto nat=call(R"([{"type":"list","value":[{"type":"nat"}]},{"type":"list","value":[{"type":"tuple","value":[{"type":"integer","value":"0"},{"type":"integer","value":"10"}]}]}])");const auto nat_result=run(original_log_request("",nat,operation));original_echo(nat_result,nat);require(nat_result.status==200,"nested LOG NaT helper was coerced or rejected: "+nat_result.json);const auto nat_value=parse_embedding_workbench_table_json(*text(nat_result.json,"helper_result_json"));require(nat_value.rows[0][0] && nat_value.rows[0][0]->kind==AttributeKind::kBoolean && nat_value.rows[0][0]->value=="true","NaT helper did not preserve its native comparison behavior");
+  for(const std::string extra:{",\"parameter_value\":{\"type\":\"null\"}",",\"parameter_entries\":[]"}){
+   const auto invalid=call("["+differences+","+bounds+"]",extra);const auto rejected=run(original_log_request("",invalid,operation));original_echo(rejected,invalid);require(rejected.status==400 && !text(rejected.json,"source_json"),"LOG helper accepted inactive parameters");contains(rejected,"\"phase\":\"control\"");
+  }
+  auto with_source=original_log_request("",raw,operation);with_source.push_back({"source_file","ignored.json","not JSON",true});const auto rejected=run(with_source);original_echo(rejected,raw);require(rejected.status==400 && text(rejected.json,"error")=="original timestamp helpers forbid source_file by presence","LOG helper imported an inactive source");
+ }
+ // Exact carrier checks bind the private extension to the old native fixture:
+ // nested NaT is date/null/NativeDate NaT; UUID is kId, never ordinary text.
+ const auto nested=call(R"([{"type":"tuple","value":[{"type":"nat"},{"type":"uuid","value":"00000000-0000-0000-0000-000000000001"},{"type":"map","value":{"kind":{"type":"frozenset","value":[{"type":"uuid","value":"00000000-0000-0000-0000-000000000002"}]}}}]}])");
+ const auto parsed=log_ltl_original_call_detail::parse(nested,1,false);const auto& nat=parsed.args[0].children[0];const auto& id=parsed.args[0].children[1];require(nat.kind==AttributeKind::kDate && nat.is_null && nat.value=="NaT" && std::get<NativeDate>(nat.typed_value).value=="NaT" && std::get<NativeDate>(nat.typed_value).resolution==NativeDateResolution::kNanosecond,"private LOG NaT carrier differs from original native fixture");require(id.kind==AttributeKind::kId && !id.is_null && id.value=="00000000-0000-0000-0000-000000000001" && std::holds_alternative<std::monostate>(id.typed_value),"private LOG UUID carrier differs from original native fixture");require(parsed.args[0].children[2].children[0].children[0].kind==AttributeKind::kId,"nested map/frozenset UUID extension was lost");
+ const std::vector<std::string> invalid={"","null","[]","{}","{"+schema+"}",call("[]"),call(sequence,R"(,"parameter_value":{"type":"null"},"parameter_entries":[])"),call(sequence,R"(,"parameter_value":{"type":"map","value":{}})"),call(sequence,R"(,"parameter_entries":[{"key":"positive","enum_key":false,"value":{"type":"boolean","value":false}},{"key":"positive","enum_key":true,"value":{"type":"boolean","value":true}}])"),call(sequence,R"(,"parameter_entries":[{"key":"unknown","enum_key":false,"value":{"type":"null"}}])"),call(R"([{"type":"nat","value":null}])"),call(R"([{"type":"uuid","value":"NOT-A-UUID"}])"),call(R"([{"type":"uuid","value":"AAAAAAAA-0000-0000-0000-000000000001"}])"),call(R"([{"type":"list","value":[{"type":"nat","\u0074ype":"null"}]}])"),call(R"([{"type":"map","value":{"B":{"type":"nat"},"A":{"type":"null"}}}])"),call(R"([{"type":"decimal","value":NaN}])")};
+ for(const auto& raw:invalid){const auto answer=run(original_log_request("invalid native source",raw));original_echo(answer,raw);require(answer.status==400 && !text(answer.json,"source_json"),"invalid LOG original call reached source import");contains(answer,"\"phase\":\"control\"");}
+ for(const std::string operation:{"eventually","next","four_eyes","different_persons","timestamp_ge","timestamp_le"}){
+  const unsigned arity=operation.starts_with("timestamp_")?2U:operation=="next"?3U:operation=="four_eyes"?2U:1U;
+  for(const auto length:{arity-1,arity+1}){std::string args="[";for(unsigned i=0;i<length;++i){if(i)args+=',';args+=a;}args+=']';const auto raw=call(args);const auto answer=run(original_log_request("invalid source",raw,operation));original_echo(answer,raw);require(answer.status==400 && text(answer.json,"error")=="original LOG call_json: args must contain exactly "+std::to_string(arity)+" typed positional operands","LOG wrong arity fabricated native binding error");contains(answer,"\"phase\":\"control\"");}
+ }
+ const auto raw=call(sequence);
+ for(const std::string name:{"values_json","typed_values_json","target_json","a_json","b_json","c_json","case_id_key","attribute_key","resource_key","timestamp_key","positive","enable_timestamp","timestamp_diff_boundaries_json","helper_a_json","helper_b_json","source_format","activity_key","case_id_column","activity_column","timestamp_column","resource_column","delimiter","trim_fields","input_kind"}){auto parts=original_log_request("invalid source",raw);parts.push_back(field(name,""));const auto answer=run(parts);original_echo(answer,raw);require(answer.status==400 && !text(answer.json,"source_json"),"LOG original accepted inactive friendly control");contains(answer,"\"phase\":\"control\"");}
+ for(const std::string engine:{"pandas","polars"}){auto parts=original_log_request("invalid source",raw);parts[0].bytes=engine;const auto answer=run(parts);original_echo(answer,raw);require(answer.status==400 && !text(answer.json,"source_json"),"table engine accepted LOG schema");contains(answer,"\"phase\":\"control\"");}
+ auto malformed=original_log_request("invalid source",std::string("{\r\n\0",4));malformed[2].file=true;malformed[2].filename="call_json.txt";const auto malformed_result=run(malformed);original_echo(malformed_result,malformed[2].bytes);require(malformed_result.status==400 && !text(malformed_result.json,"source_json"),"LOG malformed byte File reached import");
+ auto wrong=original_log_request(source,raw);wrong[2].file=true;wrong[2].filename="wrong.txt";const auto wrong_result=run(wrong);require(wrong_result.status==400 && !text(wrong_result.json,"call_mode") && !native_text(wrong_result.json,"call_json"),"LOG noncanonical File accepted or captured");
 }
 inline void polars_input_kinds(const std::function<DiscoveryWorkbenchResponse(const Parts&)>& run){
  auto table=sample_table("polars");
@@ -257,6 +312,7 @@ inline void workflows(const std::function<DiscoveryWorkbenchResponse(const Parts
  polars_input_kinds(run);
  original_polars_calls(run);
  original_pandas_calls(run);
+ original_log_calls(run);
 }
 }
 #ifndef MINERA_LTL_ROUTE_TEST
@@ -266,6 +322,7 @@ int main(){try{using namespace ltl_workbench_test;workflows([](const auto& parts
  const auto duplicate_kind=execute_ltl_filter_workbench(request("polars",source,"eventually",{field("input_kind","DataFrame")}),{field("input_kind","LazyFrame")});require(duplicate_kind.status==400 && !text(duplicate_kind.json,"input_kind"),"duplicate query/multipart input kind accepted");
  const auto duplicate_call=execute_ltl_filter_workbench(original_request(source,"{}"),{field("call_json","{}")});require(duplicate_call.status==400 && !text(duplicate_call.json,"call_mode") && !native_text(duplicate_call.json,"call_json"),"duplicate query/multipart original call accepted or captured");
  const auto duplicate_pandas_call=execute_ltl_filter_workbench(original_pandas_request(source,"{}"),{field("call_json","{}")});require(duplicate_pandas_call.status==400 && !text(duplicate_pandas_call.json,"call_mode") && !native_text(duplicate_pandas_call.json,"call_json"),"duplicate query/multipart pandas original call accepted or captured");
+ const auto duplicate_log_call=execute_ltl_filter_workbench(original_log_request("invalid source","{}"),{field("call_json","{}")});require(duplicate_log_call.status==400 && !text(duplicate_log_call.json,"call_mode") && !native_text(duplicate_log_call.json,"call_json"),"duplicate query/multipart LOG original call accepted or captured");
  auto scalar=request("polars",source);scalar[2].file=false;require(execute_ltl_filter_workbench(scalar).status==400,"plain source text accepted as File");
  std::cout<<"full relationship artifacts and strict control validation passed\n";
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}
