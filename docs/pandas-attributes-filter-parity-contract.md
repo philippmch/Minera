@@ -1,5 +1,97 @@
 # Pandas attributes: bounded public/native contract
 
+## Original typed calls in the table workbench
+
+`POST /api/reference-table-attributes` accepts `engine=pandas`, an existing
+operation, a complete native EventTable `source_file` File and `call_json`.
+The presence of `call_json` selects original mode, including malformed or empty
+text. Friendly controls are rejected by presence in that mode. Polars continues
+to use friendly controls. Ordinary text and a canonical `call_json.txt` byte
+File are accepted; duplicate fields and unrelated File names reject.
+
+The call schema is `minera-pandas-attributes-original-call-v1`. Required `args`
+is an ordered array of typed operands excluding the source. This is the binding
+shape of the complete retained bank, rather than a general Python call binder.
+
+| Operation | Public function | Args | Optional controls |
+| --- | --- | --- | --- |
+| `traces` | `apply` | values | parameters |
+| `events` | `apply_events` | values | parameters |
+| `numeric_traces` | `apply_numeric` | lower, upper | parameters |
+| `numeric_events` | `apply_numeric_events` | lower, upper | parameters |
+| `relative` | `filter_df_relative_occurrence_event_attribute` | stake | parameters |
+| `threshold` | `filter_df_keeping_activ_exc_thresh` | threshold | direct keywords |
+| `top_activities` | `filter_df_keeping_spno_activities` | empty | direct keywords |
+| `on_values` | `filter_df_on_attribute_values` | values | direct keywords |
+
+Five wrappers accept optional `parameter_value` or `parameter_entries`, exclusive
+by presence. Entries are ordered `{key,enum_key,value}` objects. Key is one of
+the eleven public underlying parameter strings; enum_key is Boolean. A string
+key and its enum key remain distinct and may occur in either order. A duplicate
+exact identity rejects. All ten captured collision calls retain the four apply
+wrappers' enum precedence and relative occurrence's literal precedence. Omitted
+parameters, explicit null, empty list and an empty dictionary stay distinguishable
+in the controls artifact even when their native outcomes coincide.
+
+Direct helpers instead accept optional ordered `keyword_entries` objects with
+`key` and typed `value`. Threshold allows `act_count0`, `activity_key` and
+`most_common_variant`; activity-limit allows `activity_key` and
+`max_no_activities`; on-values allows `case_id_glue`, `attribute_key`, `positive`
+and `keep_nan_values`. Unknown or duplicate keywords reject. Defaults are used
+only for omitted controls. The activity-limit public signature has no positional
+maximum in this bank: supply it as `max_no_activities`.
+
+Threshold count dictionaries use
+`{"type":"attribute_counts","entries":[[TypedKey,TypedCount],...]}`.
+Typed keys, order, empty dictionary presence and entry boundaries are preserved.
+The unchanged native normalizer handles Python-equal keys. Null, list and string
+count inputs remain raw typed values and retain native diagnostics.
+
+Common typed operands use `null`, `na`, `string`, `integer`, `decimal`, `boolean`,
+`bytes`, `date`, `list`, `tuple`, `set`, `frozenset` and `map`. Integer strings and
+raw integer tokens avoid a floating intermediary. Maps retain the existing
+codec's lexical-order constraint; every captured ordinary operand map meets it.
+The private recursive `pandas_timestamp` descriptor has exactly `type`, ISO
+`value`, `resolution` (`ns` or `us`) and `timezone` (null or `UTC`). It preserves
+the eight captured Timestamp operands' native units and zone, including nested
+values and count keys. A microsecond value with finer precision rejects. The
+shared `date` codec remains unchanged. Other Timestamp units, arbitrary timezone
+objects, nested dataframe controls and arbitrary Python objects are unproven.
+
+The response has 23 fields: the previous eighteen plus `call_mode`, exact
+`call_json`, `controls_before_json`, `controls_after_json` and
+`controls_unchanged`. Both control artifacts serialize actual parsed native
+operands before and after invocation, including on native error. They contain
+`args_json`, `parameter_state`, `parameters_json` and ordered `keyword_entries`.
+Native cells use complete EventTable serialization; count dictionaries retain
+their union tag and separate typed key/value cells. These are actual native
+state snapshots, separate from the raw call echo. The source and result artifacts
+continue to retain full rows, index, dtypes, categories and attributes. Original
+`case_id_key` and `attribute_key` are empty placeholders; inspect typed controls
+for selectors. Friendly role fields retain their existing meaning.
+
+The pandas editor imports valid UTF8 without normalizing BOM, CRLF, whitespace
+or integer tokens. Edits invalidate pending requests and deferred imports. Exact
+call, complete controls, full native tables and raw response bytes can be
+downloaded, including available evidence after errors. A successful filtered
+table can become the next actual source File. Error type/full message are native
+wire outcomes; original Python error.args and object-identity metadata remain
+external observations.
+
+The bounded offline census reconstructs all 448 canonical receipt IDs from both
+complete admitted banks, checks full plan/case/intent correspondence and observes
+335 full tables, 113 diagnostics, zero warnings and zero source/control mutations.
+Sorted receipt-set SHA256 is
+`4c833bf5516f0170a47ade0d1b1959054e2b7574fe9ea9914ee69c867a55cfdf`.
+Independent mapping reconstructs all 150 snapshot constructors and all 448 case
+bodies in the byte-unchanged native oracle. Five omitted/null invocation pairs
+keep distinct receipt and transport identities. This census and mapping establish
+offline evidence; current transport runtime acceptance is recorded separately.
+The first census validator's incorrect frame-class assumption was corrected to
+the observed `pandas.DataFrame`; the failed generation is preserved. No reference
+calls were made or replayed for this work, and module/catalogue closure remains
+open.
+
 The dedicated `pandas_attributes_filter.hpp` companion implements all eight
 captured public functions of `algo.filtering.pandas.attributes.attributes_filter`,
 pinned to PM4Py 2.7.22 commit `0715c31f3f1d85924107d6aa5329806db69df899`,

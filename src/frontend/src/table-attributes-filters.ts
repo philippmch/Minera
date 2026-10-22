@@ -1,4 +1,4 @@
-import {appendNativeMultipartField} from "./native-multipart";
+import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart";
 import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isTableRepetitionEnvelope, tableRepetitionSourceExample, type TableRepetitionEngine, type TableRepetitionEnvelope} from "./table-attribute-repetition";
 import {isOriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
@@ -14,6 +14,7 @@ export const TABLE_ATTRIBUTES_LABELS: Record<TableAttributesOperation, string> =
 };
 export function tableAttributesOperations(engine: TableRepetitionEngine): TableAttributesOperation[] {return TABLE_ATTRIBUTES_OPERATIONS.filter(operation => engine === "polars" || operation !== "counts");}
 export interface TableAttributesForm {
+  callMode:"friendly"|"original";callJson:string;
   engine: TableRepetitionEngine; operation: TableAttributesOperation; valuesKind: "strings" | "typed"; valuesJson: string;
   lower: string; upper: string; maxActivities: string; threshold: string; minRelative: string;
   positive: boolean; keepMissing: boolean; keepOnceMode: "default" | "false" | "true";
@@ -23,12 +24,24 @@ export interface TableAttributesForm {
   countsMode: "computed" | "supplied" | "value"; countsJson: string; mostCommonMode: "omitted" | "supplied"; mostCommonJson: string;
 }
 export function defaultTableAttributesForm(engine: TableRepetitionEngine): TableAttributesForm {
-  return {engine,operation:"traces",valuesKind:"strings",valuesJson:'["A"]',lower:"9007199254740992",upper:"9007199254740994",maxActivities:"2",threshold:"2",minRelative:"0.5",positive:true,keepMissing:false,keepOnceMode:"default",
+  return {engine,operation:"traces",callMode:"friendly",callJson:tableAttributesOriginalExample("traces"),valuesKind:"strings",valuesJson:'["A"]',lower:"9007199254740992",upper:"9007199254740994",maxActivities:"2",threshold:"2",minRelative:"0.5",positive:true,keepMissing:false,keepOnceMode:"default",
     streamOne:false,streamOneKey:"concept:name",streamOneValueJson:'{"type":"string","value":"A"}',streamTwo:false,streamTwoKey:"concept:name",streamTwoValueJson:'{"type":"string","value":"B"}',
     caseKeyMode:"default",caseKey:"case:concept:name",attributeKeyMode:"default",attributeKey:"concept:name",activityKeyMode:"default",activityKey:"concept:name",countsMode:"computed",
     countsJson:'{"type":"list","value":[{"type":"tuple","value":[{"type":"string","value":"A"},{"type":"integer","value":"3"}]}]}',mostCommonMode:"omitted",mostCommonJson:'{"type":"list","value":[{"type":"string","value":"A"}]}'};
 }
+export function tableAttributesOriginalExample(operation:TableAttributesOperation):string {
+  const integer=(value:string)=>({type:"integer",value});
+  const args=operation.startsWith("numeric_")?[integer("0"),integer("100")]:operation==="top_activities"?[]:operation==="threshold"?[integer("2")]:operation==="relative"?[{type:"decimal",value:"0.5"}]:[{type:"list",value:[{type:"string",value:"A"}]}];
+  return JSON.stringify({schema:"minera-pandas-attributes-original-call-v1",args},null,2);
+}
+export async function tableAttributesCallFileText(file:File):Promise<string> {
+  if(!(file instanceof File))throw new Error("Choose an actual original-call JSON File.");
+  try{return new TextDecoder("utf-8",{fatal:true,ignoreBOM:true}).decode(await file.arrayBuffer());}
+  catch{throw new Error("The original-call file must contain valid UTF-8. Its bytes were not replaced.");}
+}
 export interface TableAttributesEnvelope extends Omit<TableRepetitionEnvelope,"family"> {
+  call_mode:"friendly"|"original"|null;call_json:ReferenceLogFilterNativeString|null;
+  controls_before_json:ReferenceLogFilterNativeString|null;controls_after_json:ReferenceLogFilterNativeString|null;controls_unchanged:boolean|null;
   family:"TABLE_ATTRIBUTES_FILTER";operation:TableAttributesOperation|null;result_kind:"table"|"counts"|null;
   counts_table_json:ReferenceLogFilterNativeString|null;source_after_table_json:ReferenceLogFilterNativeString|null;
 }
@@ -36,14 +49,22 @@ export interface TableAttributesRun {value:TableAttributesEnvelope;sourceFile:Fi
 export function isTableAttributesEnvelope(value:unknown):value is TableAttributesEnvelope {
   if(value===null || typeof value!=="object" || Array.isArray(value))return false;
   const record=value as Record<string,unknown>;
-  if(record.family!=="TABLE_ATTRIBUTES_FILTER" || Object.keys(record).length!==18 || !(record.operation===null || TABLE_ATTRIBUTES_OPERATIONS.includes(record.operation as TableAttributesOperation)) ||
+  if(record.family!=="TABLE_ATTRIBUTES_FILTER" || Object.keys(record).length!==23 || !(record.operation===null || TABLE_ATTRIBUTES_OPERATIONS.includes(record.operation as TableAttributesOperation)) ||
+    !(record.call_mode===null||record.call_mode==="friendly"||record.call_mode==="original") ||
+    !((record.call_mode===null||record.call_mode==="friendly")&&record.call_json===null||record.call_mode==="original"&&record.call_json!==null) ||
+    !(record.controls_unchanged===null||typeof record.controls_unchanged==="boolean") ||
     !(record.result_kind===null || record.result_kind==="table" || record.result_kind==="counts") ||
-    ![record.counts_table_json,record.source_after_table_json].every(item=>item===null || isOriginalEmbeddingFilterNativeString(item)))return false;
-  const {family:_family,operation:_operation,result_kind:_kind,counts_table_json:_counts,source_after_table_json:_after,...rest}=record;
+    ![record.counts_table_json,record.source_after_table_json,record.call_json,record.controls_before_json,record.controls_after_json].every(item=>item===null || isOriginalEmbeddingFilterNativeString(item)))return false;
+  const {family:_family,operation:_operation,result_kind:_kind,counts_table_json:_counts,source_after_table_json:_after,call_mode:_mode,call_json:_call,controls_before_json:_controlsBefore,controls_after_json:_controlsAfter,controls_unchanged:_unchanged,...rest}=record;
   return isTableRepetitionEnvelope({...rest,family:"TABLE_ATTRIBUTE_REPETITION"});
 }
 export function tableAttributesFields(form:TableAttributesForm):Array<[string,string]> {
   if(!["pandas","polars"].includes(form.engine) || !tableAttributesOperations(form.engine).includes(form.operation))throw new Error("Choose an available attribute operation.");
+  if(form.callMode!=="friendly"&&form.callMode!=="original")throw new Error("Choose friendly controls or an original typed call.");
+  if(form.callMode==="original"){
+    if(form.engine!=="pandas")throw new Error("Original typed attributes calls require pandas.");
+    return [["engine",form.engine],["operation",form.operation],["call_json",form.callJson]];
+  }
   if(![form.caseKeyMode,form.attributeKeyMode,form.activityKeyMode].every(mode=>mode==="default" || mode==="custom"))throw new Error("Choose default or literal columns.");
   const fields:Array<[string,string]>=[["engine",form.engine],["operation",form.operation]];
   const membership=["traces","events","on_values"].includes(form.operation),numeric=form.operation.startsWith("numeric_"),frequency=form.operation==="threshold" || form.operation==="top_activities";
@@ -83,10 +104,18 @@ export async function requestTableAttributes(sourceFile:File,form:TableAttribute
   const value=await readNativeResponse(new Response(responseBytes),{path:"/api/reference-table-attributes",fields,reference:{name:sourceFile.name,size:sourceFile.size,last_modified:sourceFile.lastModified}});signal?.throwIfAborted();
   if(!isTableAttributesEnvelope(value) || value.http_status!==response.status)throw new Error("The table attributes response has an invalid native envelope.");
   if(value.engine!==form.engine && !(value.http_status===400 && value.engine===null) || value.operation!==form.operation && !(value.http_status===400 && value.operation===null))throw new Error("The table attributes response belongs to another engine or operation.");
+  const call=fields.find(([key])=>key==="call_json"),earlyControl=value.http_status===400&&value.phase==="control";
+  if(value.call_mode!==(call?"original":"friendly")&&!(earlyControl&&value.call_mode===null))throw new Error("The table attributes response belongs to another call mode.");
+  if(call){
+    if(value.call_json===null){if(!(earlyControl&&value.call_mode===null))throw new Error("The table attributes response lost the original call.");}
+    else{const expected=nativeStringBytes(call[1]),actual=referenceLogFilterStringBytes(value.call_json);if(actual.length!==expected.length||actual.some((byte,index)=>byte!==expected[index]))throw new Error("The table attributes response belongs to another original call.");}
+    if(value.call_mode==="original"&&(value.case_id_key!==""||value.attribute_key!==""))throw new Error("The original table attributes response contains a friendly selector role.");
+  }else if(value.call_json!==null)throw new Error("The table attributes response contains an unrelated original call.");
   return {value,sourceFile,fields,raw:nativeResponseJson(value),responseBytes};
 }
-export function tableAttributesArtifactFile(run:TableAttributesRun,kind:"source"|"source_after"|"result"|"counts"):File {
-  const value=kind==="source"?run.value.source_table_json:kind==="source_after"?run.value.source_after_table_json:kind==="counts"?run.value.counts_table_json:run.value.filtered_table_json;
+export type TableAttributesArtifact="source"|"source_after"|"result"|"counts"|"call"|"controls_before"|"controls_after";
+export function tableAttributesArtifactFile(run:TableAttributesRun,kind:TableAttributesArtifact):File {
+  const value=kind==="source"?run.value.source_table_json:kind==="source_after"?run.value.source_after_table_json:kind==="counts"?run.value.counts_table_json:kind==="call"?run.value.call_json:kind==="controls_before"?run.value.controls_before_json:kind==="controls_after"?run.value.controls_after_json:run.value.filtered_table_json;
   if(value===null || (kind==="result" || kind==="counts") && (run.value.http_status!==200 || run.value.error!==null))throw new Error("The native attribute artifact is unavailable.");
   return new File([referenceLogFilterStringBytes(value)],`${kind}-${run.value.engine??"table"}-attributes.json`,{type:"application/json"});
 }

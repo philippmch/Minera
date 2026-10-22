@@ -6,6 +6,7 @@ import {defaultTableAttributesForm, isTableAttributesEnvelope, requestTableAttri
 const source = () => new File(['{"columns":[],"rows":[]}'], "complete-source.json", {lastModified: 1234});
 function envelope(patch: Partial<TableAttributesEnvelope> = {}): TableAttributesEnvelope {
   return {family: "TABLE_ATTRIBUTES_FILTER", engine: "polars", operation: "traces", http_status: 200,
+    call_mode:"friendly",call_json:null,controls_before_json:null,controls_after_json:null,controls_unchanged:null,
     phase: "complete", apply_returned: true, source: {rows: 12, columns: 9}, result: {rows: 5, columns: 9},
     source_unchanged: true, case_id_key: "case:concept:name", attribute_key: "concept:name",
     source_table_json: '{"full":"source\\u0000Ω"}', source_after_table_json: '{"full":"after"}',

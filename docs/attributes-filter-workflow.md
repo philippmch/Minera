@@ -41,13 +41,18 @@ are independent of the variant key. No cache is inferred from the source or
 from the key. Complete auxiliary snapshots and exact supplied JSON remain
 downloadable on success and errors.
 
-The strict 26-field response distinguishes the filtered attribute from the
+The strict 30-field response distinguishes the filtered attribute from the
 original activity role for reopening. Complete native results, XES, source,
 parameter/cache artifacts and raw response bytes can be downloaded. XES export
 errors retain the complete native result. Opening uses the actual exported XES
 and original activity role. When uploading generic XES with a custom activity
 attribute, select that literal reopening role explicitly; XES does not retain
 arbitrary native first-class role metadata.
+
+The original typed log mode accepts exact `call_json` with the complete native
+source File, ordered typed operands and parameter presence. Complete threshold
+cache artifacts retain actual count entries and trace handles. See
+[the log contract](log-attributes-filter-parity-contract.md) for this mode.
 
 ## Tables
 
@@ -59,6 +64,20 @@ represented as filtered source rows. Full source snapshots, table/count results
 and response bytes remain downloadable, including source state on errors. These
 artifacts can use the complete raw-byte EventTable carrier; reupload the actual
 exported JSON to preserve every cell type and stored field.
+
+For pandas, **Original typed call** accepts all eight retained public binding
+shapes with schema `minera-pandas-attributes-original-call-v1`. It submits only
+engine, operation, source File and exact call text. Five wrappers use ordered
+parameter entries or raw parameters; three direct helpers use ordered keyword
+entries. Timestamp operands preserve nanosecond or microsecond resolution and
+UTC metadata. The uniform 23-field table response adds original call identity
+and complete actual native controls before/after, including after errors.
+The editor preserves UTF8 imports and integer tokens, discards stale responses
+and imports, and downloads full controls and table artifacts. **Use filtered
+table as source** passes the complete result File to the next request. Polars
+continues to use friendly controls. See
+[the pandas contract](pandas-attributes-filter-parity-contract.md#original-typed-calls-in-the-table-workbench)
+for exact binding shapes, descriptor grammar and evidence limits.
 
 Literal string lists, explicit typed collections, exact numeric bounds, two
 whole-case stream conditions and supplied count dictionaries are supported.
