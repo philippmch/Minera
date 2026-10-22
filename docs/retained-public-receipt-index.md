@@ -70,6 +70,34 @@ block bounded certificates, including when the legacy row has no embedded
 receipt. Full original plans, digest-only plans and entered intents retain
 separate provenance; possible entry/outcome fields cannot be hidden as plans.
 
+The separate `polars-attributes-receipt-v1` adapter requires schema
+`minera-polars-attributes-observer-receipt-v1`. Its original receipt has exactly
+seven fields: module, function, input, category observables, ordered keywords,
+call shape and eager/lazy input kind. It is closed to the nine reviewed Polars
+attributes functions. Sharing the Polars LTL call-shape spelling does not select
+this schema. Required keyword omission and raw invalid controls remain original
+error recipes; the index neither inserts defaults nor rewrites values.
+
+Full snapshots retain tuple rows, dimensions, dtypes, date/datetime ISO,
+datetime fold/offset, float hex and typed dictionary order. Category snapshots
+retain unused Enum values and named local Categorical context, physical dtype,
+ordering and observation warnings. Unknown category contexts or packed types
+are gaps. Complete frame returns and typed count-map `result_value` outcomes are
+validated before plan/intent roles, alongside exact apply/collect errors, public
+pre-collection plans or plan errors, warning arrays and all four source/control
+mutation flags. Returned-input identity requires matching source-after frames
+and category snapshots. Typed NaN descriptors do not establish Python key object
+identity, and an index observation does not establish stable cutoff tie identity.
+
+The producer's module-free intents require exact index/function/case/hash fields;
+module identity is resolved only through a validated original receipt in the
+same pinned schema/runtime/reference partition. Full audit plans require an
+embedded receipt and a closed metadata field set. Optional indices must be
+positive integers and plan case names must be nonempty strings; case dictionaries
+are accepted only as complete captured actual or entered recipe metadata. Unknown entry evidence,
+before-only records and mixed terminals become blocking gaps; known entry
+evidence remains reserved. This family does not expand any archive manifest.
+
 JSON, JSONL, gzip JSON/JSONL and explicitly allowlisted archive members are
 supported. Recognized members carry either base64 or retained UTF-8 text plus
 exact size and SHA-256. Unlisted members are recorded without decoding and are
@@ -131,11 +159,24 @@ frames, 113 errors, zero source/argument mutations and zero warnings. Its frame
 snapshot count is 150 in the original generator's scope; that count alone does
 not prove native constructors or oracle mappings. The sorted receipt-set SHA-256
 is `4c833bf5516f0170a47ade0d1b1959054e2b7574fe9ea9914ee69c867a55cfdf`.
+Root's final 59-test integrity run and final hardened index accepted all 448
+canonical receipts, resolved all 448 exact intents, reported zero gaps and then
+rehashed eight sources for eight cache hits. The test module is
+`scripts.tests.test_retained_public_receipt_pandas_attributes`. Initial frame-kind,
+source-path join and unknown-full-plan-field failures remain preserved.
+
+Root has separately admitted three complete flat Polars attributes banks.
+Independent bounded census metadata reconstructs all 726 original receipts:
+697 LazyFrame and 29 DataFrame calls, 464 frame returns, 52 typed count-map
+returns, 126 apply errors, 84 collect errors and 308 warnings. Its sorted digest
+set uses UTF-8 newline-joined hashes without a trailing newline and has SHA-256
+`128750d0b843f19f8c16ed022ca5d2a0fe86c40a81a190f7c2dd529ec0cbd2bb`.
 The new test module is
-`scripts.tests.test_retained_public_receipt_pandas_attributes`; synthetic tests
-and a proposed full-bank index/cache runner remain separately reviewed
-acceptance steps. These admissions extend neither the committed LTL archive
-manifest nor historical completeness, catalogue status or reference-call authority.
+`scripts.tests.test_retained_public_receipt_polars_attributes`; synthetic integrity
+and the proposed full-bank index/cache runner require separate root acceptance.
+Nine bounded cutoff frames and unordered count-map keys retain their existing
+limitations. These admissions extend neither the committed LTL archive manifest
+nor historical completeness, catalogue status or reference-call authority.
 
 Twenty-five synthetic integrity tests and one committed-archive integration test
 pass. The integration test checks all original digest sets, canonical bytes,
