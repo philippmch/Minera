@@ -14,7 +14,110 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: files-object discovery and residual provenance — 2026-10-22
+## Current continuation: Polars input types reach API/UI — 2026-10-22
+
+`32391002` retains the verified own-evidence checkpoint in
+`docs/retained-public-observation-polars-input-kind-checkpoint.jsonl.gz`
+(258,912 bytes; SHA256
+`e234afc88156aa18693876f8bc2f9e1ab6f4f352be86a49df6041662aa626e4b`).
+Its validation sidecar is 180,214 bytes, SHA256
+`fa04f74461de121b886eefac5f27a00138d6bbfb91515921e9f75d6feb5d9324`.
+Root independently checked all 124 members against their current source bytes
+and exact UTF8 round trips. The checkpoint includes 73 frozen acceptance members
+and 288 external declarations; raw original receipts, diagnostics, generated
+public vectors and original archives remain external. Root final acceptance is
+53,196 bytes, SHA256
+`bf023c0002ed2a93c61d8b1cf8b07a7bc2b8b3af76eb403fb5412118f6efe90c`.
+This is retained engineering/provenance evidence, with zero reference calls and
+no new public admission or catalogue promotion.
+
+`d217372a` exposes the existing eager `DataFrame` and lazy `LazyFrame` Polars
+LTL overloads through `POST /api/reference-ltl-filter` and the relationship
+workspace. Optional `input_kind` accepts those exact public names for Polars
+only; omission preserves the lazy default. The fixed response envelope now has
+25 fields, including the validated effective input kind. The frontend rejects
+cross-kind responses and clears pending/stale results when the choice changes.
+Invalid, inactive and duplicate kind controls reject before source import.
+See `docs/ltl-filter-workflow.md` for the wire contract and user workflow.
+
+This is product reachability work from already admitted public evidence:
+**675 original Polars receipt hashes** and **16 exact eager/lazy pairs** were
+independently asserted (659 lazy / 16 eager; eager five returns / eleven apply
+errors). No new reference calls or admissions occurred. The ordinary eager
+eventual case returns sorted rows while lazy returns source order; eager NEXT
+retains its apply-time `AttributeError`, full source artifacts and no result.
+The complete native/UI supported domains remain bounded by the existing
+contracts; this is not an assertion that every raw-call shape is now exposed.
+
+Root acceptance is `build/parity-closures/ltl-polars-input-kind-acceptance-1/`.
+All **192 frontend files / 9,833 tests**, TypeScript and the production build
+pass. Final native build direct exec **ce49dc** and final CTest **99da16** are
+terminal0/drained. Three assertion-enabled suites pass: all **675 retained
+Polars cases** (516 complete frames / 159 full diagnostics), direct workbench
+workflows, and an owned HTTP route with strict multipart/control cases. No
+fresh full 297-log or 429-pandas native differential run is claimed here.
+Independent source/receipt review also passes **208 extracted frontend
+transport-condition checks**. Final combined review:
+`ltl-polars-input-kind-final-independent-review-1/review.json`, SHA256
+`e9cadf6b7fe50aab4d4ad9dec71555ba19d6ecc6cb74b172ab25d5ff5e0b123b`.
+
+The first native run exposed an existing execution-code-page bug: three narrow
+`\u03c0` literals became `?` in the captured diagnostic (3,103 actual versus
+3,106 expected bytes; first difference at byte 320). `882c6026` replaces only
+those literals with explicit UTF8 byte escapes. Predicate code and all original
+675 vectors remain byte-identical; no oracle was weakened. Failure/proof and
+before/after formatter sources are retained under `ltl-polars-diagnostic-utf8-fix-1/`.
+The first HTTP failure was sandbox loopback access; the same owned route passed
+outside that sandbox, as did final CTest. The earlier frontend EPERM attempt ran
+zero tests and remains preserved. Failed independent/static harness attempts
+and subsequent corrections are retained rather than rewritten.
+
+The **final rebuilt executable** passes actual rendered browser interaction,
+direct exec **f67f4c**, under `browser-owned-2/`. It covers public navigation,
+the lazy default/eager choice, complete six-row ordering and table context,
+source preservation, stale-result clearing, exact success downloads, and exact
+source/source-after/HTTP-response downloads after eager NEXT failure. Both the
+fresh owned listener and isolated Chrome process are confirmed closed with
+output drained; listener PID ownership is checked. Existing application
+processes were not replaced. Server binary: 16,896,000 bytes, SHA256
+`aad4e424088a557e574032848fba9d0a1ddff0b0532c9cd3e15a84cc3c91e141`.
+Root visually inspected the rendered workspace; the first and final browser
+runs are preserved separately. This supersedes the earlier workflow checkpoint's
+unverified rendered-browser status for this bounded flow.
+
+Parallel provenance work remains separate from new-call authority. The G57 DFG
+native container now has an exact opaque compressed-to-uncompressed hash link
+(one archive opened and gzip bytes fed only to SHA/count; no JSON/member decode).
+Four further heuristic singleton own producers were reviewed: aggregation,
+business-hours, DFG values and local labels. Their compressed mappings remain
+unverified; business-hours has an unresolved producer-pipeline link, and
+arithmetic/nonfinite auxiliary scopes remain unresolved. Exact-CRLF evidence
+validation failed first, then passed in preserved `corrected-1/` output. Five
+of the prior 60 singleton producer definitions are now reviewed; **55 producer
+definitions remain unreviewed**. G60 received a bounded review, but its OCDFG
+receipts-wrapper producer is unresolved. Its separately identified raw capture
+has a prior declared 77-call scope and is only a future schema-review candidate,
+not a newly verified row count, complete canonical receipt set or new admission.
+
+The next product slice is proposed read-only in
+`admitted-ltl-next-product-slice-review-1/report.json`, SHA256
+`1cf0050ea75e8f6e933fceea454a321897c4dcffe1b7da1bba1a770f0d7eb104`.
+It asserts all **1,104 admitted pandas/Polars receipt hashes** and identifies
+missing-operand, raw parameter-value, enum-key and non-boolean-control behavior
+which friendly UI controls cannot currently express. Implement an exclusive
+original typed-call mode using the existing native generic carrier, preserving
+the friendly default. No implementation or new calls for that next slice have
+started. Existing EventLog `OriginalLtlFilter` controls do not supply the table
+companions' original public raw-call surface.
+
+Full scope stays **86 packages / 387 modules**, **46 packages / 226 modules
+complete**, and **201 strict open units**. The six prepared banks remain
+**565 unentered logical queries**. No catalogue row, complete historical audit,
+absence proof or new-family entry certificate follows. Continue full relevant
+history/receipt reconstruction and whole-bank dedup before new reference calls;
+never restart the terminal 2,844-source discovery or replay retained calls.
+
+## Previous checkpoint: files-object discovery and residual provenance — 2026-10-22
 
 `ed4dfdbe` adds two discovery-only files-object profiles for exactly seven
 reviewed own producers. Accepted parser SHA256:
