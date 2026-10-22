@@ -14,7 +14,86 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: retained receipts and next filtering family
+## Current continuation: streaming history inventory — 2026-10-22
+
+Clean checkpoints: `f9b514c8` adds the streaming inventory and 32 tests;
+`eca91620` preserves the zero-call Polars preparation; `56b8785d` retains real
+archive acceptance; `7aa63579` preserves full opaque history bindings and
+discovery inputs. Read `docs/retained-public-observation-inventory.md`.
+
+All **58 receipt-tool tests** pass, including the original full-receipt archive
+integration. The final streaming parser SHA256 is
+`db75974c2c3166d0a8d7303997b11654e8d7dc123b0ec30e1ebd59154c2b1d55`.
+Root verified all **1,401** actual LTL record identities against the independently
+reconstructed original digest sets; a fresh-hash cache replay preserves them.
+Metadata discovery of the 2,080,870,160-decoded-byte legacy archive finds all
+5,870 members with zero gaps. Five other bounded archives expose 8,991 members
+and retain three intentional pending-admission gaps. The initial unknown legacy
+format, every frozen parser, and a cache-reporting defect/fix remain preserved.
+Evidence: `docs/retained-public-observation-inventory-checks.jsonl.gz`,
+77 members / 2,330,097 bytes, SHA256
+`99c8906d11ebf7ee434ac8571d5c8f63cfc444b1db6e93227be22c2186239ac5`.
+The sidecar distinguishes structural classification from full receipt validation.
+
+The old LTL search was not a complete inventory for the next family. Root has
+now enumerated **507,319** candidate files below `build`/`docs` and opaque-hashed
+all **79,597,719,131 bytes**, with no read failures or changed/stale metadata
+bindings. There are 96,890 distinct content hashes. Exact directory exclusions
+and provisional provenance dispositions remain reviewable. The complete binding
+stream is `docs/retained-history-content-bindings.jsonl.gz`, 15,670,816 bytes,
+SHA256 `06969136b599b3692f910492eab6142425f495c6340ee1b978df448a05dda1c0`.
+This is current-read metadata, never provenance, original creation identity or
+absence of historical calls. New files require a later delta inventory.
+
+The inventory/mapping capsule is
+`docs/retained-history-inventory-preparation.json.gz`, 31 members / 1,085,755
+bytes, SHA256 `0ce2f6ca9fdae6c2a1737aab06fef7f4299ba3587ba69456675807817177f06a`.
+Its sidecar records the executed hash helper's limited symlink check, exact
+exclusions, metadata-only chunk semantics and remaining provenance gap. One own
+compressed copy was resolved by exact historical Git-blob equality. The Polars
+pre-EOF-repair copy remains unresolved; a shared compressed prefix is insufficient.
+
+**A coordinated metadata-only scan is running. Do not restart it.** Root exec
+session **5107** scans the **2,844** distinct own compressed contents using:
+`build/parity-closures/grouping-history-archive-discovery-final-2/manifest.json`
+(981,981 bytes, SHA256
+`05ef77cd8c8fd03bba4202ebf724cc8752b5311b47bf831895df08f1cf2fca20`).
+Output `events.jsonl`, `report.json`, cache and `run-first.log` share that folder.
+Poll/drain the existing handle; report existence alone does not prove terminal
+completion. No payload is admitted. Offset/full-member and indexed/chunk-hash
+formats stay distinct, opaque and incomplete. Unknown UTF8/report envelopes and
+all possible-entry contexts retain explicit gaps. After terminal completion,
+root may run the prepared metadata-only full-member/flat-copy projection helper
+in `grouping-history-audit-prepared-1/`; it must not open/admit matched content.
+Then review provenance, resolve relevant schemas/chunks, reconstruct complete
+original public receipts and deduplicate before any new algorithm bank.
+
+The Polars activity-split bank is now independently verified **prepare-only**:
+79 distinct full receipts, zero target/source-collect/result-collect calls,
+`prior_barrier_validated=false`, and no entry certificate. Output:
+`build/filtering-activity-split-polars-public-preentry-1/`; ordered receipt-list
+SHA256 `8ebf001d4371e7ccc5eb003043709d01fef0c6af25e8c124c51370b6f6a7739b`.
+Capsule `docs/filtering-grouping-polars-preparation.json.gz`, 27 members /
+54,009 bytes, SHA256
+`3217251d4f9fb6bdb94fd0574f0866a5b4fb845bae82e9226d92b409318bdc97`.
+All original canonical hashes, member bytes and source bindings pass. Default
+entry refuses before imports/output. The earlier failed refusal-reader assertion
+is preserved. Existing ActivitySplit recipes use assertions: invoke without
+Python optimization, and harden/review their gates before any actual certificate.
+
+Pandas case-grouping observer/candidates are under
+`build/parity-closures/case-grouping-pandas-prepared-1/` (97 consecutive,
+123 timestamp candidates). They are not executed. Independent review found
+optimization and incomplete nested-receipt gate gaps; preserve initial drafts
+and review receipts, finish corrections and a fresh per-call equality guard,
+then review again before root prepare-only materialization.
+
+No new reference algorithm was entered, product/frontend code was unchanged,
+and no parity status was promoted. The committed structural verifier still
+reports **46/86 packages and 226/387 modules complete; 201 strict open units**.
+Inherited coverage/parity edits remain untouched (31/1 and 1/1 numstat).
+
+## Earlier checkpoint: retained receipts and next filtering family
 
 The reusable offline receipt index is checkpointed in `1eb692e7`; committed LTL
 archive acceptance and evidence are in `5757778e`. Read
