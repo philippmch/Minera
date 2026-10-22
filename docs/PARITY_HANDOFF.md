@@ -14,7 +14,151 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: all 280 original LOG attributes calls reach API/UI — 2026-10-22
+## Current continuation: all 448 original pandas attributes calls reach API/UI — 2026-10-22
+
+`d3200365` retains the checkpoint in
+`docs/retained-public-observation-pandas-attributes-original-call-checkpoint.jsonl.gz`
+(718,922 bytes; SHA256
+`f58e290565aa5c3d60139b4e30fc9e365fc71153ae4e7be2608250e6921c9665`).
+Its adjacent `.validation.json` sidecar declares 167 own text members and 118 external
+bindings. Root independently decoded this newly created own capsule, checked every
+member against current bytes and verified exact UTF8 round trips (`fa8b61`). Original
+records/archives, native oracle, generated vector, scalar before-proof, binaries,
+SQLite index, raw browser responses/downloads and screenshots remain external.
+Root facts are `build/parity-closures/pandas-attributes-original-call-finalization-1/root-facts.json`
+(74,017 bytes; SHA256 `46f0c52f4aefdf1503375f961611600a552057b08dc892f889dc46f20cacd554`).
+The packager's exact external declarations are guards, not new payload admission.
+
+Six focused source commits implement this checkpoint: `e25277bc` adds the closed
+pandas attributes receipt adapter; `666cfdb1` adds original backend calls and actual
+controls; `4bb9e472` fixes independently found unreviewed plan-entry evidence;
+`eb810180` adds the original-call editor, exact imports/artifacts and contracts;
+`0f234fd9` matches original native decimal carriers; `3c644740` adds complete
+448-case native/direct/HTTP acceptance. The six descend from `cc658907`. All fifteen
+own source paths match committed bytes modulo CRLF/LF; the generated vector is an
+external payload binding. The inherited two tracked coverage edits remain unstaged.
+
+Root reviewed own producers and provenance, freshly verified exact whole-file pins
+and explicitly admitted only the two full record banks (429 + 19) and immutable own
+native oracle. No producer or original generator was executed; no original archive
+was opened. The complete census retains all eight methods: 448 distinct receipts,
+335 full returned tables / 113 full type-and-message errors / 150 native snapshots,
+zero warnings and zero source/control mutations. Sorted canonical receipt SHA256:
+`4c833bf5516f0170a47ade0d1b1959054e2b7574fe9ea9914ee69c867a55cfdf`.
+The canonical descriptor preserves original module/method/input_before/args_before/
+kwargs_before/call_shape fields. All 150 full native constructors and 448 original
+case bodies were independently mapped, with only CRLF/LF normalization; 31,628 typed
+nodes were checked. All observed frames are `pandas.DataFrame`, string columns and
+unnamed column axes; named/multilevel column fidelity is unclaimed.
+
+The final index (`pandas-attributes-admitted-index-acceptance-3/validation.json`)
+resolves all 448 original intents, full plans and digest plans, with zero gaps and
+eight rehashed cache hits. Independent review PAI1 found that unknown after-call
+plan fields could incorrectly produce a planned-only/no-prior classification.
+The family-specific whitelist now blocks that evidence. All 59 integrity tests and
+four end-to-end synthetic blocking counterexamples pass; prior four families stay
+unchanged. First failed index/path and prior successful generations remain preserved.
+
+`call_json` selects `minera-pandas-attributes-original-call-v1` on
+`POST /api/reference-table-attributes`, requiring `engine=pandas`, operation, complete
+native EventTable source File and four exclusive request fields. The descriptor keeps
+ordered typed args, five wrappers' omitted/raw/ordered enum-or-string parameter
+entries and three helpers' ordered direct keyword entries. It retains 321 parameter
+dictionaries, fifteen raw controls, five omissions and 107 direct calls. Ten enum/
+string collisions preserve method-specific precedence and order; five omitted/null
+invocation pairs remain distinct. Threshold dictionaries carry genuine typed keys/
+counts. Eight Timestamp controls retain six ns/UTC and two us/UTC values through the
+private recursive codec. The fixed 23-field envelope includes exact call bytes and
+full actual native controls before/after, including union tags and ordered boundaries.
+It does not substitute raw call echo for parsed native controls. Complete source and
+result artifacts preserve rows, dtypes, index, categories and attributes. Original
+error.args, Python returned-input identity/alias graphs, arbitrary objects/timezones,
+unobserved units and nested frame controls remain outside this transport claim.
+
+Native header, predicate, original oracle and shared LOG/LTL codecs remain unchanged.
+The oracle is 2,893,157 bytes, SHA256
+`cfa46259d2340bbf09af27045a53e8e472834aa7e3c541e503b275538225a582`.
+The first fixture compile exposed only a row-storage support-line mismatch; its
+correction preserves all 448 case/driver suffix bytes. The first full native attempt
+passed six unchanged regressions and all 335/113 native outcomes, then failed on the
+new transport's decimal display carrier (`-0.0`/`1.0` versus original constructor
+`-0.000000`/`1.000000`). The private parser now uses the same native constructor
+formatting, preserving double bits and raw call bytes. New signed-zero, fraction,
+recursive parameter/count and whole-control checks pass. The expected vector is
+unchanged by this correction (743,481 bytes; SHA256
+`3b7e2a9f4202ba7c3c4ad650dd00fd3667150737f702c9cdf4372c6716c1c8da`).
+
+Final native terminal `650484` is zero/drained: all four affected targets pass in
+200.47 seconds, including the full public target in 198.24 seconds. All 448 original
+native cases verify full native results/diagnostics and source state. Separately,
+all 448 direct calls and all 448 owned HTTP calls compare full results, type/message
+errors, source-after, actual controls, exact call bytes, reopen behavior and the exact
+23-key envelope. The wrapper never invokes its renamed original main.
+The earlier seven-target attempt remains exit 1: six unchanged pandas/Polars/LOG/LTL
+regressions passed before the private scalar correction; they were not rerun afterward.
+Do not describe that mixed attempt as seven passing tests. All 194 frontend files /
+9,871 tests pass (`cc5146`), as do 32 focused tests, final TypeScript and Vite build
+(`b28f85`). Catalogue checks against a copied committed manifest retain 86/387 and
+46/226 (`aed9bc`); never run `scripts/verify-reference-parity.mjs`.
+
+Final rendered browser terminal `2e9dd4` is zero/drained: 19 checks, 16 completed
+attributes HTTP outcomes plus one held actual response, and seven byte-exact
+downloads. It covers all eight methods, enum collisions, Timestamp native metadata,
+typed counts, raw diagnostics, exact UTF8/CRLF/large-integer imports, actual-response
+cancellation, deferred File import cancellation, full artifacts even on error and
+actual filtered File reuse in a subsequent native request. Browser examples compare
+row counts/type/phase and native controls; the complete expected result/error equality
+comes from the 448-case fixture. File identity/bytes passed to fetch and next actual
+response are checked; raw encoded multipart body inspection is unclaimed. The final
+server SHA256 is `c72855d30d32d2769ebe0b11bc56b1f2bca7f244ab226b76c0a1c4b856448276`.
+Listener ownership was verified; both new owned processes stopped with stdio drained.
+Root viewed success/error screenshots. Browser1's temporal substring assumption failed
+on valid raw carriers; browser2 fixed only the assertions; browser3 passed those same
+assertions on the final server. All attempts remain preserved.
+
+Independent backend, frontend, receipt index, full fixture mapping, scalar correction
+and packager reviews retain their distinct scopes. Packager revision 4 review is
+`pandas-attributes-original-call-packager-independent-review-1/revision-4-review.json`,
+SHA256 `0f16a4e74935b172217a6686f847ee102767cd938df9d1d9770486043e02a944`.
+A static root-facts AST parsing error was corrected before execution; the first draft
+is preserved. Other preserved attempts include the initial census frame-kind mismatch,
+mapper line endings, metadata serialization, sandbox Vitest EPERM before tests and
+the initial receipt-test command typo. Historical EXE/MAP differences are not erased
+by matching native source/object pins; current acceptance uses a fresh product build.
+
+Full scope remains 86 packages / 387 modules, 46 complete packages / 226 complete
+modules, **201 strict open units and 565 unentered logical grouping queries across
+six banks**. This checkpoint grants no catalogue promotion, new/replayed reference
+calls, full-history completeness, absence authority, root-entry certificate or full
+parity. The broad goal remains active.
+
+Next full candidate is the **726-call Polars attributes bank (700 + 18 + 8)**.
+Own metadata-only plan:
+`build/parity-closures/pandas-attributes-next-polars-metadata-plan-1/report.json`,
+SHA256 `05671209ca8b19925b49c11c20f5e5fb055ac304c031c15276ad89a78e491dd6`.
+Its five literal own metadata/source members are retained in this capsule. Declarations
+cover 464 frames (455 exact + nine existing bounded cutoff predicates), 52 typed count
+maps, 210 errors (126 apply / 84 collect), 1,102 native frame constructors, 308 warning
+observations and 81 category snapshots. These are prior declarations, not a fresh
+canonical census. No candidate original record, oracle or archive was opened/hashed
+by the metadata plan, and it grants no admission. Preserve all nine bounded cases
+without claiming exact tie identities, and preserve unordered map scope.
+
+Root next reviews own producer/schema/provenance and freshly verifies/admit exact
+flat declarations in that plan's `source-declarations.json`, including all three
+whole records and immutable native vectors/driver; intents/dedup payloads need their
+own explicit admission. Reconstruct all 726 canonical identities and complete native
+mapping before freezing transport. This producer uses source-positional/options-
+keyword calls, explicit DataFrame versus LazyFrame and original category observables,
+unlike the pandas positional descriptor. Current friendly Polars always builds a
+LazyFrame; original eager/lazy identity, typed kwargs/omissions, count unions and
+apply/collect diagnostics need explicit transport. Do not narrow the bank, rerun own
+capture/generators, inspect reference internals or use broad archive scans. Root alone
+executes targets/generators/builds/tests/Git; workers perform bounded static source/
+metadata work under separate assignments. Continue with parallel workers and clean
+logical commits/pushes while retaining inherited dirt.
+
+## Previous checkpoint: all 280 original LOG attributes calls reach API/UI — 2026-10-22
 
 `e581af39` retains the checkpoint in `docs/retained-public-observation-log-attributes-original-call-checkpoint.jsonl.gz`
 (321,141 bytes; SHA256 `e95b0c8700f30461fdb040796ec1590e78b18c6fe156e9bcff115692372adf37`). Its validation sidecar is
