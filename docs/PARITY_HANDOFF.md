@@ -53,26 +53,55 @@ exclusions, metadata-only chunk semantics and remaining provenance gap. One own
 compressed copy was resolved by exact historical Git-blob equality. The Polars
 pre-EOF-repair copy remains unresolved; a shared compressed prefix is insufficient.
 
-**A coordinated metadata-only scan is running. Do not restart it.** Root exec
-session **5107** scans the **2,844** distinct own compressed contents using:
+**The coordinated metadata-only scan is terminal0/drained. Do not restart it.**
+Root exec session **5107** finished all **2,844** selected own compressed contents:
 `build/parity-closures/grouping-history-archive-discovery-final-2/manifest.json`
 (981,981 bytes, SHA256
 `05ef77cd8c8fd03bba4202ebf724cc8752b5311b47bf831895df08f1cf2fca20`).
-Output `events.jsonl`, `report.json`, cache and `run-first.log` share that folder.
-Poll/drain the existing handle; report existence alone does not prove terminal
-completion. No payload is admitted. Offset/full-member and indexed/chunk-hash
-formats stay distinct, opaque and incomplete. Unknown UTF8/report envelopes and
-all possible-entry contexts retain explicit gaps. After terminal completion,
-root may run the prepared metadata-only full-member/flat-copy projection helper
-in `grouping-history-audit-prepared-1/`; it must not open/admit matched content.
-Its corrected helper SHA256 is
+Its finalized **645,283** metadata events include **123,763 members** and
+**490,419 chunks**, with **30,814 explicit gaps**. No payload was decoded/admitted.
+The original 370,502,511-byte event stream SHA256 is
+`4fea0b765f5a83825d86b1c26bd38ce7c844199b0bbcfabda832ccd7cfa4b42e`.
+It is preserved exactly in `docs/retained-history-archive-discovery-events.jsonl.gz`,
+24,135,968 bytes, SHA256
+`0e3e637eda6fc29d22232c556034f2cf53a86a4b990b330f91b6a4f274e9dbb9`.
+Root issued `terminal-receipt.json` only after the actual handle finished.
+
+The full-member/flat-copy metadata projection also finished terminal0/drained
+(root session **32464**), under `grouping-member-projection-root-1/`.
+It preserves 614,182 member/chunk provenance edges, 172,697 declared identity
+keys and **34,997 candidate JSON/JSONL content hashes / 223,533 flat paths**.
+Every alternative remains queryable; no matched payload was opened or admitted.
+All eleven independent SQL invariants and seven synthetic integrity tests pass.
+The 879,497,216-byte regenerable SQLite output SHA256 is
+`54872a06b90ed21541ddb9773f02edb3355c1847b62410dfce18586cb087638c`.
+Its helper in `grouping-history-audit-prepared-1/` has SHA256
 `17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5`;
-seven synthetic integrity tests pass. It now requires `--terminal-receipt` with
+it requires `--terminal-receipt` with
 schema `minera-retained-public-inventory-terminal-binding-v1`, terminal/drained/
 finalized flags, exact zero exit code/session ID, and report/events/manifest
-size/SHA bindings. Root must issue that receipt only after draining session 5107.
-Then review provenance, resolve relevant schemas/chunks, reconstruct complete
-original public receipts and deduplicate before any new algorithm bank.
+size/SHA bindings.
+
+A separate bounded eight-source correction finished terminal0/drained
+(root session **15285**). Existing legacy member mapping recovered **17,084**
+names, independently checked against the original source/ordinal/full-SHA edges;
+all original sizes remain unknown and all payloads opaque. Eight version-2
+manifest headers remain gaps. The first wide report was not overwritten.
+Output: `grouping-history-legacy-discovery-correction-1/`.
+
+Completed scan/projection/correction proof:
+`docs/retained-history-archive-discovery-checks.json.gz`, 37 exact-byte members /
+2,776,071 bytes, SHA256
+`b223f318d3e3bd072ba82e616aad73e39480e09918c45c968e7b51c5e9313b76`.
+The sidecar retains all incomplete/admission flags. **Historical audit is still
+incomplete.** Next resolve the 31 UTF8 name/text envelopes (12,313 unrecognized
+member names in the baseline), byte_count/base64 variants, key/report wrappers,
+untrusted headers, unsafe/duplicate paths and direct public-record schemas.
+Own producer reports and the exact metadata gap summary are retained. Establish
+public provenance and freshly verify complete member bytes before any flat copy
+replaces reassembly. Finish the relevant flat audit too: the projection does not
+cover unmatched flat files. Only after complete original receipt reconstruction
+and whole-bank dedup may root issue a new-family entry certificate.
 
 The Polars activity-split bank is now independently verified **prepare-only**:
 79 distinct full receipts, zero target/source-collect/result-collect calls,
@@ -103,9 +132,24 @@ test remain preserved. Capsule:
 155,223 bytes, SHA256
 `33f4d710ab4d25b1b78ab60f19a153f480a9b1302d5d40a3b684f502930a401d`.
 Its sidecar records the two ordered hashes. Root additionally verified every
-capsule member and all 67 current source bindings. A separate Polars grouping
-observer is being prepared offline under `case-grouping-polars-prepared-1/`;
-do not execute it before root and independent review.
+capsule member and all 67 current source bindings.
+
+The two Polars grouping banks are likewise root-materialized **prepare-only**:
+92 consecutive and 113 timestamp full receipts under
+`build/filtering-case-grouping-polars-{consecutive,timestamp}-public-preentry-1/`.
+All **205** original hashes, strict schemas, ordered sets and source bindings
+pass independent and root checks. Source/result/preentry collect counters and
+target calls are zero; no certificate exists. Observer SHA256:
+`2d495dc82a135cde7d2c5c5b1c8694aa0ec6714a084062be1777b7346a1d9d21`.
+Thirty extracted guard checks plus four synthetic apply/collect/plan phase
+checks pass. Failed own verifier/harness attempts remain preserved.
+Capsule `docs/filtering-polars-case-grouping-preparation.json.gz`, 80 members /
+119,294 bytes, SHA256
+`36b41c9f5c1e5c33f3c858466d3d4b405dd9fb8c6bd77026931ee3f04f426511`.
+Root verified every member and all 80 current source bindings. All six table
+modules now have **565 prepared receipts** total (61/79 activity-split and
+220/205 grouping), with every historical barrier still false. All workers,
+reference algorithms and owned tools are idle; no live scan handles remain.
 
 No new reference algorithm was entered, product/frontend code was unchanged,
 and no parity status was promoted. The committed structural verifier still
