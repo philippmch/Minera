@@ -1,0 +1,254 @@
+{
+  "schema": "minera-retained-history-metadata-provenance-checkpoint-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/retained-history-metadata-provenance-checkpoint.jsonl.gz",
+    "bytes": 332513,
+    "sha256": "5b04b36c6b26effc5defd71de87df46160f7c33f9264fbfdd760093b9f94cb6a",
+    "members": 38
+  },
+  "member_utf8_bytes_hashes_round_trip_verified": true,
+  "total_member_bytes": 5978153,
+  "uncompressed_sha256": "10f25b219a8b7245f5a93e54a6f61363d3f6da2733bb33f3a8b7566eae707642",
+  "inventory_sha256": "e1ee8195ce8bb553c5bcdeb0d130ebfa962c253baf8262d2f2b41376883d111a",
+  "all_embedded_source_bindings_revalidated": true,
+  "external_metadata_bindings": [
+    {
+      "path": "build/parity-closures/grouping-member-projection-root-1/declared-full-member-candidates.sqlite",
+      "bytes": 879497216,
+      "sha256": "54872a06b90ed21541ddb9773f02edb3355c1847b62410dfce18586cb087638c",
+      "embedded": false,
+      "role": "read-only-baseline-database"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-content-inventory-1/bindings.sqlite",
+      "bytes": 234065920,
+      "sha256": "06407901a4dea497f23b78cee48eef7c087c796a347bfb2d7c3f94813abff806",
+      "embedded": false,
+      "role": "read-only-baseline-database"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/candidate-provenance-edges.jsonl",
+      "bytes": 93267847,
+      "sha256": "42be64fc92a1b1fe3e5b72a6b60ba7c393ba9d6d58b2e5e3faa209c29b6faae2",
+      "embedded": false,
+      "role": "regenerable-large-metadata-export"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/candidate-flat-matches.jsonl",
+      "bytes": 144502887,
+      "sha256": "270ddba89a2a5a2e427743d865928bc91cfaa8cfb4ea2e02b0c54af2e50567fc",
+      "embedded": false,
+      "role": "regenerable-large-metadata-export"
+    }
+  ],
+  "all_external_hashes_bytes_revalidated": true,
+  "metadata_only": true,
+  "matched_payload_files_opened": 0,
+  "original_archive_files_opened": 0,
+  "public_observation_payloads_opened": 0,
+  "original_archive_payload_decodes": 0,
+  "reference_imports": 0,
+  "reference_algorithm_calls": 0,
+  "public_payload_admission_granted": false,
+  "historical_audit_complete": false,
+  "actual_call_absence_established": false,
+  "algorithm_entry_authority": false,
+  "source_bindings": [
+    {
+      "path": "build/document-simplicity-structure.py",
+      "bytes": 7442,
+      "sha256": "93297c224836a71986ffaff857b228e53497ab1c88d28087883db647fb457244"
+    },
+    {
+      "path": "build/implement-case-grouping.py",
+      "bytes": 3342,
+      "sha256": "b3a02f59cb3127f196387134d4d1fd7b47c38bc258b96157d3630c6ce5578e95"
+    },
+    {
+      "path": "build/package-ocel-activity-type-matching-evidence.py",
+      "bytes": 7123,
+      "sha256": "65e8ed56be0eef8bb055b2b5759cef3b16fe07f991df244a2b5046cc217d4851"
+    },
+    {
+      "path": "build/package-pandas-attributes-evidence.py",
+      "bytes": 15056,
+      "sha256": "7241f5711a3741823ec983a86cfc18d330eaa30c44b91f5cc3c09fc11d5f995b"
+    },
+    {
+      "path": "build/parity-closures/activity-split-next-review/capture-pandas-public.py",
+      "bytes": 23240,
+      "sha256": "b41f0cf80301d47dc3628587db8614c3873b5abfe165180694d0e65f75720d33"
+    },
+    {
+      "path": "build/parity-closures/activity-split-polars-next-review/capture-polars-public.py",
+      "bytes": 23081,
+      "sha256": "fc9c9847f08534f94a9afa955cda37aa1d96628b0d13c5fa9ecef0d573906c34"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/capture-public.py",
+      "bytes": 30715,
+      "sha256": "84050d49e9dd85db1ede3a6ba3840fffa55dc355ba06773375ea243d53d9d3cf"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-polars-prepared-1/capture-public.py",
+      "bytes": 31610,
+      "sha256": "2d495dc82a135cde7d2c5c5b1c8694aa0ec6714a084062be1777b7346a1d9d21"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-schema-review-2/duplicate-path-dispositions.json",
+      "bytes": 7857,
+      "sha256": "c1335ef2a8ada79789cb8d201798027fe3ce853e4c245c620602db941d510cb7"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-schema-review-2/name-data-base64-four-field-schema.json",
+      "bytes": 9562,
+      "sha256": "7838dca3aaa3b0eb18676ce476a2126d1a04ab7c1a9ee9f3814d5af320bfef08"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-schema-review-2/summary.json",
+      "bytes": 2280,
+      "sha256": "a0f9a442fb23938ae13327b2faa5cdcc99e23ee8283d0dc51eea92391448e1b7"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-schema-review-2/windows-member-path-dispositions.json",
+      "bytes": 73494,
+      "sha256": "b4254cb7b4a424e76945d83aac5b3761299b52f9b133fe010cd7d79c002c4c23"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/candidate-identities.jsonl",
+      "bytes": 109193,
+      "sha256": "360a22243896f893759305b29cdcbcdd3737dbf59a2840d3a4ed3c42a3c84760"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/catalogue-integrity-validation.json",
+      "bytes": 1327,
+      "sha256": "5cf286f29c702cad486b02a1e28e02cdeaf3ae5d6c77b5ecb001670cf9fb3e7d"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/catalogue-metadata.py",
+      "bytes": 7239,
+      "sha256": "2b34a04ab43b52696e8a50e56794d9d69e4370de53a93df369ffee5604e14765"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/filename-catalogue-summary.json",
+      "bytes": 3578,
+      "sha256": "8ccd3eb3116218533b55b4f6bff36caf010757f92ee84b87980d88275680b32c"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/filename-source-class-priorities.jsonl",
+      "bytes": 1749035,
+      "sha256": "b88e34522d99b51762dec617ddae17271eaa4e5d1c5c7349ff5f74152146f86f"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/freeze-own-source-classification.py",
+      "bytes": 7513,
+      "sha256": "3a5070f42be6b04c74c29bde44914ff72aeffb08c271f5a6f9da827ec9bc1a2a"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/inspect-schema.py",
+      "bytes": 1092,
+      "sha256": "95408cd3fcbff382e09345ed2123887f29e0ce9c6ef05c05ba9b77b96948a3bf"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/metadata-quickview.json",
+      "bytes": 6063,
+      "sha256": "146f989432fcfed55749e810d11c3f598ce93f8d6f2d5649696f86982441c366"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/metadata-quickview.py",
+      "bytes": 938,
+      "sha256": "9102d3216721855c17410f4c74a4dbc2ddd14f6f19b8d7eca7a1f6e905117f5a"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/metadata-schemas.json",
+      "bytes": 7884,
+      "sha256": "60de64b92ee6a3e859569870996b1970fab5bfcee3ea1adc7abc9de64bf78097"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/own-source-classification-freeze.json",
+      "bytes": 55187,
+      "sha256": "3d32b3cdb12a8d56ab375e9f5aaac8ad249e7471a42851b5b6e3532cd7e1c7a3"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/priority-flat-binding-paths.jsonl",
+      "bytes": 2665455,
+      "sha256": "07a23a2faaa5fb9660cfe6cc9565b07969ef09ed846fadac894e6d5f9e9b58c8"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/schema-inspection-first-failure.json",
+      "bytes": 257,
+      "sha256": "fc07ef30fff5e4815c488ec680bfd29b61f88158e925b1bf905fb5fdf10349cd"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/unmatched-priority-flat-binding-paths.jsonl",
+      "bytes": 1052299,
+      "sha256": "5201c163649b0c7a281f7aa5ddc3dca5c941bee94ec41a793711017e66f3cfee"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-target-provenance-2/validate-catalogue.py",
+      "bytes": 3851,
+      "sha256": "2368135d7eecdea2944581dbcb7a80259f6f8a88653ccce43da2c86094918766"
+    },
+    {
+      "path": "build/parity-closures/grouping-public-surface-prepared-1/observe-public-surface.py",
+      "bytes": 3512,
+      "sha256": "c4dcf097890e40e6f15a329bc3637d833108e2f5385bbf448a783ae2e521f047"
+    },
+    {
+      "path": "build/parity-closures/package-retained-history-metadata-provenance-checkpoint.py",
+      "bytes": 9683,
+      "sha256": "f830a97c876305dfbc7b7f82f14215ca144d8670bfe49a8e35dfa2dd5c33da3d"
+    },
+    {
+      "path": "build/prepare-simplicity-structure-evidence-retry.py",
+      "bytes": 1464,
+      "sha256": "6fecaac303cd743be65d5490617c5dcfb723d348d3d0afded8027b71d78f9543"
+    },
+    {
+      "path": "build/record-case-grouping.py",
+      "bytes": 5175,
+      "sha256": "962955747857f4bb2b96133c06e53d76e093a7811557c9efa2eeb52af95618e7"
+    },
+    {
+      "path": "build/save-heuristic-classic-object-supplement-reference.py",
+      "bytes": 3575,
+      "sha256": "4019ac9967896c5188a9e9da17bf9d4359247ba0dd118442f249c8aab853a9b5"
+    },
+    {
+      "path": "build/save-simplicity-structure-evidence-retry.py",
+      "bytes": 13985,
+      "sha256": "ca2c6a0cfff02435fe1ad51f7de23a516b8803bd1b7900b453ed4565491b5682"
+    },
+    {
+      "path": "build/save-simplicity-structure-evidence.py",
+      "bytes": 13719,
+      "sha256": "2a10cf6fb2f51e2f3e5b7568a7417ba1d93bab12cef49b17efff5a030ef098d6"
+    },
+    {
+      "path": "scripts/capture-container-case-grouping-reference.py",
+      "bytes": 3578,
+      "sha256": "472ac4d685c2d2f5446c60962520840cbe3fc8f49a3bd5a5f8337f04251d9d89"
+    },
+    {
+      "path": "scripts/capture-conversion-case-grouping-reference.py",
+      "bytes": 4774,
+      "sha256": "f4d48e06f664c7c1d1b3bd5e2e757cf09cdcf8a058aea934db2689d4c13a9df1"
+    },
+    {
+      "path": "scripts/capture-token-replay-dataframe-grouping-reference.py",
+      "bytes": 5809,
+      "sha256": "fedede2623de4115577a955af88973914c9983eece2f18c25bf311d28825c90e"
+    },
+    {
+      "path": "src/backend/case_grouping.cpp",
+      "bytes": 7166,
+      "sha256": "63bbeb53783be6e1564584bab27c74906ee033c8b423246cb28320b97290d12b"
+    }
+  ],
+  "helper": {
+    "path": "build/parity-closures/package-retained-history-metadata-provenance-checkpoint.py",
+    "bytes": 9683,
+    "sha256": "f830a97c876305dfbc7b7f82f14215ca144d8670bfe49a8e35dfa2dd5c33da3d"
+  }
+}
