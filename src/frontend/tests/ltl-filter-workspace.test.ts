@@ -33,11 +33,13 @@ it("offers eager and lazy Polars inputs and reports the effective type on errors
  expect(inspection).toContain("Polars input type: DataFrame.");expect(inspection).not.toContain("Download complete filtered result");
 });
 
-it("keeps friendly controls as the default and exposes original mode only for Polars",()=>{
+it("keeps friendly controls as the default and exposes original mode only for table engines",()=>{
  const polars=display(createElement(LtlFilterWorkspace,{engine:"polars"}));
  expect(polars).toContain("Polars call mode");expect(polars).toContain('<option value="friendly" selected="">');
  expect(polars).toContain("Ordered activities as JSON");expect(polars).not.toContain("Original operand presence");
  for(const engine of ["log","pandas"]as const)expect(display(createElement(LtlFilterWorkspace,{engine}))).not.toContain("Polars call mode");
+ expect(display(createElement(LtlFilterWorkspace,{engine:"pandas"}))).toContain("pandas call mode");
+ expect(display(createElement(LtlFilterWorkspace,{engine:"log"}))).not.toContain("pandas call mode");
 });
 
 it("shows exclusive omitted, raw and ordered original controls with explicit fidelity limits",()=>{
@@ -58,4 +60,23 @@ it("retains complete JSON editor text and original call error inspection/downloa
  const inspection=display(createElement(LtlFilterInspection,{run:failed}));
  for(const text of ["Call mode: Original typed call.","Complete original typed call","Download exact original call","Download complete parsed source","9007199254740993"])expect(inspection).toContain(text);
  expect(inspection).not.toContain("Download complete filtered result");
+});
+
+it("shows pandas argument arrays and arity guidance without Polars operand or input controls",()=>{
+ for(const [operation,guidance]of [["eventually","exactly one typed argument containing the activity collection"],["next","exactly three typed arguments in A, B, C order"],["four_eyes","exactly two typed arguments in A, B order"],["different_persons","exactly one typed activity argument"]]as const){
+  const form={...defaultLtlFilterForm("pandas",operation),callMode:"original"as const};
+  const html=display(createElement(LtlFilterWorkspace,{engine:"pandas",initialForm:form}));
+  for(const text of ["pandas call mode","Original ordered arguments JSON",guidance,"minera-pandas-ltl-original-call-v1","pandas.NA","hexadecimal value"])expect(html).toContain(text);
+  for(const text of ["Original operand presence","Polars input type","minera-polars-ltl-original-call-v1","Relationship selection","First typed activity as JSON"])expect(html).not.toContain(text);
+ }
+});
+
+it("retains pandas complete-call text and original error downloads",()=>{
+ const call=' {"schema":"minera-pandas-ltl-original-call-v1","args":[{"type":"bytes","value":"00ff"}]}\r\n';
+ const form={...defaultLtlFilterForm("pandas"),callMode:"original"as const,originalEditor:"json"as const,originalCallJson:call};
+ const html=display(createElement(LtlFilterWorkspace,{engine:"pandas",initialForm:form}));
+ expect(html).toContain("Complete original call JSON");expect(html).toContain("00ff");expect(html).not.toContain("Original ordered arguments JSON");
+ const failed=run(true);failed.value.engine="pandas";failed.value.call_mode="original";failed.value.call_json=call;
+ const inspection=display(createElement(LtlFilterInspection,{run:failed}));
+ expect(inspection).toContain("Call mode: Original typed call.");expect(inspection).toContain("Download exact original call");expect(inspection).not.toContain("Polars input type");expect(inspection).not.toContain("Download complete filtered result");
 });

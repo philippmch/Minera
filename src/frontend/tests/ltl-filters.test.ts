@@ -97,7 +97,7 @@ it("keeps original calls exclusive and distinguishes omitted from explicit null 
  const form={...originalForm(),originalOperand:"omitted"as const,positive:false,attributeKeyMode:"custom"as const,attributeKey:"inert"};
  expect(Object.fromEntries(ltlFilterFields(form))).toEqual({engine:"polars",operation:"eventually",input_kind:"LazyFrame",call_json:'{"schema":"minera-polars-ltl-original-call-v1"}'});
  expect(ltlOriginalCallJson({...form,originalOperand:"provided",originalOperandJson:'{"type":"null"}'})).toBe('{"schema":"minera-polars-ltl-original-call-v1","values":{"type":"null"}}');
- for(const engine of ["log","pandas"]as const)expect(()=>ltlFilterFields({...form,engine})).toThrow("require the Polars");
+ expect(()=>ltlFilterFields({...form,engine:"log"})).toThrow("table engine");
  expect(()=>ltlFilterFields({...form,callMode:"unknown"as never})).toThrow("call");
  expect(()=>ltlOriginalCallJson({...form,originalOperand:"unknown"as never})).toThrow("operand and parameter modes");
 });
@@ -144,7 +144,7 @@ it("uploads only original call controls with canonical byte fields and exact res
 it("requires the complete27field envelope and rejects cross-mode/error call echoes",async()=>{
  const call=ltlOriginalCallJson(originalForm()),valid=envelope({call_mode:"original",call_json:call});
  expect(isLtlFilterEnvelope(valid)).toBe(true);expect(Object.keys(valid)).toHaveLength(27);
- for(const patch of [{call_mode:"unknown"},{call_json:undefined},{call_mode:"original",call_json:null},{call_mode:"friendly",call_json:call},{call_mode:null,call_json:call},{engine:"pandas",input_kind:null}])expect(isLtlFilterEnvelope({...valid,...patch})).toBe(false);
+ for(const patch of [{call_mode:"unknown"},{call_json:undefined},{call_mode:"original",call_json:null},{call_mode:"friendly",call_json:call},{call_mode:null,call_json:call},{engine:"log",input_kind:null}])expect(isLtlFilterEnvelope({...valid,...patch})).toBe(false);
  const {call_mode:_mode,...old}=valid;expect(isLtlFilterEnvelope(old)).toBe(false);
  let value=valid;vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify(value),{status:value.http_status})));
  await expect(requestLtlFilter(file(),defaultLtlFilterForm("polars"))).rejects.toThrow("another call mode");
@@ -173,4 +173,50 @@ it("compares and downloads original native byte echoes without replacement text"
  }));
  const result=await requestLtlFilter(file(),form);
  expect([...new Uint8Array(await ltlFilterArtifactFile(result,"call_json").arrayBuffer())]).toEqual([0xed,0xa0,0x80]);
+});
+
+it("composes pandas ordered arguments with exact operation arities and no Polars controls",()=>{
+ for(const [operation,count]of [["eventually",1],["next",3],["four_eyes",2],["different_persons",1]]as const){
+  const form={...defaultLtlFilterForm("pandas",operation),callMode:"original"as const};
+  const fields=Object.fromEntries(ltlFilterFields(form)),call=JSON.parse(fields.call_json);
+  expect(Object.keys(fields)).toEqual(["engine","operation","call_json"]);expect(call.schema).toBe("minera-pandas-ltl-original-call-v1");
+  expect(call.args).toHaveLength(count);expect(call).not.toHaveProperty("values");expect(call).not.toHaveProperty("parameter_value");expect(call).not.toHaveProperty("parameter_entries");
+  if(operation==="eventually")expect(call.args[0].type).toBe("list");
+  expect(JSON.parse(form.originalCallJson).args).toHaveLength(count);
+ }
+ const wrongArity={...defaultLtlFilterForm("pandas","next"),callMode:"original"as const,originalArgsJson:"[]",originalOperand:"omitted"as const};
+ expect(ltlOriginalCallJson(wrongArity)).toBe('{"schema":"minera-pandas-ltl-original-call-v1","args":[]}');
+ expect(ltlOriginalCallJson({...wrongArity,originalArgsJson:'[{"type":"null"}]'})).toContain('"args":[{"type":"null"}]');
+});
+
+it("retains pandas typed NA, bytes, raw numeric text and ordered parameters without coercion",()=>{
+ const args=' \r\n[{"type":"na"},{"type":"bytes","value":"410042"},{"type":"integer","value":9007199254740993}] ';
+ const entries='[{"key":"positive","enum_key":true,"value":{"type":"integer","value":"0"}},{"key":"positive","enum_key":false,"value":{"type":"boolean","value":true}}]';
+ const form={...defaultLtlFilterForm("pandas","next"),callMode:"original"as const,originalArgsJson:args,originalParameters:"entries"as const,originalEntriesJson:entries};
+ expect(ltlOriginalCallJson(form)).toBe(`{"schema":"minera-pandas-ltl-original-call-v1","args":${args},"parameter_entries":${entries}}`);
+ const raw=' {"type":"null"} ';
+ expect(ltlOriginalCallJson({...form,originalParameters:"raw",originalParameterJson:raw})).toBe(`{"schema":"minera-pandas-ltl-original-call-v1","args":${args},"parameter_value":${raw}}`);
+});
+
+it("accepts exact pandas original response identity and rejects invented input kinds or changed arguments",async()=>{
+ const form={...defaultLtlFilterForm("pandas"),callMode:"original"as const,originalArgsJson:'[{"type":"null"}]'};
+ const call=ltlOriginalCallJson(form);
+ let value=envelope({engine:"pandas",call_mode:"original",call_json:call,http_status:400,phase:"apply",apply_returned:false,result:null,result_json:null,error_type:"TypeError",error:"native typed error"});
+ vi.stubGlobal("fetch",vi.fn(async(_url:string,init:RequestInit)=>{
+  const body=init.body as FormData;expect(body.has("input_kind")).toBe(false);expect(body.get("call_json")).toBe(call);
+  expect([...body.keys()].sort()).toEqual(["call_json","engine","operation","source_file"]);
+  return new Response(JSON.stringify(value),{status:value.http_status});
+ }));
+ expect((await requestLtlFilter(file(),form)).value.input_kind).toBeNull();
+ value={...value,call_json:call.replace('"null"','"na"')};await expect(requestLtlFilter(file(),form)).rejects.toThrow("another original call");
+ value={...value,call_json:call,input_kind:"DataFrame"};await expect(requestLtlFilter(file(),form)).rejects.toThrow("invalid native envelope");
+ value={...value,input_kind:null,call_mode:null,call_json:null,phase:"control"};expect((await requestLtlFilter(file(),form)).value.phase).toBe("control");
+});
+
+it("preserves complete pandas call JSON and invalidates argument and operation edits",()=>{
+ const raw='\r\n{"schema":"minera-pandas-ltl-original-call-v1","args":[],"args":[{"type":"null"}]}\r\n';
+ const form={...defaultLtlFilterForm("pandas"),callMode:"original"as const,originalEditor:"json"as const,originalCallJson:raw};
+ expect(Object.fromEntries(ltlFilterFields(form)).call_json).toBe(raw);
+ const identity={source:file(),form},gate=new LtlFilterRequestGate(),ticket=gate.issue(identity);
+ for(const patch of [{originalArgsJson:'[{"type":"na"}]'},{operation:"next"as const},{engine:"polars"as const},{callMode:"friendly"as const},{originalCallJson:raw.trim()}])expect(gate.accepts(ticket,{...identity,form:{...form,...patch}})).toBe(false);
 });
