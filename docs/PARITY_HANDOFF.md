@@ -14,7 +14,182 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: all 448 original pandas attributes calls reach API/UI — 2026-10-22
+## Current continuation: all 726 original Polars attributes calls reach API/UI — 2026-10-22
+
+Root package terminal `822411` retains
+`docs/retained-public-observation-polars-attributes-original-call-checkpoint.jsonl.gz`
+(1,127,749 bytes; SHA256
+`c7c8dfc7d29754a6e9c1054cc18a3e3f611ab912c3959bb661f6e6c921ddf469`).
+Its validation sidecar declares 192 own text members and 58 external bindings.
+Evidence commit `232bc9ad` retains the capsule and sidecar. Root executed the
+independent new-own-capsule verifier (`a1950f`): all 192 members match
+current bytes, exact UTF8 round trips and the complete allowlist; no external
+payload was opened.
+The final explicit scope is
+`polars-attributes-original-call-checkpoint-prepared-1/scope.json`, SHA256
+`3f3f345a312b0b9409a9540b862e66e17a14b62fbaaca84ce9b7b6604aa35b1b`.
+Its independent final-scope review is
+`polars-attributes-original-call-packager-independent-review-1/final-scope-review.json`,
+SHA256 `e381af45dfbaa130e49087354222a0a9a7b91c3a9c1636805f9961ab5cc0e6a8`.
+That review binds the final scope and remains outside the capsule to avoid a self-hash cycle.
+
+Four focused source commits descend from `2dde0eb3`: `3f672dc1` adds the closed
+Polars attributes receipt profile; `f7c0992b` adds original backend controls;
+`bfb5f302` adds the original-call editor, artifacts and workflow contracts;
+`299af794` adds complete native/direct/HTTP acceptance. Fourteen own source paths
+match committed source bytes modulo CRLF/LF; the generated transport vector is a
+separate external payload binding. The inherited two tracked coverage edits remain
+unstaged. Original header, predicate, native oracle and shared codecs are unchanged.
+
+Root reviewed own producers/provenance, freshly verified and explicitly admitted
+only the exact three flat banks and immutable own native vector/driver. Original
+capture producers and generators were read as own source, never executed. The
+complete 700 + 18 + 8 census retains all **726** distinct original receipts across
+nine methods, 697 LazyFrame / 29 DataFrame calls and 1,102 complete native frame/
+category constructors. Outcomes are 455 exact full frames, nine existing bounded
+cutoff frames, 52 unordered typed count maps and 210 complete type/message/phase
+errors (126 apply / 84 collect). All full native constructors and original case
+bodies were independently mapped. Preserve the nine bounded expectations without
+claiming exact tie identities or map iteration order.
+
+The seven-field descriptor is module/function/input/category_observables/kwargs/
+call_shape/input_kind, preserving original eager/lazy identity and ordered packed
+kwargs. The sorted canonical ID SHA256 is
+`128750d0b843f19f8c16ed022ca5d2a0fe86c40a81a190f7c2dd529ec0cbd2bb`
+(ASCII IDs joined by LF with **no trailing LF**). The mapper's alternate trailing-LF
+digest is separately verified, never substituted for this primary framing. The
+complete bank retains 313 parameter dictionaries, 42 raw controls, 371 omissions,
+34 enum/string collision calls, original category metadata and 308 outer warning
+observations. Python warnings, lazy plans, error.args and alias identity remain
+external observations, not newly transported behavior.
+
+The distinct closed receipt profile validates every original raw record slice,
+canonical receipt, full audit plan and entered intent. All 726 resolve with zero
+gaps and nine rehashed cache hits (`b7a237`). Unknown entry/terminal evidence, mixed
+after-call fields, malformed optional plan metadata and unresolved intents remain
+blocking gaps; no digest-only or planned-only record grants no-prior authority.
+All 80 integrity tests pass (`848c5a`), with the original five profiles preserved.
+The initial raw-slice synthetic expectation mismatch and original/corrected adapter
+drafts remain retained.
+
+`call_json` selects `minera-polars-attributes-original-call-v1` on
+`POST /api/reference-table-attributes`, requiring engine, operation, a complete
+native EventTable source File and the raw descriptor. Explicit `input_kind` selects
+the existing DataFrame or LazyFrame overload. Ordered keyword entries preserve
+missing arguments, raw values, dedicated ordered enum/string parameter entries and
+the actual raw union arm of the four observed supplied count dictionaries. The
+fixed 23-field envelope retains exact raw call bytes and complete actual native
+controls before/after: source kind, keyword order, eight actual operand optionals,
+ten native options, parameter state and all count-cache union fields. It does not
+substitute the raw echo for parsed controls. Friendly calls retain their defaults;
+both table engines now expose the original-call chooser. Imported JSON is forwarded
+without parsing/reserializing, and full source/result/control artifacts remain
+available on native errors. Count artifacts are separate from reusable table Files.
+
+The first backend compile exposed only an ADL ambiguity, corrected by a private
+adapter rename. The first wrapper compile exposed only a renamed-main macro
+assumption, corrected without altering the oracle. The first full transport attempt
+then exposed an invalid fixture ABI assumption: original Python-int projections
+used signed storage while the unchanged native count API returns uint64 storage.
+All 52 original maps still pass the unchanged complete semantic comparator. For
+each direct and HTTP mode, 52 additional actual-native count checks establish the
+native carrier separately, then compare every transport field and reopened artifact
+against that carrier. These **104** checks neither change original public expected
+maps nor redefine their key/type/value scope. The entire 726-case/driver suffix is
+byte-identical through the support correction. All failed attempts and original/
+corrected support/vector bindings remain preserved externally where appropriate.
+
+Final complete native terminal `1f5e86` is zero/drained: all 726 original native
+cases, all 726 direct calls and all 726 owned HTTP calls pass, with the 104 separate
+native count ABI checks (full target 100.66 seconds). Original cases retain their
+full native frame/map/error expectations and source state. Direct/HTTP checks add
+the complete 23-key envelope, full result/error/source-after, actual controls,
+exact raw call echo and artifact reopening. The original renamed main is never
+invoked. Initial four native targets also pass (`485ea4`); the prior sandbox HTTP
+connection failure and subsequent successful owned-loopback rerun remain distinct.
+
+Final unaffected regression terminal `a564bd` is zero/drained: the same owned
+CTest session passes all four complete banks, LOG LTL 297, pandas LTL 429, LOG
+attributes 280 and pandas attributes 448, in 753.74 seconds. These are distinct
+from the current full 726-case native/direct/HTTP target. Root facts are
+`build/parity-closures/polars-attributes-original-call-finalization-1/root-facts.json`
+(70,081 bytes; SHA256
+`d3efdcd0246f59e3a42508f52a98a480533165035b0f5a1b16b5549db1a3a7d2`).
+
+All 195 frontend files / 9,881 tests pass (`3dcefa`), as do 42 focused tests
+(`bfada8`), TypeScript and Vite (`aed181`). Rendered browser terminal `3c1305` is
+zero/drained: 23 checks, 20 completed attributes HTTP outcomes plus one held actual
+response and eight exact downloads. It covers all nine methods, eager/lazy dispatch,
+typed counts/raw count-cache state, enum collisions, apply/collect diagnostics,
+exact UTF8/CRLF/large-integer imports, cancellation of an actual response and a
+deferred File import, full error artifacts and actual filtered File reuse in a
+subsequent native request. Browser examples check rows, type/phase and controls;
+complete expected outcomes come from the 726-case fixture. Raw encoded multipart
+body bytes are unclaimed. Root verified listener ownership, viewed success/error
+screenshots, and stopped both owned processes with stdio drained.
+
+Independent backend, frontend, fixture, index and packager reviews keep their
+separate scopes. Packager static review is
+`polars-attributes-original-call-packager-independent-review-1/review.json`, SHA256
+`6d2dfe08de53a30cb64b02e3d89464b20b5ceefb258626b839f3ee3f349c377f`.
+The helper reads only explicitly root-reviewed own text members after complete
+external path/hash alias denial; scope/facts bootstrap hashes are mandatory. It
+decodes only the new own capsule for exact UTF8/current-byte verification. Original
+records, cases, intents, audits, original/native transport vectors and driver,
+provenance JSONL, archives, SQLite, binaries and browser raw/download/screenshot
+artifacts remain external. External declarations grant no new payload admission.
+
+Archive access must be stated precisely: the new Polars bank pipeline opened no
+original archive, and the packager opens no original payload. The existing initial
+and final 80-test integrity suites **do reopen three already-admitted LTL archives**
+through `docs/retained-public-receipt-ltl-manifest.json`. Do not turn the scoped
+new-bank/package boundary into a global whole-turn zero archive claim.
+
+Full scope remains 86 packages / 387 modules, 46 complete packages / 226 complete
+modules, **201 strict open units and 565 unentered logical grouping queries across
+six banks**. This product checkpoint grants no catalogue promotion, new/replayed
+reference calls, implementation inspection, full-history completeness, absence
+authority, root-entry certificate or full parity. The broad goal remains active.
+
+Next full candidate is **380 LOG variants calls (370 + 10), all seven functions**.
+The bounded metadata-only plan is
+`build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/report.json`
+with exact source leads in its `source-declarations.json`. Prior declarations cover
+258 returns / 122 errors and 70 native snapshots; they are not a new canonical
+census. Five initial duplicate candidates must not be counted as executed calls.
+All seven functions take the EventLog source first, including the scalar
+`find_auto_threshold` helper; do not copy the source-less LTL-helper protocol.
+
+The next bank is **not admitted**. Bounded plain metadata is missing whole-file
+bytes/SHA for both original records, intents and dedup audits; cases currently have
+SHA-only declarations. The continuation audit reportedly saves first-bank full
+bindings, but that audit remains unadmitted. The known archive has a saved opaque
+container binding and own 20-member UTF8 envelope producer; root must review its
+producer/provenance and, if needed, explicitly authorize only bounded member-binding
+metadata extraction without inspecting or emitting UTF8 member content; any
+transient envelope unescaping/byte-hash verification needs explicit bounded admission. Do not open/decompress
+the archive, records or oracle from a filename lead alone. Root must freshly verify
+and admit exact flat sources/oracle, reconstruct all 380 canonical IDs and complete
+native mapping, then freeze the full transport and scalar-helper contract. Typed
+tuple-key dictionaries/full trace references and ordinary non-trace diagnostics,
+ordered raw parameters, omissions and bounds must retain their native carriers.
+Preserve every limitation; do not narrow the bank or replay retained calls.
+
+An additional unexecuted proposal is prepared at
+`build/parity-closures/log-variants-archive-member-metadata-prepared-1/proposal.json`
+(SHA256 `5fcc3fe986b5fb533d02a2a769959387c6893cb3c8fbe8c01f5a5a1eb934f4bf`).
+Its fixed-container extractor is source only, requires a root review certificate,
+and admits no archive or flat bank. Root must review the helper, exact provenance,
+limits and transient UTF8 byte-hash boundary before any execution. This later
+preparation is outside the frozen Polars capsule.
+
+Continue with parallel workers and clean logical commits/pushes while preserving
+inherited dirt. Root alone executes generators, targets, tests, builds, browser
+acceptance and Git; workers perform bounded assigned source/metadata work. Never
+inspect reference implementation/AST/bytecode/private state or run
+`scripts/verify-reference-parity.mjs`.
+
+## Previous continuation: all 448 original pandas attributes calls reach API/UI — 2026-10-22
 
 `d3200365` retains the checkpoint in
 `docs/retained-public-observation-pandas-attributes-original-call-checkpoint.jsonl.gz`
