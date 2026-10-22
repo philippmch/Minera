@@ -85,11 +85,12 @@ engines and errors before a type was validated. The frontend checks it against
 the requested type, including source/apply/collect failures. For a Polars request,
 a null type is accepted only for an early HTTP 400 control error.
 
-## Polars original typed calls
+## Original typed table calls
 
-Polars offers **Friendly controls** by default and an exclusive **Original typed
-call** mode. Original mode keeps the same source File, relationship operation
-and DataFrame/LazyFrame choice. Its operand-presence selector distinguishes an
+Both pandas and Polars offer **Friendly controls** by default and an exclusive
+**Original typed call** mode. Original mode keeps the same source File and
+relationship operation. Polars also keeps its DataFrame/LazyFrame choice.
+Its operand-presence selector distinguishes an
 omitted argument from a supplied typed null. Parameters can be omitted, supplied
 as a raw typed non-mapping value, or supplied as ordered mapping entries. Empty
 entries mean a present empty mapping. Non-Boolean positive values and typed
@@ -103,7 +104,7 @@ editing behavior; importing and submitting without editing retains imported
 CR/LF bytes. JSON numbers are not parsed and rewritten in the frontend. Prefer
 typed integer values as decimal strings to preserve exact text in other tools.
 
-For the original mode, multipart `call_json` has exactly this versioned shape:
+For Polars original mode, multipart `call_json` has this versioned shape:
 
 ```json
 {
@@ -129,10 +130,11 @@ string keys remain literal; nonstring keys are rejected rather than stringified
 or silently omitted. Duplicate identities and unknown enum identities are
 control errors.
 
-Original requests contain only `engine=polars`, the existing `operation`,
+Polars original requests contain only `engine=polars`, the existing `operation`,
 optional `input_kind`, actual `source_file` and `call_json`. Friendly operands,
 selectors, flags and unrelated source controls are forbidden alongside
-`call_json`; other engines reject it. Shape/JSON/control failures occur before
+`call_json`. pandas uses its own schema below; EventLog rejects this control.
+Shape/JSON/control failures occur before
 source import. Missing operands and valid typed values retain native semantic
 diagnostics and apply/collect timing.
 
@@ -154,6 +156,67 @@ fixture constructors; original receipts and expected outputs are not rewritten.
 Python fold/timezone provenance, NaN payloads, arbitrary objects, warning lists
 and physical plans remain outside this bounded transport. The three module rows
 and all 201 strict open units remain partial/open.
+
+### pandas ordered arguments
+
+The **pandas call mode** selector enables the same original-call parameter,
+complete JSON, import, inspection and download workflow. Its fields editor uses
+**Original ordered arguments JSON**. Required `args` is an ordered array of
+typed objects, with exact arity determined by the relationship rule:
+
+| Operation | Ordered arguments |
+| --- | --- |
+| `eventually` | One argument containing the activity collection |
+| `next` | Three separate A, B, C arguments |
+| `four_eyes` | Two separate A, B arguments |
+| `different_persons` | One A argument |
+
+For example, a pandas consecutive-activity call uses:
+
+```json
+{
+  "schema": "minera-pandas-ltl-original-call-v1",
+  "args": [
+    {"type":"string","value":"A"},
+    {"type":"string","value":"B"},
+    {"type":"string","value":"C"}
+  ]
+}
+```
+
+The entire args fragment is submitted unchanged. Operation changes retain the
+editor text and update arity guidance; they do not silently add, remove or
+convert operands. Omitted/empty/short/extra args are unsupported control shapes.
+All 429 admitted pandas calls provide their required operands, so this interface
+does not invent missing-argument native/reference errors. A typed null is a
+provided argument and reaches native semantics. For eventual filtering, the
+activity collection is the first argument rather than the args array itself.
+
+Raw `parameter_value` and ordered `parameter_entries` use the same exclusive
+presence rules as Polars. Native pandas overloads preserve parameter omission,
+raw values and enum/string identities without resolving them into friendly flags.
+Typed `na` preserves pandas.NA; typed `bytes` uses an exact hexadecimal value.
+Temporal, set/map, non-Boolean controls and boundary values remain typed rather
+than being coerced into strings or Boolean controls. The seven public enum keys
+are accepted identities, while only POSITIVE and ATTRIBUTE_KEY occur in the
+429 retained pandas receipts; the other five do not gain executed coverage from
+this UI change.
+
+Pandas requests contain only `engine=pandas`, the existing `operation`, actual
+`source_file` and `call_json`; `input_kind` is inactive and rejected. Responses
+retain the shared 27 fields, exact original call echo, null `input_kind` and null
+original-mode selector fields. Pandas is eager: recognized native failures are
+apply errors with apply_returned false; there is no Polars collect boundary.
+Cross-engine schemas and friendly/original control mixtures are rejected before
+source import. EventLog remains outside this original typed-call mode.
+
+Full 429 pandas native/direct/owned-HTTP comparisons, 675 Polars regression,
+frontend checks and rendered browser acceptance are required for this extension.
+The editor implementation itself is not that runtime evidence. Existing carrier
+limits still apply: string keys only, lexical operand-map order and value-level
+temporal/NaN provenance. Original receipts and expected native outcomes stay
+unchanged; the wider catalogue, 201 strict open units and 565 unentered grouping
+queries are not promoted or authorized by this interface.
 
 Native strings can use the existing raw-byte carrier. Downloads preserve their
 complete bytes. The complete response is downloadable with original numeric
