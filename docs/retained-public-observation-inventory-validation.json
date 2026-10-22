@@ -1,0 +1,417 @@
+{
+  "schema": "minera-streaming-observation-inventory-validation-v1",
+  "complete_bounded_acceptance": true,
+  "archive": {
+    "path": "docs/retained-public-observation-inventory-checks.jsonl.gz",
+    "bytes": 2330097,
+    "sha256": "99c8906d11ebf7ee434ac8571d5c8f63cfc444b1db6e93227be22c2186239ac5",
+    "members": 77
+  },
+  "parser_sha256": "db75974c2c3166d0a8d7303997b11654e8d7dc123b0ec30e1ebd59154c2b1d55",
+  "synthetic_streaming_tests": 32,
+  "combined_receipt_tests": 58,
+  "retained_actual_outcomes_classified": 1401,
+  "independent_original_receipt_digest_sets_match": true,
+  "cache_hits_with_fresh_source_hashes": 3,
+  "legacy_scale_members": 5870,
+  "legacy_scale_historical_decoded_bytes": 2080870160,
+  "metadata_discovery_members": 8991,
+  "intentional_pending_admission_gaps": 3,
+  "first_unknown_schema_attempt_preserved": true,
+  "cache_reporting_defect_and_fix_preserved": true,
+  "all_own_archive_member_bytes_roundtrip_verified": true,
+  "reference_algorithm_calls": 0,
+  "reference_implementation_inspected": false,
+  "admission_complete": false,
+  "historical_audit_complete": false,
+  "catalogue_audit_complete": false,
+  "parity_status_changes": 0,
+  "source_bindings": [
+    {
+      "path": "build/parity-closures/check-polars-preparation-capsule-root.py",
+      "bytes": 2225,
+      "sha256": "ad82e039d9f70e4383034346c7655871ebd6f5b80e2acae8b86f2f9fa6c45a7c"
+    },
+    {
+      "path": "build/parity-closures/check-streaming-positive-receipts.py",
+      "bytes": 1914,
+      "sha256": "51563bdcd726a6cec411f6931fe357033277e11804c6e569068b0e5646790254"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/final-chunk-cache-identity-repro-1.json",
+      "bytes": 619,
+      "sha256": "11dd75c6ba2ea69bf831fcf88a815672d7b39c990a0f5478fcd9ecaf92bb98e1"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/final-chunk-cache-identity-repro-fixed-2.json",
+      "bytes": 580,
+      "sha256": "efa24a64b1a30e90f93e46326644278db00add65f04258da81aa0e6054ce705d"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/indexed-chunk-producer-schema.json",
+      "bytes": 10140,
+      "sha256": "9ecb1aba6dd9bcbfe13d2f8eefbdb1d6cc497ad9df763f85dc07ab12e2fd21f0"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/key-report-member-producer-schema.json",
+      "bytes": 8391,
+      "sha256": "092242f1d42608ed6eaadbf6de3af79a73f2073cfaf42fc906431cea38241406"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/offset-chunk-producer-schema.json",
+      "bytes": 31888,
+      "sha256": "d40832c3dba781131529bc00f9fd7a58ac788d9c6b06997f42366b7308b1ee12"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/polars-eof-opaque-comparison-1.json",
+      "bytes": 1553,
+      "sha256": "8c36b3aae442ba58bfd8dfac5f1c8820117e3ec2e61f4a2e99f70310ad67b365"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/schema-taxonomy-validation-1.json",
+      "bytes": 8332,
+      "sha256": "cc0b6a43c2fb7acb7e2ea4c6b66a48052f8d4fdf92a2b9a71e70aa8b3666ba6d"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/schema-taxonomy.json",
+      "bytes": 17020,
+      "sha256": "73bf8ebd0f77d267fa3cd69aacf79fa4e8736de826f91bb053d0d73561c747e3"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/streaming-inventory-independent-review-1.json",
+      "bytes": 3279,
+      "sha256": "ff4a1f453f2165462c8ab172cc291a9a8601051657c7373e59f690997f318b8a"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/streaming-inventory-independent-review-final-2.json",
+      "bytes": 1319,
+      "sha256": "b3e3dfbd7ade2b4ab72a74edcfc59abbb4d0546c9fac436040f8ed09b1e5c898"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/streaming-inventory-independent-review-final-4.json",
+      "bytes": 4219,
+      "sha256": "ba0b578a9d13700dd37f77c5847698a95cf822ac679c1331f03654c9fd9e4cda"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/streaming-inventory-independent-review-fixed-5.json",
+      "bytes": 2251,
+      "sha256": "febddb6c6017f8056550c96b104c5ca441b0cae5ee87c153356c294e198f7a11"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/streaming-inventory-legacy-review-3.json",
+      "bytes": 2731,
+      "sha256": "a68e2a6cb5fa7d9e47434c19e0b1d46bddd8c8f8ded5cb142365088838100583"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/streaming-inventory-review-repro-1.json",
+      "bytes": 3493,
+      "sha256": "225face2cdb8f04a8714129981f92ef65ad72c1e1e66a886addb3cf0644da461"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/streaming-inventory-review-repro-2.json",
+      "bytes": 3653,
+      "sha256": "fbc5b5bfe2efe72ad992c63cade516f4070dafb457321ed415192fe72c1b6b51"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/unresolved-archive-git-bindings-1.json",
+      "bytes": 1267,
+      "sha256": "6e5c7f60f6ac702ac4e8c48c46ebf2d0a2c3565e034c6351f17e22f03c65fdbb"
+    },
+    {
+      "path": "build/parity-closures/grouping-history-audit-prepared-1/utf8-name-text-producer-schema.json",
+      "bytes": 7890,
+      "sha256": "1764fe7f2ba6a42d1106c4d402a8cea30dc6a36cd47fb3fb5b2191b44a1d4b47"
+    },
+    {
+      "path": "build/parity-closures/grouping-polars-preparation-capsule-root-check.json",
+      "bytes": 340,
+      "sha256": "ba08202cfff7fd8b010f130738a618937363132b822a170632c2b2f75ac6a43e"
+    },
+    {
+      "path": "build/parity-closures/prepare-streaming-final-acceptance-v2.py",
+      "bytes": 1322,
+      "sha256": "3ec617ae4bd0800f27befed30288288417ae69e749e91eb128cddcd4f4dcff1e"
+    },
+    {
+      "path": "build/parity-closures/prepare-streaming-final-acceptance.py",
+      "bytes": 1272,
+      "sha256": "c9c5c1b3e1162e0211f1e3046a057bb77c4c07af33c7ca53f6b24960d193172c"
+    },
+    {
+      "path": "build/parity-closures/prepare-streaming-inventory-root-acceptance.py",
+      "bytes": 3944,
+      "sha256": "d3f2c02d176bdc5870152e2b70b98919cc8be79d50b5235e40ffc5b44800fc64"
+    },
+    {
+      "path": "build/parity-closures/save-streaming-inventory-checks.py",
+      "bytes": 5746,
+      "sha256": "e6a43d3b5df015aae2378c4f8ad5a028ecd87edc5fd4494fdbc529a4a6ee6ab7"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/admitted-ltl-events-first.jsonl",
+      "bytes": 648672,
+      "sha256": "f9410b80b736440b8876af745f6c70e708ccdf30248beea154340b809f44fc1d"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/admitted-ltl-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/admitted-ltl-manifest.json",
+      "bytes": 7064,
+      "sha256": "211208f4ebc9d312f9ca981b6d2a83123e0d2b6ec465d5c18ff085740a521287"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/admitted-ltl-report-first.json",
+      "bytes": 916,
+      "sha256": "154fc407eca936d307e2c1d87829febaab51eaf228e7f48198d006565a3bacb7"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/discovery-events-first.jsonl",
+      "bytes": 3792013,
+      "sha256": "3e0c125afe94aaf49a2e79965b244d5b1171a8c40571672a780808165a4ae8bf"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/discovery-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/discovery-manifest.json",
+      "bytes": 1800,
+      "sha256": "dd53225020d7a14ebf8b328c012b129e78bffb9b5fc787b3ec2fc81f028b8e8e"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/discovery-report-first.json",
+      "bytes": 875,
+      "sha256": "f16e11f37a4628a1c1e5422eee4c49ddbd7e7235502e894179c336e63c83aa3f"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/frozen-first-parser/retained_public_observation_inventory.py",
+      "bytes": 38645,
+      "sha256": "fe00469bf7fa9c85966790eabaee9d5614ae07e79fa620c258dbb77c4d66bb85"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/frozen-first-parser/test_retained_public_observation_inventory.py",
+      "bytes": 14859,
+      "sha256": "63f050babb80d9f24c064e22aeb6ef6b432c6f8afc9ae450cf6feffa3e92982e"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/scale-events-first.jsonl",
+      "bytes": 2310886,
+      "sha256": "7bfda27618ca5a0d47fad8bf2275959d70687da95329266270c55e88893adc5c"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/scale-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/scale-initial-declared-metadata.json",
+      "bytes": 492,
+      "sha256": "a83ab00093f3995cd2eae61d86b177b7c98512e54311da3de4e1ae761d667df4"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/scale-initial-key-metadata.json",
+      "bytes": 1077,
+      "sha256": "096856d11f2915a6aa30297c8dac38108e24f783e87eb611490851dd1e89dbfd"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/scale-manifest.json",
+      "bytes": 625,
+      "sha256": "f8525d8c39d5eda4b3f8dacc2b12cae61f5ca1687c395300ad47745a2c2f742f"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-acceptance-1/scale-report-first.json",
+      "bytes": 833,
+      "sha256": "e59069d26f431f2341643f3effdd1ea56fe2a8fa9a822ad24f83fba981a45e4e"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/admitted-ltl-events.jsonl",
+      "bytes": 685238,
+      "sha256": "54ee058ad44b228a1ad6e9c6756b19fc69f22233883b83d8c4044db310600adc"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/admitted-ltl-manifest.json",
+      "bytes": 7064,
+      "sha256": "211208f4ebc9d312f9ca981b6d2a83123e0d2b6ec465d5c18ff085740a521287"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/admitted-ltl-report.json",
+      "bytes": 925,
+      "sha256": "506d289fc89a06ddbb20e53ba18c7128623ca147feb0f5c738ef904d0d485f6f"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/admitted-ltl.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/discovery-manifest.json",
+      "bytes": 1800,
+      "sha256": "dd53225020d7a14ebf8b328c012b129e78bffb9b5fc787b3ec2fc81f028b8e8e"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/frozen/retained_public_observation_inventory.py",
+      "bytes": 50480,
+      "sha256": "87c51cf62f36b4578c38e023c60f9ba645ee4026604e459f5d9b8bdfcdb54d63"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/frozen/test_retained_public_observation_inventory.py",
+      "bytes": 25271,
+      "sha256": "6922eac482f31e29e72466e013b16bd3355ca2a88e20842b38f4f00b08d9bcac"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/frozen-bindings.json",
+      "bytes": 374,
+      "sha256": "e469a4e7e2e22c61975ce35fc1fc09e86491373781b5c0774d373b5d58a4b7a3"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/positive-receipt-identity-check.json",
+      "bytes": 894,
+      "sha256": "06b603b6f971acb63e43b915acaec7cb99a6b43171be4ec69ca781766426c4c7"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/scale-events.jsonl",
+      "bytes": 2814257,
+      "sha256": "2bf060ce328bf5f3b3c205399c4fed08a06e2a38bc294f61fb5b5b0412d9d097"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/scale-legacy-manifest.json",
+      "bytes": 754,
+      "sha256": "8f9cd53981fa8a72918ed69cef0f95e13372cd8b7896f3df49a894de51dc2d2a"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/scale-report.json",
+      "bytes": 827,
+      "sha256": "86512000afb2d0e34903ad9ef13c1ca36fff59faf46d9a23500b7a682240de76"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/scale.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-1/unittest-first.log",
+      "bytes": 6249,
+      "sha256": "a0e4e4c17f4c6f61bbd9bffb25b1503d257c68d1bc52e6e4811f7eada8b71f2e"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/admitted-ltl-cache-events.jsonl",
+      "bytes": 685682,
+      "sha256": "14fdda5dbbee4a342f3958915ef307c3e330b38dd8d0507525a0a0bb9d5b0a5f"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/admitted-ltl-cache-report.json",
+      "bytes": 945,
+      "sha256": "4e1c3f4d57e45d20bb5b779775d60104505ad70ab5d8632abca8a375f211e24f"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/admitted-ltl-cache.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/admitted-ltl-events.jsonl",
+      "bytes": 685238,
+      "sha256": "54ee058ad44b228a1ad6e9c6756b19fc69f22233883b83d8c4044db310600adc"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/admitted-ltl-manifest.json",
+      "bytes": 7064,
+      "sha256": "211208f4ebc9d312f9ca981b6d2a83123e0d2b6ec465d5c18ff085740a521287"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/admitted-ltl-report.json",
+      "bytes": 925,
+      "sha256": "06b5f22a5ef5d4d34adc33efad0bc853dcc5457459d5ff3f1ddbf7e534936efc"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/admitted-ltl.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/combined-receipt-unittest.log",
+      "bytes": 11027,
+      "sha256": "65c65cb86554ee1023925f3f70b529b143559a718ccc30cbdd5f56520efa5832"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/discovery-events.jsonl",
+      "bytes": 4840887,
+      "sha256": "26c54103ed51cf4fc20069bfaea439cc777c0f9d1af39ff9c45e2a4d5c600085"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/discovery-manifest.json",
+      "bytes": 1800,
+      "sha256": "dd53225020d7a14ebf8b328c012b129e78bffb9b5fc787b3ec2fc81f028b8e8e"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/discovery-report.json",
+      "bytes": 864,
+      "sha256": "a2f7bb07278dded2ab0f66dac04526f67417f6937ce2ac99a6519f7f7aa78635"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/discovery.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/frozen/retained_public_observation_inventory.py",
+      "bytes": 50498,
+      "sha256": "db75974c2c3166d0a8d7303997b11654e8d7dc123b0ec30e1ebd59154c2b1d55"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/frozen/test_retained_public_observation_inventory.py",
+      "bytes": 26512,
+      "sha256": "20372b760c7b07d11158bb3010c18d671138902eaff809dae0c04cf4ac5575d5"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/frozen-bindings.json",
+      "bytes": 374,
+      "sha256": "d0bd29be083d5d3f6508385591b760ffffccebf3cf0dd7afc62175971c901010"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/positive-receipt-identity-check.json",
+      "bytes": 894,
+      "sha256": "06b603b6f971acb63e43b915acaec7cb99a6b43171be4ec69ca781766426c4c7"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/scale-events.jsonl",
+      "bytes": 2814257,
+      "sha256": "2bf060ce328bf5f3b3c205399c4fed08a06e2a38bc294f61fb5b5b0412d9d097"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/scale-legacy-manifest.json",
+      "bytes": 754,
+      "sha256": "8f9cd53981fa8a72918ed69cef0f95e13372cd8b7896f3df49a894de51dc2d2a"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/scale-report.json",
+      "bytes": 827,
+      "sha256": "4ff4aa28bc7bc449b430856feb75162fe54ca2692791a492946809867b3da0ea"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/scale.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/streaming-inventory-root-final-2/unittest-first.log",
+      "bytes": 6412,
+      "sha256": "92689e4eec572f2d361e4b58542472142002e8b832d7d0604909d95615c90cac"
+    },
+    {
+      "path": "scripts/retained_public_observation_inventory.py",
+      "bytes": 50498,
+      "sha256": "db75974c2c3166d0a8d7303997b11654e8d7dc123b0ec30e1ebd59154c2b1d55"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_observation_inventory.py",
+      "bytes": 26512,
+      "sha256": "20372b760c7b07d11158bb3010c18d671138902eaff809dae0c04cf4ac5575d5"
+    }
+  ],
+  "note": "The coordinated wide archive discovery is separate and may still be running. This capsule certifies only bounded offline tool acceptance, never new-family call absence or a root entry certificate."
+}
