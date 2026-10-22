@@ -1,0 +1,3240 @@
+{
+  "schema": "minera-retained-public-observation-log-original-call-checkpoint-v1",
+  "scope": "Full297 already admitted LOG original-call native/direct/HTTP engineering acceptance; no new reference evidence.",
+  "root_final_acceptance": {
+    "path": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+    "bytes": 202277,
+    "sha256": "6f6666e8f793892d4c8d68a87b6a03470beff9810aa5c6442588bc3770fc9be4"
+  },
+  "root_independent_reviews": [
+    {
+      "role": "backend",
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/review.json",
+      "bytes": 8208,
+      "sha256": "97d8e19d610cc942b8fd9b9b13b1f49a48a4c056cc27ba9b84e41bb51fc8b1d5"
+    },
+    {
+      "role": "frontend-fixture:nested",
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/frontend-wrapper-review.json",
+      "bytes": 7458,
+      "sha256": "bae249392c412614b9e1c786659b32cbd1561555433751768a209d17a6cbd7a7"
+    },
+    {
+      "role": "frontend-fixture",
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/review.json",
+      "bytes": 7194,
+      "sha256": "8fb7cf62a1e05289cfa3b8d677d9da7a094bcef2a7fdf7d36415ce55691b3c78"
+    }
+  ],
+  "reviewed_plan": {
+    "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/plan-1.json",
+    "bytes": 53148,
+    "sha256": "8adee4bc97851b92d94b500a883fba0e969f15429e9be2b68f3be2514b3334ee"
+  },
+  "source_bindings": [
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/finalize.py",
+      "bytes": 5870,
+      "sha256": "61aea742353af1dc5961821733552b50046631257da1dd18aa4a6da66e3296df"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/full297-carrier-model-report.json",
+      "bytes": 10069,
+      "sha256": "81d44a55740df2560d9aadce8bdf099bf52f5b79213f9e126f7ee499064d3ff2"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/implementation-plan.md",
+      "bytes": 9148,
+      "sha256": "1ed18a81d9f91dc3f2b7a5f3508dca5583bc471d08c91844885c75ebd8c0a9b1"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/model.py",
+      "bytes": 8502,
+      "sha256": "c4a4b9a874ea18b52bd792d15f30c811b5c256a9b6657b8ec87fa86b930023f7"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "bytes": 13872,
+      "sha256": "8a2bbf76d2bf2d9b5784ced3dd3a087e29763d74210534f8a387affab0355afe"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/review.py",
+      "bytes": 7483,
+      "sha256": "ea2e50fe6f75645c4c157451257878ac64e71b162994fea278b92f4994b43598"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/wire-contract.json",
+      "bytes": 5591,
+      "sha256": "cc802aa24606ba23c5994876f1578ca872eff1a7f0e2736be85bc50dd5c93cf1"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-original-call-transport-1/case-provenance.jsonl",
+      "bytes": 307774,
+      "sha256": "4dce8edd5b6571ef906d3c0cee3f03bbcaa221fd24b858eae659aff31518736e"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 27743,
+      "sha256": "bfe67ed5aa269c76f00b1cb54c65753e650ccb19de5c7d412bd66f8b27b27084"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "bytes": 8514,
+      "sha256": "8951e80ef2b7d3b5df022caf4ad6be853182cf329435aefb4372b59e4a7eb1e8"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "bytes": 6170,
+      "sha256": "14c729c6cd868175730380d0c3aabcb78ad2b48442eb33cc6e4ad4b4dbf1cca5"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-original-call-transport-1/workbench-fixture-support.hpp.txt",
+      "bytes": 12718,
+      "sha256": "4be394c73e790c5b24fe58751daa798071a3435b656ed43637eb9a1584e6ee25"
+    },
+    {
+      "path": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/first-helper-failure.json",
+      "bytes": 366,
+      "sha256": "9d2d2d8b6cf0da9f32dbae7dac3bf2a164c6e6243528f7373befe0d60b08b5a6"
+    },
+    {
+      "path": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/implementation-plan.md",
+      "bytes": 8599,
+      "sha256": "f46a1eb8c79cba0821724c7e58396eccf43609b5cd0c11e1472566d88f9dd79f"
+    },
+    {
+      "path": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/report.json",
+      "bytes": 4790,
+      "sha256": "b1ac103500235707f35ba165b1291dfc4c7cec1b42c992f6aadfaffb055d9ad2"
+    },
+    {
+      "path": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "bytes": 13484,
+      "sha256": "1723fd423eebf642ce474ca85a6781850b3d8ea09af912701755069e8a0336ed"
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/checkpoint.py",
+      "bytes": 38468,
+      "sha256": "e031f3526b565fdd5284c66d7b374fe455d342c82eb24bfeb114cb7f42819511"
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/facts-contract.json",
+      "bytes": 5686,
+      "sha256": "e74d8e036f3670a57f9b2590b164bbddca006bf436a1aff1eddbb0f7eb8d870d"
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/plan-1.json",
+      "bytes": 53148,
+      "sha256": "8adee4bc97851b92d94b500a883fba0e969f15429e9be2b68f3be2514b3334ee"
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "bytes": 6190,
+      "sha256": "b32d80aa962525d6c91fd9087dc3511cfab833ae9004459be0978a755dfe36b8"
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/usage.md",
+      "bytes": 4967,
+      "sha256": "47580a6ee3410f0be47a502787a6b20d4bc99fd4aa0d154946a4c1a390b3ef13"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-corrected-3.log",
+      "bytes": 1308,
+      "sha256": "2a883293113a4452a3c88c8a67a4822d768c932d9c74560bc6a0ca6c15614257"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/report.json",
+      "bytes": 2427,
+      "sha256": "edc05978ee448b89e77fd6e668e45d5e5a89014200eae3c2d51305b79a93cfee"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-6/review.json",
+      "bytes": 3961,
+      "sha256": "703355ed3d157abc236304afdc10cc74c91f23f6821d53b108385f0b9d62b1f8"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "bytes": 202277,
+      "sha256": "6f6666e8f793892d4c8d68a87b6a03470beff9810aa5c6442588bc3770fc9be4"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/fixture-generation-first.log",
+      "bytes": 419,
+      "sha256": "c38b902ef0544f9d30b088071ce823268d956924ea6881c3822e72919f5c0682"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frontend-all-first.log",
+      "bytes": 257,
+      "sha256": "87eb402f965b3fa5ba595246bb05aad9b7b3168ca788723fae82542498d98dd1"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frontend-build-first.log",
+      "bytes": 8119,
+      "sha256": "67f1f2a4063918c3e259e390a2bce384a450daac6c13067ea5cec085cfc93d22"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frontend-focused-first.log",
+      "bytes": 239,
+      "sha256": "fedc021b13cbc800576a467854a0e774cbb956943942f875bba5393580368199"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/CMakeLists.txt",
+      "bytes": 124081,
+      "sha256": "2f16d302e3605a7c4826635744a3630b6b7a2b1848393eb15666f1747a001aba"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-next-product-review-1/finalize.py",
+      "bytes": 5870,
+      "sha256": "61aea742353af1dc5961821733552b50046631257da1dd18aa4a6da66e3296df"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-next-product-review-1/full297-carrier-model-report.json",
+      "bytes": 10069,
+      "sha256": "81d44a55740df2560d9aadce8bdf099bf52f5b79213f9e126f7ee499064d3ff2"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-next-product-review-1/implementation-plan.md",
+      "bytes": 9148,
+      "sha256": "1ed18a81d9f91dc3f2b7a5f3508dca5583bc471d08c91844885c75ebd8c0a9b1"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-next-product-review-1/model.py",
+      "bytes": 8502,
+      "sha256": "c4a4b9a874ea18b52bd792d15f30c811b5c256a9b6657b8ec87fa86b930023f7"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "bytes": 13872,
+      "sha256": "8a2bbf76d2bf2d9b5784ced3dd3a087e29763d74210534f8a387affab0355afe"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-next-product-review-1/review.py",
+      "bytes": 7483,
+      "sha256": "ea2e50fe6f75645c4c157451257878ac64e71b162994fea278b92f4994b43598"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-next-product-review-1/wire-contract.json",
+      "bytes": 5591,
+      "sha256": "cc802aa24606ba23c5994876f1578ca872eff1a7f0e2736be85bc50dd5c93cf1"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-original-call-transport-1/case-provenance.jsonl",
+      "bytes": 307774,
+      "sha256": "4dce8edd5b6571ef906d3c0cee3f03bbcaa221fd24b858eae659aff31518736e"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 27743,
+      "sha256": "bfe67ed5aa269c76f00b1cb54c65753e650ccb19de5c7d412bd66f8b27b27084"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "bytes": 8514,
+      "sha256": "8951e80ef2b7d3b5df022caf4ad6be853182cf329435aefb4372b59e4a7eb1e8"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "bytes": 6170,
+      "sha256": "14c729c6cd868175730380d0c3aabcb78ad2b48442eb33cc6e4ad4b4dbf1cca5"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-log-ltl-original-call-transport-1/workbench-fixture-support.hpp.txt",
+      "bytes": 12718,
+      "sha256": "4be394c73e790c5b24fe58751daa798071a3435b656ed43637eb9a1584e6ee25"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-next-product-after-log-ltl-review-1/first-helper-failure.json",
+      "bytes": 366,
+      "sha256": "9d2d2d8b6cf0da9f32dbae7dac3bf2a164c6e6243528f7373befe0d60b08b5a6"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-next-product-after-log-ltl-review-1/implementation-plan.md",
+      "bytes": 8599,
+      "sha256": "f46a1eb8c79cba0821724c7e58396eccf43609b5cd0c11e1472566d88f9dd79f"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-next-product-after-log-ltl-review-1/report.json",
+      "bytes": 4790,
+      "sha256": "b1ac103500235707f35ba165b1291dfc4c7cec1b42c992f6aadfaffb055d9ad2"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "bytes": 13484,
+      "sha256": "1723fd423eebf642ce474ca85a6781850b3d8ea09af912701755069e8a0336ed"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/checkpoint.py",
+      "bytes": 38468,
+      "sha256": "e031f3526b565fdd5284c66d7b374fe455d342c82eb24bfeb114cb7f42819511"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/checkpoint.py.next-metadata-c1.diff.patch",
+      "bytes": 1311,
+      "sha256": "b226a751b86293079b49d417df56ef98e3a9196bc6877f2de5084a6196bfa4aa"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/checkpoint.py.status-corrected-1.diff.patch",
+      "bytes": 4609,
+      "sha256": "456bd9bcfafd8929bbce5dcfac64764c68c6e56fae6fce9fced4cfa31ca8572a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/facts-contract.json",
+      "bytes": 5686,
+      "sha256": "e74d8e036f3670a57f9b2590b164bbddca006bf436a1aff1eddbb0f7eb8d870d"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/facts-contract.json.status-corrected-1.diff.patch",
+      "bytes": 852,
+      "sha256": "f1a53694887c3aed81ab6aad860ada6b3897b656d389bf1c3dc9da2cbce6e3b4"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/first-draft-1/checkpoint.py",
+      "bytes": 36757,
+      "sha256": "c0b4f5faa8c83af2314968f987660b8a5c9397a6477807c3cd2b27694a5f1b1c"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/first-draft-1/facts-contract.json",
+      "bytes": 5470,
+      "sha256": "eff0581a32c356243c5e8059ed901721a2409623d3506c518993018d744f221c"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/first-draft-1/preparation.json",
+      "bytes": 2614,
+      "sha256": "9c3516a50c1db3ab07f4efd85be4ffaa79333617d873e8923f81cf9d91815393"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/first-draft-1/usage.md",
+      "bytes": 4282,
+      "sha256": "252a879602aa53198981275770468cd2c773bf23e024dc5728c74b412cdca7e5"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/first-next-metadata-amendment-failure.json",
+      "bytes": 272,
+      "sha256": "b5f80c5464c835a90a2c5d62f4b34e3dea407ad48377317b62c4b8dd3abe2f14"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "bytes": 6190,
+      "sha256": "b32d80aa962525d6c91fd9087dc3511cfab833ae9004459be0978a755dfe36b8"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/status-corrected-1-frozen/checkpoint.py",
+      "bytes": 38031,
+      "sha256": "75a44e2cc51a6a743229260e029e6a9ec8149a3f7d0b363a16ef44399dbb4b56"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/status-corrected-1-frozen/facts-contract.json",
+      "bytes": 5686,
+      "sha256": "e74d8e036f3670a57f9b2590b164bbddca006bf436a1aff1eddbb0f7eb8d870d"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/status-corrected-1-frozen/preparation.json",
+      "bytes": 3927,
+      "sha256": "8448b5eedddae32fe0faddfe639119ce362ebb54b491d567d96c61bd1104dfa7"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/status-corrected-1-frozen/usage.md",
+      "bytes": 4503,
+      "sha256": "294aeebf5b23018b4c842499daeb4c83a28d65420e35d1a35dc3b88d5eeb12b9"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/usage.md",
+      "bytes": 4967,
+      "sha256": "47580a6ee3410f0be47a502787a6b20d4bc99fd4aa0d154946a4c1a390b3ef13"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/usage.md.next-metadata-c1.diff.patch",
+      "bytes": 783,
+      "sha256": "606691eb49c52758792b347cd9687b1a25ad28d6c90f7288dd34361d4b2bc62d"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/log-original-call-checkpoint-prepared-1/usage.md.status-corrected-1.diff.patch",
+      "bytes": 804,
+      "sha256": "542937623b57bf8290ae09cd7606f5229e628d4f530c18e52c2a33e0de81748e"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-corrected-1.log",
+      "bytes": 810,
+      "sha256": "421d7b2ae74c3bac604d01d7877c9536cf3d597663fd5b318a93255eef2273c6"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-corrected-2.log",
+      "bytes": 1264,
+      "sha256": "a9eff162925ae32018dc75e6176b114898fc54bbc62820b68303f79682fdff11"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-corrected-3.log",
+      "bytes": 1308,
+      "sha256": "2a883293113a4452a3c88c8a67a4822d768c932d9c74560bc6a0ca6c15614257"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-first.log",
+      "bytes": 338,
+      "sha256": "ed37e072f14233ea7de7b42195255f3434d4fb8fa4e1d1a207ebd9baad303773"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-1/owned-server.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-1/owned-server.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-1/report.json",
+      "bytes": 1137,
+      "sha256": "02fe8310378f4237cb2b24e2f70e671cc7375a27919707a497c446ca763978b4"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/owned-server.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/owned-server.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/report.json",
+      "bytes": 1678,
+      "sha256": "9a54227f5d0eb645bbd55aad219a4f71561f7102b7f25c65aa536555ec1f3b78"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/owned-server.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/owned-server.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/report.json",
+      "bytes": 2177,
+      "sha256": "4ebf4f8d4bf24c41c3afdf9355074fb755015cd09cf647fe31363aed5f7c1a0d"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/owned-server.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/owned-server.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/report.json",
+      "bytes": 2427,
+      "sha256": "edc05978ee448b89e77fd6e668e45d5e5a89014200eae3c2d51305b79a93cfee"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-smoke-corrected-1.cjs",
+      "bytes": 21147,
+      "sha256": "70d8043c3803ab7407a48c83c5078531c2fdfb8b97def89f69757520ba04695a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-smoke-corrected-2.cjs",
+      "bytes": 24804,
+      "sha256": "e2767d4deffa7c6a411a1762cd40d28813aa06bd52bf466de12f521f3c0e0ac6"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-smoke-corrected-3.cjs",
+      "bytes": 25340,
+      "sha256": "70a8f443944153cc7ae42de4e9a66623b57a262d0d0f501ab5682815e570b277"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-smoke-corrected-4.cjs",
+      "bytes": 25304,
+      "sha256": "bd67ed5ce8b424cc4401cde6b708fbffe2886c3314e64cfbe7065aa6bb7adbf9"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-smoke-corrected-5.cjs",
+      "bytes": 25740,
+      "sha256": "9adb7512f98f6655e5c7c495f5ff95d8707f3e591e49061152a094360d054313"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-smoke-corrected-6.cjs",
+      "bytes": 26761,
+      "sha256": "9ba1c3d49ca8b57e296fde45bc2dc7460c1e5c56c1cf1b1a0d0c566507ffb86c"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-smoke.cjs",
+      "bytes": 19939,
+      "sha256": "5e8eab8a548ac100e15294677dd2139247e1da8d1d2ef3bc35ec1da8c87a602e"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-1/expected-helper-shape.json",
+      "bytes": 871,
+      "sha256": "120813bda05b6dd1196ec3178ab7710d831b18eca532de28d8fdbec56a4c279c"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-1/first-review-harness-attempt.json",
+      "bytes": 416,
+      "sha256": "2aa2c2d5a22ff1a20f30fbfb34f3b2d46e26cb967e0903735f4f72f8fceb63b8"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-1/review-corrected-1.py",
+      "bytes": 6942,
+      "sha256": "9b4a07c25e5db3c83558ad530446c051bbd1caa46a8796f3cb5e77ccaf89f3dc"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-1/review.json",
+      "bytes": 5969,
+      "sha256": "f6ccd9f0f2aed066c6fe1d9cfdbf8973cdec661c3777686377905b775663aec5"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-1/review.py",
+      "bytes": 6821,
+      "sha256": "65ba94b50e223511e3a64ffaaac1b99cf1739a966b8091006fc3777a2b70d2e6"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-1/reviewed-browser-owned-smoke.cjs",
+      "bytes": 19939,
+      "sha256": "5e8eab8a548ac100e15294677dd2139247e1da8d1d2ef3bc35ec1da8c87a602e"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-1/validation.json",
+      "bytes": 630,
+      "sha256": "d0d3915f5b0299b2520d5afd282f0bdf245c75afa96551eb7c3210b2d057af11"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-2/browser-owned-smoke-corrected-1.cjs",
+      "bytes": 21147,
+      "sha256": "70d8043c3803ab7407a48c83c5078531c2fdfb8b97def89f69757520ba04695a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-2/browser-owned-smoke-corrected-2.cjs",
+      "bytes": 24804,
+      "sha256": "e2767d4deffa7c6a411a1762cd40d28813aa06bd52bf466de12f521f3c0e0ac6"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-2/review.json",
+      "bytes": 3817,
+      "sha256": "29e1e98ef6d9dc937e1bb68c6fea2d6c6cd6d9d4e24236056041fb0e7b6f7647"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-2/review.py",
+      "bytes": 4998,
+      "sha256": "6eb5cf16c542534dc7b9417325d57e9087231ce56bf24073541969c9aa21848b"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-2/validation.json",
+      "bytes": 531,
+      "sha256": "fb14651d915e7d851f375b6e83e484082e6d2e2ccf26710ef07b45074eaf9e30"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-3/exact-corrected-2-to-3-diff.json",
+      "bytes": 2394,
+      "sha256": "8862b9592d2c8ca0f603b461ffc369933de07b0847942256f61789982f2f9f6a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-3/review.json",
+      "bytes": 5702,
+      "sha256": "720c080af8073e051ea9cfc2a8364516a805c39bb6122705269f84eca715f063"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-3/review.py",
+      "bytes": 6960,
+      "sha256": "f42633183d5b9933deb5b5bf9ae6873fd3bcc67a10b5cfb6bcc04f05f64af357"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-3/reviewed-browser-owned-smoke-corrected-3.cjs",
+      "bytes": 25340,
+      "sha256": "70a8f443944153cc7ae42de4e9a66623b57a262d0d0f501ab5682815e570b277"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-3/validation.json",
+      "bytes": 619,
+      "sha256": "05ff41b2b63b981f23a35984570849e276a0297c7169609e0df51eea0b3e128d"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-4/diff.json",
+      "bytes": 4062,
+      "sha256": "a90349b52e828ebd63d51f49a949f4a5f92dd4f6090f85ce779d701fcdc7e6a5"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-4/review.json",
+      "bytes": 3145,
+      "sha256": "e6bafe912f731fc9f62104e8f28009f8990a95b0e99d208d5d0f78049efe98e1"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-4/review.py",
+      "bytes": 4022,
+      "sha256": "042ea1e7d39c84e34fe74b0d22dee1fa3b187f3a5eccf1a44750af002f3bfdda"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-4/reviewed-browser-owned-smoke-corrected-4.cjs",
+      "bytes": 25304,
+      "sha256": "bd67ed5ce8b424cc4401cde6b708fbffe2886c3314e64cfbe7065aa6bb7adbf9"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-4/validation.json",
+      "bytes": 503,
+      "sha256": "d96a134f8305b1c065cf0f6ca2fd481f0d396142decdc501e63e33f7f35207bc"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/corrected-4-to-5-diff.json",
+      "bytes": 3099,
+      "sha256": "245e3c27335eb72c9fc463460056c7bd212e751f5ef276f3393a37603d75e9ef"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/derive.py",
+      "bytes": 9804,
+      "sha256": "3c8417bb5c7632ec5156b20051ca37ab1a9d35c72417c9de8388b1de2812a088"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/own-source-excerpts.json",
+      "bytes": 21078,
+      "sha256": "e57e761224271b89a6127527c24a07e99ef1375f8953965e9ed745ef0d01f099"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/recipe-review.json",
+      "bytes": 3644,
+      "sha256": "29f2c1612722a0e6ac4a9914a1ecd0ca8f96814ec33bad277f50f2ce89a01f4e"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/recipe-validation.json",
+      "bytes": 822,
+      "sha256": "d5bd99e02d397f7ddc60535139d7a3bea87df803c268dc19b0069f8465ff195f"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/report.json",
+      "bytes": 6000,
+      "sha256": "c743e8db0978b40842cef570516996004dc05c5bff3bac37477649491fc4ca4d"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/review-corrected-5.py",
+      "bytes": 5300,
+      "sha256": "cca719fc9d4ef2b2bfc6baf99b7c3a81e1cec85c479f0c205f419efc6e5b46f4"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/reviewed-browser-owned-smoke-corrected-5.cjs",
+      "bytes": 25740,
+      "sha256": "9adb7512f98f6655e5c7c495f5ff95d8707f3e591e49061152a094360d054313"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-5/validation.json",
+      "bytes": 452,
+      "sha256": "7a1e21d1c4e1bad91ca7f4ac77131fd5df3178cf674b7cd3b53f3d5c7bda8de4"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-6/exact-diff.json",
+      "bytes": 5176,
+      "sha256": "44c54a627a722b656f238b171d7d2ebad98336e1d07e6f5abcf6e936eaaf21e6"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-6/review.json",
+      "bytes": 3961,
+      "sha256": "703355ed3d157abc236304afdc10cc74c91f23f6821d53b108385f0b9d62b1f8"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-6/review.py",
+      "bytes": 6486,
+      "sha256": "2605c328c53de49f704a1cc5f9fc999e1b8fbcd73179b106caa95e7d0e8328fb"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-6/reviewed-browser-owned-smoke-corrected-6.cjs",
+      "bytes": 26761,
+      "sha256": "9ba1c3d49ca8b57e296fde45bc2dc7460c1e5c56c1cf1b1a0d0c566507ffb86c"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/browser-static-review-6/validation.json",
+      "bytes": 571,
+      "sha256": "7e380c4d0bbd28610f5c55af8f6a3d69c03dea7515fa2c48e5ccf152050e8364"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/fixture-generation-first.log",
+      "bytes": 419,
+      "sha256": "c38b902ef0544f9d30b088071ce823268d956924ea6881c3822e72919f5c0682"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/frontend-all-first.log",
+      "bytes": 257,
+      "sha256": "87eb402f965b3fa5ba595246bb05aad9b7b3168ca788723fae82542498d98dd1"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/frontend-build-first.log",
+      "bytes": 8119,
+      "sha256": "67f1f2a4063918c3e259e390a2bce384a450daac6c13067ea5cec085cfc93d22"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/frontend-focused-first.log",
+      "bytes": 239,
+      "sha256": "fedc021b13cbc800576a467854a0e774cbb956943942f875bba5393580368199"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/native-control-tests-first.log",
+      "bytes": 530,
+      "sha256": "d285dce6e2654425544c190bce811b95384d94bddf9695073df723920412837b"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/native-http-controls-owned-loopback-1.log",
+      "bytes": 255,
+      "sha256": "de916d78e486510f44c32cfd7d39eb4d79ddccf77c94750bc29f9c38bff7d880"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/native-log-transport-tests-first.log",
+      "bytes": 1322,
+      "sha256": "07e7bcdb47021c285bcf46de848998638fa14fb156c4af838a8397352a60aca7"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/native-public-build-first.log",
+      "bytes": 1897,
+      "sha256": "238208f894d399bfb009e269a7fb4255d8d527f79d09ccea94568a9e4f8ad2c9"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/native-regression-tests-first.log",
+      "bytes": 2894,
+      "sha256": "35c771f62ff6a08d6f47415449abf024bcf105bfaed317bc52ca803357b32405"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/native-workbench-build-corrected-1.log",
+      "bytes": 1179,
+      "sha256": "4dbc4d17ca53766a28664cac03a699ff992a5e2442d5c46c91d18f102313b67a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/native-workbench-build-first.log",
+      "bytes": 3896,
+      "sha256": "d3e2cc81fb7cab96473f7538f3e19684526bf73c886c90e779bd5d13d1328c1a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "bytes": 2229,
+      "sha256": "bd01f3ea8e5ccd169f0799358085c87c35c613104e5f2df99315d426cfe9b7be"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/own-member-admission.json",
+      "bytes": 32188,
+      "sha256": "7017318c8743a7c54cdd9162067b3a81834a7dd5ca6be71d5b67eae4b3649fc2"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/prepare-root-facts-first.py",
+      "bytes": 11367,
+      "sha256": "30604e097c22e50bc6b3977c711c96a8457c0f19df804c8886375c3ed709df82"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/prepare-root-facts.py",
+      "bytes": 11440,
+      "sha256": "129bb0c5beaac9bb08ff14ee08a9f64d6bd156c6436f29b796853f83063ec0b3"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/root-facts.json",
+      "bytes": 98514,
+      "sha256": "78a348d83acddd625cc02600dd75db7504c6ae6fa3a9dfd1250d275e1dc18934"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-acceptance-1/source-commits.json",
+      "bytes": 2042,
+      "sha256": "a628f8415de8efc89e81224bec48a9c97f82f63112678bccb6662662bfdf6adc"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/before/ltl_filter_workbench.cpp",
+      "bytes": 20385,
+      "sha256": "9e95995b2d18a7a5cf1b4274564a9352cc3cb1fc0cd6f411e388f642178234a2"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/before/test_ltl_filter_route.cpp",
+      "bytes": 5137,
+      "sha256": "dafd8ea01a55d8e347a8e76376e4027be57cbe8af789bcb25c2001786020d3fd"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/before/test_ltl_filter_workbench.cpp",
+      "bytes": 41149,
+      "sha256": "9c22424c6c8a7b7c7046fa413a029d03d35fcbaf4a2f786322945676bd4c7a6a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/freeze.py",
+      "bytes": 5630,
+      "sha256": "4cbd334c25eb1ad83bd4b87f1466b8d282c347bec0112ec243366794a6e4a333"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/log_ltl_original_call_parser.hpp",
+      "bytes": 6876,
+      "sha256": "a86e2fdc2fa3b710b1734dcf0b4629526ebbc79ba15e2cd24f5224d99af88c57"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/ltl_filter_workbench.cpp",
+      "bytes": 21269,
+      "sha256": "f4ac49f995f4853ad53c67aa1a0bcb5ce6b636f0775a90bac7e45f0aba36db32"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/prebuild-report.json",
+      "bytes": 6793,
+      "sha256": "b00d627f2d7c917815309286ccb7fb9759403e0aaba09687288a9a36ec93a0bc"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/revision-2/freeze.py",
+      "bytes": 2239,
+      "sha256": "7f8003505f9b55879dc9542dbf8d928c5c92ee104b822e7ab1bc40a69f69e529"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/revision-2/log_ltl_original_call_parser.hpp",
+      "bytes": 6900,
+      "sha256": "ba04931e07055c4c62a487a085228084d225d99505396b69e50beb7d9801c212"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/revision-2/ltl_filter_workbench.cpp",
+      "bytes": 21269,
+      "sha256": "f4ac49f995f4853ad53c67aa1a0bcb5ce6b636f0775a90bac7e45f0aba36db32"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/revision-2/report.json",
+      "bytes": 1992,
+      "sha256": "b15ac09a8bc47c2ca79b29e8934b6dd5f010c260338d2ff0aa4c855615ecd4f0"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/revision-2/test_ltl_filter_route.cpp",
+      "bytes": 5533,
+      "sha256": "8cef96c530648a6250db838e55d0a42735a7abaf7c8112e27297e0fa89c578cd"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/revision-2/test_ltl_filter_workbench.cpp",
+      "bytes": 53770,
+      "sha256": "904a508cd4a8c76c254a407c66f350f295fe133cc548ffdda613c026c578d114"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/test_ltl_filter_route.cpp",
+      "bytes": 5533,
+      "sha256": "8cef96c530648a6250db838e55d0a42735a7abaf7c8112e27297e0fa89c578cd"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-1/test_ltl_filter_workbench.cpp",
+      "bytes": 53770,
+      "sha256": "904a508cd4a8c76c254a407c66f350f295fe133cc548ffdda613c026c578d114"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/log_ltl_original_call_parser.hpp",
+      "bytes": 6900,
+      "sha256": "ba04931e07055c4c62a487a085228084d225d99505396b69e50beb7d9801c212"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/ltl_filter_workbench.cpp",
+      "bytes": 21269,
+      "sha256": "f4ac49f995f4853ad53c67aa1a0bcb5ce6b636f0775a90bac7e45f0aba36db32"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/review.json",
+      "bytes": 8208,
+      "sha256": "97d8e19d610cc942b8fd9b9b13b1f49a48a4c056cc27ba9b84e41bb51fc8b1d5"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/review.py",
+      "bytes": 10166,
+      "sha256": "c3a6412fc3355570b516ed42170ae7b969d833fd30c9b955e1543536f123e73b"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/source-diffs.json",
+      "bytes": 10674,
+      "sha256": "a586f16df10a75b0a4dfd530407de638356e1050086ebf10fd0e1d9cdbe43c5b"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/test_ltl_filter_route.cpp",
+      "bytes": 5533,
+      "sha256": "8cef96c530648a6250db838e55d0a42735a7abaf7c8112e27297e0fa89c578cd"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/test_ltl_filter_workbench.cpp",
+      "bytes": 53770,
+      "sha256": "904a508cd4a8c76c254a407c66f350f295fe133cc548ffdda613c026c578d114"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-backend-independent-review-1/validation.json",
+      "bytes": 596,
+      "sha256": "7a7cb31288c42477afb5222945da235a9f8e130030042a06e19499ba6deb1588"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/before-bindings.json",
+      "bytes": 1050,
+      "sha256": "c4c34cbc1cc1916e6d14291236a3435da42a5ac2b2a65c4e16588d47b48638b2"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/before/docs/ltl-filter-workflow.md",
+      "bytes": 17283,
+      "sha256": "6863bba061fb218cafbd6c0b24fff8d4cc6142750c1da1e0c16410e8dc6c6bfd"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/before/src/frontend/src/components/LtlFilterWorkspace.tsx",
+      "bytes": 19912,
+      "sha256": "4edf3e554e2961c10c671344d9a426d195682a830d4f52649adbf010132e31b2"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/before/src/frontend/src/ltl-filters.ts",
+      "bytes": 19230,
+      "sha256": "0e5c37fd4e3d31dac01d0e7dfaa7ab25c59652fc23191091a8ba78cb814ff841"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/before/src/frontend/tests/ltl-filter-workspace.test.ts",
+      "bytes": 12417,
+      "sha256": "2ae0ad276d99cd8a6a257f4e81e9101ef3c1ec4b32563c15ed4e58093910cac3"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/before/src/frontend/tests/ltl-filters.test.ts",
+      "bytes": 24227,
+      "sha256": "2e4b3b7d1d9be8ed2b63bea58bea76b70dbf3dd9ac69ffb0525436e9a7c0f93d"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/freeze.py",
+      "bytes": 4753,
+      "sha256": "be06521c7153b71cd3a4aa0c46e223efe5467dc296ea17d3d6b59fe8b5ae9556"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/prebuild-report.json",
+      "bytes": 6834,
+      "sha256": "146837a09f11cdfdb66cb0030498a358bdb63aa8ce1981ac91f611c54c8e9138"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-1/source-diffs.json",
+      "bytes": 64675,
+      "sha256": "e437c72c4880fcccd4f9e2ab9f23e5aab7723fe359411761269608991c83d3c9"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/all297-independent-mappings.jsonl",
+      "bytes": 170585,
+      "sha256": "9b58c1779fb681ad8427835f0c086bd956b9ba9131950d17647558782c1325b7"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/frontend-wrapper-review.json",
+      "bytes": 7458,
+      "sha256": "bae249392c412614b9e1c786659b32cbd1561555433751768a209d17a6cbd7a7"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/review-fixture.py",
+      "bytes": 16100,
+      "sha256": "93ab3dcc376c4ede7c544d822945ee0176b8e739912501b33c9a0cf7d088f3c5"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/review-frontend-wrapper.py",
+      "bytes": 7764,
+      "sha256": "665b7b6591a817819cb9238a1b7bb38f7dd3011a9a54a8abd877fed52f1e6943"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/review.json",
+      "bytes": 7194,
+      "sha256": "8fb7cf62a1e05289cfa3b8d677d9da7a094bcef2a7fdf7d36415ce55691b3c78"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-packager-independent-review-1/first-static-helper-failure.json",
+      "bytes": 313,
+      "sha256": "9f7d78d0c72c6e94325705e202f84e0825466f0ff8edc6b73c2548043d261b68"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-packager-independent-review-1/freeze.json",
+      "bytes": 1483,
+      "sha256": "27e3292644e3590a045e60f200c98ac48abeb93a4fca9a8fa59cb3e4fad9c3b0"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-packager-independent-review-1/review-static-corrected-1.py",
+      "bytes": 9103,
+      "sha256": "5bf7b1cf87a66e331bb33fdfc6020b1abc1d83c1dc890c9c213ff8969c1eb612"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-packager-independent-review-1/review-static.py",
+      "bytes": 8910,
+      "sha256": "6e26b88624baa40fafa720f4574e91435f8fcd0ac4323d860b6497c283f6f275"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/ltl-log-original-call-packager-independent-review-1/review.json",
+      "bytes": 9698,
+      "sha256": "0bfbe4fd0250417af0eeacd4b1124c1791a651c3150c7a04ad819870fb816768"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/build/parity-closures/verify-utf8-checkpoint-capsules-root.py",
+      "bytes": 3140,
+      "sha256": "7520eedf195b85ba371c4518e568b0f5d94f5d8e32bbe1e90c805503c6049047"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/docs/ltl-filter-workflow.md",
+      "bytes": 22153,
+      "sha256": "5ed79758faba5e142c8777623e1b14568192e12fd714971517adbba862369658"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/backend/log_ltl_original_call_parser.hpp",
+      "bytes": 6900,
+      "sha256": "ba04931e07055c4c62a487a085228084d225d99505396b69e50beb7d9801c212"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/backend/ltl_filter_workbench.cpp",
+      "bytes": 21269,
+      "sha256": "f4ac49f995f4853ad53c67aa1a0bcb5ce6b636f0775a90bac7e45f0aba36db32"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/backend/tests/test_log_ltl_workbench_public.cpp",
+      "bytes": 3810,
+      "sha256": "ae63a5776cb86412c9822a94c440e61d2fe39fdd6ba34b16fed6dece41ebdc20"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/backend/tests/test_ltl_filter_route.cpp",
+      "bytes": 5533,
+      "sha256": "8cef96c530648a6250db838e55d0a42735a7abaf7c8112e27297e0fa89c578cd"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/backend/tests/test_ltl_filter_workbench.cpp",
+      "bytes": 53770,
+      "sha256": "904a508cd4a8c76c254a407c66f350f295fe133cc548ffdda613c026c578d114"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/frontend/src/components/LtlFilterWorkspace.tsx",
+      "bytes": 21373,
+      "sha256": "27c5e5f5cb44e554a29a24dbc7a6c606a0a196dead574004ed065884d202048d"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/frontend/src/ltl-filters.ts",
+      "bytes": 20309,
+      "sha256": "4c14bbebaa70f4417388fd70e715dc9c6dbba70e4e0c2298b7b22dcaac71748e"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/frontend/tests/ltl-filter-workspace.test.ts",
+      "bytes": 15839,
+      "sha256": "bbfaa2afcd03af3871feedafc7eb04bbfceb06ecfb102d532667ba68f1be176a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/frozen/src/frontend/tests/ltl-filters.test.ts",
+      "bytes": 32246,
+      "sha256": "cd5685bb06f77ba161de5fdf04fd7682ffb3a7d8abe6419a18d3a0a32ff41cae"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/native-control-tests-first.log",
+      "bytes": 530,
+      "sha256": "d285dce6e2654425544c190bce811b95384d94bddf9695073df723920412837b"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/native-http-controls-owned-loopback-1.log",
+      "bytes": 255,
+      "sha256": "de916d78e486510f44c32cfd7d39eb4d79ddccf77c94750bc29f9c38bff7d880"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/native-log-transport-tests-first.log",
+      "bytes": 1322,
+      "sha256": "07e7bcdb47021c285bcf46de848998638fa14fb156c4af838a8397352a60aca7"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/native-public-build-first.log",
+      "bytes": 1897,
+      "sha256": "238208f894d399bfb009e269a7fb4255d8d527f79d09ccea94568a9e4f8ad2c9"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/native-regression-tests-first.log",
+      "bytes": 2894,
+      "sha256": "35c771f62ff6a08d6f47415449abf024bcf105bfaed317bc52ca803357b32405"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/native-workbench-build-corrected-1.log",
+      "bytes": 1179,
+      "sha256": "4dbc4d17ca53766a28664cac03a699ff992a5e2442d5c46c91d18f102313b67a"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "bytes": 2229,
+      "sha256": "bd01f3ea8e5ccd169f0799358085c87c35c613104e5f2df99315d426cfe9b7be"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/root-facts.json",
+      "bytes": 98514,
+      "sha256": "78a348d83acddd625cc02600dd75db7504c6ae6fa3a9dfd1250d275e1dc18934"
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/source-commits.json",
+      "bytes": 2042,
+      "sha256": "a628f8415de8efc89e81224bec48a9c97f82f63112678bccb6662662bfdf6adc"
+    },
+    {
+      "path": "build/parity-closures/verify-utf8-checkpoint-capsules-root.py",
+      "bytes": 3140,
+      "sha256": "7520eedf195b85ba371c4518e568b0f5d94f5d8e32bbe1e90c805503c6049047"
+    }
+  ],
+  "embedded_members": 203,
+  "omitted_artifact_bindings": [
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/first-draft-1/checkpoint.py",
+      "bytes": 36757,
+      "sha256": "c0b4f5faa8c83af2314968f987660b8a5c9397a6477807c3cd2b27694a5f1b1c",
+      "origin": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/checkpoint.py.status-corrected-1.diff.patch",
+      "bytes": 4609,
+      "sha256": "456bd9bcfafd8929bbce5dcfac64764c68c6e56fae6fce9fced4cfa31ca8572a",
+      "origin": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/facts-contract.json.status-corrected-1.diff.patch",
+      "bytes": 852,
+      "sha256": "f1a53694887c3aed81ab6aad860ada6b3897b656d389bf1c3dc9da2cbce6e3b4",
+      "origin": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/usage.md.status-corrected-1.diff.patch",
+      "bytes": 804,
+      "sha256": "542937623b57bf8290ae09cd7606f5229e628d4f530c18e52c2a33e0de81748e",
+      "origin": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/status-corrected-1-frozen/checkpoint.py",
+      "bytes": 38031,
+      "sha256": "75a44e2cc51a6a743229260e029e6a9ec8149a3f7d0b363a16ef44399dbb4b56",
+      "origin": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/checkpoint.py.next-metadata-c1.diff.patch",
+      "bytes": 1311,
+      "sha256": "b226a751b86293079b49d417df56ef98e3a9196bc6877f2de5084a6196bfa4aa",
+      "origin": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/usage.md.next-metadata-c1.diff.patch",
+      "bytes": 783,
+      "sha256": "606691eb49c52758792b347cd9687b1a25ad28d6c90f7288dd34361d4b2bc62d",
+      "origin": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/log-original-call-checkpoint-prepared-1/first-next-metadata-amendment-failure.json",
+      "bytes": 272,
+      "sha256": "b5f80c5464c835a90a2c5d62f4b34e3dea407ad48377317b62c4b8dd3abe2f14",
+      "origin": "build/parity-closures/log-original-call-checkpoint-prepared-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/receipt-index-root-acceptance/flat-manifest.json",
+      "bytes": 40126,
+      "sha256": "a6ec6b3529dea741c50f87b1d524639c601032bd833a63d551f623d5e6a6eb3e",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-expected.json",
+      "bytes": 823,
+      "sha256": "6843d794011f9ed384da685f006a862f44af97f114c88aa2e7747feec0648ec2",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-boundaries-public-actual-1/records.jsonl",
+      "bytes": 129539,
+      "sha256": "14c5db7b4369a763c2e15e763e9c8985b87d3d2fb9a1daac25e98d3664297635",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-helper-public-actual-1/records.jsonl",
+      "bytes": 243682,
+      "sha256": "317adbbc07e87666026dc79c8929066cfe0a10b255f3f9bd115bc3dc639c67ae",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-indexing-public-actual-1/records.jsonl",
+      "bytes": 109211,
+      "sha256": "603edbf459a2bcf6afbb97b1b26958cd2cb2673e998b7331b97fececa14f5896",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-multibounds-public-actual-1/records.jsonl",
+      "bytes": 131423,
+      "sha256": "2b97ce226fd01b723ca0358df9980949a4975e57ff23e8d3c0b52ba3a6e98222",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-actual-1/records.jsonl",
+      "bytes": 52579062,
+      "sha256": "432cd58f508d7787ced3e47eea79b724cfb7374e69fb759cefbaef813afba92e",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-witness-public-actual-1/records.jsonl",
+      "bytes": 226080,
+      "sha256": "78f8289f8748aa88d3afc247e4bad106110a1297ad62d9b87916c1282cf03c02",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "include/minera/log_ltl_filter.hpp",
+      "bytes": 2337,
+      "sha256": "bc3d58e71e09524edf5306e41e2f3641130b62057258666f3cd609fc5822280c",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_ltl_filter.cpp",
+      "bytes": 21463,
+      "sha256": "74d3389d82cd807f3863342d9ecd50b591c397b7bad63eab7bb5ad1126c89a56",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/ltl_filter_workbench.cpp",
+      "bytes": 20385,
+      "sha256": "9e95995b2d18a7a5cf1b4274564a9352cc3cb1fc0cd6f411e388f642178234a2",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_log_ltl_filter.cpp",
+      "bytes": 4176860,
+      "sha256": "7557ccd210fb886ec26f45083a81292dffe3ef980d8261ede13c2a38c1d0e4ec",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-prepared-1/generate-native-tests.py",
+      "bytes": 13741,
+      "sha256": "82d7cc78789896ce13092fa3978c9dd3a69a99c7dc2f29900ea192ea1f3b10e2",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-actual-1/executed-capture-public.py",
+      "bytes": 17206,
+      "sha256": "1c0e702489f6e0c40915eaee526b4ea2507e34fa52b4985dbc8580cf2d170341",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-public-surface-actual-1/capture.json",
+      "bytes": 18822,
+      "sha256": "06fd5430fc1ab53481e4bc661d9fdafe8f2c90ff3c67991e81326c71714e1bab",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_attribute_repetition_controls.cpp",
+      "bytes": 9389,
+      "sha256": "1f559ca4ac69a6526fa671a0c726402e3c54e54b50b1dced6d59d1a05f6bc490",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/ltl-filters.ts",
+      "bytes": 19230,
+      "sha256": "0e5c37fd4e3d31dac01d0e7dfaa7ab25c59652fc23191091a8ba78cb814ff841",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/components/LtlFilterWorkspace.tsx",
+      "bytes": 19912,
+      "sha256": "4edf3e554e2961c10c671344d9a426d195682a830d4f52649adbf010132e31b2",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/components/OriginalLtlFilter.tsx",
+      "bytes": 9814,
+      "sha256": "65edf41a1141d1d21261baf2fe51a1492af10f537d63ca66f2cab0fbcfdda32c",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/exact_filter_discovery_json.cpp",
+      "bytes": 68776,
+      "sha256": "5ed387ef7c66067664cdfb4a9feb5159611b380c0b6dc7074e10926db681f0e1",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/receipt-analysis.json",
+      "bytes": 13574,
+      "sha256": "b0a1d196cfb186eee825643b618cfd8f0740e24606205616b0530539161abf82",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/admitted-297-control-metadata.jsonl",
+      "bytes": 250669,
+      "sha256": "be6d906dd987e78b8534fc292f0cc075c100008adef98908d2d46debc926504f",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/candidate-full297-control-projections.jsonl",
+      "bytes": 182846,
+      "sha256": "7834c131868d05291bf3e3e1311ba304569abe32e5f11c242ac244188680d957",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/admitted-297-control-metadata.jsonl",
+      "bytes": 250669,
+      "sha256": "be6d906dd987e78b8534fc292f0cc075c100008adef98908d2d46debc926504f",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/full297-carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-public-surface-actual-1/capture.json",
+      "bytes": 18822,
+      "sha256": "06fd5430fc1ab53481e4bc661d9fdafe8f2c90ff3c67991e81326c71714e1bab",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/full297-carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/candidate-full297-control-projections.jsonl",
+      "bytes": 182846,
+      "sha256": "7834c131868d05291bf3e3e1311ba304569abe32e5f11c242ac244188680d957",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/full297-carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-prepared-1/generate-native-tests.py",
+      "bytes": 13741,
+      "sha256": "82d7cc78789896ce13092fa3978c9dd3a69a99c7dc2f29900ea192ea1f3b10e2",
+      "origin": "build/parity-closures/admitted-log-ltl-next-product-review-1/full297-carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-boundaries-public-actual-1/records.jsonl",
+      "bytes": 129539,
+      "sha256": "14c5db7b4369a763c2e15e763e9c8985b87d3d2fb9a1daac25e98d3664297635",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-helper-public-actual-1/records.jsonl",
+      "bytes": 243682,
+      "sha256": "317adbbc07e87666026dc79c8929066cfe0a10b255f3f9bd115bc3dc639c67ae",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-indexing-public-actual-1/records.jsonl",
+      "bytes": 109211,
+      "sha256": "603edbf459a2bcf6afbb97b1b26958cd2cb2673e998b7331b97fececa14f5896",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-multibounds-public-actual-1/records.jsonl",
+      "bytes": 131423,
+      "sha256": "2b97ce226fd01b723ca0358df9980949a4975e57ff23e8d3c0b52ba3a6e98222",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-actual-1/records.jsonl",
+      "bytes": 52579062,
+      "sha256": "432cd58f508d7787ced3e47eea79b724cfb7374e69fb759cefbaef813afba92e",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-witness-public-actual-1/records.jsonl",
+      "bytes": 226080,
+      "sha256": "78f8289f8748aa88d3afc247e4bad106110a1297ad62d9b87916c1282cf03c02",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_log_ltl_filter.cpp",
+      "bytes": 4176860,
+      "sha256": "7557ccd210fb886ec26f45083a81292dffe3ef980d8261ede13c2a38c1d0e4ec",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/log_ltl_workbench_public_vectors.inc",
+      "bytes": 648141,
+      "sha256": "45f57882b721f726605246af8da88daab6185d8c9d17a2ca6090bb5c00a87662",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-boundaries-public-actual-1/records.jsonl",
+      "bytes": 129539,
+      "sha256": "14c5db7b4369a763c2e15e763e9c8985b87d3d2fb9a1daac25e98d3664297635",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-helper-public-actual-1/records.jsonl",
+      "bytes": 243682,
+      "sha256": "317adbbc07e87666026dc79c8929066cfe0a10b255f3f9bd115bc3dc639c67ae",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-indexing-public-actual-1/records.jsonl",
+      "bytes": 109211,
+      "sha256": "603edbf459a2bcf6afbb97b1b26958cd2cb2673e998b7331b97fececa14f5896",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-multibounds-public-actual-1/records.jsonl",
+      "bytes": 131423,
+      "sha256": "2b97ce226fd01b723ca0358df9980949a4975e57ff23e8d3c0b52ba3a6e98222",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-actual-1/records.jsonl",
+      "bytes": 52579062,
+      "sha256": "432cd58f508d7787ced3e47eea79b724cfb7374e69fb759cefbaef813afba92e",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-witness-public-actual-1/records.jsonl",
+      "bytes": 226080,
+      "sha256": "78f8289f8748aa88d3afc247e4bad106110a1297ad62d9b87916c1282cf03c02",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_ltl_filter.cpp",
+      "bytes": 21463,
+      "sha256": "74d3389d82cd807f3863342d9ecd50b591c397b7bad63eab7bb5ad1126c89a56",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_log_ltl_filter.cpp",
+      "bytes": 4176860,
+      "sha256": "7557ccd210fb886ec26f45083a81292dffe3ef980d8261ede13c2a38c1d0e4ec",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-prepared-1/generate-native-tests.py",
+      "bytes": 13741,
+      "sha256": "82d7cc78789896ce13092fa3978c9dd3a69a99c7dc2f29900ea192ea1f3b10e2",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-actual-1/executed-capture-public.py",
+      "bytes": 17206,
+      "sha256": "1c0e702489f6e0c40915eaee526b4ea2507e34fa52b4985dbc8580cf2d170341",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-public-surface-actual-1/capture.json",
+      "bytes": 18822,
+      "sha256": "06fd5430fc1ab53481e4bc661d9fdafe8f2c90ff3c67991e81326c71714e1bab",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/candidate-full297-control-projections.jsonl",
+      "bytes": 182846,
+      "sha256": "7834c131868d05291bf3e3e1311ba304569abe32e5f11c242ac244188680d957",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/receipt-index-root-acceptance/flat-manifest.json",
+      "bytes": 40126,
+      "sha256": "a6ec6b3529dea741c50f87b1d524639c601032bd833a63d551f623d5e6a6eb3e",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-expected.json",
+      "bytes": 823,
+      "sha256": "6843d794011f9ed384da685f006a862f44af97f114c88aa2e7747feec0648ec2",
+      "origin": "build/parity-closures/admitted-log-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_ltl_filter.cpp",
+      "bytes": 21463,
+      "sha256": "74d3389d82cd807f3863342d9ecd50b591c397b7bad63eab7bb5ad1126c89a56",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/pandas_ltl_filter.cpp",
+      "bytes": 19905,
+      "sha256": "78083f0dd57d53ba3395119de5650f29e2dc8d6551e0648367c41310367dd0cb",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/polars_ltl_filter.cpp",
+      "bytes": 34392,
+      "sha256": "baff88bc0f0b59d769e323afe8b56a4c4563cfcee277822727fb5f75891cd1d7",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/polars_ltl_original_call_parser.hpp",
+      "bytes": 8560,
+      "sha256": "c29cd03a284ba4a66cbd5d3473999d17384f188ec1cec66a4a56defe91c6da79",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/pandas_ltl_original_call_parser.hpp",
+      "bytes": 4005,
+      "sha256": "68a55f302338c250fd53b7147214cc2c9770f9c6b6f5f226eff535aa29fdf72c",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_log_ltl_filter.cpp",
+      "bytes": 4176860,
+      "sha256": "7557ccd210fb886ec26f45083a81292dffe3ef980d8261ede13c2a38c1d0e4ec",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_pandas_ltl_filter.cpp",
+      "bytes": 6677515,
+      "sha256": "7e2250ee98278cb153bb26e723802277ca60bf4f18eb231bbd1f8e5c01d05ad9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/polars_ltl_filter_public_vectors.inc",
+      "bytes": 4515742,
+      "sha256": "1b9c2b8740d8c17f94820d7ed057af78a498cdbce53520ffee8ae93405620111",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/pandas_ltl_workbench_public_vectors.inc",
+      "bytes": 897861,
+      "sha256": "4b52230f31557f239739cf0ce0060b472636a457bdede07d4c42c73158bfb280",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/polars_ltl_workbench_public_vectors.inc",
+      "bytes": 1484080,
+      "sha256": "78157fdb5359e253f4c8d17a2954adf98ca317b7accb57d1eee9a3cb5089ce50",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "scripts/retained_public_observation_inventory.py",
+      "bytes": 86550,
+      "sha256": "4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/original-invariants.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/receipt-index-root-acceptance/flat-manifest.json",
+      "bytes": 40126,
+      "sha256": "a6ec6b3529dea741c50f87b1d524639c601032bd833a63d551f623d5e6a6eb3e",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-public-actual-1/validation.json",
+      "bytes": 9621,
+      "sha256": "cd39f07289a9d62172207f7ce43f7c092adccc4c5160fad60d533fb28b4a7849",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-public-prepared-1/capture-public.py",
+      "bytes": 16189,
+      "sha256": "38d410e93fc448e37a79ecc2624bce102abaf49da543389a821207185537c08b",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-boundaries-public-actual-1/validation.json",
+      "bytes": 9614,
+      "sha256": "f08a33907fa34cc607537b864cb6d9553bb7f6e5c330bc3becabf970b7520f2f",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-boundaries-prepared-1/capture-public.py",
+      "bytes": 16251,
+      "sha256": "15280c81b453cf6f93a5ceb36a72cc8164587ea273e7d45687e12ef440f46530",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-parameters-public-actual-1/validation.json",
+      "bytes": 9610,
+      "sha256": "26063e68b020ff8dc2ed5cc9c2f3c6912a45fbc52eec6c4de75582b7ba51fa9e",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-parameters-prepared-1/capture-public.py",
+      "bytes": 16325,
+      "sha256": "ddcb522e1eb72d6a1873486a86e0f8fe9f494ff1e540adfb46cf113d7bf778e8",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-forwarding-public-actual-1/validation.json",
+      "bytes": 9610,
+      "sha256": "683051d036663eef7ac1f6cca98285ad30cbd726fe69e0a72d0b51daa2a7ee17",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-forwarding-prepared-1/capture-public.py",
+      "bytes": 16399,
+      "sha256": "0418a6c4e792884b33523458417069a160d56f47310200026d24207b15094623",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-ranking-public-actual-1/validation.json",
+      "bytes": 9610,
+      "sha256": "791cb59bbcbaf060e4b102b9a6d5d1ed6edf7ff2dd0edc654cbe8d7e4da05d12",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-ranking-prepared-1/capture-public.py",
+      "bytes": 16473,
+      "sha256": "e3097e63df63c0f76c5e540aa5e18e66c9a7007e718a1633be7beb4540a194bb",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-relative-public-actual-1/validation.json",
+      "bytes": 9610,
+      "sha256": "1d9d96a458f3d60c30d0c7bdf2ea41c4ed2786bccc124122e3c9010a82209ab5",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-relative-prepared-1/capture-public.py",
+      "bytes": 16544,
+      "sha256": "cbb53e9bd545ad632da64a42abb573732dd1e6f60613b2ef4074704e6b1df581",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/PARITY_HANDOFF.md",
+      "bytes": 127789,
+      "sha256": "3d8508af15f41dc990bdbad86141a60b02e3e35cca52825aeda46d10e9d3de93",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/retained-public-receipt-index.md",
+      "bytes": 4697,
+      "sha256": "d25a8c6d648a85915523b67f312257c3cdfe218136199c3bb811d42995145dee",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "scripts/retained_public_receipt_index.py",
+      "bytes": 26808,
+      "sha256": "885d16b3935a95d51d90fc09abd085dde3e46bf8732915bb25f520a0ac8ff613",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/log-attributes-filter-parity-contract.md",
+      "bytes": 8125,
+      "sha256": "7e825f6b2410c28c25a2a6144a1ce47b13cee7102793edab85f4d67cb4e7800b",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/pandas-attributes-filter-parity-contract.md",
+      "bytes": 12462,
+      "sha256": "c19f2fc43d2dd158fe085a848c98a31c4dd2b0ba7dc8a86f0de227a42444254b",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/polars-attributes-filter-parity-contract.md",
+      "bytes": 13147,
+      "sha256": "c625413a3e2d2397a1e18903d0faed17db05d8b37d3ba18aea5e430525149489",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "include/minera/log_attributes_filter.hpp",
+      "bytes": 4055,
+      "sha256": "e61731287d9bcf301cb7f3d48b1adab7558e413165db6fbe7fdb50eebcdf9025",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_attributes_filter.cpp",
+      "bytes": 29805,
+      "sha256": "a09591e703430a28c082cee8449df8f0ffaa331aefac729ccf9971e7abb12817",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_attributes_filter_workbench.cpp",
+      "bytes": 16838,
+      "sha256": "e2e7850ffcf4c366b74ff2390cc1dede86c9e7ec0096ea5b3e9bd38333b848c6",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_log_attributes_filter.cpp",
+      "bytes": 3481841,
+      "sha256": "657b5ab0e92b78de2e85adc685c1f6e949623f12390ddbeca382cc72a61a2e7c",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-attributes-log-public-prepared-1/generate-native-tests.py",
+      "bytes": 18838,
+      "sha256": "c677e38c205fc91c63dd135039b609f519eb57e3bd58bbe5efa701fd89b3af57",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/log-attributes-filters.ts",
+      "bytes": 13051,
+      "sha256": "a1503322ad35d40e95251dc18ce619c9c521fb204b2270f85c37be6de7c52072",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/components/LogAttributesFilterWorkspace.tsx",
+      "bytes": 15207,
+      "sha256": "9405330418bb10ca46f5bcfa132888845c53713fa24d669a82751ac13afbc579",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/table_attributes_filter_workbench.cpp",
+      "bytes": 13595,
+      "sha256": "7f8f2c73b0441f0c9837c9e670e5ec520a9fbfb2c635c90325edcc8cb76f8231",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "include/minera/polars_attributes_filter.hpp",
+      "bytes": 6136,
+      "sha256": "bc57dafa547e1c90b30cdd5cf8cd2356263e33770131155b38dfa92aac5be40e",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/table-attributes-filters.ts",
+      "bytes": 10967,
+      "sha256": "9e5ce65aa9e8e10fdaea46c91ee719a1df93224e237c8776c57a9fa12071fc04",
+      "origin": "build/parity-closures/admitted-next-product-after-log-ltl-review-1/scope-bindings.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-1/downloaded-example.csv",
+      "bytes": 245,
+      "sha256": "a160608a2bb70640a1395394f764c98ab4014afb123726ead52b44282903d858",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-1/landing-buttons.json",
+      "bytes": 2395,
+      "sha256": "632f6d47c633a52f0b5435b4cc21b01a6e02c0e8a88ab45ce6efd2edea82ab02",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-1/uploaded-own-example.csv",
+      "bytes": 275,
+      "sha256": "7b8ab8188098c24f3047bbac4023f884784598b1abe6240429020d6404df3972",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/downloaded-example.csv",
+      "bytes": 245,
+      "sha256": "a160608a2bb70640a1395394f764c98ab4014afb123726ead52b44282903d858",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/error-call-download.json",
+      "bytes": 188,
+      "sha256": "ca7c949bb3a2070b5cfad808e6793b7dca74ffc164f202506b9d764c7638ca84",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/error-response-download.json",
+      "bytes": 12886,
+      "sha256": "b1422b34cb1e2207e6d87eca38889103df4843d26bb4f0f57bc44a5e249e14c9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/error-source-after-download.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/error-source-download.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/filter-na-error-response.json",
+      "bytes": 12773,
+      "sha256": "2c0c2253d994adf41893b44e1a289ba06d807a4bb5a874aa8df826c364bfcc6e",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/filter-nat-response.json",
+      "bytes": 13239,
+      "sha256": "e2ee44e0103e49924f5b8dc18dd750de965be2f3fd3ad0c88785b50a63e27f8f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/filter-uuid-response.json",
+      "bytes": 13291,
+      "sha256": "5134e3a6ed8a9b3984660a75cdb5d42f2bd42f8a7efeb118186c0353ff86416e",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/friendly-log-default-response.json",
+      "bytes": 20477,
+      "sha256": "e156e7bdf8aa2ded1e0ccf26d092a42b0bcfbe89e28e6c26f9c3d921facaaee1",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/landing-buttons.json",
+      "bytes": 2395,
+      "sha256": "632f6d47c633a52f0b5435b4cc21b01a6e02c0e8a88ab45ce6efd2edea82ab02",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/log-raw-error.png",
+      "bytes": 122978,
+      "sha256": "dc1975de0c315073a863c9fddd5c20a82e1a861073eeb7ce34b6ee77c14650dc",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/original-different_persons-response.json",
+      "bytes": 13233,
+      "sha256": "fffc79fecbe76a09039de09bc2affdbe1dfb19d606cf53f7f73266b350ca9a9f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/original-eventually-response.json",
+      "bytes": 20617,
+      "sha256": "d29ca4332fdaf8432567a1b6d4f9e04f02e414e09f9951a43c93fe7abf72b539",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/original-four_eyes-response.json",
+      "bytes": 16922,
+      "sha256": "90d190b8e8f17de1ec96902c6dadb43581ab3ec944e1230081a7534ff8a0c131",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/original-next-response.json",
+      "bytes": 16955,
+      "sha256": "f0d4e36510391f1044f206903a5c1d67570e17bb6b6ddc9738b9abadd80db6c6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/original-timestamp_ge-response.json",
+      "bytes": 1777,
+      "sha256": "29ff827af3983dc2a29ee63c8c503cecf379280b98da9d6b243d9923e8bd2aed",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/raw-empty-list-response.json",
+      "bytes": 20670,
+      "sha256": "f3ffe5762c67d34cfbefa85b4c77079703871b7215d50f86283742bbd727f0a0",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/raw-integer-error-response.json",
+      "bytes": 12886,
+      "sha256": "b1422b34cb1e2207e6d87eca38889103df4843d26bb4f0f57bc44a5e249e14c9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/raw-null-response.json",
+      "bytes": 20657,
+      "sha256": "47793c503dd102d1227f0719ea687c2e7d11967cd4a18974668298106c63a3d2",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/typed-options-response.json",
+      "bytes": 13520,
+      "sha256": "27eea29742ef00b5b2e0f3092bde0e799c9bb8d05902a64bc3a71301e5509375",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/uploaded-own-example.csv",
+      "bytes": 275,
+      "sha256": "7b8ab8188098c24f3047bbac4023f884784598b1abe6240429020d6404df3972",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-2/uploaded-own-native-log.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/cancelled-native-response.json",
+      "bytes": 1668,
+      "sha256": "3919d1b7cce2cecdec191c770216033705ad5304ebd647183b6143c285dddd3a",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/complete-call-download.json",
+      "bytes": 259,
+      "sha256": "f4c785f92d748d524eb727020e9e15e55103bb970693b6a091219d5fd6e7a6d6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/complete-helper-download.json",
+      "bytes": 733,
+      "sha256": "e1a005479c70d546d70d6c72b75a039a23d08d5b1ff9a27d7777981647050eb6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/complete-log-download.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/complete-response-download.json",
+      "bytes": 1668,
+      "sha256": "3919d1b7cce2cecdec191c770216033705ad5304ebd647183b6143c285dddd3a",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/complete-xes-download.xes",
+      "bytes": 1617,
+      "sha256": "25e5039352a6eb3984b5aeaa72b45aa4a32858851da42dd8af8b8de313372e80",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/downloaded-example.csv",
+      "bytes": 245,
+      "sha256": "a160608a2bb70640a1395394f764c98ab4014afb123726ead52b44282903d858",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/error-call-download.json",
+      "bytes": 188,
+      "sha256": "ca7c949bb3a2070b5cfad808e6793b7dca74ffc164f202506b9d764c7638ca84",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/error-response-download.json",
+      "bytes": 12886,
+      "sha256": "b1422b34cb1e2207e6d87eca38889103df4843d26bb4f0f57bc44a5e249e14c9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/error-source-after-download.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/error-source-download.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/filter-na-error-response.json",
+      "bytes": 12773,
+      "sha256": "2c0c2253d994adf41893b44e1a289ba06d807a4bb5a874aa8df826c364bfcc6e",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/filter-nat-response.json",
+      "bytes": 13239,
+      "sha256": "e2ee44e0103e49924f5b8dc18dd750de965be2f3fd3ad0c88785b50a63e27f8f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/filter-uuid-response.json",
+      "bytes": 13291,
+      "sha256": "5134e3a6ed8a9b3984660a75cdb5d42f2bd42f8a7efeb118186c0353ff86416e",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/friendly-helper-response.json",
+      "bytes": 1356,
+      "sha256": "fd3386265d415743c38210c8191046f15610acaa0830e4bf24d80e200ad5f9e5",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/friendly-log-default-response.json",
+      "bytes": 20477,
+      "sha256": "e156e7bdf8aa2ded1e0ccf26d092a42b0bcfbe89e28e6c26f9c3d921facaaee1",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/helper-exact-import-response.json",
+      "bytes": 1668,
+      "sha256": "3919d1b7cce2cecdec191c770216033705ad5304ebd647183b6143c285dddd3a",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/helper-forbidden-params-response.json",
+      "bytes": 769,
+      "sha256": "118d216ae6a4b5b079f9e335ee824271673d98c61dd99d4f0063052f9cdf7f11",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/helper-nested-nat-response.json",
+      "bytes": 1706,
+      "sha256": "eb40d2b6be8b010fcf03f20479ce7eea67aee5d6d576c2a8c9e599a2fcf46f44",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/helper-null-error-response.json",
+      "bytes": 856,
+      "sha256": "637e1d8ead37a1740d2a46c0345d70c5a0e64fa887ac200e7181099d50380ce8",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/landing-buttons.json",
+      "bytes": 2395,
+      "sha256": "632f6d47c633a52f0b5435b4cc21b01a6e02c0e8a88ab45ce6efd2edea82ab02",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/log-filter-success.png",
+      "bytes": 120046,
+      "sha256": "5d087261475d8ca2f2aa921ac4a9318bcdb09974654badf0857f0bd40fb88530",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/log-helper-success.png",
+      "bytes": 98973,
+      "sha256": "0f514b9b6379be76ea2a8978cb67fc62b3c389bc8f27bd003871acb369faaef7",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/log-raw-error.png",
+      "bytes": 123957,
+      "sha256": "89c7aff20439f9f3de9a43611319b7ef0f883bbe8d23f5b3bbd7722530f3fdf7",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/original-different_persons-response.json",
+      "bytes": 13233,
+      "sha256": "fffc79fecbe76a09039de09bc2affdbe1dfb19d606cf53f7f73266b350ca9a9f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/original-eventually-response.json",
+      "bytes": 20617,
+      "sha256": "d29ca4332fdaf8432567a1b6d4f9e04f02e414e09f9951a43c93fe7abf72b539",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/original-four_eyes-response.json",
+      "bytes": 16922,
+      "sha256": "90d190b8e8f17de1ec96902c6dadb43581ab3ec944e1230081a7534ff8a0c131",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/original-next-response.json",
+      "bytes": 16955,
+      "sha256": "f0d4e36510391f1044f206903a5c1d67570e17bb6b6ddc9738b9abadd80db6c6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/original-reopen-response.json",
+      "bytes": 20617,
+      "sha256": "d29ca4332fdaf8432567a1b6d4f9e04f02e414e09f9951a43c93fe7abf72b539",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/original-timestamp_ge-response.json",
+      "bytes": 1777,
+      "sha256": "29ff827af3983dc2a29ee63c8c503cecf379280b98da9d6b243d9923e8bd2aed",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/original-timestamp_le-response.json",
+      "bytes": 1777,
+      "sha256": "52b669d0b9e42c9df53a42085385f1ebfd28e998d45bd83b5a587eab03e1330f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/raw-empty-list-response.json",
+      "bytes": 20670,
+      "sha256": "f3ffe5762c67d34cfbefa85b4c77079703871b7215d50f86283742bbd727f0a0",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/raw-integer-error-response.json",
+      "bytes": 12886,
+      "sha256": "b1422b34cb1e2207e6d87eca38889103df4843d26bb4f0f57bc44a5e249e14c9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/raw-null-response.json",
+      "bytes": 20657,
+      "sha256": "47793c503dd102d1227f0719ea687c2e7d11967cd4a18974668298106c63a3d2",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/reopened-mine-response.json",
+      "bytes": 126060,
+      "sha256": "4014ca36ea4d35398a1e8ad52d5977d0535a6cd35509c4c33f2f656e43f92180",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/typed-options-response.json",
+      "bytes": 13520,
+      "sha256": "27eea29742ef00b5b2e0f3092bde0e799c9bb8d05902a64bc3a71301e5509375",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/uploaded-own-example.csv",
+      "bytes": 275,
+      "sha256": "7b8ab8188098c24f3047bbac4023f884784598b1abe6240429020d6404df3972",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-3/uploaded-own-native-log.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/actual-reopen-fetch-form.json",
+      "bytes": 3562,
+      "sha256": "b104f22beb7b3511092adced12fd276d2fca223ca4916402709da6489f59147f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/cancelled-native-response.json",
+      "bytes": 1668,
+      "sha256": "3919d1b7cce2cecdec191c770216033705ad5304ebd647183b6143c285dddd3a",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/complete-call-download.json",
+      "bytes": 259,
+      "sha256": "f4c785f92d748d524eb727020e9e15e55103bb970693b6a091219d5fd6e7a6d6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/complete-helper-download.json",
+      "bytes": 733,
+      "sha256": "e1a005479c70d546d70d6c72b75a039a23d08d5b1ff9a27d7777981647050eb6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/complete-log-download.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/complete-response-download.json",
+      "bytes": 1668,
+      "sha256": "3919d1b7cce2cecdec191c770216033705ad5304ebd647183b6143c285dddd3a",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/complete-xes-download.xes",
+      "bytes": 1617,
+      "sha256": "25e5039352a6eb3984b5aeaa72b45aa4a32858851da42dd8af8b8de313372e80",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/downloaded-example.csv",
+      "bytes": 245,
+      "sha256": "a160608a2bb70640a1395394f764c98ab4014afb123726ead52b44282903d858",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/error-call-download.json",
+      "bytes": 188,
+      "sha256": "ca7c949bb3a2070b5cfad808e6793b7dca74ffc164f202506b9d764c7638ca84",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/error-response-download.json",
+      "bytes": 12886,
+      "sha256": "b1422b34cb1e2207e6d87eca38889103df4843d26bb4f0f57bc44a5e249e14c9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/error-source-after-download.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/error-source-download.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/filter-na-error-response.json",
+      "bytes": 12773,
+      "sha256": "2c0c2253d994adf41893b44e1a289ba06d807a4bb5a874aa8df826c364bfcc6e",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/filter-nat-response.json",
+      "bytes": 13239,
+      "sha256": "e2ee44e0103e49924f5b8dc18dd750de965be2f3fd3ad0c88785b50a63e27f8f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/filter-uuid-response.json",
+      "bytes": 13291,
+      "sha256": "5134e3a6ed8a9b3984660a75cdb5d42f2bd42f8a7efeb118186c0353ff86416e",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/friendly-helper-response.json",
+      "bytes": 1356,
+      "sha256": "fd3386265d415743c38210c8191046f15610acaa0830e4bf24d80e200ad5f9e5",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/friendly-log-default-response.json",
+      "bytes": 20477,
+      "sha256": "e156e7bdf8aa2ded1e0ccf26d092a42b0bcfbe89e28e6c26f9c3d921facaaee1",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/helper-exact-import-response.json",
+      "bytes": 1668,
+      "sha256": "3919d1b7cce2cecdec191c770216033705ad5304ebd647183b6143c285dddd3a",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/helper-forbidden-params-response.json",
+      "bytes": 769,
+      "sha256": "118d216ae6a4b5b079f9e335ee824271673d98c61dd99d4f0063052f9cdf7f11",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/helper-nested-nat-response.json",
+      "bytes": 1706,
+      "sha256": "eb40d2b6be8b010fcf03f20479ce7eea67aee5d6d576c2a8c9e599a2fcf46f44",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/helper-null-error-response.json",
+      "bytes": 856,
+      "sha256": "637e1d8ead37a1740d2a46c0345d70c5a0e64fa887ac200e7181099d50380ce8",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/landing-buttons.json",
+      "bytes": 2395,
+      "sha256": "632f6d47c633a52f0b5435b4cc21b01a6e02c0e8a88ab45ce6efd2edea82ab02",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/log-filter-success.png",
+      "bytes": 119843,
+      "sha256": "77709d04cc2ec8789d4d87c69fb5ba0e42d86d2545a2af989b49b3f3fcae58e3",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/log-helper-success.png",
+      "bytes": 98973,
+      "sha256": "0f514b9b6379be76ea2a8978cb67fc62b3c389bc8f27bd003871acb369faaef7",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/log-raw-error.png",
+      "bytes": 123489,
+      "sha256": "64ba576c36600c2495610429f8b64e5945bca1639281ecf8139f5e6b2f22dc99",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/original-different_persons-response.json",
+      "bytes": 13233,
+      "sha256": "fffc79fecbe76a09039de09bc2affdbe1dfb19d606cf53f7f73266b350ca9a9f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/original-eventually-response.json",
+      "bytes": 20617,
+      "sha256": "d29ca4332fdaf8432567a1b6d4f9e04f02e414e09f9951a43c93fe7abf72b539",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/original-four_eyes-response.json",
+      "bytes": 16922,
+      "sha256": "90d190b8e8f17de1ec96902c6dadb43581ab3ec944e1230081a7534ff8a0c131",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/original-next-response.json",
+      "bytes": 16955,
+      "sha256": "f0d4e36510391f1044f206903a5c1d67570e17bb6b6ddc9738b9abadd80db6c6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/original-reopen-response.json",
+      "bytes": 20617,
+      "sha256": "d29ca4332fdaf8432567a1b6d4f9e04f02e414e09f9951a43c93fe7abf72b539",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/original-timestamp_ge-response.json",
+      "bytes": 1777,
+      "sha256": "29ff827af3983dc2a29ee63c8c503cecf379280b98da9d6b243d9923e8bd2aed",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/original-timestamp_le-response.json",
+      "bytes": 1777,
+      "sha256": "52b669d0b9e42c9df53a42085385f1ebfd28e998d45bd83b5a587eab03e1330f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/raw-empty-list-response.json",
+      "bytes": 20670,
+      "sha256": "f3ffe5762c67d34cfbefa85b4c77079703871b7215d50f86283742bbd727f0a0",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/raw-integer-error-response.json",
+      "bytes": 12886,
+      "sha256": "b1422b34cb1e2207e6d87eca38889103df4843d26bb4f0f57bc44a5e249e14c9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/raw-null-response.json",
+      "bytes": 20657,
+      "sha256": "47793c503dd102d1227f0719ea687c2e7d11967cd4a18974668298106c63a3d2",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/reopened-active-log.png",
+      "bytes": 91973,
+      "sha256": "91efa3b1db3a8a9e0f18a46b771bb5ab01b27dea4a678909987bc71769b2bfe6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/reopened-mine-response.json",
+      "bytes": 126060,
+      "sha256": "4014ca36ea4d35398a1e8ad52d5977d0535a6cd35509c4c33f2f656e43f92180",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/typed-options-response.json",
+      "bytes": 13520,
+      "sha256": "27eea29742ef00b5b2e0f3092bde0e799c9bb8d05902a64bc3a71301e5509375",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/uploaded-own-example.csv",
+      "bytes": 275,
+      "sha256": "7b8ab8188098c24f3047bbac4023f884784598b1abe6240429020d6404df3972",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-acceptance-1/browser-owned-4/uploaded-own-native-log.json",
+      "bytes": 5391,
+      "sha256": "de36ad2c5705100cdb398608cd1bb9032ea89da734f3e25a7a98a8b458b5f191",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/log_ltl_workbench_public_vectors.inc",
+      "bytes": 648141,
+      "sha256": "45f57882b721f726605246af8da88daab6185d8c9d17a2ca6090bb5c00a87662",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-boundaries-public-actual-1/records.jsonl",
+      "bytes": 129539,
+      "sha256": "14c5db7b4369a763c2e15e763e9c8985b87d3d2fb9a1daac25e98d3664297635",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-helper-public-actual-1/records.jsonl",
+      "bytes": 243682,
+      "sha256": "317adbbc07e87666026dc79c8929066cfe0a10b255f3f9bd115bc3dc639c67ae",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-indexing-public-actual-1/records.jsonl",
+      "bytes": 109211,
+      "sha256": "603edbf459a2bcf6afbb97b1b26958cd2cb2673e998b7331b97fececa14f5896",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-multibounds-public-actual-1/records.jsonl",
+      "bytes": 131423,
+      "sha256": "2b97ce226fd01b723ca0358df9980949a4975e57ff23e8d3c0b52ba3a6e98222",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-actual-1/records.jsonl",
+      "bytes": 52579062,
+      "sha256": "432cd58f508d7787ced3e47eea79b724cfb7374e69fb759cefbaef813afba92e",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-witness-public-actual-1/records.jsonl",
+      "bytes": 226080,
+      "sha256": "78f8289f8748aa88d3afc247e4bad106110a1297ad62d9b87916c1282cf03c02",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_ltl_filter.cpp",
+      "bytes": 21463,
+      "sha256": "74d3389d82cd807f3863342d9ecd50b591c397b7bad63eab7bb5ad1126c89a56",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_log_ltl_filter.cpp",
+      "bytes": 4176860,
+      "sha256": "7557ccd210fb886ec26f45083a81292dffe3ef980d8261ede13c2a38c1d0e4ec",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-prepared-1/generate-native-tests.py",
+      "bytes": 13741,
+      "sha256": "82d7cc78789896ce13092fa3978c9dd3a69a99c7dc2f29900ea192ea1f3b10e2",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-log-public-actual-1/executed-capture-public.py",
+      "bytes": 17206,
+      "sha256": "1c0e702489f6e0c40915eaee526b4ea2507e34fa52b4985dbc8580cf2d170341",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/filtering-ltl-public-surface-actual-1/capture.json",
+      "bytes": 18822,
+      "sha256": "06fd5430fc1ab53481e4bc661d9fdafe8f2c90ff3c67991e81326c71714e1bab",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/candidate-full297-control-projections.jsonl",
+      "bytes": 182846,
+      "sha256": "7834c131868d05291bf3e3e1311ba304569abe32e5f11c242ac244188680d957",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/receipt-index-root-acceptance/flat-manifest.json",
+      "bytes": 40126,
+      "sha256": "a6ec6b3529dea741c50f87b1d524639c601032bd833a63d551f623d5e6a6eb3e",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-expected.json",
+      "bytes": 823,
+      "sha256": "6843d794011f9ed384da685f006a862f44af97f114c88aa2e7747feec0648ec2",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "include/minera/log_ltl_filter.hpp",
+      "bytes": 2337,
+      "sha256": "bc3d58e71e09524edf5306e41e2f3641130b62057258666f3cd609fc5822280c",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/ltl_filter_workbench.cpp",
+      "bytes": 20385,
+      "sha256": "9e95995b2d18a7a5cf1b4274564a9352cc3cb1fc0cd6f411e388f642178234a2",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_attribute_repetition_controls.cpp",
+      "bytes": 9389,
+      "sha256": "1f559ca4ac69a6526fa671a0c726402e3c54e54b50b1dced6d59d1a05f6bc490",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/ltl-filters.ts",
+      "bytes": 19230,
+      "sha256": "0e5c37fd4e3d31dac01d0e7dfaa7ab25c59652fc23191091a8ba78cb814ff841",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/components/LtlFilterWorkspace.tsx",
+      "bytes": 19912,
+      "sha256": "4edf3e554e2961c10c671344d9a426d195682a830d4f52649adbf010132e31b2",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/src/components/OriginalLtlFilter.tsx",
+      "bytes": 9814,
+      "sha256": "65edf41a1141d1d21261baf2fe51a1492af10f537d63ca66f2cab0fbcfdda32c",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/exact_filter_discovery_json.cpp",
+      "bytes": 68776,
+      "sha256": "5ed387ef7c66067664cdfb4a9feb5159611b380c0b6dc7074e10926db681f0e1",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/receipt-analysis.json",
+      "bytes": 13574,
+      "sha256": "b0a1d196cfb186eee825643b618cfd8f0740e24606205616b0530539161abf82",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/admitted-log-ltl-next-product-review-1/admitted-297-control-metadata.jsonl",
+      "bytes": 250669,
+      "sha256": "be6d906dd987e78b8534fc292f0cc075c100008adef98908d2d46debc926504f",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/pandas_ltl_filter.cpp",
+      "bytes": 19905,
+      "sha256": "78083f0dd57d53ba3395119de5650f29e2dc8d6551e0648367c41310367dd0cb",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/polars_ltl_filter.cpp",
+      "bytes": 34392,
+      "sha256": "baff88bc0f0b59d769e323afe8b56a4c4563cfcee277822727fb5f75891cd1d7",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/polars_ltl_original_call_parser.hpp",
+      "bytes": 8560,
+      "sha256": "c29cd03a284ba4a66cbd5d3473999d17384f188ec1cec66a4a56defe91c6da79",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/pandas_ltl_original_call_parser.hpp",
+      "bytes": 4005,
+      "sha256": "68a55f302338c250fd53b7147214cc2c9770f9c6b6f5f226eff535aa29fdf72c",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_pandas_ltl_filter.cpp",
+      "bytes": 6677515,
+      "sha256": "7e2250ee98278cb153bb26e723802277ca60bf4f18eb231bbd1f8e5c01d05ad9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/polars_ltl_filter_public_vectors.inc",
+      "bytes": 4515742,
+      "sha256": "1b9c2b8740d8c17f94820d7ed057af78a498cdbce53520ffee8ae93405620111",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/pandas_ltl_workbench_public_vectors.inc",
+      "bytes": 897861,
+      "sha256": "4b52230f31557f239739cf0ce0060b472636a457bdede07d4c42c73158bfb280",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/polars_ltl_workbench_public_vectors.inc",
+      "bytes": 1484080,
+      "sha256": "78157fdb5359e253f4c8d17a2954adf98ca317b7accb57d1eee9a3cb5089ce50",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "scripts/retained_public_observation_inventory.py",
+      "bytes": 86550,
+      "sha256": "4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/ltl_filter_workbench.cpp",
+      "bytes": 21269,
+      "sha256": "f4ac49f995f4853ad53c67aa1a0bcb5ce6b636f0775a90bac7e45f0aba36db32",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/log_ltl_original_call_parser.hpp",
+      "bytes": 6900,
+      "sha256": "ba04931e07055c4c62a487a085228084d225d99505396b69e50beb7d9801c212",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_ltl_filter_workbench.cpp",
+      "bytes": 53770,
+      "sha256": "904a508cd4a8c76c254a407c66f350f295fe133cc548ffdda613c026c578d114",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/backend/tests/test_ltl_filter_route.cpp",
+      "bytes": 5533,
+      "sha256": "8cef96c530648a6250db838e55d0a42735a7abaf7c8112e27297e0fa89c578cd",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-backend-independent-review-1/ltl_filter_workbench.cpp",
+      "bytes": 21269,
+      "sha256": "f4ac49f995f4853ad53c67aa1a0bcb5ce6b636f0775a90bac7e45f0aba36db32",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-backend-independent-review-1/log_ltl_original_call_parser.hpp",
+      "bytes": 6900,
+      "sha256": "ba04931e07055c4c62a487a085228084d225d99505396b69e50beb7d9801c212",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-backend-independent-review-1/test_ltl_filter_workbench.cpp",
+      "bytes": 53770,
+      "sha256": "904a508cd4a8c76c254a407c66f350f295fe133cc548ffdda613c026c578d114",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-backend-independent-review-1/test_ltl_filter_route.cpp",
+      "bytes": 5533,
+      "sha256": "8cef96c530648a6250db838e55d0a42735a7abaf7c8112e27297e0fa89c578cd",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-backend-1/prebuild-report.json",
+      "bytes": 6793,
+      "sha256": "b00d627f2d7c917815309286ccb7fb9759403e0aaba09687288a9a36ec93a0bc",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-backend-1/revision-2/report.json",
+      "bytes": 1992,
+      "sha256": "b15ac09a8bc47c2ca79b29e8934b6dd5f010c260338d2ff0aa4c855615ecd4f0",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-backend-independent-review-1/source-diffs.json",
+      "bytes": 10674,
+      "sha256": "a586f16df10a75b0a4dfd530407de638356e1050086ebf10fd0e1d9cdbe43c5b",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/frontend-wrapper-review.json",
+      "bytes": 7458,
+      "sha256": "bae249392c412614b9e1c786659b32cbd1561555433751768a209d17a6cbd7a7",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/parity-closures/ltl-log-original-call-frontend-fixture-independent-review-1/all297-independent-mappings.jsonl",
+      "bytes": 170585,
+      "sha256": "9b58c1779fb681ad8427835f0c086bd956b9ba9131950d17647558782c1325b7",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "docs/log-ltl-filter-public.json.gz",
+      "bytes": 7592723,
+      "sha256": "2660b657d674d7d7bb621d994f1f4cf93d77fddea034384cdd4b9aafd4174173",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/Release/minera_server.exe",
+      "bytes": 16937984,
+      "sha256": "be85a226e724e347c65017d63c3fa04b845b18d8b20dd2525011338e45f996a8",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/Release/minera_ltl_filter_workbench_tests.exe",
+      "bytes": 1310720,
+      "sha256": "c0b4e935d6342525a6de389e69e5c55e3e450d341ff5493e2ebfe6df5a198d6a",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/Release/minera_ltl_filter_route_tests.exe",
+      "bytes": 1629696,
+      "sha256": "818166cc3231fd12a679c8536c01dec99fcf73c78876fb19ce58c93bea5758a6",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/Release/minera_log_ltl_filter_tests.exe",
+      "bytes": 16576000,
+      "sha256": "48f26275d7a163dd3eb7e5fb4497f93036cd5e3bdc6f7fcaeb98529b65796270",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/Release/minera_log_ltl_workbench_public_tests.exe",
+      "bytes": 18775552,
+      "sha256": "a6bb4826ddbe235b6dc7d778c01a7b8e7e2587f880bbbf1f9c215fd79490fae9",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/Release/minera_pandas_ltl_filter_tests.exe",
+      "bytes": 42502656,
+      "sha256": "21595c9ec9ff48fe4d9bb14a06204db8c4cf5dd9326775b1c34212f36c7b7237",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/Release/minera_pandas_ltl_workbench_public_tests.exe",
+      "bytes": 44792320,
+      "sha256": "053829dedde4b2667ade84a26e0e5def0bc5d411ced27fd4ee5177351b69e1b7",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "build/Release/minera_polars_ltl_filter_tests.exe",
+      "bytes": 17533440,
+      "sha256": "e688f07f85270d5c59c841213629f951fbd1ce4a604b0f02edf37dc0240513a1",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "src/frontend/dist/index.html",
+      "bytes": 886,
+      "sha256": "c64aab460fcd45d88e461c674fe7742fcf3438f1e9e7d928350fcf0cbedc6623",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    },
+    {
+      "path": "scripts/retained_public_receipt_index.py",
+      "bytes": 26808,
+      "sha256": "885d16b3935a95d51d90fc09abd085dde3e46bf8732915bb25f520a0ac8ff613",
+      "origin": "build/parity-closures/ltl-log-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false
+    }
+  ],
+  "original_receipts": {
+    "calls": 297,
+    "filter_calls": 227,
+    "returned_logs": 191,
+    "filter_diagnostics": 36,
+    "helper_calls": 70,
+    "helper_values": 23,
+    "helper_diagnostics": 47,
+    "recursive_typed_nodes": 1283,
+    "nat_originals": 6,
+    "uuid_originals": 4,
+    "sorted_sha256": "566c337e8c65cad2a73dc35d9dccfd5bd5d51515660e8dee834e4fbebdb232d3"
+  },
+  "engineering_acceptance": {
+    "transport": {
+      "direct": {
+        "complete": true,
+        "calls": 297,
+        "filter_calls": 227,
+        "returned_logs": 191,
+        "filter_diagnostics": 36,
+        "helper_calls": 70,
+        "helper_values": 23,
+        "helper_diagnostics": 47
+      },
+      "http": {
+        "complete": true,
+        "calls": 297,
+        "filter_calls": 227,
+        "returned_logs": 191,
+        "filter_diagnostics": 36,
+        "helper_calls": 70,
+        "helper_values": 23,
+        "helper_diagnostics": 47
+      }
+    },
+    "frontend": {
+      "complete": true,
+      "files": 192,
+      "tests": 9858,
+      "focused_tests": 49
+    },
+    "browser": {
+      "complete": true,
+      "checks": 23,
+      "api_requests": 22,
+      "relationship_requests": 21
+    },
+    "native_regression": {
+      "log_original": 297,
+      "pandas_native": 429,
+      "pandas_direct": 429,
+      "pandas_http": 429,
+      "polars_native": 675,
+      "polars_direct": 675,
+      "polars_http": 675,
+      "complete": true
+    }
+  },
+  "reference_algorithm_calls": 0,
+  "member_execution": 0,
+  "original_external_payloads_opened_by_packager": 0,
+  "new_public_member_admission": false,
+  "historical_audit_complete": false,
+  "canonical_receipts_replaced": false,
+  "reference_call_absence_established": false,
+  "root_entry_certificate": false,
+  "full_parity_claim": false,
+  "strict_open_units_unchanged": 201,
+  "unentered_logical_queries_unchanged": 565,
+  "limits": [
+    "All297 retained originals:227filters191logs36errors+70helpers23values47errors;1283typed descriptors6nat4uuid.",
+    "Full native/direct/HTTP engineering acceptance reuses existing canonical IDs; candidate JSON is not a replacement receipt.",
+    "Original archives/banks/oracles/generatedincs/browserpayloads/screenshots/binaries/rawdiagnostic evidence stay external declarations.",
+    "XES remains optional OWN projection; full native LOG JSON and full helper values/errors remain original authorities.",
+    "No new reference calls, public admission, history completeness, call absence, root certificate or full parity claim.",
+    "Existing201 strict open units and565 unentered logical queries remain unchanged."
+  ],
+  "kind": "validation",
+  "complete": true,
+  "archive": {
+    "path": "docs/retained-public-observation-log-original-call-checkpoint.jsonl.gz",
+    "bytes": 652958,
+    "sha256": "66c9fd82dfb550a9477980896fed8c0b252aa916928f4ff784d26b169ddb1b3f",
+    "members": 203,
+    "uncompressed_bytes": 3633340,
+    "uncompressed_sha256": "c737aa9f2be4baabcdef95682e3e55013fd390ef51a8309ed5aec116ad7b999a"
+  },
+  "exact_UTF8_roundtrips": true,
+  "embedded_members_match_current_frozen_bytes": true,
+  "source_bindings_reverified_after_packaging": true,
+  "root_generic_validator_compatible_member_fields": [
+    "kind",
+    "path",
+    "bytes",
+    "sha256",
+    "utf8"
+  ]
+}
