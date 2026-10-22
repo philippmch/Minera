@@ -7,7 +7,7 @@ inventory description), modules, and sources. Each source declares path, bytes,
 sha256, provenance='own-public-observation', format ('json', 'jsonl',
 'gzip-json', 'gzip-jsonl', 'gzip-envelope-json', 'gzip-envelope-jsonl'), adapter
 ('receipt-v1', 'pandas-before-v1', 'polars-receipt-v1', 'log-attributes-packed-v1',
-'pandas-attributes-before-v1', or 'digest-plan-v1'),
+'pandas-attributes-before-v1', 'polars-attributes-receipt-v1', or 'digest-plan-v1'),
 receipt_schema, reference, runtime, and role
 ('observations', 'plans', or 'intents'). JSON object wrappers require records_key;
 otherwise JSON must be one record or an array of records. Envelope sources also
@@ -23,7 +23,7 @@ it never certifies a directory tree, all archives, or reference parity. Missing
 schemas/operands/pins remain gaps, never reconstructed by guessing. Cache hits
 still require a fresh full container hash. Database history is append-only.
 The closed receipt adapters admit the three versioned LTL observer schemas and
-the separate LOG/pandas attributes observers listed in SCHEMAS. New families require an explicit
+the separate LOG/pandas/Polars attributes observers listed in SCHEMAS. New families require an explicit
 adapter/schema addition with operand-form and canonicalization validation.
 """
 
@@ -49,6 +49,7 @@ SCHEMAS = {
     'polars-receipt-v1': ('minera-polars-ltl-observer-receipt-v1', 'source_positional_all_options_keyword'),
     'log-attributes-packed-v1': ('minera-log-attributes-observer-receipt-v1', 'positional_args_keyword_controls'),
     'pandas-attributes-before-v1': ('minera-pandas-attributes-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
+    'polars-attributes-receipt-v1': ('minera-polars-attributes-observer-receipt-v1', 'source_positional_all_options_keyword'),
 }
 LOG_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.log.attributes.attributes_filter'
 LOG_ATTRIBUTES_ARITIES = {
@@ -555,6 +556,309 @@ def _pandas_attributes_outcome(row, profile):
     return
 
 
+POLARS_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.polars.attributes.attributes_filter'
+POLARS_ATTRIBUTES_KEYWORDS = {
+    'apply': {'values', 'parameters'}, 'apply_events': {'values', 'parameters'},
+    'apply_numeric': {'int1', 'int2', 'parameters'}, 'apply_numeric_events': {'int1', 'int2', 'parameters'},
+    'filter_df_keeping_activ_exc_thresh': {'thresh', 'act_count0', 'activity_key', 'most_common_variant'},
+    'filter_df_keeping_spno_activities': {'activity_key', 'max_no_activities'},
+    'filter_df_on_attribute_values': {'values', 'case_id_glue', 'attribute_key', 'positive'},
+    'filter_df_relative_occurrence_event_attribute': {'min_relative_stake', 'parameters'},
+    'get_attribute_values': {'attribute_key', 'parameters'},
+}
+POLARS_ATTRIBUTES_ENUMS = {
+    'ATTRIBUTE_KEY': 'pm4py:param:attribute_key', 'ACTIVITY_KEY': 'pm4py:param:activity_key',
+    'CASE_ID_KEY': 'pm4py:param:case_id_key', 'DECREASING_FACTOR': 'decreasingFactor',
+    'POSITIVE': 'positive', 'STREAM_FILTER_KEY1': 'stream_filter_key1', 'STREAM_FILTER_VALUE1': 'stream_filter_value1',
+    'STREAM_FILTER_KEY2': 'stream_filter_key2', 'STREAM_FILTER_VALUE2': 'stream_filter_value2', 'KEEP_ONCE_PER_CASE': 'keep_once_per_case',
+}
+POLARS_ATTRIBUTES_BASE_FIELDS = {
+    'index', 'module', 'case', 'receipt', 'receipt_sha256', 'input_before', 'input_categories_before', 'kwargs_before',
+    'phase', 'apply_returned', 'warnings', 'input_after', 'input_categories_after', 'kwargs_after',
+    'input_values_unchanged', 'input_categories_unchanged', 'input_unchanged', 'kwargs_unchanged',
+}
+POLARS_ATTRIBUTES_ENTRY_FIELDS = POLARS_ATTRIBUTES_BASE_FIELDS | {
+    'result_type', 'returned_input_identity', 'public_unoptimized_plan', 'public_plan_error', 'public_plan_warnings',
+}
+POLARS_ATTRIBUTES_PLAN_FIELDS = {'receipt', 'receipt_sha256', 'index', 'case', 'module', 'function'}
+POLARS_ATTRIBUTES_TERMINALS = {'result', 'result_value', 'result_kind', 'error', 'error_type', 'value_result', 'output', 'return', 'returned', 'exception'}
+
+
+def _polars_attributes_need(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def _polars_attributes_exact(value, fields, message):
+    _polars_attributes_need(type(value) is dict and set(value) == set(fields), message)
+
+
+def _polars_attributes_packed(value, expected=None, depth=0):
+    _polars_attributes_need(depth < 192 and type(value) is dict and type(value.get('type')) is str, 'packed Polars value absent/too deep')
+    kind = value['type']
+    _polars_attributes_need(expected is None or kind == expected, 'packed Polars value kind mismatch')
+    if kind in {'NoneType', 'str', 'bool', 'int'}:
+        _polars_attributes_exact(value, {'type', 'value'}, 'unknown Polars scalar fields')
+        _polars_attributes_need(type(value['value']) is {'NoneType': type(None), 'str': str, 'bool': bool, 'int': int}[kind], 'Polars scalar type mismatch')
+    elif kind == 'float':
+        _polars_attributes_exact(value, {'type', 'hex'}, 'unknown Polars float fields')
+        try:
+            _polars_attributes_need(type(value['hex']) is str and float.fromhex(value['hex']).hex() == value['hex'], 'noncanonical Polars float hex')
+        except (ValueError, OverflowError):
+            raise ValueError('invalid Polars float hex') from None
+    elif kind in {'datetime', 'date'}:
+        _polars_attributes_exact(value, {'type', 'iso', 'fold', 'offset_seconds'} if kind == 'datetime' else {'type', 'iso'}, 'unknown Polars temporal fields')
+        _polars_attributes_need(type(value['iso']) is str, 'Polars temporal ISO absent')
+        try:
+            parsed = (datetime.datetime if kind == 'datetime' else datetime.date).fromisoformat(value['iso'])
+            _polars_attributes_need(parsed.isoformat() == value['iso'], 'noncanonical Polars temporal ISO')
+        except (ValueError, OverflowError):
+            raise ValueError('invalid Polars temporal ISO') from None
+        if kind == 'datetime':
+            offset = parsed.utcoffset()
+            _polars_attributes_need(type(value['fold']) is int and value['fold'] in {0, 1}, 'Polars datetime fold mismatch')
+            _polars_attributes_need(value['offset_seconds'] is None if offset is None else type(value['offset_seconds']) is float and math.isfinite(value['offset_seconds']) and value['offset_seconds'] == offset.total_seconds(), 'Polars datetime offset mismatch')
+    elif kind == 'enum':
+        _polars_attributes_exact(value, {'type', 'module', 'name', 'value'}, 'unknown Polars enum fields')
+        _polars_attributes_need(value['module'] == POLARS_ATTRIBUTES_MODULE and type(value['name']) is str and value['name'] in POLARS_ATTRIBUTES_ENUMS
+                               and value['value'] == {'type': 'str', 'value': POLARS_ATTRIBUTES_ENUMS[value['name']]}, 'unknown Polars enum module/name/value identity')
+    elif kind in {'list', 'tuple', 'set'}:
+        _polars_attributes_exact(value, {'type', 'values'}, 'unknown Polars sequence fields')
+        _polars_attributes_need(type(value['values']) is list, 'Polars sequence values absent')
+        for child in value['values']:
+            _polars_attributes_packed(child, depth=depth + 1)
+        if kind == 'set':
+            _polars_attributes_need(value['values'] == sorted(value['values'], key=lambda item: json.dumps(item, sort_keys=True)), 'Polars original set order mismatch')
+    elif kind == 'dict':
+        _polars_attributes_exact(value, {'type', 'items'}, 'unknown Polars ordered dictionary fields')
+        _polars_attributes_need(type(value['items']) is list, 'Polars dictionary items absent')
+        for pair in value['items']:
+            _polars_attributes_need(type(pair) is list and len(pair) == 2, 'Polars typed dictionary pair absent')
+            for child in pair:
+                _polars_attributes_packed(child, depth=depth + 1)
+    else:
+        raise ValueError('unknown Polars observer packed type')
+
+
+def _polars_attributes_frame(frame):
+    _polars_attributes_exact(frame, {'columns', 'dtypes', 'shape', 'rows'}, 'unknown/incomplete Polars frame')
+    _polars_attributes_need(type(frame['columns']) is list and all(type(x) is str for x in frame['columns']) and len(set(frame['columns'])) == len(frame['columns']), 'Polars column labels invalid')
+    width = len(frame['columns'])
+    _polars_attributes_need(type(frame['dtypes']) is list and len(frame['dtypes']) == width and all(type(x) is str and x for x in frame['dtypes']), 'Polars dtypes absent/cardinality mismatch')
+    _polars_attributes_need(type(frame['shape']) is list and len(frame['shape']) == 2 and all(type(x) is int and x >= 0 for x in frame['shape'])
+                           and type(frame['rows']) is list and frame['shape'] == [len(frame['rows']), width], 'Polars frame dimensions mismatch')
+    for row in frame['rows']:
+        _polars_attributes_packed(row, 'tuple')
+        _polars_attributes_need(len(row['values']) == width, 'Polars row width mismatch')
+
+
+def _polars_attributes_messages(messages):
+    _polars_attributes_need(type(messages) is list, 'Polars complete warnings absent')
+    for item in messages:
+        _polars_attributes_exact(item, {'type', 'message'}, 'unknown/incomplete Polars public warning')
+        _polars_attributes_need(type(item['type']) is str and item['type'] and type(item['message']) is str, 'Polars public warning type/message absent')
+
+
+def _polars_attributes_series(series):
+    _polars_attributes_exact(series, {'name', 'dtype', 'length', 'values'}, 'unknown/incomplete Polars category Series')
+    _polars_attributes_need(type(series['name']) is str and series['dtype'] == 'String' and type(series['length']) is int
+                           and series['length'] >= 0 and type(series['values']) is list and len(series['values']) == series['length'], 'Polars category Series type/length mismatch')
+    for value in series['values']:
+        _polars_attributes_packed(value, 'str')
+
+
+def _polars_attributes_categories(categories, frame):
+    _polars_attributes_need(type(categories) is list, 'Polars category observables absent')
+    indices = []
+    for item in categories:
+        _polars_attributes_need(type(item) is dict and item.get('kind') in {'Categorical', 'Enum'}, 'unknown Polars category kind')
+        fields = {'column_index', 'column', 'kind', 'dtype', 'get_categories', 'observation_warnings'}
+        fields |= {'declared_categories'} if item['kind'] == 'Enum' else {'context', 'ordering'}
+        _polars_attributes_exact(item, fields, 'unknown/incomplete Polars category fields')
+        index = item['column_index'];indices.append(index)
+        _polars_attributes_need(type(index) is int and 0 <= index < len(frame['columns']) and item['column'] == frame['columns'][index] and item['dtype'] == frame['dtypes'][index], 'Polars category column/dtype binding mismatch')
+        _polars_attributes_series(item['get_categories']);_polars_attributes_messages(item['observation_warnings'])
+        if item['kind'] == 'Enum':
+            _polars_attributes_series(item['declared_categories'])
+            _polars_attributes_need(item['get_categories']['values'] == item['declared_categories']['values'], 'Polars declared Enum categories differ')
+            expected = 'Enum(categories=' + repr([x['value'] for x in item['declared_categories']['values']]) + ')'
+        else:
+            context = item['context'];_polars_attributes_exact(context, {'name', 'namespace', 'physical_dtype', 'is_global'}, 'unknown Polars category context')
+            _polars_attributes_need(type(context['name']) is str and type(context['namespace']) is str and context['physical_dtype'] == 'UInt32'
+                                   and context['is_global'] is False and item['ordering'] == 'lexical', 'unreviewed Polars category context/order')
+            expected = 'Categorical(Categories(name=' + json.dumps(context['name'], ensure_ascii=False) + ', namespace=' + json.dumps(context['namespace'], ensure_ascii=False) + ', physical=pl.UInt32))'
+        _polars_attributes_need(item['dtype'] == expected, 'Polars category dtype/context declaration differs')
+    _polars_attributes_need(indices == sorted(set(indices)), 'Polars categories duplicate/out of column order')
+    expected_indices = [i for i, dtype in enumerate(frame['dtypes']) if dtype.startswith(('Categorical', 'Enum'))]
+    _polars_attributes_need(indices == expected_indices, 'Polars categorical column metadata missing/extraneous')
+    plain = {'String', 'Float64', 'Int64', 'Int32', 'UInt32', 'UInt64', 'Boolean', 'Null', 'Date', "Datetime(time_unit='us', time_zone='UTC')"}
+    _polars_attributes_need(all(i in indices or dtype in plain for i, dtype in enumerate(frame['dtypes'])), 'unreviewed Polars frame dtype')
+
+
+def _polars_attributes_kwargs(kwargs, function):
+    _polars_attributes_packed(kwargs, 'dict')
+    keys = []
+    for key, _ in kwargs['items']:
+        _polars_attributes_need(key['type'] == 'str' and key['value'] in POLARS_ATTRIBUTES_KEYWORDS[function], 'unreviewed Polars keyword binding')
+        keys.append(key['value'])
+    _polars_attributes_need(len(keys) == len(set(keys)), 'duplicate Polars keyword')
+
+
+def _polars_attributes_receipt(receipt):
+    _polars_attributes_exact(receipt, {'module', 'function', 'input', 'category_observables', 'kwargs', 'call_shape', 'input_kind'}, 'unknown/incomplete Polars attributes receipt')
+    _polars_attributes_need(receipt['module'] == POLARS_ATTRIBUTES_MODULE and type(receipt['function']) is str and receipt['function'] in POLARS_ATTRIBUTES_KEYWORDS
+                           and receipt['call_shape'] == 'source_positional_all_options_keyword' and type(receipt['input_kind']) is str and receipt['input_kind'] in {'DataFrame', 'LazyFrame'}, 'unreviewed Polars attributes module/function/call shape/kind')
+    _polars_attributes_frame(receipt['input']);_polars_attributes_categories(receipt['category_observables'], receipt['input'])
+    _polars_attributes_kwargs(receipt['kwargs'], receipt['function'])
+
+
+def _polars_attributes_case(case, receipt):
+    _polars_attributes_need(type(case) is dict and {'name', 'function', 'eager', 'fixture', 'kwargs'} <= set(case)
+                                            and not set(case) - {'name', 'function', 'eager', 'fixture', 'kwargs', 'parameters', 'parameters_literal'}, 'unknown/incomplete Polars case metadata')
+    _polars_attributes_need(type(case['name']) is str and case['name'] and case['function'] == receipt['function'] and type(case['eager']) is bool
+                           and case['eager'] == (receipt['input_kind'] == 'DataFrame') and type(case['fixture']) is dict and type(case['kwargs']) is dict
+                           and ('parameters_literal' not in case or type(case['parameters_literal']) is bool), 'Polars case/function/kind identity mismatch')
+
+
+def _polars_attributes_plan_metadata(row, receipt=None, entry=False):
+    if 'index' in row:
+        _polars_attributes_need(type(row['index']) is int and row['index'] > 0, 'Polars optional plan/entry index must be a positive integer')
+    if 'case' in row:
+        if entry and type(row['case']) is dict:
+            _polars_attributes_case(row['case'], receipt)
+        else:
+            _polars_attributes_need(type(row['case']) is str and row['case'], 'Polars optional full-plan/digest case must be a nonempty string')
+
+
+def _polars_attributes_outcome(row, receipt):
+    _polars_attributes_need(type(row.get('apply_returned')) is bool, 'Polars apply-returned status absent')
+    fields = set(POLARS_ATTRIBUTES_BASE_FIELDS)
+    error = 'error' in row
+    if row['apply_returned']:
+        fields |= {'result_type', 'returned_input_identity'}
+        _polars_attributes_need(row.get('result_type') in {'polars.lazyframe.frame.LazyFrame', 'polars.dataframe.frame.DataFrame', 'builtins.dict'}
+                               and type(row.get('returned_input_identity')) is bool, 'Polars result class/identity absent')
+        if row['result_type'] == 'polars.lazyframe.frame.LazyFrame':
+            fields |= {'public_plan_warnings'}
+            _polars_attributes_need(('public_unoptimized_plan' in row) != ('public_plan_error' in row), 'Polars public plan/error exclusivity mismatch')
+            fields |= {'public_unoptimized_plan'} if 'public_unoptimized_plan' in row else {'public_plan_error'}
+            _polars_attributes_messages(row['public_plan_warnings'])
+            if 'public_unoptimized_plan' in row:
+                _polars_attributes_need(type(row['public_unoptimized_plan']) is str, 'Polars original public plan absent')
+            else:
+                _polars_attributes_exact(row['public_plan_error'], {'type', 'message'}, 'Polars full public-plan error absent')
+                _polars_attributes_need(all(type(row['public_plan_error'][key]) is str for key in ('type', 'message')), 'Polars plan error type mismatch')
+    if error:
+        fields |= {'error'}
+        _polars_attributes_exact(row['error'], {'type', 'message', 'args', 'phase'}, 'unknown/incomplete Polars full error')
+        _polars_attributes_need(row.get('phase') == row['error']['phase'] == ('collect' if row['apply_returned'] else 'apply')
+                               and type(row['error']['type']) is str and row['error']['type'] and type(row['error']['message']) is str, 'Polars full error phase/type/message mismatch')
+        _polars_attributes_need(not row['apply_returned'] or row['result_type'] == 'polars.lazyframe.frame.LazyFrame', 'unreviewed Polars collect-error class')
+        _polars_attributes_packed(row['error']['args'], 'tuple')
+    else:
+        _polars_attributes_need(row['apply_returned'] and row.get('phase') == 'complete', 'Polars complete outcome phase mismatch')
+        fields |= {'result_kind'}
+        if row.get('result_kind') == 'frame':
+            fields |= {'result', 'result_categories'}
+            _polars_attributes_need(row['result_type'] != 'builtins.dict' and receipt['function'] != 'get_attribute_values', 'Polars frame result/function class mismatch')
+            _polars_attributes_frame(row['result']);_polars_attributes_categories(row['result_categories'], row['result'])
+        elif row.get('result_kind') == 'scalar':
+            fields |= {'result_value'}
+            _polars_attributes_need(row['result_type'] == 'builtins.dict' and receipt['function'] == 'get_attribute_values' and not row['returned_input_identity'], 'Polars count-map result/function class mismatch')
+            _polars_attributes_packed(row['result_value'], 'dict')
+            _polars_attributes_need(all(key['type'] in {'NoneType', 'str', 'bool', 'int', 'float', 'date', 'datetime'} and value['type'] == 'int' and value['value'] >= 0 for key, value in row['result_value']['items']), 'Polars count-map counts not nonnegative integers')
+        else:
+            raise ValueError('unknown Polars terminal result kind')
+    _polars_attributes_exact(row, fields, 'unknown/mixed/incomplete Polars observation fields')
+    _polars_attributes_need(type(row['index']) is int and row['index'] > 0 and row['module'] == POLARS_ATTRIBUTES_MODULE, 'Polars actual index/module mismatch')
+    _polars_attributes_case(row['case'], receipt)
+    _polars_attributes_need(row['input_before'] == receipt['input'] and row['input_categories_before'] == receipt['category_observables'] and row['kwargs_before'] == receipt['kwargs'], 'Polars original receipt/before snapshots differ')
+    _polars_attributes_frame(row['input_after']);_polars_attributes_categories(row['input_categories_after'], row['input_after'])
+    _polars_attributes_kwargs(row['kwargs_after'], receipt['function'])
+    _polars_attributes_need([x[0] for x in row['kwargs_after']['items']] == [x[0] for x in row['kwargs_before']['items']], 'Polars outer keyword binding changed')
+    for field, same in [('input_values_unchanged', row['input_before'] == row['input_after']), ('input_categories_unchanged', row['input_categories_before'] == row['input_categories_after']),
+                        ('input_unchanged', row['input_before'] == row['input_after'] and row['input_categories_before'] == row['input_categories_after']), ('kwargs_unchanged', row['kwargs_before'] == row['kwargs_after'])]:
+        _polars_attributes_need(type(row[field]) is bool and row[field] == same, 'Polars source/control mutation flag mismatch')
+    _polars_attributes_messages(row['warnings'])
+    if row.get('returned_input_identity'):
+        expected_type = 'polars.dataframe.frame.DataFrame' if receipt['input_kind'] == 'DataFrame' else 'polars.lazyframe.frame.LazyFrame'
+        _polars_attributes_need(row['result_type'] == expected_type, 'Polars returned input class/kind mismatch')
+        if not error:
+            _polars_attributes_need(row['result'] == row['input_after'] and row['result_categories'] == row['input_categories_after'], 'Polars returned identity/source-after snapshots differ')
+
+
+def _polars_attributes_audit(data, spec):
+    _polars_attributes_need(spec['role'] == 'plans' and spec['format'] == 'json', 'Polars audit requires full JSON planned provenance')
+    audit = load_json(data)
+    _polars_attributes_exact(audit, {'planned', 'prior_receipts_verified', 'duplicates', 'prior_overlaps', 'receipts'}, 'unknown/incomplete Polars full audit wrapper')
+    _polars_attributes_need(type(audit['planned']) is int and audit['planned'] >= 0 and type(audit['prior_receipts_verified']) is int
+                           and audit['prior_receipts_verified'] >= 0 and type(audit['receipts']) is list and len(audit['receipts']) == audit['planned'], 'Polars audit plan count mismatch')
+    _polars_attributes_need(audit['duplicates'] == [] and audit['prior_overlaps'] == [], 'Polars completed audit has duplicate/prior-overlap evidence')
+    seen = set()
+    for row in audit['receipts']:
+        _polars_attributes_exact(row, {'case', 'receipt', 'receipt_sha256'}, 'unknown Polars full audit plan fields')
+        _polars_attributes_need(type(row['case']) is str and row['case'] and type(row['receipt_sha256']) is str
+                               and re.fullmatch('[0-9a-f]{64}', row['receipt_sha256']) and row['receipt_sha256'] not in seen, 'Polars audit case/digest/uniqueness mismatch')
+        seen.add(row['receipt_sha256'])
+
+
+def _polars_attributes_adapt(row, spec):
+    role = spec['role']
+    if spec['adapter'] == 'digest-plan-v1':
+        _polars_attributes_need(role == 'plans' and not set(row) - {'index', 'case', 'module', 'function', 'receipt_sha256'}, 'Polars digest plan has unknown/entry fields')
+        _polars_attributes_plan_metadata(row)
+        receipt = None
+    elif 'receipt' not in row and role == 'intents':
+        _polars_attributes_exact(row, {'index', 'case', 'function', 'receipt_sha256'}, 'Polars own intent must have exact module-free metadata')
+        _polars_attributes_need(type(row['index']) is int and row['index'] > 0 and type(row['case']) is str and row['case']
+                               and type(row['function']) is str and row['function'] in POLARS_ATTRIBUTES_KEYWORDS, 'Polars intent metadata invalid')
+        receipt = None
+    else:
+        receipt = row.get('receipt');_polars_attributes_receipt(receipt)
+    if 'module' in row:
+        _polars_attributes_need(row['module'] == POLARS_ATTRIBUTES_MODULE, 'outer Polars module conflict')
+    if 'function' in row:
+        _polars_attributes_need(type(row['function']) is str and row['function'] in POLARS_ATTRIBUTES_KEYWORDS and (receipt is None or row['function'] == receipt['function']), 'outer Polars function conflict')
+    digest = row.get('receipt_sha256')
+    _polars_attributes_need(type(digest) is str and re.fullmatch('[0-9a-f]{64}', digest), 'Polars original receipt digest absent')
+    if receipt is None:
+        return row.get('module'), row.get('function'), None, digest, 'digest_only_plan' if spec['adapter'] == 'digest-plan-v1' else 'entered_without_outcome'
+    raw = canonical(receipt);_polars_attributes_need(sha(raw) == digest, 'Polars full original canonical receipt hash mismatch')
+    if set(row) & POLARS_ATTRIBUTES_TERMINALS:
+        _polars_attributes_outcome(row, receipt)
+        status = 'actual_outcome'
+    elif set(row) - POLARS_ATTRIBUTES_PLAN_FIELDS:
+        _polars_attributes_plan_metadata(row, receipt, entry=True)
+        _polars_attributes_need(not set(row) - (POLARS_ATTRIBUTES_ENTRY_FIELDS | POLARS_ATTRIBUTES_PLAN_FIELDS), 'unknown Polars entry evidence fields')
+        for field in ('input_before', 'input_categories_before', 'kwargs_before'):
+            if field in row:
+                _polars_attributes_need(row[field] == receipt[{'input_before': 'input', 'input_categories_before': 'category_observables', 'kwargs_before': 'kwargs'}[field]], 'partial Polars before snapshot mismatch')
+        _polars_attributes_need(any(key in row for key in ('apply_returned', 'input_after', 'input_categories_after', 'kwargs_after', 'public_unoptimized_plan', 'public_plan_error', 'public_plan_warnings')), 'before-only Polars row is not a full plan/entry')
+        for field in ('apply_returned', 'returned_input_identity', 'input_values_unchanged', 'input_categories_unchanged', 'input_unchanged', 'kwargs_unchanged'):
+            if field in row:
+                _polars_attributes_need(type(row[field]) is bool, 'partial Polars entry boolean mismatch')
+        if 'phase' in row:
+            _polars_attributes_need(type(row['phase']) is str and row['phase'] in {'apply', 'collect', 'complete'}, 'partial Polars entry phase mismatch')
+        if 'input_after' in row or 'input_categories_after' in row:
+            _polars_attributes_need('input_after' in row and 'input_categories_after' in row, 'partial Polars source/category pair incomplete')
+            _polars_attributes_frame(row['input_after']);_polars_attributes_categories(row['input_categories_after'], row['input_after'])
+        if 'kwargs_after' in row:
+            _polars_attributes_kwargs(row['kwargs_after'], receipt['function'])
+        if 'public_unoptimized_plan' in row:
+            _polars_attributes_need(type(row['public_unoptimized_plan']) is str and 'public_plan_error' not in row, 'partial Polars plan text/exclusivity mismatch')
+        if 'public_plan_error' in row:
+            _polars_attributes_exact(row['public_plan_error'], {'type', 'message'}, 'partial Polars public-plan error incomplete')
+            _polars_attributes_need(all(type(row['public_plan_error'][key]) is str for key in ('type', 'message')), 'partial Polars plan error type mismatch')
+        if 'public_plan_warnings' in row:
+            _polars_attributes_messages(row['public_plan_warnings'])
+        status = 'entered_without_outcome'
+    else:
+        _polars_attributes_plan_metadata(row)
+        _polars_attributes_need(role in {'plans', 'intents'}, 'Polars full receipt has no entry/outcome provenance')
+        status = 'planned_only' if role == 'plans' else 'entered_without_outcome'
+    return receipt['module'], receipt['function'], raw, digest, status
+
+
 def adapt(row, spec):
     if not isinstance(row, dict):
         raise ValueError('record must be an object')
@@ -568,6 +872,8 @@ def adapt(row, spec):
             raise ValueError('unknown original receipt schema')
     elif spec.get('receipt_schema') != SCHEMAS[adapter][0]:
         raise ValueError('unknown original receipt schema for adapter')
+    if spec.get('receipt_schema') == SCHEMAS['polars-attributes-receipt-v1'][0]:
+        return _polars_attributes_adapt(row, spec)
     attributes_schema = spec.get('receipt_schema') == SCHEMAS['log-attributes-packed-v1'][0]
     if attributes_schema:
         if row.get('module', LOG_ATTRIBUTES_MODULE) != LOG_ATTRIBUTES_MODULE or row.get('function', row.get('method')) is not None and row.get('function', row.get('method')) not in LOG_ATTRIBUTES_ARITIES:
@@ -730,6 +1036,9 @@ class Index:
                 if not spec.get(field):
                     raise ValueError('missing declared ' + field)
             partition = canonical([spec['reference'], spec['runtime']]).decode()
+            if spec['receipt_schema'] == SCHEMAS['polars-attributes-receipt-v1'][0] and spec.get('records_key') is not None:
+                _polars_attributes_need(spec.get('records_key') == 'receipts', 'unknown Polars attributes wrapper selector')
+                _polars_attributes_audit(data, spec)
             for ordinal, (row, raw) in enumerate(records(data, spec['format'], spec.get('records_key')), 1):
                 try:
                     module, function, full, digest, status = adapt(row, spec)
@@ -745,6 +1054,12 @@ class Index:
                         if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
                             hints.append(row['receipt']['module'])
                         if any(hint != PANDAS_ATTRIBUTES_PROFILE['module'] for hint in hints):
+                            gap_row = None
+                    if spec['receipt_schema'] == SCHEMAS['polars-attributes-receipt-v1'][0] and isinstance(row, dict):
+                        hints = [row['module']] if 'module' in row else []
+                        if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
+                            hints.append(row['receipt']['module'])
+                        if any(hint != POLARS_ATTRIBUTES_MODULE for hint in hints):
                             gap_row = None
                     self.gap(key, member, ordinal, gap_row, str(error))
         except (ValueError, KeyError, TypeError, UnicodeError) as error:
