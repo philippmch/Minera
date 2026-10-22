@@ -8,6 +8,59 @@ Python 3.11.9. The opaque module SHA-256 is
 The canonical module remains **partial**. Existing convenience variant filters
 retain their separate contracts.
 
+## Full491 original-call transport: complete API acceptance and rendered UI checks
+
+The pandas-only original mode is implemented separately from friendly pandas
+and Polars filtering. Root passes all491 original-native/direct/ownedHTTP cases,
+comparing complete24-field envelopes, actual caller controls, source before/after,
+auxiliary unions, complete results and all native type/message diagnostics.
+The retained scope is all439+52 calls,357 complete frame returns and134 full
+type/message errors, across177 complete original native snapshots. The original
+native predicate, public header/oracle and shared codecs remain unchanged.
+
+`POST /api/reference-table-variants` selects this mode by call_json presence.
+Allowed fields are engine=pandas, one of membership/top_k/min_coverage/
+max_coverage, source_file, call_json and optional variants_file. The descriptor is
+exact schema minera-pandas-variants-original-call-v1, one Packed criterion in
+args excluding the source, and ordered keyword_entries. Parameters is the only
+keyword. It may be omitted, null, raw or an ordered typed dictionary. Enum and
+literal keys retain independent identity/order. Membership typed dictionaries
+retain each complete key and ignored value. JSON integer tokens, float hex,
+bytes, missing markers, Timestamp precision/timezone and recursive containers
+retain the original native constructor carriers.
+
+An actual auxiliary EventTable File is required exactly for the supported direct
+literal variants_df value `{type:pandas.DataFrame,file:variants_file}`. It is not
+an inline or recursively inferred frame. All34 retained supplied frames use that
+placement. The native dispatch remains the original46 ordered vector calls and
+445 raw parameter calls, including the separate omission/null caller states.
+All observed original column_names are neutral singleNone; EventTable does not
+represent arbitrary pandas column names. Observed Timestamp units ns/us and UTC
+match the unchanged native generator; this is no arbitrary runtime-class or
+Python object identity claim.
+
+The fixed24-field envelope adds exact call_mode/call_json, actual caller controls
+before/after, controls_unchanged and source_after_table_json to the friendly18
+shape. Original selector fields are null. Complete actual controls have args,
+keyword_entries, parameter_state, parameter_native_arm, parameters and
+native_options_present=false. They serialize the invoked criterion, raw/vector
+parameters and table unions, including on native errors. The supplied table
+artifact and unchanged flag refer to the table actually passed to the native
+overload. Full result/source/auxiliary/control artifacts and raw response bytes
+are downloadable; successful native output is reusable as a genuine next source
+File. Qualified Python error identity/args, warnings and aliases remain external.
+
+The editor/File importer preserves exact BOM/CRLF and arbitrary-width integer
+text. File/operation/descriptor edits, mode unmount, held responses and deferred
+imports use cancellation/identity guards. The owned headless browser passes17
+checks,14 actual HTTP requests and11 byte-exact downloads. Full independently
+expected native subsets, auxiliary File controls, wide integers/BOM/CRLF,
+held-response/deferred-import cancellation and actual filtered File reuse pass.
+Both success/error screenshots were inspected and owned processes drained.
+Five focused native suites,121 receipt integrity tests, all491 indexed original
+receipts,36 focused frontend tests,199 frontend files /9916 tests and
+TypeScript/Vite also pass. See [workflow examples](variants-filter-workflow.md).
+
 ## Membership and variant shapes
 
 `filter_pandas_variants` retains or excludes complete cases whose activity

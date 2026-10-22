@@ -1,5 +1,78 @@
 # Complete activity-variant filtering
 
+## Original pandas calls: full 491-call API acceptance and rendered UI checks
+
+The pandas table workflow now offers **Pandas variants call mode**. Its default
+keeps the existing friendly form and18-field response. **Use an original typed
+call** opens a separate editor for all four original functions; Polars keeps its
+existing form. All491 unchanged native cases, direct calls and owned HTTP calls
+pass complete result, source, auxiliary and actual-control comparisons.
+
+The original request uses `POST /api/reference-table-variants` with `engine=pandas`,
+`operation`, a genuine native EventTable `source_file`, and exact `call_json`.
+Operations membership/top_k/min_coverage/max_coverage map to apply/
+filter_variants_top_k/filter_variants_by_coverage_percentage/
+filter_variants_by_maximum_coverage_percentage. The descriptor has exactly
+`schema`, `args`, and ordered `keyword_entries`:
+
+```json
+{"schema":"minera-pandas-variants-original-call-v1","args":[{"type":"list","values":[{"type":"tuple","values":[{"type":"str","value":"A"},{"type":"str","value":"B"}]}]}],"keyword_entries":[]}
+```
+
+Args contain one criterion and exclude the source. Packed sequences use `values`,
+dictionaries use ordered typed `items` pairs, floats use hexadecimal `hex`, and
+integers remain exact JSON tokens. An omitted parameters keyword differs from
+explicit None, raw values and ordered enum/string dictionaries. The example
+chooser includes a typed tuple-key dictionary with9007199254740993, ordered enum
+and literal keys, an auxiliary table reference, and a raw-parameter diagnostic.
+The complete editor also accepts original calls beyond these examples.
+
+A supplied variants table is a genuine native `variants_file`. Reference it only
+as the direct value of the literal variants_df parameter:
+
+```json
+{"key":"parameters","value":{"type":"dict","items":[[{"type":"str","value":"variants_df"},{"type":"pandas.DataFrame","file":"variants_file"}]]}}
+```
+
+This is a keyword entry within `keyword_entries`, not an inline frame. The actual
+File retains its full rows, index, categories and attributes. Missing referenced
+Files and unused uploads receive native control errors; remove an uploaded
+mapping when the descriptor no longer uses it.
+
+The strict UTF8 File importer preserves a leading BOM, CRLF and wide integer
+tokens without parsing and rewriting JSON. Imported state supplies request and
+download bytes even when the textarea displays normalized line endings. The
+shared multipart codec uses canonical call_json.txt byte Files when necessary.
+Changing source, auxiliary table, operation or descriptor invalidates pending
+requests and imports. Switching modes unmounts and cancels the active workflow.
+
+Original responses use24fields. Friendly selector fields case_id_key,
+attribute_key and timestamp_key are null. The inspection offers exact original
+call, complete actual controls before/after, source before/after, actual supplied
+table, full raw response and successful filtered native table downloads. The
+controls record caller operands, original parameter state, actual raw/vector
+native arm and complete table unions; descriptor echo does not replace them.
+Native errors retain source/control/auxiliary artifacts when available. **Use
+filtered variants table as source** uses the actual returned File on the next
+request. It does not reconstruct the table through browser JSON.
+
+The complete retained scope is439+52=491 calls,357 frames,134 errors and177 mapped
+native snapshots. Python aliases, warning transport, qualified exception identity
+and error.args remain outside this new envelope. Native stages are transport
+metadata, not observer phase claims. The canonical module remains partial;
+201strict open units and565unentered grouping queries remain unchanged.
+
+Root acceptance also passes five focused native suites, 121 receipt integrity
+tests, all491 original index entries with1964 exact raw slices and eight rehashed
+cache hits, 36 focused frontend tests, all199 frontend files /9916 tests, and
+TypeScript/Vite. The owned headless browser passes17 checks with14 actual HTTP
+requests and11 byte-exact downloads. Independently expected complete native
+subsets include typed wide integers, attributes, dtypes and index labels.
+Actual auxiliary controls, both held-response cancellations, both deferred-import
+cancellations, exact BOM/CRLF import and genuine filtered File reuse pass.
+Both rendered success/error screenshots were inspected; owned Chrome/server
+processes stopped and their output streams closed. No retained call was replayed.
+
 ## Original LOG calls: complete 380-call API and UI acceptance
 
 The event-log family chooser now has **Original activity-variant calls**, alongside
