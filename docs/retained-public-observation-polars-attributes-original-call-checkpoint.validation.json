@@ -1,0 +1,2274 @@
+{
+  "schema": "minera-owned-utf8-checkpoint-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/retained-public-observation-polars-attributes-original-call-checkpoint.jsonl.gz",
+    "bytes": 1127749,
+    "sha256": "c7c8dfc7d29754a6e9c1054cc18a3e3f611ab912c3959bb661f6e6c921ddf469",
+    "members": 192,
+    "uncompressed_bytes": 6118584,
+    "uncompressed_sha256": "254d06756b6cd60317f07c603b168a348958fc6d67a7117d7a368e5eb6f72fbf"
+  },
+  "own_members": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 124313,
+      "sha256": "2f6000b61450b102b5f94f46e9c3b081fd4a162979469c1b1d0c7ca31ddc263f"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/validation.json",
+      "bytes": 10822,
+      "sha256": "8fabf2d55a770d81b5e8ce0afd77c5a41e01d5a2e5a1edd3f8791cc1e4d19c3f"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-prepared-1/capture-public.py",
+      "bytes": 15907,
+      "sha256": "00f31f61f52c41fd2ab29bfecc2f226d4d4da22d667786f0377c9bd880798506"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-prepared-1/generate-native-tests.py",
+      "bytes": 9396,
+      "sha256": "c8825f37336ffe6c11fcdb4352962e954aeb2145a61b646c47b4deeea2f2495a"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/validation.json",
+      "bytes": 10815,
+      "sha256": "86c9ef0376274b8d30e342331a36f315956324886bdbb9c78193d2190985fde8"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-prepared-1/capture-public.py",
+      "bytes": 15972,
+      "sha256": "a3802edfd02c835d66e05e72b21ea4d3227206ee4c8fbc60a9290ebc71c0c855"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/validation.json",
+      "bytes": 10823,
+      "sha256": "1024731e5e7da74717dcea616ad42c2c6e1bf85f14900f1d71f53f22d93e0df2"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-prepared-1/capture-public.py",
+      "bytes": 16066,
+      "sha256": "b75d08d1c3d703eeaba27b7e711c1de2bee3a5daf6ebd40f0c80908df22c5db4"
+    },
+    {
+      "path": "build/parity-closures/admit-polars-attributes-public-observations-1.py",
+      "bytes": 4543,
+      "sha256": "17240ded2ccc9af18e1c6861321fee41f53cc8523499c0159bcbb1b285280d52"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/apply-count-abi-correction.py",
+      "bytes": 4107,
+      "sha256": "afa0df78fed899fb0b11ce81c3c9b1c12c7727f29a94df2a6f5eeecb9891342d"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/before-fixture-support.hpp.txt",
+      "bytes": 15867,
+      "sha256": "b2bbef4c60eb10d7cacda32e0eabc008fdc83ba676ed95c807f8f68a844148bb"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/before-generation-report.json",
+      "bytes": 8203,
+      "sha256": "ac2c0e919d27621deb1e9fb159451e007ac4313b7784501d5a631d92b3d3b292"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/before-preparation.json",
+      "bytes": 9096,
+      "sha256": "dd5aaef41877d4ba7a50e7074e7cb72b4d1d6214616cd1e7fc31d5a7dbaa6f2e"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/freeze-preparation.py",
+      "bytes": 2303,
+      "sha256": "3b83ec50b01424b81c3b1b40bb3c157779fbbb825d34352f09df177a986e6f2a"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/preparation.json",
+      "bytes": 3272,
+      "sha256": "c3779c93cabd9bdba2c023f5717cee75893d9fa6bf4e8916ec6aae87fa2f2b11"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/report.json",
+      "bytes": 3826,
+      "sha256": "f514685459de641acae34976ff05bc7687ee154d0e8c41430af3fb6da81aed24"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/support.diff.patch",
+      "bytes": 4044,
+      "sha256": "e38e799d56fb8e74b22f36752a42013d0a67bc049d9c7eaec57a44b9f63481f0"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/first-draft-support-before-most-common.hpp.txt",
+      "bytes": 15822,
+      "sha256": "9a2075f047a5eca0c04533ea74997966041e9dee20456ebc79d697f5e6e5f44d"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/fixture-support.hpp.txt",
+      "bytes": 17224,
+      "sha256": "af752175e6daa0fe24a27b963415fed7c4fb965f21c5d0029582b57b6b0cfef1"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/freeze-preparation.py",
+      "bytes": 4326,
+      "sha256": "111b275425e2a3f11c95bb303967f4186670f937e4eb48b2937cc48c8ba665fa"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 11954,
+      "sha256": "e132d2ea33bda5e1c468b529c2da22f78ed8c44438dc98c056d85fe389bdc667"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/generation-report.json",
+      "bytes": 8203,
+      "sha256": "ac2c0e919d27621deb1e9fb159451e007ac4313b7784501d5a631d92b3d3b292"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/preparation.json",
+      "bytes": 9096,
+      "sha256": "dd5aaef41877d4ba7a50e7074e7cb72b4d1d6214616cd1e7fc31d5a7dbaa6f2e"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/before-wrapper.cpp",
+      "bytes": 3553,
+      "sha256": "fdfd4cbbb54cd80d06e14d72b924bdb2cacc921679aded303b35ca363053b9df"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/freeze.py",
+      "bytes": 2662,
+      "sha256": "c66c029ae5501958ef07696f94eeac257d532a107d12cd5f673d1bda2f78aa26"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/frozen-wrapper.cpp",
+      "bytes": 3818,
+      "sha256": "51298f16b547c1ad31a79232da8a90967eff2580ea6ba2551667a6100a1b7692"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/original-generation-report.json",
+      "bytes": 8203,
+      "sha256": "ac2c0e919d27621deb1e9fb159451e007ac4313b7784501d5a631d92b3d3b292"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/original-preparation.json",
+      "bytes": 9096,
+      "sha256": "dd5aaef41877d4ba7a50e7074e7cb72b4d1d6214616cd1e7fc31d5a7dbaa6f2e"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/report.json",
+      "bytes": 1992,
+      "sha256": "4fb5c7c14c6eeb7fb53ae30bf74003d68641a165ce865630c412f3fadfed665f"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/wrapper.diff.patch",
+      "bytes": 592,
+      "sha256": "5fd50076652ea04b8da0fb51150ae730cc2e7c47419b84e94cb440af2785063a"
+    },
+    {
+      "path": "build/parity-closures/census-polars-attributes-original-calls-root-1.py",
+      "bytes": 9037,
+      "sha256": "bd6b2c6ceb1657bc527c65f93bfc5298a8a88e6da305b6f7beb4714178ce780a"
+    },
+    {
+      "path": "build/parity-closures/census-polars-attributes-original-calls-root-2.py",
+      "bytes": 9023,
+      "sha256": "0703df4fc458bf05f53e89017688b0d0a36a1e0c0d8f6f60fcdf0da5a1d0d8b9"
+    },
+    {
+      "path": "build/parity-closures/freeze-polars-attributes-original-wire-1.py",
+      "bytes": 3189,
+      "sha256": "b9403daf8dcc934a6da8d587e4f56148b37156bd70e8d99ad66b029d400706ca"
+    },
+    {
+      "path": "build/parity-closures/make-polars-attributes-root-facts-1.py",
+      "bytes": 12847,
+      "sha256": "c4aae4ed8f353cb34a5bd2b2717cef65e07d92e7a17f84736da360185c77640f"
+    },
+    {
+      "path": "build/parity-closures/package-retained-public-observation-polars-attributes-original-call-checkpoint.py",
+      "bytes": 21520,
+      "sha256": "a30fcd63607ee74acc057da919c708bbdce2b911db25505f82b226ef125ab31f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/generation-1.json",
+      "bytes": 1094,
+      "sha256": "dab0e43b60b95813c8273c69f145f5646e40a38d372861bbe6aa28502c7c1209"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/generation-2-cache.json",
+      "bytes": 1094,
+      "sha256": "f621d7f59e62ad2b00e7485cb2ae05a9e837a8466eae3625cb75c564a5a432ad"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/manifest.json",
+      "bytes": 10383,
+      "sha256": "eddb15548f11c4ff6c3eaad398aa793205a0fe170616dd95556b2b1b55151494"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/validation.json",
+      "bytes": 6469,
+      "sha256": "cd06b3329ed61965b110548a9562d05d8afb11824813b81798b508197de8bf61"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-independent-1/receipt-identities.jsonl",
+      "bytes": 539282,
+      "sha256": "858d2ba9bd7863f6ea6b934d9929c2dd4c495e3b6ec6395f1a65cb426a838233"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-independent-1/report.json",
+      "bytes": 93463,
+      "sha256": "49b973de069f2f389ddf65f431125b1887884369d7a844d844a547933c3d47e7"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-independent-2/receipt-identities.jsonl",
+      "bytes": 539282,
+      "sha256": "858d2ba9bd7863f6ea6b934d9929c2dd4c495e3b6ec6395f1a65cb426a838233"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-independent-2/report.json",
+      "bytes": 93463,
+      "sha256": "49b973de069f2f389ddf65f431125b1887884369d7a844d844a547933c3d47e7"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-root-2/receipt-identities.json",
+      "bytes": 215935,
+      "sha256": "155176aa6f4449dc04f23399ced99984511bc048ae59c33fe399bca27018ed64"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-root-2/report.json",
+      "bytes": 67126,
+      "sha256": "3538bc3ea0652f6452c3bc5719ba1a2a022e5c789fb12d9e0e265525ae67a3bc"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-actual-1/all1102-frame-bindings.jsonl",
+      "bytes": 304917,
+      "sha256": "a6fe3876313a13adc2210035b2b03ad16eeb100eb8d545628ffdc59353542bdc"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-actual-1/all726-mappings.jsonl",
+      "bytes": 475341,
+      "sha256": "be0525e900d3e71bcef41a5e3d697ddf9e54498b2c1f3d3f9f9dc3e713068a87"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-actual-1/domain-census.json",
+      "bytes": 81734,
+      "sha256": "43ce8cfa76ea52060c9726bc370e44af92fb44001bddef743085aa1aff73ed57"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-actual-1/report.json",
+      "bytes": 8969,
+      "sha256": "fa2c210bb1ca7d87594761e64e401df2040d4a9c02ad4e44d2347f02a07866a2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-prepared-1/map-full726.py",
+      "bytes": 22855,
+      "sha256": "b82fd12fa7abaf125cdf966dc9e268283300ee2c51e4bd5caddd2cf9cf45c7a5"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-prepared-1/preparation.json",
+      "bytes": 3107,
+      "sha256": "75adc61698d20a8450ab72f37573c36ce9d655a161299518a92db2a780d5522a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/census-revision-2.py",
+      "bytes": 22030,
+      "sha256": "d23ec693e565f6f65fcd80c7207ffd45bebf292712599870b311dcf5a6dfb6c2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/census.py",
+      "bytes": 22020,
+      "sha256": "6199d2e546a11ebb822b0e009a904b2fbe0667d05328ff68e7538b18116c7982"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/preparation.json",
+      "bytes": 3332,
+      "sha256": "8566e618f57b0d8f1e33c128f497b0d9c78fdbe1ee0627bf6eadf959abe1e113"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/provenance-review.json",
+      "bytes": 7636,
+      "sha256": "2444bc2bd00ef3c171313d1d875e5cc3b7a5ee8bfa35331c535afa120701315f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/usage.md",
+      "bytes": 1761,
+      "sha256": "6555bca1b3e4a3c6f362eac26444550bae58fd472953a04267fad04aa13e2b17"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/accept-726-root-revision-2.pre-pin-size-draft.py",
+      "bytes": 12032,
+      "sha256": "8d1ed119dbf872d94b7c2a3be82a48689ec857a116bd3be46c4fff2eee21582f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/accept-726-root-revision-2.py",
+      "bytes": 12032,
+      "sha256": "4651f1927565aec30e45d8f9172f735bb83baa1220505cafdd867e00d0920f54"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/accept-726-root.py",
+      "bytes": 10792,
+      "sha256": "4c99c601883945e915d1fb00bb5635dc1e4c290bf71eada0a3c0fa129a03266f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/accept-726-root.revision-1-to-2.diff.patch",
+      "bytes": 5919,
+      "sha256": "f346289e30192fabb4d41174e2646544f97379331590da268898730a1490f58d"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/adapter-integration.diff.patch",
+      "bytes": 28813,
+      "sha256": "2126b31258b76e95ab9e1004fab5b0b46b506c427f09845ac3f30a044b0754ec"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/adapter-plan.md",
+      "bytes": 3457,
+      "sha256": "7f74d751cdbfbc557b95a5c34c0ba4923f1fccc63dc8878df0eb597c6a277741"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/admitted-shape-census.json",
+      "bytes": 8974,
+      "sha256": "d2fbef34a5edb48e4007ab2cd917e3682642bf254bc0a65d43780f9ffcc0a05e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/before/retained-public-receipt-index.md",
+      "bytes": 9522,
+      "sha256": "4dbee33e49f96aaf936117b76934cb85a6854fbed1d22f70257536e4993bff7a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/before/retained_public_receipt_index.py",
+      "bytes": 58166,
+      "sha256": "5e12528284d81be4d571e7753de6ac39a991e6c4f46b8bc7897157f716d9e349"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/closed-profile-proposal.json",
+      "bytes": 2930,
+      "sha256": "bfed87048bff6159f6b932e18b4b5e7fd49b98df1de5c101d8605b2ec4e36730"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/freeze.json",
+      "bytes": 3406,
+      "sha256": "4a89caecad49ff8cd2d2dabd44a78ce165ea3ae28e8239899fd71b9b980ebb67"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/manifest.json",
+      "bytes": 10383,
+      "sha256": "eddb15548f11c4ff6c3eaad398aa793205a0fe170616dd95556b2b1b55151494"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/observed-domains.json",
+      "bytes": 4249,
+      "sha256": "5318a8459884eab2631b4aa28c0ce774e5fe491afadf22307cf3f53c07eb5ae9"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/plan-freeze.json",
+      "bytes": 2765,
+      "sha256": "fb45a9c295cb4564f02ab28ecdfcdd0c04387112f3736a4f08730d26dec88533"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/private-adapter-draft.py",
+      "bytes": 21046,
+      "sha256": "0a5a9d197bd363d3e6eb1a19c992a37527140c0d57438b9e0a23437e5d87b17b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/retained_public_receipt_index.py.revision-1-to-2.diff.patch",
+      "bytes": 4879,
+      "sha256": "bda2d0cc5d111e9bd135c16b9c8cddf29b772b15f0e8f8a23aaa48d230c5fd47"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/accept-726-root.py",
+      "bytes": 10792,
+      "sha256": "4c99c601883945e915d1fb00bb5635dc1e4c290bf71eada0a3c0fa129a03266f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/freeze.json",
+      "bytes": 3406,
+      "sha256": "4a89caecad49ff8cd2d2dabd44a78ce165ea3ae28e8239899fd71b9b980ebb67"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/retained-public-receipt-index.md",
+      "bytes": 12234,
+      "sha256": "24e580ccbf07c9af710f72ea7c32082723cdc23657c60111503c318ac080ec58"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/retained_public_receipt_index.py",
+      "bytes": 83395,
+      "sha256": "4cb9fd10638bef39d8eb1deccc90210fd0f0241d8e66c38aaf756ef7c50337c8"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/root-commands.md",
+      "bytes": 1045,
+      "sha256": "7ab3161f4f76e152cdfb649f5748d1dd1d3796190409fc121764ed1c3a1d289b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/test_retained_public_receipt_polars_attributes.py",
+      "bytes": 21924,
+      "sha256": "a283d2f7509acea563208bc5f4d21992063d87079684045678dd8a7f6d1647a0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-2-freeze.json",
+      "bytes": 1861,
+      "sha256": "70044cdd1101ee4cf60dfb20f8194d5f78d45b6fa0565456647b835b441ea1d6"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/root-commands-revision-2.md",
+      "bytes": 1056,
+      "sha256": "96d26fb886b6110d96492b6b7e776db405a82fd99a81878fe51ac6e721b63e94"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/root-commands.md",
+      "bytes": 1045,
+      "sha256": "7ab3161f4f76e152cdfb649f5748d1dd1d3796190409fc121764ed1c3a1d289b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/test_retained_public_receipt_polars_attributes.py.revision-1-to-2.diff.patch",
+      "bytes": 2578,
+      "sha256": "a7955a4c7d58ce78c21778ee6460381972f40a46e86763d40a5ce53705d30f9b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-independent-review-1/review-static.py",
+      "bytes": 8990,
+      "sha256": "4955a3c0e28e2be39b6e0459946783a1072beb2081e3cfad30968095734d19eb"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-independent-review-1/review.json",
+      "bytes": 9582,
+      "sha256": "5f9214053b434518aee136cf823a5ac59af42aed9d2bd8bb869ca4a78d18fe21"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/prepare.py",
+      "bytes": 16917,
+      "sha256": "ce121c196d62a69289b10ddf024c835eb04549b863e360c37b9fff70e9da2b0e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/public-signature-map.json",
+      "bytes": 1538,
+      "sha256": "1f7d761b966c2041073aa0be1b3539c8a1ea4f2c337f3f7bc38291b0e21ba8d0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/report.json",
+      "bytes": 10350,
+      "sha256": "72fb81c2f8c6d0d4a23e6a64871f414910f44135025d4ae5c6797f11468c0241"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/source-declarations.json",
+      "bytes": 12727,
+      "sha256": "bbfe63a95e3385a05928fa7f7b406f36c4efa3a8017e3622791d1731530be2da"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/validation.json",
+      "bytes": 1091,
+      "sha256": "51ccb7d285b3e02ed989da9f2a080bb4fd4f13a53489fb07a3e46a9206ac556b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/browser-terminal.json",
+      "bytes": 1484,
+      "sha256": "3776b04dd2e4194057de00d4166c4e1bef7d61271a267fc058aa4c19961403b8"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/frontend-all-terminal.json",
+      "bytes": 318,
+      "sha256": "07a05480cc67bd8b5538fcc8aa41afcd7569907d6a43afc690f3ba1381be54a4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/frontend-build-terminal.json",
+      "bytes": 325,
+      "sha256": "c3b42a722371ffe95a1cd75ca9d206979fc7af67373b01f43c92637caa019852"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/frontend-focused-terminal.json",
+      "bytes": 134,
+      "sha256": "5fd06d291b4350b0cccbe017f97c14db52781cc8d3555209c80bfe57df55b82a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/index-terminal.json",
+      "bytes": 281,
+      "sha256": "027aa0794b240bc750c2ea479ff0b31ccac9e4a327cc76785921bca72a557507"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/initial-four-native-terminal.json",
+      "bytes": 625,
+      "sha256": "363fd75c26520a8d1a23638f8d73eeb2b83dba734a3d3c9c0cfd5baf2037d490"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-build-terminal.json",
+      "bytes": 2614,
+      "sha256": "6fd8bf2952ae7c8526bab105e4ece20c6b4b2aa5b5fc39afe6be6a1a29f24fb9"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-count-abi-build-terminal.json",
+      "bytes": 1102,
+      "sha256": "07a926912b3ac5e6b15150d6fe10d7ad095ff644166e7fcb394d3fef153e9cf9"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-full-attempt-1.json",
+      "bytes": 1249,
+      "sha256": "f464133e69ab46cabffda72142036111c53ed3d8c6de3f524a29f9bc021d7bc4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-full-terminal.json",
+      "bytes": 1097,
+      "sha256": "1befe9e9df452a1d2c6ed8d77fa6aebb01783daf2fd20b10a28a59143384aff4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-regressions-terminal.json",
+      "bytes": 1208,
+      "sha256": "24bbf06ef030387b4dbf9ea0dbfa3727cd698bfb94939fc8ea6a8d155f52aa71"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/preserved-attempts.json",
+      "bytes": 1862,
+      "sha256": "30b245bbc547acdea6e98e939dbd62dd166bd3368cc3d48925c4f9326e8cb93c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/receipt-integrity-terminal.json",
+      "bytes": 5091,
+      "sha256": "63cf3950fb9833829dbb7a7ae08a57b13857fab89018e636d9cb9cefefef3be0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/adl-supplement-1.json",
+      "bytes": 1336,
+      "sha256": "348974b74e014b3eda76e8809b8aca179947389c1f40a6b4671db02123963d53"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/first-review-attempt-failures.json",
+      "bytes": 733,
+      "sha256": "bea1df46cc5d896b32e636931b536032cf9223990438a596149591189565aed4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/frozen-polars_attributes_original_call_parser.hpp",
+      "bytes": 11755,
+      "sha256": "54d57a28a778360099d857ab86ceb21acbb82a5879b0ee406c0b676e510038f0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/frozen-table_attributes_filter_workbench.cpp",
+      "bytes": 19127,
+      "sha256": "cdf521df062986dc8a0a2747e19c8de5b34920163303f26263e1d5dd7d76d163"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/frozen-test_polars_attributes_original_call_controls.cpp",
+      "bytes": 8981,
+      "sha256": "95c073ac10f4c0b7e1ab7bd617f333f7b0e86ecdd8426588b1459ebb06488bd8"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/initial-adl-parser.diff.patch",
+      "bytes": 3194,
+      "sha256": "5ff2d3f4e5efc70f970b685163b5642ff4ba4a0678d41b490baababaa046fddc"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/inspect-own-branch-diff.py",
+      "bytes": 559,
+      "sha256": "5a3b2be3405b6b749f01ca6174d3a87fc0e0ddb21c6b7b016085788eeba60bfc"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review-adl-supplement.py",
+      "bytes": 1827,
+      "sha256": "2fbd58a1ebcca92fcc340080fe3923150af1d74dfb67d27ac54645b40c37dc5e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review-corrected-1.py",
+      "bytes": 9041,
+      "sha256": "22df133627b9ad8608ecde0fd77bcb3c98a6e9efcf4233b5f80d791d15c8bd57"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review-first-assertion-failure.py",
+      "bytes": 8955,
+      "sha256": "84c1039e86f221070522e7659f75cb25ecfb77d89823a9ae5637921293ae8fbe"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review.json",
+      "bytes": 8445,
+      "sha256": "ae1b2db382b238ffb7448fe22da4986c395b9683281cb1de046f5529dba302c7"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review.py",
+      "bytes": 8955,
+      "sha256": "84c1039e86f221070522e7659f75cb25ecfb77d89823a9ae5637921293ae8fbe"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/validation.json",
+      "bytes": 538,
+      "sha256": "8ffd721bff8c0592b81f2cd4624e2630536217ec2d471ab2fb5c800f5532e104"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/workbench-vs-pandas-baseline.diff.patch",
+      "bytes": 5783,
+      "sha256": "3bdb3417009c408980e75700789c0d6f9699b441957aac829fac12a64e68e4a8"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/report.json",
+      "bytes": 4177,
+      "sha256": "4999d35b5cf68f18412ee050df1001251ff7f8dcb3b68b25fe6aabe1e315af20"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/byte-checker-compatibility-correction.json",
+      "bytes": 802,
+      "sha256": "1fab8fe2fcdc08c1faec6528fef76392cc1c3986d91a2df6304de76ca67a7056"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/draft-corrections.json",
+      "bytes": 720,
+      "sha256": "358414078252ba2d7ed426a6bbd53028c8c6d77c3a8c9f82985c259be0f536a9"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/first-draft-1/packager.py",
+      "bytes": 21377,
+      "sha256": "1033ad3667e8d364cef5b6cf5478ff7ec2517515340daaf770eaac45ab54759e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/first-draft-1/prepare-scope.py",
+      "bytes": 8649,
+      "sha256": "f5508ecaa2dcedd20cce93ffe7246d629218399ab6f3a89bce77066cf654a694"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/first-draft-1/root-facts-contract.json",
+      "bytes": 8153,
+      "sha256": "2d07f765dae86028b492ca17e94fbb485fc7aed36c7bcf2134d738f1f4dcff05"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/first-draft-1/scope.json",
+      "bytes": 63819,
+      "sha256": "c3016d5369e36878281ed883258c51ea4231897dc9651effff94b6f2540ffd02"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/freeze-final-scope.py",
+      "bytes": 5760,
+      "sha256": "b7de227beb2b790920adca3d3d64b6323f34f51ab164b3d763545046dca35c87"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/prepare-scope.py",
+      "bytes": 8910,
+      "sha256": "6016330b1c2c3e45351e93dc533ee2fe8c999120ef6b3a9526a64a3f58f38f0a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/root-facts-contract.json",
+      "bytes": 8153,
+      "sha256": "2d07f765dae86028b492ca17e94fbb485fc7aed36c7bcf2134d738f1f4dcff05"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/scope-before-final.json",
+      "bytes": 74043,
+      "sha256": "aac89496dda3e1b3648e121ea43b483883740d8eb9940382a0b6b404bc394716"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/scope.json",
+      "bytes": 81470,
+      "sha256": "3f3f345a312b0b9409a9540b862e66e17a14b62fbaaca84ce9b7b6604aa35b1b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/second-draft-1/packager.py",
+      "bytes": 21382,
+      "sha256": "878111cf5e819b80e7b70a7c732a050ec5c34ebf50415c954452adb5ec384364"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/second-draft-1/prepare-scope.py",
+      "bytes": 8756,
+      "sha256": "bcf00a824bbf8e3e9542e8b77aa82f5b7ce4435e13291382e51bf486c7a834aa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/second-draft-1/scope.json",
+      "bytes": 72614,
+      "sha256": "48cf2ef95e223973653c004b55e799367af6707a8420e603ce2796b8d20a93ed"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/CMakeLists-backend-commit.txt",
+      "bytes": 122072,
+      "sha256": "d862dccc773d3e386aa98d5142411b38c2e75e1db30fb26d9129cb84b6c630e2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/committed-coverage.json",
+      "bytes": 480643,
+      "sha256": "ed9016cdefdb039ece6d17e0d6bdabae8e5e0530119e01bbecffc78fec1f3989"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/count-transport-evidence-boundary.json",
+      "bytes": 1647,
+      "sha256": "62fbdee6ce6b6b8ba4adce51fffe124b54a61e0a79acf0aa558a3c4fe400ef6c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/external-runtime-artifact-bindings.json",
+      "bytes": 7812,
+      "sha256": "5257555404a31f29a69a174835999e3655af90d3a5f17b5ac3965734e2ae8072"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/prior-archive-regression-scope.json",
+      "bytes": 1446,
+      "sha256": "3d0941c51b37169e6942f085a139f786f30b6d3e975e14eda45dacec7a4c65ed"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/root-facts.json",
+      "bytes": 70081,
+      "sha256": "d3efdcd0246f59e3a42508f52a98a480533165035b0f5a1b16b5549db1a3a7d2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/source-commits.json",
+      "bytes": 3525,
+      "sha256": "a1a1ea0e9f31fab1ee4dfbc5b4412aa450102b1c20748c18debb296c1f1bc1af"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-fixture-independent-review-1/all726-independent-mappings.jsonl",
+      "bytes": 497810,
+      "sha256": "6e6e90ef13ffb21680f72d84c9e920ad46a9fabee3eb4f0a1fe66303658d656f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-fixture-independent-review-1/review.json",
+      "bytes": 8483,
+      "sha256": "885315f7dde51244b4028c64891fc4fc2717a4b8feaf5172bccf39701e9b4cfa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-fixture-independent-review-1/review.py",
+      "bytes": 19299,
+      "sha256": "1d14866f8a6cb64ca9675ddb252921f1e242655ac09f5c431908a925461adfcb"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-fixture-independent-review-1/validation.json",
+      "bytes": 735,
+      "sha256": "17f6dc572ffd6e5771e3fbfdda893c84d1ff78c5172c1ba665121938e9346e22"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-TableAttributesFilterWorkspace.tsx",
+      "bytes": 18014,
+      "sha256": "12684a78bed372c3673c2400a0c32d74c04ef2b0496b3af4dcdafe71acf06f02"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-attributes-filter-workflow.md",
+      "bytes": 9588,
+      "sha256": "d50efd1beb3e29202eb9ffe01d7144a48df8fed36b6e9a9bba83be7f3e2e052c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-polars-attributes-filter-parity-contract.md",
+      "bytes": 13147,
+      "sha256": "c625413a3e2d2397a1e18903d0faed17db05d8b37d3ba18aea5e430525149489"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-table-attributes-filters.test.ts",
+      "bytes": 14629,
+      "sha256": "b676b9ae7952d61bdba065d5d244ec76af7e0b74759a6116eb39191bf652d49c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-table-attributes-filters.ts",
+      "bytes": 14392,
+      "sha256": "e8153a733d4f7bd214358591f568a7743b204aa0ac9e01263d119874abe688ce"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-table-attributes-original-call.test.ts",
+      "bytes": 6766,
+      "sha256": "e47805da507e144b591e6e6747c780dd5cd3e37be34f3ce7e96cc33fb42b31fa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-table-attributes-workspace.test.ts",
+      "bytes": 8795,
+      "sha256": "07571af3f0d44276e4ef425bba875cbb314f922b7168fd6064ab96c76ddf39fa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/browser-base-pandas-3.cjs",
+      "bytes": 18971,
+      "sha256": "b7077f33fec08b5614b3c043699b961c5a76d068e5787a828a7d0ef7e457e9c5"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/browser-preparation.json",
+      "bytes": 2074,
+      "sha256": "a5351bd6b3f3458f831645241b00093e6c75fcce52560d6e89695cb640df66ee"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/browser-smoke.cjs",
+      "bytes": 20968,
+      "sha256": "fa69597a4be5d965c49a2188611f4bc7df5199c9a514bdd39eee79696db46545"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/browser-usage.md",
+      "bytes": 2581,
+      "sha256": "0fab6ffc073661af6314a145e47e32c5288cb4b339d3938d48070b3ed319bffa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/first-patch-failure.json",
+      "bytes": 329,
+      "sha256": "ee7ce974af5984716e1ac50448fc361a7d3bbd3fbbf77b4211ee8f40f58ecdea"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/prebuild-report.json",
+      "bytes": 3030,
+      "sha256": "1d74ba88245605557d8a03763e689c23bce31b76c6963c9abbcbff55d7281f72"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/prepare-browser-recipe.py",
+      "bytes": 11523,
+      "sha256": "094fe8445fe143eb86cfbb040720e396372737ae13743204c1e883cccef60030"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-TableAttributesFilterWorkspace.tsx",
+      "bytes": 19083,
+      "sha256": "7538ee7511eda1f58e6012a094a641f221408e65c2abc98fa57cc6de3d71179b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-attributes-filter-workflow.md",
+      "bytes": 10566,
+      "sha256": "0ea0f221b783c83adef6558535b6faf505e0d8c38bd2929b342110a546e91e8d"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-polars-attributes-filter-parity-contract.md",
+      "bytes": 16331,
+      "sha256": "e13eebc530a70145fa253f15f7ae1c7e7aeb45e1e75513798c301837f8fc6277"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-table-attributes-filters.ts",
+      "bytes": 15243,
+      "sha256": "c3293a388316eeb7cc090ab3c73609017cd025bee161ac2f316c206e5fabf349"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-table-attributes-original-call.test.ts",
+      "bytes": 6911,
+      "sha256": "ff95058c68ebe8cd991dadbe5e1d86ed8eb68c12503fb137b3896ff079884e86"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-table-attributes-polars-original-call.test.ts",
+      "bytes": 9795,
+      "sha256": "54d923bcff39561bc364f5d290d9fda5f9367682b2dc1e35675ffe01466516cb"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/review.json",
+      "bytes": 9154,
+      "sha256": "69979eb311bde2ec776d7ccda8d9f524a0a699a0e75b6e5103be1f2933366d9b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/review.py",
+      "bytes": 8544,
+      "sha256": "f296701a273f6ab9ed72abe608bb00a6ac342390bbf8142d48901f1a21340371"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/transport-vs-pandas-reviewed-baseline.diff.patch",
+      "bytes": 3918,
+      "sha256": "8ec769fc4a77aae3db506124340b8db502023b1439d863fe3b2c3e219099b3b4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/validation.json",
+      "bytes": 517,
+      "sha256": "d807a90a6aacb79a82164c695f0b13d2afe75da4233cc31588d15e14ac6bf30e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-initial-build-1/parser-before-adl-fix.hpp",
+      "bytes": 11689,
+      "sha256": "0397486e95be00f6f17aaaca14fe8564c032a2a4083e76313ab07c86e69ef746"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/compatibility-only.diff.patch",
+      "bytes": 820,
+      "sha256": "4e3a258f53b45e1bde3f623b1f2c9a00c93e34b00a0d0fd0ccd0f36a7c5be3a0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/review-static.py",
+      "bytes": 10776,
+      "sha256": "795b5c62224c56a030e03075e8e6d47361d6ac3a7b4bf598279d94db3811d667"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/review-writer-static.py",
+      "bytes": 6595,
+      "sha256": "108c2b0fc16ae365bc95eefe40095644e0953a2b4803d4ea31b71e62df9b5142"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/review.json",
+      "bytes": 8348,
+      "sha256": "6d2dfe08de53a30cb64b02e3d89464b20b5ceefb258626b839f3ee3f349c377f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/root-facts-writer-review.json",
+      "bytes": 5117,
+      "sha256": "acfd1bfbdb4a6315f4adb46458ca184e661969efa11956b3a2d22858dbd89385"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-wire-frozen-1.json",
+      "bytes": 8893,
+      "sha256": "e2ccc6f1b46fa61f82ac5e3664205297af0261100215d3bcf9f91a1b6529823c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-wire-frozen-2.json",
+      "bytes": 9874,
+      "sha256": "b6f599eaea8cc08eaf3a949364f747f44af7f0825d85778ed1a4d4df7d347314"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-wire-proposal-1.json",
+      "bytes": 7279,
+      "sha256": "054c583e8b218d4c8556476f39129515a2f84ac617c6729319e3c7a22f7f0229"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-public-observation-admission-1/admitted-sources.json",
+      "bytes": 9351,
+      "sha256": "41cbb5c074118f17b6fd7eb5044b3db97320d46e5514d0fe03c64e34b01d0511"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-public-observation-admission-1/validation.json",
+      "bytes": 152,
+      "sha256": "5b34fddd7b860eac3ccfe62a7c48979541f284473617c4b8ad421a86f22fedd1"
+    },
+    {
+      "path": "build/parity-closures/verify-utf8-checkpoint-capsules-root.py",
+      "bytes": 3140,
+      "sha256": "7520eedf195b85ba371c4518e568b0f5d94f5d8e32bbe1e90c805503c6049047"
+    },
+    {
+      "path": "docs/attributes-filter-workflow.md",
+      "bytes": 10566,
+      "sha256": "0ea0f221b783c83adef6558535b6faf505e0d8c38bd2929b342110a546e91e8d"
+    },
+    {
+      "path": "docs/polars-attributes-filter-parity-contract.md",
+      "bytes": 16331,
+      "sha256": "e13eebc530a70145fa253f15f7ae1c7e7aeb45e1e75513798c301837f8fc6277"
+    },
+    {
+      "path": "docs/retained-public-receipt-index.md",
+      "bytes": 12415,
+      "sha256": "7b575f8a4cd01ab4cfa1efabd9e57ed7a2bcaab3905ffb19c0c5d246a5dd179d"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91"
+    },
+    {
+      "path": "scripts/retained_public_receipt_index.py",
+      "bytes": 84156,
+      "sha256": "de281d2729c9ce42c6ca85782898f16cf900780cd62a3d1023f1605242d97f08"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_receipt_polars_attributes.py",
+      "bytes": 22644,
+      "sha256": "1560c43d0853a1e225ae7c10efaeec1553602c1c706d24b91ad08af40ed35397"
+    },
+    {
+      "path": "src/backend/polars_attributes_original_call_parser.hpp",
+      "bytes": 11755,
+      "sha256": "54d57a28a778360099d857ab86ceb21acbb82a5879b0ee406c0b676e510038f0"
+    },
+    {
+      "path": "src/backend/table_attributes_filter_workbench.cpp",
+      "bytes": 19127,
+      "sha256": "cdf521df062986dc8a0a2747e19c8de5b34920163303f26263e1d5dd7d76d163"
+    },
+    {
+      "path": "src/backend/tests/test_polars_attributes_original_call_controls.cpp",
+      "bytes": 8981,
+      "sha256": "95c073ac10f4c0b7e1ab7bd617f333f7b0e86ecdd8426588b1459ebb06488bd8"
+    },
+    {
+      "path": "src/backend/tests/test_polars_attributes_workbench_public.cpp",
+      "bytes": 3818,
+      "sha256": "51298f16b547c1ad31a79232da8a90967eff2580ea6ba2551667a6100a1b7692"
+    },
+    {
+      "path": "src/frontend/src/components/TableAttributesFilterWorkspace.tsx",
+      "bytes": 19083,
+      "sha256": "7538ee7511eda1f58e6012a094a641f221408e65c2abc98fa57cc6de3d71179b"
+    },
+    {
+      "path": "src/frontend/src/table-attributes-filters.ts",
+      "bytes": 15243,
+      "sha256": "c3293a388316eeb7cc090ab3c73609017cd025bee161ac2f316c206e5fabf349"
+    },
+    {
+      "path": "src/frontend/tests/table-attributes-original-call.test.ts",
+      "bytes": 6911,
+      "sha256": "ff95058c68ebe8cd991dadbe5e1d86ed8eb68c12503fb137b3896ff079884e86"
+    },
+    {
+      "path": "src/frontend/tests/table-attributes-polars-original-call.test.ts",
+      "bytes": 9795,
+      "sha256": "54d923bcff39561bc364f5d290d9fda5f9367682b2dc1e35675ffe01466516cb"
+    }
+  ],
+  "source_bindings": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 124313,
+      "sha256": "2f6000b61450b102b5f94f46e9c3b081fd4a162979469c1b1d0c7ca31ddc263f"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/validation.json",
+      "bytes": 10822,
+      "sha256": "8fabf2d55a770d81b5e8ce0afd77c5a41e01d5a2e5a1edd3f8791cc1e4d19c3f"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-prepared-1/capture-public.py",
+      "bytes": 15907,
+      "sha256": "00f31f61f52c41fd2ab29bfecc2f226d4d4da22d667786f0377c9bd880798506"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-prepared-1/generate-native-tests.py",
+      "bytes": 9396,
+      "sha256": "c8825f37336ffe6c11fcdb4352962e954aeb2145a61b646c47b4deeea2f2495a"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/validation.json",
+      "bytes": 10815,
+      "sha256": "86c9ef0376274b8d30e342331a36f315956324886bdbb9c78193d2190985fde8"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-prepared-1/capture-public.py",
+      "bytes": 15972,
+      "sha256": "a3802edfd02c835d66e05e72b21ea4d3227206ee4c8fbc60a9290ebc71c0c855"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/validation.json",
+      "bytes": 10823,
+      "sha256": "1024731e5e7da74717dcea616ad42c2c6e1bf85f14900f1d71f53f22d93e0df2"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-prepared-1/capture-public.py",
+      "bytes": 16066,
+      "sha256": "b75d08d1c3d703eeaba27b7e711c1de2bee3a5daf6ebd40f0c80908df22c5db4"
+    },
+    {
+      "path": "build/parity-closures/admit-polars-attributes-public-observations-1.py",
+      "bytes": 4543,
+      "sha256": "17240ded2ccc9af18e1c6861321fee41f53cc8523499c0159bcbb1b285280d52"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/apply-count-abi-correction.py",
+      "bytes": 4107,
+      "sha256": "afa0df78fed899fb0b11ce81c3c9b1c12c7727f29a94df2a6f5eeecb9891342d"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/before-fixture-support.hpp.txt",
+      "bytes": 15867,
+      "sha256": "b2bbef4c60eb10d7cacda32e0eabc008fdc83ba676ed95c807f8f68a844148bb"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/before-generation-report.json",
+      "bytes": 8203,
+      "sha256": "ac2c0e919d27621deb1e9fb159451e007ac4313b7784501d5a631d92b3d3b292"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/before-preparation.json",
+      "bytes": 9096,
+      "sha256": "dd5aaef41877d4ba7a50e7074e7cb72b4d1d6214616cd1e7fc31d5a7dbaa6f2e"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/freeze-preparation.py",
+      "bytes": 2303,
+      "sha256": "3b83ec50b01424b81c3b1b40bb3c157779fbbb825d34352f09df177a986e6f2a"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/preparation.json",
+      "bytes": 3272,
+      "sha256": "c3779c93cabd9bdba2c023f5717cee75893d9fa6bf4e8916ec6aae87fa2f2b11"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/report.json",
+      "bytes": 3826,
+      "sha256": "f514685459de641acae34976ff05bc7687ee154d0e8c41430af3fb6da81aed24"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/support.diff.patch",
+      "bytes": 4044,
+      "sha256": "e38e799d56fb8e74b22f36752a42013d0a67bc049d9c7eaec57a44b9f63481f0"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/first-draft-support-before-most-common.hpp.txt",
+      "bytes": 15822,
+      "sha256": "9a2075f047a5eca0c04533ea74997966041e9dee20456ebc79d697f5e6e5f44d"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/fixture-support.hpp.txt",
+      "bytes": 17224,
+      "sha256": "af752175e6daa0fe24a27b963415fed7c4fb965f21c5d0029582b57b6b0cfef1"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/freeze-preparation.py",
+      "bytes": 4326,
+      "sha256": "111b275425e2a3f11c95bb303967f4186670f937e4eb48b2937cc48c8ba665fa"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 11954,
+      "sha256": "e132d2ea33bda5e1c468b529c2da22f78ed8c44438dc98c056d85fe389bdc667"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/generation-report.json",
+      "bytes": 8203,
+      "sha256": "ac2c0e919d27621deb1e9fb159451e007ac4313b7784501d5a631d92b3d3b292"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/preparation.json",
+      "bytes": 9096,
+      "sha256": "dd5aaef41877d4ba7a50e7074e7cb72b4d1d6214616cd1e7fc31d5a7dbaa6f2e"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/before-wrapper.cpp",
+      "bytes": 3553,
+      "sha256": "fdfd4cbbb54cd80d06e14d72b924bdb2cacc921679aded303b35ca363053b9df"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/freeze.py",
+      "bytes": 2662,
+      "sha256": "c66c029ae5501958ef07696f94eeac257d532a107d12cd5f673d1bda2f78aa26"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/frozen-wrapper.cpp",
+      "bytes": 3818,
+      "sha256": "51298f16b547c1ad31a79232da8a90967eff2580ea6ba2551667a6100a1b7692"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/original-generation-report.json",
+      "bytes": 8203,
+      "sha256": "ac2c0e919d27621deb1e9fb159451e007ac4313b7784501d5a631d92b3d3b292"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/original-preparation.json",
+      "bytes": 9096,
+      "sha256": "dd5aaef41877d4ba7a50e7074e7cb72b4d1d6214616cd1e7fc31d5a7dbaa6f2e"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/report.json",
+      "bytes": 1992,
+      "sha256": "4fb5c7c14c6eeb7fb53ae30bf74003d68641a165ce865630c412f3fadfed665f"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/wrapper-macro-correction-1/wrapper.diff.patch",
+      "bytes": 592,
+      "sha256": "5fd50076652ea04b8da0fb51150ae730cc2e7c47419b84e94cb440af2785063a"
+    },
+    {
+      "path": "build/parity-closures/census-polars-attributes-original-calls-root-1.py",
+      "bytes": 9037,
+      "sha256": "bd6b2c6ceb1657bc527c65f93bfc5298a8a88e6da305b6f7beb4714178ce780a"
+    },
+    {
+      "path": "build/parity-closures/census-polars-attributes-original-calls-root-2.py",
+      "bytes": 9023,
+      "sha256": "0703df4fc458bf05f53e89017688b0d0a36a1e0c0d8f6f60fcdf0da5a1d0d8b9"
+    },
+    {
+      "path": "build/parity-closures/freeze-polars-attributes-original-wire-1.py",
+      "bytes": 3189,
+      "sha256": "b9403daf8dcc934a6da8d587e4f56148b37156bd70e8d99ad66b029d400706ca"
+    },
+    {
+      "path": "build/parity-closures/make-polars-attributes-root-facts-1.py",
+      "bytes": 12847,
+      "sha256": "c4aae4ed8f353cb34a5bd2b2717cef65e07d92e7a17f84736da360185c77640f"
+    },
+    {
+      "path": "build/parity-closures/package-retained-public-observation-polars-attributes-original-call-checkpoint.py",
+      "bytes": 21520,
+      "sha256": "a30fcd63607ee74acc057da919c708bbdce2b911db25505f82b226ef125ab31f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/generation-1.json",
+      "bytes": 1094,
+      "sha256": "dab0e43b60b95813c8273c69f145f5646e40a38d372861bbe6aa28502c7c1209"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/generation-2-cache.json",
+      "bytes": 1094,
+      "sha256": "f621d7f59e62ad2b00e7485cb2ae05a9e837a8466eae3625cb75c564a5a432ad"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/manifest.json",
+      "bytes": 10383,
+      "sha256": "eddb15548f11c4ff6c3eaad398aa793205a0fe170616dd95556b2b1b55151494"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/validation.json",
+      "bytes": 6469,
+      "sha256": "cd06b3329ed61965b110548a9562d05d8afb11824813b81798b508197de8bf61"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-independent-1/receipt-identities.jsonl",
+      "bytes": 539282,
+      "sha256": "858d2ba9bd7863f6ea6b934d9929c2dd4c495e3b6ec6395f1a65cb426a838233"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-independent-1/report.json",
+      "bytes": 93463,
+      "sha256": "49b973de069f2f389ddf65f431125b1887884369d7a844d844a547933c3d47e7"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-independent-2/receipt-identities.jsonl",
+      "bytes": 539282,
+      "sha256": "858d2ba9bd7863f6ea6b934d9929c2dd4c495e3b6ec6395f1a65cb426a838233"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-independent-2/report.json",
+      "bytes": 93463,
+      "sha256": "49b973de069f2f389ddf65f431125b1887884369d7a844d844a547933c3d47e7"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-root-2/receipt-identities.json",
+      "bytes": 215935,
+      "sha256": "155176aa6f4449dc04f23399ced99984511bc048ae59c33fe399bca27018ed64"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-canonical-census-root-2/report.json",
+      "bytes": 67126,
+      "sha256": "3538bc3ea0652f6452c3bc5719ba1a2a022e5c789fb12d9e0e265525ae67a3bc"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-actual-1/all1102-frame-bindings.jsonl",
+      "bytes": 304917,
+      "sha256": "a6fe3876313a13adc2210035b2b03ad16eeb100eb8d545628ffdc59353542bdc"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-actual-1/all726-mappings.jsonl",
+      "bytes": 475341,
+      "sha256": "be0525e900d3e71bcef41a5e3d697ddf9e54498b2c1f3d3f9f9dc3e713068a87"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-actual-1/domain-census.json",
+      "bytes": 81734,
+      "sha256": "43ce8cfa76ea52060c9726bc370e44af92fb44001bddef743085aa1aff73ed57"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-actual-1/report.json",
+      "bytes": 8969,
+      "sha256": "fa2c210bb1ca7d87594761e64e401df2040d4a9c02ad4e44d2347f02a07866a2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-prepared-1/map-full726.py",
+      "bytes": 22855,
+      "sha256": "b82fd12fa7abaf125cdf966dc9e268283300ee2c51e4bd5caddd2cf9cf45c7a5"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-full-native-mapping-prepared-1/preparation.json",
+      "bytes": 3107,
+      "sha256": "75adc61698d20a8450ab72f37573c36ce9d655a161299518a92db2a780d5522a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/census-revision-2.py",
+      "bytes": 22030,
+      "sha256": "d23ec693e565f6f65fcd80c7207ffd45bebf292712599870b311dcf5a6dfb6c2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/census.py",
+      "bytes": 22020,
+      "sha256": "6199d2e546a11ebb822b0e009a904b2fbe0667d05328ff68e7538b18116c7982"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/preparation.json",
+      "bytes": 3332,
+      "sha256": "8566e618f57b0d8f1e33c128f497b0d9c78fdbe1ee0627bf6eadf959abe1e113"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/provenance-review.json",
+      "bytes": 7636,
+      "sha256": "2444bc2bd00ef3c171313d1d875e5cc3b7a5ee8bfa35331c535afa120701315f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-independent-census-prepared-1/usage.md",
+      "bytes": 1761,
+      "sha256": "6555bca1b3e4a3c6f362eac26444550bae58fd472953a04267fad04aa13e2b17"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/accept-726-root-revision-2.pre-pin-size-draft.py",
+      "bytes": 12032,
+      "sha256": "8d1ed119dbf872d94b7c2a3be82a48689ec857a116bd3be46c4fff2eee21582f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/accept-726-root-revision-2.py",
+      "bytes": 12032,
+      "sha256": "4651f1927565aec30e45d8f9172f735bb83baa1220505cafdd867e00d0920f54"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/accept-726-root.py",
+      "bytes": 10792,
+      "sha256": "4c99c601883945e915d1fb00bb5635dc1e4c290bf71eada0a3c0fa129a03266f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/accept-726-root.revision-1-to-2.diff.patch",
+      "bytes": 5919,
+      "sha256": "f346289e30192fabb4d41174e2646544f97379331590da268898730a1490f58d"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/adapter-integration.diff.patch",
+      "bytes": 28813,
+      "sha256": "2126b31258b76e95ab9e1004fab5b0b46b506c427f09845ac3f30a044b0754ec"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/adapter-plan.md",
+      "bytes": 3457,
+      "sha256": "7f74d751cdbfbc557b95a5c34c0ba4923f1fccc63dc8878df0eb597c6a277741"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/admitted-shape-census.json",
+      "bytes": 8974,
+      "sha256": "d2fbef34a5edb48e4007ab2cd917e3682642bf254bc0a65d43780f9ffcc0a05e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/before/retained-public-receipt-index.md",
+      "bytes": 9522,
+      "sha256": "4dbee33e49f96aaf936117b76934cb85a6854fbed1d22f70257536e4993bff7a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/before/retained_public_receipt_index.py",
+      "bytes": 58166,
+      "sha256": "5e12528284d81be4d571e7753de6ac39a991e6c4f46b8bc7897157f716d9e349"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/closed-profile-proposal.json",
+      "bytes": 2930,
+      "sha256": "bfed87048bff6159f6b932e18b4b5e7fd49b98df1de5c101d8605b2ec4e36730"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/freeze.json",
+      "bytes": 3406,
+      "sha256": "4a89caecad49ff8cd2d2dabd44a78ce165ea3ae28e8239899fd71b9b980ebb67"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/manifest.json",
+      "bytes": 10383,
+      "sha256": "eddb15548f11c4ff6c3eaad398aa793205a0fe170616dd95556b2b1b55151494"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/observed-domains.json",
+      "bytes": 4249,
+      "sha256": "5318a8459884eab2631b4aa28c0ce774e5fe491afadf22307cf3f53c07eb5ae9"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/plan-freeze.json",
+      "bytes": 2765,
+      "sha256": "fb45a9c295cb4564f02ab28ecdfcdd0c04387112f3736a4f08730d26dec88533"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/private-adapter-draft.py",
+      "bytes": 21046,
+      "sha256": "0a5a9d197bd363d3e6eb1a19c992a37527140c0d57438b9e0a23437e5d87b17b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/retained_public_receipt_index.py.revision-1-to-2.diff.patch",
+      "bytes": 4879,
+      "sha256": "bda2d0cc5d111e9bd135c16b9c8cddf29b772b15f0e8f8a23aaa48d230c5fd47"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/accept-726-root.py",
+      "bytes": 10792,
+      "sha256": "4c99c601883945e915d1fb00bb5635dc1e4c290bf71eada0a3c0fa129a03266f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/freeze.json",
+      "bytes": 3406,
+      "sha256": "4a89caecad49ff8cd2d2dabd44a78ce165ea3ae28e8239899fd71b9b980ebb67"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/retained-public-receipt-index.md",
+      "bytes": 12234,
+      "sha256": "24e580ccbf07c9af710f72ea7c32082723cdc23657c60111503c318ac080ec58"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/retained_public_receipt_index.py",
+      "bytes": 83395,
+      "sha256": "4cb9fd10638bef39d8eb1deccc90210fd0f0241d8e66c38aaf756ef7c50337c8"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/root-commands.md",
+      "bytes": 1045,
+      "sha256": "7ab3161f4f76e152cdfb649f5748d1dd1d3796190409fc121764ed1c3a1d289b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-1/test_retained_public_receipt_polars_attributes.py",
+      "bytes": 21924,
+      "sha256": "a283d2f7509acea563208bc5f4d21992063d87079684045678dd8a7f6d1647a0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/revision-2-freeze.json",
+      "bytes": 1861,
+      "sha256": "70044cdd1101ee4cf60dfb20f8194d5f78d45b6fa0565456647b835b441ea1d6"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/root-commands-revision-2.md",
+      "bytes": 1056,
+      "sha256": "96d26fb886b6110d96492b6b7e776db405a82fd99a81878fe51ac6e721b63e94"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/root-commands.md",
+      "bytes": 1045,
+      "sha256": "7ab3161f4f76e152cdfb649f5748d1dd1d3796190409fc121764ed1c3a1d289b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-adapter-prepared-1/test_retained_public_receipt_polars_attributes.py.revision-1-to-2.diff.patch",
+      "bytes": 2578,
+      "sha256": "a7955a4c7d58ce78c21778ee6460381972f40a46e86763d40a5ce53705d30f9b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-independent-review-1/review-static.py",
+      "bytes": 8990,
+      "sha256": "4955a3c0e28e2be39b6e0459946783a1072beb2081e3cfad30968095734d19eb"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-index-independent-review-1/review.json",
+      "bytes": 9582,
+      "sha256": "5f9214053b434518aee136cf823a5ac59af42aed9d2bd8bb869ca4a78d18fe21"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/prepare.py",
+      "bytes": 16917,
+      "sha256": "ce121c196d62a69289b10ddf024c835eb04549b863e360c37b9fff70e9da2b0e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/public-signature-map.json",
+      "bytes": 1538,
+      "sha256": "1f7d761b966c2041073aa0be1b3539c8a1ea4f2c337f3f7bc38291b0e21ba8d0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/report.json",
+      "bytes": 10350,
+      "sha256": "72fb81c2f8c6d0d4a23e6a64871f414910f44135025d4ae5c6797f11468c0241"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/source-declarations.json",
+      "bytes": 12727,
+      "sha256": "bbfe63a95e3385a05928fa7f7b406f36c4efa3a8017e3622791d1731530be2da"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-next-log-variants-metadata-plan-1/validation.json",
+      "bytes": 1091,
+      "sha256": "51ccb7d285b3e02ed989da9f2a080bb4fd4f13a53489fb07a3e46a9206ac556b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/browser-terminal.json",
+      "bytes": 1484,
+      "sha256": "3776b04dd2e4194057de00d4166c4e1bef7d61271a267fc058aa4c19961403b8"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/frontend-all-terminal.json",
+      "bytes": 318,
+      "sha256": "07a05480cc67bd8b5538fcc8aa41afcd7569907d6a43afc690f3ba1381be54a4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/frontend-build-terminal.json",
+      "bytes": 325,
+      "sha256": "c3b42a722371ffe95a1cd75ca9d206979fc7af67373b01f43c92637caa019852"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/frontend-focused-terminal.json",
+      "bytes": 134,
+      "sha256": "5fd06d291b4350b0cccbe017f97c14db52781cc8d3555209c80bfe57df55b82a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/index-terminal.json",
+      "bytes": 281,
+      "sha256": "027aa0794b240bc750c2ea479ff0b31ccac9e4a327cc76785921bca72a557507"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/initial-four-native-terminal.json",
+      "bytes": 625,
+      "sha256": "363fd75c26520a8d1a23638f8d73eeb2b83dba734a3d3c9c0cfd5baf2037d490"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-build-terminal.json",
+      "bytes": 2614,
+      "sha256": "6fd8bf2952ae7c8526bab105e4ece20c6b4b2aa5b5fc39afe6be6a1a29f24fb9"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-count-abi-build-terminal.json",
+      "bytes": 1102,
+      "sha256": "07a926912b3ac5e6b15150d6fe10d7ad095ff644166e7fcb394d3fef153e9cf9"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-full-attempt-1.json",
+      "bytes": 1249,
+      "sha256": "f464133e69ab46cabffda72142036111c53ed3d8c6de3f524a29f9bc021d7bc4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-full-terminal.json",
+      "bytes": 1097,
+      "sha256": "1befe9e9df452a1d2c6ed8d77fa6aebb01783daf2fd20b10a28a59143384aff4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/native-regressions-terminal.json",
+      "bytes": 1208,
+      "sha256": "24bbf06ef030387b4dbf9ea0dbfa3727cd698bfb94939fc8ea6a8d155f52aa71"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/preserved-attempts.json",
+      "bytes": 1862,
+      "sha256": "30b245bbc547acdea6e98e939dbd62dd166bd3368cc3d48925c4f9326e8cb93c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-acceptance-1/receipt-integrity-terminal.json",
+      "bytes": 5091,
+      "sha256": "63cf3950fb9833829dbb7a7ae08a57b13857fab89018e636d9cb9cefefef3be0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/adl-supplement-1.json",
+      "bytes": 1336,
+      "sha256": "348974b74e014b3eda76e8809b8aca179947389c1f40a6b4671db02123963d53"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/first-review-attempt-failures.json",
+      "bytes": 733,
+      "sha256": "bea1df46cc5d896b32e636931b536032cf9223990438a596149591189565aed4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/frozen-polars_attributes_original_call_parser.hpp",
+      "bytes": 11755,
+      "sha256": "54d57a28a778360099d857ab86ceb21acbb82a5879b0ee406c0b676e510038f0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/frozen-table_attributes_filter_workbench.cpp",
+      "bytes": 19127,
+      "sha256": "cdf521df062986dc8a0a2747e19c8de5b34920163303f26263e1d5dd7d76d163"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/frozen-test_polars_attributes_original_call_controls.cpp",
+      "bytes": 8981,
+      "sha256": "95c073ac10f4c0b7e1ab7bd617f333f7b0e86ecdd8426588b1459ebb06488bd8"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/initial-adl-parser.diff.patch",
+      "bytes": 3194,
+      "sha256": "5ff2d3f4e5efc70f970b685163b5642ff4ba4a0678d41b490baababaa046fddc"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/inspect-own-branch-diff.py",
+      "bytes": 559,
+      "sha256": "5a3b2be3405b6b749f01ca6174d3a87fc0e0ddb21c6b7b016085788eeba60bfc"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review-adl-supplement.py",
+      "bytes": 1827,
+      "sha256": "2fbd58a1ebcca92fcc340080fe3923150af1d74dfb67d27ac54645b40c37dc5e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review-corrected-1.py",
+      "bytes": 9041,
+      "sha256": "22df133627b9ad8608ecde0fd77bcb3c98a6e9efcf4233b5f80d791d15c8bd57"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review-first-assertion-failure.py",
+      "bytes": 8955,
+      "sha256": "84c1039e86f221070522e7659f75cb25ecfb77d89823a9ae5637921293ae8fbe"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review.json",
+      "bytes": 8445,
+      "sha256": "ae1b2db382b238ffb7448fe22da4986c395b9683281cb1de046f5529dba302c7"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/review.py",
+      "bytes": 8955,
+      "sha256": "84c1039e86f221070522e7659f75cb25ecfb77d89823a9ae5637921293ae8fbe"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/validation.json",
+      "bytes": 538,
+      "sha256": "8ffd721bff8c0592b81f2cd4624e2630536217ec2d471ab2fb5c800f5532e104"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-backend-independent-review-1/workbench-vs-pandas-baseline.diff.patch",
+      "bytes": 5783,
+      "sha256": "3bdb3417009c408980e75700789c0d6f9699b441957aac829fac12a64e68e4a8"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/report.json",
+      "bytes": 4177,
+      "sha256": "4999d35b5cf68f18412ee050df1001251ff7f8dcb3b68b25fe6aabe1e315af20"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/byte-checker-compatibility-correction.json",
+      "bytes": 802,
+      "sha256": "1fab8fe2fcdc08c1faec6528fef76392cc1c3986d91a2df6304de76ca67a7056"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/draft-corrections.json",
+      "bytes": 720,
+      "sha256": "358414078252ba2d7ed426a6bbd53028c8c6d77c3a8c9f82985c259be0f536a9"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/first-draft-1/packager.py",
+      "bytes": 21377,
+      "sha256": "1033ad3667e8d364cef5b6cf5478ff7ec2517515340daaf770eaac45ab54759e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/first-draft-1/prepare-scope.py",
+      "bytes": 8649,
+      "sha256": "f5508ecaa2dcedd20cce93ffe7246d629218399ab6f3a89bce77066cf654a694"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/first-draft-1/root-facts-contract.json",
+      "bytes": 8153,
+      "sha256": "2d07f765dae86028b492ca17e94fbb485fc7aed36c7bcf2134d738f1f4dcff05"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/first-draft-1/scope.json",
+      "bytes": 63819,
+      "sha256": "c3016d5369e36878281ed883258c51ea4231897dc9651effff94b6f2540ffd02"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/freeze-final-scope.py",
+      "bytes": 5760,
+      "sha256": "b7de227beb2b790920adca3d3d64b6323f34f51ab164b3d763545046dca35c87"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/prepare-scope.py",
+      "bytes": 8910,
+      "sha256": "6016330b1c2c3e45351e93dc533ee2fe8c999120ef6b3a9526a64a3f58f38f0a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/root-facts-contract.json",
+      "bytes": 8153,
+      "sha256": "2d07f765dae86028b492ca17e94fbb485fc7aed36c7bcf2134d738f1f4dcff05"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/scope-before-final.json",
+      "bytes": 74043,
+      "sha256": "aac89496dda3e1b3648e121ea43b483883740d8eb9940382a0b6b404bc394716"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/scope.json",
+      "bytes": 81470,
+      "sha256": "3f3f345a312b0b9409a9540b862e66e17a14b62fbaaca84ce9b7b6604aa35b1b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/second-draft-1/packager.py",
+      "bytes": 21382,
+      "sha256": "878111cf5e819b80e7b70a7c732a050ec5c34ebf50415c954452adb5ec384364"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/second-draft-1/prepare-scope.py",
+      "bytes": 8756,
+      "sha256": "bcf00a824bbf8e3e9542e8b77aa82f5b7ce4435e13291382e51bf486c7a834aa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/second-draft-1/scope.json",
+      "bytes": 72614,
+      "sha256": "48cf2ef95e223973653c004b55e799367af6707a8420e603ce2796b8d20a93ed"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/CMakeLists-backend-commit.txt",
+      "bytes": 122072,
+      "sha256": "d862dccc773d3e386aa98d5142411b38c2e75e1db30fb26d9129cb84b6c630e2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/committed-coverage.json",
+      "bytes": 480643,
+      "sha256": "ed9016cdefdb039ece6d17e0d6bdabae8e5e0530119e01bbecffc78fec1f3989"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/count-transport-evidence-boundary.json",
+      "bytes": 1647,
+      "sha256": "62fbdee6ce6b6b8ba4adce51fffe124b54a61e0a79acf0aa558a3c4fe400ef6c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/external-runtime-artifact-bindings.json",
+      "bytes": 7812,
+      "sha256": "5257555404a31f29a69a174835999e3655af90d3a5f17b5ac3965734e2ae8072"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/prior-archive-regression-scope.json",
+      "bytes": 1446,
+      "sha256": "3d0941c51b37169e6942f085a139f786f30b6d3e975e14eda45dacec7a4c65ed"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/root-facts.json",
+      "bytes": 70081,
+      "sha256": "d3efdcd0246f59e3a42508f52a98a480533165035b0f5a1b16b5549db1a3a7d2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-finalization-1/source-commits.json",
+      "bytes": 3525,
+      "sha256": "a1a1ea0e9f31fab1ee4dfbc5b4412aa450102b1c20748c18debb296c1f1bc1af"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-fixture-independent-review-1/all726-independent-mappings.jsonl",
+      "bytes": 497810,
+      "sha256": "6e6e90ef13ffb21680f72d84c9e920ad46a9fabee3eb4f0a1fe66303658d656f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-fixture-independent-review-1/review.json",
+      "bytes": 8483,
+      "sha256": "885315f7dde51244b4028c64891fc4fc2717a4b8feaf5172bccf39701e9b4cfa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-fixture-independent-review-1/review.py",
+      "bytes": 19299,
+      "sha256": "1d14866f8a6cb64ca9675ddb252921f1e242655ac09f5c431908a925461adfcb"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-fixture-independent-review-1/validation.json",
+      "bytes": 735,
+      "sha256": "17f6dc572ffd6e5771e3fbfdda893c84d1ff78c5172c1ba665121938e9346e22"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-TableAttributesFilterWorkspace.tsx",
+      "bytes": 18014,
+      "sha256": "12684a78bed372c3673c2400a0c32d74c04ef2b0496b3af4dcdafe71acf06f02"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-attributes-filter-workflow.md",
+      "bytes": 9588,
+      "sha256": "d50efd1beb3e29202eb9ffe01d7144a48df8fed36b6e9a9bba83be7f3e2e052c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-polars-attributes-filter-parity-contract.md",
+      "bytes": 13147,
+      "sha256": "c625413a3e2d2397a1e18903d0faed17db05d8b37d3ba18aea5e430525149489"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-table-attributes-filters.test.ts",
+      "bytes": 14629,
+      "sha256": "b676b9ae7952d61bdba065d5d244ec76af7e0b74759a6116eb39191bf652d49c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-table-attributes-filters.ts",
+      "bytes": 14392,
+      "sha256": "e8153a733d4f7bd214358591f568a7743b204aa0ac9e01263d119874abe688ce"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-table-attributes-original-call.test.ts",
+      "bytes": 6766,
+      "sha256": "e47805da507e144b591e6e6747c780dd5cd3e37be34f3ce7e96cc33fb42b31fa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/before-table-attributes-workspace.test.ts",
+      "bytes": 8795,
+      "sha256": "07571af3f0d44276e4ef425bba875cbb314f922b7168fd6064ab96c76ddf39fa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/browser-base-pandas-3.cjs",
+      "bytes": 18971,
+      "sha256": "b7077f33fec08b5614b3c043699b961c5a76d068e5787a828a7d0ef7e457e9c5"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/browser-preparation.json",
+      "bytes": 2074,
+      "sha256": "a5351bd6b3f3458f831645241b00093e6c75fcce52560d6e89695cb640df66ee"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/browser-smoke.cjs",
+      "bytes": 20968,
+      "sha256": "fa69597a4be5d965c49a2188611f4bc7df5199c9a514bdd39eee79696db46545"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/browser-usage.md",
+      "bytes": 2581,
+      "sha256": "0fab6ffc073661af6314a145e47e32c5288cb4b339d3938d48070b3ed319bffa"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/first-patch-failure.json",
+      "bytes": 329,
+      "sha256": "ee7ce974af5984716e1ac50448fc361a7d3bbd3fbbf77b4211ee8f40f58ecdea"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/prebuild-report.json",
+      "bytes": 3030,
+      "sha256": "1d74ba88245605557d8a03763e689c23bce31b76c6963c9abbcbff55d7281f72"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-1/prepare-browser-recipe.py",
+      "bytes": 11523,
+      "sha256": "094fe8445fe143eb86cfbb040720e396372737ae13743204c1e883cccef60030"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-TableAttributesFilterWorkspace.tsx",
+      "bytes": 19083,
+      "sha256": "7538ee7511eda1f58e6012a094a641f221408e65c2abc98fa57cc6de3d71179b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-attributes-filter-workflow.md",
+      "bytes": 10566,
+      "sha256": "0ea0f221b783c83adef6558535b6faf505e0d8c38bd2929b342110a546e91e8d"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-polars-attributes-filter-parity-contract.md",
+      "bytes": 16331,
+      "sha256": "e13eebc530a70145fa253f15f7ae1c7e7aeb45e1e75513798c301837f8fc6277"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-table-attributes-filters.ts",
+      "bytes": 15243,
+      "sha256": "c3293a388316eeb7cc090ab3c73609017cd025bee161ac2f316c206e5fabf349"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-table-attributes-original-call.test.ts",
+      "bytes": 6911,
+      "sha256": "ff95058c68ebe8cd991dadbe5e1d86ed8eb68c12503fb137b3896ff079884e86"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/frozen-table-attributes-polars-original-call.test.ts",
+      "bytes": 9795,
+      "sha256": "54d923bcff39561bc364f5d290d9fda5f9367682b2dc1e35675ffe01466516cb"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/review.json",
+      "bytes": 9154,
+      "sha256": "69979eb311bde2ec776d7ccda8d9f524a0a699a0e75b6e5103be1f2933366d9b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/review.py",
+      "bytes": 8544,
+      "sha256": "f296701a273f6ab9ed72abe608bb00a6ac342390bbf8142d48901f1a21340371"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/transport-vs-pandas-reviewed-baseline.diff.patch",
+      "bytes": 3918,
+      "sha256": "8ec769fc4a77aae3db506124340b8db502023b1439d863fe3b2c3e219099b3b4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-frontend-independent-review-1/validation.json",
+      "bytes": 517,
+      "sha256": "d807a90a6aacb79a82164c695f0b13d2afe75da4233cc31588d15e14ac6bf30e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-initial-build-1/parser-before-adl-fix.hpp",
+      "bytes": 11689,
+      "sha256": "0397486e95be00f6f17aaaca14fe8564c032a2a4083e76313ab07c86e69ef746"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/compatibility-only.diff.patch",
+      "bytes": 820,
+      "sha256": "4e3a258f53b45e1bde3f623b1f2c9a00c93e34b00a0d0fd0ccd0f36a7c5be3a0"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/review-static.py",
+      "bytes": 10776,
+      "sha256": "795b5c62224c56a030e03075e8e6d47361d6ac3a7b4bf598279d94db3811d667"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/review-writer-static.py",
+      "bytes": 6595,
+      "sha256": "108c2b0fc16ae365bc95eefe40095644e0953a2b4803d4ea31b71e62df9b5142"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/review.json",
+      "bytes": 8348,
+      "sha256": "6d2dfe08de53a30cb64b02e3d89464b20b5ceefb258626b839f3ee3f349c377f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-packager-independent-review-1/root-facts-writer-review.json",
+      "bytes": 5117,
+      "sha256": "acfd1bfbdb4a6315f4adb46458ca184e661969efa11956b3a2d22858dbd89385"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-wire-frozen-1.json",
+      "bytes": 8893,
+      "sha256": "e2ccc6f1b46fa61f82ac5e3664205297af0261100215d3bcf9f91a1b6529823c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-wire-frozen-2.json",
+      "bytes": 9874,
+      "sha256": "b6f599eaea8cc08eaf3a949364f747f44af7f0825d85778ed1a4d4df7d347314"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-wire-proposal-1.json",
+      "bytes": 7279,
+      "sha256": "054c583e8b218d4c8556476f39129515a2f84ac617c6729319e3c7a22f7f0229"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-public-observation-admission-1/admitted-sources.json",
+      "bytes": 9351,
+      "sha256": "41cbb5c074118f17b6fd7eb5044b3db97320d46e5514d0fe03c64e34b01d0511"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-public-observation-admission-1/validation.json",
+      "bytes": 152,
+      "sha256": "5b34fddd7b860eac3ccfe62a7c48979541f284473617c4b8ad421a86f22fedd1"
+    },
+    {
+      "path": "build/parity-closures/verify-utf8-checkpoint-capsules-root.py",
+      "bytes": 3140,
+      "sha256": "7520eedf195b85ba371c4518e568b0f5d94f5d8e32bbe1e90c805503c6049047"
+    },
+    {
+      "path": "docs/attributes-filter-workflow.md",
+      "bytes": 10566,
+      "sha256": "0ea0f221b783c83adef6558535b6faf505e0d8c38bd2929b342110a546e91e8d"
+    },
+    {
+      "path": "docs/polars-attributes-filter-parity-contract.md",
+      "bytes": 16331,
+      "sha256": "e13eebc530a70145fa253f15f7ae1c7e7aeb45e1e75513798c301837f8fc6277"
+    },
+    {
+      "path": "docs/retained-public-receipt-index.md",
+      "bytes": 12415,
+      "sha256": "7b575f8a4cd01ab4cfa1efabd9e57ed7a2bcaab3905ffb19c0c5d246a5dd179d"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91"
+    },
+    {
+      "path": "scripts/retained_public_receipt_index.py",
+      "bytes": 84156,
+      "sha256": "de281d2729c9ce42c6ca85782898f16cf900780cd62a3d1023f1605242d97f08"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_receipt_polars_attributes.py",
+      "bytes": 22644,
+      "sha256": "1560c43d0853a1e225ae7c10efaeec1553602c1c706d24b91ad08af40ed35397"
+    },
+    {
+      "path": "src/backend/polars_attributes_original_call_parser.hpp",
+      "bytes": 11755,
+      "sha256": "54d57a28a778360099d857ab86ceb21acbb82a5879b0ee406c0b676e510038f0"
+    },
+    {
+      "path": "src/backend/table_attributes_filter_workbench.cpp",
+      "bytes": 19127,
+      "sha256": "cdf521df062986dc8a0a2747e19c8de5b34920163303f26263e1d5dd7d76d163"
+    },
+    {
+      "path": "src/backend/tests/test_polars_attributes_original_call_controls.cpp",
+      "bytes": 8981,
+      "sha256": "95c073ac10f4c0b7e1ab7bd617f333f7b0e86ecdd8426588b1459ebb06488bd8"
+    },
+    {
+      "path": "src/backend/tests/test_polars_attributes_workbench_public.cpp",
+      "bytes": 3818,
+      "sha256": "51298f16b547c1ad31a79232da8a90967eff2580ea6ba2551667a6100a1b7692"
+    },
+    {
+      "path": "src/frontend/src/components/TableAttributesFilterWorkspace.tsx",
+      "bytes": 19083,
+      "sha256": "7538ee7511eda1f58e6012a094a641f221408e65c2abc98fa57cc6de3d71179b"
+    },
+    {
+      "path": "src/frontend/src/table-attributes-filters.ts",
+      "bytes": 15243,
+      "sha256": "c3293a388316eeb7cc090ab3c73609017cd025bee161ac2f316c206e5fabf349"
+    },
+    {
+      "path": "src/frontend/tests/table-attributes-original-call.test.ts",
+      "bytes": 6911,
+      "sha256": "ff95058c68ebe8cd991dadbe5e1d86ed8eb68c12503fb137b3896ff079884e86"
+    },
+    {
+      "path": "src/frontend/tests/table-attributes-polars-original-call.test.ts",
+      "bytes": 9795,
+      "sha256": "54d923bcff39561bc364f5d290d9fda5f9367682b2dc1e35675ffe01466516cb"
+    }
+  ],
+  "external_bindings": [
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/records.jsonl",
+      "bytes": 17035517,
+      "sha256": "650a20a6741b9c38338554d395ea5a579bc59ee801ff8c411e095eeab657759b"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/call-intents.jsonl",
+      "bytes": 142939,
+      "sha256": "cd4385db4b94fa5089706a40733abd56f0ebf332bd5b44106b01c82dd098af03"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/dedup-audit.json",
+      "bytes": 11571723,
+      "sha256": "dc833a8485ba8fcdc0e0e3e556c0f63e2aa2ef1f969405dc65ccf3a3585fa85a"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-prepared-1/cases.json",
+      "bytes": 2208665,
+      "sha256": "84dff1bfc88f28dbce97eb271082e102ea7f226a25d3e08792dd5001ec8a8ed9"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/records.jsonl",
+      "bytes": 416923,
+      "sha256": "931489435aabe03041b6ce4f4346a1d9f21d520931b58e64125a567f0be4bcfc"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/call-intents.jsonl",
+      "bytes": 3599,
+      "sha256": "4f1caa5bf33898b3462d472f5fb1d2922723ada1802e9cfbed625e9069219d70"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/dedup-audit.json",
+      "bytes": 300021,
+      "sha256": "1be861ff55bb0f9ff2114b2891de17cd9a187aff971de90cba7fb9a9fad920b7"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-prepared-1/cases.json",
+      "bytes": 58345,
+      "sha256": "c43767fb08ebaf8616c062584348b2c8f2c26ed4e3799433959c4c681ae3dd80"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/records.jsonl",
+      "bytes": 190809,
+      "sha256": "fbd439bb0420ece66b64ca429be7645ab018fb28dee216aa7c0879694457bb81"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/call-intents.jsonl",
+      "bytes": 1592,
+      "sha256": "15da57d8b5753e66a5cfdecfc86bb3e829715b84c5cad4f18626d07273922fb3"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/dedup-audit.json",
+      "bytes": 128517,
+      "sha256": "8529e8fa80568267a1d53cde96c19099d3b3e57027d3bbf7f5ee56bac71dcde2"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-prepared-1/cases.json",
+      "bytes": 24741,
+      "sha256": "a6c21dc069113862d6c510a1baf2d6e395e0b197450764887345db5d0152377c"
+    },
+    {
+      "path": "src/backend/tests/polars_attributes_filter_public_vectors.inc",
+      "bytes": 17208527,
+      "sha256": "f699f1152ad129aeb847dcd466f9fbd9e4bd2aab496f79638e2965c2691ec4d2"
+    },
+    {
+      "path": "src/backend/tests/test_polars_attributes_filter.cpp",
+      "bytes": 10301,
+      "sha256": "f1c8186977215b6b3380bad4847ef1a5bda279461005deb248be6e21b5c205c8"
+    },
+    {
+      "path": "src/backend/tests/polars_attributes_workbench_public_vectors.inc",
+      "bytes": 2335204,
+      "sha256": "184e6f779dd415e0158bfba6f1281a1456d715403cfcc5aee13500c44dc691ce"
+    },
+    {
+      "path": "src/backend/tests/polars_attributes_workbench_public_vectors.inc",
+      "bytes": 2336561,
+      "sha256": "f5ac62af0a9c16d4d4aec4e3cbfdd27b231b86b25ff21a30656dfaf3f616f6d1"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/before-polars_attributes_workbench_public_vectors.inc",
+      "bytes": 2335204,
+      "sha256": "184e6f779dd415e0158bfba6f1281a1456d715403cfcc5aee13500c44dc691ce"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-admitted-index-acceptance-1/receipts.sqlite",
+      "bytes": 12779520,
+      "sha256": "3cd689854594ccfc056d47eb0871b040add3480a4b4f0ae45fe51eed3ebca101"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/typed-counts.json",
+      "bytes": 1528,
+      "sha256": "49da4476365202d9cbbf8a88dafa49a50ca289812fb69b1f78d9307704fb81c3"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/controls_before_json.json",
+      "bytes": 6884,
+      "sha256": "e8f8d0c0843b9b472642cdaac2f8e3f877aad3f1b18139695a7b7b281eece61f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/controls_after_json.json",
+      "bytes": 6884,
+      "sha256": "e8f8d0c0843b9b472642cdaac2f8e3f877aad3f1b18139695a7b7b281eece61f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/error-source-after.json",
+      "bytes": 1469,
+      "sha256": "a776f8bbe67a707aeed7c42e8b0ae73997b470e3fc7c3d5eba628a45ef9302b4"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/error-response.json",
+      "bytes": 20109,
+      "sha256": "516e73b928706e88fc32059d62cd0587baed674e350f69cde013029b0f8acfa1"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/exact-call-download.json",
+      "bytes": 405,
+      "sha256": "2e2093c420494dd650d403d4dba06767b5b8a8db4594a9cc3ce70ffe372a6cf2"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/filtered-table.json",
+      "bytes": 895,
+      "sha256": "bcb4bc81bfa4186c9f9c8a193dd89309b4340a75850431047bfe6f9b95729a5c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/parsed-source.json",
+      "bytes": 1469,
+      "sha256": "a776f8bbe67a707aeed7c42e8b0ae73997b470e3fc7c3d5eba628a45ef9302b4"
+    },
+    {
+      "path": "build/Release/minera_server.exe",
+      "bytes": 17046016,
+      "sha256": "dfbad88fd6203dd1767674de88e29b2ed775bf0ff0fec858048343464d798bab"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/actual-filtered-source-reuse-response.json",
+      "bytes": 17708,
+      "sha256": "706b29ef84569f043e69d8dc3a83ae6397ec8b1ae1868854b2a9e5ce3957e36b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/cancelled-native-response.json",
+      "bytes": 25143,
+      "sha256": "9200b5b44252b8619eb179a70ebfac2152be3458b4bd9675e6266d91763a108e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/eager-events-response.json",
+      "bytes": 19072,
+      "sha256": "c88dddae4dcea6dc53903b8b599a686851661a6ff3846f9b23cf8eb9c9afc73f"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/eager-statistics-diagnostic-response.json",
+      "bytes": 17378,
+      "sha256": "9d0a16290c14bef647bc1ea46a1e25003f9ff61a286cd236d83eb4b2cf71ee61"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/enum-literal-precedence-response.json",
+      "bytes": 25430,
+      "sha256": "0eb4926ee409471ef55c6c665f218d0476c730c412c6ed6dd0487f874f3fca71"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/exact-large-integer-import-response.json",
+      "bytes": 25143,
+      "sha256": "9200b5b44252b8619eb179a70ebfac2152be3458b4bd9675e6266d91763a108e"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/friendly-events-response.json",
+      "bytes": 5089,
+      "sha256": "c0b925f30b95e1604026d1fa17551535a0cfc722f777d8480cac367d17329f19"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/lazy-collect-diagnostic-response.json",
+      "bytes": 23508,
+      "sha256": "7c2d88db06ec72e1db476ee078ad9f02355adf28e8ad453fd0c2e8e5d48c377a"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/missing-required-keyword-response.json",
+      "bytes": 15287,
+      "sha256": "30ded4b228de74c18492c8f9670c6ae62ed7ba5420f4a1fbaa4312c8c384e7c3"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-counts-response.json",
+      "bytes": 19061,
+      "sha256": "9df683c2947d6e1701578cd6bcf6caf78a433f7d79bc0ad4d2f23cb0755f9fec"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-events-response.json",
+      "bytes": 19072,
+      "sha256": "444db7ad9db067593559a7ed3f7b5040b36fbc3032afea8bc76fd94983d546ed"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-numeric_events-response.json",
+      "bytes": 25139,
+      "sha256": "8d3d8cfba29d2ac0d081dba4e589e2e5ea94d3bc5644ed07a2368f0c94a512ae"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-numeric_traces-response.json",
+      "bytes": 25139,
+      "sha256": "0dd65ce22b1c22956e4dc0ddc0fb09d7a354325bd7a300b537e00b9946420413"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-on_values-response.json",
+      "bytes": 19416,
+      "sha256": "0955f5c5747d553a3c9890dd63cf0b7715a1509066eb16e4241afa56fa0da16d"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-relative-response.json",
+      "bytes": 19074,
+      "sha256": "ee22a9649e1ef030627a993a0e75def7676d43daaadff3a9d7924af6e00b7e3d"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-threshold-response.json",
+      "bytes": 19002,
+      "sha256": "16083e07fd88bc12bcabe15c74aab7b2381cb638b4288858722d73109d5b322c"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-top_activities-response.json",
+      "bytes": 19040,
+      "sha256": "c4d032e89c1ad83c20898c89872134d13b7fd520e39b63cd6a1f552331eebaeb"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/original-traces-response.json",
+      "bytes": 19413,
+      "sha256": "87314e862d08188e3b6f34aef0674f1f52f554bb131b9f8286a785df894caf0b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/own-source.json",
+      "bytes": 699,
+      "sha256": "a68a602959492b30165ddf50a2d54428f47f0fc5645716e0e0b08f30246ea68b"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/polars-original-error.png",
+      "bytes": 150148,
+      "sha256": "bc902c80e3559b0b8a1ecff35d03f1237fee297401a3c16a74dc1fd29f2249d6"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/polars-original-success.png",
+      "bytes": 153837,
+      "sha256": "8c12c946b4798b5b6f2721c129754e57d3b623096007a80c1cf39cc3615a7fa5"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/raw-parameter-diagnostic-response.json",
+      "bytes": 20109,
+      "sha256": "516e73b928706e88fc32059d62cd0587baed674e350f69cde013029b0f8acfa1"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/reusable-filtered-table-response.json",
+      "bytes": 19072,
+      "sha256": "444db7ad9db067593559a7ed3f7b5040b36fbc3032afea8bc76fd94983d546ed"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-original-call-browser-owned-1/supplied-raw-count-map-response.json",
+      "bytes": 21894,
+      "sha256": "0eb5995a7532c8c1a7c4ca851f2334f69a8edfa83751c66939c42e6a3b9615de"
+    },
+    {
+      "path": "docs/log-ltl-filter-public.json.gz",
+      "bytes": 7592723,
+      "sha256": "2660b657d674d7d7bb621d994f1f4cf93d77fddea034384cdd4b9aafd4174173"
+    },
+    {
+      "path": "docs/pandas-ltl-filter-public.json.gz",
+      "bytes": 8972301,
+      "sha256": "9f073d0be9b35661772538d4a81a8de206160c281d9da3c119e8b4a2b7bb77fd"
+    },
+    {
+      "path": "docs/polars-ltl-filter-public.json.gz",
+      "bytes": 610562,
+      "sha256": "6270a238dc204c126e80ee816e5790449ad0f5b23f7ccce9fb7f1e9ab7fd417b"
+    },
+    {
+      "path": "docs/log-variants-filter-public.json.gz",
+      "bytes": 723678,
+      "sha256": "ba5745834c3f541a28a80d2ec98185bf031e2c06e5f851a450072a2020365bf4"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/case-provenance.jsonl",
+      "bytes": 521097,
+      "sha256": "7b8990accc7b9485d0ce863fe80fbcbf6a894e25893f05572ffdaeb811b78e04"
+    },
+    {
+      "path": "build/parity-closures/admitted-polars-attributes-original-call-transport-1/count-abi-correction-1/before-case-provenance.jsonl",
+      "bytes": 521097,
+      "sha256": "7b8990accc7b9485d0ce863fe80fbcbf6a894e25893f05572ffdaeb811b78e04"
+    },
+    {
+      "path": "src/frontend/dist/index.html",
+      "bytes": 886,
+      "sha256": "6c6066641eaafac5ac87292cbd5f4a2117e55839e8031707947e93be79580616"
+    }
+  ],
+  "member_count": 192,
+  "external_binding_count": 58,
+  "source_bytes": 5662443,
+  "exact_utf8_roundtrip": true,
+  "all_current_source_bytes_equal": true,
+  "external_payloads_opened": false,
+  "root_facts": {
+    "path": "build/parity-closures/polars-attributes-original-call-finalization-1/root-facts.json",
+    "bytes": 70081,
+    "sha256": "d3efdcd0246f59e3a42508f52a98a480533165035b0f5a1b16b5549db1a3a7d2"
+  },
+  "scope_binding": {
+    "path": "build/parity-closures/polars-attributes-original-call-checkpoint-prepared-1/scope.json",
+    "bytes": 81470,
+    "sha256": "3f3f345a312b0b9409a9540b862e66e17a14b62fbaaca84ce9b7b6604aa35b1b"
+  },
+  "limitations": {
+    "new_reference_calls": false,
+    "reference_implementation_inspected": false,
+    "complete_history": false,
+    "new_call_authority": false,
+    "full_parity": false,
+    "catalogue_promoted": false,
+    "warnings_transported": false,
+    "lazy_plans_transported": false,
+    "error_args_transported": false,
+    "python_alias_identity_proven": false,
+    "map_order_claim": false,
+    "raw_multipart_body_claim": false
+  },
+  "failed_attempts_preserved": true,
+  "count_boundary": {
+    "original52_same_counts_unchanged": true,
+    "fresh_native_abi_counts": 104,
+    "whole726_case_driver_suffix_unchanged": true,
+    "original_public_int_storage_not_native_abi": true
+  },
+  "new_bank_archive_payload_opens": 0,
+  "package_original_payload_opens": 0,
+  "prior_archive_regression": {
+    "manifest": "docs/retained-public-receipt-ltl-manifest.json",
+    "containers": 3,
+    "scope": "unchanged bounded prior LTL integration regression"
+  },
+  "no_reference_calls": true,
+  "no_history_completeness": true
+}
