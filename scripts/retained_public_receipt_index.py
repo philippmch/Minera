@@ -7,7 +7,8 @@ inventory description), modules, and sources. Each source declares path, bytes,
 sha256, provenance='own-public-observation', format ('json', 'jsonl',
 'gzip-json', 'gzip-jsonl', 'gzip-envelope-json', 'gzip-envelope-jsonl'), adapter
 ('receipt-v1', 'pandas-before-v1', 'polars-receipt-v1', 'log-attributes-packed-v1',
-'pandas-attributes-before-v1', 'polars-attributes-receipt-v1', or 'digest-plan-v1'),
+'pandas-attributes-before-v1', 'polars-attributes-receipt-v1',
+'log-variants-packed-v1', or 'digest-plan-v1'),
 receipt_schema, reference, runtime, and role
 ('observations', 'plans', or 'intents'). JSON object wrappers require records_key;
 otherwise JSON must be one record or an array of records. Envelope sources also
@@ -50,6 +51,7 @@ SCHEMAS = {
     'log-attributes-packed-v1': ('minera-log-attributes-observer-receipt-v1', 'positional_args_keyword_controls'),
     'pandas-attributes-before-v1': ('minera-pandas-attributes-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
     'polars-attributes-receipt-v1': ('minera-polars-attributes-observer-receipt-v1', 'source_positional_all_options_keyword'),
+    'log-variants-packed-v1': ('minera-log-variants-observer-receipt-v1', 'positional_args_keyword_controls'),
 }
 LOG_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.log.attributes.attributes_filter'
 LOG_ATTRIBUTES_ARITIES = {
@@ -367,6 +369,320 @@ def _attributes_outcome(row, receipt, source):
             ti, ei = pair
             if not 0 <= ti < len(after['traces']) or not 0 <= ei < len(after['traces'][ti]['events']) or after['traces'][ti]['events'][ei] not in trace['events']:
                 raise ValueError('LOG attributes event alias snapshot mismatch')
+
+
+LOG_VARIANTS_MODULE = 'pm4py.algo.filtering.log.variants.variants_filter'
+LOG_VARIANTS_ARITIES = {'apply': {2}, 'filter_log_variants_percentage': {1, 2},
+    'filter_variants_by_coverage_percentage': {2}, 'filter_variants_by_maximum_coverage_percentage': {2},
+    'filter_variants_top_k': {2}, 'filter_variants_variants_percentage': {2, 3}, 'find_auto_threshold': {2, 3}}
+LOG_VARIANTS_ENUM = {'ACTIVITY_KEY': 'pm4py:param:activity_key', 'POSITIVE': 'positive', 'DECREASING_FACTOR': 'decreasingFactor'}
+LOG_VARIANTS_KEYWORDS = {name: {'parameters'} for name in LOG_VARIANTS_ARITIES}
+LOG_VARIANTS_KEYWORDS['filter_variants_variants_percentage'] = {'variants_percentage'}
+LOG_VARIANTS_KEYWORDS['find_auto_threshold'] = {'decreasing_factor'}
+LOG_VARIANTS_PLAN_FIELDS = {'receipt', 'receipt_sha256', 'module', 'function', 'index', 'case'}
+LOG_VARIANTS_TERMINALS = {'result', 'error', 'value_result', 'result_value', 'result_kind', 'output', 'return', 'returned', 'exception', 'error_type'}
+LOG_VARIANTS_ENTRY_FIELDS = {'input_before', 'controls_before', 'input_after', 'controls_after', 'input_unchanged', 'controls_unchanged', 'apply_returned', 'warnings', 'returned_input_identity', 'trace_aliases_source', 'event_source_positions'}
+
+
+def _log_variants_exact(value, fields):
+    if type(value) is not dict or set(value) != set(fields):
+        raise ValueError('unknown/incomplete LOG variants descriptor fields')
+
+
+def _log_variants_trace(value, source, depth):
+    _log_variants_exact(value, ['attributes', 'properties', 'events'])
+    for key in ('attributes', 'properties'):
+        _log_variants_packed(value[key], source, depth + 1, 'dict')
+    if type(value['events']) is not list:
+        raise ValueError('LOG variants trace events absent')
+    for event in value['events']:
+        _log_variants_packed(event, source, depth + 1, 'dict')
+
+
+def _log_variants_snapshot(value, source, depth=0):
+    _log_variants_exact(value, ['attributes', 'extensions', 'classifiers', 'omni_present', 'properties', 'traces'])
+    for key in ('attributes', 'extensions', 'classifiers', 'omni_present', 'properties'):
+        _log_variants_packed(value[key], source, depth + 1, 'dict')
+    if type(value['traces']) is not list:
+        raise ValueError('LOG variants source traces absent')
+    for trace in value['traces']:
+        _log_variants_trace(trace, source, depth + 1)
+
+
+def _log_variants_packed(value, source, depth=0, expected=None):
+    if depth > 256 or type(value) is not dict or type(value.get('type')) is not str:
+        raise ValueError('LOG variants typed descriptor absent/too deep')
+    kind = value['type']
+    if expected is not None and kind != expected:
+        raise ValueError('LOG variants packed container type mismatch')
+    if kind in {'NoneType', 'str', 'bool', 'int'}:
+        _log_variants_exact(value, ['type', 'value'])
+        if type(value['value']) is not {'NoneType': type(None), 'str': str, 'bool': bool, 'int': int}[kind]:
+            raise ValueError('LOG variants typed scalar payload mismatch')
+    elif kind == 'float':
+        _log_variants_exact(value, ['type', 'hex'])
+        try:
+            if type(value['hex']) is not str or float.fromhex(value['hex']).hex() != value['hex']:
+                raise ValueError()
+        except (ValueError, OverflowError):
+            raise ValueError('invalid original LOG variants float hex') from None
+    elif kind == 'bytes':
+        _log_variants_exact(value, ['type', 'hex'])
+        if type(value['hex']) is not str or not re.fullmatch('(?:[0-9a-f]{2})*', value['hex']):
+            raise ValueError('invalid original LOG variants bytes hex')
+    elif kind in {'native_na', 'nat'}:
+        _log_variants_exact(value, ['type'])
+    elif kind == 'uuid':
+        _log_variants_exact(value, ['type', 'value'])
+        if type(value['value']) is not str or not re.fullmatch('[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', value['value']):
+            raise ValueError('invalid original LOG variants UUID')
+    elif kind == 'datetime':
+        _log_variants_exact(value, ['type', 'iso', 'fold', 'offset_seconds'])
+        if type(value['iso']) is not str or type(value['fold']) is not int or value['fold'] not in (0, 1):
+            raise ValueError('invalid LOG variants datetime metadata')
+        try:
+            offset = datetime.datetime.fromisoformat(value['iso']).utcoffset()
+        except (ValueError, OverflowError):
+            raise ValueError('invalid LOG variants datetime iso') from None
+        seconds = value['offset_seconds']
+        if not (seconds is None or type(seconds) in (int, float) and math.isfinite(seconds)) or seconds != (None if offset is None else offset.total_seconds()):
+            raise ValueError('LOG variants datetime offset mismatch')
+    elif kind == 'enum':
+        _log_variants_exact(value, ['type', 'module', 'name', 'value'])
+        if value['module'] != LOG_VARIANTS_MODULE or type(value['name']) is not str or value['name'] not in LOG_VARIANTS_ENUM or value['value'] != {'type': 'str', 'value': LOG_VARIANTS_ENUM[value['name']]}:
+            raise ValueError('unknown LOG variants enum identity/value')
+    elif kind in {'list', 'tuple', 'set', 'frozenset'}:
+        _log_variants_exact(value, ['type', 'values'])
+        if type(value['values']) is not list:
+            raise ValueError('LOG variants typed sequence absent')
+        for child in value['values']:
+            _log_variants_packed(child, source, depth + 1)
+        if kind in {'set', 'frozenset'} and value['values'] != sorted(value['values'], key=lambda item: json.dumps(item, sort_keys=True)):
+            raise ValueError('LOG variants original set ordering mismatch')
+    elif kind == 'dict':
+        _log_variants_exact(value, ['type', 'items'])
+        if type(value['items']) is not list:
+            raise ValueError('LOG variants ordered dictionary entries absent')
+        for pair in value['items']:
+            if type(pair) is not list or len(pair) != 2:
+                raise ValueError('LOG variants ordered key/value pair absent')
+            for child in pair:
+                _log_variants_packed(child, source, depth + 1)
+    elif kind == 'log':
+        _log_variants_exact(value, ['type', 'snapshot'])
+        _log_variants_snapshot(value['snapshot'], source, depth + 1)
+    elif kind == 'trace':
+        _log_variants_exact(value, ['type', 'snapshot', 'source_trace_index'])
+        _log_variants_trace(value['snapshot'], source, depth + 1)
+        index = value['source_trace_index']
+        if index is not None:
+            if type(index) is not int or not 0 <= index < len(source['traces']) or value['snapshot'] != source['traces'][index]:
+                raise ValueError('LOG variants source trace alias mismatch')
+    else:
+        raise ValueError('unknown LOG variants packed type')
+
+
+
+
+def _log_variants_need(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def _log_variants_receipt(receipt):
+    _log_variants_exact(receipt, {'module', 'function', 'args', 'kwargs', 'call_shape'})
+    _log_variants_need(receipt['module'] == LOG_VARIANTS_MODULE and type(receipt['function']) is str
+                       and receipt['function'] in LOG_VARIANTS_ARITIES
+                       and receipt['call_shape'] == SCHEMAS['log-variants-packed-v1'][1], 'unknown LOG variants identity/call shape')
+    args = receipt['args'];_log_variants_exact(args, {'type', 'values'})
+    _log_variants_need(args['type'] == 'list' and type(args['values']) is list
+                       and len(args['values']) in LOG_VARIANTS_ARITIES[receipt['function']], 'LOG variants supplied arity')
+    first = args['values'][0];_log_variants_exact(first, {'type', 'snapshot'})
+    _log_variants_need(first['type'] == 'log', 'LOG variants complete first source missing')
+    source = first['snapshot'];_log_variants_snapshot(source, source)
+    _log_variants_packed(args, source, expected='list')
+    _log_variants_packed(receipt['kwargs'], source, expected='dict')
+    names = []
+    for key, value in receipt['kwargs']['items']:
+        _log_variants_need(key.get('type') == 'str' and key['value'] in LOG_VARIANTS_KEYWORDS[receipt['function']]
+                           and key['value'] not in names, 'unknown/duplicate LOG variants keyword')
+        names.append(key['value'])
+    return source
+
+
+def _log_variants_metadata(row, receipt=None, entry=False):
+    if 'index' in row:
+        _log_variants_need(type(row['index']) is int and row['index'] > 0, 'LOG variants index must be positive exact int')
+    if 'case' in row:
+        case = row['case']
+        if entry and type(case) is dict:
+            allowed = {'name', 'function', 'sequences', 'missing_activity', 'admitted', 'variants_raw',
+                       'variant_entries', 'bound', 'kwargs', 'parameters_mode', 'parameters_raw', 'parameters'}
+            _log_variants_need(not set(case) - allowed and type(case.get('name')) is str and case['name']
+                               and type(case.get('function')) is str and case['function'] in LOG_VARIANTS_ARITIES
+                               and (receipt is None or case['function'] == receipt['function']), 'LOG variants case metadata')
+        else:
+            _log_variants_need(type(case) is str and case, 'LOG variants plan/intent case must be a nonempty string')
+    if 'module' in row:
+        _log_variants_need(row['module'] == LOG_VARIANTS_MODULE, 'outer LOG variants module conflict')
+    if 'function' in row:
+        _log_variants_need(type(row['function']) is str and row['function'] in LOG_VARIANTS_ARITIES
+                           and (receipt is None or row['function'] == receipt['function']), 'outer LOG variants function conflict')
+
+
+def _log_variants_controls(controls, source, receipt):
+    _log_variants_exact(controls, {'args', 'kwargs'})
+    _log_variants_packed(controls['args'], source, expected='list')
+    _log_variants_packed(controls['kwargs'], source, expected='dict')
+    _log_variants_need(len(controls['args']['values']) == len(receipt['args']['values'])
+                       and controls['args']['values'][0] == {'type': 'log', 'snapshot': source}, 'LOG variants after source/arity mismatch')
+    _log_variants_need([p[0] for p in controls['kwargs']['items']] == [p[0] for p in receipt['kwargs']['items']], 'LOG variants keyword identities changed')
+
+
+def _log_variants_warnings(warnings):
+    _log_variants_need(type(warnings) is list, 'LOG variants warnings absent')
+    for warning in warnings:
+        _log_variants_exact(warning, {'category', 'message'})
+        _log_variants_need(all(type(warning[k]) is str for k in ('category', 'message')), 'LOG variants warning metadata')
+
+
+def _log_variants_outcome(row, receipt, source):
+    base = {'index', 'module', 'case', 'receipt_sha256', 'receipt', 'input_before', 'controls_before',
+            'warnings', 'input_after', 'controls_after', 'input_unchanged', 'controls_unchanged'}
+    if 'error' in row:
+        terminal = {'error'}
+    elif 'result' in row:
+        terminal = {'result_kind', 'result', 'returned_input_identity', 'trace_aliases_source', 'event_source_positions'}
+    else:
+        terminal = {'result_kind', 'value_result'}
+    _log_variants_exact(row, base | terminal);_log_variants_metadata(row, receipt, entry=True)
+    _log_variants_need(type(row['case']) is dict and row['input_before'] == source
+                       and row['controls_before'] == {'args': receipt['args'], 'kwargs': receipt['kwargs']}, 'LOG variants full before binding')
+    after = row['input_after'];_log_variants_snapshot(after, after)
+    _log_variants_controls(row['controls_after'], after, receipt)
+    for key, actual in [('input_unchanged', source == after), ('controls_unchanged', row['controls_before'] == row['controls_after'])]:
+        _log_variants_need(type(row[key]) is bool and row[key] == actual, 'LOG variants mutation flag contradiction')
+    _log_variants_warnings(row['warnings'])
+    if 'error' in row:
+        error = row['error'];_log_variants_exact(error, {'type', 'message', 'args'})
+        _log_variants_need(type(error['type']) is str and re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+', error['type'])
+                           and type(error['message']) is str, 'LOG variants full error type/message')
+        _log_variants_packed(error['args'], after, expected='tuple')
+        return
+    if 'result' not in row:
+        _log_variants_need(receipt['function'] == 'find_auto_threshold' and row['result_kind'] == 'value', 'LOG variants scalar helper identity')
+        _log_variants_packed(row['value_result'], after, expected='float')
+        return
+    _log_variants_need(receipt['function'] != 'find_auto_threshold' and row['result_kind'] == 'log'
+                       and type(row['returned_input_identity']) is bool, 'LOG variants returned log identity')
+    _log_variants_snapshot(row['result'], after)
+    aliases = row['trace_aliases_source'];positions = row['event_source_positions']
+    _log_variants_need(type(aliases) is list and type(positions) is list and len(aliases) == len(row['result']['traces'])
+                       and len(positions) == len(aliases) and all(type(x) is bool for x in aliases), 'LOG variants trace alias shape')
+    if row['returned_input_identity']:
+        _log_variants_need(row['result'] == after and all(aliases), 'LOG variants returned-input alias contradiction')
+    for trace, alias, refs in zip(row['result']['traces'], aliases, positions):
+        if alias:
+            _log_variants_need(trace in after['traces'], 'LOG variants trace alias source mismatch')
+        _log_variants_need(type(refs) is list, 'LOG variants flattened event source positions')
+        mapped = []
+        for pair in refs:
+            _log_variants_need(type(pair) is list and len(pair) == 2 and all(type(x) is int for x in pair), 'LOG variants event source pair')
+            ti, ei = pair
+            _log_variants_need(0 <= ti < len(after['traces']) and 0 <= ei < len(after['traces'][ti]['events']), 'LOG variants event source bounds')
+            mapped.append(after['traces'][ti]['events'][ei])
+        # The observer flattens all identity matches per result event. Validate
+        # ordered nonempty groups, allowing multiple matches, without deducing
+        # Python identity solely from equality of packed event values.
+        reachable = {0}
+        for event in trace['events']:
+            following = set()
+            for start in reachable:
+                for end in range(start, len(mapped)):
+                    if mapped[end] != event:
+                        break
+                    following.add(end + 1)
+            reachable = following
+        _log_variants_need(len(mapped) in reachable, 'LOG variants flattened event groups contradict result')
+
+
+def _log_variants_audit(data, spec):
+    _log_variants_need(spec['role'] == 'plans' and spec['adapter'] == 'digest-plan-v1'
+                       and spec['records_key'] == 'receipts', 'LOG variants audit requires digest-only plan selector')
+    audit = load_json(data)
+    _log_variants_exact(audit, {'planned', 'prior_paths', 'prior_receipt_count', 'prior_full_receipt_audits', 'duplicates', 'prior_overlaps', 'receipts'})
+    _log_variants_need(type(audit['planned']) is int and audit['planned'] > 0 and type(audit['prior_receipt_count']) is int
+                       and audit['prior_receipt_count'] >= 0 and type(audit['receipts']) is list and type(audit['duplicates']) is list
+                       and audit['prior_overlaps'] == [] and type(audit['prior_paths']) is list and type(audit['prior_full_receipt_audits']) is list, 'LOG variants full audit shape')
+    cases = {};digests = set()
+    for row in audit['receipts']:
+        _log_variants_exact(row, {'case', 'receipt_sha256'});_log_variants_metadata(row)
+        digest = row['receipt_sha256']
+        _log_variants_need(type(digest) is str and re.fullmatch('[0-9a-f]{64}', digest) and digest not in digests
+                           and row['case'] not in cases, 'LOG variants duplicate/invalid audit receipt')
+        cases[row['case']] = digest;digests.add(digest)
+    duplicate_names = set()
+    for duplicate in audit['duplicates']:
+        _log_variants_exact(duplicate, {'first', 'duplicate', 'receipt_sha256'})
+        _log_variants_need(type(duplicate['first']) is str and duplicate['first'] in cases
+                           and duplicate['receipt_sha256'] == cases[duplicate['first']] and type(duplicate['duplicate']) is str
+                           and duplicate['duplicate'] and duplicate['duplicate'] not in cases and duplicate['duplicate'] not in duplicate_names, 'LOG variants duplicate candidate fingerprint')
+        duplicate_names.add(duplicate['duplicate'])
+    _log_variants_need(audit['planned'] == len(cases) + len(duplicate_names), 'LOG variants audit planned count')
+    paths = []
+    for prior in audit['prior_full_receipt_audits']:
+        _log_variants_exact(prior, {'path', 'bytes', 'sha256', 'complete_receipts_reconstructed'})
+        safe_path(prior['path'])
+        _log_variants_need(type(prior['bytes']) is int and prior['bytes'] >= 0 and type(prior['sha256']) is str
+                           and re.fullmatch('[0-9a-f]{64}', prior['sha256']) and type(prior['complete_receipts_reconstructed']) is int
+                           and prior['complete_receipts_reconstructed'] >= 0, 'LOG variants prior full audit binding')
+        paths.append(prior['path'])
+    _log_variants_need(len(paths) == len(set(paths)) and paths == audit['prior_paths']
+                       and sum(x['complete_receipts_reconstructed'] for x in audit['prior_full_receipt_audits']) == audit['prior_receipt_count'], 'LOG variants prior audit count/path mismatch')
+
+
+def _log_variants_adapt(row, spec):
+    role = spec['role'];digest = row.get('receipt_sha256')
+    _log_variants_need(type(digest) is str and re.fullmatch('[0-9a-f]{64}', digest), 'LOG variants receipt digest missing')
+    if spec['adapter'] == 'digest-plan-v1':
+        _log_variants_need(role == 'plans' and 'case' in row and not set(row) - (LOG_VARIANTS_PLAN_FIELDS - {'receipt'}), 'LOG variants digest plan hides entry/unknown fields')
+        _log_variants_metadata(row)
+        return row.get('module'), row.get('function'), None, digest, 'digest_only_plan'
+    if 'receipt' not in row:
+        _log_variants_need(role == 'intents', 'LOG variants full receipt absent')
+        _log_variants_exact(row, {'index', 'module', 'function', 'case', 'receipt_sha256'});_log_variants_metadata(row)
+        return row['module'], row['function'], None, digest, 'entered_without_outcome'
+    receipt = row['receipt'];source = _log_variants_receipt(receipt)
+    raw = canonical(receipt);_log_variants_need(sha(raw) == digest, 'LOG variants original canonical receipt hash mismatch')
+    _log_variants_metadata(row, receipt, entry=bool(set(row) & (LOG_VARIANTS_ENTRY_FIELDS | LOG_VARIANTS_TERMINALS)))
+    if set(row) & LOG_VARIANTS_TERMINALS:
+        _log_variants_outcome(row, receipt, source);status = 'actual_outcome'
+    elif set(row) - LOG_VARIANTS_PLAN_FIELDS:
+        _log_variants_need(not set(row) - (LOG_VARIANTS_PLAN_FIELDS | LOG_VARIANTS_ENTRY_FIELDS)
+                           and any(k in row for k in ('input_after', 'controls_after', 'apply_returned')), 'unknown/before-only LOG variants entry')
+        if 'input_before' in row:
+            _log_variants_need(row['input_before'] == source, 'partial LOG variants input mismatch')
+        if 'controls_before' in row:
+            _log_variants_need(row['controls_before'] == {'args': receipt['args'], 'kwargs': receipt['kwargs']}, 'partial LOG variants control mismatch')
+        after = row.get('input_after', source)
+        if 'input_after' in row:
+            _log_variants_snapshot(after, after)
+        if 'controls_after' in row:
+            _log_variants_controls(row['controls_after'], after, receipt)
+        for key in ('apply_returned', 'input_unchanged', 'controls_unchanged', 'returned_input_identity'):
+            if key in row:
+                _log_variants_need(type(row[key]) is bool, 'partial LOG variants entry boolean')
+        if 'input_unchanged' in row:
+            _log_variants_need('input_after' in row and row['input_unchanged'] == (source == after), 'partial source mutation flag')
+        if 'controls_unchanged' in row:
+            _log_variants_need('controls_after' in row and row['controls_unchanged'] == ({'args': receipt['args'], 'kwargs': receipt['kwargs']} == row['controls_after']), 'partial control mutation flag')
+        if 'warnings' in row:
+            _log_variants_warnings(row['warnings'])
+        status = 'entered_without_outcome'
+    else:
+        _log_variants_need(role in {'plans', 'intents'}, 'LOG variants receipt has no outcome/entry provenance')
+        status = 'planned_only' if role == 'plans' else 'entered_without_outcome'
+    return LOG_VARIANTS_MODULE, receipt['function'], raw, digest, status
 
 
 PANDAS_ATTRIBUTES_PROFILE = {'module': 'pm4py.algo.filtering.pandas.attributes.attributes_filter',
@@ -872,6 +1188,8 @@ def adapt(row, spec):
             raise ValueError('unknown original receipt schema')
     elif spec.get('receipt_schema') != SCHEMAS[adapter][0]:
         raise ValueError('unknown original receipt schema for adapter')
+    if spec.get('receipt_schema') == SCHEMAS['log-variants-packed-v1'][0]:
+        return _log_variants_adapt(row, spec)
     if spec.get('receipt_schema') == SCHEMAS['polars-attributes-receipt-v1'][0]:
         return _polars_attributes_adapt(row, spec)
     attributes_schema = spec.get('receipt_schema') == SCHEMAS['log-attributes-packed-v1'][0]
@@ -1036,6 +1354,8 @@ class Index:
                 if not spec.get(field):
                     raise ValueError('missing declared ' + field)
             partition = canonical([spec['reference'], spec['runtime']]).decode()
+            if spec['receipt_schema'] == SCHEMAS['log-variants-packed-v1'][0] and spec.get('records_key') is not None:
+                _log_variants_audit(data, spec)
             if spec['receipt_schema'] == SCHEMAS['polars-attributes-receipt-v1'][0] and spec.get('records_key') is not None:
                 _polars_attributes_need(spec.get('records_key') == 'receipts', 'unknown Polars attributes wrapper selector')
                 _polars_attributes_audit(data, spec)
@@ -1060,6 +1380,12 @@ class Index:
                         if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
                             hints.append(row['receipt']['module'])
                         if any(hint != POLARS_ATTRIBUTES_MODULE for hint in hints):
+                            gap_row = None
+                    if spec['receipt_schema'] == SCHEMAS['log-variants-packed-v1'][0] and isinstance(row, dict):
+                        hints = [row['module']] if 'module' in row else []
+                        if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
+                            hints.append(row['receipt']['module'])
+                        if any(hint != LOG_VARIANTS_MODULE for hint in hints):
                             gap_row = None
                     self.gap(key, member, ordinal, gap_row, str(error))
         except (ValueError, KeyError, TypeError, UnicodeError) as error:

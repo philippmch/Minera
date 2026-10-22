@@ -23,6 +23,43 @@ later writes require another inventory and validation generation.
 
 ## Supported evidence
 
+The distinct `log-variants-packed-v1` adapter requires schema
+`minera-log-variants-observer-receipt-v1`. It retains the original five fields
+`module`, `function`, `args`, `kwargs`, and `call_shape`, including the complete
+EventLog source at the first positional argument of every function. It is closed
+to the seven reviewed LOG variants functions and their observed supplied arities;
+sharing the LOG LTL or attributes call-shape string grants no schema admission.
+Typed tuple-key dictionaries, ordered keyword/parameter entries, full source
+trace snapshots and enum module/name/value identities remain canonical bytes.
+
+Terminal observations validate full before/after sources and controls, mutation
+flags, warnings, returned logs and aliases, the threshold helper's typed scalar,
+or full error type/message/typed arguments. Event-source positions retain the
+observer's flattened groups of all identity matches per returned trace. Their
+indices and event values must agree; equal values alone do not establish Python
+object identity. The observer has no saved native phase or `apply_returned`
+field, and this adapter invents neither. Unknown or mixed terminal shapes fail
+closed before plan classification.
+
+Full plans require an embedded validated receipt and closed metadata. The own
+dedup audit instead contains digest-only `{case,receipt_sha256}` rows; these do
+not reconstruct operands or module identity. Its wrapper validates candidate
+duplicates, prior full-receipt binding metadata and counts without following any
+prior path. Lightweight intents retain exact positive indices, module/function,
+case name and original digest, and resolve only against exact terminal evidence
+in the same schema and reference/runtime partition. Before-only, unknown-entry
+and malformed metadata cannot certify absence. A new synthetic test module is
+`scripts.tests.test_retained_public_receipt_log_variants`; root must separately
+run its tests and the proposed complete flat-bank index/cache acceptance.
+
+Two bounded offline census paths agree on all 380 original receipts (370 + 10):
+226 returned logs, 32 helper values, 122 errors and 70 distinct full snapshots
+in the own native generator's original first-occurrence order. Their sorted IDs,
+joined by LF with no trailing LF, have SHA-256
+`3d0e1902b74c68d64d81227822ea5dd726f436c91b31d7717a5283ed59bb6fb9`.
+This admission and census do not establish native mapping, product transport,
+historical completeness, catalogue closure or new reference-call authority.
+
 Version 1 admits three exact original LTL observer schemas: LOG positional
 arguments and keyword controls, pandas source/argument/keyword snapshots, and
 Polars source/category/kind/keyword snapshots. Their original canonical receipt
