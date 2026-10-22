@@ -1,0 +1,1953 @@
+{
+  "schema": "minera-owned-utf8-checkpoint-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/retained-public-observation-log-variants-original-call-checkpoint.jsonl.gz",
+    "bytes": 763618,
+    "sha256": "e8ac773a7f5ac9f246688fd7b13d1dc070c6dfeb10a2723b1610dffb2b307b5a",
+    "members": 163,
+    "uncompressed_bytes": 4495899,
+    "uncompressed_sha256": "745e4f5cf33db9582603035622ce9384135b5a7757c3241cedf483e43de618a0"
+  },
+  "source_bindings": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 124514,
+      "sha256": "8bd17920fb413809eb1a47beb0a60e7a128c5921a16d37d65f996f074494b1e0"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/interface-draft.md",
+      "bytes": 10681,
+      "sha256": "daa1753acc0cd9a77bd2a54dd610e7aa453eb2a8ce69def1cae9bb6d955e06da"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/interface-first-draft.md",
+      "bytes": 10210,
+      "sha256": "df265593cf838d8d7faf6d7bfdd60182b9c37fc8d9cf0cf4a8b0a57bcf104a37"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/report.json",
+      "bytes": 4557,
+      "sha256": "3b1c92417a8ffe4992edaf579b1b682a0ee82a806870b3d286bdd2c4ece7f6a8"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/scope-bindings.json",
+      "bytes": 2110,
+      "sha256": "252611b23517f0520c180cf74c62822948f011648c3d07003f0d3f68c8d2c7ce"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/wire-contract-draft.json",
+      "bytes": 6846,
+      "sha256": "3bc476fa06025d847885b362756a86a857b70b78c87db21643212438102c7364"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/case-provenance.jsonl",
+      "bytes": 354701,
+      "sha256": "0effd481aac134e5f09fe84e7e9117425c4535eb1d8d24be0b46db37b47ff62e"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/first-draft-1/generate-transport-fixture.py",
+      "bytes": 22479,
+      "sha256": "3189041b445008ab4df8475949daad63c06ebf4b3f7431bfd461bd8cb70554c3"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/first-draft-1/syntax-failure.json",
+      "bytes": 124,
+      "sha256": "1fa4a3705291664f67e24259db36613b60596d7ea2aed781ac3e289cf4d52eac"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/first-draft-1/test_log_variants_workbench_public.cpp",
+      "bytes": 5498,
+      "sha256": "7b2041ebfabdb245cc884fe27c6152036b67366d61e5555a78be32c14fcde3bc"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/first-draft-1/wrapper-adaptation-failure.json",
+      "bytes": 252,
+      "sha256": "8a08ee4ab7d91078d6bf0a96fbb8efea3503566bd0df56afb6ede506f24a575e"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 23306,
+      "sha256": "381fd69fad3caefbd989cc11a7128e9b6bac3b083a9fe92096c5174929c9d49b"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/generation-report.json",
+      "bytes": 5897,
+      "sha256": "7b8eeb011f2cb9a2dc2f21733e2371aa14d0709b7145ab6c65929bba18e963b8"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/preparation.json",
+      "bytes": 3464,
+      "sha256": "a704443a22339694cb543cdedf7ba39d09ebe4c6ee8df88d954efb711427df6e"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/usage.md",
+      "bytes": 1561,
+      "sha256": "c7c8c7e9be1938bf18d83c942ed49d9c5fa48f4d27108b3798fa4f614ad2790c"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/workbench-fixture-support.hpp.txt",
+      "bytes": 13161,
+      "sha256": "77babd0890a1e3f5437dc33c1c0d45163c4b070d7ce69d96545e02811053528b"
+    },
+    {
+      "path": "build/parity-closures/declared-catalog-from-head.json",
+      "bytes": 163158,
+      "sha256": "acd6096de77de91b069a005756ce0a48493e9110f712b2b1144abb627fd33736"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/generation-1.json",
+      "bytes": 1063,
+      "sha256": "700c3ea725467cc5ffc76976e91bb773714443c9890637990e958a1a289e1ea8"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/generation-2-cache.json",
+      "bytes": 1063,
+      "sha256": "dfaef9ec4bd6025f2fe44b4ca258d758a4b552b24c048081fdf418b185afb83b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/manifest.json",
+      "bytes": 7236,
+      "sha256": "a921fab8d8c657836080d78cfb650a9196dad75f33c9afd63f5906354dbbac38"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/validation.json",
+      "bytes": 7924,
+      "sha256": "330aecc1302adb36663991b1836060ed8afde3d1d219ba75cf6b9a5e822ee47b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-independent-review-1/actual-metadata-review.json",
+      "bytes": 4175,
+      "sha256": "6ce247dfb38723d903209a84a7bacd0e7e3c01aa7f96ecaa69967527746ec143"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-independent-review-1/first-draft-1/review.json",
+      "bytes": 8243,
+      "sha256": "a6298f67cb391df60f916955e9c363af306cd50e319e0092f2270b8fa6a4df2d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-independent-review-1/review.json",
+      "bytes": 8682,
+      "sha256": "22b4bb2c922b6c6c241282b24d44901e5882bf9fefb2e27699b9c6f64dc3d859"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-independent-review-1/verify-actual-metadata.py",
+      "bytes": 8158,
+      "sha256": "aa407a7e16395d362d19ec74d4340be85ffa2fbc565b398ebca8064d8eca1b13"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-prepared-1/extract-member-bindings.py",
+      "bytes": 12369,
+      "sha256": "0c75f109eaafebad5651f577dd9c8f8b4be108f6d5e27b080afc2d40849d46c7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-prepared-1/preparation.json",
+      "bytes": 2864,
+      "sha256": "164f378d40db1d1421fb820e7b48803dcdb1dcb9ea95c65f7925e203a52cfd9f"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-prepared-1/proposal.json",
+      "bytes": 5639,
+      "sha256": "5fcc3fe986b5fb533d02a2a769959387c6893cb3c8fbe8c01f5a5a1eb934f4bf"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-prepared-1/root-review-certificate.json",
+      "bytes": 2202,
+      "sha256": "5df14b7a5281018119a1c296d7cb8da1fadef261917f698ca1dfbbfe9d5be024"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-root-1/member-bindings.json",
+      "bytes": 10863,
+      "sha256": "11d25b7eb9db480b8951a5f4032d17c34a379904d688cf216b7d9c5b0a688931"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-1/identities.jsonl",
+      "bytes": 518916,
+      "sha256": "0b466f2d071600f22d64f80b784680c7d52c9680fba61105df0d7f64d5fb0033"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-1/report.json",
+      "bytes": 4665,
+      "sha256": "f56b76762472fced8aa43f0f94406fbf9d43a851ffa483c885bd9118c57d286f"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-root-2/control-domains.json",
+      "bytes": 19862,
+      "sha256": "b8ba9c5bc6d2e895c3d48f4141ea73845fab08bfd72006e863b65d9e20d9353b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-root-2/metadata-summary.json",
+      "bytes": 3754,
+      "sha256": "83df84555d1a9e201b4ad029a6e02440a72429ee4bb72da8f9aac086e59ba7b5"
+    },
+    {
+      "path": "build/parity-closures/log-variants-frontend-index-independent-review-1/frontend-final-review.json",
+      "bytes": 2814,
+      "sha256": "00a4faec8eb9176312b8b1f4b922d9df790ad8235a14448fad82781ee8893958"
+    },
+    {
+      "path": "build/parity-closures/log-variants-frontend-index-independent-review-1/frontend-review.json",
+      "bytes": 5027,
+      "sha256": "d02fa3391b4d29a5a2fb4b88d8c2b35a8021ba147f5064d02d6fc651a3b89d35"
+    },
+    {
+      "path": "build/parity-closures/log-variants-frontend-index-independent-review-1/index-review.json",
+      "bytes": 4942,
+      "sha256": "82aa0a4200fef611fb50aa092e34ad017fd82ace6b365cea9a228a691c05baf6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-frontend-index-independent-review-1/review-static.py",
+      "bytes": 11041,
+      "sha256": "320053c4d25963be9600705a1fcad49027576711502bebd4e50263e7e6992161"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-actual-1/all380-independent-mappings.jsonl",
+      "bytes": 210174,
+      "sha256": "7aa4ee7513f4caa006b07a447bd961c0dcfe588e7c6a5e2e388ab2499dcce3c6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-actual-1/all70-snapshot-constructor-bindings.jsonl",
+      "bytes": 94179,
+      "sha256": "77f77057b534e147dda5e99edf3a2dd2b1288d7e5f302cd145a6782433fa825b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-actual-1/domain-census.json",
+      "bytes": 2912,
+      "sha256": "3e8bda74b62d4e190417116b08724ce37e4b20cfe2087d0699f78262b9cb863c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-actual-1/report.json",
+      "bytes": 5612,
+      "sha256": "82d76b355c533b770052cf0807333455941e17eac1d50d08ce4b762b09683cce"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-prepared-1/map-full380.py",
+      "bytes": 27038,
+      "sha256": "dbc49ffa8f35bef3ec6443fcb4eef3f2464a9659eb2cb7d7570aeac83394e965"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-prepared-1/preparation.json",
+      "bytes": 5411,
+      "sha256": "9dcb7b977519b9cc8e613974cc54222133e596bdd73ba8f3d67d6401390bb06a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/accept-380-root.py",
+      "bytes": 11549,
+      "sha256": "c9a83d4692f6b6997f922888d6e40f55139a17a6365f69a768007708ba7ec50c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/before/bindings.json",
+      "bytes": 344,
+      "sha256": "c3009cfb6bc47b888f3fea14b9968a72a8e6036ca3d9cfa3c951faa73bbe7a04"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/before/retained-public-receipt-index.md",
+      "bytes": 12415,
+      "sha256": "7b575f8a4cd01ab4cfa1efabd9e57ed7a2bcaab3905ffb19c0c5d246a5dd179d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/before/retained_public_receipt_index.py",
+      "bytes": 84156,
+      "sha256": "de281d2729c9ce42c6ca85782898f16cf900780cd62a3d1023f1605242d97f08"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/first-preparation-failure.json",
+      "bytes": 264,
+      "sha256": "6b65862ae21d0ff65974b1f7528a420c83471dbe387e2bc29f15aa6af3c70821"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/index.patch",
+      "bytes": 25157,
+      "sha256": "6735ee7936779564c51323bf97037825e253869df84a0464a65470b2a31cc4e5"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/manifest.json",
+      "bytes": 7236,
+      "sha256": "a921fab8d8c657836080d78cfb650a9196dad75f33c9afd63f5906354dbbac38"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/preparation.json",
+      "bytes": 2720,
+      "sha256": "aaa5d6cdc9c85e2045edce4bd87b3f7105fb8fe7869757a7065694d8e7b3e3b5"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/root-commands.md",
+      "bytes": 1403,
+      "sha256": "b4e0cf7481a2b86a59d77ff84eddc902c930f3f0259e199291a2827fed59fcf6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/runner-pins.json",
+      "bytes": 1246,
+      "sha256": "59c75fe77b4c94ea118c19cf4b91c1d8995730612599e2ccfd82bbcfa1dcfe88"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/validator-prefix.txt",
+      "bytes": 5574,
+      "sha256": "f8fd39a71b02b917c2a656b9eaa8190d37585a178daa39e4e1139e3ce5f5d178"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-root-independent-review-1/review.json",
+      "bytes": 1938,
+      "sha256": "9df38a788cd428886f13a22a4152ca84f743e9e9f001b7b08762feb29a1086c7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-independent-review-1/review.json",
+      "bytes": 3437,
+      "sha256": "f79685bc137e473ce81a0586dd6c541ba3714889a1684b8c19d58c5f157b7a63"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/prepare.py",
+      "bytes": 6946,
+      "sha256": "3656056d05288babb9adcba68857a97ed373dab9553b98feb009d6982bb89f01"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/public-signature-map.json",
+      "bytes": 1837,
+      "sha256": "07728e1b7d6cfdbf4000ecbbd79b4e7d60911518653e65de1d1cb44b4d9e0273"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/report.json",
+      "bytes": 12838,
+      "sha256": "249c1b0ddcca61c991f7f1cbfa2dc12d2813bc4ae9b6f305f9ecd5dab452dd58"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/source-declarations.json",
+      "bytes": 20182,
+      "sha256": "8cc1ddc70074f364ae0a00fc531b464429af18032cb354be0a6e26c19170329c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/validation.json",
+      "bytes": 5316,
+      "sha256": "d3bd1304730e10adcc68cafe70d0547405334a46b165e0b18f6decae65327186"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/browser-terminal.json",
+      "bytes": 1264,
+      "sha256": "47c7a61fd7db5c1ef20e753512ca3d31bd4f6e6ffbff503338e8564a0eeec783"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/frontend-all-terminal.json",
+      "bytes": 387,
+      "sha256": "ec2b6d0ba467cc708f1ec36de7b430bdcac9b48f896429910f3116712915f914"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/frontend-build-terminal.json",
+      "bytes": 8343,
+      "sha256": "1edf43ca6a904c111444c6b89ba588555a834d0a98ed57584f22126130e8a9ef"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/frontend-focused-attempt-1.json",
+      "bytes": 1564,
+      "sha256": "971a4943fd775ea7afc4eac524fa8ae68ac91871732565943addab90d0f22bd6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/frontend-focused-terminal.json",
+      "bytes": 432,
+      "sha256": "c3312a7caa231e337ce2b3a26d633d6f081a7075d43e2dba4b44802b8baf2670"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/index-terminal.json",
+      "bytes": 305,
+      "sha256": "d95f6d2566fd197968600f3e5b06ce907169af1af5b7a3a7c153998623eb1ea1"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/initial-six-native-terminal.json",
+      "bytes": 1228,
+      "sha256": "fff6e3cee8b0194765ef6857f593930bfb71e11ef8ca8ac61ad392607cf97470"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/native-build-terminal.json",
+      "bytes": 4522,
+      "sha256": "4c14f7e2a6bb81f3b156fdba4966df947f0a38d7769517684fa5a47ae8ea7440"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/native-full-build-terminal.json",
+      "bytes": 1207,
+      "sha256": "efa8d1c9f2ea7e458d3e12b09390e96a6dbf11d8b9247ef5e3940762e6f97923"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/native-full-ctest-last.log",
+      "bytes": 1293,
+      "sha256": "a913cc881c6c664ee8e7480d38ea6ec4c8158ab6fc6337b9d34dd7d62e4d3978"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/native-full-terminal.json",
+      "bytes": 946,
+      "sha256": "8086a95b734578fa9223cffabf27ddfc704764d3e7094a031cdeebf0d5190bdf"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/receipt-integrity-terminal.json",
+      "bytes": 7217,
+      "sha256": "3fc4f567b1686c3d5285307844fb18eecca547bbe493f10303959fb5e54c0319"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/log_variants_filter_route.hpp",
+      "bytes": 693,
+      "sha256": "fe58bdd909e74977c0e22df8612c7bb0ee24e4ca0e86f4c809e0cb19873030ce"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/log_variants_filter_workbench.cpp",
+      "bytes": 6330,
+      "sha256": "4dfa4a4eebc37ab10bf19d0550cf80f1e23eac8abb60b866c3634db9d945252c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/log_variants_filter_workbench.hpp",
+      "bytes": 308,
+      "sha256": "0310803a20122cc823a4895195f25b58135648af6999ef55a21fd9f21a35bf7b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/log_variants_original_call_parser.hpp",
+      "bytes": 18533,
+      "sha256": "2f0977eb9046f6cd737b35ce62614e271d9e39bcd357a79b6b64a2f82a08fb13"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/test_log_variants_filter_route.cpp",
+      "bytes": 2016,
+      "sha256": "c3a4eb615ef7f1107cb13a636a217e7efc61d3653b324830068d345c31323eef"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/test_log_variants_filter_workbench.cpp",
+      "bytes": 9804,
+      "sha256": "4ab8943b382d98a0e0b583f603eebd872ea37ef4b91b55d2236dd6ca7f12f31c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/test_log_variants_original_call_controls.cpp",
+      "bytes": 6817,
+      "sha256": "04a6398d0733d4defba8a2f4f27ca0db0b8aa0b17e9788da0cdfbc8ae8d7da98"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/prebuild-report.json",
+      "bytes": 4198,
+      "sha256": "20bddd1474daad30807a7758124b01fdfa6d78cb6ee3a98c07716ad802669c96"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/static-corrections-1/before-controls.cpp",
+      "bytes": 6396,
+      "sha256": "2f01fbace66b1336583a46960a9132e7f5f8fccc975e8c15822c2d8f50cde8c7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/static-corrections-1/before-parser.hpp",
+      "bytes": 18190,
+      "sha256": "5c56ee0698e06199bc207016dc6f1b0075a6235878b9f0926ded2ff02fa127e1"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/static-corrections-1/before-workbench.cpp",
+      "bytes": 6260,
+      "sha256": "db62cc9fcea68db5504a855a2134745d3e1b1df4732aec031167b33b0760acfd"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-independent-review-1/review.json",
+      "bytes": 6720,
+      "sha256": "6c63ea5041ddcf6d6e68886e824f0a0ff97ec2162b2e953f6f1cf36272817a8f"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/report.json",
+      "bytes": 4603,
+      "sha256": "061cde211670d2e53edb65f6588103975e41a3b0d5d2367bb288f908a85f40a4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-1.cjs",
+      "bytes": 18280,
+      "sha256": "c839ead80b19f8552c186170e02f694f3dbbfb95cf3476b5d86af6d08a59a9f2"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-1.preparation.json",
+      "bytes": 1382,
+      "sha256": "d5da156063bb467d7d6608920c3028dd1895a2ac194313aaa0fe8ecdd520d620"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-corrected-1.cjs",
+      "bytes": 18280,
+      "sha256": "8cd5a8516f77e896cedb038af9e15b265386466e1d193f6e026a2ca09475039d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-corrected-1.preparation.json",
+      "bytes": 3268,
+      "sha256": "af65599584756da2104f5bfe701bd724c4a3e87202349943594a426742d6fc80"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-corrected-2.cjs",
+      "bytes": 18297,
+      "sha256": "4a36ab502ffd1c2f9346939e753e9584d370e2d90aea3fe7267a9e51e415b199"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-corrected-2.preparation.json",
+      "bytes": 1935,
+      "sha256": "9c9db4164956a4520e17cba9ca92c5ffcea99699efadd41a64be563bb0ceab52"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-independent-readback-prepared-1/preparation.json",
+      "bytes": 3481,
+      "sha256": "241b56d85ad19506dbd4b536284fa4d133c8a3668c4ea9d838dda4d2630fe65a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-independent-readback-prepared-1/verify-readback.py",
+      "bytes": 13618,
+      "sha256": "39aafa784f53de234d94924b7aad04db1c7683dc78148a116a3625c8bc4c8135"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/freeze-explicit-scope.py",
+      "bytes": 9535,
+      "sha256": "7a86b4c4e88046fb6cb3ea9b56cbf5905302e14816452755ffbdb30a15561125"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/freeze-final-scope.py",
+      "bytes": 2701,
+      "sha256": "a76c35fffd929b39d2d1b21d65d76c4ab65eab56f06132c0b9f37baa8dcf38cf"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/freeze-scope-after-mjs-correction.py",
+      "bytes": 2871,
+      "sha256": "97e64dc7607b7ca479e8bfddee5a72a538834b9fc140ccf9b40ca8d5ea59bf53"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/attempt.json",
+      "bytes": 514,
+      "sha256": "af730a95a5fd771daa7267af6e7d5095c0d093787becbe9eb645b89b0b51e158"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/packager-before.py",
+      "bytes": 21348,
+      "sha256": "932191b8f1c4b5c13092060b58b3dadbb0ca2ae3d02a598b28c33789f19c7d96"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/packager-review-before.json",
+      "bytes": 5165,
+      "sha256": "087828f0f9ea0674107f423455685adc45afb4993872c4e0aa2d7dcaabec4848"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/readback-before.py",
+      "bytes": 13611,
+      "sha256": "b2fb7c13dd50d9a899d99d3683a4c424e54f14771a30b1bf564eb9b45c58e24f"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/root-facts-before.json",
+      "bytes": 54230,
+      "sha256": "2b882e21afad0cb9a79a076115c68a604fba051f9cd6dec3c8ab11d6d41d6619"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/scope-before.json",
+      "bytes": 60123,
+      "sha256": "b9e68bef4745faffbc8e7e0b94c16bf7fffc367ea6a7fec43438feddd33d6938"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/root-facts-contract.json",
+      "bytes": 7330,
+      "sha256": "52dfa55be3f547eefde52c079398d3028885b204498db9501b9487e59d5cb0d7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/scope-before-final.json",
+      "bytes": 56115,
+      "sha256": "9655262c30f09846ce518b97566d685580bdc18adbca2ac637de7d14094a9119"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/scope.json",
+      "bytes": 64114,
+      "sha256": "217e7a6330f524fc91b699e718d3062b59e845cdad061edc57f165135f2c1596"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/catalogue-terminal.json",
+      "bytes": 517,
+      "sha256": "85a8a03529d8908965f12a02ecc0665fe9e736d97198f46cadf64a88f0f42f39"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/committed-coverage.json",
+      "bytes": 480643,
+      "sha256": "ed9016cdefdb039ece6d17e0d6bdabae8e5e0530119e01bbecffc78fec1f3989"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/freeze-root-terminal-facts.py",
+      "bytes": 5643,
+      "sha256": "8453376f3bca7fa4db626cbdaeed0393aa1e9cce6fd624bd22bc06160bdc2525"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/freeze-runtime-externals.py",
+      "bytes": 2473,
+      "sha256": "310a0a05b37ef369eff1d3f760e1e00b303802dbde04e214d4167563758c8ecc"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/freeze-source-commits.py",
+      "bytes": 3907,
+      "sha256": "264b28f244dc3e39c64abac036e9b7445108c4f81f9ec1b1061439b5396a19fb"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/next-pandas-plan-terminal.json",
+      "bytes": 464,
+      "sha256": "5ae582408511f05289cc7190df78ff34364418682bca863c482dc074c238cc70"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/root-facts.json",
+      "bytes": 56458,
+      "sha256": "a9821d467faac3ec096320bf350b291ea02c2e2c48efbeb2fac34e03fec27ae4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/runtime-external-bindings.json",
+      "bytes": 7778,
+      "sha256": "061f44776f0916d9920e9539cd27137847af0d84c7587225104d3867afa0e45a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/source-commits.json",
+      "bytes": 12824,
+      "sha256": "a590e352b3bc33d48f550679ae27608f57a281dcedb694f33753f86c0dce25cd"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-fixture-independent-review-1/failed-first-report.json",
+      "bytes": 4257,
+      "sha256": "33ba6d183ecc8c9b2727c8fab31c7ea36d45c481eb512f77af5499c72814e803"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-fixture-independent-review-1/review.json",
+      "bytes": 8130,
+      "sha256": "052a28ae7411d91e227e6edcdec650f1e4df5d7fe38acafcdb1f45ce6b35df2d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-LogVariantsFilterWorkspace.tsx",
+      "bytes": 10270,
+      "sha256": "c65d3da9849352e6e9cf3815fe9917cf9dc35c89a5eda9deb3d34c197533700a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-ReferenceLogFilterWorkspace.tsx",
+      "bytes": 27601,
+      "sha256": "0996e945c8a3c29ee5a715b269b0ee75b57bba207e42564483b46eb8538e63c2"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-log-variants-filter-parity-contract.md",
+      "bytes": 8711,
+      "sha256": "92fb439d85a388275b259084d571767f51c5ba4385d343422b6e982a0c5522e3"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-log-variants-filter-workspace.test.ts",
+      "bytes": 5065,
+      "sha256": "d6e3f7e0a888ca05c227bde6ea4bfc330d456bbf77858aaeb57e99e78a02b465"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-log-variants-filters.test.ts",
+      "bytes": 10367,
+      "sha256": "2091d872bc1102c09575390ef7468096b01f9a4a36f18cd92f242f668234f2a4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-log-variants-filters.ts",
+      "bytes": 11496,
+      "sha256": "528841409f572bc157a5122646b93224cc326687a1f56e4fe8b783ba75bd15db"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-variants-filter-workflow.md",
+      "bytes": 8607,
+      "sha256": "cf5f20c4c797cf972fd600a98bd7b4ecf4df9b50840aefecb40e407e3e09c7e6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/multipart-test-correction-1/before-log-variants-filters.test.ts",
+      "bytes": 10367,
+      "sha256": "2091d872bc1102c09575390ef7468096b01f9a4a36f18cd92f242f668234f2a4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/multipart-test-correction-1/corrected-log-variants-filters.test.ts",
+      "bytes": 10623,
+      "sha256": "d71514bff7f95eda1ccaed42d045305a2484b10bbd560d2887049abec2727b53"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/multipart-test-correction-1/report.json",
+      "bytes": 957,
+      "sha256": "96920c491acbad73397a0815d5d7c0926ba73ddd02451dc5e239b30e9b6cab17"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/phase-guard-verification.json",
+      "bytes": 1314,
+      "sha256": "f93c485173489ccdfab0cc584c603406c887b662d7bbeeb15eb1deefb825018b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/prebuild-report.json",
+      "bytes": 3865,
+      "sha256": "8f75d6767eba9c87b8d04d4ae5c13b7c992e5691b685c1a0fb306764cf1bf28d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-packager-independent-review-1/review.json",
+      "bytes": 6394,
+      "sha256": "a2f0724afe02f1a4d647d3fb8efee2f2a29503b555f53b0fcb112a90dd797837"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-product-prework-1/mapping-followup.json",
+      "bytes": 899,
+      "sha256": "9bc71562a4284e5224dcb6c4341e7aa79ca99e3cd49a9075f3e16baf07d0ac1c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-product-prework-1/report.json",
+      "bytes": 6605,
+      "sha256": "1e68f7a7d8d8c0d78f992c5f28af9bc376c295a543242b6a14ddd76f9742bc92"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-product-prework-1/source-bindings.json",
+      "bytes": 5536,
+      "sha256": "ca4b18fb29cf4adfbb0c7bfa139e54120b26566f3d9ce18065af7e316372411a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-product-prework-1/transport-capability-gap-map.md",
+      "bytes": 15322,
+      "sha256": "66813e755b77a5285be3aa253b86409a07fa8debb64820cdbce18d9c60e33ffb"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-wire-frozen-1.json",
+      "bytes": 9807,
+      "sha256": "4fb14455eb405f065f02bde28e5eddda10a01e22e47383d27499069a78c501d2"
+    },
+    {
+      "path": "build/parity-closures/log-variants-public-observation-admission-1/admitted-sources.json",
+      "bytes": 8293,
+      "sha256": "6d669b7a2d52ee5ea9969bac220cdb95d71271c66c086c2fe544a5f6a1d61590"
+    },
+    {
+      "path": "build/parity-closures/log-variants-receipt-admission-prepared-1/canonical-census.py",
+      "bytes": 28090,
+      "sha256": "ffe1108c5748f02512c2eadd25dfd1056a876e32a5afdc29c607acc0f2e0cd38"
+    },
+    {
+      "path": "build/parity-closures/log-variants-receipt-admission-prepared-1/observer-profile.json",
+      "bytes": 3402,
+      "sha256": "52db6244eef8eaa7e1a4abd4db0bf1d3f940ca150b51f9206f6eb671567c2a94"
+    },
+    {
+      "path": "build/parity-closures/log-variants-receipt-admission-prepared-1/preparation.json",
+      "bytes": 2307,
+      "sha256": "cd961f4ef1658b9cb3607dbc77045f51dcbc47ec33846fabcf2d4788a2ae0bf5"
+    },
+    {
+      "path": "build/parity-closures/log-variants-receipt-admission-prepared-1/root-command.md",
+      "bytes": 762,
+      "sha256": "bc99e41c3eb635df9f0289b7fceae49f7517dceef50aae0e80c8f380466a5d92"
+    },
+    {
+      "path": "build/parity-closures/package-retained-public-observation-log-variants-original-call-checkpoint.py",
+      "bytes": 21355,
+      "sha256": "3770a060cbabaef5c01f226ea7e35d5b2aaf17343baecea481eb2460212ffcc6"
+    },
+    {
+      "path": "build/parity-closures/prepare-log-variants-browser-recipe-1.py",
+      "bytes": 14334,
+      "sha256": "e8b5cb7cffb9f74eba27e88142eda65c5e15cbafd36b7f60481b50ec1f42a801"
+    },
+    {
+      "path": "build/parity-closures/verify-declared-catalog.mjs",
+      "bytes": 44214,
+      "sha256": "61f959bf30f2ddb6e8ee00afec5f9f50a578125a5a9b48f6e400476d1a00bbb1"
+    },
+    {
+      "path": "docs/log-variants-filter-parity-contract.md",
+      "bytes": 9327,
+      "sha256": "ae7e6f012c8b7d8e750e098b12adb12e8f13d7a7ef8e04473a8efa59c52e21e7"
+    },
+    {
+      "path": "docs/retained-public-receipt-index.md",
+      "bytes": 14922,
+      "sha256": "2820836d6d1ba30ff8cd9693816cc80639acd454a843bfcc924cf2833c9c00b5"
+    },
+    {
+      "path": "docs/variants-filter-workflow.md",
+      "bytes": 8982,
+      "sha256": "21ae1a0c5dc6da16d0313ebb89f395499e0ef2f0b1a9bb7d752d3e0e7283a799"
+    },
+    {
+      "path": "include/minera/log_variants_filter_workbench.hpp",
+      "bytes": 308,
+      "sha256": "0310803a20122cc823a4895195f25b58135648af6999ef55a21fd9f21a35bf7b"
+    },
+    {
+      "path": "scripts/retained_public_receipt_index.py",
+      "bytes": 105991,
+      "sha256": "f818bf7734beec65027c3ecdb4dbb949a47f89ef04dca0b23a6302625b4066d1"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_receipt_log_variants.py",
+      "bytes": 16182,
+      "sha256": "e8839b4f1c22999f0ad5fcd3b08c260a8b1eaabe6de2557611affaa02fd3b742"
+    },
+    {
+      "path": "src/backend/log_variants_filter_workbench.cpp",
+      "bytes": 6330,
+      "sha256": "4dfa4a4eebc37ab10bf19d0550cf80f1e23eac8abb60b866c3634db9d945252c"
+    },
+    {
+      "path": "src/backend/log_variants_original_call_parser.hpp",
+      "bytes": 18533,
+      "sha256": "2f0977eb9046f6cd737b35ce62614e271d9e39bcd357a79b6b64a2f82a08fb13"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_filter_route.cpp",
+      "bytes": 2016,
+      "sha256": "c3a4eb615ef7f1107cb13a636a217e7efc61d3653b324830068d345c31323eef"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_filter_workbench.cpp",
+      "bytes": 9804,
+      "sha256": "4ab8943b382d98a0e0b583f603eebd872ea37ef4b91b55d2236dd6ca7f12f31c"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_original_call_controls.cpp",
+      "bytes": 6817,
+      "sha256": "04a6398d0733d4defba8a2f4f27ca0db0b8aa0b17e9788da0cdfbc8ae8d7da98"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_workbench_public.cpp",
+      "bytes": 5484,
+      "sha256": "8a9a3484a8bd5155134f51d510d3ed1fa08aa37de9f69421ccb4decf8fa0350b"
+    },
+    {
+      "path": "src/backend/tools/log_variants_filter_route.hpp",
+      "bytes": 693,
+      "sha256": "fe58bdd909e74977c0e22df8612c7bb0ee24e4ca0e86f4c809e0cb19873030ce"
+    },
+    {
+      "path": "src/backend/tools/minera_server.cpp",
+      "bytes": 589648,
+      "sha256": "80f8d756592e9e5a32bbfb350bf952b4ff3d94654aa5f68fa08b74591a3da0b4"
+    },
+    {
+      "path": "src/frontend/src/components/LogVariantsFilterWorkspace.tsx",
+      "bytes": 10270,
+      "sha256": "c65d3da9849352e6e9cf3815fe9917cf9dc35c89a5eda9deb3d34c197533700a"
+    },
+    {
+      "path": "src/frontend/src/components/ReferenceLogFilterWorkspace.tsx",
+      "bytes": 27601,
+      "sha256": "0996e945c8a3c29ee5a715b269b0ee75b57bba207e42564483b46eb8538e63c2"
+    },
+    {
+      "path": "src/frontend/src/log-variants-filters.ts",
+      "bytes": 11496,
+      "sha256": "528841409f572bc157a5122646b93224cc326687a1f56e4fe8b783ba75bd15db"
+    },
+    {
+      "path": "src/frontend/tests/log-variants-filter-workspace.test.ts",
+      "bytes": 5065,
+      "sha256": "d6e3f7e0a888ca05c227bde6ea4bfc330d456bbf77858aaeb57e99e78a02b465"
+    },
+    {
+      "path": "src/frontend/tests/log-variants-filters.test.ts",
+      "bytes": 10623,
+      "sha256": "d71514bff7f95eda1ccaed42d045305a2484b10bbd560d2887049abec2727b53"
+    }
+  ],
+  "own_members": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 124514,
+      "sha256": "8bd17920fb413809eb1a47beb0a60e7a128c5921a16d37d65f996f074494b1e0"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/interface-draft.md",
+      "bytes": 10681,
+      "sha256": "daa1753acc0cd9a77bd2a54dd610e7aa453eb2a8ce69def1cae9bb6d955e06da"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/interface-first-draft.md",
+      "bytes": 10210,
+      "sha256": "df265593cf838d8d7faf6d7bfdd60182b9c37fc8d9cf0cf4a8b0a57bcf104a37"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/report.json",
+      "bytes": 4557,
+      "sha256": "3b1c92417a8ffe4992edaf579b1b682a0ee82a806870b3d286bdd2c4ece7f6a8"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/scope-bindings.json",
+      "bytes": 2110,
+      "sha256": "252611b23517f0520c180cf74c62822948f011648c3d07003f0d3f68c8d2c7ce"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-design-1/wire-contract-draft.json",
+      "bytes": 6846,
+      "sha256": "3bc476fa06025d847885b362756a86a857b70b78c87db21643212438102c7364"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/case-provenance.jsonl",
+      "bytes": 354701,
+      "sha256": "0effd481aac134e5f09fe84e7e9117425c4535eb1d8d24be0b46db37b47ff62e"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/first-draft-1/generate-transport-fixture.py",
+      "bytes": 22479,
+      "sha256": "3189041b445008ab4df8475949daad63c06ebf4b3f7431bfd461bd8cb70554c3"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/first-draft-1/syntax-failure.json",
+      "bytes": 124,
+      "sha256": "1fa4a3705291664f67e24259db36613b60596d7ea2aed781ac3e289cf4d52eac"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/first-draft-1/test_log_variants_workbench_public.cpp",
+      "bytes": 5498,
+      "sha256": "7b2041ebfabdb245cc884fe27c6152036b67366d61e5555a78be32c14fcde3bc"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/first-draft-1/wrapper-adaptation-failure.json",
+      "bytes": 252,
+      "sha256": "8a08ee4ab7d91078d6bf0a96fbb8efea3503566bd0df56afb6ede506f24a575e"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 23306,
+      "sha256": "381fd69fad3caefbd989cc11a7128e9b6bac3b083a9fe92096c5174929c9d49b"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/generation-report.json",
+      "bytes": 5897,
+      "sha256": "7b8eeb011f2cb9a2dc2f21733e2371aa14d0709b7145ab6c65929bba18e963b8"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/preparation.json",
+      "bytes": 3464,
+      "sha256": "a704443a22339694cb543cdedf7ba39d09ebe4c6ee8df88d954efb711427df6e"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/usage.md",
+      "bytes": 1561,
+      "sha256": "c7c8c7e9be1938bf18d83c942ed49d9c5fa48f4d27108b3798fa4f614ad2790c"
+    },
+    {
+      "path": "build/parity-closures/admitted-log-variants-original-call-transport-1/workbench-fixture-support.hpp.txt",
+      "bytes": 13161,
+      "sha256": "77babd0890a1e3f5437dc33c1c0d45163c4b070d7ce69d96545e02811053528b"
+    },
+    {
+      "path": "build/parity-closures/declared-catalog-from-head.json",
+      "bytes": 163158,
+      "sha256": "acd6096de77de91b069a005756ce0a48493e9110f712b2b1144abb627fd33736"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/generation-1.json",
+      "bytes": 1063,
+      "sha256": "700c3ea725467cc5ffc76976e91bb773714443c9890637990e958a1a289e1ea8"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/generation-2-cache.json",
+      "bytes": 1063,
+      "sha256": "dfaef9ec4bd6025f2fe44b4ca258d758a4b552b24c048081fdf418b185afb83b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/manifest.json",
+      "bytes": 7236,
+      "sha256": "a921fab8d8c657836080d78cfb650a9196dad75f33c9afd63f5906354dbbac38"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/validation.json",
+      "bytes": 7924,
+      "sha256": "330aecc1302adb36663991b1836060ed8afde3d1d219ba75cf6b9a5e822ee47b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-independent-review-1/actual-metadata-review.json",
+      "bytes": 4175,
+      "sha256": "6ce247dfb38723d903209a84a7bacd0e7e3c01aa7f96ecaa69967527746ec143"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-independent-review-1/first-draft-1/review.json",
+      "bytes": 8243,
+      "sha256": "a6298f67cb391df60f916955e9c363af306cd50e319e0092f2270b8fa6a4df2d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-independent-review-1/review.json",
+      "bytes": 8682,
+      "sha256": "22b4bb2c922b6c6c241282b24d44901e5882bf9fefb2e27699b9c6f64dc3d859"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-independent-review-1/verify-actual-metadata.py",
+      "bytes": 8158,
+      "sha256": "aa407a7e16395d362d19ec74d4340be85ffa2fbc565b398ebca8064d8eca1b13"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-prepared-1/extract-member-bindings.py",
+      "bytes": 12369,
+      "sha256": "0c75f109eaafebad5651f577dd9c8f8b4be108f6d5e27b080afc2d40849d46c7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-prepared-1/preparation.json",
+      "bytes": 2864,
+      "sha256": "164f378d40db1d1421fb820e7b48803dcdb1dcb9ea95c65f7925e203a52cfd9f"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-prepared-1/proposal.json",
+      "bytes": 5639,
+      "sha256": "5fcc3fe986b5fb533d02a2a769959387c6893cb3c8fbe8c01f5a5a1eb934f4bf"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-prepared-1/root-review-certificate.json",
+      "bytes": 2202,
+      "sha256": "5df14b7a5281018119a1c296d7cb8da1fadef261917f698ca1dfbbfe9d5be024"
+    },
+    {
+      "path": "build/parity-closures/log-variants-archive-member-metadata-root-1/member-bindings.json",
+      "bytes": 10863,
+      "sha256": "11d25b7eb9db480b8951a5f4032d17c34a379904d688cf216b7d9c5b0a688931"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-1/identities.jsonl",
+      "bytes": 518916,
+      "sha256": "0b466f2d071600f22d64f80b784680c7d52c9680fba61105df0d7f64d5fb0033"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-1/report.json",
+      "bytes": 4665,
+      "sha256": "f56b76762472fced8aa43f0f94406fbf9d43a851ffa483c885bd9118c57d286f"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-root-2/control-domains.json",
+      "bytes": 19862,
+      "sha256": "b8ba9c5bc6d2e895c3d48f4141ea73845fab08bfd72006e863b65d9e20d9353b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-root-2/metadata-summary.json",
+      "bytes": 3754,
+      "sha256": "83df84555d1a9e201b4ad029a6e02440a72429ee4bb72da8f9aac086e59ba7b5"
+    },
+    {
+      "path": "build/parity-closures/log-variants-frontend-index-independent-review-1/frontend-final-review.json",
+      "bytes": 2814,
+      "sha256": "00a4faec8eb9176312b8b1f4b922d9df790ad8235a14448fad82781ee8893958"
+    },
+    {
+      "path": "build/parity-closures/log-variants-frontend-index-independent-review-1/frontend-review.json",
+      "bytes": 5027,
+      "sha256": "d02fa3391b4d29a5a2fb4b88d8c2b35a8021ba147f5064d02d6fc651a3b89d35"
+    },
+    {
+      "path": "build/parity-closures/log-variants-frontend-index-independent-review-1/index-review.json",
+      "bytes": 4942,
+      "sha256": "82aa0a4200fef611fb50aa092e34ad017fd82ace6b365cea9a228a691c05baf6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-frontend-index-independent-review-1/review-static.py",
+      "bytes": 11041,
+      "sha256": "320053c4d25963be9600705a1fcad49027576711502bebd4e50263e7e6992161"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-actual-1/all380-independent-mappings.jsonl",
+      "bytes": 210174,
+      "sha256": "7aa4ee7513f4caa006b07a447bd961c0dcfe588e7c6a5e2e388ab2499dcce3c6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-actual-1/all70-snapshot-constructor-bindings.jsonl",
+      "bytes": 94179,
+      "sha256": "77f77057b534e147dda5e99edf3a2dd2b1288d7e5f302cd145a6782433fa825b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-actual-1/domain-census.json",
+      "bytes": 2912,
+      "sha256": "3e8bda74b62d4e190417116b08724ce37e4b20cfe2087d0699f78262b9cb863c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-actual-1/report.json",
+      "bytes": 5612,
+      "sha256": "82d76b355c533b770052cf0807333455941e17eac1d50d08ce4b762b09683cce"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-prepared-1/map-full380.py",
+      "bytes": 27038,
+      "sha256": "dbc49ffa8f35bef3ec6443fcb4eef3f2464a9659eb2cb7d7570aeac83394e965"
+    },
+    {
+      "path": "build/parity-closures/log-variants-full-native-mapping-prepared-1/preparation.json",
+      "bytes": 5411,
+      "sha256": "9dcb7b977519b9cc8e613974cc54222133e596bdd73ba8f3d67d6401390bb06a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/accept-380-root.py",
+      "bytes": 11549,
+      "sha256": "c9a83d4692f6b6997f922888d6e40f55139a17a6365f69a768007708ba7ec50c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/before/bindings.json",
+      "bytes": 344,
+      "sha256": "c3009cfb6bc47b888f3fea14b9968a72a8e6036ca3d9cfa3c951faa73bbe7a04"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/before/retained-public-receipt-index.md",
+      "bytes": 12415,
+      "sha256": "7b575f8a4cd01ab4cfa1efabd9e57ed7a2bcaab3905ffb19c0c5d246a5dd179d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/before/retained_public_receipt_index.py",
+      "bytes": 84156,
+      "sha256": "de281d2729c9ce42c6ca85782898f16cf900780cd62a3d1023f1605242d97f08"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/first-preparation-failure.json",
+      "bytes": 264,
+      "sha256": "6b65862ae21d0ff65974b1f7528a420c83471dbe387e2bc29f15aa6af3c70821"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/index.patch",
+      "bytes": 25157,
+      "sha256": "6735ee7936779564c51323bf97037825e253869df84a0464a65470b2a31cc4e5"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/manifest.json",
+      "bytes": 7236,
+      "sha256": "a921fab8d8c657836080d78cfb650a9196dad75f33c9afd63f5906354dbbac38"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/preparation.json",
+      "bytes": 2720,
+      "sha256": "aaa5d6cdc9c85e2045edce4bd87b3f7105fb8fe7869757a7065694d8e7b3e3b5"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/root-commands.md",
+      "bytes": 1403,
+      "sha256": "b4e0cf7481a2b86a59d77ff84eddc902c930f3f0259e199291a2827fed59fcf6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/runner-pins.json",
+      "bytes": 1246,
+      "sha256": "59c75fe77b4c94ea118c19cf4b91c1d8995730612599e2ccfd82bbcfa1dcfe88"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-adapter-prepared-1/validator-prefix.txt",
+      "bytes": 5574,
+      "sha256": "f8fd39a71b02b917c2a656b9eaa8190d37585a178daa39e4e1139e3ce5f5d178"
+    },
+    {
+      "path": "build/parity-closures/log-variants-index-root-independent-review-1/review.json",
+      "bytes": 1938,
+      "sha256": "9df38a788cd428886f13a22a4152ca84f743e9e9f001b7b08762feb29a1086c7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-independent-review-1/review.json",
+      "bytes": 3437,
+      "sha256": "f79685bc137e473ce81a0586dd6c541ba3714889a1684b8c19d58c5f157b7a63"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/prepare.py",
+      "bytes": 6946,
+      "sha256": "3656056d05288babb9adcba68857a97ed373dab9553b98feb009d6982bb89f01"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/public-signature-map.json",
+      "bytes": 1837,
+      "sha256": "07728e1b7d6cfdbf4000ecbbd79b4e7d60911518653e65de1d1cb44b4d9e0273"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/report.json",
+      "bytes": 12838,
+      "sha256": "249c1b0ddcca61c991f7f1cbfa2dc12d2813bc4ae9b6f305f9ecd5dab452dd58"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/source-declarations.json",
+      "bytes": 20182,
+      "sha256": "8cc1ddc70074f364ae0a00fc531b464429af18032cb354be0a6e26c19170329c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-next-pandas-variants-metadata-plan-1/validation.json",
+      "bytes": 5316,
+      "sha256": "d3bd1304730e10adcc68cafe70d0547405334a46b165e0b18f6decae65327186"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/browser-terminal.json",
+      "bytes": 1264,
+      "sha256": "47c7a61fd7db5c1ef20e753512ca3d31bd4f6e6ffbff503338e8564a0eeec783"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/frontend-all-terminal.json",
+      "bytes": 387,
+      "sha256": "ec2b6d0ba467cc708f1ec36de7b430bdcac9b48f896429910f3116712915f914"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/frontend-build-terminal.json",
+      "bytes": 8343,
+      "sha256": "1edf43ca6a904c111444c6b89ba588555a834d0a98ed57584f22126130e8a9ef"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/frontend-focused-attempt-1.json",
+      "bytes": 1564,
+      "sha256": "971a4943fd775ea7afc4eac524fa8ae68ac91871732565943addab90d0f22bd6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/frontend-focused-terminal.json",
+      "bytes": 432,
+      "sha256": "c3312a7caa231e337ce2b3a26d633d6f081a7075d43e2dba4b44802b8baf2670"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/index-terminal.json",
+      "bytes": 305,
+      "sha256": "d95f6d2566fd197968600f3e5b06ce907169af1af5b7a3a7c153998623eb1ea1"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/initial-six-native-terminal.json",
+      "bytes": 1228,
+      "sha256": "fff6e3cee8b0194765ef6857f593930bfb71e11ef8ca8ac61ad392607cf97470"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/native-build-terminal.json",
+      "bytes": 4522,
+      "sha256": "4c14f7e2a6bb81f3b156fdba4966df947f0a38d7769517684fa5a47ae8ea7440"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/native-full-build-terminal.json",
+      "bytes": 1207,
+      "sha256": "efa8d1c9f2ea7e458d3e12b09390e96a6dbf11d8b9247ef5e3940762e6f97923"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/native-full-ctest-last.log",
+      "bytes": 1293,
+      "sha256": "a913cc881c6c664ee8e7480d38ea6ec4c8158ab6fc6337b9d34dd7d62e4d3978"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/native-full-terminal.json",
+      "bytes": 946,
+      "sha256": "8086a95b734578fa9223cffabf27ddfc704764d3e7094a031cdeebf0d5190bdf"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-acceptance-1/receipt-integrity-terminal.json",
+      "bytes": 7217,
+      "sha256": "3fc4f567b1686c3d5285307844fb18eecca547bbe493f10303959fb5e54c0319"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/log_variants_filter_route.hpp",
+      "bytes": 693,
+      "sha256": "fe58bdd909e74977c0e22df8612c7bb0ee24e4ca0e86f4c809e0cb19873030ce"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/log_variants_filter_workbench.cpp",
+      "bytes": 6330,
+      "sha256": "4dfa4a4eebc37ab10bf19d0550cf80f1e23eac8abb60b866c3634db9d945252c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/log_variants_filter_workbench.hpp",
+      "bytes": 308,
+      "sha256": "0310803a20122cc823a4895195f25b58135648af6999ef55a21fd9f21a35bf7b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/log_variants_original_call_parser.hpp",
+      "bytes": 18533,
+      "sha256": "2f0977eb9046f6cd737b35ce62614e271d9e39bcd357a79b6b64a2f82a08fb13"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/test_log_variants_filter_route.cpp",
+      "bytes": 2016,
+      "sha256": "c3a4eb615ef7f1107cb13a636a217e7efc61d3653b324830068d345c31323eef"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/test_log_variants_filter_workbench.cpp",
+      "bytes": 9804,
+      "sha256": "4ab8943b382d98a0e0b583f603eebd872ea37ef4b91b55d2236dd6ca7f12f31c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/frozen-prebuild-1/test_log_variants_original_call_controls.cpp",
+      "bytes": 6817,
+      "sha256": "04a6398d0733d4defba8a2f4f27ca0db0b8aa0b17e9788da0cdfbc8ae8d7da98"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/prebuild-report.json",
+      "bytes": 4198,
+      "sha256": "20bddd1474daad30807a7758124b01fdfa6d78cb6ee3a98c07716ad802669c96"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/static-corrections-1/before-controls.cpp",
+      "bytes": 6396,
+      "sha256": "2f01fbace66b1336583a46960a9132e7f5f8fccc975e8c15822c2d8f50cde8c7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/static-corrections-1/before-parser.hpp",
+      "bytes": 18190,
+      "sha256": "5c56ee0698e06199bc207016dc6f1b0075a6235878b9f0926ded2ff02fa127e1"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-1/static-corrections-1/before-workbench.cpp",
+      "bytes": 6260,
+      "sha256": "db62cc9fcea68db5504a855a2134745d3e1b1df4732aec031167b33b0760acfd"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-backend-independent-review-1/review.json",
+      "bytes": 6720,
+      "sha256": "6c63ea5041ddcf6d6e68886e824f0a0ff97ec2162b2e953f6f1cf36272817a8f"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/report.json",
+      "bytes": 4603,
+      "sha256": "061cde211670d2e53edb65f6588103975e41a3b0d5d2367bb288f908a85f40a4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-1.cjs",
+      "bytes": 18280,
+      "sha256": "c839ead80b19f8552c186170e02f694f3dbbfb95cf3476b5d86af6d08a59a9f2"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-1.preparation.json",
+      "bytes": 1382,
+      "sha256": "d5da156063bb467d7d6608920c3028dd1895a2ac194313aaa0fe8ecdd520d620"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-corrected-1.cjs",
+      "bytes": 18280,
+      "sha256": "8cd5a8516f77e896cedb038af9e15b265386466e1d193f6e026a2ca09475039d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-corrected-1.preparation.json",
+      "bytes": 3268,
+      "sha256": "af65599584756da2104f5bfe701bd724c4a3e87202349943594a426742d6fc80"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-corrected-2.cjs",
+      "bytes": 18297,
+      "sha256": "4a36ab502ffd1c2f9346939e753e9584d370e2d90aea3fe7267a9e51e415b199"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-smoke-corrected-2.preparation.json",
+      "bytes": 1935,
+      "sha256": "9c9db4164956a4520e17cba9ca92c5ffcea99699efadd41a64be563bb0ceab52"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-independent-readback-prepared-1/preparation.json",
+      "bytes": 3481,
+      "sha256": "241b56d85ad19506dbd4b536284fa4d133c8a3668c4ea9d838dda4d2630fe65a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-independent-readback-prepared-1/verify-readback.py",
+      "bytes": 13618,
+      "sha256": "39aafa784f53de234d94924b7aad04db1c7683dc78148a116a3625c8bc4c8135"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/freeze-explicit-scope.py",
+      "bytes": 9535,
+      "sha256": "7a86b4c4e88046fb6cb3ea9b56cbf5905302e14816452755ffbdb30a15561125"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/freeze-final-scope.py",
+      "bytes": 2701,
+      "sha256": "a76c35fffd929b39d2d1b21d65d76c4ab65eab56f06132c0b9f37baa8dcf38cf"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/freeze-scope-after-mjs-correction.py",
+      "bytes": 2871,
+      "sha256": "97e64dc7607b7ca479e8bfddee5a72a538834b9fc140ccf9b40ca8d5ea59bf53"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/attempt.json",
+      "bytes": 514,
+      "sha256": "af730a95a5fd771daa7267af6e7d5095c0d093787becbe9eb645b89b0b51e158"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/packager-before.py",
+      "bytes": 21348,
+      "sha256": "932191b8f1c4b5c13092060b58b3dadbb0ca2ae3d02a598b28c33789f19c7d96"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/packager-review-before.json",
+      "bytes": 5165,
+      "sha256": "087828f0f9ea0674107f423455685adc45afb4993872c4e0aa2d7dcaabec4848"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/readback-before.py",
+      "bytes": 13611,
+      "sha256": "b2fb7c13dd50d9a899d99d3683a4c424e54f14771a30b1bf564eb9b45c58e24f"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/root-facts-before.json",
+      "bytes": 54230,
+      "sha256": "2b882e21afad0cb9a79a076115c68a604fba051f9cd6dec3c8ab11d6d41d6619"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/mjs-source-correction-1/scope-before.json",
+      "bytes": 60123,
+      "sha256": "b9e68bef4745faffbc8e7e0b94c16bf7fffc367ea6a7fec43438feddd33d6938"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/root-facts-contract.json",
+      "bytes": 7330,
+      "sha256": "52dfa55be3f547eefde52c079398d3028885b204498db9501b9487e59d5cb0d7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/scope-before-final.json",
+      "bytes": 56115,
+      "sha256": "9655262c30f09846ce518b97566d685580bdc18adbca2ac637de7d14094a9119"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/scope.json",
+      "bytes": 64114,
+      "sha256": "217e7a6330f524fc91b699e718d3062b59e845cdad061edc57f165135f2c1596"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/catalogue-terminal.json",
+      "bytes": 517,
+      "sha256": "85a8a03529d8908965f12a02ecc0665fe9e736d97198f46cadf64a88f0f42f39"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/committed-coverage.json",
+      "bytes": 480643,
+      "sha256": "ed9016cdefdb039ece6d17e0d6bdabae8e5e0530119e01bbecffc78fec1f3989"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/freeze-root-terminal-facts.py",
+      "bytes": 5643,
+      "sha256": "8453376f3bca7fa4db626cbdaeed0393aa1e9cce6fd624bd22bc06160bdc2525"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/freeze-runtime-externals.py",
+      "bytes": 2473,
+      "sha256": "310a0a05b37ef369eff1d3f760e1e00b303802dbde04e214d4167563758c8ecc"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/freeze-source-commits.py",
+      "bytes": 3907,
+      "sha256": "264b28f244dc3e39c64abac036e9b7445108c4f81f9ec1b1061439b5396a19fb"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/next-pandas-plan-terminal.json",
+      "bytes": 464,
+      "sha256": "5ae582408511f05289cc7190df78ff34364418682bca863c482dc074c238cc70"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/root-facts.json",
+      "bytes": 56458,
+      "sha256": "a9821d467faac3ec096320bf350b291ea02c2e2c48efbeb2fac34e03fec27ae4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/runtime-external-bindings.json",
+      "bytes": 7778,
+      "sha256": "061f44776f0916d9920e9539cd27137847af0d84c7587225104d3867afa0e45a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-finalization-1/source-commits.json",
+      "bytes": 12824,
+      "sha256": "a590e352b3bc33d48f550679ae27608f57a281dcedb694f33753f86c0dce25cd"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-fixture-independent-review-1/failed-first-report.json",
+      "bytes": 4257,
+      "sha256": "33ba6d183ecc8c9b2727c8fab31c7ea36d45c481eb512f77af5499c72814e803"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-fixture-independent-review-1/review.json",
+      "bytes": 8130,
+      "sha256": "052a28ae7411d91e227e6edcdec650f1e4df5d7fe38acafcdb1f45ce6b35df2d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-LogVariantsFilterWorkspace.tsx",
+      "bytes": 10270,
+      "sha256": "c65d3da9849352e6e9cf3815fe9917cf9dc35c89a5eda9deb3d34c197533700a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-ReferenceLogFilterWorkspace.tsx",
+      "bytes": 27601,
+      "sha256": "0996e945c8a3c29ee5a715b269b0ee75b57bba207e42564483b46eb8538e63c2"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-log-variants-filter-parity-contract.md",
+      "bytes": 8711,
+      "sha256": "92fb439d85a388275b259084d571767f51c5ba4385d343422b6e982a0c5522e3"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-log-variants-filter-workspace.test.ts",
+      "bytes": 5065,
+      "sha256": "d6e3f7e0a888ca05c227bde6ea4bfc330d456bbf77858aaeb57e99e78a02b465"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-log-variants-filters.test.ts",
+      "bytes": 10367,
+      "sha256": "2091d872bc1102c09575390ef7468096b01f9a4a36f18cd92f242f668234f2a4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-log-variants-filters.ts",
+      "bytes": 11496,
+      "sha256": "528841409f572bc157a5122646b93224cc326687a1f56e4fe8b783ba75bd15db"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/frozen-variants-filter-workflow.md",
+      "bytes": 8607,
+      "sha256": "cf5f20c4c797cf972fd600a98bd7b4ecf4df9b50840aefecb40e407e3e09c7e6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/multipart-test-correction-1/before-log-variants-filters.test.ts",
+      "bytes": 10367,
+      "sha256": "2091d872bc1102c09575390ef7468096b01f9a4a36f18cd92f242f668234f2a4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/multipart-test-correction-1/corrected-log-variants-filters.test.ts",
+      "bytes": 10623,
+      "sha256": "d71514bff7f95eda1ccaed42d045305a2484b10bbd560d2887049abec2727b53"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/multipart-test-correction-1/report.json",
+      "bytes": 957,
+      "sha256": "96920c491acbad73397a0815d5d7c0926ba73ddd02451dc5e239b30e9b6cab17"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/phase-guard-verification.json",
+      "bytes": 1314,
+      "sha256": "f93c485173489ccdfab0cc584c603406c887b662d7bbeeb15eb1deefb825018b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-frontend-1/prebuild-report.json",
+      "bytes": 3865,
+      "sha256": "8f75d6767eba9c87b8d04d4ae5c13b7c992e5691b685c1a0fb306764cf1bf28d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-packager-independent-review-1/review.json",
+      "bytes": 6394,
+      "sha256": "a2f0724afe02f1a4d647d3fb8efee2f2a29503b555f53b0fcb112a90dd797837"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-product-prework-1/mapping-followup.json",
+      "bytes": 899,
+      "sha256": "9bc71562a4284e5224dcb6c4341e7aa79ca99e3cd49a9075f3e16baf07d0ac1c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-product-prework-1/report.json",
+      "bytes": 6605,
+      "sha256": "1e68f7a7d8d8c0d78f992c5f28af9bc376c295a543242b6a14ddd76f9742bc92"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-product-prework-1/source-bindings.json",
+      "bytes": 5536,
+      "sha256": "ca4b18fb29cf4adfbb0c7bfa139e54120b26566f3d9ce18065af7e316372411a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-product-prework-1/transport-capability-gap-map.md",
+      "bytes": 15322,
+      "sha256": "66813e755b77a5285be3aa253b86409a07fa8debb64820cdbce18d9c60e33ffb"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-wire-frozen-1.json",
+      "bytes": 9807,
+      "sha256": "4fb14455eb405f065f02bde28e5eddda10a01e22e47383d27499069a78c501d2"
+    },
+    {
+      "path": "build/parity-closures/log-variants-public-observation-admission-1/admitted-sources.json",
+      "bytes": 8293,
+      "sha256": "6d669b7a2d52ee5ea9969bac220cdb95d71271c66c086c2fe544a5f6a1d61590"
+    },
+    {
+      "path": "build/parity-closures/log-variants-receipt-admission-prepared-1/canonical-census.py",
+      "bytes": 28090,
+      "sha256": "ffe1108c5748f02512c2eadd25dfd1056a876e32a5afdc29c607acc0f2e0cd38"
+    },
+    {
+      "path": "build/parity-closures/log-variants-receipt-admission-prepared-1/observer-profile.json",
+      "bytes": 3402,
+      "sha256": "52db6244eef8eaa7e1a4abd4db0bf1d3f940ca150b51f9206f6eb671567c2a94"
+    },
+    {
+      "path": "build/parity-closures/log-variants-receipt-admission-prepared-1/preparation.json",
+      "bytes": 2307,
+      "sha256": "cd961f4ef1658b9cb3607dbc77045f51dcbc47ec33846fabcf2d4788a2ae0bf5"
+    },
+    {
+      "path": "build/parity-closures/log-variants-receipt-admission-prepared-1/root-command.md",
+      "bytes": 762,
+      "sha256": "bc99e41c3eb635df9f0289b7fceae49f7517dceef50aae0e80c8f380466a5d92"
+    },
+    {
+      "path": "build/parity-closures/package-retained-public-observation-log-variants-original-call-checkpoint.py",
+      "bytes": 21355,
+      "sha256": "3770a060cbabaef5c01f226ea7e35d5b2aaf17343baecea481eb2460212ffcc6"
+    },
+    {
+      "path": "build/parity-closures/prepare-log-variants-browser-recipe-1.py",
+      "bytes": 14334,
+      "sha256": "e8b5cb7cffb9f74eba27e88142eda65c5e15cbafd36b7f60481b50ec1f42a801"
+    },
+    {
+      "path": "build/parity-closures/verify-declared-catalog.mjs",
+      "bytes": 44214,
+      "sha256": "61f959bf30f2ddb6e8ee00afec5f9f50a578125a5a9b48f6e400476d1a00bbb1"
+    },
+    {
+      "path": "docs/log-variants-filter-parity-contract.md",
+      "bytes": 9327,
+      "sha256": "ae7e6f012c8b7d8e750e098b12adb12e8f13d7a7ef8e04473a8efa59c52e21e7"
+    },
+    {
+      "path": "docs/retained-public-receipt-index.md",
+      "bytes": 14922,
+      "sha256": "2820836d6d1ba30ff8cd9693816cc80639acd454a843bfcc924cf2833c9c00b5"
+    },
+    {
+      "path": "docs/variants-filter-workflow.md",
+      "bytes": 8982,
+      "sha256": "21ae1a0c5dc6da16d0313ebb89f395499e0ef2f0b1a9bb7d752d3e0e7283a799"
+    },
+    {
+      "path": "include/minera/log_variants_filter_workbench.hpp",
+      "bytes": 308,
+      "sha256": "0310803a20122cc823a4895195f25b58135648af6999ef55a21fd9f21a35bf7b"
+    },
+    {
+      "path": "scripts/retained_public_receipt_index.py",
+      "bytes": 105991,
+      "sha256": "f818bf7734beec65027c3ecdb4dbb949a47f89ef04dca0b23a6302625b4066d1"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_receipt_log_variants.py",
+      "bytes": 16182,
+      "sha256": "e8839b4f1c22999f0ad5fcd3b08c260a8b1eaabe6de2557611affaa02fd3b742"
+    },
+    {
+      "path": "src/backend/log_variants_filter_workbench.cpp",
+      "bytes": 6330,
+      "sha256": "4dfa4a4eebc37ab10bf19d0550cf80f1e23eac8abb60b866c3634db9d945252c"
+    },
+    {
+      "path": "src/backend/log_variants_original_call_parser.hpp",
+      "bytes": 18533,
+      "sha256": "2f0977eb9046f6cd737b35ce62614e271d9e39bcd357a79b6b64a2f82a08fb13"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_filter_route.cpp",
+      "bytes": 2016,
+      "sha256": "c3a4eb615ef7f1107cb13a636a217e7efc61d3653b324830068d345c31323eef"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_filter_workbench.cpp",
+      "bytes": 9804,
+      "sha256": "4ab8943b382d98a0e0b583f603eebd872ea37ef4b91b55d2236dd6ca7f12f31c"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_original_call_controls.cpp",
+      "bytes": 6817,
+      "sha256": "04a6398d0733d4defba8a2f4f27ca0db0b8aa0b17e9788da0cdfbc8ae8d7da98"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_workbench_public.cpp",
+      "bytes": 5484,
+      "sha256": "8a9a3484a8bd5155134f51d510d3ed1fa08aa37de9f69421ccb4decf8fa0350b"
+    },
+    {
+      "path": "src/backend/tools/log_variants_filter_route.hpp",
+      "bytes": 693,
+      "sha256": "fe58bdd909e74977c0e22df8612c7bb0ee24e4ca0e86f4c809e0cb19873030ce"
+    },
+    {
+      "path": "src/backend/tools/minera_server.cpp",
+      "bytes": 589648,
+      "sha256": "80f8d756592e9e5a32bbfb350bf952b4ff3d94654aa5f68fa08b74591a3da0b4"
+    },
+    {
+      "path": "src/frontend/src/components/LogVariantsFilterWorkspace.tsx",
+      "bytes": 10270,
+      "sha256": "c65d3da9849352e6e9cf3815fe9917cf9dc35c89a5eda9deb3d34c197533700a"
+    },
+    {
+      "path": "src/frontend/src/components/ReferenceLogFilterWorkspace.tsx",
+      "bytes": 27601,
+      "sha256": "0996e945c8a3c29ee5a715b269b0ee75b57bba207e42564483b46eb8538e63c2"
+    },
+    {
+      "path": "src/frontend/src/log-variants-filters.ts",
+      "bytes": 11496,
+      "sha256": "528841409f572bc157a5122646b93224cc326687a1f56e4fe8b783ba75bd15db"
+    },
+    {
+      "path": "src/frontend/tests/log-variants-filter-workspace.test.ts",
+      "bytes": 5065,
+      "sha256": "d6e3f7e0a888ca05c227bde6ea4bfc330d456bbf77858aaeb57e99e78a02b465"
+    },
+    {
+      "path": "src/frontend/tests/log-variants-filters.test.ts",
+      "bytes": 10623,
+      "sha256": "d71514bff7f95eda1ccaed42d045305a2484b10bbd560d2887049abec2727b53"
+    }
+  ],
+  "external_bindings": [
+    {
+      "path": "build/Release/minera_server.exe",
+      "bytes": 17108480,
+      "sha256": "97e175cb4028fa9cf9b777cc2753d4356f643555ab317b2f28dc12801f1fc257"
+    },
+    {
+      "path": "build/filtering-variants-log-boundaries-prepared-1/capture-public.py",
+      "bytes": 13931,
+      "sha256": "5297ce6f40f78b5dbbe1c0d1d57d41fca0cf3f87cbb8a479ba22435ac9db7602"
+    },
+    {
+      "path": "build/filtering-variants-log-boundaries-prepared-1/cases.json",
+      "bytes": 3425,
+      "sha256": "188f1249ca9d31eda1012acfa4bde3e83c2941c581b5e2aa747cdb1461c6e1a3"
+    },
+    {
+      "path": "build/filtering-variants-log-boundaries-public-actual-1/call-intents.jsonl",
+      "bytes": 2478,
+      "sha256": "f63ecf412bc9e70e72c56cd1cf58466e91a8478f114327ea922cd78a9e1c574b"
+    },
+    {
+      "path": "build/filtering-variants-log-boundaries-public-actual-1/dedup-audit.json",
+      "bytes": 2011,
+      "sha256": "a2b518d74826c0bd2a77f184324afc3f3a66847c5fbfcd2521d8dffa33056986"
+    },
+    {
+      "path": "build/filtering-variants-log-boundaries-public-actual-1/records.jsonl",
+      "bytes": 249402,
+      "sha256": "f1b1531b2be6be239989000b307f8caf8fca9ed0dc1409de1447d161efd69182"
+    },
+    {
+      "path": "build/filtering-variants-log-boundaries-public-actual-1/validation.json",
+      "bytes": 6522,
+      "sha256": "43310bb676f5c49d41fd2497733c2911366ee087276614ae851b0f817b4cf101"
+    },
+    {
+      "path": "build/filtering-variants-log-public-actual-1/call-intents.jsonl",
+      "bytes": 97785,
+      "sha256": "1b8c1132fe787bfe5d31d95768390b31a40d977a5df2c8908c48fc85efd31bc7"
+    },
+    {
+      "path": "build/filtering-variants-log-public-actual-1/dedup-audit.json",
+      "bytes": 63182,
+      "sha256": "5df7d2cab749196545ae861eedbe257d164166b0d3383f7f2374922efcf919d8"
+    },
+    {
+      "path": "build/filtering-variants-log-public-actual-1/records.jsonl",
+      "bytes": 44708255,
+      "sha256": "b8d0a472b105176dfc9cb03e432a0a5ff53e88d7b9c44316072440cefa2c9e41"
+    },
+    {
+      "path": "build/filtering-variants-log-public-actual-1/validation.json",
+      "bytes": 6527,
+      "sha256": "4de96e556cacd3fa47ae812c96a8dd4d897d37a5aaf6ff64e7ee9680c568b37f"
+    },
+    {
+      "path": "build/filtering-variants-log-public-prepared-1/capture-public.py",
+      "bytes": 13871,
+      "sha256": "d13e480a688fbcc175662ee1d7cea700d4c671595f1c820cf9e9d77d638bdc68"
+    },
+    {
+      "path": "build/filtering-variants-log-public-prepared-1/cases.json",
+      "bytes": 84881,
+      "sha256": "8438e13f726edcdab8df358e4ff2b4dc7515ec3fac97ec9371e1b5b33113ac40"
+    },
+    {
+      "path": "build/filtering-variants-log-public-prepared-1/generate-native-tests.py",
+      "bytes": 15646,
+      "sha256": "8c964b7dc2b9b7c7acfff92ab2fb4cf0b3153fcfd42ba48fa57134dd5951e6e7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-admitted-index-acceptance-1/receipts.sqlite",
+      "bytes": 9662464,
+      "sha256": "b7f672db7a6f09d5677af1691bd27425a36be7531d898b701b15cea9c575446e"
+    },
+    {
+      "path": "build/parity-closures/log-variants-canonical-census-root-2/report.json",
+      "bytes": 5800,
+      "sha256": "f0aeb141778f86117f6b403c7e6a68c5440094a7682b8edf35249773ccf1475e"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-input-1/source.native.json",
+      "bytes": 125630,
+      "sha256": "c69454859c0a415e96ad6d6722cffce18d8bd48562849a66c2b7a752f8d376b8"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/actual-filtered-File-reuse-response.json",
+      "bytes": 32042,
+      "sha256": "bd25c36ad5c02b1a00d79ee74b1675f13dba8bcad4e4b3e85aa251106e378b76"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/cancelled-native-response.json",
+      "bytes": 41333,
+      "sha256": "31b93e435cb86ab11fcdfb10bcce2e958077d1fa548d21ec7023740c544042b4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/controls_after_json.json",
+      "bytes": 3561,
+      "sha256": "dc0454ee62532adba96c5e9984f97716c3b6ca565724e3123b758df22c8ed7aa"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/controls_before_json.json",
+      "bytes": 3561,
+      "sha256": "dc0454ee62532adba96c5e9984f97716c3b6ca565724e3123b758df22c8ed7aa"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/exact-call.json",
+      "bytes": 128,
+      "sha256": "7c8ebce6c48f2b95ed7e7729d44ac8b5be24e57781fc46a39896f9a60abc9047"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/exact-large-integer-CRLF-import-response.json",
+      "bytes": 41333,
+      "sha256": "31b93e435cb86ab11fcdfb10bcce2e958077d1fa548d21ec7023740c544042b4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/example-apply-response.json",
+      "bytes": 38156,
+      "sha256": "eee2feade4a77a7ccfe32d696709488b6974d60425bf69626e609fd4b3f7441b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/example-filter_log_variants_percentage-response.json",
+      "bytes": 37728,
+      "sha256": "f6a29b605f53324f48249819e172db4aa4d68459ad28db88da4946bc71c7bf06"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/example-filter_variants_by_coverage_percentage-response.json",
+      "bytes": 37736,
+      "sha256": "fab04ef0c8ca57409141bab6247292017a94ac95fa997a1124758e695f366591"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/example-filter_variants_by_maximum_coverage_percentage-response.json",
+      "bytes": 34202,
+      "sha256": "8a6b3d13fb26f8d6f27438d816f88c96b413f21efc7d24d09a952101c66a1df6"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/example-filter_variants_top_k-response.json",
+      "bytes": 37632,
+      "sha256": "33466119ce43230e940e8c1f67e18f38e9e3ca501d5dfc4f8421236da1a40c42"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/example-filter_variants_variants_percentage-response.json",
+      "bytes": 66269,
+      "sha256": "9f5c56cd771e849e34e6cb514d48fdda1e05709924a0a9526877c1cdce50f2b4"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/example-find_auto_threshold-response.json",
+      "bytes": 58759,
+      "sha256": "8f023fd62604ca0ac894294cc287bbe2fce97b7b54695bbb2ff0df21f780a40d"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/failed-response.json",
+      "bytes": 35798,
+      "sha256": "ded63fc9563d10392aa8b0fd33a4f30c0a18a4cb0129d7d43691126cae524303"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/failed-source-after.json",
+      "bytes": 9025,
+      "sha256": "0e1dac08ea824d1d6da1d63c2a2a3b26a6252fac097ba6620f834a27d90ddac7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/filtered_log_json.json",
+      "bytes": 6314,
+      "sha256": "0cca17d0e4974be1352efa9e722e10a2994aa6500a97402da4e163c0db9b459a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/filtered_xes.xes",
+      "bytes": 1104,
+      "sha256": "018cb139dbf75b2c6288a033f01bfe735b33fe906babdec42dc10a853d812a8e"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/malformed-control-response.json",
+      "bytes": 510,
+      "sha256": "4711be324877ed847494dead78acac09e077562b90fca9dbdba6638491d24629"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/own-source.json",
+      "bytes": 2807,
+      "sha256": "5537b3b68d6cd167219e3179e2259efb97e9c7e67219d3c163e794fa87797eb9"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/owned-server.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/owned-server.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/raw-parameter-error-response.json",
+      "bytes": 35798,
+      "sha256": "ded63fc9563d10392aa8b0fd33a4f30c0a18a4cb0129d7d43691126cae524303"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/reusable-native-log-response.json",
+      "bytes": 38156,
+      "sha256": "eee2feade4a77a7ccfe32d696709488b6974d60425bf69626e609fd4b3f7441b"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/source_log_json.json",
+      "bytes": 9025,
+      "sha256": "0e1dac08ea824d1d6da1d63c2a2a3b26a6252fac097ba6620f834a27d90ddac7"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/threshold.json",
+      "bytes": 755,
+      "sha256": "02a564be8b76f8e766d0a44dd72a4ec14cc0274536d2914366d1b2397e7ea96a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/typed-negative-control-response.json",
+      "bytes": 43031,
+      "sha256": "de5a82463a88fdf1e3278134a7c3c95422f1cc10912781186d1c834c7d4f6d9a"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/typed-tuple-key-dictionary-response.json",
+      "bytes": 39265,
+      "sha256": "5e4c23ee4755146784925ec40cd0a576c26b470da31fe76a2930754716a7072c"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/variants-error.png",
+      "bytes": 147056,
+      "sha256": "100832ca2b809b3eb0d3e9e08620db4fdbc889448b006c81e56d64dc0e1a2ec2"
+    },
+    {
+      "path": "build/parity-closures/log-variants-original-call-browser-owned-1/variants-success.png",
+      "bytes": 150723,
+      "sha256": "99cf90824658eab96bc7abe29542a6cbb4404eef019d1f09952638e2cc893cee"
+    },
+    {
+      "path": "docs/log-ltl-filter-public.json.gz",
+      "bytes": 7592723,
+      "sha256": "2660b657d674d7d7bb621d994f1f4cf93d77fddea034384cdd4b9aafd4174173"
+    },
+    {
+      "path": "docs/log-variants-filter-public.json.gz",
+      "bytes": 723678,
+      "sha256": "ba5745834c3f541a28a80d2ec98185bf031e2c06e5f851a450072a2020365bf4"
+    },
+    {
+      "path": "docs/pandas-ltl-filter-public.json.gz",
+      "bytes": 8972301,
+      "sha256": "9f073d0be9b35661772538d4a81a8de206160c281d9da3c119e8b4a2b7bb77fd"
+    },
+    {
+      "path": "docs/polars-ltl-filter-public.json.gz",
+      "bytes": 610562,
+      "sha256": "6270a238dc204c126e80ee816e5790449ad0f5b23f7ccce9fb7f1e9ab7fd417b"
+    },
+    {
+      "path": "src/backend/tests/log_variants_workbench_public_vectors.inc",
+      "bytes": 1317716,
+      "sha256": "008a0e8ef5c0b44e773d84562cde25858631d15e99c2b5ffcc7cced100423d8f"
+    },
+    {
+      "path": "src/backend/tests/test_log_variants_filter.cpp",
+      "bytes": 1543614,
+      "sha256": "a829dcf13c241d9f54974be43936648dad5f566da0fce7794ffc5edda2108cd7"
+    },
+    {
+      "path": "src/frontend/dist/index.html",
+      "bytes": 886,
+      "sha256": "7c6b3b7122992afc4b641b82a91563c2f5beaaa173d7265bca850e2fb21b8420"
+    }
+  ],
+  "member_count": 163,
+  "external_binding_count": 53,
+  "source_bytes": 4169428,
+  "exact_utf8_roundtrip": true,
+  "all_current_source_bytes_equal": true,
+  "root_facts": {
+    "path": "build/parity-closures/log-variants-original-call-finalization-1/root-facts.json",
+    "bytes": 56458,
+    "sha256": "a9821d467faac3ec096320bf350b291ea02c2e2c48efbeb2fac34e03fec27ae4"
+  },
+  "scope_binding": {
+    "path": "build/parity-closures/log-variants-original-call-checkpoint-prepared-1/scope.json",
+    "bytes": 64114,
+    "sha256": "217e7a6330f524fc91b699e718d3062b59e845cdad061edc57f165135f2c1596"
+  },
+  "archive_boundary": {
+    "known_LOG_archive_containers": 1,
+    "transient_UTF8_unescape_for_member_hashes": true,
+    "prior_LTL_integrity_archive_containers": 3,
+    "package_original_payload_opens": 0,
+    "admitted_flat_parse_separate": true
+  },
+  "package_original_payload_opens": 0,
+  "failed_attempts_preserved": true,
+  "history_complete": false,
+  "reference_calls": 0,
+  "limitations": {
+    "new_reference_calls": false,
+    "reference_implementation_inspected": false,
+    "complete_history": false,
+    "new_call_authority": false,
+    "full_parity": false,
+    "catalogue_promoted": false,
+    "warning_transport": false,
+    "python_alias_identity_proven": false,
+    "error_args_transported": false,
+    "raw_multipart_body_claim": false,
+    "native_predicate_header_oracle_changed": false,
+    "shared_typed_codecs_changed": false
+  }
+}
