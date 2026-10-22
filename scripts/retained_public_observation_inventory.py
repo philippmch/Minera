@@ -21,6 +21,9 @@ schemas are discovery-only. Chunk events preserve full-member versus chunk
 size/hash declarations without decoding, verification, assembly or completion.
 Optional series_identity scopes duplicate chunk declarations across containers;
 without it, identities are scoped only to the individual container.
+The explicit utf8-name-text-members-v1 schema is discovery-only: name and
+byte_count declare a full-member path and byte length, while text stays opaque.
+Its header and tail are unadmitted metadata candidates and remain gaps.
 
 Discovery validates JSON structure and inventories metadata without unescaping
 or decoding archive payload strings. An unlisted payload remains opaque even
@@ -556,7 +559,8 @@ class Inventory:
         payload_types = {}
         legacy = spec.get('envelope_schema') == 'legacy-name-data-base64-v1'
         chunk_schema = spec.get('envelope_schema') in CHUNK_SCHEMAS
-        payload_keys = PAYLOAD_KEYS | ({'data_base64'} if legacy else set())
+        utf8_schema = spec.get('envelope_schema') == 'utf8-name-text-members-v1'
+        payload_keys = PAYLOAD_KEYS | ({'data_base64'} if legacy else set()) | ({'text'} if utf8_schema else set())
         admitted = {member['path']: member for member in spec.get('members', [])}
         try:
             parser.r.whitespace()
@@ -571,7 +575,7 @@ class Inventory:
                     parser.r.whitespace()
                     if key in payload_keys:
                         payload_types[key] = 'string' if parser.r.peek() == 34 else 'nested-json'
-                        preserve = not discovery and ('path' not in metadata or metadata.get('path') in admitted)
+                        preserve = not discovery and not utf8_schema and ('path' not in metadata or metadata.get('path') in admitted)
                         if parser.r.peek() == 34:
                             raw = tempfile.SpooledTemporaryFile(max_size=65536) if preserve else None
                             if raw is not None:
@@ -579,19 +583,20 @@ class Inventory:
                             parser.string(sink=raw)
                         else:
                             parser.value(False)
-                    elif key in {'path', 'sha256', 'encoding', 'schema', 'kind'} or (legacy and key == 'name') or (chunk_schema and key in {'member', 'file_sha256'}):
-                        metadata_key = 'path' if legacy and key == 'name' or chunk_schema and key == 'member' else key
+                    elif key in {'path', 'sha256', 'encoding', 'schema', 'kind'} or ((legacy or utf8_schema) and key == 'name') or (chunk_schema and key in {'member', 'file_sha256'}) or (utf8_schema and key in {'group', 'inventory_sha256'}):
+                        metadata_key = 'path' if (legacy or utf8_schema) and key == 'name' or chunk_schema and key == 'member' else key
                         if parser.r.peek() == 34:
                             metadata[metadata_key] = parser.string(materialize=True)
                         else:
                             parser.value(False)
                             metadata[metadata_key] = None
-                    elif key == 'bytes' or (legacy and key == 'schema_version') or (chunk_schema and key in {'offset', 'chunk', 'chunks'}):
+                    elif key == 'bytes' or (legacy and key == 'schema_version') or (chunk_schema and key in {'offset', 'chunk', 'chunks'}) or (utf8_schema and key in {'byte_count', 'version', 'members', 'member_count', 'total_member_bytes'}):
+                        metadata_key = 'bytes' if utf8_schema and key == 'byte_count' else key
                         if parser.r.peek() in b'-0123456789' if parser.r.peek() is not None else False:
-                            metadata[key] = parser.value()
+                            metadata[metadata_key] = parser.value()
                         else:
                             parser.value(False)
-                            metadata[key] = None
+                            metadata[metadata_key] = None
                     else:
                         parser.value(False)
                     parser.r.whitespace()
@@ -606,6 +611,15 @@ class Inventory:
             name = metadata.get('path')
             if chunk_schema:
                 self.chunk_metadata(ordinal, spec, metadata, keys, payload_types)
+                return
+            if utf8_schema and metadata.get('kind') != 'member':
+                declared = {key: value for key, value in metadata.items() if key in {
+                    'kind', 'schema', 'version', 'group', 'members', 'member_count',
+                    'total_member_bytes', 'inventory_sha256'}}
+                self.event('header_candidate', ordinal=ordinal, envelope_schema=spec['envelope_schema'],
+                           envelope_keys=sorted(keys), declared_metadata=declared,
+                           possible_call_fields=sorted(keys & POSSIBLE_CALL_KEYS))
+                self.gap('UTF8 header/tail or unknown row kind remains unadmitted', ordinal=ordinal)
                 return
             if legacy and name is None and not payload_types:
                 valid_header = (metadata.get('kind') == spec.get('metadata_kind') == 'manifest'
@@ -645,7 +659,15 @@ class Inventory:
                         self.gap('unsafe archive member path', ordinal=ordinal, member=name)
             self.event('member', ordinal=ordinal, **{k: v for k, v in metadata.items() if k != 'kind'}, envelope_kind=metadata.get('kind'), payload_fields=payload_types, path_disposition=disposition,
                        admitted=not discovery and name in admitted, envelope_keys=sorted(keys),
-                       envelope_schema=spec.get('envelope_schema'), original_size_unavailable='bytes' not in metadata)
+                       envelope_schema=spec.get('envelope_schema'), original_size_unavailable='bytes' not in metadata,
+                       **({'payload_hash_verified': False,
+                           'metadata_valid': (keys == {'kind', 'name', 'byte_count', 'sha256', 'text'}
+                               and metadata.get('kind') == 'member' and isinstance(name, str)
+                               and disposition in {'safe-relative-path', 'excluded-path'}
+                               and name not in self.seen_members.get(self.context.get('source'), set())
+                               and type(metadata.get('bytes')) is int and metadata['bytes'] >= 0
+                               and bool(re.fullmatch('[0-9a-f]{64}', str(metadata.get('sha256', ''))))
+                               and payload_types == {'text': 'string'})} if utf8_schema else {}))
             if not isinstance(name, str):
                 self.gap('envelope path absent', ordinal=ordinal)
                 return
@@ -664,6 +686,16 @@ class Inventory:
             if not legacy and keys & {'chunk', 'chunks', 'file_sha256', 'offset', 'member'}:
                 self.gap('chunk envelope requires an explicit metadata-only chunk schema', ordinal=ordinal, member=name)
                 return
+            if utf8_schema:
+                if keys != {'kind', 'name', 'byte_count', 'sha256', 'text'}:
+                    self.gap('UTF8 member fields do not match exact producer schema', ordinal=ordinal, member=name)
+                if payload_types != {'text': 'string'}:
+                    self.gap('UTF8 member text must remain an opaque string', ordinal=ordinal, member=name)
+                if type(metadata.get('bytes')) is not int or metadata['bytes'] < 0:
+                    self.gap('UTF8 full-member byte_count must be a nonnegative integer', ordinal=ordinal, member=name)
+                if not re.fullmatch('[0-9a-f]{64}', str(metadata.get('sha256', ''))):
+                    self.gap('UTF8 full-member SHA-256 declaration absent', ordinal=ordinal, member=name)
+                return  # metadata only, irrespective of member suffix/disposition
             if legacy and metadata.get('kind') != 'member':
                 self.gap('legacy envelope requires kind=member', ordinal=ordinal, member=name)
                 return
@@ -772,6 +804,10 @@ class Inventory:
             self.gap('unknown top-level object structure; no automatic admission')
 
     def parse(self, stream, spec):
+        if spec.get('envelope_schema') in CHUNK_SCHEMAS and (spec.get('layout') != 'discover' or spec.get('members')):
+            raise ValueError('chunk schema is metadata discovery only; explicit reassembly is unavailable')
+        if spec.get('envelope_schema') == 'utf8-name-text-members-v1' and (spec.get('layout') != 'discover' or spec.get('members')):
+            raise ValueError('UTF8 name/text schema is metadata discovery only; member admission is unavailable')
         parser = Parser(stream, self.chunk_size, self.max_record_bytes)
         if parser.r.peek() == 0xef:
             parser.r.expect(0xef)
@@ -956,10 +992,12 @@ def run(manifest, emit, chunk_size=65536, max_record_bytes=64 * 1024 * 1024, cac
     for spec in manifest['sources']:
         try:
             members = spec.get('members', [])
-            if spec.get('envelope_schema') not in {None, 'legacy-name-data-base64-v1'} | CHUNK_SCHEMAS:
+            if spec.get('envelope_schema') not in {None, 'legacy-name-data-base64-v1', 'utf8-name-text-members-v1'} | CHUNK_SCHEMAS:
                 raise ValueError('unknown explicit envelope schema')
             if spec.get('envelope_schema') in CHUNK_SCHEMAS and (spec.get('layout') != 'discover' or members):
                 raise ValueError('chunk schema is metadata discovery only; explicit reassembly is unavailable')
+            if spec.get('envelope_schema') == 'utf8-name-text-members-v1' and (spec.get('layout') != 'discover' or members):
+                raise ValueError('UTF8 name/text schema is metadata discovery only; member admission is unavailable')
             names = [safe_path(member['path'], public_json=True) for member in members]
             for member in members:
                 require_declared_binding(member)
