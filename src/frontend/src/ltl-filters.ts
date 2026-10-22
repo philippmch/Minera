@@ -5,6 +5,7 @@ import {isOriginalEmbeddingFilterNativeString} from "./original-embedding-filter
 import {openReferenceLogFilter,referenceLogFilterStringBytes,type ReferenceLogFilterNativeString,type ReferenceLogFilterOpenLog,type ReferenceLogFilterRun} from "./reference-log-filters";
 
 export type LtlFilterEngine="log"|"pandas"|"polars";
+export type LtlPolarsInputKind="LazyFrame"|"DataFrame";
 export const LTL_FILTER_OPERATIONS=["eventually","next","four_eyes","different_persons","timestamp_ge","timestamp_le"]as const;
 export type LtlFilterOperation=typeof LTL_FILTER_OPERATIONS[number];
 export function ltlFilterOperations(engine:LtlFilterEngine){return LTL_FILTER_OPERATIONS.filter(operation=>engine==="log"||!operation.startsWith("timestamp_"));}
@@ -12,7 +13,7 @@ export const isLtlHelper=(operation:LtlFilterOperation)=>operation.startsWith("t
 export const ltlUsesCollection=(engine:LtlFilterEngine,operation:LtlFilterOperation)=>operation==="eventually"||engine==="polars"&&(operation==="next"||operation==="four_eyes");
 export const ltlUsesTimestampOrder=(engine:LtlFilterEngine,operation:LtlFilterOperation)=>engine==="polars"&&(operation==="eventually"||operation==="next");
 export interface LtlFilterForm {
-  engine:LtlFilterEngine;operation:LtlFilterOperation;sourceFormat:"auto"|"csv"|"xes"|"native_log";
+  engine:LtlFilterEngine;operation:LtlFilterOperation;sourceFormat:"auto"|"csv"|"xes"|"native_log";polarsInputKind:LtlPolarsInputKind;
   valuesKind:"strings"|"typed";valuesJson:string;typedValuesJson:string;aJson:string;bJson:string;cJson:string;targetJson:string;
   positive:boolean;enableTimestamp:"default"|"true"|"false";boundariesMode:"omitted"|"supplied";boundariesJson:string;
   attributeKeyMode:"default"|"custom";attributeKey:string;caseKeyMode:"default"|"custom";caseKey:string;
@@ -21,12 +22,16 @@ export interface LtlFilterForm {
   csvOptions:boolean;csv:{case_id_column:string;activity_column:string;timestamp_column:string;resource_column:string;delimiter:string};trimFields:boolean;
 }
 export function defaultLtlFilterForm(engine:LtlFilterEngine="log",operation:LtlFilterOperation="eventually"):LtlFilterForm {
-  return {engine,operation,sourceFormat:"auto",valuesKind:"strings",valuesJson:operation==="next"?'["A","B","C"]':'["A","B"]',typedValuesJson:'{"type":"list","value":[{"type":"string","value":"A"},{"type":"string","value":"B"}]}',aJson:'{"type":"string","value":"A"}',bJson:'{"type":"string","value":"B"}',cJson:'{"type":"string","value":"C"}',targetJson:'{"type":"string","value":"A"}',positive:true,enableTimestamp:"default",boundariesMode:"omitted",boundariesJson:'{"type":"list","value":[{"type":"tuple","value":[{"type":"decimal","value":"0"},{"type":"decimal","value":"60"}]}]}',attributeKeyMode:"default",attributeKey:"concept:name",caseKeyMode:"default",caseKey:"case:concept:name",resourceKeyMode:"default",resourceKey:"org:resource",timestampKeyMode:"default",timestampKey:"time:timestamp",activityKeyMode:"default",activityKey:"concept:name",helperAJson:'{"type":"list","value":[{"type":"integer","value":"1"},{"type":"integer","value":"4"}]}',helperBJson:'{"type":"list","value":[{"type":"tuple","value":[{"type":"integer","value":"1"},{"type":"integer","value":"2"}]},{"type":"tuple","value":[{"type":"integer","value":"3"},{"type":"integer","value":"4"}]}]}',csvOptions:false,csv:{case_id_column:"case_id",activity_column:"activity",timestamp_column:"timestamp",resource_column:"resource",delimiter:","},trimFields:false};
+  return {engine,operation,polarsInputKind:"LazyFrame",sourceFormat:"auto",valuesKind:"strings",valuesJson:operation==="next"?'["A","B","C"]':'["A","B"]',typedValuesJson:'{"type":"list","value":[{"type":"string","value":"A"},{"type":"string","value":"B"}]}',aJson:'{"type":"string","value":"A"}',bJson:'{"type":"string","value":"B"}',cJson:'{"type":"string","value":"C"}',targetJson:'{"type":"string","value":"A"}',positive:true,enableTimestamp:"default",boundariesMode:"omitted",boundariesJson:'{"type":"list","value":[{"type":"tuple","value":[{"type":"decimal","value":"0"},{"type":"decimal","value":"60"}]}]}',attributeKeyMode:"default",attributeKey:"concept:name",caseKeyMode:"default",caseKey:"case:concept:name",resourceKeyMode:"default",resourceKey:"org:resource",timestampKeyMode:"default",timestampKey:"time:timestamp",activityKeyMode:"default",activityKey:"concept:name",helperAJson:'{"type":"list","value":[{"type":"integer","value":"1"},{"type":"integer","value":"4"}]}',helperBJson:'{"type":"list","value":[{"type":"tuple","value":[{"type":"integer","value":"1"},{"type":"integer","value":"2"}]},{"type":"tuple","value":[{"type":"integer","value":"3"},{"type":"integer","value":"4"}]}]}',csvOptions:false,csv:{case_id_column:"case_id",activity_column:"activity",timestamp_column:"timestamp",resource_column:"resource",delimiter:","},trimFields:false};
 }
 export function ltlFilterFields(form:LtlFilterForm):Array<[string,string]> {
   if(!["log","pandas","polars"].includes(form.engine)||!ltlFilterOperations(form.engine).includes(form.operation))throw new Error("Choose an available relationship filter.");
   const fields:Array<[string,string]>=[["engine",form.engine],["operation",form.operation]];
   if(isLtlHelper(form.operation)){fields.push(["helper_a_json",form.helperAJson],["helper_b_json",form.helperBJson]);return fields;}
+  if(form.engine==="polars"){
+    if(form.polarsInputKind!=="LazyFrame"&&form.polarsInputKind!=="DataFrame")throw new Error("Choose a Polars DataFrame or LazyFrame input.");
+    fields.push(["input_kind",form.polarsInputKind]);
+  }
   if(![form.attributeKeyMode,form.caseKeyMode,form.resourceKeyMode,form.timestampKeyMode,form.activityKeyMode].every(mode=>mode==="default"||mode==="custom"))throw new Error("Choose default or literal attribute names.");
   fields.push(["positive",String(form.positive)]);
   if(ltlUsesCollection(form.engine,form.operation)){
@@ -54,7 +59,7 @@ export function ltlFilterFields(form:LtlFilterForm):Array<[string,string]> {
 export interface LtlFilterCounts {traces?:number;events?:number;rows?:number;columns?:number;}
 export interface LtlFilterEnvelope {
   family:"REFERENCE_LTL_FILTER";engine:LtlFilterEngine|null;operation:LtlFilterOperation|null;result_kind:"log"|"table"|"helper"|null;
-  http_status:200|400;phase:string;apply_returned:boolean;source_format:string|null;source:LtlFilterCounts|null;result:LtlFilterCounts|null;source_unchanged:boolean|null;
+  http_status:200|400;phase:string;apply_returned:boolean;source_format:string|null;input_kind:LtlPolarsInputKind|null;source:LtlFilterCounts|null;result:LtlFilterCounts|null;source_unchanged:boolean|null;
   activity_key:ReferenceLogFilterNativeString|null;case_id_key:ReferenceLogFilterNativeString|null;attribute_key:ReferenceLogFilterNativeString|null;resource_key:ReferenceLogFilterNativeString|null;timestamp_key:ReferenceLogFilterNativeString|null;
   source_json:ReferenceLogFilterNativeString|null;source_after_json:ReferenceLogFilterNativeString|null;result_json:ReferenceLogFilterNativeString|null;filtered_xes:ReferenceLogFilterNativeString|null;xes_error:ReferenceLogFilterNativeString|null;helper_result_json:ReferenceLogFilterNativeString|null;error_type:ReferenceLogFilterNativeString|null;error:ReferenceLogFilterNativeString|null;
 }
@@ -62,7 +67,7 @@ const object=(value:unknown):value is Record<string,unknown>=>value!==null&&type
 function counts(value:unknown){if(value===null)return true;if(!object(value))return false;const keys=Object.hasOwn(value,"traces")?["traces","events"]:["rows","columns"];return Object.keys(value).length===2&&keys.every(key=>typeof value[key]==="number"&&/^(0|[1-9]\d*)$/.test(String(nativeCell(value,key)))&&BigInt(String(nativeCell(value,key)))<=18446744073709551615n);}
 const nativeFields=["activity_key","case_id_key","attribute_key","resource_key","timestamp_key","source_json","source_after_json","result_json","filtered_xes","xes_error","helper_result_json","error_type","error"]as const;
 export function isLtlFilterEnvelope(value:unknown):value is LtlFilterEnvelope {
-  return object(value)&&Object.keys(value).length===24&&value.family==="REFERENCE_LTL_FILTER"&&(value.engine===null||["log","pandas","polars"].includes(String(value.engine)))&&(value.operation===null||LTL_FILTER_OPERATIONS.includes(value.operation as LtlFilterOperation))&&(value.result_kind===null||["log","table","helper"].includes(String(value.result_kind)))&&(value.http_status===200||value.http_status===400)&&typeof value.phase==="string"&&typeof value.apply_returned==="boolean"&&(value.source_format===null||typeof value.source_format==="string")&&counts(value.source)&&counts(value.result)&&(value.source_unchanged===null||typeof value.source_unchanged==="boolean")&&nativeFields.every(key=>Object.hasOwn(value,key)&&(value[key]===null||isOriginalEmbeddingFilterNativeString(value[key])));
+  return object(value)&&Object.keys(value).length===25&&value.family==="REFERENCE_LTL_FILTER"&&(value.engine===null||["log","pandas","polars"].includes(String(value.engine)))&&(value.operation===null||LTL_FILTER_OPERATIONS.includes(value.operation as LtlFilterOperation))&&(value.result_kind===null||["log","table","helper"].includes(String(value.result_kind)))&&(value.http_status===200||value.http_status===400)&&typeof value.phase==="string"&&typeof value.apply_returned==="boolean"&&(value.source_format===null||typeof value.source_format==="string")&&(value.input_kind===null||value.engine==="polars"&&(value.input_kind==="LazyFrame"||value.input_kind==="DataFrame"))&&counts(value.source)&&counts(value.result)&&(value.source_unchanged===null||typeof value.source_unchanged==="boolean")&&nativeFields.every(key=>Object.hasOwn(value,key)&&(value[key]===null||isOriginalEmbeddingFilterNativeString(value[key])));
 }
 export interface LtlFilterRun {value:LtlFilterEnvelope;sourceFile:File|null;fields:Array<[string,string]>;raw:string;responseBytes:Uint8Array<ArrayBuffer>;}
 export async function requestLtlFilter(sourceFile:File|null,form:LtlFilterForm,signal?:AbortSignal):Promise<LtlFilterRun> {
@@ -74,6 +79,8 @@ export async function requestLtlFilter(sourceFile:File|null,form:LtlFilterForm,s
   const value=await readNativeResponse(new Response(responseBytes),{path:"/api/reference-ltl-filter",fields,reference:supplied?{name:supplied.name,size:supplied.size,last_modified:supplied.lastModified}:undefined});signal?.throwIfAborted();
   if(!isLtlFilterEnvelope(value)||value.http_status!==response.status)throw new Error("The relationship response has an invalid native envelope.");
   if(value.engine!==form.engine&&!(value.http_status===400&&value.engine===null)||value.operation!==form.operation&&!(value.http_status===400&&value.operation===null))throw new Error("The relationship response belongs to another engine or operation.");
+  const expectedKind=form.engine==="polars"?form.polarsInputKind:null;
+  if(value.input_kind!==expectedKind&&!(value.http_status===400&&value.phase==="control"&&value.input_kind===null))throw new Error("The relationship response belongs to another Polars input type.");
   return {value,sourceFile:supplied,fields,raw:nativeResponseJson(value),responseBytes};
 }
 export const LTL_FILTER_ARTIFACTS=["source_json","source_after_json","result_json","filtered_xes","helper_result_json"]as const;
