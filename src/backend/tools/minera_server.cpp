@@ -9,6 +9,7 @@
 #include "minera/table_variants_filter_workbench.hpp"
 #include "minera/table_attributes_filter_workbench.hpp"
 #include "minera/log_attributes_filter_workbench.hpp"
+#include "minera/log_variants_filter_workbench.hpp"
 #include "minera/ltl_filter_workbench.hpp"
 #include "minera/ocel_exact_filter_controls.hpp"
 #include "minera/ocel_activity_type_matching.hpp"
@@ -4141,6 +4142,7 @@ void handle_workflow_discovery(const httplib::Request& request,
 #include "table_variants_filter_route.hpp"
 #include "table_attributes_filter_route.hpp"
 #include "log_attributes_filter_route.hpp"
+#include "log_variants_filter_route.hpp"
 #include "ltl_filter_route.hpp"
 #include "monte_carlo_route.hpp"
 #include "playout_route.hpp"
@@ -10792,6 +10794,7 @@ int main(int argc, char** argv) {
   server.Post("/api/reference-table-variants", handle_table_variants_filter);
   server.Post("/api/reference-table-attributes", handle_table_attributes_filter);
   server.Post("/api/reference-log-attributes", handle_log_attributes_filter);
+  server.Post("/api/reference-log-variants", handle_log_variants_filter);
   server.Post("/api/reference-ltl-filter", handle_reference_ltl_filter);
   server.Options("/api/emd-workbench", preflight);
   server.Post("/api/emd-workbench", handle_original_emd_workbench);
