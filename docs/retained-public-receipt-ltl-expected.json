@@ -1,0 +1,18 @@
+{
+  "schema": "minera-retained-public-receipt-set-check-v1",
+  "derivation": "Independently reconstructed original receipts from all sixteen retained actual banks, asserting every saved original SHA-256 before indexing. Sorted digest lines include LF.",
+  "modules": {
+    "pm4py.algo.filtering.log.ltl.ltl_checker": {
+      "count": 297,
+      "sorted_receipt_sha256": "566c337e8c65cad2a73dc35d9dccfd5bd5d51515660e8dee834e4fbebdb232d3"
+    },
+    "pm4py.algo.filtering.pandas.ltl.ltl_checker": {
+      "count": 429,
+      "sorted_receipt_sha256": "09d3110a437f6ff51870b60b7477377be83ea128f6a8b197e12eb40f357bf39c"
+    },
+    "pm4py.algo.filtering.polars.ltl.ltl_checker": {
+      "count": 675,
+      "sorted_receipt_sha256": "4b777fc6cfbe75bc7c90cf73022160f54b7da02bb8f3a7b5437f2c12082968b1"
+    }
+  }
+}
