@@ -725,5 +725,216 @@ class ObservationInventoryTests(unittest.TestCase):
             self.assertGreater(M.run(manifest, self.events.append, 1, cache_dir=cache)['gaps'], 0)
 
 
+    def key_file(self, key='final-source/own/public.json', origin='C:/untrusted/reference-runtime/original.py'):
+        return {'data': 'FORBIDDEN_FILE_PAYLOAD\\u0041', 'kind': 'file', 'key': key,
+                'origin_path': origin, 'size_bytes': 3, 'sha256': 'a' * 64, 'encoding': 'base64'}
+
+    def key_controls(self, count=1, profile='heuristic-pandas-dispatch-v1'):
+        wrappers = [{'kind': kind, 'key': key} for kind, key in M.KEY_WRAPPER_PROFILES[profile]]
+        return {'schema_review_sha256': M.KEY_WRAPPER_REVIEW_SHA256, 'producer_profile': profile,
+                'expected_file_count': count, 'expected_wrapper_count': len(wrappers),
+                'expected_wrapper_sequence': wrappers}
+
+    def key_wrappers(self, profile='heuristic-pandas-dispatch-v1'):
+        values = {'report': {'FORBIDDEN_PRIVATE_NESTED_KEY': {'result': 'FORBIDDEN_COPIED_RESULT', 'error': 'FORBIDDEN_COPIED_ERROR'}},
+                  'public_cases': [{'FORBIDDEN_PRIVATE_ALIAS_KEY': 'FORBIDDEN_PUBLIC_RESULT'}]}
+        return [{'kind': kind, 'key': key, 'value': values[kind]} for kind, key in M.KEY_WRAPPER_PROFILES[profile]]
+
+    def key_spec(self, rows=None, count=None, profile='heuristic-pandas-dispatch-v1', wrappers=True, **changes):
+        rows = [self.key_file()] if rows is None else rows
+        count = len(rows) if count is None else count
+        values = (self.key_wrappers(profile) if wrappers else []) + rows
+        return self.spec(b'\n'.join(M.canonical(value) for value in values), format='jsonl',
+                         envelope_schema=M.KEY_WRAPPER_SCHEMA, key_wrapper_metadata=self.key_controls(count, profile), **changes)
+
+    def test_key_wrapper_both_profiles_payload_and_nested_keys_stay_opaque(self):
+        original = M.json.loads
+        def loads(raw, *args, **kwargs):
+            if b'FORBIDDEN' in (raw.encode() if isinstance(raw, str) else raw):
+                raise AssertionError('private payload or nested key was JSON-unescaped')
+            return original(raw, *args, **kwargs)
+        for profile in M.KEY_WRAPPER_PROFILES:
+            with self.subTest(profile=profile):
+                self.events.clear()
+                spec = self.key_spec(profile=profile)
+                with patch.object(M.json, 'loads', loads), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+                    report = self.run_source(spec, 1)
+                expected_wrappers = len(M.KEY_WRAPPER_PROFILES[profile])
+                self.assertEqual(report['counts'], {'header_candidate': expected_wrappers, 'gap': expected_wrappers, 'member': 1, 'container_structure': 1})
+                event = next(event for event in self.events if event['kind'] == 'member')
+                self.assertTrue(event['metadata_valid'])
+                self.assertEqual(event['path'], 'final-source/own/public.json')
+                self.assertEqual(event['origin_path_provenance'], 'C:/untrusted/reference-runtime/original.py')
+                self.assertTrue(event['origin_path_is_provenance_only'])
+                self.assertEqual(event['identity_scope'], 'logical-member')
+                self.assertTrue(event['source_file_identity_unavailable'])
+                for field in ['admitted', 'payload_hash_verified', 'whole_source_file_binding_verified', 'whole_source_file_mapping_complete']:
+                    self.assertFalse(event[field])
+                self.assertNotIn('FORBIDDEN', json.dumps(self.events))
+                candidates = [event for event in self.events if event['kind'] == 'header_candidate']
+                self.assertTrue(all(event['possible_historical_entry_evidence'] and not event['complete_original_receipts_available'] for event in candidates))
+                self.assertTrue(next(event for event in self.events if event['kind'] == 'container_structure')['declared_count_sequence_uniqueness_valid'])
+                self.assertFalse(report['admission_complete'])
+
+    def test_key_wrapper_origin_never_opens_or_selects_source_path(self):
+        origin = str(self.root / 'DO-NOT-OPEN-private-origin.py')
+        value = self.key_file('head-source/logical-alias.json', origin)
+        spec = self.key_spec([value])
+        old_open = Path.open
+        def opened(path, *args, **kwargs):
+            if str(path) == origin:
+                raise AssertionError('origin_path followed')
+            return old_open(path, *args, **kwargs)
+        with patch.object(Path, 'open', opened):
+            self.assertEqual(self.run_source(spec)['gaps'], 1)
+        event = next(event for event in self.events if event['kind'] == 'member')
+        self.assertEqual(event['path'], value['key'])
+        self.assertEqual(event['origin_path_provenance'], origin)
+        self.assertTrue(event['source_file_identity_unavailable'])
+
+    def test_key_wrapper_guards_reject_before_parser_or_any_source_hash(self):
+        base = self.key_spec()
+        variants = [{'layout': 'envelope'}, {'layout': 'records'}, {'members': [{'path': 'own/x.json'}]},
+                    {'format': 'json'}, {'key_wrapper_metadata': {}}, {'provenance': 'unknown'}]
+        control = base['key_wrapper_metadata']
+        variants += [{'key_wrapper_metadata': control | value} for value in [
+            {'schema_review_sha256': '0' * 64}, {'producer_profile': 'unknown'}, {'producer_profile': []},
+            {'expected_file_count': True}, {'expected_file_count': -1}, {'expected_file_count': 1.5},
+            {'expected_wrapper_count': True}, {'expected_wrapper_count': 2},
+            {'expected_wrapper_sequence': []}, {'expected_wrapper_sequence': [{'kind': 'report', 'key': 'unknown'}]}, {'extra': 1}]]
+        for change in variants:
+            bad = base | change
+            with self.subTest(change=change), patch.object(M, 'Parser', side_effect=AssertionError('parser created')), patch.object(M, 'hash_file', side_effect=AssertionError('source read')), patch.object(M.Inventory, 'source', side_effect=AssertionError('source entered')):
+                with self.assertRaises(ValueError):
+                    M.Inventory(self.events.append).parse(io.BytesIO(b'FORBIDDEN'), bad)
+                self.assertGreater(self.run_source(bad)['gaps'], 0)
+
+    def test_key_wrapper_exact_fields_kinds_types_aliases_and_entry_flags(self):
+        value = self.key_file()
+        changes = [{'size_bytes': True}, {'size_bytes': -1}, {'size_bytes': 1.5}, {'size_bytes': '3'},
+                   {'origin_path': None}, {'origin_path': ''}, {'origin_path': {'FORBIDDEN_PRIVATE_KEY': 'unknown'}},
+                   {'key': None}, {'key': '../x'}, {'key': '/x'}, {'key': 'C:/x'}, {'key': 'a\\b'},
+                   {'sha256': 'A' * 64}, {'sha256': None}, {'encoding': 'utf8'}, {'kind': 'unknown'},
+                   {'data': {'FORBIDDEN_NESTED_DATA': 'value'}}, {'path': 'alias.json'}, {'name': 'alias.json'},
+                   {'bytes': 3}, {'chunk': 0}, {'extra': 1}, {'module': MODULE, 'function': 'apply', 'result': None}, {'apply_returned': True}]
+        rows = [value | change for change in changes] + [{k: v for k, v in value.items() if k != field} for field in value]
+        for row_value in rows:
+            self.events.clear()
+            with self.subTest(value=row_value), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+                report = self.run_source(self.key_spec([row_value]), 1)
+            self.assertGreater(report['gaps'], 1)
+            self.assertFalse(next(event for event in self.events if event['kind'] == 'container_structure')['declared_count_sequence_uniqueness_valid'])
+        self.events.clear()
+        report = self.run_source(self.key_spec([self.key_file('pm4py/private.json')]))
+        self.assertEqual(report['gaps'], 1)
+        event = next(event for event in self.events if event['kind'] == 'member')
+        self.assertTrue(event['metadata_valid'])
+        self.assertEqual(event['path_disposition'], 'excluded-path')
+        self.assertFalse(event['admitted'])
+
+    def test_key_wrapper_file_count_wrapper_order_uniqueness_and_empty_profile(self):
+        value = self.key_file()
+        for rows, count, wrappers in [([value], 2, True), ([value, value], 2, True), ([value], 1, False), ([], 0, False), ([['FORBIDDEN_UNKNOWN_ROW']], 1, True)]:
+            self.events.clear()
+            with self.subTest(rows=rows, count=count, wrappers=wrappers):
+                report = self.run_source(self.key_spec(rows, count, wrappers=wrappers), 1)
+                self.assertGreater(report['gaps'], int(wrappers))
+                self.assertFalse(next(event for event in self.events if event['kind'] == 'container_structure')['declared_count_sequence_uniqueness_valid'])
+        self.events.clear()
+        self.assertEqual(self.run_source(self.key_spec([], 0))['gaps'], 1)
+        self.assertTrue(next(event for event in self.events if event['kind'] == 'container_structure')['declared_count_sequence_uniqueness_valid'])
+        profile = 'plusplus-petri-producer-v1'
+        for mutation in ['swapped', 'late', 'duplicate', 'missing']:
+            wrappers = self.key_wrappers(profile)
+            rows = {'swapped': list(reversed(wrappers)) + [value], 'late': [value] + wrappers,
+                    'duplicate': wrappers + [wrappers[0], value], 'missing': [wrappers[0], value]}[mutation]
+            self.events.clear()
+            spec = self.spec(b'\n'.join(M.canonical(v) for v in rows), format='jsonl', envelope_schema=M.KEY_WRAPPER_SCHEMA, key_wrapper_metadata=self.key_controls(1, profile))
+            self.assertGreater(self.run_source(spec, 1)['gaps'], 2)
+            self.assertFalse(next(event for event in self.events if event['kind'] == 'container_structure')['declared_count_sequence_uniqueness_valid'])
+
+    def test_key_wrapper_unknown_or_partial_outcome_wrappers_remain_gaps(self):
+        variants = [{'kind': 'report', 'key': 'unknown', 'value': {'result': 'FORBIDDEN_RESULT'}},
+                    {'kind': 'metadata', 'key': 'public-entry-point-acceptance', 'value': {'error': 'FORBIDDEN_ERROR'}},
+                    {'kind': 'report', 'key': 'public-entry-point-acceptance', 'value': 'FORBIDDEN_SCALAR'},
+                    {'kind': 'report', 'key': 'public-entry-point-acceptance', 'value': {'error': None}, 'apply_returned': True}]
+        for value in variants:
+            self.events.clear()
+            spec = self.spec(M.canonical(value), format='jsonl', envelope_schema=M.KEY_WRAPPER_SCHEMA, key_wrapper_metadata=self.key_controls(0))
+            report = self.run_source(spec, 1)
+            self.assertGreater(report['gaps'], 1)
+            event = next(event for event in self.events if event['kind'] == 'header_candidate')
+            self.assertFalse(event['metadata_valid'])
+            self.assertFalse(event['admitted'])
+            self.assertTrue(event['possible_historical_entry_evidence'])
+            self.assertNotIn('record', report['counts'])
+            self.assertNotIn('FORBIDDEN', json.dumps(self.events))
+
+    def test_key_wrapper_opaque_nonfinite_json_is_rejected_and_outer_duplicates_fail(self):
+        controls = self.key_controls(0)
+        for scalar in [b'NaN', b'Infinity', b'-Infinity', b'1e999']:
+            raw = b'{"kind":"report","key":"public-entry-point-acceptance","value":{"FORBIDDEN_PRIVATE_KEY":' + scalar + b'}}'
+            with self.subTest(scalar=scalar), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')):
+                spec = self.spec(raw, format='jsonl', envelope_schema=M.KEY_WRAPPER_SCHEMA, key_wrapper_metadata=controls)
+                self.assertGreater(self.run_source(spec, 1)['gaps'], 0)
+        raw = b'{"kind":"report","kind":"report","key":"public-entry-point-acceptance","value":{}}'
+        self.events.clear()
+        spec = self.spec(raw, format='jsonl', envelope_schema=M.KEY_WRAPPER_SCHEMA, key_wrapper_metadata=controls)
+        self.assertGreater(self.run_source(spec, 1)['gaps'], 0)
+        self.assertTrue(any('duplicate envelope key' in event.get('reason', '') for event in self.events))
+
+    def test_key_wrapper_large_data_and_value_keep_bounded_memory_and_nested_keys_opaque(self):
+        body = ('FORBIDDEN\\n\\u0041' * 250000).encode()
+        raw = b'{"kind":"report","key":"public-entry-point-acceptance","value":{"FORBIDDEN_PRIVATE_KEY":"' + body + b'"}}'
+        inventory = M.Inventory(self.events.append, chunk_size=4096)
+        stream = BoundedStream(raw, 4096)
+        spec = {'layout': 'discover', 'format': 'jsonl', 'provenance': 'own-container',
+                'envelope_schema': M.KEY_WRAPPER_SCHEMA, 'key_wrapper_metadata': self.key_controls(0)}
+        with patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+            tracemalloc.start()
+            try:
+                inventory.parse(stream, spec)
+                peak = tracemalloc.get_traced_memory()[1]
+            finally:
+                tracemalloc.stop()
+        self.assertLess(peak, 2 * 1024 * 1024)
+        self.assertLessEqual(stream.largest, 4096)
+        self.assertEqual(inventory.gaps, 1)
+        self.assertNotIn('FORBIDDEN', json.dumps(self.events))
+
+    def test_key_wrapper_cache_is_exact_controls_and_source_identity_are_bound(self):
+        owned = Path(__file__).resolve().parents[1] / 'test-work'
+        owned.mkdir(exist_ok=True)
+        temporary = tempfile.TemporaryDirectory(prefix='key-cache-', dir=owned)
+        self.addCleanup(temporary.cleanup)
+        cache = Path(temporary.name) / 'cache'
+        spec = self.key_spec(profile='plusplus-petri-producer-v1')
+        manifest = {'schema': M.MANIFEST, 'root': str(self.root), 'scope': 'synthetic key wrapper cache', 'sources': [spec]}
+        first = M.run(manifest, self.events.append, 1, cache_dir=cache)
+        original = list(self.events)
+        self.events.clear()
+        moved = self.root / 'build/moved-key.jsonl'
+        moved.write_bytes((self.root / spec['path']).read_bytes())
+        moved_spec = spec | {'path': 'build/moved-key.jsonl'}
+        manifest['sources'] = [moved_spec]
+        with patch.object(M.Inventory, 'parse', side_effect=AssertionError('cache miss')):
+            second = M.run(manifest, self.events.append, 1, cache_dir=cache)
+        self.assertEqual(first['gaps'], second['gaps'])
+        observed = [event for event in self.events if event['kind'] != 'cache_hit']
+        expected = [event | {'source': moved_spec['path']} for event in original]
+        self.assertEqual(observed, expected)
+        self.assertRegex(next(event['cache_key'] for event in self.events if event['kind'] == 'cache_hit'), r'^[0-9a-f]{64}$')
+        self.assertNotIn('FORBIDDEN', next(cache.glob('*.jsonl')).read_text())
+        self.events.clear()
+        changed = moved_spec | {'key_wrapper_metadata': spec['key_wrapper_metadata'] | {'expected_file_count': 2}}
+        manifest['sources'] = [changed]
+        self.assertGreater(M.run(manifest, self.events.append, 1, cache_dir=cache)['gaps'], first['gaps'])
+        self.assertFalse(any(event['kind'] == 'cache_hit' for event in self.events))
+        manifest['sources'] = [moved_spec]
+        moved.write_bytes(b'changed')
+        with patch.object(M.Inventory, 'parse', side_effect=AssertionError('changed source parsed')):
+            self.assertGreater(M.run(manifest, self.events.append, 1, cache_dir=cache)['gaps'], 0)
+
+
 if __name__ == '__main__':
     unittest.main()

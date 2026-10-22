@@ -73,6 +73,12 @@ PAYLOAD_KEYS = {'utf8', 'data', 'base64'}
 CHUNK_SCHEMAS = {'offset-full-member-base64-chunks-v1', 'indexed-base64-chunks-v1'}
 FOUR_FIELD_SCHEMA = 'name-data-base64-four-field-members-v1'
 FOUR_FIELD_REVIEW_SHA256 = '7838dca3aaa3b0eb18676ce476a2126d1a04ab7c1a9ee9f3814d5af320bfef08'
+KEY_WRAPPER_SCHEMA = 'key-origin-size-base64-members-v1'
+KEY_WRAPPER_REVIEW_SHA256 = '7df2a2270cbc8740749bea3b4044d86a195cb2d17dd9115342674757776a3b02'
+KEY_WRAPPER_PROFILES = {
+    'heuristic-pandas-dispatch-v1': [('report', 'public-entry-point-acceptance')],
+    'plusplus-petri-producer-v1': [('report', 'acceptance'), ('public_cases', 'saved-75-public-aliases')],
+}
 CHUNK_SIZE = 8 * 1024 * 1024
 POSSIBLE_CALL_KEYS = {'receipt', 'receipt_sha256', 'function', 'method', 'module',
                       'result', 'error', 'value_result', 'result_value', 'output',
@@ -98,6 +104,32 @@ def require_four_field_spec(spec):
             or type(control.get('expected_member_count')) is not int
             or control['expected_member_count'] < 0):
         raise ValueError('four-field schema requires explicit reviewed header/count metadata controls')
+
+
+def require_key_wrapper_spec(spec):
+    if spec.get('envelope_schema') != KEY_WRAPPER_SCHEMA:
+        return
+    if spec.get('layout') != 'discover' or spec.get('members'):
+        raise ValueError('key-wrapper schema is metadata discovery only; member admission is unavailable')
+    if spec.get('format') not in {'jsonl', 'gzip-jsonl'}:
+        raise ValueError('key-wrapper schema requires JSONL transport')
+    if spec.get('provenance') not in {'own-container', 'own-public-observation'}:
+        raise ValueError('key-wrapper schema requires explicit own-container provenance')
+    control = spec.get('key_wrapper_metadata')
+    fields = {'schema_review_sha256', 'producer_profile', 'expected_file_count',
+              'expected_wrapper_count', 'expected_wrapper_sequence'}
+    if not isinstance(control, dict) or set(control) != fields:
+        raise ValueError('key-wrapper schema requires exact explicit profile/count/sequence controls')
+    profile = control.get('producer_profile')
+    if not isinstance(profile, str) or profile not in KEY_WRAPPER_PROFILES:
+        raise ValueError('unknown reviewed key-wrapper producer profile')
+    expected = [{'kind': kind, 'key': key} for kind, key in KEY_WRAPPER_PROFILES[profile]]
+    if (control.get('schema_review_sha256') != KEY_WRAPPER_REVIEW_SHA256
+            or type(control.get('expected_file_count')) is not int or control['expected_file_count'] < 0
+            or type(control.get('expected_wrapper_count')) is not int
+            or control['expected_wrapper_count'] != len(expected)
+            or control.get('expected_wrapper_sequence') != expected):
+        raise ValueError('key-wrapper review/profile/count/sequence controls do not match reviewed definitions')
 
 
 def canonical(value):
@@ -673,9 +705,84 @@ class Inventory:
         for reason in reasons:
             self.gap(reason, ordinal=ordinal, member=name)
 
+    def key_wrapper_metadata(self, ordinal, spec, metadata, keys, payload_types):
+        state = self.key_wrapper_state
+        control = spec['key_wrapper_metadata']
+        kind, key = metadata.get('kind'), metadata.get('key')
+        if 'value' in keys or kind in {'report', 'public_cases'}:
+            expected = control['expected_wrapper_sequence']
+            position = len(state['wrappers'])
+            candidate = {'kind': kind, 'key': key}
+            state['wrappers'].append(candidate)
+            value_type = 'json-array' if kind == 'public_cases' else 'json-object' if kind == 'report' else None
+            valid = (keys == {'kind', 'key', 'value'} and payload_types == {'value': value_type}
+                     and position < len(expected) and candidate == expected[position]
+                     and ordinal == position + 1 and state['files'] == 0
+                     and not (keys & POSSIBLE_CALL_KEYS))
+            state['wrapper_valid'] = state['wrapper_valid'] and valid
+            self.event('header_candidate', ordinal=ordinal, envelope_schema=KEY_WRAPPER_SCHEMA,
+                       envelope_keys=sorted(keys), wrapper_kind=kind, wrapper_key=key,
+                       payload_fields=payload_types, metadata_valid=valid, admitted=False,
+                       payload_hash_verified=False, possible_historical_entry_evidence=True,
+                       complete_original_receipts_available=False,
+                       possible_call_fields=sorted(keys & POSSIBLE_CALL_KEYS))
+            self.gap('key-wrapper report/public_cases value remains opaque unresolved historical evidence', ordinal=ordinal)
+            if not valid:
+                self.gap('key-wrapper kind/key/fields/order do not match explicit wrapper sequence', ordinal=ordinal)
+            return
+        state['files'] += 1
+        reasons = []
+        disposition = 'unknown'
+        if isinstance(key, str):
+            try:
+                safe_path(key)
+                disposition = 'safe-relative-path'
+            except ValueError as error:
+                disposition = 'excluded-path' if 'excluded' in str(error) else 'unsafe-path'
+                if disposition == 'unsafe-path':
+                    reasons.append('unsafe key-wrapper logical member path')
+        else:
+            reasons.append('key-wrapper logical key absent or not a string')
+        seen = self.seen_members.setdefault(self.context.get('source'), set())
+        if isinstance(key, str):
+            if key in seen:
+                reasons.append('duplicate key-wrapper logical member key')
+            seen.add(key); state['names'].add(key)
+        if keys != {'kind', 'key', 'origin_path', 'size_bytes', 'sha256', 'encoding', 'data'}:
+            reasons.append('key-wrapper file fields do not match exact producer schema')
+        if kind != 'file' or metadata.get('encoding') != 'base64':
+            reasons.append('key-wrapper file requires kind=file and encoding=base64')
+        if payload_types != {'data': 'string'}:
+            reasons.append('key-wrapper data must remain an opaque base64 string')
+        size, sha, origin = metadata.get('bytes'), metadata.get('sha256'), metadata.get('origin_path')
+        if type(size) is not int or size < 0:
+            reasons.append('key-wrapper logical size_bytes must be a nonnegative integer')
+        if not isinstance(sha, str) or not re.fullmatch('[0-9a-f]{64}', sha):
+            reasons.append('key-wrapper logical SHA-256 declaration absent')
+        if not isinstance(origin, str) or not origin:
+            reasons.append('key-wrapper origin_path must be a provenance string')
+        if keys & POSSIBLE_CALL_KEYS:
+            reasons.append('key-wrapper file has unexpected call/entry evidence')
+        if len(state['wrappers']) != control['expected_wrapper_count']:
+            reasons.append('key-wrapper file precedes the complete expected wrapper sequence')
+        state['file_metadata_valid'] = state['file_metadata_valid'] and not reasons
+        self.event('member', ordinal=ordinal, path=key, bytes=size, sha256=sha,
+                   envelope_schema=KEY_WRAPPER_SCHEMA, envelope_keys=sorted(keys),
+                   payload_fields=payload_types, path_disposition=disposition,
+                   metadata_valid=not reasons, admitted=False, payload_hash_verified=False,
+                   original_size_unavailable=type(size) is not int, identity_scope='logical-member',
+                   declared_logical_member_bytes=size, declared_logical_member_sha256=sha,
+                   logical_member_kind='logical-member', source_file_identity_unavailable=True,
+                   whole_source_file_binding_verified=False, whole_source_file_mapping_complete=False,
+                   origin_path_provenance=origin, origin_path_is_provenance_only=True)
+        for reason in reasons:
+            self.gap(reason, ordinal=ordinal, member=key)
+
     def envelope(self, parser, ordinal, spec, discovery=False):
         if parser.r.peek() != 123:
-            parser.opaque_value() if spec.get('envelope_schema') == FOUR_FIELD_SCHEMA else parser.value(False)
+            parser.opaque_value() if spec.get('envelope_schema') in {FOUR_FIELD_SCHEMA, KEY_WRAPPER_SCHEMA} else parser.value(False)
+            if spec.get('envelope_schema') == KEY_WRAPPER_SCHEMA:
+                self.key_wrapper_state['unknown_rows'] += 1
             self.gap('archive envelope member is not an object', ordinal=ordinal)
             return
         parser.r.byte()
@@ -687,7 +794,9 @@ class Inventory:
         chunk_schema = spec.get('envelope_schema') in CHUNK_SCHEMAS
         utf8_schema = spec.get('envelope_schema') == 'utf8-name-text-members-v1'
         four_field = spec.get('envelope_schema') == FOUR_FIELD_SCHEMA
-        payload_keys = PAYLOAD_KEYS | ({'data_base64'} if legacy or four_field else set()) | ({'text'} if utf8_schema else set())
+        key_wrapper = spec.get('envelope_schema') == KEY_WRAPPER_SCHEMA
+        opaque_profile = four_field or key_wrapper
+        payload_keys = PAYLOAD_KEYS | ({'data_base64'} if legacy or four_field else set()) | ({'text'} if utf8_schema else set()) | ({'value'} if key_wrapper else set())
         admitted = {member['path']: member for member in spec.get('members', [])}
         try:
             parser.r.whitespace()
@@ -701,31 +810,36 @@ class Inventory:
                     parser.r.expect(58)
                     parser.r.whitespace()
                     if key in payload_keys:
-                        payload_types[key] = 'string' if parser.r.peek() == 34 else 'nested-json'
-                        preserve = not discovery and not utf8_schema and not four_field and ('path' not in metadata or metadata.get('path') in admitted)
-                        if parser.r.peek() == 34:
-                            raw = tempfile.SpooledTemporaryFile(max_size=65536) if preserve else None
-                            if raw is not None:
-                                payloads[key] = raw
-                            parser.string(sink=raw)
+                        if key_wrapper:
+                            token = parser.r.peek()
+                            payload_types[key] = ('string' if token == 34 else 'json-object' if token == 123 else 'json-array' if token == 91 else 'json-scalar')
+                            parser.opaque_value()
                         else:
-                            parser.opaque_value() if four_field else parser.value(False)
-                    elif key in {'path', 'sha256', 'encoding', 'schema', 'kind'} or ((legacy or utf8_schema or four_field) and key == 'name') or (chunk_schema and key in {'member', 'file_sha256'}) or (utf8_schema and key in {'group', 'inventory_sha256'}) or (four_field and key == 'type'):
+                            payload_types[key] = 'string' if parser.r.peek() == 34 else 'nested-json'
+                            preserve = not discovery and not utf8_schema and not four_field and ('path' not in metadata or metadata.get('path') in admitted)
+                            if parser.r.peek() == 34:
+                                raw = tempfile.SpooledTemporaryFile(max_size=65536) if preserve else None
+                                if raw is not None:
+                                    payloads[key] = raw
+                                parser.string(sink=raw)
+                            else:
+                                parser.opaque_value() if four_field else parser.value(False)
+                    elif key in {'path', 'sha256', 'encoding', 'schema', 'kind'} or ((legacy or utf8_schema or four_field) and key == 'name') or (chunk_schema and key in {'member', 'file_sha256'}) or (utf8_schema and key in {'group', 'inventory_sha256'}) or (four_field and key == 'type') or (key_wrapper and key in {'key', 'origin_path'}):
                         metadata_key = 'path' if (legacy or utf8_schema or four_field) and key == 'name' or chunk_schema and key == 'member' else key
                         if parser.r.peek() == 34:
                             metadata[metadata_key] = parser.string(materialize=True)
                         else:
-                            parser.opaque_value() if four_field else parser.value(False)
+                            parser.opaque_value() if opaque_profile else parser.value(False)
                             metadata[metadata_key] = None
-                    elif key == 'bytes' or (legacy and key == 'schema_version') or (chunk_schema and key in {'offset', 'chunk', 'chunks'}) or (utf8_schema and key in {'byte_count', 'version', 'members', 'member_count', 'total_member_bytes'}) or (four_field and key in {'byte_count', 'member_count'}):
-                        metadata_key = 'bytes' if (utf8_schema or four_field) and key == 'byte_count' else key
+                    elif key == 'bytes' or (legacy and key == 'schema_version') or (chunk_schema and key in {'offset', 'chunk', 'chunks'}) or (utf8_schema and key in {'byte_count', 'version', 'members', 'member_count', 'total_member_bytes'}) or (four_field and key in {'byte_count', 'member_count'}) or (key_wrapper and key == 'size_bytes'):
+                        metadata_key = 'bytes' if (utf8_schema or four_field) and key == 'byte_count' or key_wrapper and key == 'size_bytes' else key
                         if parser.r.peek() in b'-0123456789' if parser.r.peek() is not None else False:
                             metadata[metadata_key] = parser.value()
                         else:
-                            parser.opaque_value() if four_field else parser.value(False)
+                            parser.opaque_value() if opaque_profile else parser.value(False)
                             metadata[metadata_key] = None
                     else:
-                        parser.opaque_value() if four_field else parser.value(False)
+                        parser.opaque_value() if opaque_profile else parser.value(False)
                     parser.r.whitespace()
                     sep = parser.r.byte()
                     if sep == 125:
@@ -736,6 +850,9 @@ class Inventory:
             else:
                 parser.r.byte()
             name = metadata.get('path')
+            if key_wrapper:
+                self.key_wrapper_metadata(ordinal, spec, metadata, keys, payload_types)
+                return
             if four_field:
                 self.four_field_metadata(ordinal, spec, metadata, keys, payload_types)
                 return
@@ -934,7 +1051,12 @@ class Inventory:
             self.gap('unknown top-level object structure; no automatic admission')
 
     def parse(self, stream, spec):
+        require_key_wrapper_spec(spec)
         require_four_field_spec(spec)
+        key_wrapper = spec.get('envelope_schema') == KEY_WRAPPER_SCHEMA
+        if key_wrapper:
+            self.key_wrapper_state = {'files': 0, 'names': set(), 'wrappers': [], 'wrapper_valid': True,
+                                      'file_metadata_valid': True, 'unknown_rows': 0}
         four_field = spec.get('envelope_schema') == FOUR_FIELD_SCHEMA
         if four_field:
             self.four_field_state = {'headers': 0, 'header_valid': False, 'rows': 0, 'names': set()}
@@ -987,6 +1109,19 @@ class Inventory:
                            historical_audit_complete=False, payload_hash_verified=False)
                 if not valid:
                     self.gap('four-field EOF header/member count or uniqueness mismatch')
+            if key_wrapper:
+                state, control = self.key_wrapper_state, spec['key_wrapper_metadata']
+                valid = (state['files'] == control['expected_file_count'] == len(state['names'])
+                         and state['wrappers'] == control['expected_wrapper_sequence']
+                         and state['wrapper_valid'] and state['file_metadata_valid'] and not state['unknown_rows'])
+                self.event('container_structure', envelope_schema=KEY_WRAPPER_SCHEMA,
+                           declared_expected_file_count=control['expected_file_count'], observed_file_rows=state['files'],
+                           observed_unique_member_names=len(state['names']), observed_wrapper_rows=len(state['wrappers']),
+                           expected_wrapper_sequence=control['expected_wrapper_sequence'],
+                           declared_count_sequence_uniqueness_valid=valid, admitted=False,
+                           historical_audit_complete=False, payload_hash_verified=False)
+                if not valid:
+                    self.gap('key-wrapper EOF file count, wrapper sequence, metadata or uniqueness mismatch')
             return
         parser.r.whitespace()
         token = parser.r.peek()
@@ -1135,11 +1270,13 @@ def run(manifest, emit, chunk_size=65536, max_record_bytes=64 * 1024 * 1024, cac
     paths = [source['path'] for source in manifest['sources']]
     if len(set(paths)) != len(paths):
         raise ValueError('duplicate source path')
+    key_sources_ready = set()
     for spec in manifest['sources']:
         try:
             members = spec.get('members', [])
+            require_key_wrapper_spec(spec)
             require_four_field_spec(spec)
-            if spec.get('envelope_schema') not in {None, 'legacy-name-data-base64-v1', 'utf8-name-text-members-v1', FOUR_FIELD_SCHEMA} | CHUNK_SCHEMAS:
+            if spec.get('envelope_schema') not in {None, 'legacy-name-data-base64-v1', 'utf8-name-text-members-v1', FOUR_FIELD_SCHEMA, KEY_WRAPPER_SCHEMA} | CHUNK_SCHEMAS:
                 raise ValueError('unknown explicit envelope schema')
             if spec.get('envelope_schema') in CHUNK_SCHEMAS and (spec.get('layout') != 'discover' or members):
                 raise ValueError('chunk schema is metadata discovery only; explicit reassembly is unavailable')
@@ -1150,11 +1287,15 @@ def run(manifest, emit, chunk_size=65536, max_record_bytes=64 * 1024 * 1024, cac
                 require_declared_binding(member)
             if len(set(names)) != len(names):
                 raise ValueError('duplicate member allowlist path')
+            if spec.get('envelope_schema') == KEY_WRAPPER_SCHEMA:
+                key_sources_ready.add(spec['path'])
             inventory.source(root, spec, Path(cache_dir) if cache_dir else None)
         except (ValueError, TypeError, KeyError, OSError, EOFError, UnicodeError) as error:
             inventory.context = {'source': spec.get('path')}
             inventory.gap(str(error))
     for spec in manifest['sources']:
+        if spec.get('envelope_schema') == KEY_WRAPPER_SCHEMA and spec.get('path') not in key_sources_ready:
+            continue  # rejected controls/admission must precede every source read
         try:
             require_binding(hash_file(resolve_source(root, spec['path'])), spec)
         except (ValueError, TypeError, KeyError, OSError) as error:
