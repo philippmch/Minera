@@ -30,6 +30,25 @@ bytes and saved SHA-256 are reconstructed without changing operands or call
 shape. Unknown schemas and incomplete source snapshots become blocking gaps.
 Adding another observer requires an independently validated adapter and tests.
 
+The separate `log-attributes-packed-v1` adapter requires receipt schema
+`minera-log-attributes-observer-receipt-v1`. It is closed to the exact LOG
+attributes module, its eight reviewed functions and observed positional
+arities. Sharing `positional_args_keyword_controls` with LOG LTL does not select
+this adapter. Complete ordered typed arguments, keyword entries, enum identities,
+log snapshots and cache trace snapshots remain in the original canonical bytes.
+Each non-null `source_trace_index` must match its corresponding before/after
+source trace. Unknown descriptors, incomplete snapshots, conflicting enum values
+and malformed outcome or mutation metadata are gaps.
+
+Terminal records require complete source/control before and after, full returned
+logs or errors, warnings and captured result alias metadata. Aggregate control
+changes can include aliases to source mutations; they do not prove independent
+cache changes. Full plans and lightweight intents retain the index's separate
+historical semantics. Possible terminal evidence cannot become a plan, and
+after-state evidence remains reserved as an entry. Matching intents resolve only
+against exact validated receipts in the same schema and reference/runtime
+partition. This adapter grants no new observation provenance or reference entry.
+
 JSON, JSONL, gzip JSON/JSONL and explicitly allowlisted archive members are
 supported. Recognized members carry either base64 or retained UTF-8 text plus
 exact size and SHA-256. Unlisted members are recorded without decoding and are
@@ -66,6 +85,24 @@ indexing; the expected sorted digest-set hashes are committed separately.
 Archive indexing, flat-bank indexing and incremental archive copies preserve
 those exact sets. Successful helper scalar returns are included. Plans and
 intents retain separate provenance rather than inflating the actual-call count.
+
+Root separately admitted six complete flat LOG attributes banks for bounded
+offline parsing. Two standard-library census implementations reconstructed all
+280 original receipt hashes across eight functions: 182 returned logs, 98 full
+errors, zero warnings, 162 source changes and 165 aggregate control changes.
+Their sorted original receipt-set SHA-256 is
+`ec5330eb47c1a4611d4790d94a02178cde7e914b48d6f5be6c9b93a5fe88a597`.
+The second implementation confirms 16 keyword-control changes in maximum-activity
+calls, three without source changes, and complete before/after source trace
+membership metadata. It is a separate code path by the first helper's author;
+it does not substitute for an independent reviewer. These flat-bank admissions
+do not extend the committed three-archive LTL manifest. The new synthetic test
+module is `scripts.tests.test_retained_public_receipt_log_attributes`. Root ran
+all 41 tests (25 existing integrity tests, the committed-archive integration
+test and 15 attributes tests). A fresh flat-bank index reconstructs all 280
+canonical receipts, resolves all 280 exact intents and reports zero gaps. A
+second generation rehashes all twelve sources and reports twelve cache hits.
+This acceptance covers only those explicitly admitted flat files.
 
 Twenty-five synthetic integrity tests and one committed-archive integration test
 pass. The integration test checks all original digest sets, canonical bytes,

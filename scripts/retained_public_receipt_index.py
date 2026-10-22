@@ -21,8 +21,8 @@ certificate covers only this explicit inventory and previously indexed history;
 it never certifies a directory tree, all archives, or reference parity. Missing
 schemas/operands/pins remain gaps, never reconstructed by guessing. Cache hits
 still require a fresh full container hash. Database history is append-only.
-Currently the closed receipt adapters admit only the three versioned LTL
-observer schemas listed in SCHEMAS. New observer families require an explicit
+The closed receipt adapters admit the three versioned LTL observer schemas and
+the separate LOG attributes observer listed in SCHEMAS. New families require an explicit
 adapter/schema addition with operand-form and canonicalization validation.
 """
 
@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import datetime
 import gzip
 import hashlib
 import json
@@ -45,6 +46,23 @@ SCHEMAS = {
     'receipt-v1': ('minera-log-ltl-observer-receipt-v1', 'positional_args_keyword_controls'),
     'pandas-before-v1': ('minera-pandas-ltl-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
     'polars-receipt-v1': ('minera-polars-ltl-observer-receipt-v1', 'source_positional_all_options_keyword'),
+    'log-attributes-packed-v1': ('minera-log-attributes-observer-receipt-v1', 'positional_args_keyword_controls'),
+}
+LOG_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.log.attributes.attributes_filter'
+LOG_ATTRIBUTES_ARITIES = {
+    'apply': {2}, 'apply_events': {2}, 'apply_trace_attribute': {2},
+    'apply_numeric': {3}, 'apply_numeric_events': {3},
+    'filter_log_by_attributes_threshold': {5, 6},
+    'filter_log_on_max_no_activities': {1, 2},
+    'filter_log_relative_occurrence_event_attribute': {2},
+}
+LOG_ATTRIBUTES_ENUM = {
+    'ATTRIBUTE_KEY': 'pm4py:param:attribute_key', 'ACTIVITY_KEY': 'pm4py:param:activity_key',
+    'CASE_ID_KEY': 'pm4py:param:case_id_key', 'PARAMETER_KEY_CASE_GLUE': 'case_id_glue',
+    'DECREASING_FACTOR': 'decreasingFactor', 'POSITIVE': 'positive',
+    'STREAM_FILTER_KEY1': 'stream_filter_key1', 'STREAM_FILTER_VALUE1': 'stream_filter_value1',
+    'STREAM_FILTER_KEY2': 'stream_filter_key2', 'STREAM_FILTER_VALUE2': 'stream_filter_value2',
+    'KEEP_ONCE_PER_CASE': 'keep_once_per_case',
 }
 EXCLUDED = {'pm4py', 'site-packages', 'reference-runtime',
             'heuristic-subsecond-reference-runtime', 'node_modules', '__pycache__',
@@ -167,11 +185,192 @@ def _skip(text, pos):
     return pos
 
 
+def _attributes_exact(value, fields):
+    if type(value) is not dict or set(value) != set(fields):
+        raise ValueError('unknown/incomplete LOG attributes descriptor fields')
+
+
+def _attributes_trace(value, source, depth):
+    _attributes_exact(value, ['attributes', 'properties', 'events'])
+    for key in ('attributes', 'properties'):
+        _attributes_packed(value[key], source, depth + 1, 'dict')
+    if type(value['events']) is not list:
+        raise ValueError('LOG attributes trace events absent')
+    for event in value['events']:
+        _attributes_packed(event, source, depth + 1, 'dict')
+
+
+def _attributes_snapshot(value, source, depth=0):
+    _attributes_exact(value, ['attributes', 'extensions', 'classifiers', 'omni_present', 'properties', 'traces'])
+    for key in ('attributes', 'extensions', 'classifiers', 'omni_present', 'properties'):
+        _attributes_packed(value[key], source, depth + 1, 'dict')
+    if type(value['traces']) is not list:
+        raise ValueError('LOG attributes source traces absent')
+    for trace in value['traces']:
+        _attributes_trace(trace, source, depth + 1)
+
+
+def _attributes_packed(value, source, depth=0, expected=None):
+    if depth > 256 or type(value) is not dict or type(value.get('type')) is not str:
+        raise ValueError('LOG attributes typed descriptor absent/too deep')
+    kind = value['type']
+    if expected is not None and kind != expected:
+        raise ValueError('LOG attributes packed container type mismatch')
+    if kind in {'NoneType', 'str', 'bool', 'int'}:
+        _attributes_exact(value, ['type', 'value'])
+        if type(value['value']) is not {'NoneType': type(None), 'str': str, 'bool': bool, 'int': int}[kind]:
+            raise ValueError('LOG attributes typed scalar payload mismatch')
+    elif kind == 'float':
+        _attributes_exact(value, ['type', 'hex'])
+        try:
+            if type(value['hex']) is not str or float.fromhex(value['hex']).hex() != value['hex']:
+                raise ValueError()
+        except (ValueError, OverflowError):
+            raise ValueError('invalid original LOG attributes float hex') from None
+    elif kind == 'bytes':
+        _attributes_exact(value, ['type', 'hex'])
+        if type(value['hex']) is not str or not re.fullmatch('(?:[0-9a-f]{2})*', value['hex']):
+            raise ValueError('invalid original LOG attributes bytes hex')
+    elif kind in {'native_na', 'nat'}:
+        _attributes_exact(value, ['type'])
+    elif kind == 'uuid':
+        _attributes_exact(value, ['type', 'value'])
+        if type(value['value']) is not str or not re.fullmatch('[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', value['value']):
+            raise ValueError('invalid original LOG attributes UUID')
+    elif kind == 'datetime':
+        _attributes_exact(value, ['type', 'iso', 'fold', 'offset_seconds'])
+        if type(value['iso']) is not str or type(value['fold']) is not int or value['fold'] not in (0, 1):
+            raise ValueError('invalid LOG attributes datetime metadata')
+        try:
+            offset = datetime.datetime.fromisoformat(value['iso']).utcoffset()
+        except (ValueError, OverflowError):
+            raise ValueError('invalid LOG attributes datetime iso') from None
+        seconds = value['offset_seconds']
+        if not (seconds is None or type(seconds) in (int, float) and math.isfinite(seconds)) or seconds != (None if offset is None else offset.total_seconds()):
+            raise ValueError('LOG attributes datetime offset mismatch')
+    elif kind == 'enum':
+        _attributes_exact(value, ['type', 'module', 'name', 'value'])
+        if value['module'] != LOG_ATTRIBUTES_MODULE or type(value['name']) is not str or value['name'] not in LOG_ATTRIBUTES_ENUM or value['value'] != {'type': 'str', 'value': LOG_ATTRIBUTES_ENUM[value['name']]}:
+            raise ValueError('unknown LOG attributes enum identity/value')
+    elif kind in {'list', 'tuple', 'set', 'frozenset'}:
+        _attributes_exact(value, ['type', 'values'])
+        if type(value['values']) is not list:
+            raise ValueError('LOG attributes typed sequence absent')
+        for child in value['values']:
+            _attributes_packed(child, source, depth + 1)
+        if kind in {'set', 'frozenset'} and value['values'] != sorted(value['values'], key=lambda item: json.dumps(item, sort_keys=True)):
+            raise ValueError('LOG attributes original set ordering mismatch')
+    elif kind == 'dict':
+        _attributes_exact(value, ['type', 'items'])
+        if type(value['items']) is not list:
+            raise ValueError('LOG attributes ordered dictionary entries absent')
+        for pair in value['items']:
+            if type(pair) is not list or len(pair) != 2:
+                raise ValueError('LOG attributes ordered key/value pair absent')
+            for child in pair:
+                _attributes_packed(child, source, depth + 1)
+    elif kind == 'log':
+        _attributes_exact(value, ['type', 'snapshot'])
+        _attributes_snapshot(value['snapshot'], source, depth + 1)
+    elif kind == 'trace':
+        _attributes_exact(value, ['type', 'snapshot', 'source_trace_index'])
+        _attributes_trace(value['snapshot'], source, depth + 1)
+        index = value['source_trace_index']
+        if index is not None:
+            if type(index) is not int or not 0 <= index < len(source['traces']) or value['snapshot'] != source['traces'][index]:
+                raise ValueError('LOG attributes source trace alias mismatch')
+    else:
+        raise ValueError('unknown LOG attributes packed type')
+
+
+def _attributes_receipt(receipt):
+    _attributes_exact(receipt, ['module', 'function', 'args', 'kwargs', 'call_shape'])
+    if receipt['module'] != LOG_ATTRIBUTES_MODULE or type(receipt['function']) is not str or receipt['function'] not in LOG_ATTRIBUTES_ARITIES:
+        raise ValueError('unknown LOG attributes module/function')
+    if receipt['call_shape'] != SCHEMAS['log-attributes-packed-v1'][1]:
+        raise ValueError('unknown LOG attributes original call shape')
+    args = receipt['args']
+    _attributes_exact(args, ['type', 'values'])
+    if args['type'] != 'list' or type(args['values']) is not list or len(args['values']) not in LOG_ATTRIBUTES_ARITIES[receipt['function']]:
+        raise ValueError('LOG attributes positional operand arity mismatch')
+    first = args['values'][0]
+    _attributes_exact(first, ['type', 'snapshot'])
+    if first['type'] != 'log':
+        raise ValueError('complete LOG attributes primary source absent')
+    source = first['snapshot']
+    _attributes_snapshot(source, source)
+    _attributes_packed(args, source, expected='list')
+    _attributes_packed(receipt['kwargs'], source, expected='dict')
+    keywords = []
+    for key, _ in receipt['kwargs']['items']:
+        if key.get('type') != 'str' or key.get('value') != 'parameters' or key['value'] in keywords:
+            raise ValueError('unknown/duplicate LOG attributes keyword operand')
+        keywords.append(key['value'])
+    return source
+
+
+def _attributes_outcome(row, receipt, source):
+    """Validate the known full terminal observer shape; no case execution."""
+    base = {'index', 'module', 'case', 'receipt_sha256', 'receipt', 'input_before', 'controls_before',
+            'warnings', 'input_after', 'controls_after', 'input_unchanged', 'controls_unchanged'}
+    success = 'error' not in row
+    _attributes_exact(row, base | ({'result_kind', 'result', 'returned_input_identity', 'trace_aliases_source', 'event_source_positions'} if success else {'error'}))
+    if type(row['index']) is not int or row['index'] < 1 or type(row['case']) is not dict or row['case'].get('function') != receipt['function'] or type(row['case'].get('name')) is not str:
+        raise ValueError('LOG attributes observer index/case identity mismatch')
+    if row['input_before'] != source or row['controls_before'] != {'args': receipt['args'], 'kwargs': receipt['kwargs']}:
+        raise ValueError('LOG attributes original source/control before mismatch')
+    after = row['input_after']
+    _attributes_snapshot(after, after)
+    controls = row['controls_after']
+    _attributes_exact(controls, ['args', 'kwargs'])
+    _attributes_packed(controls['args'], after, expected='list')
+    _attributes_packed(controls['kwargs'], after, expected='dict')
+    if len(controls['args']['values']) != len(receipt['args']['values']) or controls['args']['values'][0] != {'type': 'log', 'snapshot': after}:
+        raise ValueError('LOG attributes after source alias mismatch')
+    if [pair[0] for pair in controls['kwargs']['items']] != [pair[0] for pair in receipt['kwargs']['items']]:
+        raise ValueError('LOG attributes top-level keyword identities mutated')
+    if type(row['input_unchanged']) is not bool or row['input_unchanged'] != (source == after) or type(row['controls_unchanged']) is not bool or row['controls_unchanged'] != (row['controls_before'] == controls):
+        raise ValueError('LOG attributes before/after mutation flag mismatch')
+    if type(row['warnings']) is not list:
+        raise ValueError('complete LOG attributes warnings absent')
+    for warning in row['warnings']:
+        _attributes_exact(warning, ['category', 'message'])
+        if type(warning['category']) is not str or type(warning['message']) is not str:
+            raise ValueError('invalid LOG attributes warning metadata')
+    if not success:
+        _attributes_exact(row['error'], ['type', 'message', 'args'])
+        if type(row['error']['type']) is not str or not row['error']['type'] or type(row['error']['message']) is not str:
+            raise ValueError('complete LOG attributes error absent')
+        _attributes_packed(row['error']['args'], after, expected='tuple')
+        return
+    if row['result_kind'] != 'log' or type(row['returned_input_identity']) is not bool:
+        raise ValueError('unknown LOG attributes successful outcome')
+    _attributes_snapshot(row['result'], after)
+    if row['returned_input_identity'] and row['result'] != after:
+        raise ValueError('LOG attributes returned source identity contradicts its full snapshot')
+    aliases = row['trace_aliases_source']; positions = row['event_source_positions']
+    if type(aliases) is not list or type(positions) is not list or len(aliases) != len(row['result']['traces']) or len(positions) != len(aliases) or any(type(x) is not bool for x in aliases):
+        raise ValueError('LOG attributes result alias metadata shape mismatch')
+    if row['returned_input_identity'] and not all(aliases):
+        raise ValueError('LOG attributes returned source identity contradicts trace alias flags')
+    for trace, is_alias, trace_positions in zip(row['result']['traces'], aliases, positions):
+        if is_alias and trace not in after['traces']:
+            raise ValueError('LOG attributes returned source trace alias mismatch')
+        if type(trace_positions) is not list:
+            raise ValueError('LOG attributes event source positions absent')
+        for pair in trace_positions:
+            if type(pair) is not list or len(pair) != 2 or any(type(x) is not int for x in pair):
+                raise ValueError('LOG attributes event source pair malformed')
+            ti, ei = pair
+            if not 0 <= ti < len(after['traces']) or not 0 <= ei < len(after['traces'][ti]['events']) or after['traces'][ti]['events'][ei] not in trace['events']:
+                raise ValueError('LOG attributes event alias snapshot mismatch')
+
+
 def adapt(row, spec):
     if not isinstance(row, dict):
         raise ValueError('record must be an object')
     adapter = spec.get('adapter')
-    if adapter not in {'receipt-v1', 'pandas-before-v1', 'polars-receipt-v1', 'digest-plan-v1'}:
+    if adapter not in {*SCHEMAS, 'digest-plan-v1'}:
         raise ValueError('unknown receipt adapter')
     if spec.get('role') not in {'observations', 'plans', 'intents'}:
         raise ValueError('unknown call provenance role')
@@ -180,6 +379,12 @@ def adapt(row, spec):
             raise ValueError('unknown original receipt schema')
     elif spec.get('receipt_schema') != SCHEMAS[adapter][0]:
         raise ValueError('unknown original receipt schema for adapter')
+    attributes_schema = spec.get('receipt_schema') == SCHEMAS['log-attributes-packed-v1'][0]
+    if attributes_schema:
+        if row.get('module', LOG_ATTRIBUTES_MODULE) != LOG_ATTRIBUTES_MODULE or row.get('function', row.get('method')) is not None and row.get('function', row.get('method')) not in LOG_ATTRIBUTES_ARITIES:
+            raise ValueError('unreviewed LOG attributes intent/plan identity')
+        if adapter == 'digest-plan-v1' and any(key in row for key in ['result_kind', 'result_value', 'output', 'return', 'returned', 'exception', 'apply_returned', 'input_after', 'controls_after']):
+            raise ValueError('LOG attributes digest-only plan contains possible entry/outcome')
     if adapter == 'digest-plan-v1' and any(key in row for key in ['result', 'error', 'value_result', 'receipt']):
         raise ValueError('digest-only plan contains full receipt or outcome; explicit full adapter required')
     if adapter == 'digest-plan-v1' or (spec.get('role') == 'intents' and 'receipt' not in row):
@@ -190,7 +395,7 @@ def adapt(row, spec):
             raise ValueError('invalid digest-only receipt binding')
         return (row.get('module'), row.get('function', row.get('method')), None,
                 digest, 'digest_only_plan' if adapter == 'digest-plan-v1' else 'entered_without_outcome')
-    if adapter in {'receipt-v1', 'polars-receipt-v1'}:
+    if adapter in {'receipt-v1', 'polars-receipt-v1', 'log-attributes-packed-v1'}:
         receipt = row.get('receipt')
     elif adapter == 'pandas-before-v1':
         if 'receipt' in row:
@@ -204,6 +409,7 @@ def adapt(row, spec):
         raise ValueError('unknown receipt adapter')
     if not isinstance(receipt, dict):
         raise ValueError('full original receipt absent; possible entry remains unresolved')
+    attributes_source = _attributes_receipt(receipt) if adapter == 'log-attributes-packed-v1' else None
     required = ['module', 'kwargs', 'call_shape']
     required += ['input', 'category_observables', 'input_kind'] if adapter == 'polars-receipt-v1' else ['args']
     for field in required:
@@ -251,6 +457,11 @@ def adapt(row, spec):
     digest = sha(raw)
     if row.get('receipt_sha256') != digest:
         raise ValueError('full original receipt hash mismatch')
+    if adapter == 'log-attributes-packed-v1':
+        if any(key in row for key in ['result', 'error', 'value_result', 'result_value', 'result_kind', 'output', 'return', 'returned', 'exception']):
+            _attributes_outcome(row, receipt, attributes_source)
+        elif any(key in row for key in ['input_after', 'controls_after', 'apply_returned']):
+            return module, function, raw, digest, 'entered_without_outcome'
     # Outcome FIRST: modern records have both full receipt and result/error.
     if any(key in row for key in ['result', 'error', 'value_result']):
         status = 'actual_outcome'
