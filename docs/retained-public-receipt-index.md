@@ -23,6 +23,41 @@ later writes require another inventory and validation generation.
 
 ## Supported evidence
 
+The distinct `pandas-variants-before-v1` adapter requires schema
+`minera-pandas-variants-observer-receipt-v1`. It reconstructs the original six
+fields `module`, `method`, `input`, `args`, `kwargs`, and `call_shape`, preserving
+the complete `pandas.DataFrame` source separately from the single supplied
+positional operand. The four reviewed variants methods accept only the direct
+`parameters` keyword; raw parameter states and ordered enum/string entries stay
+unchanged. Supplied nested DataFrames retain their full index, category, dtype,
+attribute and row snapshots. The producer's closed descriptor grammar supports
+NaT and datetime, although neither occurred among this retained bank's fifteen
+observed tags. Sharing a pandas call shape does not select this profile.
+
+Actual results and complete errors take priority over declared plan provenance.
+Before/after source and argument snapshots, mutation flags, full warnings and
+returned-input identity consistency are validated. Full plans and lightweight
+intents require exact producer fields, positive integer indices and string case
+names. Unknown entry fields and before-only rows remain blocking gaps. The own
+digest audit validates complete candidate counts and removed-candidate target,
+name and hash links. Digest-only rows supply no missing operands or module, and
+prior-row counters do not independently authenticate historical files. Exact
+intents resolve only within the original schema and reference/runtime partition.
+
+Root's bounded census reconstructed all 491 original receipts (439 + 52), with
+357 full returned frames, 134 complete errors, zero recorded mutations or
+warnings, 34 supplied DataFrame descriptors and 177 snapshots in the original
+generator's scope. Its sorted original IDs joined by LF without a trailing LF
+have SHA-256
+`82df0e73830fdbedc81501b7d59384d16a7c203253bb2320a36c622f0e99efd3`.
+The new synthetic module is
+`scripts.tests.test_retained_public_receipt_pandas_variants`. Root executed all
+121 receipt integrity tests and the full491 index acceptance: all original
+canonical bytes, 1,964 raw record/plan/intent/audit slices and entered intents
+match, with zero gaps and eight rehashed source-cache hits. These index checks
+do not establish product transport, full historical coverage, catalogue closure
+or new call authority.
+
 The distinct `log-variants-packed-v1` adapter requires schema
 `minera-log-variants-observer-receipt-v1`. It retains the original five fields
 `module`, `function`, `args`, `kwargs`, and `call_shape`, including the complete
