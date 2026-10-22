@@ -14,7 +14,104 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: original typed Polars calls reach API/UI — 2026-10-22
+## Current continuation: original typed pandas calls reach API/UI — 2026-10-22
+
+`dacc2899` retains the checkpoint in
+`docs/retained-public-observation-pandas-original-call-checkpoint.jsonl.gz`
+(601,625 bytes; SHA256
+`960e66788c5098f83356a22ae4f6536d62d6ddf3f58ac7d1ea32e67d9cbcae66`).
+Its validation sidecar is 123,916 bytes, SHA256
+`23d8686577a49bdb43fa5c7c095675e028cb3b5e01dd72bbe197addf7dbc811f`.
+Root independently checked all **151 own text members** against source bytes
+and exact UTF8 round trips. There are **161 external declarations**; original
+banks/archives, full oracle source, generated vector includes, diagnostic-bearing
+initial analysis, raw browser artifacts and binaries remain external. Root final
+acceptance is 121,159 bytes, SHA256
+`e2650512f490c9be86cd6ab1a0ef34b5244cea0ab3a0987f5f41c47ad55b2925`.
+All runtime sessions are terminal/drained; root-facts bindings retain their
+actual command receipts and separate independent review scopes.
+
+Three clean source commits extend original typed-call reachability to pandas:
+`c9185663` adds strict backend transport and control tests; `26cca8a6` adds the
+UI/editor/contract changes; `921a53b8` adds a full public transport acceptance
+target. `call_json` now accepts the engine-specific
+`minera-pandas-ltl-original-call-v1` schema with an ordered typed `args` array.
+Exact arities are one/three/two/one for eventual/NEXT/four-eyes/different-persons.
+All 429 admitted calls supply every operand. Missing/extra arguments reject as
+transport controls; explicit null reaches native semantics. No missing-argument
+reference error or new generic native pandas call API was invented.
+
+Omitted parameters, raw non-mapping values and ordered string/enum entries use
+existing native overloads. Parameter keys are retained in the pandas carrier's
+`value.key`; enum precedence and typed non-Boolean flags remain native behavior.
+The shared 27-field response retains exact call text, mode, complete artifacts,
+null pandas input kind and null original-mode selector roles. Polars parsing,
+dispatch, original vectors and both predicate sources remain byte-identical.
+The original pandas oracle source also remains unchanged: 6,677,515 bytes,
+SHA256 `7e2250ee98278cb153bb26e723802277ca60bf4f18eb231bbd1f8e5c01d05ad9`.
+
+Root acceptance is `build/parity-closures/ltl-pandas-original-call-acceptance-1/`.
+All **192 frontend files / 9,849 tests**, focused **40 tests**, TypeScript and
+production build pass. Corrected direct/HTTP control suites pass terminal
+**b9f340**. Original pandas **350 full tables / 79 diagnostics** and Polars
+**675 native/direct/HTTP comparisons per mode** pass fresh regression terminal
+**638b95**. The new pandas target separately passes original native assertions
+and **all 429 calls through both direct workbench and owned HTTP**, each with
+**350 complete tables / 79 exact diagnostics**: terminal0/drained **8c2b2d**,
+289.76 seconds. Source-before/after, request mutation controls, exact call echo,
+full table/index/category/context and 27 response fields are compared. The
+legacy pandas observer saved eager returns/exceptions, without explicit phase
+fields; wire complete/apply boundaries follow those outcomes, not Polars collect.
+No fresh full 297-call LOG differential run is claimed here.
+
+All nine admitted pandas banks were independently reconstructed and hash-checked:
+**429 original canonical IDs**, sorted SHA256
+`09d3110a437f6ff51870b60b7477377be83ea128f6a8b197e12eb40f357bf39c`.
+The generator checks all 268 original snapshot IDs and 1,644 recursive typed
+value descriptors. New fixture SHA256:
+`4b52230f31557f239739cf0ce0060b472636a457bdede07d4c42c73158bfb280`.
+The test wrapper includes the unchanged original oracle, calls `retained_cases`
+directly, and never invokes its renamed unused main. The original native target
+also runs separately. Independent frontend/fixture and backend/control reviews
+pass respectively at `1f1ecbe8` and `ec193fef` report SHA prefixes.
+
+Actual rendered browser acceptance passes terminal0/drained **e9e4ad**:
+**14 checks / 12 actual requests** cover all four argument shapes, friendly
+defaults, raw null/empty-list/string parameters, both enum/string orders, exact
+CRLF/large-integer/NA/bytes import text, complete success/error downloads, stale
+clearing, arity rejection and engine transitions. NA/bytes browser parameters
+are harmless unknown literal controls testing transport; the full native bank
+provides their admitted behavioral comparisons. Both owned processes closed
+with output drained and listener PID ownership checked; root inspected both
+screenshots. Server SHA256:
+`dd4952e40cf153b9bc4cf7cc5e2f1462589345dbc5a152a957b674985466ab56`.
+
+Preserved attempts include two own control-test failures caused by expecting
+schema validation ahead of the correct unknown-field guard. Both expectations
+were corrected and separate schema-only guard cases added; product parsing and
+original outcomes were unchanged. The first browser recipe was rejected during
+static review because its expected table omitted pandas index metadata. A new
+explicitly indexed own upload and complete label subsetting corrected the
+recipe without weakening full equality. The unaccepted browser recipe was not executed.
+Checkpoint helpers were also corrected before execution to admit own members
+before opening them and keep the diagnostic-bearing first analysis external.
+
+Full scope remains **86 packages / 387 modules**, **46 / 226 complete**, **201
+strict open units** and **565 unentered logical queries** across six banks.
+No new/replayed reference calls, admissions, historical completeness, absence
+proof or catalogue promotions follow. Typed temporal provenance, arbitrary
+Python keys and other existing carrier limits remain explicit.
+
+Next read-only design is
+`build/parity-closures/admitted-log-ltl-next-product-review-1/report.json`,
+SHA256 `8a2bbf76d2bf2d9b5784ced3dd3a087e29763d74210534f8a387affab0355afe`.
+It verifies all **297 LOG IDs** and retains the full **227 filters + 70 helpers**
+as the next acceptance scope. Ten receipts require exact private typed codec
+extensions: six NaT and four UUID values. Follow the existing own native
+constructors; do not coerce them to ordinary null/string values or reduce the
+bank. No LOG product implementation or new reference calls have started.
+
+## Previous checkpoint: original typed Polars calls reach API/UI — 2026-10-22
 
 `ca20fd47` retains this checkpoint in
 `docs/retained-public-observation-polars-original-call-checkpoint.jsonl.gz`
