@@ -65,6 +65,12 @@ formats stay distinct, opaque and incomplete. Unknown UTF8/report envelopes and
 all possible-entry contexts retain explicit gaps. After terminal completion,
 root may run the prepared metadata-only full-member/flat-copy projection helper
 in `grouping-history-audit-prepared-1/`; it must not open/admit matched content.
+Its corrected helper SHA256 is
+`17f6eec37d3123b988844ae508d60e92313926bfdb83ea9c3622397b04bd96a5`;
+seven synthetic integrity tests pass. It now requires `--terminal-receipt` with
+schema `minera-retained-public-inventory-terminal-binding-v1`, terminal/drained/
+finalized flags, exact zero exit code/session ID, and report/events/manifest
+size/SHA bindings. Root must issue that receipt only after draining session 5107.
 Then review provenance, resolve relevant schemas/chunks, reconstruct complete
 original public receipts and deduplicate before any new algorithm bank.
 
@@ -83,10 +89,23 @@ Python optimization, and harden/review their gates before any actual certificate
 
 Pandas case-grouping observer/candidates are under
 `build/parity-closures/case-grouping-pandas-prepared-1/` (97 consecutive,
-123 timestamp candidates). They are not executed. Independent review found
-optimization and incomplete nested-receipt gate gaps; preserve initial drafts
-and review receipts, finish corrections and a fresh per-call equality guard,
-then review again before root prepare-only materialization.
+123 timestamp candidates). Root has now run **prepare-only** for both fresh
+`build/filtering-case-grouping-pandas-{consecutive,timestamp}-public-preentry-1/`
+banks, independently verifying all **220** original full receipt hashes and
+both ordered digest sets. Zero algorithms, no intents/outcomes/certificates and
+`prior_barrier_validated=false` remain explicit. The corrected observer SHA256
+is `84050d49e9dd85db1ede3a6ba3840fffa55dc355ba06773375ea243d53d9d3cf`.
+It rejects optimized Python and incomplete nested receipts and recomputes each
+full current receipt immediately before an actual intent. All 26 independent
+extracted checks pass. Initial findings/drafts and the failed class-spelling
+test remain preserved. Capsule:
+`docs/filtering-pandas-case-grouping-preparation.json.gz`, 67 members /
+155,223 bytes, SHA256
+`33f4d710ab4d25b1b78ab60f19a153f480a9b1302d5d40a3b684f502930a401d`.
+Its sidecar records the two ordered hashes. Root additionally verified every
+capsule member and all 67 current source bindings. A separate Polars grouping
+observer is being prepared offline under `case-grouping-polars-prepared-1/`;
+do not execute it before root and independent review.
 
 No new reference algorithm was entered, product/frontend code was unchanged,
 and no parity status was promoted. The committed structural verifier still
