@@ -6,7 +6,7 @@ import {ReferenceLogFilterWorkspace} from "../src/components/ReferenceLogFilterW
 import {defaultLtlFilterForm,ltlFilterSourceExample,type LtlFilterEnvelope,type LtlFilterRun} from "../src/ltl-filters";
 const display=(element:ReturnType<typeof createElement>)=>renderToStaticMarkup(element);
 afterEach(()=>vi.unstubAllGlobals());
-function run(failure=false):LtlFilterRun{const value:LtlFilterEnvelope={family:"REFERENCE_LTL_FILTER",engine:"log",input_kind:null,operation:"eventually",result_kind:failure?null:"log",http_status:failure?400:200,phase:failure?"apply":"complete",apply_returned:!failure,source_format:"native_log",source:{traces:2,events:6},result:failure?null:{traces:1,events:3},source_unchanged:!failure,activity_key:"work",case_id_key:null,attribute_key:"kind",resource_key:"performer",timestamp_key:"time",source_json:"before",source_after_json:"after",result_json:failure?null:"result",filtered_xes:failure?null:"<log/>",xes_error:null,helper_result_json:null,error_type:failure?"TypeError":null,error:failure?"complete diagnostic":null};const raw=JSON.stringify(value);return {value,sourceFile:new File(["source"],"source.json"),fields:[],raw,responseBytes:new TextEncoder().encode(raw)};}
+function run(failure=false):LtlFilterRun{const value:LtlFilterEnvelope={family:"REFERENCE_LTL_FILTER",call_mode:"friendly",call_json:null,engine:"log",input_kind:null,operation:"eventually",result_kind:failure?null:"log",http_status:failure?400:200,phase:failure?"apply":"complete",apply_returned:!failure,source_format:"native_log",source:{traces:2,events:6},result:failure?null:{traces:1,events:3},source_unchanged:!failure,activity_key:"work",case_id_key:null,attribute_key:"kind",resource_key:"performer",timestamp_key:"time",source_json:"before",source_after_json:"after",result_json:failure?null:"result",filtered_xes:failure?null:"<log/>",xes_error:null,helper_result_json:null,error_type:failure?"TypeError":null,error:failure?"complete diagnostic":null};const raw=JSON.stringify(value);return {value,sourceFile:new File(["source"],"source.json"),fields:[],raw,responseBytes:new TextEncoder().encode(raw)};}
 it("mounts the new event-log family while preserving the default existing workspace",()=>{const existing=display(createElement(ReferenceLogFilterWorkspace));expect(existing).toContain("Filter an event log");expect(existing).not.toContain('id="ltl-filter-heading"');const relationships=display(createElement(ReferenceLogFilterWorkspace,{initialLogFamily:"ltl"}));expect(relationships).toContain("Filter activity relationships");expect(relationships).not.toContain('id="reference-log-filter-heading"');});
 it("renders engine-specific operands without an eager network request",()=>{const fetch=vi.fn();vi.stubGlobal("fetch",fetch);for(const engine of ["log","pandas","polars"]as const){const html=display(createElement(LtlFilterWorkspace,{engine,initialForm:defaultLtlFilterForm(engine,"next")}));if(engine==="polars"){expect(html).toContain("Ordered activities as JSON");expect(html).not.toContain("Third typed activity");}else {expect(html).toContain("Third typed activity as JSON");if(engine==="pandas")expect(html).toContain("last B and C");}expect(html.includes('value="timestamp_ge"')).toBe(engine==="log");}expect(fetch).not.toHaveBeenCalled();});
 it("shows performer roles only for social rules and supports literal keys",()=>{const form={...defaultLtlFilterForm("pandas","four_eyes"),resourceKeyMode:"custom"as const,resourceKey:" custom Ω "};const social=display(createElement(LtlFilterWorkspace,{engine:"pandas",initialForm:form}));expect(social).toContain("Exact performer attribute");expect(social).toContain("custom Ω");expect(social).toContain("Cases missing required activities");const sequence=display(createElement(LtlFilterWorkspace,{engine:"pandas"}));expect(sequence).not.toContain("Performer attribute");expect(sequence).toContain("Case ID column");});
@@ -31,4 +31,31 @@ it("offers eager and lazy Polars inputs and reports the effective type on errors
  const failed=run(true);failed.value.engine="polars";failed.value.input_kind="DataFrame";
  const inspection=display(createElement(LtlFilterInspection,{run:failed}));
  expect(inspection).toContain("Polars input type: DataFrame.");expect(inspection).not.toContain("Download complete filtered result");
+});
+
+it("keeps friendly controls as the default and exposes original mode only for Polars",()=>{
+ const polars=display(createElement(LtlFilterWorkspace,{engine:"polars"}));
+ expect(polars).toContain("Polars call mode");expect(polars).toContain('<option value="friendly" selected="">');
+ expect(polars).toContain("Ordered activities as JSON");expect(polars).not.toContain("Original operand presence");
+ for(const engine of ["log","pandas"]as const)expect(display(createElement(LtlFilterWorkspace,{engine}))).not.toContain("Polars call mode");
+});
+
+it("shows exclusive omitted, raw and ordered original controls with explicit fidelity limits",()=>{
+ const base={...defaultLtlFilterForm("polars"),callMode:"original"as const,originalOperand:"omitted"as const,originalParameters:"raw"as const};
+ const raw=display(createElement(LtlFilterWorkspace,{engine:"polars",initialForm:base}));
+ for(const text of ["Original operand presence","Raw typed parameters JSON","Import complete original call JSON","explicit null argument","arbitrary Python keys"])expect(raw).toContain(text);
+ for(const text of ["Original typed operand JSON","Relationship selection","Matched activity attribute","Activity encoding"])expect(raw).not.toContain(text);
+ const entries=display(createElement(LtlFilterWorkspace,{engine:"polars",initialForm:{...base,originalOperand:"provided",originalParameters:"entries"}}));
+ expect(entries).toContain("Original typed operand JSON");expect(entries).toContain("Ordered parameter entries JSON");expect(entries).not.toContain("Raw typed parameters JSON");
+});
+
+it("retains complete JSON editor text and original call error inspection/download actions",()=>{
+ const raw=' {"schema":"minera-polars-ltl-original-call-v1","values":{"type":"integer","value":9007199254740993}}\r\n';
+ const form={...defaultLtlFilterForm("polars"),callMode:"original"as const,originalEditor:"json"as const,originalCallJson:raw};
+ const html=display(createElement(LtlFilterWorkspace,{engine:"polars",initialForm:form}));
+ expect(html).toContain("Complete original call JSON");expect(html).toContain("9007199254740993");expect(html).not.toContain("Original operand presence");
+ const failed=run(true);failed.value.engine="polars";failed.value.input_kind="LazyFrame";failed.value.call_mode="original";failed.value.call_json=raw;
+ const inspection=display(createElement(LtlFilterInspection,{run:failed}));
+ for(const text of ["Call mode: Original typed call.","Complete original typed call","Download exact original call","Download complete parsed source","9007199254740993"])expect(inspection).toContain(text);
+ expect(inspection).not.toContain("Download complete filtered result");
 });
