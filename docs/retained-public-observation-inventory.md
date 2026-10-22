@@ -89,6 +89,24 @@ lexically. EOF checks validate metadata, counts, order and name uniqueness;
 nonfinite JSON remains an error. Downstream projection must explicitly refuse
 this schema independently of logical flags before it can consume these events.
 
+Two JSON-object profiles support **discovery only** for seven reviewed source
+paths: `owned-scope-files-bytes-base64-object-v1` and
+`owned-summary-files-binary-bindings-object-v1`. Their `files_object_metadata`
+requires the exact review hash, producer profile, root keys and nested fields,
+`expected_file_count=null`, and
+`file_count_authority="not-saved-in-reviewed-sidecar"`. Other transports,
+wrapper/record admission, paths or controls are rejected before source reads
+and parser creation. Root separately binds the exact archive/producer/sidecar.
+
+The `files` object streams logical names and exact SHA/optional size metadata;
+`bytes_base64` stays opaque. Missing sizes remain `null`, and all member hashes
+and present sizes remain unverified declarations. Scope, summary, binary and
+unknown branches stay opaque candidates with gaps. EOF reports observed rows,
+unique names and structural validity, while retaining an unavailable external
+file-count gap for every source. Observed counts never become independent
+counts. Both schemas must be explicitly refused by the generic full-file
+projector, including when logical flags are missing or false.
+
 Two explicit chunk schemas support **discovery only**:
 
 | Schema | Declared identity |

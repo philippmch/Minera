@@ -35,6 +35,14 @@ gap. These controls check declared metadata, never payload or history completion
 Root must separately bind the reviewed source/sidecar; review SHA alone does not
 establish provenance authority for another source.
 
+The explicit owned-scope-files-bytes-base64-object-v1 and
+owned-summary-files-binary-bindings-object-v1 profiles are discovery only for
+seven reviewed source paths. files_object_metadata binds review/profile/root
+keys and exact nested fields; original external file counts stay unknown. Files
+maps stream logical names and opaque bytes_base64 envelopes. scope, summary,
+binary maps and all unknown branches remain lexical opaque candidates/gaps.
+No logical member establishes source-file identity or payload verification.
+
 Discovery validates JSON structure and inventories metadata without unescaping
 or decoding archive payload strings. An unlisted payload remains opaque even
 when its path appears after its data. Listed payloads are spooled until metadata
@@ -78,6 +86,19 @@ KEY_WRAPPER_REVIEW_SHA256 = '7df2a2270cbc8740749bea3b4044d86a195cb2d17dd91153426
 KEY_WRAPPER_PROFILES = {
     'heuristic-pandas-dispatch-v1': [('report', 'public-entry-point-acceptance')],
     'plusplus-petri-producer-v1': [('report', 'acceptance'), ('public_cases', 'saved-75-public-aliases')],
+}
+FILES_OBJECT_REVIEW_SHA256 = '59de627eab160ba29089e07edd8b0048eca88c0204e344d9e60b20bb3ffc5cc9'
+FILES_SCOPE_SCHEMA = 'owned-scope-files-bytes-base64-object-v1'
+FILES_SUMMARY_SCHEMA = 'owned-summary-files-binary-bindings-object-v1'
+FILES_OBJECT_SCHEMAS = {FILES_SCOPE_SCHEMA, FILES_SUMMARY_SCHEMA}
+FILES_OBJECT_PROFILES = {
+    'token-backwards-controls-capture-v1': (FILES_SCOPE_SCHEMA, 'docs/token-backwards-controls-capture-evidence.json.gz', False),
+    'heuristic-classic-flat-timestamps-capture-v1': (FILES_SCOPE_SCHEMA, 'docs/heuristic-classic-flat-timestamps-capture-evidence.json.gz', True),
+    'token-backwards-parameters-capture-v1': (FILES_SCOPE_SCHEMA, 'docs/token-backwards-parameters-capture-evidence.json.gz', True),
+    'token-backwards-zero-capture-v1': (FILES_SCOPE_SCHEMA, 'docs/token-backwards-zero-capture-evidence.json.gz', False),
+    'token-backwards-parameters-baseline-v1': (FILES_SUMMARY_SCHEMA, 'docs/token-backwards-parameters-baseline-checks.json.gz', True),
+    'token-backwards-parameters-after-v1': (FILES_SUMMARY_SCHEMA, 'docs/token-backwards-parameters-after-checks.json.gz', True),
+    'token-backwards-weighted-routing-v1': (FILES_SUMMARY_SCHEMA, 'docs/token-backwards-weighted-routing-checks.json.gz', True),
 }
 CHUNK_SIZE = 8 * 1024 * 1024
 POSSIBLE_CALL_KEYS = {'receipt', 'receipt_sha256', 'function', 'method', 'module',
@@ -130,6 +151,36 @@ def require_key_wrapper_spec(spec):
             or control['expected_wrapper_count'] != len(expected)
             or control.get('expected_wrapper_sequence') != expected):
         raise ValueError('key-wrapper review/profile/count/sequence controls do not match reviewed definitions')
+
+
+def require_files_object_spec(spec):
+    if spec.get('envelope_schema') not in FILES_OBJECT_SCHEMAS:
+        return
+    if (spec.get('layout') != 'discover' or spec.get('members', []) != []
+            or spec.get('members_key') is not None or spec.get('records_key') is not None):
+        raise ValueError('files-object schema is metadata discovery only; all record/member admission is unavailable')
+    if spec.get('format') not in {'json', 'gzip-json'}:
+        raise ValueError('files-object schema requires JSON object transport only')
+    if spec.get('provenance') not in {'own-container', 'own-public-observation'}:
+        raise ValueError('files-object schema requires explicit own-container provenance')
+    control = spec.get('files_object_metadata')
+    fields = {'schema_review_sha256', 'producer_profile', 'expected_root_keys',
+              'expected_member_fields', 'expected_file_count', 'file_count_authority'}
+    if not isinstance(control, dict) or set(control) != fields:
+        raise ValueError('files-object schema requires exact review/profile/root-key/count controls')
+    name = control.get('producer_profile')
+    if not isinstance(name, str) or name not in FILES_OBJECT_PROFILES:
+        raise ValueError('unknown reviewed files-object producer profile')
+    schema, path, sized = FILES_OBJECT_PROFILES[name]
+    root_keys = ['files', 'scope'] if schema == FILES_SCOPE_SCHEMA else ['binary_hashes_only', 'files', 'summary']
+    member_fields = ['bytes_base64', 'sha256', 'size_bytes'] if sized else ['bytes_base64', 'sha256']
+    if (control.get('schema_review_sha256') != FILES_OBJECT_REVIEW_SHA256
+            or spec.get('envelope_schema') != schema or spec.get('path') != path
+            or control.get('expected_root_keys') != root_keys
+            or control.get('expected_member_fields') != member_fields
+            or control.get('expected_file_count') is not None
+            or control.get('file_count_authority') != 'not-saved-in-reviewed-sidecar'):
+        raise ValueError('files-object controls do not match exact reviewed source/profile; independent count remains unknown')
 
 
 def canonical(value):
@@ -995,6 +1046,161 @@ class Inventory:
             for raw in payloads.values():
                 raw.close()
 
+    def files_object_member(self, parser, ordinal, name, spec, state):
+        fields = set(spec['files_object_metadata']['expected_member_fields'])
+        sized = 'size_bytes' in fields
+        keys, metadata, payload_types, reasons = set(), {}, {}, []
+        if parser.r.peek() != 123:
+            parser.opaque_value()
+            reasons.append('files-object logical envelope must be an object')
+        else:
+            parser.r.byte()
+            parser.r.whitespace()
+            if parser.r.peek() != 125:
+                while True:
+                    key = parser.string(materialize=True)
+                    if key in keys:
+                        raise ValueError('duplicate files-object member metadata field')
+                    keys.add(key)
+                    parser.r.whitespace(); parser.r.expect(58); parser.r.whitespace()
+                    if key == 'sha256':
+                        if parser.r.peek() == 34:
+                            metadata[key] = parser.string(materialize=True)
+                        else:
+                            parser.opaque_value(); metadata[key] = None
+                    elif key == 'size_bytes':
+                        if parser.r.peek() is not None and parser.r.peek() in b'-0123456789':
+                            metadata[key] = parser.value()
+                        else:
+                            parser.opaque_value(); metadata[key] = None
+                    else:
+                        payload_types[key] = ('string' if parser.r.peek() == 34 else 'json-object' if parser.r.peek() == 123 else 'json-array' if parser.r.peek() == 91 else 'json-scalar')
+                        parser.opaque_value()  # even unknown data/source strings and nested keys
+                    parser.r.whitespace(); separator = parser.r.byte()
+                    if separator == 125:
+                        break
+                    if separator != 44:
+                        raise ValueError('missing files-object member separator')
+                    parser.r.whitespace()
+            else:
+                parser.r.byte()
+        if keys != fields:
+            reasons.append('files-object member fields do not match exact producer profile')
+        if payload_types != {'bytes_base64': 'string'}:
+            reasons.append('files-object bytes_base64 must remain an opaque string')
+        sha = metadata.get('sha256')
+        if not isinstance(sha, str) or not re.fullmatch('[0-9a-f]{64}', sha):
+            reasons.append('files-object logical SHA-256 declaration absent')
+        if sized:
+            size = metadata.get('size_bytes')
+            if type(size) is not int or size < 0:
+                reasons.append('files-object logical size_bytes must be a nonnegative integer')
+        else:
+            size = None  # original size absence is never supplied by any alias or flat match
+        disposition = 'unknown'
+        try:
+            safe_path(name)
+            disposition = 'safe-relative-path'
+        except ValueError as error:
+            disposition = 'excluded-path' if 'excluded' in str(error) else 'unsafe-path'
+            if disposition == 'unsafe-path':
+                reasons.append('unsafe files-object logical member path')
+        if name in state['names']:
+            reasons.append('duplicate files-object logical member path')
+            state['unique'] = False
+        state['names'].add(name)
+        self.seen_members.setdefault(self.context.get('source'), set()).add(name)
+        if keys & POSSIBLE_CALL_KEYS:
+            reasons.append('files-object member has unexpected call/entry evidence')
+        state['valid'] = state['valid'] and not reasons
+        self.event('member', ordinal=ordinal, path=name, bytes=size, sha256=sha,
+                   envelope_schema=spec['envelope_schema'], producer_profile=spec['files_object_metadata']['producer_profile'],
+                   envelope_keys=sorted(keys), payload_fields=payload_types, path_disposition=disposition,
+                   metadata_valid=not reasons, admitted=False, payload_hash_verified=False,
+                   original_size_unavailable=not sized, original_size_status='declared-logical-bytes' if sized else 'original-size-unavailable',
+                   identity_scope='logical-member', logical_member_kind='logical-member',
+                   declared_logical_member_bytes=size, declared_logical_member_sha256=sha,
+                   source_file_identity_unavailable=True, whole_source_file_binding_verified=False,
+                   whole_source_file_mapping_complete=False)
+        for reason in reasons:
+            self.gap(reason, ordinal=ordinal, member=name)
+
+    def files_object_map(self, parser, spec, state):
+        if parser.r.peek() != 123:
+            parser.opaque_value(); state['valid'] = False
+            self.gap('files-object files branch must be an object')
+            return
+        parser.r.byte(); parser.r.whitespace()
+        if parser.r.peek() != 125:
+            while True:
+                name = parser.string(materialize=True)
+                parser.r.whitespace(); parser.r.expect(58); parser.r.whitespace()
+                state['rows'] += 1
+                self.files_object_member(parser, state['rows'], name, spec, state)
+                parser.r.whitespace(); separator = parser.r.byte()
+                if separator == 125:
+                    break
+                if separator != 44:
+                    raise ValueError('missing files-object map separator')
+                parser.r.whitespace()
+        else:
+            parser.r.byte()
+
+    def files_object_root(self, parser, spec):
+        control = spec['files_object_metadata']
+        state = {'names': set(), 'rows': 0, 'unique': True, 'valid': True}
+        parser.r.whitespace()
+        if parser.r.peek() != 123:
+            raise ValueError('files-object transport requires a root JSON object')
+        parser.r.byte(); parser.r.whitespace()
+        keys = set()
+        if parser.r.peek() != 125:
+            while True:
+                key = parser.string(materialize=True)
+                if key in keys:
+                    raise ValueError('duplicate files-object root key')
+                keys.add(key)
+                parser.r.whitespace(); parser.r.expect(58); parser.r.whitespace()
+                if key == 'files':
+                    self.files_object_map(parser, spec, state)
+                else:
+                    token = parser.r.peek()
+                    kind = 'string' if token == 34 else 'json-object' if token == 123 else 'json-array' if token == 91 else 'json-scalar'
+                    expected_type = 'string' if key == 'scope' else 'json-object'
+                    expected = key in control['expected_root_keys'] and kind == expected_type
+                    parser.opaque_value()
+                    self.event('header_candidate', envelope_schema=spec['envelope_schema'],
+                               producer_profile=control['producer_profile'], branch_key=key,
+                               payload_fields={key: kind}, metadata_valid=expected, admitted=False,
+                               payload_hash_verified=False, possible_historical_entry_evidence=True,
+                               complete_original_receipts_available=False)
+                    self.gap('files-object scope/summary/binary or unknown branch remains opaque and unadmitted', branch_key=key)
+                    if not expected:
+                        state['valid'] = False
+                        self.gap('files-object branch key/type does not match exact root profile', branch_key=key)
+                parser.r.whitespace(); separator = parser.r.byte()
+                if separator == 125:
+                    break
+                if separator != 44:
+                    raise ValueError('missing files-object root separator')
+                parser.r.whitespace()
+        else:
+            parser.r.byte()
+        parser.finish()
+        root_valid = sorted(keys) == control['expected_root_keys']
+        if not root_valid:
+            self.gap('files-object root keys do not match exact producer profile')
+        self.event('container_structure', envelope_schema=spec['envelope_schema'],
+                   producer_profile=control['producer_profile'], top_level_keys=sorted(keys),
+                   observed_file_rows=state['rows'], observed_unique_member_names=len(state['names']),
+                   observed_names_unique=state['unique'], root_keys_match_profile=root_valid,
+                   observed_metadata_valid=state['valid'] and state['unique'] and root_valid,
+                   independently_expected_file_count=None, independent_file_count_available=False,
+                   external_file_count_verified=False, file_count_authority=control['file_count_authority'],
+                   original_file_count_unavailable=True, payload_hash_verified=False, admitted=False,
+                   historical_audit_complete=False)
+        self.gap('files-object independent original file count remains unavailable')
+
     def top_object(self, parser, spec, discovery=False):
         parser.r.expect(123)
         keys = set()
@@ -1051,6 +1257,7 @@ class Inventory:
             self.gap('unknown top-level object structure; no automatic admission')
 
     def parse(self, stream, spec):
+        require_files_object_spec(spec)
         require_key_wrapper_spec(spec)
         require_four_field_spec(spec)
         key_wrapper = spec.get('envelope_schema') == KEY_WRAPPER_SCHEMA
@@ -1076,6 +1283,9 @@ class Inventory:
         fmt = spec.get('format', '').removeprefix('gzip-')
         if fmt not in {'json', 'jsonl'}:
             raise ValueError('unknown JSON transport format')
+        if spec.get('envelope_schema') in FILES_OBJECT_SCHEMAS:
+            self.files_object_root(parser, spec)
+            return
         if fmt == 'jsonl':
             ordinal = 0
             while True:
@@ -1271,12 +1481,14 @@ def run(manifest, emit, chunk_size=65536, max_record_bytes=64 * 1024 * 1024, cac
     if len(set(paths)) != len(paths):
         raise ValueError('duplicate source path')
     key_sources_ready = set()
+    files_object_sources_ready = set()
     for spec in manifest['sources']:
         try:
             members = spec.get('members', [])
+            require_files_object_spec(spec)
             require_key_wrapper_spec(spec)
             require_four_field_spec(spec)
-            if spec.get('envelope_schema') not in {None, 'legacy-name-data-base64-v1', 'utf8-name-text-members-v1', FOUR_FIELD_SCHEMA, KEY_WRAPPER_SCHEMA} | CHUNK_SCHEMAS:
+            if spec.get('envelope_schema') not in {None, 'legacy-name-data-base64-v1', 'utf8-name-text-members-v1', FOUR_FIELD_SCHEMA, KEY_WRAPPER_SCHEMA} | CHUNK_SCHEMAS | FILES_OBJECT_SCHEMAS:
                 raise ValueError('unknown explicit envelope schema')
             if spec.get('envelope_schema') in CHUNK_SCHEMAS and (spec.get('layout') != 'discover' or members):
                 raise ValueError('chunk schema is metadata discovery only; explicit reassembly is unavailable')
@@ -1289,11 +1501,15 @@ def run(manifest, emit, chunk_size=65536, max_record_bytes=64 * 1024 * 1024, cac
                 raise ValueError('duplicate member allowlist path')
             if spec.get('envelope_schema') == KEY_WRAPPER_SCHEMA:
                 key_sources_ready.add(spec['path'])
+            if spec.get('envelope_schema') in FILES_OBJECT_SCHEMAS:
+                files_object_sources_ready.add(spec['path'])
             inventory.source(root, spec, Path(cache_dir) if cache_dir else None)
         except (ValueError, TypeError, KeyError, OSError, EOFError, UnicodeError) as error:
             inventory.context = {'source': spec.get('path')}
             inventory.gap(str(error))
     for spec in manifest['sources']:
+        if spec.get('envelope_schema') in FILES_OBJECT_SCHEMAS and spec.get('path') not in files_object_sources_ready:
+            continue  # controls/admission rejection precedes every source read
         if spec.get('envelope_schema') == KEY_WRAPPER_SCHEMA and spec.get('path') not in key_sources_ready:
             continue  # rejected controls/admission must precede every source read
         try:
