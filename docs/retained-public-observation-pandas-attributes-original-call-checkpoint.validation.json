@@ -1,0 +1,1453 @@
+{
+  "schema": "minera-pandas-attributes-original-call-checkpoint-validation-v1",
+  "complete": true,
+  "capsule": {
+    "path": "docs/retained-public-observation-pandas-attributes-original-call-checkpoint.jsonl.gz",
+    "bytes": 718922,
+    "sha256": "f58e290565aa5c3d60139b4e30fc9e365fc71153ae4e7be2608250e6921c9665"
+  },
+  "own_members": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 124230,
+      "sha256": "0aa6b156e9789d745630301b0db0c30ac6f373633e079ce353bd9c7922caea41"
+    },
+    {
+      "path": "build/parity-closures/admit-pandas-attributes-public-observations-1.py",
+      "bytes": 6200,
+      "sha256": "6879f30465276c1315e439bb06970fca308120d3a357676f1aafe76a1de562a7"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/backend-review.py",
+      "bytes": 6061,
+      "sha256": "c5eae18a588446aa0dbbff355771ec31bd257e5276e901dfe41f14506061130f"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/case-provenance.jsonl",
+      "bytes": 384090,
+      "sha256": "89c05abde698260edf59f02607500478da5b3866e843b50f165427b54ce54837"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/correct-row-storage-1.py",
+      "bytes": 3997,
+      "sha256": "44cd1e25b59f464ba5ca0f8b45228329334a3dba134865500260e9bed1123162"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/freeze-preparation.py",
+      "bytes": 5103,
+      "sha256": "33c1c3bb42a9e7ef9282c18b4ead3df13f9fe78934f943e03810808d709b664c"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 16434,
+      "sha256": "fd38fda88251e42f59c2a4b36080e25be88598d6a315b69da097f24bf5d854b3"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/generation-report.json",
+      "bytes": 7539,
+      "sha256": "60c8ee1b171ba8e216459882689f7c2b4ef625d9c33917bbd769788b72b63ec8"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/native-codec-source.txt",
+      "bytes": 1983,
+      "sha256": "043299a6131899c100995ff55e0a3137ee0b8fcac74a8a47ddec3dd076147748"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/preparation.json",
+      "bytes": 6238,
+      "sha256": "eb84151df9c2f6b8fef86cad85c6e0f8171c47dfc1a66c0ab665bdd8a074a8c9"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/prepare-files.py",
+      "bytes": 7294,
+      "sha256": "25d7cf7b728b5db14652ff431f44ad7bc49892c8a37355e4debab1c62531e5e7"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/row-storage-correction-1/first-case-provenance.jsonl",
+      "bytes": 384090,
+      "sha256": "89c05abde698260edf59f02607500478da5b3866e843b50f165427b54ce54837"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/row-storage-correction-1/first-generate-transport-fixture.py",
+      "bytes": 16434,
+      "sha256": "fd38fda88251e42f59c2a4b36080e25be88598d6a315b69da097f24bf5d854b3"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/row-storage-correction-1/first-generation-report.json",
+      "bytes": 7539,
+      "sha256": "60c8ee1b171ba8e216459882689f7c2b4ef625d9c33917bbd769788b72b63ec8"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/row-storage-correction-1/first-preparation.json",
+      "bytes": 6238,
+      "sha256": "eb84151df9c2f6b8fef86cad85c6e0f8171c47dfc1a66c0ab665bdd8a074a8c9"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/row-storage-correction-1/first-support.hpp.txt",
+      "bytes": 10568,
+      "sha256": "8d4ab7d30c3a11c3bb04a77513d5ad615a8c7a1a87941a7b5a1eae0cda284d4e"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/row-storage-correction-1/report.json",
+      "bytes": 3768,
+      "sha256": "2353412466ccef37495542087499d9dea82b0875171d4b0bfd582c69153efe10"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/row-storage-correction-1/workbench-fixture-support-row-corrected-1.hpp.txt",
+      "bytes": 10632,
+      "sha256": "e9be69c85ac138bfe73d5e69c421bfc2b37b27e7bf6c085ffa2ed796b687122d"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/usage.md",
+      "bytes": 3059,
+      "sha256": "2dd4d41fb3958f47a25e7f970591862cec1c9d8197318f46a808c7f71a90d7ee"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-attributes-original-call-transport-1/workbench-fixture-support.hpp.txt",
+      "bytes": 10568,
+      "sha256": "8d4ab7d30c3a11c3bb04a77513d5ad615a8c7a1a87941a7b5a1eae0cda284d4e"
+    },
+    {
+      "path": "build/parity-closures/check-pandas-attributes-plan-gap-integration-1.py",
+      "bytes": 2745,
+      "sha256": "5741650756ad0e7ae344bdcd5614532737f897c42b2707afdcf09c2739d63cc1"
+    },
+    {
+      "path": "build/parity-closures/make-pandas-attributes-root-facts-1.py",
+      "bytes": 11277,
+      "sha256": "2e79fe3e90daa2203444bf9ea8e1284dddb98cd706fde696d0d8422ad666fb89"
+    },
+    {
+      "path": "build/parity-closures/package-pandas-attributes-original-call-checkpoint.py",
+      "bytes": 31092,
+      "sha256": "f8336cd0ea5866e069fe6a5f378cc6d1f9996d6f567ba96c701690c52c063d11"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-1/generation-1.json",
+      "bytes": 1162,
+      "sha256": "a093e398a81798eed6cf7a53c4d4c1d37a2a00184edb29f4e1d8d24f209fc50f"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-1/manifest.json",
+      "bytes": 9083,
+      "sha256": "214aa78a4ff2be7d2720d9bfb049ada6bf304ce76fd6e8de8d87d38115c2b9ee"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-1/validation.json",
+      "bytes": 1993,
+      "sha256": "92d1d364deab0115b691566377377a15a22e56892c411b2d25bbc4ba3a524aa0"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-2/generation-1.json",
+      "bytes": 1162,
+      "sha256": "a093e398a81798eed6cf7a53c4d4c1d37a2a00184edb29f4e1d8d24f209fc50f"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-2/generation-2-cache.json",
+      "bytes": 1162,
+      "sha256": "13240dec120c136099940149ddcefceb0cf51713fd08931cb8d22922c6a5cbc5"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-2/manifest.json",
+      "bytes": 9083,
+      "sha256": "214aa78a4ff2be7d2720d9bfb049ada6bf304ce76fd6e8de8d87d38115c2b9ee"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-2/validation.json",
+      "bytes": 2303,
+      "sha256": "44f8383857ecda8caa43c4dfe444b73b1ecdc51b395d852edd828ad860513654"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-3/generation-1.json",
+      "bytes": 1162,
+      "sha256": "24ea789a49ff5a2c7d3e8165cea7bc853a41b1912492ce02cc5251f78ff862d4"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-3/generation-2-cache.json",
+      "bytes": 1162,
+      "sha256": "e9e14b4ba59f79709c455cd307bef89687e6bcefe6e04bf7148ca9697e1667c6"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-3/manifest.json",
+      "bytes": 9083,
+      "sha256": "214aa78a4ff2be7d2720d9bfb049ada6bf304ce76fd6e8de8d87d38115c2b9ee"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-3/validation.json",
+      "bytes": 2303,
+      "sha256": "fbcbe0b3817cfe1350d509b3108437bb2934eec327dfcb3dda67266db71327f6"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-canonical-census-1/receipt-identities.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-canonical-census-1/report.json",
+      "bytes": 194275,
+      "sha256": "0cc104c307344f106a662ce8895aa314f6502ba22920829baec1bea5b704d344"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-canonical-census-2/receipt-identities.jsonl",
+      "bytes": 475900,
+      "sha256": "2571966db6ee23d4fddb78be3b1c62b60d7db178bd3acb032457933b0069ec47"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-canonical-census-2/report.json",
+      "bytes": 8026,
+      "sha256": "f05fc65cb5e9743310d7d20c44d20a279842d872666513cb746960ac9a110508"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-full-native-mapping-review-1/all150-snapshot-bindings.jsonl",
+      "bytes": 42518,
+      "sha256": "06f1d7724b4727d10773efb0fc2978e6a3bcfe46e97a46b55cdf9aa361c9eb98"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-full-native-mapping-review-1/all448-mappings.jsonl",
+      "bytes": 370193,
+      "sha256": "ce5910fbfc8d43cf27faedc155b1055df1e6caadf658240c527ae8cfc44debb8"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-full-native-mapping-review-1/finish.py",
+      "bytes": 6107,
+      "sha256": "dbff5c3d649276106a88fb2971aecb6f90092d8a3bd4d4adf6b8649a5ca4a897"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-full-native-mapping-review-1/first-helper-failure.json",
+      "bytes": 333,
+      "sha256": "816333e60a3961fd28a9ec1b0d5435dcd5a6883bfd24e5dba2f801a9c18f5104"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-full-native-mapping-review-1/freeze.json",
+      "bytes": 2228,
+      "sha256": "1686a8b51dce7afe8e0fa5d218e6f6c1b36a6f63419756c8ed6a41befc5d8ef5"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-full-native-mapping-review-1/map-corrected-1.py",
+      "bytes": 16901,
+      "sha256": "168ecc18e366fda058f4da0f104fe61b4d0c39d77117868ca4cfd484a0bbbe3c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-full-native-mapping-review-1/map.py",
+      "bytes": 16852,
+      "sha256": "b6c08d96f6d11f5871eaee4830788ec1d08ba23b75aaff36d533421226d84d0f"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-full-native-mapping-review-1/report.json",
+      "bytes": 8761,
+      "sha256": "0279d074a6f942e98ae4de98db57e1448b339fd8efd40d5416dc6f7d9f0404f8"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/accept-448-root-first-draft.py",
+      "bytes": 10023,
+      "sha256": "b134aa7fbe4258c6206c4af87c59ebb200b7908125ba88723b5acd9edb04139e"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/accept-448-root-revision-2.py",
+      "bytes": 10276,
+      "sha256": "b7ef2fd0950405a63ad82c7b20b9470f8908d3e3743b9438e5e4a6d11d82c7e3"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/accept-448-root-revision-3.py",
+      "bytes": 11111,
+      "sha256": "3c42a80dc912ffb0631f9b7e4543df4950242086da6cd6cae200531be447b6db"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/accept-448-root-revision-4.py",
+      "bytes": 11111,
+      "sha256": "a00130e5a5a2ccf7dec5894a766a35732693a712c78377c7ff54fac7d7fea7c4"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/accept-448-root.py",
+      "bytes": 10276,
+      "sha256": "b7ef2fd0950405a63ad82c7b20b9470f8908d3e3743b9438e5e4a6d11d82c7e3"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/acceptance-runner-first-to-revision-2.diff.patch",
+      "bytes": 2720,
+      "sha256": "36b403f1ec4019f6861ffce94d91f5ad6d178ee5b7339ff0fd5f9b66cd73472b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/acceptance-runner-revision-2-to-3.diff.patch",
+      "bytes": 2581,
+      "sha256": "b15c863d90a26c200f6c3c6eec6b5c8821d9d88bdf20b904ff8394c7fde67460"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/acceptance-runner-revision-3-preparation.json",
+      "bytes": 1732,
+      "sha256": "af9bd08b5262f77b5eabbb744ac6fffc283a893285ca77123d3d993a199201f9"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/adapter-integration.diff.patch",
+      "bytes": 25600,
+      "sha256": "24d27a274cbdd82e7862c36477de3e60d6e65d690c49e8ed15cb24311637c7b0"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/before-full-plan-hardening-1/freeze.json",
+      "bytes": 1701,
+      "sha256": "7553514b88aa665844341b743452a6b0315ca6d623a52724dd41fc4b113b1753"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/before-full-plan-hardening-1/retained_public_receipt_index.py",
+      "bytes": 57917,
+      "sha256": "f0aced46e3cab03931631217b2cf1fdcc6ce40738f0aca07aa41ca3f9fc3dbcb"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/before-full-plan-hardening-1/retained_public_receipt_index.py.diff.patch",
+      "bytes": 827,
+      "sha256": "d25255b7fbf4fa32357efc319e8d511b8c8503db120e41f371db0d7efaa60ac1"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/before-full-plan-hardening-1/test_retained_public_receipt_pandas_attributes.py",
+      "bytes": 15804,
+      "sha256": "d6697ffb6378087365eb7ddf8ebdabcab367d0ae21a25fe5344350b79a4a4b84"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/before-full-plan-hardening-1/test_retained_public_receipt_pandas_attributes.py.diff.patch",
+      "bytes": 1267,
+      "sha256": "a9b3c187588be069fda9a668db67fa72c471392655f18ab03e768c32ae60c452"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/before/bindings.json",
+      "bytes": 331,
+      "sha256": "ee01d54cfd7a530161aabc6ffd1bacbf3cd4022397403787cd1766aa20b9f84d"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/before/retained-public-receipt-index.md",
+      "bytes": 7271,
+      "sha256": "8e4b1e518443cf750dec87be6c6101b6d47cf1f1bdeb0871f31e1c5768aafaf3"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/before/retained_public_receipt_index.py",
+      "bytes": 40546,
+      "sha256": "83f02e060128db35ec6b14e4c3c54d3604aecd0b51f317fe6c1d8e78ee719ebe"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/draft-before-positive-index.py",
+      "bytes": 57789,
+      "sha256": "9b0b6fe7b357dc94e66cb79eb1a920c12949d9794389db596c64c8b7103ab600"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/freeze.json",
+      "bytes": 3316,
+      "sha256": "143cab5ef861b42cbb5d062e70aa0d4f908dd0eb59567b53c69d28d747350b48"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/manifest.json",
+      "bytes": 9083,
+      "sha256": "214aa78a4ff2be7d2720d9bfb049ada6bf304ce76fd6e8de8d87d38115c2b9ee"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/root-commands.md",
+      "bytes": 1941,
+      "sha256": "b05ee6cf47f8c8fe0c851b8f622f05a488580a4bca9842dd14e384fb6fac2f17"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-adapter-prepared-1/static-structure-checks.json",
+      "bytes": 600,
+      "sha256": "8f606af551f8c8fbbffa89fe5b45d53af192bd79048699276a99327455820c8b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-index-independent-review-1/review.json",
+      "bytes": 9866,
+      "sha256": "036a075c65f418be7afc18f7261451992a93d0a37ea248ac05f6cfa369f6d957"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-next-polars-metadata-plan-1/prepare.py",
+      "bytes": 11595,
+      "sha256": "dcdac2386a7e492442114fcd03337dbf20201e02757c66c4001b70b5d765a55d"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-next-polars-metadata-plan-1/public-signature-map.json",
+      "bytes": 3497,
+      "sha256": "e6d28058a40b779ec11c2d9fc913a8132d448ed6d7e5dcbb0c9b07f9b1af93d2"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-next-polars-metadata-plan-1/report.json",
+      "bytes": 9213,
+      "sha256": "05671209ca8b19925b49c11c20f5e5fb055ac304c031c15276ad89a78e491dd6"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-next-polars-metadata-plan-1/source-declarations.json",
+      "bytes": 5894,
+      "sha256": "fd05431742139a1c6bdc2f424519b3f46830919846e01bd0654785a3f2527375"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-next-polars-metadata-plan-1/validation.json",
+      "bytes": 523,
+      "sha256": "e7b3240c358dd0d9f035c18e41cb8a9c41778cee66cf7d9ef668c56cba9c3d92"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-acceptance-1/browser-terminal-final.json",
+      "bytes": 1362,
+      "sha256": "8089223cd2217e25315045fcb75823f60cb63655548be86b0748222242839388"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-acceptance-1/frontend-all-terminal.json",
+      "bytes": 464,
+      "sha256": "991e022cb8715a2d55e121dd8b134c4b3487bbbae93a0d0995ef9ca349373bb3"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-acceptance-1/frontend-build-terminal.json",
+      "bytes": 551,
+      "sha256": "26b90978392c57dfdda6b107a259a29a69d0c2cb9c89c87c7a1410d43472d255"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-acceptance-1/native-controls-terminal.json",
+      "bytes": 740,
+      "sha256": "05ed7064ca076fe838ed16d6f5669c444f57aa0e5137f8ae492b542768fd9b6d"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-acceptance-1/native-full-attempt-1.json",
+      "bytes": 3503,
+      "sha256": "f42980e547c8943c219d22f6eb61aab522b1ce838ce953e76414986456b589ab"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-acceptance-1/native-full-terminal.json",
+      "bytes": 1550,
+      "sha256": "ccf027d9d8622a6c904311e8d802fbbf1e21c5a75ce73cf0f62d9abfbc5ce8ae"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-acceptance-1/receipt-integrity-terminal-final.json",
+      "bytes": 432,
+      "sha256": "0935776079bbe6e8f9066d4fa502ea205e0d581cd045d01e27814d69a18aaea2"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-acceptance-1/receipt-integrity-terminal.json",
+      "bytes": 298,
+      "sha256": "9a2c7c81e639d5fb3b1ba1a91bf687d17f6e2482a1849007349be4f5fa7f02a9"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/before-workbench.cpp",
+      "bytes": 13595,
+      "sha256": "7f8f2c73b0441f0c9837c9e670e5ec520a9fbfb2c635c90325edcc8cb76f8231"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/first-control-test-draft.cpp",
+      "bytes": 12821,
+      "sha256": "4e9bb1fe45238ad94652f851eb764f0dda60ae4b58e097c9d10bfd37aa50845e"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/first-parser-draft.hpp",
+      "bytes": 11534,
+      "sha256": "333b0a5a384d16afc137d11996c21450696d631fe67e4733d7594a1681158f77"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/first-workbench-draft.cpp",
+      "bytes": 17248,
+      "sha256": "8ef2517b0c1ffd861739cd9e23199b3a72c6ea4ca58c19efd831afe46afc4fc5"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/freeze-bindings.json",
+      "bytes": 1957,
+      "sha256": "78bcef59fe695fd4871bf4fce003cd1231d9f8acb53dae6c4d49c1b2a7bc05d1"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/freeze.py",
+      "bytes": 7033,
+      "sha256": "66039bd29fb3d8d9dd8f7ff99c4ccd8fa0063b7de0349b1a1bcec8badd209d98"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/frozen-pandas_attributes_original_call_parser.hpp",
+      "bytes": 11534,
+      "sha256": "333b0a5a384d16afc137d11996c21450696d631fe67e4733d7594a1681158f77"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/frozen-table_attributes_filter_workbench.cpp",
+      "bytes": 17248,
+      "sha256": "8ef2517b0c1ffd861739cd9e23199b3a72c6ea4ca58c19efd831afe46afc4fc5"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/frozen-test_pandas_attributes_original_call_controls.cpp",
+      "bytes": 12832,
+      "sha256": "55452cc81b56efcb2b5976b396fee09b4189db5a7ae980e44a0a409d4b9fdf1e"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-1/prebuild-report.json",
+      "bytes": 6831,
+      "sha256": "4e3e9d18be28c5d715dfb9c32b2adc328e6517de9f0927638fbdb56cc203aa4e"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-backend-independent-review-1/review.json",
+      "bytes": 5924,
+      "sha256": "99ba40706f629dd98d07c10a7626e39077fce22124a6f2b452bd978c437b8f05"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/report.json",
+      "bytes": 1622,
+      "sha256": "7017faa06e67c331149260710984528bc7c14fec23fb384ce92d5b998131a9de"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/report.json",
+      "bytes": 3710,
+      "sha256": "af0aa4bda4712dfb1c8d9109895f4806eebd31d1965f56dfef5dcd5fd2f9ec88"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/report.json",
+      "bytes": 3711,
+      "sha256": "06cd70f80aee3de338d849518c7b9cf83c64de42da418a0e3bc15055cd3b64a6"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-smoke-1.cjs",
+      "bytes": 18592,
+      "sha256": "554b69e5e484d35686d9ebfc1854571de0a5c5b268b8a32f1c632fda44559b75"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-smoke-2.cjs",
+      "bytes": 18971,
+      "sha256": "1c651d2cee3728768d228b5dbad81104c01aedcb34b3c25710099e03aeaeab11"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-smoke-3.cjs",
+      "bytes": 18971,
+      "sha256": "b7077f33fec08b5614b3c043699b961c5a76d068e5787a828a7d0ef7e457e9c5"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-checkpoint-prepared-1/preparation-revision-1.json",
+      "bytes": 1416,
+      "sha256": "e04c2c6136cf7f8d14fbb6b43d64ca1084a4ebdf52f59d9b87eb13a959b4f9de"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-checkpoint-prepared-1/revision-1.py",
+      "bytes": 25920,
+      "sha256": "760255f7a1f150f1d0118e3eb7360e8d301ab9353a19944e321cc2e92db7e2d5"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-checkpoint-prepared-1/root-facts-contract-revision-1.json",
+      "bytes": 15601,
+      "sha256": "4f0af04a89eacc15275a6ed1e40e9e7b8a6d21336bc5d06eb129bacc8440c121"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-finalization-1/committed-coverage.json",
+      "bytes": 480643,
+      "sha256": "ed9016cdefdb039ece6d17e0d6bdabae8e5e0530119e01bbecffc78fec1f3989"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-finalization-1/external-runtime-artifact-bindings-final.json",
+      "bytes": 4952,
+      "sha256": "8c291e2a86748fd593d8e5e6a232eba1054aaead58d985730341a0f93d68fea9"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-finalization-1/external-runtime-artifact-bindings.json",
+      "bytes": 7799,
+      "sha256": "7cca55739238af2c2c14bcd07b6a25ba183ecf06665502633295161f960b540e"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-finalization-1/root-facts.json",
+      "bytes": 74017,
+      "sha256": "46f0c52f4aefdf1503375f961611600a552057b08dc892f889dc46f20cacd554"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-finalization-1/root-terminal-receipts.json",
+      "bytes": 3974,
+      "sha256": "22ffc7bbe127ea25463d2c93368d40d559432d59ebc5de7ba625855d5802d1ce"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/TableAttributeRepetitionWorkspace.tsx",
+      "bytes": 11660,
+      "sha256": "e305681d7a654e846b75333641138de97268e48d327315d90eadc84f7f17d595"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/TableAttributesFilterWorkspace.tsx",
+      "bytes": 18014,
+      "sha256": "12684a78bed372c3673c2400a0c32d74c04ef2b0496b3af4dcdafe71acf06f02"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/browser-1-to-2.diff",
+      "bytes": 4210,
+      "sha256": "ea8996a832a1681bec55210c3813cd01a20c5c5d46e329e161ecaead94d0b40b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/doc-followup-review-1.json",
+      "bytes": 1252,
+      "sha256": "b1a34733027222b77f69cf815319fe19b55c1dc31267f777bd21343d8220c694"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/pandas-attributes-original-call-browser-smoke-1.cjs",
+      "bytes": 18592,
+      "sha256": "554b69e5e484d35686d9ebfc1854571de0a5c5b268b8a32f1c632fda44559b75"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/pandas-attributes-original-call-browser-smoke-2.cjs",
+      "bytes": 18971,
+      "sha256": "1c651d2cee3728768d228b5dbad81104c01aedcb34b3c25710099e03aeaeab11"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/review.json",
+      "bytes": 7736,
+      "sha256": "bc1ccd4a791fb41f6f4d0f44412a3fccd783b4a37a2658753c3827322df67121"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/review.py",
+      "bytes": 6838,
+      "sha256": "f04bb3eb02c247faae73817c795b80f30d73f7f2312e499a35dd527c7b86bbb3"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/table-attributes-filters.test.ts",
+      "bytes": 14629,
+      "sha256": "b676b9ae7952d61bdba065d5d244ec76af7e0b74759a6116eb39191bf652d49c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/table-attributes-filters.ts",
+      "bytes": 14392,
+      "sha256": "e8153a733d4f7bd214358591f568a7743b204aa0ac9e01263d119874abe688ce"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/table-attributes-original-call.test.ts",
+      "bytes": 6766,
+      "sha256": "e47805da507e144b591e6e6747c780dd5cd3e37be34f3ce7e96cc33fb42b31fa"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/table-attributes-workspace.test.ts",
+      "bytes": 8795,
+      "sha256": "07571af3f0d44276e4ef425bba875cbb314f922b7168fd6064ab96c76ddf39fa"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-frontend-review-1/validation.json",
+      "bytes": 494,
+      "sha256": "95da7bd667b5bf506916dc819f016f86f9d8b9b71f352f9f21b292378bcb56ec"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/census.py",
+      "bytes": 6745,
+      "sha256": "6e1839bcec177c37c8c23cc8fb4be4b8e400d29061a6c06796eef8e984a8ef99"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/finalize-corrected-1.py",
+      "bytes": 13954,
+      "sha256": "c61440db7d94a1752fc6014505f2b38d5a15f0391792b1bc1b615169c95e18c1"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/finalize.py",
+      "bytes": 13787,
+      "sha256": "b074196a2546fd7307e92c08f25e08e33f5688a1ea68dd96fcc2bbf197f6bc18"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/first-finalizer-failure.json",
+      "bytes": 452,
+      "sha256": "630628590cd3d46cfa8c30dad8c46e3aac080d0ba72e591d959392d5ef52bae3"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/freeze-corrected-1.json",
+      "bytes": 2354,
+      "sha256": "e59eff957ad5e3ec683309d869b3ba462a28936edb1dc271851f01326c8eb985"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/prepare-corrected-finalizer.py",
+      "bytes": 1379,
+      "sha256": "380ba9715a5d107a7e8694aac6551ae911bf71fe0034f622c6672a7deded0e08"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/report-corrected-1.json",
+      "bytes": 1577,
+      "sha256": "d548162a14c936e3773f197ce99349510d3b14ae83aa75c4161dc599da667c53"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/wire-contract-corrected-1.json",
+      "bytes": 9185,
+      "sha256": "5ca98769d0220c06d700ba86ea9761f6b55754be7c199b3a02eaa62396488b01"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/wire-contract.json",
+      "bytes": 2403,
+      "sha256": "0ca83a346e3365153232fd8264ca351efa988b6053e42f1a31600df9021c98bd"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/before-pandas_attributes_original_call_parser.hpp",
+      "bytes": 11534,
+      "sha256": "333b0a5a384d16afc137d11996c21450696d631fe67e4733d7594a1681158f77"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/before-test_pandas_attributes_original_call_controls.cpp",
+      "bytes": 12832,
+      "sha256": "55452cc81b56efcb2b5976b396fee09b4189db5a7ae980e44a0a409d4b9fdf1e"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/freeze.py",
+      "bytes": 4640,
+      "sha256": "28541de1a08bddf17fffebda60da5041d178335882763f60017d0e78e68799d2"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/frozen-pandas_attributes_original_call_parser.hpp",
+      "bytes": 11630,
+      "sha256": "264617871930985a4ec70aeaa84459b628ae46d5f21c516234eb58d69348a50c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/frozen-test_pandas_attributes_original_call_controls.cpp",
+      "bytes": 15968,
+      "sha256": "9501ffb89ef98ad0a642c7d5088849a2884fff2357443637aa8ad287afb59249"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/pandas_attributes_original_call_parser.hpp.diff.patch",
+      "bytes": 756,
+      "sha256": "3f7fd461e11726d7a2c59f70dba536ad3c16c37aab5df42ab11f709d9716f3b5"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/preserve.py",
+      "bytes": 3387,
+      "sha256": "5e11f6010487f1ff759c1d3b815419ac401a69dec359fb4a28481726a9e3d1d0"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/report.json",
+      "bytes": 4385,
+      "sha256": "f944d4b9ee56a07e1f6b38ef3f8363d43168b0427475b13e68591b6649a68faf"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/test_pandas_attributes_original_call_controls.cpp.diff.patch",
+      "bytes": 4486,
+      "sha256": "cf7829540c96542e240a80be9a40c7d5233b7c0de4ba6863700f2ac992ecca6c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/validation.json",
+      "bytes": 526,
+      "sha256": "d7f3f793017ce20526855b8b682bd66697837d165f8e08e44f348f6482c32d52"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-independent-review-1/review.json",
+      "bytes": 5015,
+      "sha256": "5b711fcc8f052020f5193289e0e95bd9369b34c3963800418a93e181d2ee2d29"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-plan-gap-integration-1/report.json",
+      "bytes": 1691,
+      "sha256": "ce440f0adb4ad80e3cc1fcc0b6f774bd533fd85fc3accf1a207c957934695418"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-public-observation-admission-1/admitted-native-oracle.json",
+      "bytes": 1529,
+      "sha256": "d0bcda23bf13a6013e1a6133b6ed644e2bcdbd229d689677b09c703cc0d8a5cd"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-public-observation-admission-1/admitted-sources.json",
+      "bytes": 6450,
+      "sha256": "51e9fdb4edaa31014b003e47c1ef05b90d9ff696e16ce038bd0beac109813e3d"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/adapter-proposal.md",
+      "bytes": 6175,
+      "sha256": "049b01632e2d447f6eaec515662318a900aeb736d6309e7afc8f29380c8d4e21"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/canonical-census-revision-2.py",
+      "bytes": 28398,
+      "sha256": "a520b054a5c5c22022f6b97af4d84995a4a061998a0a5dae25544235a7a72111"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/canonical-census.py",
+      "bytes": 28395,
+      "sha256": "414fbb45955da2172a4385c0916d88891c0b44a4edaccd0a2c47f2df1bae47d0"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/closed-observer-profile-revision-2.json",
+      "bytes": 8517,
+      "sha256": "c3ddf4eee9af2b4c65fd889a3db1f2f23f7a467c95657f94e0b1dc4e99dea419"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/closed-observer-profile.json",
+      "bytes": 8481,
+      "sha256": "794a222bdadc54f68a7c85cc34b1b0116cfe5721250064d6160caa8612dff41c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/manifest-contract.json",
+      "bytes": 5984,
+      "sha256": "1a1e74cb441a1207b6f09c0f1f2c247968b25c4f5cb1c2381e7143092e6e59a5"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/own-producer-excerpts.json",
+      "bytes": 8023,
+      "sha256": "38caea0e36de371c65af47926fd2ffd5d80edb82ea0ecf2059d7baaa5be22990"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/preparation.json",
+      "bytes": 2666,
+      "sha256": "af2f2267fe4720fb928cf62526b4ef7e4944ce7362cc9c9553cc9f0fa63bf67f"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/revision-1-to-2.diff.patch",
+      "bytes": 1367,
+      "sha256": "b63a3a3bf748b2662a7a1132093e7710fd2bbf7c8df3fae6530c435df85afaf7"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-receipt-admission-prepared-1/revision-2-preparation.json",
+      "bytes": 2987,
+      "sha256": "affaea8b0c6772c9dafd4b7874de60424980ba01ed82a3c18f7eeacf064e0415"
+    },
+    {
+      "path": "docs/attributes-filter-workflow.md",
+      "bytes": 9588,
+      "sha256": "d50efd1beb3e29202eb9ffe01d7144a48df8fed36b6e9a9bba83be7f3e2e052c"
+    },
+    {
+      "path": "docs/pandas-attributes-filter-parity-contract.md",
+      "bytes": 18474,
+      "sha256": "04d90b914334edebe153c6eb1dfa58774852d37fa0d99268be271b376b8e3657"
+    },
+    {
+      "path": "docs/retained-public-receipt-index.md",
+      "bytes": 9522,
+      "sha256": "4dbee33e49f96aaf936117b76934cb85a6854fbed1d22f70257536e4993bff7a"
+    },
+    {
+      "path": "scripts/retained_public_receipt_index.py",
+      "bytes": 58166,
+      "sha256": "5e12528284d81be4d571e7753de6ac39a991e6c4f46b8bc7897157f716d9e349"
+    },
+    {
+      "path": "scripts/tests/test_retained_public_receipt_pandas_attributes.py",
+      "bytes": 16500,
+      "sha256": "9edc15106e9784240c3bf1d24f025f3647a4ffc4087c26ae6acc99038cc04401"
+    },
+    {
+      "path": "src/backend/pandas_attributes_original_call_parser.hpp",
+      "bytes": 11630,
+      "sha256": "264617871930985a4ec70aeaa84459b628ae46d5f21c516234eb58d69348a50c"
+    },
+    {
+      "path": "src/backend/table_attributes_filter_workbench.cpp",
+      "bytes": 17248,
+      "sha256": "8ef2517b0c1ffd861739cd9e23199b3a72c6ea4ca58c19efd831afe46afc4fc5"
+    },
+    {
+      "path": "src/backend/tests/test_pandas_attributes_original_call_controls.cpp",
+      "bytes": 15968,
+      "sha256": "9501ffb89ef98ad0a642c7d5088849a2884fff2357443637aa8ad287afb59249"
+    },
+    {
+      "path": "src/backend/tests/test_pandas_attributes_workbench_public.cpp",
+      "bytes": 3937,
+      "sha256": "506dedc60179fce65a5d7c6f03b854f1e415f39a8b52e722d9ec284d07652ec9"
+    },
+    {
+      "path": "src/frontend/src/components/TableAttributesFilterWorkspace.tsx",
+      "bytes": 18014,
+      "sha256": "12684a78bed372c3673c2400a0c32d74c04ef2b0496b3af4dcdafe71acf06f02"
+    },
+    {
+      "path": "src/frontend/src/table-attributes-filters.ts",
+      "bytes": 14392,
+      "sha256": "e8153a733d4f7bd214358591f568a7743b204aa0ac9e01263d119874abe688ce"
+    },
+    {
+      "path": "src/frontend/tests/table-attributes-filters.test.ts",
+      "bytes": 14629,
+      "sha256": "b676b9ae7952d61bdba065d5d244ec76af7e0b74759a6116eb39191bf652d49c"
+    },
+    {
+      "path": "src/frontend/tests/table-attributes-original-call.test.ts",
+      "bytes": 6766,
+      "sha256": "e47805da507e144b591e6e6747c780dd5cd3e37be34f3ce7e96cc33fb42b31fa"
+    },
+    {
+      "path": "src/frontend/tests/table-attributes-workspace.test.ts",
+      "bytes": 8795,
+      "sha256": "07571af3f0d44276e4ef425bba875cbb314f922b7168fd6064ab96c76ddf39fa"
+    }
+  ],
+  "external_declarations": [
+    {
+      "path": "build/filtering-attributes-pandas-public-actual-1/records.jsonl",
+      "bytes": 16027153,
+      "sha256": "79c325c1a383b22280d1e8ae75824a049b449973d16f2ef8f47821f978ab5cad"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-public-prepared-1/capture-public.py",
+      "bytes": 21708,
+      "sha256": "0ad540ca2f75593d88dd3521e9911c6c753cfb90d7f511724ab55554253663f3"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-public-actual-1/validation.json",
+      "bytes": 10220,
+      "sha256": "c103375a7ab4b5f3b001a85ef70ca28e1272fc3989630779fd084d73a45f61aa"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-public-prepared-1/cases.json",
+      "bytes": 125379,
+      "sha256": "9284bb315c6c70b264715ed2f2f4fd406f4db86dee8a7541abd09feba3f8c899"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-public-actual-1/call-plan.jsonl",
+      "bytes": 6612816,
+      "sha256": "8cce1b97cb9e079434a6413297648ec108552e804b05f03582ef1a528f24f1a8"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-public-actual-1/call-intents.jsonl",
+      "bytes": 111813,
+      "sha256": "de463dd56bce2845e0e3dfa94d513f78e6b8ab81afe764e2b84dcecec157fe6c"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-public-actual-1/dedup-audit.json",
+      "bytes": 70566,
+      "sha256": "00a45385d78ad93dd7d880c3eeba05bea732c9ca0b57c654af4ec5c4401febff"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-public-actual-1/prior-receipt-search.json",
+      "bytes": 1157,
+      "sha256": "2dad070c370bad190e573d396593358b3feaebbf32796a3ae7edec14f0e3d354"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-continuation-public-actual-1/records.jsonl",
+      "bytes": 712113,
+      "sha256": "f38fa4e62d57d3762339a62ae63f7bf2cd8102950f0fa3ddd970d2999b972f85"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-continuation-prepared-1/capture-public.py",
+      "bytes": 21722,
+      "sha256": "202b22694aeb603b614476553c64dd0518b8e981cf4739cf30fc4ad91e929b9d"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-continuation-public-actual-1/validation.json",
+      "bytes": 10217,
+      "sha256": "ad953500eddf710dad82d24aa460158cd8239d75192d8e3996cbed39db2644cf"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-continuation-prepared-1/cases.json",
+      "bytes": 6096,
+      "sha256": "567dfec2aba3e8fe05fb36570a1e974891099efd75a9eade21a2843772f793cb"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-continuation-public-actual-1/call-plan.jsonl",
+      "bytes": 303065,
+      "sha256": "8f1f2c3c24169a004f9becf4f06aa4adb0cc82743c717c1079c18c068684f8a9"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-continuation-public-actual-1/call-intents.jsonl",
+      "bytes": 4886,
+      "sha256": "d2ada4b35a322414bf119166960be51cd4c5c720458405f8c59e49e338cbc1bb"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-continuation-public-actual-1/dedup-audit.json",
+      "bytes": 3205,
+      "sha256": "6646f4b20685d01ceac67ed2e1c528e596401d35e130d59ddda0f078b705e39a"
+    },
+    {
+      "path": "build/filtering-attributes-pandas-continuation-public-actual-1/prior-receipt-search.json",
+      "bytes": 4466,
+      "sha256": "11aa941903702494322185aa5897bb0e8b4be7d569d183c4ef2f96fb009112d4"
+    },
+    {
+      "path": "src/backend/tests/test_pandas_attributes_filter.cpp",
+      "bytes": 2893157,
+      "sha256": "cfa46259d2340bbf09af27045a53e8e472834aa7e3c541e503b275538225a582"
+    },
+    {
+      "path": "src/backend/pandas_attributes_filter.cpp",
+      "bytes": 26838,
+      "sha256": "1c20d34f4186d03e89260d6c9628857afbedbe05ccb04b2edc9b31d8ba546e6b"
+    },
+    {
+      "path": "include/minera/pandas_attributes_filter.hpp",
+      "bytes": 4506,
+      "sha256": "d010865fdccc54395fdbe1c5586105dc589010b06284b205c78be3df3c05f4f2"
+    },
+    {
+      "path": "src/backend/tests/pandas_attributes_workbench_public_vectors.inc",
+      "bytes": 743417,
+      "sha256": "87911e3160cf3ad1009f9ef32f8376d7ed03d5c6081ba8f1526cab0b1d7694a2"
+    },
+    {
+      "path": "src/backend/tests/pandas_attributes_workbench_public_vectors.inc",
+      "bytes": 743481,
+      "sha256": "3b7e2a9f4202ba7c3c4ad650dd00fd3667150737f702c9cdf4372c6716c1c8da"
+    },
+    {
+      "path": "build/Release/minera_server.exe",
+      "bytes": 17014784,
+      "sha256": "c72855d30d32d2769ebe0b11bc56b1f2bca7f244ab226b76c0a1c4b856448276"
+    },
+    {
+      "path": "src/frontend/dist/index.html",
+      "bytes": 886,
+      "sha256": "40d01ba51b9f570144d49a56fbb3cee0d5b4cd61ac8121170e1428309ebdec50"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-admitted-index-acceptance-3/receipts.sqlite",
+      "bytes": 15298560,
+      "sha256": "b0ef19883b66415976d8a3ba19b50567a15944d58c2bf45c5aae86fedd59e749"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/controls_before_json.json",
+      "bytes": 4236,
+      "sha256": "127f3c4650938917bea950ee1735062db2556ad4383c2ab0356399406c6a64cf"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/controls_after_json.json",
+      "bytes": 4236,
+      "sha256": "127f3c4650938917bea950ee1735062db2556ad4383c2ab0356399406c6a64cf"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/error-source-after.json",
+      "bytes": 2275,
+      "sha256": "a177adf467ef2bf814813d731fe253b2b4cfa31c5858ed1735a0e857399c2067"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/error-response.json",
+      "bytes": 10875,
+      "sha256": "b737c385393604d1a326cc51c559eddd3f83fb7ad01b63a42661467ad24ed41b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/exact-call-download.json",
+      "bytes": 275,
+      "sha256": "e1eb5ece6b00a3ba2fcd2edc4adf054b8ed6e5aec04609838ea4943640354f28"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/filtered-table.json",
+      "bytes": 1638,
+      "sha256": "2edcc4104505be444de4ecbfb2a0596baf9011f5ffad82c78e10f01fbd5b4da3"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/parsed-source.json",
+      "bytes": 2275,
+      "sha256": "a177adf467ef2bf814813d731fe253b2b4cfa31c5858ed1735a0e857399c2067"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/census.py",
+      "bytes": 6745,
+      "sha256": "6e1839bcec177c37c8c23cc8fb4be4b8e400d29061a6c06796eef8e984a8ef99"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/finalize.py",
+      "bytes": 13787,
+      "sha256": "b074196a2546fd7307e92c08f25e08e33f5688a1ea68dd96fcc2bbf197f6bc18"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/finalize-corrected-1.py",
+      "bytes": 13954,
+      "sha256": "c61440db7d94a1752fc6014505f2b38d5a15f0391792b1bc1b615169c95e18c1"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/full448-census.json",
+      "bytes": 199426,
+      "sha256": "713430ad02222a6037283219335f94b94ef48b880cc6d6eadf717e0bdc95245e"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/full448-controls.json",
+      "bytes": 451756,
+      "sha256": "ede00db39efeefa3653c7584107c5b5dfafc3c80ed961838a6ad18f3c3aac1cb"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/supplied-count-domains.json",
+      "bytes": 6859,
+      "sha256": "b55f99879ffc94fb706085f81caba1445f51a0506bb0c6783e15a862be9477b0"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/full448-wire-projections.json",
+      "bytes": 300658,
+      "sha256": "fa93496e9ec8d296d8039f003caa5cc9a6ac4d522395336f6f5873315dd09307"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/wire-contract-corrected-1.json",
+      "bytes": 9185,
+      "sha256": "5ca98769d0220c06d700ba86ea9761f6b55754be7c199b3a02eaa62396488b01"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-product-wire-proposal-1/report-corrected-1.json",
+      "bytes": 1577,
+      "sha256": "d548162a14c936e3773f197ce99349510d3b14ae83aa75c4161dc599da667c53"
+    },
+    {
+      "path": "build/parity-closures/polars-attributes-filter-acceptance/check-bindings.json",
+      "bytes": 34258,
+      "sha256": "643aae1051a2e17792094adbb4c9892673a94d5f2c987a8e8c3cd38f285b880f"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/validation.json",
+      "bytes": 10822,
+      "sha256": "8fabf2d55a770d81b5e8ce0afd77c5a41e01d5a2e5a1edd3f8791cc1e4d19c3f"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/records.jsonl",
+      "bytes": 17035517,
+      "sha256": "650a20a6741b9c38338554d395ea5a579bc59ee801ff8c411e095eeab657759b"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/call-intents.jsonl",
+      "bytes": 142939,
+      "sha256": "cd4385db4b94fa5089706a40733abd56f0ebf332bd5b44106b01c82dd098af03"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-actual-1/dedup-audit.json",
+      "bytes": 11571723,
+      "sha256": "dc833a8485ba8fcdc0e0e3e556c0f63e2aa2ef1f969405dc65ccf3a3585fa85a"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-prepared-1/capture-public.py",
+      "bytes": 15907,
+      "sha256": "00f31f61f52c41fd2ab29bfecc2f226d4d4da22d667786f0377c9bd880798506"
+    },
+    {
+      "path": "build/filtering-attributes-polars-public-prepared-1/cases.json",
+      "bytes": 2208665,
+      "sha256": "84dff1bfc88f28dbce97eb271082e102ea7f226a25d3e08792dd5001ec8a8ed9"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/validation.json",
+      "bytes": 10815,
+      "sha256": "86c9ef0376274b8d30e342331a36f315956324886bdbb9c78193d2190985fde8"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/records.jsonl",
+      "bytes": 416923,
+      "sha256": "931489435aabe03041b6ce4f4346a1d9f21d520931b58e64125a567f0be4bcfc"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/call-intents.jsonl",
+      "bytes": 3599,
+      "sha256": "4f1caa5bf33898b3462d472f5fb1d2922723ada1802e9cfbed625e9069219d70"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-actual-1/dedup-audit.json",
+      "bytes": 300021,
+      "sha256": "1be861ff55bb0f9ff2114b2891de17cd9a187aff971de90cba7fb9a9fad920b7"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-prepared-1/capture-public.py",
+      "bytes": 15972,
+      "sha256": "a3802edfd02c835d66e05e72b21ea4d3227206ee4c8fbc60a9290ebc71c0c855"
+    },
+    {
+      "path": "build/filtering-attributes-polars-relative-public-prepared-1/cases.json",
+      "bytes": 58345,
+      "sha256": "c43767fb08ebaf8616c062584348b2c8f2c26ed4e3799433959c4c681ae3dd80"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/validation.json",
+      "bytes": 10823,
+      "sha256": "1024731e5e7da74717dcea616ad42c2c6e1bf85f14900f1d71f53f22d93e0df2"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/records.jsonl",
+      "bytes": 190809,
+      "sha256": "fbd439bb0420ece66b64ca429be7645ab018fb28dee216aa7c0879694457bb81"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/call-intents.jsonl",
+      "bytes": 1592,
+      "sha256": "15da57d8b5753e66a5cfdecfc86bb3e829715b84c5cad4f18626d07273922fb3"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-actual-1/dedup-audit.json",
+      "bytes": 128517,
+      "sha256": "8529e8fa80568267a1d53cde96c19099d3b3e57027d3bbf7f5ee56bac71dcde2"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-prepared-1/capture-public.py",
+      "bytes": 16066,
+      "sha256": "b75d08d1c3d703eeaba27b7e711c1de2bee3a5daf6ebd40f0c80908df22c5db4"
+    },
+    {
+      "path": "build/filtering-attributes-polars-ties-discriminating-public-prepared-1/cases.json",
+      "bytes": 24741,
+      "sha256": "a6c21dc069113862d6c510a1baf2d6e395e0b197450764887345db5d0152377c"
+    },
+    {
+      "path": "src/backend/tests/polars_attributes_filter_public_vectors.inc",
+      "bytes": 17208527,
+      "sha256": "f699f1152ad129aeb847dcd466f9fbd9e4bd2aab496f79638e2965c2691ec4d2"
+    },
+    {
+      "path": "src/backend/tests/test_polars_attributes_filter.cpp",
+      "bytes": 10301,
+      "sha256": "f1c8186977215b6b3380bad4847ef1a5bda279461005deb248be6e21b5c205c8"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/friendly-events-response.json",
+      "bytes": 7806,
+      "sha256": "3c300060ca6dbc41091b4ce4b21f722d93b3cbf7e885f8c8ffe1428adcc3f3de"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/original-traces-response.json",
+      "bytes": 11468,
+      "sha256": "77baa5ffb139744beed8fddad55f6bca35c5345a1ed11281bbb34dc040de7bfa"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/original-events-response.json",
+      "bytes": 10756,
+      "sha256": "b63cbe7bf0abf8e6ca163d22fbf6e89586d256943b5f1608b586e6525315c866"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/original-numeric_traces-response.json",
+      "bytes": 16390,
+      "sha256": "4ba7bb82dd821d8f830183961a045967cc589b3fefbadc3087575886f25901e8"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/original-numeric_events-response.json",
+      "bytes": 16390,
+      "sha256": "23836723e921068ddd390b9f77f731de83120b8f2e9c992f1968833b218571bf"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/original-threshold-response.json",
+      "bytes": 10745,
+      "sha256": "a652d991f6af9ba9ff73a23aea44b23188cb9f99436f4f49e8c0e6d772479aa2"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/original-top_activities-response.json",
+      "bytes": 11401,
+      "sha256": "959ac36dfb20d65b8261a11529ef724f888f75d85b823bfca1ca4e9b15036995"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/original-on_values-response.json",
+      "bytes": 11485,
+      "sha256": "38c7df1069c642f42211ddf6932c17332aa9ecd9541e2aa8a7a5b7a8b95fd53b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/original-relative-response.json",
+      "bytes": 10020,
+      "sha256": "5116299c81c2525336d63abc7f8e76ac7b21800d9ff4d5ee4d324cc4207dce2c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/enum-literal-precedence-response.json",
+      "bytes": 17226,
+      "sha256": "48731e5f1f11924849c807acae7d8f46dc93624cadb714ee808a5d57f91129c6"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/nanosecond-typed-operand-response.json",
+      "bytes": 15192,
+      "sha256": "30069e7fcfe19c9cfb37c6d27ca41d2e3d554975ba068cd868ec27b6994f6f4c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-1/own-source.json",
+      "bytes": 1365,
+      "sha256": "c68ddcd6fcb0ac25b69f9aa3d25da87aea2ce37a69a122a34cedceaeb580f9ab"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/friendly-events-response.json",
+      "bytes": 7806,
+      "sha256": "3c300060ca6dbc41091b4ce4b21f722d93b3cbf7e885f8c8ffe1428adcc3f3de"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/original-traces-response.json",
+      "bytes": 11468,
+      "sha256": "77baa5ffb139744beed8fddad55f6bca35c5345a1ed11281bbb34dc040de7bfa"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/original-events-response.json",
+      "bytes": 10756,
+      "sha256": "b63cbe7bf0abf8e6ca163d22fbf6e89586d256943b5f1608b586e6525315c866"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/original-numeric_traces-response.json",
+      "bytes": 16390,
+      "sha256": "4ba7bb82dd821d8f830183961a045967cc589b3fefbadc3087575886f25901e8"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/original-numeric_events-response.json",
+      "bytes": 16390,
+      "sha256": "23836723e921068ddd390b9f77f731de83120b8f2e9c992f1968833b218571bf"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/original-threshold-response.json",
+      "bytes": 10745,
+      "sha256": "a652d991f6af9ba9ff73a23aea44b23188cb9f99436f4f49e8c0e6d772479aa2"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/original-top_activities-response.json",
+      "bytes": 11401,
+      "sha256": "959ac36dfb20d65b8261a11529ef724f888f75d85b823bfca1ca4e9b15036995"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/original-on_values-response.json",
+      "bytes": 11485,
+      "sha256": "38c7df1069c642f42211ddf6932c17332aa9ecd9541e2aa8a7a5b7a8b95fd53b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/original-relative-response.json",
+      "bytes": 10020,
+      "sha256": "5116299c81c2525336d63abc7f8e76ac7b21800d9ff4d5ee4d324cc4207dce2c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/enum-literal-precedence-response.json",
+      "bytes": 17226,
+      "sha256": "48731e5f1f11924849c807acae7d8f46dc93624cadb714ee808a5d57f91129c6"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/nanosecond-typed-operand-response.json",
+      "bytes": 15192,
+      "sha256": "30069e7fcfe19c9cfb37c6d27ca41d2e3d554975ba068cd868ec27b6994f6f4c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/typed-count-dictionary-response.json",
+      "bytes": 18333,
+      "sha256": "cd877364aec456dd7a162c20407bd3afc6bca8e449ce5b4e07b82f6994033694"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/raw-parameter-diagnostic-response.json",
+      "bytes": 10875,
+      "sha256": "b737c385393604d1a326cc51c559eddd3f83fb7ad01b63a42661467ad24ed41b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/exact-large-integer-import-response.json",
+      "bytes": 16394,
+      "sha256": "74b33806645bda82f560216d67aeade57167bdfdd7ccada1d2a4452e547f1f1d"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/reusable-filtered-table-response.json",
+      "bytes": 10756,
+      "sha256": "b63cbe7bf0abf8e6ca163d22fbf6e89586d256943b5f1608b586e6525315c866"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/actual-filtered-source-reuse-response.json",
+      "bytes": 9294,
+      "sha256": "e913da39abdedbdecb9611f14cd881c886b960b6d9d7b8ae71eb17cb1b327bb4"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/own-source.json",
+      "bytes": 1365,
+      "sha256": "c68ddcd6fcb0ac25b69f9aa3d25da87aea2ce37a69a122a34cedceaeb580f9ab"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/cancelled-native-response.json",
+      "bytes": 16394,
+      "sha256": "74b33806645bda82f560216d67aeade57167bdfdd7ccada1d2a4452e547f1f1d"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/pandas-original-success.png",
+      "bytes": 135497,
+      "sha256": "c0837b2704778486fbcc3710a32ce8ac08a815716e1ea26ed9cb14b029a2f9df"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-2/pandas-original-error.png",
+      "bytes": 132011,
+      "sha256": "ea4fac15dce281428d89a4779c628b407651dd7cc3403da8b42a2d5f73e7de7f"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/friendly-events-response.json",
+      "bytes": 7806,
+      "sha256": "3c300060ca6dbc41091b4ce4b21f722d93b3cbf7e885f8c8ffe1428adcc3f3de"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/original-traces-response.json",
+      "bytes": 11468,
+      "sha256": "77baa5ffb139744beed8fddad55f6bca35c5345a1ed11281bbb34dc040de7bfa"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/original-events-response.json",
+      "bytes": 10756,
+      "sha256": "b63cbe7bf0abf8e6ca163d22fbf6e89586d256943b5f1608b586e6525315c866"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/original-numeric_traces-response.json",
+      "bytes": 16390,
+      "sha256": "4ba7bb82dd821d8f830183961a045967cc589b3fefbadc3087575886f25901e8"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/original-numeric_events-response.json",
+      "bytes": 16390,
+      "sha256": "23836723e921068ddd390b9f77f731de83120b8f2e9c992f1968833b218571bf"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/original-threshold-response.json",
+      "bytes": 10745,
+      "sha256": "a652d991f6af9ba9ff73a23aea44b23188cb9f99436f4f49e8c0e6d772479aa2"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/original-top_activities-response.json",
+      "bytes": 11401,
+      "sha256": "959ac36dfb20d65b8261a11529ef724f888f75d85b823bfca1ca4e9b15036995"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/original-on_values-response.json",
+      "bytes": 11485,
+      "sha256": "38c7df1069c642f42211ddf6932c17332aa9ecd9541e2aa8a7a5b7a8b95fd53b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/original-relative-response.json",
+      "bytes": 10036,
+      "sha256": "b10bee6243d4862517fbde06f09768dc25857469a1f5fdaa896c3ee89a2d5ea1"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/enum-literal-precedence-response.json",
+      "bytes": 17226,
+      "sha256": "48731e5f1f11924849c807acae7d8f46dc93624cadb714ee808a5d57f91129c6"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/nanosecond-typed-operand-response.json",
+      "bytes": 15192,
+      "sha256": "30069e7fcfe19c9cfb37c6d27ca41d2e3d554975ba068cd868ec27b6994f6f4c"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/typed-count-dictionary-response.json",
+      "bytes": 18333,
+      "sha256": "cd877364aec456dd7a162c20407bd3afc6bca8e449ce5b4e07b82f6994033694"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/raw-parameter-diagnostic-response.json",
+      "bytes": 10875,
+      "sha256": "b737c385393604d1a326cc51c559eddd3f83fb7ad01b63a42661467ad24ed41b"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/exact-large-integer-import-response.json",
+      "bytes": 16394,
+      "sha256": "74b33806645bda82f560216d67aeade57167bdfdd7ccada1d2a4452e547f1f1d"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/reusable-filtered-table-response.json",
+      "bytes": 10756,
+      "sha256": "b63cbe7bf0abf8e6ca163d22fbf6e89586d256943b5f1608b586e6525315c866"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/actual-filtered-source-reuse-response.json",
+      "bytes": 9294,
+      "sha256": "e913da39abdedbdecb9611f14cd881c886b960b6d9d7b8ae71eb17cb1b327bb4"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/own-source.json",
+      "bytes": 1365,
+      "sha256": "c68ddcd6fcb0ac25b69f9aa3d25da87aea2ce37a69a122a34cedceaeb580f9ab"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/cancelled-native-response.json",
+      "bytes": 16394,
+      "sha256": "74b33806645bda82f560216d67aeade57167bdfdd7ccada1d2a4452e547f1f1d"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/pandas-original-success.png",
+      "bytes": 135497,
+      "sha256": "c0837b2704778486fbcc3710a32ce8ac08a815716e1ea26ed9cb14b029a2f9df"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-browser-owned-3/pandas-original-error.png",
+      "bytes": 131968,
+      "sha256": "114dd6afea26e499472c627370b9c7d6170e78a725d907a9bafb36f8e11de0b6"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-original-call-scalar-correction-1/before-proof.json",
+      "bytes": 3917,
+      "sha256": "decd378a9bfc7bb861338220a256f3b3d3e809d90dcbcd9fdc4bea93a48dca3b"
+    },
+    {
+      "path": "build/filtering-attributes-public-surface-actual-1/capture.json",
+      "bytes": 18895,
+      "sha256": "eecdaa45e020384761bbcf6fd2a79d4067d0079a45efb81ceebdca31253a4444"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-next-product-metadata-review-1/scope-bindings.json",
+      "bytes": 12242,
+      "sha256": "328a71422cd555144e2ed1d9c2b9f9abc6ce200ed57c0e166c1e3cb64e430320"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-public-provenance-1/report.json",
+      "bytes": 2733,
+      "sha256": "9b8500cde3b9522370d78456507e0032edb787c235e9c3b4cff322dcfc2a9bfd"
+    },
+    {
+      "path": "build/parity-closures/pandas-attributes-filter-acceptance/check-bindings.json",
+      "bytes": 37990,
+      "sha256": "d3d21383b1ff808d62fc5de64c94ffff033733d70ccae79e7d5cbb7613d3a550"
+    }
+  ],
+  "root_facts": {
+    "path": "build/parity-closures/pandas-attributes-original-call-finalization-1/root-facts.json",
+    "bytes": 74017,
+    "sha256": "46f0c52f4aefdf1503375f961611600a552057b08dc892f889dc46f20cacd554"
+  },
+  "source_commit": "3c644740e67953af30cb12f9d30b54279f1f8560",
+  "original_payload_opens": 0,
+  "external_declarations_reopened": false,
+  "reference_calls": 0,
+  "UTF8_exact_member_roundtrip": true,
+  "all_own_members_revalidated": true,
+  "full_history_complete": false,
+  "absence_authority": false,
+  "strict_open_units": 201,
+  "unentered_logical_queries": 565
+}
