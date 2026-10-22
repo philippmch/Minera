@@ -14,7 +14,92 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: Polars input types reach API/UI — 2026-10-22
+## Current continuation: original typed Polars calls reach API/UI — 2026-10-22
+
+`ca20fd47` retains this checkpoint in
+`docs/retained-public-observation-polars-original-call-checkpoint.jsonl.gz`
+(618,416 bytes; SHA256
+`b3d8021ac792c4b0e300e79ce32eb32620afba7dc81c6a5059e2b2861ac03d19`).
+Its validation sidecar is 84,459 bytes, SHA256
+`a572ff65b1927bf81e762f4a8e2304537eaa6eb7403143cce9f46b90a9f04f3d`.
+Root independently verified all **120 own text members** against their source
+bytes and exact UTF8 round trips. There are **104 external declarations**;
+original receipts/archives, both generated public vector includes, browser raw
+artifacts and runtime binaries remain external. Final root acceptance is
+62,531 bytes, SHA256
+`ce95925a5609c8ecb9fe24d2835fa2cc843a83db006cf726dd4406cb954ff09f`.
+The packager's initial overly broad browser-directory guard rejected its own
+helper during plan-only validation; the corrected bounded guard and failure
+metadata are retained. No original payload was opened by packaging.
+
+Three clean source commits extend the previous input-kind checkpoint:
+`1e993417` adds strict backend original-call transport; `57676f9d` adds the
+frontend editors, inspection/downloads and workflow documentation; `86bd11ea`
+adds complete retained-call transport acceptance. The original predicate and
+675-case native oracle include remain byte-identical.
+
+Optional `call_json` exclusively selects original Polars mode at
+`POST /api/reference-ltl-filter`. The required schema is
+`minera-polars-ltl-original-call-v1`. Preserve omitted versus explicit null
+operands, omitted/raw parameters, and ordered string/enum mapping entries.
+Both DataFrame and LazyFrame use the existing native generic overloads. Strict
+JSON grammar, decoded duplicate keys, mixed controls, unsupported enum identities
+and unrepresentable operand-map order reject before source import. Recognized
+native semantic errors retain their exact apply/collect boundary and message.
+The response now has **27 fields**, adding `call_mode` and exact native-string
+`call_json`; original-mode selector fields are null instead of invented friendly
+defaults. Other engines reject `call_json`.
+
+The friendly form remains the default. Original mode supports operand/parameter
+editors plus an authoritative complete-call editor and strict UTF8 file import.
+Raw integer tokens and imported CRLF are retained rather than parsed/reformatted.
+Edits/import generations cancel stale work; frontend identity checks bind the
+exact original call, mode and input type. Complete call/source/result/HTTP-response
+downloads remain available at their valid success/error boundaries.
+
+Root acceptance is `build/parity-closures/ltl-polars-original-call-acceptance-1/`.
+All **192 frontend files / 9,843 tests**, the focused 34 tests, TypeScript and
+production build pass. Native workbench and HTTP control suites pass terminal
+**3c9a4b**. All **675 original Polars calls** then pass twice through the new
+transport: direct workbench and owned loopback HTTP, each with **516 complete
+frames / 159 full diagnostics**, full source before/after, exact errors/phases,
+27-field envelope and request mutation checks. The original 675 native
+comparisons also pass. This test completed terminal0/drained **698cda** in
+104 seconds; native build terminals are **8e375b** and **44a981**.
+No fresh full 297-log or 429-pandas native differential run is claimed here.
+
+The new transport fixture reuses 236 original frame functions. Its generator
+independently reconstructed all original canonical receipt hashes and the
+unchanged sorted set `4b777fc6cfbe75bc7c90cf73022160f54b7da02bb8f3a7b5437f2c12082968b1`.
+Final fixture SHA256 is
+`78157fdb5359e253f4c8d17a2954adf98ca317b7accb57d1eee9a3cb5089ce50`.
+The initial single-function layout is retained; per-case noinline wrappers have
+identical 675 assertion calls and provenance bytes. No expected outcome changed.
+Independent backend/fixture review passes, SHA256
+`92a19d85c640e6cddf1386b3f77a5cfc7161a14a0b681be7653032843a6a3777`.
+
+Actual rendered browser interaction passes terminal0/drained **e46503**: nine
+checks / seven actual requests cover friendly default, missing/null/raw parameter
+errors, both string/enum conflict orders, eager complete-call import, exact
+CRLF/large-integer text and downloads, stale clearing and inactive pandas mode.
+Root inspected both success/error screenshots. The owned server and isolated
+Chrome closed with output drained and listener PID verified. No existing
+process was replaced. Server SHA256:
+`ef12532ba4709f1ec5105a3d919316acb972e798fddbd3f84006d6f9a9e939b9`.
+The first browser helper failed syntax checking before any app execution;
+the failed helper and corrected independently reviewed recipe remain retained.
+
+The 1,203 projected typed values represent the admitted domain, not arbitrary
+Python object reconstruction. Nonstring keys, arbitrary ordered operand maps,
+custom enums, temporal provenance and other contract gaps remain explicit.
+Full scope remains **86 packages / 387 modules**, **46 / 226 complete**, **201
+strict open units**, and **565 unentered logical queries** across six banks.
+There are zero new/replayed reference calls, new admissions or catalogue
+promotions. Historical reconstruction and whole-bank dedup gates still apply.
+Continue the analogous already-admitted pandas original-call surface next;
+the Polars interface does not close the wider family or catalogue.
+
+## Previous checkpoint: Polars input types reach API/UI — 2026-10-22
 
 `32391002` retains the verified own-evidence checkpoint in
 `docs/retained-public-observation-polars-input-kind-checkpoint.jsonl.gz`
