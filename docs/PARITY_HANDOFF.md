@@ -14,7 +14,135 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: all 726 original Polars attributes calls reach API/UI — 2026-10-22
+## Current continuation: all 380 original LOG variants calls reach API/UI — 2026-10-22
+
+Root package terminal `c51997` retains
+`docs/retained-public-observation-log-variants-original-call-checkpoint.jsonl.gz`
+(763,618 bytes; SHA256
+`e8ac773a7f5ac9f246688fd7b13d1dc070c6dfeb10a2723b1610dffb2b307b5a`).
+Evidence commit `bc41d9e9` contains the capsule and validation sidecar. The
+capsule has 163 own UTF8 members and 53 external bindings. Root executed the
+independent new-own-capsule verifier (`731361`): the complete member set,
+UTF8 round trips, full hashes and current own bytes all match. No external
+payload was opened by packaging or this readback.
+
+The final explicit scope is
+`log-variants-original-call-checkpoint-prepared-1/scope.json`, SHA256
+`217e7a6330f524fc91b699e718d3062b59e845cdad061edc57f165135f2c1596`.
+Root terminal facts are
+`log-variants-original-call-finalization-1/root-facts.json`, SHA256
+`a9821d467faac3ec096320bf350b291ea02c2e2c48efbeb2fac34e03fec27ae4`.
+The independent final-scope review remains outside the capsule to avoid a
+self-hash cycle:
+`log-variants-original-call-packager-independent-review-1/final-scope-review.json`,
+SHA256 `efc6b8dffbe2b7f4c02336794e0888548a71ec5836822c14af77a006885495f3`.
+Independent readback report SHA256 is
+`e25c135cdb1864151564bfdb49c4d85481f68aa37e06bf34e0d297d5c83b21a4`
+at `log-variants-original-call-checkpoint-independent-readback-prepared-1/review.json`.
+
+Four focused source commits descend from `fdd2c172`: `75fd31ac` adds the closed
+LOG variants receipt profile; `5abf45b6` adds original backend controls;
+`737bf1ce` adds the editor, artifacts and workflow contracts; `d5156b5d` adds
+complete native/direct/HTTP acceptance. Twenty own source paths match committed
+bytes modulo CRLF/LF. The generated transport include is separately external
+(1,317,716 bytes; SHA256
+`008a0e8ef5c0b44e773d84562cde25858631d15e99c2b5ffcc7cced100423d8f`).
+Original native header, predicate, oracle and shared typed codecs are unchanged.
+The inherited two tracked coverage edits remain unstaged.
+
+The complete retained bank is **370 + 10 = 380** calls across all seven methods:
+apply 60; filter_log_variants_percentage 58;
+filter_variants_by_coverage_percentage 56;
+filter_variants_by_maximum_coverage_percentage 55; filter_variants_top_k 58;
+filter_variants_variants_percentage 47; find_auto_threshold 46. Outcomes retain
+226 complete logs, 32 scalar values and 122 complete native type/message errors.
+Independent census and mapping cover all 70 complete native snapshots,
+365 trace/log constructor functions, 380 entire native cases and their driver.
+All 704 supplied Trace references are bound to actual complete source traces.
+Warnings and source/control mutations are zero. Python returned-object and trace
+alias observations remain external; transport value equality does not prove
+Python identity.
+
+The five-field canonical descriptor is module/function/args/kwargs/call_shape,
+with `positional_args_keyword_controls` and the source first for all seven
+methods, including the scalar helper. Sorted canonical IDs joined by LF with
+**no trailing LF** have SHA256
+`3d0e1902b74c68d64d81227822ea5dd726f436c91b31d7717a5283ed59bb6fb9`.
+The alternate trailing-LF digest is separately recorded, never substituted.
+The closed receipt profile resolves all 380 original raw records, digest-only
+audit plans and entered intents with zero gaps and six rehashed cache hits
+(`4ec2ac`). All 98 receipt integrity tests pass (`b9502f`); unknown or incomplete
+terminal/entry evidence remains a blocking gap and grants no new-call authority.
+
+The dedicated `POST /api/reference-log-variants` takes operation, a genuine
+native EventLog File and exact raw `call_json` using
+`minera-log-variants-original-call-v1`. Its private parser retains all 17 observed
+operand wire tags, ordered string/enum parameter entries, typed admission and
+supplied variants dictionaries, ignored values, raw/null/omitted controls,
+arbitrary-width integers and source-bound Trace handles. All seven methods
+expose actual parsed controls before/after in the fixed 21-field envelope;
+the raw descriptor echo is not substituted for those structures. Full native
+source/result artifacts and secondary XES export errors remain available.
+Scalar artifacts are separate from reusable EventLog Files. The editor preserves
+raw BOM/CRLF and large-integer bytes, cancellation and actual filtered File reuse.
+Python error.args, qualified exception identity, warnings and alias identity are
+not newly transported; native phases are transport metadata, not observer phases.
+
+Runtime acceptance passed: six focused native/regression suites (`17ff13`);
+all 380 original native outcomes plus all 380 direct and all 380 owned HTTP cases
+(`acdce5`, 86.90 seconds), comparing complete outputs, controls, source-after and
+reopened artifacts; 48 focused frontend tests (`cc0422`); all 197 frontend files /
+9,898 tests (`065b41`); TypeScript and Vite production build (`685554`). Owned
+headless browser acceptance (`c2d3ae`) passed 16 checks, 14 completed POSTs plus one
+held actual response, and ten exact downloads. It covers all seven examples,
+typed controls, native/control errors, exact imported bytes, both cancellation
+paths and real native File reuse. The owned listener PID was verified; browser
+and server stopped and stdio drained. Browser inputs, raw responses, artifacts,
+PNGs, binaries and SQLite remain external bindings.
+
+Preserve failed attempts and corrections. Static backend review corrected empty
+native-error strings and datetime offset validation before the first build. The
+first frontend focused run had 47 passes / one assertion failure: the shared
+byte-safe multipart helper correctly used a File for raw CRLF, so only the test
+assertion changed. Original fixture/browser drafts and reviewer-report failures
+remain retained. Final scope review added missing browser recipe provenance and
+committed catalogue inputs. The first packaging attempt (`376a0e`) stopped at
+source-suffix preflight without member reads or docs writes; the reviewed
+correction accepts `.mjs` own source. Prior helper, scope, facts and failure are
+preserved; product behavior and expectations were unchanged.
+
+Archive access is explicitly bounded: root separately approved exactly one
+known LOG archive for transient UTF8 envelope decoding/reencoding of 20 member
+strings to recover full hashes, with no semantic record parse in that step.
+Root then separately verified/admitted 14 exact flat/native inputs for census
+and mapping. The unchanged receipt integrity regression also opens three prior
+LTL containers. **Only packaging/readback have zero original payload opens**;
+do not claim global or new-bank archive-zero access. Original producers and
+generators were read as own source and never executed/imported. No new reference
+calls or reference implementation inspection occurred.
+
+Safe catalogue verification from committed coverage (`fac9ff`) still reports
+86 packages (46 complete / 40 partial) and 387 modules (226 complete / 161 partial):
+**201 strict open units**, six grouping banks and **565 unentered logical
+queries**. This workflow checkpoint grants no catalogue promotion, full-history
+closure, absence proof or new public-call authority.
+
+Next is the full **491 = 439 + 52 pandas variants** bank, never just its 357 frame
+returns: preserve all 134 errors, four methods and 177 declared full native
+snapshots. The exactly five-file metadata plan is
+`log-variants-next-pandas-variants-metadata-plan-1/`; report SHA256
+`249c1b0ddcca61c991f7f1cbfa2dc12d2813bc4ae9b6f305f9ecd5dab452dd58`.
+Saved metadata supplies all requested whole-file pins. Root reviewed and ran its
+own-metadata-only `--verify-only` (`170d2d`); no originals were opened and no
+admission was granted. Full six-field canonical census, recursive supplied
+DataFrame controls and complete 177-snapshot / 491-case mapping remain required.
+New root-only admission/census helper preparation is separately frozen and
+unexecuted at `pandas-variants-full491-admission-prepared-1/`; preparation SHA256
+`c4926cc0f18a6bca8ed04c08ed16227ee33a8a95f3e6e8054c6a08423ae06196`.
+Review its source and explicit whole-pin admission before any payload parse. No archive extraction
+is needed merely to recover this next bank's saved flat pins.
+
+## Previous continuation: all 726 original Polars attributes calls reach API/UI — 2026-10-22
 
 Root package terminal `822411` retains
 `docs/retained-public-observation-polars-attributes-original-call-checkpoint.jsonl.gz`
