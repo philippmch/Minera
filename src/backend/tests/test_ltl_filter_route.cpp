@@ -39,6 +39,8 @@ int main(){try{
  const auto polars_source=serialize_embedding_workbench_table_json(sample_table("polars"));
  const auto duplicate_kind=send(client,ltl_workbench_test::request("polars",polars_source,"eventually",{field("input_kind","DataFrame")}),std::string(route)+"?input_kind=LazyFrame");
  require(duplicate_kind.status==400 && !text(duplicate_kind.json,"input_kind"),"duplicate HTTP query/multipart input kind accepted");contains(duplicate_kind,"\"phase\":\"control\"");
+ const auto duplicate_call=send(client,original_request(polars_source,"{}"),std::string(route)+"?call_json=%7B%7D");
+ require(duplicate_call.status==400 && !text(duplicate_call.json,"call_mode") && !native_text(duplicate_call.json,"call_json"),"duplicate HTTP query/multipart original call accepted or captured");contains(duplicate_call,"\"phase\":\"control\"");
  const auto ordinary=received(client.Post(route,"not multipart","text/plain"));require(ordinary.status==400,"nonmultipart relationship request accepted");
  const auto malformed=client.Post(route,"missing delimiters","multipart/form-data; boundary=broken");require(malformed && malformed->status==400,"malformed relationship multipart accepted");
  owned.stop();require(owned.listened,"owned relationship server listen failed");std::cout<<"owned relationship HTTP workflows and strict actual Files passed\n";

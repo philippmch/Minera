@@ -36,6 +36,77 @@ inline EventTable subset(EventTable source,const std::vector<std::size_t>& indic
 inline void common_success(const DiscoveryWorkbenchResponse& answer,const std::string& source,const std::string& expected,const std::string& engine,const std::string& input_kind="LazyFrame"){
  require(answer.status==200,"relationship success expected: "+answer.json);contains(answer,"\"family\":\"REFERENCE_LTL_FILTER\"");contains(answer,"\"phase\":\"complete\"");contains(answer,"\"apply_returned\":true");contains(answer,"\"source_unchanged\":true");require(text(answer.json,"engine")==engine,"relationship engine changed");require(text(answer.json,"source_json")==source,"relationship full parsed source changed");require(text(answer.json,"source_after_json")==source,"relationship full source-after changed");require(text(answer.json,"result_json")==expected,"relationship complete result mismatch");require(!text(answer.json,"error"),"relationship unexpected diagnostic");
  require(text(answer.json,"input_kind")== (engine=="polars"?std::optional<std::string>{input_kind}:std::nullopt),"relationship effective Polars input kind changed");
+ require(text(answer.json,"call_mode")=="friendly" && !native_text(answer.json,"call_json"),"friendly request changed call mode or acquired original call text");
+}
+inline Parts original_request(const std::string& source,const std::string& raw,const std::string& operation="eventually",const std::string& kind="LazyFrame"){
+ return {field("engine","polars"),field("operation",operation),field("input_kind",kind),{"source_file","source.json",source,true},field("call_json",raw)};
+}
+inline void original_echo(const DiscoveryWorkbenchResponse& answer,const std::string& raw){
+ require(text(answer.json,"call_mode")=="original" && native_text(answer.json,"call_json")==raw,"original call bytes or mode changed");
+ for(const std::string name:{"case_id_key","attribute_key","resource_key","timestamp_key"})require(!text(answer.json,name),"original response fabricated friendly role "+name);
+}
+inline void original_polars_calls(const std::function<DiscoveryWorkbenchResponse(const Parts&)>& run){
+ const auto table=sample_table("polars");const auto source=serialize_embedding_workbench_table_json(table);
+ const std::string schema=R"("schema":"minera-polars-ltl-original-call-v1")";
+ const std::string values=R"("values":{"type":"list","value":[{"type":"string","value":"A"},{"type":"string","value":"B"},{"type":"string","value":"C"}]})";
+ const auto call=[&](const std::string& extra){return "{"+schema+","+values+extra+"}";};
+ const auto expected=serialize_embedding_workbench_table_json(subset(table,{0,1,2}));
+ const auto success=[&](const DiscoveryWorkbenchResponse& answer,const std::string& raw,const std::string& result){
+  require(answer.status==200,"original call success expected: "+answer.json);original_echo(answer,raw);contains(answer,"\"phase\":\"complete\"");contains(answer,"\"apply_returned\":true");contains(answer,"\"source_unchanged\":true");
+  require(text(answer.json,"source_json")==source && text(answer.json,"source_after_json")==source && text(answer.json,"result_json")==result && !text(answer.json,"error"),"original full source/result artifacts changed");
+ };
+ for(const std::string kind:{"LazyFrame","DataFrame"}){
+  const auto raw=call("");const auto answer=run(original_request(source,raw,"eventually",kind));success(answer,raw,expected);require(text(answer.json,"input_kind")==kind,"original effective input kind changed");
+ }
+ success(run(original_request(source,call(",\"parameter_entries\":[]"))),call(",\"parameter_entries\":[]"),expected);
+ for(const std::string parameter:{R"({"type":"null"})",R"({"type":"list","value":[]})"}){
+  const auto raw=call(",\"parameter_value\":"+parameter);success(run(original_request(source,raw)),raw,expected);
+ }
+ // Enum/string identities coexist in either insertion order; native enum wins.
+ const std::string literal=R"({"key":"positive","enum_key":false,"value":{"type":"boolean","value":false}})",enumerated=R"({"key":"positive","enum_key":true,"value":{"type":"boolean","value":true}})";
+ for(const bool reverse:{false,true}){
+  const auto raw=call(",\"parameter_entries\":["+(reverse?enumerated+","+literal:literal+","+enumerated)+"]");success(run(original_request(source,raw)),raw,expected);
+ }
+ const auto negative=call(",\"parameter_entries\":["+literal+"]");success(run(original_request(source,negative)),negative,serialize_embedding_workbench_table_json(subset(table,{3,4,5,6,7})));
+ // Raw non-map parameters are native semantics, including false and zero.
+ for(const auto& pair:std::vector<std::pair<std::string,std::string>>{
+  {R"({"type":"boolean","value":false})","'bool' object is not iterable"},{R"({"type":"boolean","value":true})","'bool' object is not iterable"},
+  {R"({"type":"integer","value":"0"})","'int' object is not iterable"},{R"({"type":"string","value":"x"})","string indices must be integers, not 'str'"},
+  {R"({"type":"list","value":[{"type":"integer","value":"1"}]})","list indices must be integers or slices, not str"}}){
+  const auto raw=call(",\"parameter_value\":"+pair.first);const auto answer=run(original_request(source,raw));original_echo(answer,raw);require(answer.status==400 && text(answer.json,"error_type")=="TypeError" && text(answer.json,"error")==pair.second,"raw parameter diagnostic was coerced or lost");contains(answer,"\"phase\":\"apply\"");contains(answer,"\"apply_returned\":false");require(text(answer.json,"source_json")==source && text(answer.json,"source_after_json")==source,"native raw parameter failure lost imported source");
+ }
+ for(const std::string operation:{"eventually","next","four_eyes","different_persons"}){
+  const auto raw="{"+schema+"}";const auto answer=run(original_request(source,raw,operation));original_echo(answer,raw);require(answer.status==400 && text(answer.json,"error_type")=="TypeError" && text(answer.json,"error")->find("missing 1 required positional argument")!=std::string::npos,"missing operand did not reach native call");contains(answer,"\"phase\":\"apply\"");contains(answer,"\"apply_returned\":false");require(text(answer.json,"source_json")==source && text(answer.json,"source_after_json")==source,"missing operand rejected before import");
+ }
+ const auto explicit_null="{"+schema+",\"values\":{\"type\":\"null\"}}";const auto null_answer=run(original_request(source,explicit_null));original_echo(null_answer,explicit_null);require(null_answer.status==400 && text(null_answer.json,"error")->find("missing 1 required positional argument")==std::string::npos,"present null became missing operand");contains(null_answer,"\"phase\":\"apply\"");
+ const auto eager_next=run(original_request(source,call(""),"next","DataFrame"));original_echo(eager_next,call(""));require(eager_next.status==400 && text(eager_next.json,"error")=="'DataFrame' object has no attribute 'collect'","original eager call silently made lazy");contains(eager_next,"\"apply_returned\":false");
+ const auto missing_column=call(R"(,"parameter_entries":[{"key":"pm4py:param:attribute_key","enum_key":true,"value":{"type":"string","value":"missing"}}])");
+ for(const std::string kind:{"LazyFrame","DataFrame"}){
+  const auto answer=run(original_request(source,missing_column,"eventually",kind));original_echo(answer,missing_column);require(answer.status==400,"original missing column succeeded");contains(answer,kind=="LazyFrame"?"\"phase\":\"collect\"":"\"phase\":\"apply\"");contains(answer,kind=="LazyFrame"?"\"apply_returned\":true":"\"apply_returned\":false");require(text(answer.json,"source_json")==source && text(answer.json,"source_after_json")==source,"original column error lost full source");
+ }
+ // Preserve CRLF, NUL and escaped Unicode exactly, including malformed bytes.
+ const auto exact="{\r\n"+schema+","+values+R"(,"parameter_entries":[{"key":"ignored\u0000\u03a9","enum_key":false,"value":{"type":"string","value":"literal\r\n\u0000\u03a9"}}])"+"\r\n}";
+ auto file=original_request(source,exact);file.back()={"call_json","call_json.txt",exact,true};success(run(file),exact,expected);
+ const auto malformed_bytes=std::string("{\r\n\0",4);file.back().bytes=malformed_bytes;const auto malformed=run(file);require(malformed.status==400 && !text(malformed.json,"source_json"),"malformed original control reached source import");original_echo(malformed,malformed_bytes);
+ const std::vector<std::string> invalid={"","null","[]","{}","{"+schema+",}","{"+schema+R"(,"unknown":null})",
+  "{"+schema+R"(,"schema":"minera-polars-ltl-original-call-v1"})","{"+schema+R"(,"\u0073chema":"minera-polars-ltl-original-call-v1"})",
+  "{"+schema+R"(,"values":{"type":"list","value":[{"type":"string","value":"A","\u0076alue":"B"}]}})",
+  call(R"(,"parameter_value":{"type":"null"},"parameter_entries":[])"),call(R"(,"parameter_value":{"type":"map","value":{}})"),
+  call(R"(,"parameter_entries":null)"),call(R"(,"parameter_entries":[{"key":"unknown","enum_key":true,"value":{"type":"null"}}])"),
+  call(R"(,"parameter_entries":[{"key":7,"enum_key":false,"value":{"type":"null"}}])"),
+  call(R"(,"parameter_entries":[{"key":"positive","enum_key":false,"value":{"type":"null"}},{"key":"positive","enum_key":false,"value":{"type":"boolean","value":true}}])"),
+  "{"+schema+R"(,"values":{"type":"map","value":{"B":{"type":"null"},"A":{"type":"null"}}}})",
+  "{"+schema+R"(,"values":{"type":"decimal","value":NaN}})","{"+schema+R"(,"values":{"type":"integer","value":01}})"};
+ for(const auto& raw:invalid){const auto answer=run(original_request("invalid native source",raw));original_echo(answer,raw);require(answer.status==400 && !text(answer.json,"source_json"),"invalid original call reached source import");contains(answer,"\"phase\":\"control\"");}
+ for(const std::string name:{"values_json","typed_values_json","target_json","a_json","b_json","c_json","case_id_key","attribute_key","resource_key","timestamp_key","positive","enable_timestamp","timestamp_diff_boundaries_json","helper_a_json","helper_b_json","source_format","activity_key","case_id_column","activity_column","timestamp_column","resource_column","delimiter","trim_fields"}){
+  auto parts=original_request("invalid native source",call(""));parts.push_back(field(name,""));const auto answer=run(parts);original_echo(answer,call(""));require(answer.status==400 && !text(answer.json,"source_json"),"empty friendly control accepted with original call");contains(answer,"\"phase\":\"control\"");
+ }
+ for(const std::string engine:{"log","pandas"}){
+  auto parts=original_request("invalid native source",call(""));parts[0].bytes=engine;parts.erase(parts.begin()+2);const auto answer=run(parts);original_echo(answer,call(""));require(answer.status==400 && text(answer.json,"error")=="call_json requires the polars engine" && !text(answer.json,"source_json"),"inactive original mode reached source import");
+ }
+ auto wrong=original_request(source,call(""));wrong.back()={"call_json","wrong.txt",call(""),true};const auto wrong_answer=run(wrong);require(wrong_answer.status==400 && !text(wrong_answer.json,"call_mode") && !native_text(wrong_answer.json,"call_json"),"noncanonical original File accepted or captured");
+ auto duplicate=original_request(source,call(""));duplicate.push_back(field("call_json",call("")));require(run(duplicate).status==400,"duplicate original call accepted");
+ const auto helper=run(original_request("invalid native source",call(""),"timestamp_ge"));original_echo(helper,call(""));require(helper.status==400 && !text(helper.json,"source_json"),"original mode accepted helper operation");
 }
 inline void polars_input_kinds(const std::function<DiscoveryWorkbenchResponse(const Parts&)>& run){
  auto table=sample_table("polars");
@@ -120,6 +191,7 @@ inline void workflows(const std::function<DiscoveryWorkbenchResponse(const Parts
   require(answer.status==200,"nonempty interval helper failed: "+answer.json);const auto result=parse_embedding_workbench_table_json(*text(answer.json,"helper_result_json"));require(result.rows.size()==1 && result.rows[0].size()==1 && result.rows[0][0] && result.rows[0][0]->kind==AttributeKind::kBoolean && result.rows[0][0]->value=="true","inclusive helper interval endpoints changed");
  }
  polars_input_kinds(run);
+ original_polars_calls(run);
 }
 }
 #ifndef MINERA_LTL_ROUTE_TEST
@@ -127,6 +199,7 @@ int main(){try{using namespace ltl_workbench_test;workflows([](const auto& parts
  for(const auto& invalid:Parts{field("unknown","x"),field("engine","polars"),field("positive","yes"),field("resource_key","inactive"),field("timestamp_key","inactive"),field("a_json","inactive"),field("helper_a_json","inactive"),field("source_format","native_log")})require(execute_ltl_filter_workbench(request("polars",source,"eventually",{invalid})).status==400,"invalid/inactive relationship control accepted");
  require(execute_ltl_filter_workbench(request("polars",source),{field("engine","polars")}).status==400,"duplicate query/multipart relationship control accepted");
  const auto duplicate_kind=execute_ltl_filter_workbench(request("polars",source,"eventually",{field("input_kind","DataFrame")}),{field("input_kind","LazyFrame")});require(duplicate_kind.status==400 && !text(duplicate_kind.json,"input_kind"),"duplicate query/multipart input kind accepted");
+ const auto duplicate_call=execute_ltl_filter_workbench(original_request(source,"{}"),{field("call_json","{}")});require(duplicate_call.status==400 && !text(duplicate_call.json,"call_mode") && !native_text(duplicate_call.json,"call_json"),"duplicate query/multipart original call accepted or captured");
  auto scalar=request("polars",source);scalar[2].file=false;require(execute_ltl_filter_workbench(scalar).status==400,"plain source text accepted as File");
  std::cout<<"full relationship artifacts and strict control validation passed\n";
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}
