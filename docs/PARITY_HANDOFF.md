@@ -14,7 +14,73 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: native byte controls and LTL filtering
+## Current continuation: retained receipts and next filtering family
+
+The reusable offline receipt index is checkpointed in `1eb692e7`; committed LTL
+archive acceptance and evidence are in `5757778e`. Read
+`docs/retained-public-receipt-index.md`. The tool and 25 synthetic integrity tests
+plus one committed-archive integration test pass. Root independently reconstructed
+and asserted all **1,401** original full receipts from the sixteen executed LTL
+banks: LOG 297, pandas 429, Polars 675. Flat ingestion, archived copies and a
+rehashing cache generation preserve those exact sets. All relevant intents in
+the admitted banks resolve against terminal outcomes. No new reference algorithm
+was entered and no catalogue status changed: **201 strict open units** remain.
+
+The index supports three closed LTL observer schemas. Unknown schemas require
+validated adapters. It preserves immutable history, actual/plan/entered status,
+exact receipt and record hashes, reference/runtime partitions and provenance;
+corruption, unknown identities, incomplete snapshots, parser changes and source
+changes block bounded certificates. Every report remains
+`catalogue_audit_complete=false`. The manifest covers explicit sources/members
+only; it does **not** replace the complete relevant historical audit required
+before a new family can enter. Never relabel its LTL certificate as a complete
+ActivitySplit or case-grouping audit.
+
+Evidence: `docs/retained-public-receipt-index-checks.jsonl.gz`, 28 members,
+94,095 bytes, SHA256
+`1b4d4ee521a2fe622d59b546d34add67b0ceeef323b732f3b75e43e5025fb369`.
+The sidecar `docs/retained-public-receipt-index-validation.json` binds the frozen
+parser SHA256 `885d16b3935a95d51d90fc09abd085dde3e46bf8732915bb25f520a0ac8ff613`.
+Root final acceptance: `build/parity-closures/receipt-index-root-acceptance/`
+(`validation.json`, `flat-final-report.json`, `archive-final-report.json`,
+`archive-cache-final-report.json`, `cli-final-report.json`,
+`unittest-final-first.log`). Earlier manifest/adapter attempts remain retained;
+they are not final proof. Postcommit Git/archive bindings pass. Git text
+comparison normalizes CRLF/LF only; actual input and archive hashes stay exact.
+
+Next prepared family: the six pandas/Polars `activity_split`,
+`consecutive_act_case_grouping` and `timestamp_case_grouping` modules. Root's
+public signatures/docs/enums and opaque pin capture is complete at
+`build/grouping-public-surface-actual-1/capture.json`, with zero algorithm calls.
+Existing convenience implementations are EventLog-only and do not establish
+table parity. Offline reviews and a 20-fixture grouping specification are under
+`build/parity-closures/{activity-split,case-grouping}-next-review/`.
+
+The pandas activity-split observer and 61 candidates are frozen. Root ran
+**prepare-only**, materializing 61 distinct complete typed receipts and asserting
+their original hashes, with **zero target calls**. The output is
+`build/filtering-activity-split-pandas-public-preentry-1/`; its validation
+explicitly says `prior_barrier_validated=false`. Its final ordered receipt-list
+SHA256 is `43f81e0b1c6c71adf5796477bb9a84d22d4ad70a741d56849d3972fbd8718bba`.
+No entry certificate exists. Actual entry requires a root-reviewed complete
+relevant flat/archive historical audit, checked underlying bindings, full prior
+receipt reconstruction and whole-bank dedup. The gate rejects a bounded index
+alone; nine offline gate checks pass and root verified default entry refusal
+before output creation/reference imports. Do not execute these planned calls
+until that barrier is actually satisfied.
+
+The full preparation capsule is `docs/filtering-grouping-preparation.json.gz`,
+37 members / 55,701 bytes, SHA256
+`8ae44615941a0eb3c514f00f542da7a28831c65eb91dc9fd20e0f860e9646856`;
+its sidecar validation records the zero-call boundary. It retains the original
+weaker recipe, the corrected frozen recipe, public surface, materialized plans,
+reviews and root checks. Recipe SHA256:
+`b41f0cf80301d47dc3628587db8614c3873b5abfe165180694d0e65f75720d33`.
+All workers are frozen. No builds, HTTP servers or reference calls remain running.
+Product/frontend code was unchanged during this checkpoint; the native,
+frontend and HTTP results below remain the earlier LTL acceptance, not new runs.
+
+## Previous continuation: native byte controls and LTL filtering
 
 Commit `13f34f35be95c6a3d054b694ff9a528b400aa867` is pushed. Both attributes
 workbenches now accept the frontend's canonical `<field>.txt` byte-preserving
@@ -41,7 +107,8 @@ prior focused archive. First two harness attempts misread the valid raw-byte
 log wrapper; third passed 101 and final fourth added complete raw-byte log
 artifact equality and passed 101. All owned server processes exited. No product
 changes were needed for those reader corrections. Rendered browser acceptance
-remains unverified; LTL integration still requires its own rebuilt server.
+remains unverified. At that checkpoint, LTL's separate rebuild was pending;
+its accepted final build is recorded below.
 
 The LTL family is implemented across LOG, pandas and Polars through native
 companions and `POST /api/reference-ltl-filter`. The workbench exposes genuine
@@ -1054,7 +1121,9 @@ Rendered application interaction remains unverified.
   combinations, physical lazy plans/category context, warnings and group-order
   diagnostics remain separate gates. The offline catalogue-wide receipt-index
   plan at `build/parity-closures/retained-public-receipt-index-plan.json` is
-  archived with Polars checks; it is a design, not a completed new receipt audit.
+  archived with Polars checks. Its reusable indexing tooling now has bounded LTL
+  acceptance as recorded above; catalogue-wide and next-family historical audits
+  remain open.
 
 - Continue the between modules' declared boundaries. The 20-case log-selector
   bank is now **executed and accepted**, with the equality bank explicitly
