@@ -1,0 +1,47 @@
+{
+  "schema": "minera-retained-history-inventory-preparation-validation-v1",
+  "archive": {
+    "path": "docs/retained-history-inventory-preparation.json.gz",
+    "bytes": 1085755,
+    "sha256": "0ce2f6ca9fdae6c2a1737aab06fef7f4299ba3587ba69456675807817177f06a",
+    "members": 31
+  },
+  "all_exact_member_bytes_roundtrip_verified": true,
+  "opaque_content_bindings_archive": {
+    "path": "docs/retained-history-content-bindings.jsonl.gz",
+    "bytes": 15670816,
+    "sha256": "06969136b599b3692f910492eab6142425f495c6340ee1b978df448a05dda1c0"
+  },
+  "candidate_files_opaque_hashed": 507319,
+  "candidate_bytes_opaque_hashed": 79597719131,
+  "candidate_content_hashes": 96890,
+  "selected_own_distinct_archive_contents": 2844,
+  "identified_third_party_archive_paths_excluded": 256,
+  "own_compressed_copy_identity_resolved_from_exact_historical_git_blob": 1,
+  "remaining_unresolved_compressed_copy_provenance_paths": [
+    "build/parity-closures/polars-case-filter-checks-before-eof-repair.jsonl.gz"
+  ],
+  "metadata_only_chunk_mappings": {
+    "offset-full-member-base64-chunks-v1": 2071,
+    "indexed-base64-chunks-v1": 433
+  },
+  "wide_manifest": {
+    "path": "build/parity-closures/grouping-history-archive-discovery-final-2/manifest.json",
+    "bytes": 981981,
+    "sha256": "05ef77cd8c8fd03bba4202ebf724cc8752b5311b47bf831895df08f1cf2fca20"
+  },
+  "wide_discovery_result_included": false,
+  "exclusions_require_root_review": true,
+  "new_files_require_delta_inventory": true,
+  "historical_audit_complete": false,
+  "admission_complete": false,
+  "reference_algorithm_calls": 0,
+  "reference_implementation_interpreted": false,
+  "parity_status_changes": 0,
+  "limitations": [
+    "Opaque content hashes establish current-read bindings, not original creation/provenance or prior-call absence.",
+    "Executed hash helper resolves paths before its is_symlink check; that check cannot independently certify lexical symlink absence. Root confinement and later source resolution remain required.",
+    "Chunk mappings are structural metadata hypotheses from reviewed producers, not per-source producer bindings, verified payload hashes or complete reassembly.",
+    "The separate wide scan must finish and every relevant schema/provenance/public-record gap must be resolved before a new-family root entry certificate."
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema": "minera-retained-history-content-bindings-validation-v1",
+  "archive": {
+    "path": "docs/retained-history-content-bindings.jsonl.gz",
+    "bytes": 15670816,
+    "sha256": "06969136b599b3692f910492eab6142425f495c6340ee1b978df448a05dda1c0"
+  },
+  "roundtrip_verified": true,
+  "original": {
+    "path": "build/parity-closures/grouping-history-content-inventory-1/bindings.jsonl",
+    "bytes": 203962592,
+    "sha256": "31af54e21e918dec9f2eeb313bb7b8076894ec28903f8565256a98acd78aebbb"
+  },
+  "records": 507319,
+  "candidate_bytes_opaque_hashed": 79597719131,
+  "enumeration_input": {
+    "path": "build/parity-closures/grouping-history-path-inventory-1/paths.jsonl",
+    "bytes": 95047454,
+    "sha256": "3e57b32543300754155edc7eca92a5745010eb05edf735edd86ba421e36ce950"
+  },
+  "scope": "Current-read opaque bindings for candidate .json/.jsonl/.json.gz/.jsonl.gz/.txt/.log/.md files below build and docs. Exact exclusions and provenance remain in the separate audit capsule.",
+  "actual_read_completed_utc": "2026-10-22T08:36:51.499309+00:00",
+  "current_path_revalidation_required": true,
+  "historical_audit_complete": false,
+  "admission_complete": false,
+  "reference_algorithm_calls": 0,
+  "reference_implementation_interpreted": false,
+  "note": "Hash stability during a read does not establish original creation identity, provenance, absence of prior calls, or unchanged bytes from earlier runs. Private/third-party payloads were never interpreted. These are metadata rows, not public observation records.",
+  "own_packager": {
+    "path": "build/parity-closures/save-history-content-bindings.py",
+    "bytes": 2842,
+    "sha256": "6ebdce6493794e49262821c3f2134aa4f5073975c41c3a09806a82f1a9a474f4"
+  }
+}
