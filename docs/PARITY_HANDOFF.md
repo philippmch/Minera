@@ -14,7 +14,108 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: key wrappers and remaining object schemas — 2026-10-22
+## Current continuation: files-object discovery and residual provenance — 2026-10-22
+
+`ed4dfdbe` adds two discovery-only files-object profiles for exactly seven
+reviewed own producers. Accepted parser SHA256:
+`4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106`;
+tests SHA256:
+`a660b8742b34c6468514472e2a66380ca65cc7482a5669b6f9d772cd4f450bd7`.
+All **91 receipt-tool tests**, **90 independent synthetic checks**, and **15
+projection-guard tests** pass. The 91 include the original LTL receipt-archive
+integration. There was **no fresh current-parser LTL streaming run**; retain
+the prior parser's separately bound streaming acceptance below.
+
+Root acceptance is `build/parity-closures/streaming-files-object-root-acceptance-1/`.
+The actual metadata run finished terminal0/drained as direct exec **5dddaa**.
+It discovers **289 logical members** across seven sources (3/11/6/5/98/108/58),
+with **281 declared sizes and eight missing original sizes**. All 289 payload
+hashes remain unverified declarations and all source-file identities unavailable.
+Observed EOF structure/name/metadata checks pass, but no independent original
+file count was saved: each source retains its explicit unknown-count gap.
+Together with ten opaque branch gaps, **all 17 gaps remain**. The original wide
+scan did not record these nested members; this is their first metadata extraction,
+not an equality claim against old member edges.
+
+Raw events: 306,413 bytes, SHA256
+`c86307f9f19579bab91e43c508497bc133b9a65de34f35de9b2bd69fa23f0fe1`.
+Seven cache hits reproduce all remaining raw event bytes exactly. The fresh
+key-wrapper regression retains all 416 declarations and three wrapper gaps,
+with event bytes identical to the accepted prior run. Root checks are in
+`files-object-root-check.json` and `final-regression-validation.json`.
+Independent actual review passes with no findings:
+`files-object-actual-metadata-independent-review-1/review.json`, SHA256
+`5e44e4de6035760a75c8dcc5901199d05c2926c5afa131193d00a559bd64215d`.
+
+The current guarded projector is
+`full-member-projection-scope-guard-1/revision-4/project-declared-full-member-candidates.py`,
+SHA256 `261e46800114540b3372357bdbd96f2c548ba8460c0e3d304121e72ac70ecac7`.
+Both files-object schemas are refused even with missing/false logical flags.
+Prior full/UTF8/chunk/missing-size behavior passes the six-table/view differential
+checks. The failed initial synthetic fixture remains preserved. Actual projection
+in `files-object-scope-projection-root-1/` retains **289 member-metadata edges
+and 289 refusal gaps**, all `identity_id=NULL`, `full_declaration=0`, with zero
+full-file identities and zero flat matches. All 17 original source gaps remain.
+SQLite: 970,752 bytes, SHA256
+`2838b9cabd8625613bb0189b53d38007a9201e2b7689cc515690cef36b215b81`.
+Independent event/SQL/cache/scope review passes with no findings:
+`files-object-scope-projection-independent-review-1/review.json`, SHA256
+`65eea4eb712b01dcb99e04009e8d5f949a58a12e027582cab34902dbbd88cee0`.
+
+The path-gap overlay matches **30,589 of 30,638** original path-absent rows to
+exact corrected metadata declarations. The **49 residual rows** comprise 31
+tails, eight legacy manifests, three report/cases wrappers, one four-field header
+and six token-root rows. Thirty-eight have corrected boundary candidates which
+remain gaps; eleven lie outside those selections (five synthetic empty tails
+and six token-root rows). The other 176 original gaps and all 64 correction gaps
+remain. **225 is original-row accounting, not a current gap union or closure**.
+Report: `grouping-history-path-gap-overlay-review-1/report.json`, SHA256
+`bbe3d6e74100b6edce2bd40b4d6d1ba01da10431483b6453495210b0557b7b62`.
+
+Own producer review identifies the five mock-tail sources as synthetic empty
+fixtures, with no real-reference authority. The six token rows span producer,
+cycle and self cases in helper/replay modes: two have recorded result-key
+candidates and four may represent entry/resource termination. None is an absence
+proof or complete receipt. Original values remain unparsed. Report:
+`grouping-history-residual-root-schema-review-1/report.json`, SHA256
+`c0a453d45da8deb1cff8d3bc8ae5502ea52af71b18a2992096092729eda9b529`.
+
+Root also verified five exact compressed-to-uncompressed producer SHA mappings
+under `grouping-history-opaque-uncompressed-root-1/`, terminal0 direct exec
+**a17189**, with zero failures. This operation **opened five original archives
+and decompressed gzip bytes opaquely** into SHA/count checks. It performed no
+JSON/Unicode/member decoding, extraction, source inspection or payload display.
+Unknown original uncompressed sizes remain null; observed byte counts are
+separate. These bindings strengthen producer provenance only, with no receipt
+completeness, public admission, absence or entry authority.
+Independent metadata/static-byteflow review passes:
+`grouping-history-opaque-uncompressed-independent-review-1/review.json`, SHA256
+`29765d14d8c8ce66106ab84b2d17c0f0f3b2014ddc6c0e08e0f8ae14cec9af0c`.
+
+Preserved in `6a0923a2`:
+`docs/retained-public-observation-files-object-checkpoint.jsonl.gz`, **199
+members / 8,460,106 bytes**, SHA256
+`ba2a58505568f593204aa610e01538835cc15999b137a2e7468aca5f201e3f5b`.
+Root checked every member against its exact current UTF8 source bytes; see
+`files-object-capsule-root-byte-check-1.json`. The sidecar retains 38 external
+artifact bindings. The packager opened no original archives; the earlier five
+opaque gzip checks are explicitly separate operations. The capsule preserves
+the complete 30,638-row relation overlay, original gap metadata, failed drafts,
+scope guards, independent reviews and a frozen review of this section. Its live
+capsule sentence was added after that frozen review and the root byte check.
+
+Full scope remains **86 packages / 387 modules**, with **46 packages and 226
+modules complete; 201 strict open units**. The six banks remain **565 unentered
+logical queries**. No family certificate, history-completeness claim or catalogue
+promotion follows. Sixty singleton object-root ownerships remain outside this
+checkpoint's completed schema reviews;
+comparison/public-result branches also remain opaque gaps. Continue relevant
+flat/archive provenance and complete original canonical receipt reconstruction,
+hash assertion and whole-bank dedup before new calls. Do not restart the terminal
+2,844-source scan or replay retained calls. No product/native/frontend acceptance
+was freshly established by this tooling checkpoint.
+
+## Previous checkpoint: key wrappers and remaining object schemas — 2026-10-22
 
 `ff1162f3` adds discovery-only `key-origin-size-base64-members-v1`. The accepted
 parser SHA256 is `2dacc29e9cb14cfab370a953d28d0cd1640bf0aa352934db6b0cbace4b9f6061`;
@@ -93,10 +194,11 @@ ownerships unreviewed**. Nested runtime token types were not captured in the
 old metadata and remain unverified. Report:
 `grouping-history-object-wrapper-schema-review-1/report.json`, SHA256
 `59de627eab160ba29089e07edd8b0048eca88c0204e344d9e60b20bb3ffc5cc9`.
-The recommended next scope is files-object discovery for exactly seven
+The then-recommended next scope was files-object discovery for exactly seven
 producer-backed G02/G03 sources, with separate size-present/absent forms.
 Its isolated draft/review under `streaming-files-object-{development,independent-review}-1/`
-has not changed the accepted parser or run against real archives. All other
+had not then changed the accepted parser or run against real archives. The current
+continuation above supersedes that draft status. All other
 scope/summary/binary/comparison branches remain opaque and gapped.
 
 Full scope remains **86 packages / 387 modules**, with **46 packages and 226
