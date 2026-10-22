@@ -1,0 +1,2292 @@
+{
+  "schema": "minera-retained-public-observation-pandas-original-call-checkpoint-v1",
+  "scope": "Already admitted429 pandas original typed-call product transport;350full tables79diagnostics authoritative, with retained675Polars regression.",
+  "root_final_acceptance": {
+    "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+    "bytes": 121159,
+    "sha256": "e2650512f490c9be86cd6ab1a0ef34b5244cea0ab3a0987f5f41c47ad55b2925"
+  },
+  "root_independent_reviews": [
+    {
+      "role": "frontend-fixture",
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "bytes": 7638,
+      "sha256": "1f1ecbe87b57ed3ed789b04dd6ea7c4fdccbbfbb5badef4fd8ea56fad71962c8"
+    },
+    {
+      "role": "backend",
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/review.json",
+      "bytes": 8141,
+      "sha256": "ec193fef56228599372cb86d689652684960f6519cf8ed5118d6389e6fa93b28"
+    }
+  ],
+  "reviewed_plan": {
+    "path": "build/parity-closures/pandas-original-call-checkpoint-prepared-1/plan-1.json",
+    "bytes": 73643,
+    "sha256": "fcf7f576a3bda9a93f5f53630048698cad7c7a4eeca9d6e20c78fc0f2afa4e23"
+  },
+  "source_bindings": [
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-identity-limitations.json",
+      "bytes": 3534,
+      "sha256": "48cc8c83dbeb34432b8a83cd237a3faa4dbe41c6520c565c33697ddf2abba659"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-model-report.json",
+      "bytes": 11835,
+      "sha256": "339ca32cec764831d52693c0d96b0ad3d79c9602445e56a60d9ae21d52e1524f"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/finalize.py",
+      "bytes": 5646,
+      "sha256": "ca8961819dd2d25954c4dbc98c5c1d158e249727901330591575e027b293114e"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/implementation-plan.md",
+      "bytes": 8023,
+      "sha256": "e17a2185879b14e114b9653df4794db961692851e3b1f71f7fc3bbf1e05aa85c"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/inspect-types.py",
+      "bytes": 698,
+      "sha256": "188951db15c1afbd0aabbc125c6752d9929bebd46c9ba89847705d72fe1512f3"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/model.py",
+      "bytes": 8266,
+      "sha256": "56bfe17fe07e2786c6e785d1fd7c70291708dbb753a30bbc7e06ff256eb8abac"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "bytes": 6140,
+      "sha256": "8276e16cba21273b0601b97a6d6f331302c742f1f0e45b7ea2a79824843ed6cc"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "bytes": 10765,
+      "sha256": "e102a42ea1d0b26ba3a0ec14d2f1c67d35c8cb5bac3ba921c0601cbb79e11fbb"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/review-corrected-1.py",
+      "bytes": 1351,
+      "sha256": "fc15791ab153d7d1c6803716634731f92b88ecd31f23a874c532e9ca10e4eacc"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/review.py",
+      "bytes": 6083,
+      "sha256": "b0563aa95457eba9d318bfd2678de68f942f7e90e78ae1dc0f5bfb46c2aa084f"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/wire-contract.json",
+      "bytes": 4798,
+      "sha256": "b7f2f1858b81f7f224f6f2b624950ac9d9b11071c6a5ae71d0df58beb50e8a5b"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/case-provenance.jsonl",
+      "bytes": 460803,
+      "sha256": "455db7a3c66593912f3933a2ded4c9883c16e8078f4aaa6dbf8f93f798051507"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 23583,
+      "sha256": "f4891e704703bcc3dd60f3dea679f0bd742ed7615e102e7210b8d9d89d52a206"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "bytes": 5823,
+      "sha256": "c2680fd7e0d9ea06ebfa61df4296892a7823fb6cf79696446dd071712e9f68c9"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "bytes": 6295,
+      "sha256": "da31327cd2b94b21d08dcccbc3aa2489fbe1b9889fa1d344f1ee322625d772fa"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/workbench-fixture-support.hpp.txt",
+      "bytes": 9721,
+      "sha256": "e3f299bbf04920c3c68c95fef7269e2efa6e92ded097dc7ce9899965e058785a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-first.log",
+      "bytes": 900,
+      "sha256": "d8362fe95136ccf7f27a6cbdfc8000d6e3ebfd7db408aba5825016f913525d78"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "bytes": 121159,
+      "sha256": "e2650512f490c9be86cd6ab1a0ef34b5244cea0ab3a0987f5f41c47ad55b2925"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/finalize-root.py",
+      "bytes": 18799,
+      "sha256": "65d20a6c80e2e15ce094775938976439904bed663a27282a9576174ac095f48f"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frontend-all-first.log",
+      "bytes": 256,
+      "sha256": "c4acb5c138ae687398702f14530218fe8c257dcffc5f7209281c2938534fe296"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frontend-build-first.log",
+      "bytes": 8175,
+      "sha256": "805a697e7a97fcc8b94f598d287c3000a8349d6a3b0daa35e302268891f846cb"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frontend-focused-first.log",
+      "bytes": 239,
+      "sha256": "18f7d43910f25cc3c9c75f97ca23bd26aff045d3d846523821a1ca5b168ac4bd"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/CMakeLists.txt",
+      "bytes": 124050,
+      "sha256": "08446852655488aa78e5ea7720250cd9fe798cf0052242dd3f8ef7f0add14c9b"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-identity-limitations.json",
+      "bytes": 3534,
+      "sha256": "48cc8c83dbeb34432b8a83cd237a3faa4dbe41c6520c565c33697ddf2abba659"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-model-report.json",
+      "bytes": 11835,
+      "sha256": "339ca32cec764831d52693c0d96b0ad3d79c9602445e56a60d9ae21d52e1524f"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/finalize.py",
+      "bytes": 5646,
+      "sha256": "ca8961819dd2d25954c4dbc98c5c1d158e249727901330591575e027b293114e"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/implementation-plan.md",
+      "bytes": 8023,
+      "sha256": "e17a2185879b14e114b9653df4794db961692851e3b1f71f7fc3bbf1e05aa85c"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/inspect-types.py",
+      "bytes": 698,
+      "sha256": "188951db15c1afbd0aabbc125c6752d9929bebd46c9ba89847705d72fe1512f3"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/model.py",
+      "bytes": 8266,
+      "sha256": "56bfe17fe07e2786c6e785d1fd7c70291708dbb753a30bbc7e06ff256eb8abac"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "bytes": 6140,
+      "sha256": "8276e16cba21273b0601b97a6d6f331302c742f1f0e45b7ea2a79824843ed6cc"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "bytes": 10765,
+      "sha256": "e102a42ea1d0b26ba3a0ec14d2f1c67d35c8cb5bac3ba921c0601cbb79e11fbb"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/review-corrected-1.py",
+      "bytes": 1351,
+      "sha256": "fc15791ab153d7d1c6803716634731f92b88ecd31f23a874c532e9ca10e4eacc"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/review.py",
+      "bytes": 6083,
+      "sha256": "b0563aa95457eba9d318bfd2678de68f942f7e90e78ae1dc0f5bfb46c2aa084f"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-design-1/wire-contract.json",
+      "bytes": 4798,
+      "sha256": "b7f2f1858b81f7f224f6f2b624950ac9d9b11071c6a5ae71d0df58beb50e8a5b"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-transport-1/case-provenance.jsonl",
+      "bytes": 460803,
+      "sha256": "455db7a3c66593912f3933a2ded4c9883c16e8078f4aaa6dbf8f93f798051507"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generate-transport-fixture.py",
+      "bytes": 23583,
+      "sha256": "f4891e704703bcc3dd60f3dea679f0bd742ed7615e102e7210b8d9d89d52a206"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "bytes": 5823,
+      "sha256": "c2680fd7e0d9ea06ebfa61df4296892a7823fb6cf79696446dd071712e9f68c9"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "bytes": 6295,
+      "sha256": "da31327cd2b94b21d08dcccbc3aa2489fbe1b9889fa1d344f1ee322625d772fa"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/admitted-pandas-ltl-original-call-transport-1/workbench-fixture-support.hpp.txt",
+      "bytes": 9721,
+      "sha256": "e3f299bbf04920c3c68c95fef7269e2efa6e92ded097dc7ce9899965e058785a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/base.json",
+      "bytes": 2060,
+      "sha256": "9fd602f991ee0e15d139097c1c3446099cc4911c489aabc3c2b3580a60600f25"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-first.log",
+      "bytes": 900,
+      "sha256": "d8362fe95136ccf7f27a6cbdfc8000d6e3ebfd7db408aba5825016f913525d78"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/owned-server.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/owned-server.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/report.json",
+      "bytes": 1765,
+      "sha256": "45fcf45a27bc3c693c2c375a088cd4a0e8c023aab5ec5b7c0de765bdbb716261"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-smoke-corrected-1.cjs",
+      "bytes": 16455,
+      "sha256": "c9667f11d0d421cbaa570709e91bcb2bbb993e594fcfba4d4b0dff3552a36352"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-smoke.cjs",
+      "bytes": 16020,
+      "sha256": "0f7f0da2252da63e84bd94f1e4a80a4fa4e690fc9f224c26999d12d0dacc3818"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-1/expected-index-wire.json",
+      "bytes": 2531,
+      "sha256": "32bb7cc4a8d5d20083f5bb6e06162be9599a74ae5e202627041272ed8a299b21"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-1/first-review-attempt.json",
+      "bytes": 457,
+      "sha256": "f5c30fc5db8b4478528c9b52e7dcca86ec13894e413d45bb90d2bcc2bacd2605"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-1/own-source-excerpts.json",
+      "bytes": 5493,
+      "sha256": "da504e3c53bb23363c5d78bb7544368073759f14d11aaa840f0f270e0490e2b6"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-1/review-corrected-1.py",
+      "bytes": 7730,
+      "sha256": "7ae278935bfaae773392c71cd4dc5927948f965871354f5325fc18618707465c"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-1/review.json",
+      "bytes": 5044,
+      "sha256": "9ac6287884a82e2ad7f7b6a8347e7f14439ac551f5fcf5e5201166da9bf7cf99"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-1/review.py",
+      "bytes": 7763,
+      "sha256": "2cd1694b0172806ba595ea356f01587faa8734e1cc1e22ba68bbd553b8e4bb97"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-1/reviewed-browser-owned-smoke.cjs",
+      "bytes": 16020,
+      "sha256": "0f7f0da2252da63e84bd94f1e4a80a4fa4e690fc9f224c26999d12d0dacc3818"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-1/validation.json",
+      "bytes": 610,
+      "sha256": "8b0913a24fa36d104b1912dadac808cf00a5f2bac8e82bc2ee8d8d0adf99bfe8"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/exact-diff-corrected-2.json",
+      "bytes": 3012,
+      "sha256": "a8680b230bd1bf3abd1b5aed94c96d34044dffd8f61359c31f7c47d4d2653741"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/exact-diff.json",
+      "bytes": 3012,
+      "sha256": "a8680b230bd1bf3abd1b5aed94c96d34044dffd8f61359c31f7c47d4d2653741"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/first-review-harness-attempt.json",
+      "bytes": 374,
+      "sha256": "d10396b58f12585cc00778a61001875104b81dd7bb0fa9343dddd5d8d08dbd62"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/review-corrected-1.py",
+      "bytes": 5878,
+      "sha256": "aac27b6fd7e310812e3b5a08260d935ecc562518be718f869b0695c7bacd240a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/review-corrected-2.py",
+      "bytes": 5907,
+      "sha256": "647d2f9dcdaac37575177a17e1571034217bd2a864ae0c889c10aebe06f6c22b"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/review.json",
+      "bytes": 3528,
+      "sha256": "9ffda8007aa6b7433e0f3a6ff28ca3fa30e9a35c8e2e4346e34e48151213abee"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/review.py",
+      "bytes": 5796,
+      "sha256": "3d13872c789c864f925ba7c12b92f652b3d48d1612ccc702275ccca87a56eedf"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/reviewed-browser-owned-smoke-corrected-1.cjs",
+      "bytes": 16455,
+      "sha256": "c9667f11d0d421cbaa570709e91bcb2bbb993e594fcfba4d4b0dff3552a36352"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/second-review-harness-attempt.json",
+      "bytes": 336,
+      "sha256": "adf6eb03bab9012cff3cda665ccbb62a5eee62b86552583e92ad442ef9204faa"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-static-review-2/validation.json",
+      "bytes": 622,
+      "sha256": "3d223beba2f42f77bca2f0c48ccbcf21674bb214a56327e3d70d7c609d84b8ba"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/finalize-root.py",
+      "bytes": 18799,
+      "sha256": "65d20a6c80e2e15ce094775938976439904bed663a27282a9576174ac095f48f"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/fixture-generation-first.log",
+      "bytes": 425,
+      "sha256": "6b91801f08172d1a852489aa34a47db92ddff7dcf7f8b71c697225df75a80369"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/frontend-all-first.log",
+      "bytes": 256,
+      "sha256": "c4acb5c138ae687398702f14530218fe8c257dcffc5f7209281c2938534fe296"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/frontend-build-first.log",
+      "bytes": 8175,
+      "sha256": "805a697e7a97fcc8b94f598d287c3000a8349d6a3b0daa35e302268891f846cb"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/frontend-focused-first.log",
+      "bytes": 239,
+      "sha256": "18f7d43910f25cc3c9c75f97ca23bd26aff045d3d846523821a1ca5b168ac4bd"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-control-build-corrected-2.log",
+      "bytes": 914,
+      "sha256": "29d53acc08c341042891c163d25389ce8c862466cdcd6857a27059c3df283076"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-final-build-first.log",
+      "bytes": 1478,
+      "sha256": "03add1c8aaddcd522896de62a45d9a1da21ab3d00a1aeb0c1c6761a48569565a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-pandas-transport-tests-first.log",
+      "bytes": 1233,
+      "sha256": "5a90aa7b100443586ff7f717f0b80a84f3dee0fab99e94df6ddb42a3667d6dae"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-regression-build-first.log",
+      "bytes": 795,
+      "sha256": "234573100fac8a2a13d6280eb0c18307ed19384e9a8478a17bc033752b92c5e9"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-regression-tests-first.log",
+      "bytes": 1662,
+      "sha256": "81c1e21f4fdac471b953ae658b5dc2244f68ed6eedbd5dd65e9c4b3d73f23f21"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-workbench-build-first.log",
+      "bytes": 1662,
+      "sha256": "11e67abba4b7ef18168e72d4cb5e86d33359caff74a07cd4133b2abdfdeafcc8"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-workbench-tests-corrected-1.log",
+      "bytes": 1444,
+      "sha256": "266a1e6f6ab1bf207e2dd631d113e10595dee5ee64f53c2f1b2dc084f89ffc8b"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-workbench-tests-corrected-2.log",
+      "bytes": 1372,
+      "sha256": "200e520ed169cf7a4a002c429224373f87dcbc948fc449844b5e2632a2e114ec"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/native-workbench-tests-first.log",
+      "bytes": 1424,
+      "sha256": "e34ac5bde23b0a807a8a4de068dce2218f24ef78dbd2faf04d49a64c5da7b0b6"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/prepare-browser.py",
+      "bytes": 10777,
+      "sha256": "dff469674992a68015c4629ba9982eae70232e4960cea25a1bf765eaa9c8fdfc"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/prepare-root-facts.py",
+      "bytes": 7200,
+      "sha256": "740d59b64f09e66732b813155a72606bbb6b1a6c856d92483517aebeee36568d"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/preserved-attempts.json",
+      "bytes": 1959,
+      "sha256": "01e08214edb03df5ca3d1f58ef8c6a6647e779cad06dc1e9cda21eee8baf6136"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-acceptance-1/root-facts.json",
+      "bytes": 48886,
+      "sha256": "bd017b87e1b01d2c8a2d9b15e5d7dfdf0fd06ff7eb04a76ee34df6fa66fc0e9c"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/before/ltl_filter_workbench.cpp",
+      "bytes": 19120,
+      "sha256": "bf36f87d9c083ee11e033d6419bbfa86fda227c0917ea7b236393baaa34652bb"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/before/polars_ltl_original_call_parser.hpp",
+      "bytes": 8560,
+      "sha256": "c29cd03a284ba4a66cbd5d3473999d17384f188ec1cec66a4a56defe91c6da79"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/before/test_ltl_filter_route.cpp",
+      "bytes": 4713,
+      "sha256": "6ca98097bb505b591e37dac93e15de298af344b009b6f05a7e7b515ac3eb951e"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/before/test_ltl_filter_workbench.cpp",
+      "bytes": 28696,
+      "sha256": "b7a29ac27ed1796bdaef6e861d8617e0b9b0eec531e9c08f226b6681d3fa2274"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/freeze.py",
+      "bytes": 4277,
+      "sha256": "0ee36ea157200fbdba4ae2c6f7344df947d84422f71be2fe5374905c5ab2ea1c"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/ltl_filter_workbench.cpp",
+      "bytes": 20385,
+      "sha256": "9e95995b2d18a7a5cf1b4274564a9352cc3cb1fc0cd6f411e388f642178234a2"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/pandas_ltl_original_call_parser.hpp",
+      "bytes": 4005,
+      "sha256": "68a55f302338c250fd53b7147214cc2c9770f9c6b6f5f226eff535aa29fdf72c"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/polars_ltl_original_call_parser.hpp",
+      "bytes": 8560,
+      "sha256": "c29cd03a284ba4a66cbd5d3473999d17384f188ec1cec66a4a56defe91c6da79"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/prebuild-report.json",
+      "bytes": 5437,
+      "sha256": "13ca515df0ca6adcf63feff3ec8af7d4dfaa74d508f9d4ee2c643b3f813230d3"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/test_ltl_filter_route.cpp",
+      "bytes": 5137,
+      "sha256": "dafd8ea01a55d8e347a8e76376e4027be57cbe8af789bcb25c2001786020d3fd"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-1/test_ltl_filter_workbench.cpp",
+      "bytes": 39843,
+      "sha256": "dc8fd6cf3e28853ca5fd316b0ddb5549f1050abdde1ec025605d7fc6dd827733"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/ltl_filter_workbench.cpp",
+      "bytes": 20385,
+      "sha256": "9e95995b2d18a7a5cf1b4274564a9352cc3cb1fc0cd6f411e388f642178234a2"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/pandas_ltl_original_call_parser.hpp",
+      "bytes": 4005,
+      "sha256": "68a55f302338c250fd53b7147214cc2c9770f9c6b6f5f226eff535aa29fdf72c"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/polars_ltl_original_call_parser.hpp",
+      "bytes": 8560,
+      "sha256": "c29cd03a284ba4a66cbd5d3473999d17384f188ec1cec66a4a56defe91c6da79"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/review.json",
+      "bytes": 8141,
+      "sha256": "ec193fef56228599372cb86d689652684960f6519cf8ed5118d6389e6fa93b28"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/review.py",
+      "bytes": 10604,
+      "sha256": "c87baecece680187fd012bf4e78fa08f935c030a4a25d757af6ef14c25a887c3"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/root-final-control-test-diff.json",
+      "bytes": 6021,
+      "sha256": "0d759ecefb027a43e27d724a180952187d2bf9c9e3e380b5a2cf69aecd902c6e"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/test_ltl_filter_route.cpp",
+      "bytes": 5137,
+      "sha256": "dafd8ea01a55d8e347a8e76376e4027be57cbe8af789bcb25c2001786020d3fd"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/test_ltl_filter_workbench.cpp",
+      "bytes": 41149,
+      "sha256": "9c22424c6c8a7b7c7046fa413a029d03d35fcbaf4a2f786322945676bd4c7a6a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-backend-independent-review-1/validation.json",
+      "bytes": 647,
+      "sha256": "4273cb21f1e29b8180400df00a55e9ca97cad8b2b54bcbc3f3b44ca1f194aea8"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-independent-review-1/all429-independent-mappings.jsonl",
+      "bytes": 169909,
+      "sha256": "9cac9501b663d4cba2680f90f409ba0dd3a95e9859f8865e9304b9da37deb73b"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "bytes": 7638,
+      "sha256": "1f1ecbe87b57ed3ed789b04dd6ea7c4fdccbbfbb5badef4fd8ea56fad71962c8"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-independent-review-1/review.py",
+      "bytes": 15210,
+      "sha256": "3e9666320d4e8483808285994b931fadeb0bb3259e2b4320bcdef8679d4e6394"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/corrected-static-checks.json",
+      "bytes": 3706,
+      "sha256": "4c757da437296d5f9a8d032de4925351785f02b7769f6be112f8d3ca4463d12f"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/final-review.json",
+      "bytes": 5060,
+      "sha256": "09c61794e7a3444a6fc3c76978a29fb40108bb9197cb608ba7fab16c691129ba"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/final-validation.json",
+      "bytes": 577,
+      "sha256": "9ffae70be05fc987f79732b7d00a39dfb3983a52dec2bac31cab8760a2e6810a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/finalize-root-corrected-1.py",
+      "bytes": 18799,
+      "sha256": "65d20a6c80e2e15ce094775938976439904bed663a27282a9576174ac095f48f"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/finalize-root.py",
+      "bytes": 17097,
+      "sha256": "312c04b0540f184342793b6efdf27efc3788e6bde10652b83ca1d1a133d6172e"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/package-retained-public-observation-pandas-original-call-checkpoint-corrected-1.py",
+      "bytes": 22971,
+      "sha256": "e3b8512d7048bf2498c733a7dadadd0d23dfee6501884678416145ad9b095f2d"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/package-retained-public-observation-pandas-original-call-checkpoint.py",
+      "bytes": 21462,
+      "sha256": "9450143e7b33ec621ea45db8b594d7e3a60bb1dc690b9a0f9ff63ca74a27cf9a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/review-corrected-1.py",
+      "bytes": 9326,
+      "sha256": "98b407a9e6eb8ab3a84c5dd95b80b6516b4604e31aed177c9aba6c43f6be745f"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/review.json",
+      "bytes": 4242,
+      "sha256": "65dfe9f2c07cccc06b01a155958e24c99c659908ffbf65b4e15d8cda35229ad3"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/review.py",
+      "bytes": 6544,
+      "sha256": "658cc5b73c657c8fdce4ff34cc2dfe9d1680d71ae1f0efeec8712a8a807bf6f7"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/static-payload-classification.json",
+      "bytes": 3663,
+      "sha256": "5565f11c24aae5b853cb0b7c7f6242880d06bafecc9af9b5006239015b1caefa"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/ltl-pandas-original-call-packager-independent-review-1/validation.json",
+      "bytes": 566,
+      "sha256": "799ca918104b9a18cbfd0c736d90140752c7272d4d7b40f5db29e9749068b075"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/pandas-original-call-checkpoint-prepared-1/finalize-root.py.corrected-1.diff.patch",
+      "bytes": 5528,
+      "sha256": "ebb4d5fed9d613056b13b76f51d549368270420177ca9fd990e80df6f4bff1a3"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/pandas-original-call-checkpoint-prepared-1/first-draft-1/finalize-root.py",
+      "bytes": 17097,
+      "sha256": "312c04b0540f184342793b6efdf27efc3788e6bde10652b83ca1d1a133d6172e"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/pandas-original-call-checkpoint-prepared-1/first-draft-1/package-retained-public-observation-pandas-original-call-checkpoint.py",
+      "bytes": 21462,
+      "sha256": "9450143e7b33ec621ea45db8b594d7e3a60bb1dc690b9a0f9ff63ca74a27cf9a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/pandas-original-call-checkpoint-prepared-1/first-draft-1/preparation.json",
+      "bytes": 3823,
+      "sha256": "f31598e4206f9594c701fd8bd8ec0e6e003b07744bf7408edb0c40635a5f94ab"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/pandas-original-call-checkpoint-prepared-1/initial-analysis-failure-summary.json",
+      "bytes": 1810,
+      "sha256": "1cece7ca0d83b4d0e019b13dac4bde135e91daa034128c7507e2c65b41ab1d91"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/pandas-original-call-checkpoint-prepared-1/package-retained-public-observation-pandas-original-call-checkpoint.py.corrected-1.diff.patch",
+      "bytes": 4031,
+      "sha256": "50fd4bd20c0daeb3f17ee385e43e2daa11b8831fd1ca2ea933e2ce36fde0d535"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/pandas-original-call-checkpoint-prepared-1/preparation.json",
+      "bytes": 3823,
+      "sha256": "f31598e4206f9594c701fd8bd8ec0e6e003b07744bf7408edb0c40635a5f94ab"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/build/parity-closures/pandas-original-call-checkpoint-prepared-1/static-metadata-admission-audit.json",
+      "bytes": 8171,
+      "sha256": "be306c90a076aeb9838d14b9e8b46c7646e67609458fe026dc611dc7a22d4767"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/docs/ltl-filter-workflow.md",
+      "bytes": 17283,
+      "sha256": "6863bba061fb218cafbd6c0b24fff8d4cc6142750c1da1e0c16410e8dc6c6bfd"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/backend/ltl_filter_workbench.cpp",
+      "bytes": 20385,
+      "sha256": "9e95995b2d18a7a5cf1b4274564a9352cc3cb1fc0cd6f411e388f642178234a2"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/backend/pandas_ltl_original_call_parser.hpp",
+      "bytes": 4005,
+      "sha256": "68a55f302338c250fd53b7147214cc2c9770f9c6b6f5f226eff535aa29fdf72c"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/backend/tests/test_ltl_filter_route.cpp",
+      "bytes": 5137,
+      "sha256": "dafd8ea01a55d8e347a8e76376e4027be57cbe8af789bcb25c2001786020d3fd"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/backend/tests/test_ltl_filter_workbench.cpp",
+      "bytes": 41149,
+      "sha256": "9c22424c6c8a7b7c7046fa413a029d03d35fcbaf4a2f786322945676bd4c7a6a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/backend/tests/test_pandas_ltl_workbench_public.cpp",
+      "bytes": 3668,
+      "sha256": "059aaa90be292d8c6871f6780746889b1907b706aaa222347eefa71790ca577e"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/frontend/src/components/LtlFilterWorkspace.tsx",
+      "bytes": 19912,
+      "sha256": "4edf3e554e2961c10c671344d9a426d195682a830d4f52649adbf010132e31b2"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/frontend/src/ltl-filters.ts",
+      "bytes": 19230,
+      "sha256": "0e5c37fd4e3d31dac01d0e7dfaa7ab25c59652fc23191091a8ba78cb814ff841"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/frontend/tests/ltl-filter-workspace.test.ts",
+      "bytes": 12417,
+      "sha256": "2ae0ad276d99cd8a6a257f4e81e9101ef3c1ec4b32563c15ed4e58093910cac3"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/frozen/src/frontend/tests/ltl-filters.test.ts",
+      "bytes": 24227,
+      "sha256": "2e4b3b7d1d9be8ed2b63bea58bea76b70dbf3dd9ac69ffb0525436e9a7c0f93d"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/native-control-build-corrected-2.log",
+      "bytes": 914,
+      "sha256": "29d53acc08c341042891c163d25389ce8c862466cdcd6857a27059c3df283076"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/native-final-build-first.log",
+      "bytes": 1478,
+      "sha256": "03add1c8aaddcd522896de62a45d9a1da21ab3d00a1aeb0c1c6761a48569565a"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/native-pandas-transport-tests-first.log",
+      "bytes": 1233,
+      "sha256": "5a90aa7b100443586ff7f717f0b80a84f3dee0fab99e94df6ddb42a3667d6dae"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/native-regression-build-first.log",
+      "bytes": 795,
+      "sha256": "234573100fac8a2a13d6280eb0c18307ed19384e9a8478a17bc033752b92c5e9"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/native-regression-tests-first.log",
+      "bytes": 1662,
+      "sha256": "81c1e21f4fdac471b953ae658b5dc2244f68ed6eedbd5dd65e9c4b3d73f23f21"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/native-workbench-build-first.log",
+      "bytes": 1662,
+      "sha256": "11e67abba4b7ef18168e72d4cb5e86d33359caff74a07cd4133b2abdfdeafcc8"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/native-workbench-tests-corrected-2.log",
+      "bytes": 1372,
+      "sha256": "200e520ed169cf7a4a002c429224373f87dcbc948fc449844b5e2632a2e114ec"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/root-facts.json",
+      "bytes": 48886,
+      "sha256": "bd017b87e1b01d2c8a2d9b15e5d7dfdf0fd06ff7eb04a76ee34df6fa66fc0e9c"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-independent-review-1/all429-independent-mappings.jsonl",
+      "bytes": 169909,
+      "sha256": "9cac9501b663d4cba2680f90f409ba0dd3a95e9859f8865e9304b9da37deb73b"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "bytes": 7638,
+      "sha256": "1f1ecbe87b57ed3ed789b04dd6ea7c4fdccbbfbb5badef4fd8ea56fad71962c8"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.py",
+      "bytes": 15210,
+      "sha256": "3e9666320d4e8483808285994b931fadeb0bb3259e2b4320bcdef8679d4e6394"
+    },
+    {
+      "path": "build/parity-closures/package-retained-public-observation-pandas-original-call-checkpoint.py",
+      "bytes": 22971,
+      "sha256": "e3b8512d7048bf2498c733a7dadadd0d23dfee6501884678416145ad9b095f2d"
+    },
+    {
+      "path": "build/parity-closures/pandas-original-call-checkpoint-prepared-1/initial-analysis-failure-summary.json",
+      "bytes": 1810,
+      "sha256": "1cece7ca0d83b4d0e019b13dac4bde135e91daa034128c7507e2c65b41ab1d91"
+    },
+    {
+      "path": "build/parity-closures/pandas-original-call-checkpoint-prepared-1/plan-1.json",
+      "bytes": 73643,
+      "sha256": "fcf7f576a3bda9a93f5f53630048698cad7c7a4eeca9d6e20c78fc0f2afa4e23"
+    },
+    {
+      "path": "build/parity-closures/pandas-original-call-checkpoint-prepared-1/static-metadata-admission-audit.json",
+      "bytes": 8171,
+      "sha256": "be306c90a076aeb9838d14b9e8b46c7646e67609458fe026dc611dc7a22d4767"
+    },
+    {
+      "path": "build/parity-closures/verify-utf8-checkpoint-capsules-root.py",
+      "bytes": 3140,
+      "sha256": "7520eedf195b85ba371c4518e568b0f5d94f5d8e32bbe1e90c805503c6049047"
+    }
+  ],
+  "embedded_members": 151,
+  "omitted_artifact_bindings": [
+    {
+      "path": "build/parity-closures/receipt-index-root-acceptance/flat-manifest.json",
+      "bytes": 40126,
+      "sha256": "a6ec6b3529dea741c50f87b1d524639c601032bd833a63d551f623d5e6a6eb3e",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-expected.json",
+      "bytes": 823,
+      "sha256": "6843d794011f9ed384da685f006a862f44af97f114c88aa2e7747feec0648ec2",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/records.jsonl",
+      "bytes": 67113,
+      "sha256": "96850f5021e660056894440620f9d0bfa1d978457e4b069d83c059f8e476b0b9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-continuation-public-actual-1/records.jsonl",
+      "bytes": 1798265,
+      "sha256": "8bca6bf90705f1a42bc263ca5e0c4a81469d26b9c04242c778ff7e0606453db5",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/records.jsonl",
+      "bytes": 56471,
+      "sha256": "f132105f5e8cf6048ff631f7279b9cf9aa690d4004fe65e73038bef17c017e2d",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/records.jsonl",
+      "bytes": 24781954,
+      "sha256": "fe24ce67cf6f0a5f6be2f96fd2498873f7b887a89fe2069d93409edcd46855c7",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/records.jsonl",
+      "bytes": 91432,
+      "sha256": "ea0739c6ebe51ac89b2150beac7096ec37545fbb6c2715de47b8ea72353ea756",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/records.jsonl",
+      "bytes": 57989,
+      "sha256": "c3000bccc4f8cbd068f84045a4c981696ed2918d926e960239a1b7307a83534b",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/records.jsonl",
+      "bytes": 11071,
+      "sha256": "2a1711275812de2baca859c921c20e3af3c5b9e8bf645cb67c44aacb0b9a8fe1",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/records.jsonl",
+      "bytes": 68206,
+      "sha256": "fa7ebc2d32e7fcebf3cf95030884497b9adc267b172e244ccd6c0fa8b1140c8e",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/records.jsonl",
+      "bytes": 378722,
+      "sha256": "5b1fe22d631418ce56a8d5953f730570f7b1775ba4c72249de9db789f6c39ad9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "include/minera/pandas_ltl_filter.hpp",
+      "bytes": 2846,
+      "sha256": "d2851833dd14e5c5b0b10798409e3af57f9fc90325d85fbf4ed569a9b072a98c",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/pandas_ltl_filter.cpp",
+      "bytes": 19905,
+      "sha256": "78083f0dd57d53ba3395119de5650f29e2dc8d6551e0648367c41310367dd0cb",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/ltl_filter_workbench.cpp",
+      "bytes": 19120,
+      "sha256": "bf36f87d9c083ee11e033d6419bbfa86fda227c0917ea7b236393baaa34652bb",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/polars_ltl_original_call_parser.hpp",
+      "bytes": 8560,
+      "sha256": "c29cd03a284ba4a66cbd5d3473999d17384f188ec1cec66a4a56defe91c6da79",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/log_attribute_repetition_controls.cpp",
+      "bytes": 9389,
+      "sha256": "1f559ca4ac69a6526fa671a0c726402e3c54e54b50b1dced6d59d1a05f6bc490",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/src/ltl-filters.ts",
+      "bytes": 18424,
+      "sha256": "fce01166194e257006fbbf9f4c324be1f2df9ec0e73e31566321caf2043a0fa6",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/src/components/LtlFilterWorkspace.tsx",
+      "bytes": 18879,
+      "sha256": "6a35114153a8618b9c24b0832113fc964f7b4e62d2650eb40eb120cd76e05672",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-public-surface-actual-1/capture.json",
+      "bytes": 18822,
+      "sha256": "06fd5430fc1ab53481e4bc661d9fdafe8f2c90ff3c67991e81326c71714e1bab",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/executed-script.py",
+      "bytes": 23454,
+      "sha256": "775abe1df8867c0ae59ca40ac9a240155c672c672c7418d58b8a5ee519ddcd3d",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-prepared-1/generate-native-tests.py",
+      "bytes": 11422,
+      "sha256": "48e2c549b6afdd9f1634f0628b5098657f503cd4ce7c038df6df1fee34af29d9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis.json",
+      "bytes": 293933,
+      "sha256": "28852c4c99e7006621da9f6f4c011ce9e836145580646d89d5a4cf26c6edd0bb",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/admitted-429-control-metadata.jsonl",
+      "bytes": 282790,
+      "sha256": "6b78739a2ff0c468f0e88b0801cd26819164bc09a4fa8b95438aac55c4878424",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/admitted-429-control-metadata-corrected-1.jsonl",
+      "bytes": 282790,
+      "sha256": "6b78739a2ff0c468f0e88b0801cd26819164bc09a4fa8b95438aac55c4878424",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/candidate-control-projections.jsonl",
+      "bytes": 199747,
+      "sha256": "faa4961032ff5b0cd60cbce3d202fca5bac5ab3a6a99523d53970f3d47c5b507",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/receipt-index-root-acceptance/flat-manifest.json",
+      "bytes": 40126,
+      "sha256": "a6ec6b3529dea741c50f87b1d524639c601032bd833a63d551f623d5e6a6eb3e",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-expected.json",
+      "bytes": 823,
+      "sha256": "6843d794011f9ed384da685f006a862f44af97f114c88aa2e7747feec0648ec2",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/records.jsonl",
+      "bytes": 67113,
+      "sha256": "96850f5021e660056894440620f9d0bfa1d978457e4b069d83c059f8e476b0b9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-continuation-public-actual-1/records.jsonl",
+      "bytes": 1798265,
+      "sha256": "8bca6bf90705f1a42bc263ca5e0c4a81469d26b9c04242c778ff7e0606453db5",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/records.jsonl",
+      "bytes": 56471,
+      "sha256": "f132105f5e8cf6048ff631f7279b9cf9aa690d4004fe65e73038bef17c017e2d",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/records.jsonl",
+      "bytes": 24781954,
+      "sha256": "fe24ce67cf6f0a5f6be2f96fd2498873f7b887a89fe2069d93409edcd46855c7",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/records.jsonl",
+      "bytes": 91432,
+      "sha256": "ea0739c6ebe51ac89b2150beac7096ec37545fbb6c2715de47b8ea72353ea756",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/records.jsonl",
+      "bytes": 57989,
+      "sha256": "c3000bccc4f8cbd068f84045a4c981696ed2918d926e960239a1b7307a83534b",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/records.jsonl",
+      "bytes": 11071,
+      "sha256": "2a1711275812de2baca859c921c20e3af3c5b9e8bf645cb67c44aacb0b9a8fe1",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/records.jsonl",
+      "bytes": 68206,
+      "sha256": "fa7ebc2d32e7fcebf3cf95030884497b9adc267b172e244ccd6c0fa8b1140c8e",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/records.jsonl",
+      "bytes": 378722,
+      "sha256": "5b1fe22d631418ce56a8d5953f730570f7b1775ba4c72249de9db789f6c39ad9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/admitted-429-control-metadata-corrected-1.jsonl",
+      "bytes": 282790,
+      "sha256": "6b78739a2ff0c468f0e88b0801cd26819164bc09a4fa8b95438aac55c4878424",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "include/minera/pandas_ltl_filter.hpp",
+      "bytes": 2846,
+      "sha256": "d2851833dd14e5c5b0b10798409e3af57f9fc90325d85fbf4ed569a9b072a98c",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/pandas_ltl_filter.cpp",
+      "bytes": 19905,
+      "sha256": "78083f0dd57d53ba3395119de5650f29e2dc8d6551e0648367c41310367dd0cb",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/ltl_filter_workbench.cpp",
+      "bytes": 19120,
+      "sha256": "bf36f87d9c083ee11e033d6419bbfa86fda227c0917ea7b236393baaa34652bb",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/polars_ltl_original_call_parser.hpp",
+      "bytes": 8560,
+      "sha256": "c29cd03a284ba4a66cbd5d3473999d17384f188ec1cec66a4a56defe91c6da79",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/log_attribute_repetition_controls.cpp",
+      "bytes": 9389,
+      "sha256": "1f559ca4ac69a6526fa671a0c726402e3c54e54b50b1dced6d59d1a05f6bc490",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/src/ltl-filters.ts",
+      "bytes": 18424,
+      "sha256": "fce01166194e257006fbbf9f4c324be1f2df9ec0e73e31566321caf2043a0fa6",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/src/components/LtlFilterWorkspace.tsx",
+      "bytes": 18879,
+      "sha256": "6a35114153a8618b9c24b0832113fc964f7b4e62d2650eb40eb120cd76e05672",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis-corrected-1.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/admitted-429-control-metadata-corrected-1.jsonl",
+      "bytes": 282790,
+      "sha256": "6b78739a2ff0c468f0e88b0801cd26819164bc09a4fa8b95438aac55c4878424",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-public-surface-actual-1/capture.json",
+      "bytes": 18822,
+      "sha256": "06fd5430fc1ab53481e4bc661d9fdafe8f2c90ff3c67991e81326c71714e1bab",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/executed-script.py",
+      "bytes": 23454,
+      "sha256": "775abe1df8867c0ae59ca40ac9a240155c672c672c7418d58b8a5ee519ddcd3d",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-prepared-1/generate-native-tests.py",
+      "bytes": 11422,
+      "sha256": "48e2c549b6afdd9f1634f0628b5098657f503cd4ce7c038df6df1fee34af29d9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/candidate-control-projections.jsonl",
+      "bytes": 199747,
+      "sha256": "faa4961032ff5b0cd60cbce3d202fca5bac5ab3a6a99523d53970f3d47c5b507",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/carrier-model-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis.json",
+      "bytes": 293933,
+      "sha256": "28852c4c99e7006621da9f6f4c011ce9e836145580646d89d5a4cf26c6edd0bb",
+      "origin": "build/parity-closures/pandas-original-call-checkpoint-prepared-1/initial-analysis-failure-summary.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis.json",
+      "bytes": 293933,
+      "sha256": "28852c4c99e7006621da9f6f4c011ce9e836145580646d89d5a4cf26c6edd0bb",
+      "origin": "build/parity-closures/pandas-original-call-checkpoint-prepared-1/static-metadata-admission-audit.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/records.jsonl",
+      "bytes": 67113,
+      "sha256": "96850f5021e660056894440620f9d0bfa1d978457e4b069d83c059f8e476b0b9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-continuation-public-actual-1/records.jsonl",
+      "bytes": 1798265,
+      "sha256": "8bca6bf90705f1a42bc263ca5e0c4a81469d26b9c04242c778ff7e0606453db5",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/records.jsonl",
+      "bytes": 56471,
+      "sha256": "f132105f5e8cf6048ff631f7279b9cf9aa690d4004fe65e73038bef17c017e2d",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/records.jsonl",
+      "bytes": 24781954,
+      "sha256": "fe24ce67cf6f0a5f6be2f96fd2498873f7b887a89fe2069d93409edcd46855c7",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/records.jsonl",
+      "bytes": 91432,
+      "sha256": "ea0739c6ebe51ac89b2150beac7096ec37545fbb6c2715de47b8ea72353ea756",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/records.jsonl",
+      "bytes": 57989,
+      "sha256": "c3000bccc4f8cbd068f84045a4c981696ed2918d926e960239a1b7307a83534b",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/records.jsonl",
+      "bytes": 11071,
+      "sha256": "2a1711275812de2baca859c921c20e3af3c5b9e8bf645cb67c44aacb0b9a8fe1",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/records.jsonl",
+      "bytes": 68206,
+      "sha256": "fa7ebc2d32e7fcebf3cf95030884497b9adc267b172e244ccd6c0fa8b1140c8e",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/records.jsonl",
+      "bytes": 378722,
+      "sha256": "5b1fe22d631418ce56a8d5953f730570f7b1775ba4c72249de9db789f6c39ad9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/test_pandas_ltl_filter.cpp",
+      "bytes": 6677515,
+      "sha256": "7e2250ee98278cb153bb26e723802277ca60bf4f18eb231bbd1f8e5c01d05ad9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/preparation.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/pandas_ltl_workbench_public_vectors.inc",
+      "bytes": 897861,
+      "sha256": "4b52230f31557f239739cf0ce0060b472636a457bdede07d4c42c73158bfb280",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/records.jsonl",
+      "bytes": 24781954,
+      "sha256": "fe24ce67cf6f0a5f6be2f96fd2498873f7b887a89fe2069d93409edcd46855c7",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-continuation-public-actual-1/records.jsonl",
+      "bytes": 1798265,
+      "sha256": "8bca6bf90705f1a42bc263ca5e0c4a81469d26b9c04242c778ff7e0606453db5",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/records.jsonl",
+      "bytes": 378722,
+      "sha256": "5b1fe22d631418ce56a8d5953f730570f7b1775ba4c72249de9db789f6c39ad9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/records.jsonl",
+      "bytes": 68206,
+      "sha256": "fa7ebc2d32e7fcebf3cf95030884497b9adc267b172e244ccd6c0fa8b1140c8e",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/records.jsonl",
+      "bytes": 67113,
+      "sha256": "96850f5021e660056894440620f9d0bfa1d978457e4b069d83c059f8e476b0b9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/records.jsonl",
+      "bytes": 56471,
+      "sha256": "f132105f5e8cf6048ff631f7279b9cf9aa690d4004fe65e73038bef17c017e2d",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/records.jsonl",
+      "bytes": 57989,
+      "sha256": "c3000bccc4f8cbd068f84045a4c981696ed2918d926e960239a1b7307a83534b",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/records.jsonl",
+      "bytes": 91432,
+      "sha256": "ea0739c6ebe51ac89b2150beac7096ec37545fbb6c2715de47b8ea72353ea756",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/records.jsonl",
+      "bytes": 11071,
+      "sha256": "2a1711275812de2baca859c921c20e3af3c5b9e8bf645cb67c44aacb0b9a8fe1",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/test_pandas_ltl_filter.cpp",
+      "bytes": 6677515,
+      "sha256": "7e2250ee98278cb153bb26e723802277ca60bf4f18eb231bbd1f8e5c01d05ad9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/pandas_ltl_filter.cpp",
+      "bytes": 19905,
+      "sha256": "78083f0dd57d53ba3395119de5650f29e2dc8d6551e0648367c41310367dd0cb",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-prepared-1/generate-native-tests.py",
+      "bytes": 11422,
+      "sha256": "48e2c549b6afdd9f1634f0628b5098657f503cd4ce7c038df6df1fee34af29d9",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/executed-script.py",
+      "bytes": 23454,
+      "sha256": "775abe1df8867c0ae59ca40ac9a240155c672c672c7418d58b8a5ee519ddcd3d",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-public-surface-actual-1/capture.json",
+      "bytes": 18822,
+      "sha256": "06fd5430fc1ab53481e4bc661d9fdafe8f2c90ff3c67991e81326c71714e1bab",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/candidate-control-projections.jsonl",
+      "bytes": 199747,
+      "sha256": "faa4961032ff5b0cd60cbce3d202fca5bac5ab3a6a99523d53970f3d47c5b507",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-expected.json",
+      "bytes": 823,
+      "sha256": "6843d794011f9ed384da685f006a862f44af97f114c88aa2e7747feec0648ec2",
+      "origin": "build/parity-closures/admitted-pandas-ltl-original-call-transport-1/generation-report.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/src/ltl-filters.ts",
+      "bytes": 19230,
+      "sha256": "0e5c37fd4e3d31dac01d0e7dfaa7ab25c59652fc23191091a8ba78cb814ff841",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/src/components/LtlFilterWorkspace.tsx",
+      "bytes": 19912,
+      "sha256": "4edf3e554e2961c10c671344d9a426d195682a830d4f52649adbf010132e31b2",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/tests/ltl-filters.test.ts",
+      "bytes": 24227,
+      "sha256": "2e4b3b7d1d9be8ed2b63bea58bea76b70dbf3dd9ac69ffb0525436e9a7c0f93d",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/tests/ltl-filter-workspace.test.ts",
+      "bytes": 12417,
+      "sha256": "2ae0ad276d99cd8a6a257f4e81e9101ef3c1ec4b32563c15ed4e58093910cac3",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/ltl-filter-workflow.md",
+      "bytes": 17283,
+      "sha256": "6863bba061fb218cafbd6c0b24fff8d4cc6142750c1da1e0c16410e8dc6c6bfd",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/test_pandas_ltl_workbench_public.cpp",
+      "bytes": 3668,
+      "sha256": "059aaa90be292d8c6871f6780746889b1907b706aaa222347eefa71790ca577e",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 124050,
+      "sha256": "08446852655488aa78e5ea7720250cd9fe798cf0052242dd3f8ef7f0add14c9b",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/test_pandas_ltl_filter.cpp",
+      "bytes": 6677515,
+      "sha256": "7e2250ee98278cb153bb26e723802277ca60bf4f18eb231bbd1f8e5c01d05ad9",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/pandas_ltl_workbench_public_vectors.inc",
+      "bytes": 897861,
+      "sha256": "4b52230f31557f239739cf0ce0060b472636a457bdede07d4c42c73158bfb280",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/receipt-index-root-acceptance/flat-manifest.json",
+      "bytes": 40126,
+      "sha256": "a6ec6b3529dea741c50f87b1d524639c601032bd833a63d551f623d5e6a6eb3e",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/records.jsonl",
+      "bytes": 24781954,
+      "sha256": "fe24ce67cf6f0a5f6be2f96fd2498873f7b887a89fe2069d93409edcd46855c7",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-continuation-public-actual-1/records.jsonl",
+      "bytes": 1798265,
+      "sha256": "8bca6bf90705f1a42bc263ca5e0c4a81469d26b9c04242c778ff7e0606453db5",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/records.jsonl",
+      "bytes": 378722,
+      "sha256": "5b1fe22d631418ce56a8d5953f730570f7b1775ba4c72249de9db789f6c39ad9",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/records.jsonl",
+      "bytes": 68206,
+      "sha256": "fa7ebc2d32e7fcebf3cf95030884497b9adc267b172e244ccd6c0fa8b1140c8e",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/records.jsonl",
+      "bytes": 67113,
+      "sha256": "96850f5021e660056894440620f9d0bfa1d978457e4b069d83c059f8e476b0b9",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/records.jsonl",
+      "bytes": 56471,
+      "sha256": "f132105f5e8cf6048ff631f7279b9cf9aa690d4004fe65e73038bef17c017e2d",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/records.jsonl",
+      "bytes": 57989,
+      "sha256": "c3000bccc4f8cbd068f84045a4c981696ed2918d926e960239a1b7307a83534b",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/records.jsonl",
+      "bytes": 91432,
+      "sha256": "ea0739c6ebe51ac89b2150beac7096ec37545fbb6c2715de47b8ea72353ea756",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/records.jsonl",
+      "bytes": 11071,
+      "sha256": "2a1711275812de2baca859c921c20e3af3c5b9e8bf645cb67c44aacb0b9a8fe1",
+      "origin": "build/parity-closures/ltl-pandas-original-call-independent-review-1/review.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/records.jsonl",
+      "bytes": 24781954,
+      "sha256": "fe24ce67cf6f0a5f6be2f96fd2498873f7b887a89fe2069d93409edcd46855c7",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-continuation-public-actual-1/records.jsonl",
+      "bytes": 1798265,
+      "sha256": "8bca6bf90705f1a42bc263ca5e0c4a81469d26b9c04242c778ff7e0606453db5",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-time-activation-public-actual-1/records.jsonl",
+      "bytes": 378722,
+      "sha256": "5b1fe22d631418ce56a8d5953f730570f7b1775ba4c72249de9db789f6c39ad9",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-temporal-witness-public-actual-1/records.jsonl",
+      "bytes": 68206,
+      "sha256": "fa7ebc2d32e7fcebf3cf95030884497b9adc267b172e244ccd6c0fa8b1140c8e",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-case-identity-public-actual-1/records.jsonl",
+      "bytes": 67113,
+      "sha256": "96850f5021e660056894440620f9d0bfa1d978457e4b069d83c059f8e476b0b9",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-next-terminal-public-actual-1/records.jsonl",
+      "bytes": 56471,
+      "sha256": "f132105f5e8cf6048ff631f7279b9cf9aa690d4004fe65e73038bef17c017e2d",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-pairs-public-actual-1/records.jsonl",
+      "bytes": 57989,
+      "sha256": "c3000bccc4f8cbd068f84045a4c981696ed2918d926e960239a1b7307a83534b",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-identity-public-actual-1/records.jsonl",
+      "bytes": 91432,
+      "sha256": "ea0739c6ebe51ac89b2150beac7096ec37545fbb6c2715de47b8ea72353ea756",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-resource-union-public-actual-1/records.jsonl",
+      "bytes": 11071,
+      "sha256": "2a1711275812de2baca859c921c20e3af3c5b9e8bf645cb67c44aacb0b9a8fe1",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/test_pandas_ltl_filter.cpp",
+      "bytes": 6677515,
+      "sha256": "7e2250ee98278cb153bb26e723802277ca60bf4f18eb231bbd1f8e5c01d05ad9",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/pandas_ltl_filter.cpp",
+      "bytes": 19905,
+      "sha256": "78083f0dd57d53ba3395119de5650f29e2dc8d6551e0648367c41310367dd0cb",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-prepared-1/generate-native-tests.py",
+      "bytes": 11422,
+      "sha256": "48e2c549b6afdd9f1634f0628b5098657f503cd4ce7c038df6df1fee34af29d9",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-pandas-public-actual-1/executed-script.py",
+      "bytes": 23454,
+      "sha256": "775abe1df8867c0ae59ca40ac9a240155c672c672c7418d58b8a5ee519ddcd3d",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/filtering-ltl-public-surface-actual-1/capture.json",
+      "bytes": 18822,
+      "sha256": "06fd5430fc1ab53481e4bc661d9fdafe8f2c90ff3c67991e81326c71714e1bab",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/candidate-control-projections.jsonl",
+      "bytes": 199747,
+      "sha256": "faa4961032ff5b0cd60cbce3d202fca5bac5ab3a6a99523d53970f3d47c5b507",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-manifest.json",
+      "bytes": 43037,
+      "sha256": "028bec03569e8a72ab5bd43ab2b03b8b5e8d56b56fe1ab6964f01c1f0911ad91",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/retained-public-receipt-ltl-expected.json",
+      "bytes": 823,
+      "sha256": "6843d794011f9ed384da685f006a862f44af97f114c88aa2e7747feec0648ec2",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/polars_ltl_filter_public_vectors.inc",
+      "bytes": 4515742,
+      "sha256": "1b9c2b8740d8c17f94820d7ed057af78a498cdbce53520ffee8ae93405620111",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/polars_ltl_filter.cpp",
+      "bytes": 34392,
+      "sha256": "baff88bc0f0b59d769e323afe8b56a4c4563cfcee277822727fb5f75891cd1d7",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/polars_ltl_workbench_public_vectors.inc",
+      "bytes": 1484080,
+      "sha256": "78157fdb5359e253f4c8d17a2954adf98ca317b7accb57d1eee9a3cb5089ce50",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/test_polars_ltl_filter.cpp",
+      "bytes": 12916,
+      "sha256": "4b7835691f217ad7bf07ed44e4d6b9a433202d3669e7cf99b94bbf62fcb64650",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "scripts/retained_public_observation_inventory.py",
+      "bytes": 86550,
+      "sha256": "4b96608736aead97860a9ca915e99ef3ae558ef03bc8cfb01604deb244d45106",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/tests/pandas_ltl_workbench_public_vectors.inc",
+      "bytes": 897861,
+      "sha256": "4b52230f31557f239739cf0ce0060b472636a457bdede07d4c42c73158bfb280",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "docs/pandas-ltl-filter-public.json.gz",
+      "bytes": 8972301,
+      "sha256": "9f073d0be9b35661772538d4a81a8de206160c281d9da3c119e8b4a2b7bb77fd",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/admitted-pandas-ltl-original-call-design-1/receipt-analysis.json",
+      "bytes": 293933,
+      "sha256": "28852c4c99e7006621da9f6f4c011ce9e836145580646d89d5a4cf26c6edd0bb",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/Release/minera_server.exe",
+      "bytes": 16928256,
+      "sha256": "dd4952e40cf153b9bc4cf7cc5e2f1462589345dbc5a152a957b674985466ab56",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/Release/minera_core.lib",
+      "bytes": 594680198,
+      "sha256": "e11627b43c4f5cd2f70794c64be9aebffff69984f665c3f8590de30ea6751c96",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/Release/minera_pandas_ltl_filter_tests.exe",
+      "bytes": 42502656,
+      "sha256": "7f016c7fba11364795e84279227c3806f682f49ba6af2e333697ee245691a98a",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/Release/minera_polars_ltl_filter_tests.exe",
+      "bytes": 17524736,
+      "sha256": "0c37d8b7edd3a225018bbb0436020621de7ba723f3228219237e4313ebc42972",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/Release/minera_pandas_ltl_workbench_public_tests.exe",
+      "bytes": 44783616,
+      "sha256": "ca07f926a0be534472b73ffe2fabe4ca9bbe100413b6dd332c221442bfe8d527",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/Release/minera_ltl_filter_workbench_tests.exe",
+      "bytes": 1268736,
+      "sha256": "696c7f747fa00a7f42952f160de8258ab031a40b016822e5aa32dc10aeda7bb3",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/Release/minera_ltl_filter_route_tests.exe",
+      "bytes": 1587712,
+      "sha256": "6e8ade753babd345d2044c2b5690ab64bbaaae1be8a1db7d416d1c4486ac2515",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/complete-call-download.json",
+      "bytes": 404,
+      "sha256": "e50a2e34b1a993235db848cc4df83bc5ed959c863775b9168cbd26536893639a",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/complete-import-response.json",
+      "bytes": 13069,
+      "sha256": "54d9f7c76ddbdea0f49f47a72c36f5a95971b64b10b62eab0c6c2fa15caaa63b",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/complete-response-download.json",
+      "bytes": 13069,
+      "sha256": "54d9f7c76ddbdea0f49f47a72c36f5a95971b64b10b62eab0c6c2fa15caaa63b",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/complete-result-download.json",
+      "bytes": 3357,
+      "sha256": "fac8972518612e67211581e1c9e2020338f1156fe731dcb5e758f47c609ae790",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/downloaded-example.json",
+      "bytes": 1891,
+      "sha256": "0b3bbe0ec55df667dfa8ab50cd01145044eb720aa7cd1efdefd4a95e2d4efeef",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/enum-string-response.json",
+      "bytes": 12962,
+      "sha256": "d51810b6cff632e14f91b1e762d910ea262337be43532ba759824f7639cacaf5",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/failed-call-download.json",
+      "bytes": 190,
+      "sha256": "0ee4c2ec008c9795597ff4cbcd9eacd0379ea50f791a57a56298274303c96e67",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/failed-response-download.json",
+      "bytes": 8840,
+      "sha256": "403fd81a79098f2753f17f045858fc1d8bf95bd210a1a5f381b91b6c9c4d7c64",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/failed-source-after-download.json",
+      "bytes": 3357,
+      "sha256": "fac8972518612e67211581e1c9e2020338f1156fe731dcb5e758f47c609ae790",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/failed-source-download.json",
+      "bytes": 3357,
+      "sha256": "fac8972518612e67211581e1c9e2020338f1156fe731dcb5e758f47c609ae790",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/friendly-default-response.json",
+      "bytes": 12636,
+      "sha256": "670867c2953ccfcd52814c78b7c1701ade3af718e83607a8801c262ececd881a",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/landing-buttons.json",
+      "bytes": 2395,
+      "sha256": "632f6d47c633a52f0b5435b4cc21b01a6e02c0e8a88ab45ce6efd2edea82ab02",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/original-different_persons-response.json",
+      "bytes": 9211,
+      "sha256": "089f632cae9ba8e0304efb42918a9ba6f44c66d7f7cf97f2fc596193bf7d7e23",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/original-eventually-response.json",
+      "bytes": 12757,
+      "sha256": "7cbe5df46c0bb36236c3d65644233738b0113bb574bb59fd7f4bd9d22aa05927",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/original-four_eyes-response.json",
+      "bytes": 10981,
+      "sha256": "633c96d3e7b21ff622b7f8b4bd76f974e70fadc25663ec6d184a03d5b2f91f6c",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/original-next-response.json",
+      "bytes": 11014,
+      "sha256": "8984b85ebb30859318c7509f138c4e65df9504de38b25143aac8fb127033cf07",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/pandas-complete-success.png",
+      "bytes": 128018,
+      "sha256": "2a76dcc9159420f14fde3651dd58ba453896bf3b4834c98dc158b475390d065a",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/pandas-raw-error.png",
+      "bytes": 122264,
+      "sha256": "3fd0810910742522db33c7fefa92da53ee880d1b7f87937f7369440acbc1e0b2",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/raw-empty-list-response.json",
+      "bytes": 12810,
+      "sha256": "e6306c8aacc3477b6ce7868ad42466617d634f0635d780e810f9c5ccf3261f93",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/raw-invalid-response.json",
+      "bytes": 8840,
+      "sha256": "403fd81a79098f2753f17f045858fc1d8bf95bd210a1a5f381b91b6c9c4d7c64",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/raw-null-response.json",
+      "bytes": 12797,
+      "sha256": "af3f8e45212c1b2de8a48ced20d0d6761b85d6c47bdc005e7518817e07d12592",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/string-enum-response.json",
+      "bytes": 12962,
+      "sha256": "e2aa84f5d74452cda2f3f59480253a1efde91570c8f76a42386727d51c308a5c",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/uploaded-own-example.json",
+      "bytes": 1869,
+      "sha256": "75f110cba219c9100f7c7c7f79819dd067ef664e09fb2341f5f483c037341585",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "build/parity-closures/ltl-pandas-original-call-acceptance-1/browser-owned-1/wrong-arity-response.json",
+      "bytes": 692,
+      "sha256": "a986c5a39fd8e74be0bfd84dbec51bd0ff8e87056672431fd95c9d3452c0e62e",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/dist/assets/html2canvas.esm-DXEQVQnt.js",
+      "bytes": 201041,
+      "sha256": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/dist/assets/index-CMbgkaNZ.js",
+      "bytes": 3195899,
+      "sha256": "77a4bb0503c47acfcd85d05f1f012dfd6199f004d2d5100800b53a39ce7db781",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/dist/assets/index-ZxHDB9qQ.css",
+      "bytes": 89096,
+      "sha256": "e028d28448296dfa1568a2a00a31332cc7494b3492df935724d09b79887ab26a",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/frontend/dist/index.html",
+      "bytes": 886,
+      "sha256": "dae5b6b68b31377c93ab13ed2ada61ef9c1f5bf22db36ef7c5dbdb961999dd9d",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    },
+    {
+      "path": "src/backend/polars_ltl_original_call_parser.hpp",
+      "bytes": 8560,
+      "sha256": "c29cd03a284ba4a66cbd5d3473999d17384f188ec1cec66a4a56defe91c6da79",
+      "origin": "build/parity-closures/ltl-pandas-original-call-acceptance-1/final-acceptance.json",
+      "packager_opened": false,
+      "packager_hash_reverified": false,
+      "disposition": "external binding declaration only; original payload/outcome/vector/binary not opened"
+    }
+  ],
+  "existing_original_receipts": {
+    "count": 429,
+    "frames": 350,
+    "diagnostics": 79,
+    "recursive_typed_descriptors": 1644,
+    "sorted_receipt_sha256": "09d3110a437f6ff51870b60b7477377be83ea128f6a8b197e12eb40f357bf39c"
+  },
+  "engineering_acceptance": {
+    "direct_calls": 429,
+    "http_calls": 429,
+    "polars_regression_calls_per_mode": 675,
+    "frontend_files": 192,
+    "frontend_tests": 9849,
+    "focused_tests": 40,
+    "browser_checks": 14,
+    "browser_requests": 12
+  },
+  "original_external_payloads_opened_by_packager": 0,
+  "reference_algorithm_calls": 0,
+  "member_execution": 0,
+  "new_public_member_admission": false,
+  "historical_audit_complete": false,
+  "canonical_receipts_replaced": false,
+  "reference_call_absence_established": false,
+  "root_entry_certificate": false,
+  "full_parity_claim": false,
+  "strict_open_units_unchanged": 201,
+  "unentered_logical_queries_unchanged": 565,
+  "limits": [
+    "Existing admitted429 pandas originals only;1644 typed value-level descriptors are not exact Python constructor provenance.",
+    "Pandas legacy eager observer has no explicit phase/apply_returned fields; complete/apply boundaries derive from direct return/exception, never Polars collect.",
+    "First/corrected1 workbench expectation failures and browserstatic index finding/harness attempts remain retained.",
+    "No new reference calls, public admission, original receipt replacement, history completeness, call absence, root entry certificate or full parity claim.",
+    "Existing201 strict open units and565 unentered logical queries remain unchanged."
+  ],
+  "kind": "validation",
+  "complete": true,
+  "archive": {
+    "path": "docs/retained-public-observation-pandas-original-call-checkpoint.jsonl.gz",
+    "bytes": 601625,
+    "sha256": "960e66788c5098f83356a22ae4f6536d62d6ddf3f58ac7d1ea32e67d9cbcae66",
+    "members": 151,
+    "uncompressed_bytes": 3102152,
+    "uncompressed_sha256": "d93561b51b4c10b41dcc4a4a840a908e87e95679697abef17c9df57bd37ede8e"
+  },
+  "exact_UTF8_roundtrips": true,
+  "embedded_members_match_current_frozen_bytes": true,
+  "source_bindings_reverified_after_packaging": true,
+  "root_generic_validator_compatible_member_fields": [
+    "kind",
+    "path",
+    "bytes",
+    "sha256",
+    "utf8"
+  ]
+}
