@@ -4,6 +4,7 @@
 #include "minera/embedding_workbench_json.hpp"
 #include "minera/pandas_attributes_filter.hpp"
 #include "minera/polars_attributes_filter.hpp"
+#include "pandas_attributes_original_call_parser.hpp"
 #include <map>
 #include <optional>
 #include <set>
@@ -17,22 +18,54 @@ DiscoveryWorkbenchResponse execute_table_attributes_filter(const std::vector<Dis
     const std::vector<DiscoveryWorkbenchPart>& query,std::string_view transport_error){
   std::map<std::string,const DiscoveryWorkbenchPart*> fields;
   std::optional<EventTable> source,result;std::optional<std::string> before,after;std::optional<bool> unchanged;
-  std::string engine,operation,kind,phase="control",case_key="case:concept:name",attribute_key="concept:name",error_type,error,filtered,counted;
+  std::optional<pandas_attributes_original_call_detail::Call> original_call;
+  std::optional<std::string> call_text,controls_before,controls_after;std::optional<bool> controls_unchanged;
+  std::string engine,operation,kind,phase="control",case_key="case:concept:name",attribute_key="concept:name",error_type,error,filtered,counted,call_mode;
   int status=200;bool apply_returned=false;
   const auto field=[&](const std::string& name,std::string fallback={}){const auto found=fields.find(name);return found==fields.end()?fallback:found->second->bytes;};
   const auto boolean=[&](const std::string& name,std::string fallback){const auto value=field(name,std::move(fallback));if(value!="true" && value!="false")throw std::invalid_argument(name+" must be true or false");return parse_case_filter_bound(value);};
   try{
     if(!transport_error.empty())throw std::invalid_argument(std::string(transport_error));
-    static const std::set<std::string> allowed={"engine","operation","source_file","values_json","typed_values_json","lower","upper","criterion","positive","keep_nan_values","keep_once_per_case","case_id_key","attribute_key","activity_key","stream_filter_key1","stream_filter_value1_json","stream_filter_key2","stream_filter_value2_json","counts_json","counts_value_json","most_common_json"};
+    static const std::set<std::string> allowed={"engine","operation","source_file","values_json","typed_values_json","lower","upper","criterion","positive","keep_nan_values","keep_once_per_case","case_id_key","attribute_key","activity_key","stream_filter_key1","stream_filter_value1_json","stream_filter_key2","stream_filter_value2_json","counts_json","counts_value_json","most_common_json","call_json"};
     for(const auto* collection:{&query,&parts})for(const auto& part:*collection){
       if(!allowed.contains(part.name))throw std::invalid_argument("unknown table attributes control: "+part.name);
       if(part.file && part.name!="source_file" && part.filename!=part.name+".txt")throw std::invalid_argument("ordinary table attributes controls must be text or canonical byte fields: "+part.name);
       if(!fields.emplace(part.name,&part).second)throw std::invalid_argument("duplicate table attributes control: "+part.name);
     }
+    call_mode=fields.contains("call_json")?"original":"friendly";
+    if(call_mode=="original"){call_text=field("call_json");case_key.clear();attribute_key.clear();}
     engine=field("engine");if(engine!="pandas" && engine!="polars"){engine.clear();throw std::invalid_argument("choose pandas or polars attributes filtering");}
     operation=field("operation");
     static const std::set<std::string> modes={"traces","events","numeric_traces","numeric_events","threshold","top_activities","on_values","relative","counts"};
     if(!modes.contains(operation)){operation.clear();throw std::invalid_argument("choose a supported attributes operation");}
+    if(call_mode=="original"){
+      namespace original=pandas_attributes_original_call_detail;
+      if(engine!="pandas"||operation=="counts")throw std::invalid_argument("original table attributes calls require pandas and one of its eight operations");
+      for(const auto& [name,part]:fields){(void)part;if(name!="engine"&&name!="operation"&&name!="source_file"&&name!="call_json")throw std::invalid_argument("friendly controls are inactive for original pandas attributes calls: "+name);}
+      original_call=original::parse(*call_text,operation);auto& call=*original_call;
+      controls_before=original::controls_json(call);
+      const auto uploaded=fields.find("source_file");if(uploaded==fields.end()||!uploaded->second->file)throw std::invalid_argument("source_file requires an uploaded native EventTable JSON File");
+      for(const auto& part:query)if(part.name=="source_file")throw std::invalid_argument("source_file must be a multipart File");
+      phase="source_import";source=parse_embedding_workbench_table_json(uploaded->second->bytes);before=serialize_embedding_workbench_table_json(*source);phase="apply";
+      if(call.direct){
+        const auto options=original::direct_options(call);
+        if(operation=="threshold")result=filter_pandas_attributes_threshold(*source,call.args[0],options);
+        else if(operation=="on_values")result=filter_pandas_attributes_on_values(*source,call.args[0],options);
+        else{const auto* supplied=original::keyword(call,"max_no_activities");result=filter_pandas_attributes_top_activities(*source,supplied?supplied->value:EventAttribute{"","25",AttributeKind::kInt},options);}
+      }else{
+        const auto invoke=[&](const auto& parameter)->EventTable{
+          if(operation=="traces")return filter_pandas_attributes(*source,call.args[0],parameter);
+          if(operation=="events")return filter_pandas_attributes_events(*source,call.args[0],parameter);
+          if(operation=="numeric_traces")return filter_pandas_attributes_numeric(*source,call.args[0],call.args[1],parameter);
+          if(operation=="numeric_events")return filter_pandas_attributes_numeric_events(*source,call.args[0],call.args[1],parameter);
+          return filter_pandas_attributes_relative_occurrence(*source,call.args[0],parameter);
+        };
+        if(call.parameters)result=invoke(*call.parameters);
+        else if(call.raw_parameters)result=invoke(*call.raw_parameters);
+        else result=invoke(PandasAttributesFilterOptions{});
+      }
+      apply_returned=true;kind="table";
+    }else{
     const bool membership=operation=="traces" || operation=="events" || operation=="on_values",numeric=operation.starts_with("numeric_"),relative=operation=="relative",counting=operation=="counts",threshold=operation=="threshold",frequency=threshold || operation=="top_activities";
     if(engine=="pandas" && counting)throw std::invalid_argument("the public attributes counting helper requires Polars");
     const auto value_fields=static_cast<unsigned>(fields.contains("values_json"))+static_cast<unsigned>(fields.contains("typed_values_json"));
@@ -106,17 +139,21 @@ DiscoveryWorkbenchResponse execute_table_attributes_filter(const std::vector<Dis
         apply_returned=true;phase="collect";result=selected.materialize();kind="table";
       }
     }
+    }
     phase="result_export";if(kind=="counts")counted=serialize_embedding_workbench_table_json(*result);else filtered=serialize_embedding_workbench_table_json(*result);phase="complete";
   }catch(const PandasAttributesFilterError& e){status=400;error_type=e.type;error=e.message;
   }catch(const PolarsAttributesFilterError& e){status=400;error_type=e.type;error=e.message;phase=e.phase;
   }catch(const std::exception& e){status=400;error_type="native_error";error=e.what();}
   if(source && before)try{after=serialize_embedding_workbench_table_json(*source);unchanged=*before==*after;}catch(const std::exception&){}
+  if(original_call&&controls_before)try{controls_after=pandas_attributes_original_call_detail::controls_json(*original_call);controls_unchanged=*controls_before==*controls_after;}catch(const std::exception&){}
   const auto text=[&](const std::string& value,bool present){return present?q(value):std::string("null");};
+  const auto optional_text=[&](const std::optional<std::string>& value){return value?q(*value):std::string("null");};
   return {status,"{\"family\":\"TABLE_ATTRIBUTES_FILTER\",\"engine\":"+text(engine,!engine.empty())+",\"operation\":"+text(operation,!operation.empty())+
     ",\"http_status\":"+std::to_string(status)+",\"phase\":"+q(phase)+",\"apply_returned\":"+(apply_returned?"true":"false")+
     ",\"source\":"+(source?counts(*source):"null")+",\"result\":"+(result?counts(*result):"null")+",\"source_unchanged\":"+(unchanged?(*unchanged?"true":"false"):"null")+
     ",\"case_id_key\":"+q(case_key)+",\"attribute_key\":"+q(attribute_key)+",\"source_table_json\":"+(before?q(*before):"null")+
     ",\"source_after_table_json\":"+(after?q(*after):"null")+",\"filtered_table_json\":"+text(filtered,!filtered.empty())+",\"counts_table_json\":"+text(counted,!counted.empty())+
-    ",\"result_kind\":"+text(kind,!kind.empty())+",\"error_type\":"+text(error_type,!error_type.empty())+",\"error\":"+text(error,!error.empty())+'}'};
+    ",\"result_kind\":"+text(kind,!kind.empty())+",\"error_type\":"+text(error_type,!error_type.empty())+",\"error\":"+text(error,!error.empty())+
+    ",\"call_mode\":"+text(call_mode,!call_mode.empty())+",\"call_json\":"+optional_text(call_text)+",\"controls_before_json\":"+optional_text(controls_before)+",\"controls_after_json\":"+optional_text(controls_after)+",\"controls_unchanged\":"+(controls_unchanged?(*controls_unchanged?"true":"false"):"null")+'}'};
 }
 }
