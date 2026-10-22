@@ -37,7 +37,9 @@ inline EventAttribute attributes_typed(std::string_view raw,const shared::Node& 
     if(tag->text=="set"||tag->text=="frozenset")for(const auto& child:result.children)if(!root_cause_key_is_hashable(child))invalid("set members require immutable typed values");
     return result;
   }
-  auto result=log_ltl_original_call_detail::log_typed(raw,node,std::move(key));return result;
+  auto result=log_ltl_original_call_detail::log_typed(raw,node,std::move(key));
+  if(tag->text=="decimal")result.value=std::to_string(std::get<double>(result.typed_value));
+  return result;
 }
 struct Keyword {std::string key;EventAttribute value;std::optional<PandasAttributesCountMap> count_dictionary;};
 struct Call {
