@@ -5,6 +5,7 @@
 #include "minera/pandas_attributes_filter.hpp"
 #include "minera/polars_attributes_filter.hpp"
 #include "pandas_attributes_original_call_parser.hpp"
+#include "polars_attributes_original_call_parser.hpp"
 #include <map>
 #include <optional>
 #include <set>
@@ -19,6 +20,7 @@ DiscoveryWorkbenchResponse execute_table_attributes_filter(const std::vector<Dis
   std::map<std::string,const DiscoveryWorkbenchPart*> fields;
   std::optional<EventTable> source,result;std::optional<std::string> before,after;std::optional<bool> unchanged;
   std::optional<pandas_attributes_original_call_detail::Call> original_call;
+  std::optional<polars_attributes_original_call_detail::Call> polars_original_call;
   std::optional<std::string> call_text,controls_before,controls_after;std::optional<bool> controls_unchanged;
   std::string engine,operation,kind,phase="control",case_key="case:concept:name",attribute_key="concept:name",error_type,error,filtered,counted,call_mode;
   int status=200;bool apply_returned=false;
@@ -39,9 +41,27 @@ DiscoveryWorkbenchResponse execute_table_attributes_filter(const std::vector<Dis
     static const std::set<std::string> modes={"traces","events","numeric_traces","numeric_events","threshold","top_activities","on_values","relative","counts"};
     if(!modes.contains(operation)){operation.clear();throw std::invalid_argument("choose a supported attributes operation");}
     if(call_mode=="original"){
+      if(engine=="pandas"&&operation=="counts")throw std::invalid_argument("original table attributes calls require pandas and one of its eight operations");
+      for(const auto& [name,part]:fields){(void)part;if(name!="engine"&&name!="operation"&&name!="source_file"&&name!="call_json")throw std::invalid_argument("friendly controls are inactive for original "+engine+" attributes calls: "+name);}
+      if(engine=="polars"){
+        namespace original=polars_attributes_original_call_detail;
+        polars_original_call=original::parse(*call_text,operation);auto& call=*polars_original_call;
+        controls_before=original::controls_json(call);
+        const auto uploaded=fields.find("source_file");if(uploaded==fields.end()||!uploaded->second->file)throw std::invalid_argument("source_file requires an uploaded native EventTable JSON File");
+        for(const auto& part:query)if(part.name=="source_file")throw std::invalid_argument("source_file must be a multipart File");
+        phase="source_import";source=parse_embedding_workbench_table_json(uploaded->second->bytes);before=serialize_embedding_workbench_table_json(*source);phase="apply";
+        if(call.eager){
+          auto selected=invoke_polars_attributes_filter(*source,call.native);apply_returned=true;
+          if(const auto* table=std::get_if<EventTable>(&selected)){result=*table;kind="table";}
+          else{result=count_table(std::get<PolarsAttributeCounts>(selected));kind="counts";}
+        }else{
+          const auto lazy=LazyEventTable::from_table(*source);
+          auto selected=invoke_polars_attributes_filter(lazy,call.native);apply_returned=true;
+          if(const auto* table=std::get_if<LazyEventTable>(&selected)){phase="collect";result=table->materialize();kind="table";}
+          else{result=count_table(std::get<PolarsAttributeCounts>(selected));kind="counts";}
+        }
+      }else{
       namespace original=pandas_attributes_original_call_detail;
-      if(engine!="pandas"||operation=="counts")throw std::invalid_argument("original table attributes calls require pandas and one of its eight operations");
-      for(const auto& [name,part]:fields){(void)part;if(name!="engine"&&name!="operation"&&name!="source_file"&&name!="call_json")throw std::invalid_argument("friendly controls are inactive for original pandas attributes calls: "+name);}
       original_call=original::parse(*call_text,operation);auto& call=*original_call;
       controls_before=original::controls_json(call);
       const auto uploaded=fields.find("source_file");if(uploaded==fields.end()||!uploaded->second->file)throw std::invalid_argument("source_file requires an uploaded native EventTable JSON File");
@@ -65,6 +85,7 @@ DiscoveryWorkbenchResponse execute_table_attributes_filter(const std::vector<Dis
         else result=invoke(PandasAttributesFilterOptions{});
       }
       apply_returned=true;kind="table";
+      }
     }else{
     const bool membership=operation=="traces" || operation=="events" || operation=="on_values",numeric=operation.starts_with("numeric_"),relative=operation=="relative",counting=operation=="counts",threshold=operation=="threshold",frequency=threshold || operation=="top_activities";
     if(engine=="pandas" && counting)throw std::invalid_argument("the public attributes counting helper requires Polars");
@@ -146,6 +167,7 @@ DiscoveryWorkbenchResponse execute_table_attributes_filter(const std::vector<Dis
   }catch(const std::exception& e){status=400;error_type="native_error";error=e.what();}
   if(source && before)try{after=serialize_embedding_workbench_table_json(*source);unchanged=*before==*after;}catch(const std::exception&){}
   if(original_call&&controls_before)try{controls_after=pandas_attributes_original_call_detail::controls_json(*original_call);controls_unchanged=*controls_before==*controls_after;}catch(const std::exception&){}
+  if(polars_original_call&&controls_before)try{controls_after=polars_attributes_original_call_detail::controls_json(*polars_original_call);controls_unchanged=*controls_before==*controls_after;}catch(const std::exception&){}
   const auto text=[&](const std::string& value,bool present){return present?q(value):std::string("null");};
   const auto optional_text=[&](const std::optional<std::string>& value){return value?q(*value):std::string("null");};
   return {status,"{\"family\":\"TABLE_ATTRIBUTES_FILTER\",\"engine\":"+text(engine,!engine.empty())+",\"operation\":"+text(operation,!operation.empty())+
