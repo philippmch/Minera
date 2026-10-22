@@ -5,11 +5,12 @@ import {tableRepetitionCountText, type TableRepetitionEngine} from "../table-att
 import {defaultTableVariantsForm, requestTableVariants, tableVariantsArtifactFile, tableVariantsResponseFile, tableVariantsSourceExample,
   tableVariantsOperations, tableVariantsMappingExample, TABLE_VARIANTS_LABELS, TableVariantsRequestGate, type TableVariantsForm, type TableVariantsRun} from "../table-variants-filters";
 import {PandasVariantsOriginalCallWorkspace} from "./PandasVariantsOriginalCallWorkspace";
+import {PolarsVariantsOriginalCallWorkspace} from "./PolarsVariantsOriginalCallWorkspace";
 
 export function TableVariantsFilterWorkspace({engine,initialForm,initialCallMode="friendly"}:{engine:TableRepetitionEngine;initialForm?:TableVariantsForm;initialCallMode?:"friendly"|"original"}){
   const [mode,setMode]=useState(initialCallMode);
   useEffect(()=>{setMode(initialCallMode);},[engine,initialCallMode]);
-  return <>{engine==="pandas"&&<section className="panel query-workspace"><label className="filters-field"><span>Pandas variants call mode</span><select value={mode} onChange={event=>setMode(event.target.value as "friendly"|"original")}><option value="friendly">Choose variants with form controls</option><option value="original">Use an original typed call</option></select></label></section>}{engine==="pandas"&&mode==="original"?<PandasVariantsOriginalCallWorkspace/>:<TableVariantsFriendlyWorkspace key={engine} engine={engine} initialForm={initialForm}/>}</>;
+  return <><section className="panel query-workspace"><label className="filters-field"><span>{engine==="pandas"?"Pandas":"Polars"} variants call mode</span><select value={mode} onChange={event=>setMode(event.target.value as "friendly"|"original")}><option value="friendly">Choose variants with form controls</option><option value="original">Use an original typed call</option></select></label></section>{mode==="original"?engine==="pandas"?<PandasVariantsOriginalCallWorkspace/>:<PolarsVariantsOriginalCallWorkspace/>:<TableVariantsFriendlyWorkspace key={engine} engine={engine} initialForm={initialForm}/>}</>;
 }
 function TableVariantsFriendlyWorkspace({engine, initialForm}: {engine: TableRepetitionEngine; initialForm?: TableVariantsForm}) {
   const [variants, setVariants] = useState<File | null>(null);

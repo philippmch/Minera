@@ -1,11 +1,101 @@
 # Complete activity-variant filtering
 
+## Original Polars calls: full 411-call API acceptance and rendered UI checks
+
+The Polars table workflow offers **Polars variants call mode**, defaulting to
+the existing friendly form. **Use an original typed call** opens the complete
+original editor for membership, serialized-list, top-k and automatic calls.
+The serialized-list and automatic functions remain callable and retain native
+unavailable-helper diagnostics. All411 unchanged native cases, direct calls and
+owned HTTP calls pass complete native result, diagnostic and artifact checks.
+The rendered browser acceptance covers18 bounded checks on owned examples.
+
+The original request has exactly four fields at
+`POST /api/reference-table-variants`: `engine=polars`, `operation`, a genuine
+native EventTable `source_file`, and opaque `call_json`. There is no auxiliary or
+header upload. Operations membership/from_list/top_k/auto map to apply/
+apply_from_variant_list/filter_variants_top_k/apply_auto_filter. The descriptor
+has exactly `schema`, `input_kind` and ordered `keyword_entries`:
+
+```json
+{"schema":"minera-polars-variants-original-call-v1","input_kind":"LazyFrame","keyword_entries":[{"key":"admitted_variants","value":{"type":"list","values":[{"type":"list","values":[{"type":"str","value":"A"},{"type":"str","value":"B"}]}]}}]}
+```
+
+`input_kind` selects actual DataFrame or LazyFrame invocation. The source is the
+sole positional input; no args array is added. Missing required keyword operands
+reach the native missing-argument overload, even when unused malformed parameters
+were supplied. Explicit None, omitted parameters, raw values and ordered literal
+and enum entries retain their distinct controls. Examples intentionally replace
+the complete editor; imported text is never parsed, rewritten or synchronized
+with hidden source-kind state. The strict UTF8 importer and native multipart
+codec preserve a leading BOM, CRLF and wide integer tokens. Source, operation,
+descriptor/example edits and mode changes invalidate pending requests/imports.
+
+The original Polars response has exactly25 fields. Complete source before/after,
+actual eight-field controls before/after, exact call, raw response and successful
+filtered native table are available as byte-preserving downloads. The controls
+contain input_kind, supplied keyword order, actual optional argument, parameter
+state, complete actual raw/vector parameters, invoked arm, parameters_passed and
+native_options_present. A missing-control overload snapshots its constructed
+unused parameters but reports parameters_passed=false. Selectors and auxiliary
+table response fields remain null; native errors retain full messages, empty
+text and NUL and the actual invocation-returned flag.
+
+`returned_table_metadata_json` is a separate response-only diagnostic artifact
+with exactly kind, row_count_known, row_count and table_context_json. It describes
+the actual returned EventTable/LazyEventTable before materialization, including
+known zero versus unknown row count. Its entire unchanged native table-context
+codec string is downloadable, including raw fallback/schema markers. The header
+uses empty rows while preserving real context; it is never a reusable data
+table. Collect errors retain returned metadata when invocation already returned.
+Only **Use filtered Polars variants table as source** reuses the genuine complete
+successful filtered data File and its exact bytes on the next request.
+
+Root's complete-bank gate passed in67.91seconds: the unchanged411 native cases
+plus two own native regressions,411 direct calls and411 fresh owned HTTP calls.
+It compares all25 response fields,142 complete frames and269 exact native
+type/phase/message diagnostics (258apply/11collect), with35 genuine eager and376
+lazy calls. Full source/control before-after and returned four-field metadata
+artifacts reopen through the unchanged native codec, including complete header
+context restoration. All528 native snapshot mappings remain bound. The actual
+invocations use274 raw parameter arms,134 ordered arms and3 missing-control
+default-option arms; the3 unused constructed raw parameters remain inspectable.
+
+Nine focused native and existing pandas491/friendly regressions passed, as did
+146 receipt integrity tests and the complete411 index with1233 exact raw slices
+and6 freshly rehashed cache hits. Frontend acceptance passed57 focused tests,
+all201 files /9937 tests, TypeScript and the production Vite build.
+
+The owned headless browser passed18 checks using16 actual HTTP requests and9
+byte-exact downloads. These cover all four operations, eager/lazy examples,
+collect-error metadata, missing versus None and unused parameters, raw/ordered
+controls, exact BOM/CRLF/wide-integer import, held-response and deferred-import
+cancellation, and genuine filtered File reuse. Complete independently expected
+native source/result/context values were checked for those examples. Both
+success/error screenshots were inspected; owned server and Chrome processes
+stopped and drained. These browser examples supplement the complete411 API gate.
+
+The preserved first fixture build (937714) lacked a public codec include in the
+test wrapper; adding only that include fixed compilation (006bda). The first
+browser attempt (57ab2a) completed its16 HTTP requests and9 downloads, then missed
+the final pandas chooser because changing engine resets table behavior. The
+corrected recipe selected variants after the switch and used a fresh output
+folder; the complete18-check run passed (a191bb). These corrections changed only
+the test wrapper and browser recipe; native kernel, driver and oracle vectors
+were unchanged.
+
+Python identities, warning emission, qualified exception prefixes/error.args,
+physical category runtime state and public explain-plan observations remain
+external. Friendly18 and pandas original24 contracts remain separate. The
+canonical module remains partial, with201 strict units and565 unentered grouping
+queries still open.
+
 ## Original pandas calls: full 491-call API acceptance and rendered UI checks
 
 The pandas table workflow now offers **Pandas variants call mode**. Its default
 keeps the existing friendly form and18-field response. **Use an original typed
-call** opens a separate editor for all four original functions; Polars keeps its
-existing form. All491 unchanged native cases, direct calls and owned HTTP calls
+call** opens a separate editor for all four original functions. Polars now has
+its own original editor described above. All491 unchanged native cases, direct calls and owned HTTP calls
 pass complete result, source, auxiliary and actual-control comparisons.
 
 The original request uses `POST /api/reference-table-variants` with `engine=pandas`,
