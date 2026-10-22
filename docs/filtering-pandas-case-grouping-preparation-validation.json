@@ -1,0 +1,388 @@
+{
+  "schema": "minera-filtering-pandas-case-grouping-preparation-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/filtering-pandas-case-grouping-preparation.json.gz",
+    "bytes": 155223,
+    "sha256": "33f4d710ab4d25b1b78ab60f19a153f480a9b1302d5d40a3b684f502930a401d",
+    "members": 67,
+    "uncompressed_bytes": 2057573,
+    "uncompressed_sha256": "cce581d0e8fd569ad34ca33f2dc1075b949dd950bc5228a70634747044f6f5aa"
+  },
+  "prepared_full_receipts": 220,
+  "families": [
+    {
+      "family": "consecutive",
+      "module": "pm4py.algo.filtering.pandas.consecutive_act_case_grouping.consecutive_act_case_grouping_filter",
+      "prepared_receipts": 97,
+      "source_kinds": {
+        "dataframe": 91,
+        "event_log": 3,
+        "event_stream": 3
+      },
+      "ordered_receipts_sha256": "75ea23dee80869d3badb3e094c7e48af2f2e31d0370c3ff9a90a692380b788d5"
+    },
+    {
+      "family": "timestamp",
+      "module": "pm4py.algo.filtering.pandas.timestamp_case_grouping.timestamp_case_grouping_filter",
+      "prepared_receipts": 123,
+      "source_kinds": {
+        "dataframe": 115,
+        "event_log": 4,
+        "event_stream": 4
+      },
+      "ordered_receipts_sha256": "638c97bbd426c7ba433239e5a6379804e6c0c3db9e45af10bd43eb2368f52275"
+    }
+  ],
+  "target_algorithm_calls": 0,
+  "public_surface_modules": 6,
+  "all_original_canonical_receipt_hashes_verified": true,
+  "strict_complete_saved_receipt_validation": true,
+  "both_ordered_receipt_list_hashes_verified": true,
+  "frozen_script_cases_recipe_and_surface_verified": true,
+  "all_member_utf8_bytes_hashes_round_trip_verified": true,
+  "all_source_bindings_rechecked_after_round_trip": true,
+  "independent_extracted_checks": 26,
+  "failed_drafts_and_initial_findings_preserved": true,
+  "prior_barrier_validated": false,
+  "root_entry_certificate_issued": false,
+  "module_status_changes": 0,
+  "source_bindings": [
+    {
+      "path": "build/filtering-case-grouping-pandas-consecutive-public-preentry-1/call-plan.jsonl",
+      "bytes": 283592,
+      "sha256": "316e8429b25756d8e4ad80b161ee5dc10165f4164ec4b35145921d4256c2760d"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-consecutive-public-preentry-1/dedup-audit.json",
+      "bytes": 14927,
+      "sha256": "004046985c150bf0de10681f24ffd48f825bd0ccc7af56314a3c9e0c22bc2714"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-consecutive-public-preentry-1/executed-cases.json",
+      "bytes": 191817,
+      "sha256": "34d498c57ea63b21852e544e2e851364b2a3cce2f4ac3a55e12a781ea624456c"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-consecutive-public-preentry-1/executed-script.py",
+      "bytes": 30715,
+      "sha256": "84050d49e9dd85db1ede3a6ba3840fffa55dc355ba06773375ea243d53d9d3cf"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-consecutive-public-preentry-1/executed-source-recipe.json",
+      "bytes": 1514,
+      "sha256": "1fa01e8ea5505099eade1d9ac70626531ee04835b6a728ebade37abbda046384"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-consecutive-public-preentry-1/prior-receipt-search.json",
+      "bytes": 138,
+      "sha256": "bb561d0eb09c8771f39f610f27ebab7c812a639399efe6d24bbbfd3209f30d70"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-consecutive-public-preentry-1/validation.json",
+      "bytes": 1235,
+      "sha256": "aa8a774093cae3458a97ce793abc33079e317191ffb9dba5d324db8960c93a17"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-timestamp-public-preentry-1/call-plan.jsonl",
+      "bytes": 355830,
+      "sha256": "527f0e76711b04464de72cad9ff96869b72e814edab3c19ce428d18b4859ba1d"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-timestamp-public-preentry-1/dedup-audit.json",
+      "bytes": 18747,
+      "sha256": "5973691e4c117e92dcffa024fb96a3dcf80f01cde3604b7372326b77da9d0ef2"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-timestamp-public-preentry-1/executed-cases.json",
+      "bytes": 191817,
+      "sha256": "34d498c57ea63b21852e544e2e851364b2a3cce2f4ac3a55e12a781ea624456c"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-timestamp-public-preentry-1/executed-script.py",
+      "bytes": 30715,
+      "sha256": "84050d49e9dd85db1ede3a6ba3840fffa55dc355ba06773375ea243d53d9d3cf"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-timestamp-public-preentry-1/executed-source-recipe.json",
+      "bytes": 1514,
+      "sha256": "1fa01e8ea5505099eade1d9ac70626531ee04835b6a728ebade37abbda046384"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-timestamp-public-preentry-1/prior-receipt-search.json",
+      "bytes": 138,
+      "sha256": "bb561d0eb09c8771f39f610f27ebab7c812a639399efe6d24bbbfd3209f30d70"
+    },
+    {
+      "path": "build/filtering-case-grouping-pandas-timestamp-public-preentry-1/validation.json",
+      "bytes": 1223,
+      "sha256": "08c68e63a25bb3ad8c2f44600707bd2c009b95a6e9195f6c078e146898e54cb3"
+    },
+    {
+      "path": "build/grouping-public-surface-actual-1/capture.json",
+      "bytes": 22696,
+      "sha256": "f6bc24786f614d0391052235684949b5e4a227f0c42c660e43a0e8963e3b4c66"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-next-review/fixture-bank-spec.json",
+      "bytes": 10549,
+      "sha256": "f6f0cbc6e4867341661328069116acf448db45ed7d3f659dc74d3835a0424279"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-next-review/review.json",
+      "bytes": 7266,
+      "sha256": "e92d0a5fa9faca5512bd363b7e148f3e8f29b166afbf7db6760bc64d51ece6ff"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/capture-public.py",
+      "bytes": 30715,
+      "sha256": "84050d49e9dd85db1ede3a6ba3840fffa55dc355ba06773375ea243d53d9d3cf"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/cases.json",
+      "bytes": 191817,
+      "sha256": "34d498c57ea63b21852e544e2e851364b2a3cce2f4ac3a55e12a781ea624456c"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/consecutive-root-prepare-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/frozen-before-hardening-1/capture-public.py",
+      "bytes": 23838,
+      "sha256": "af4ba27c1754d178389f11683075d124d9312352b4f6e570ee1ffd2dbd5d68f9"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/frozen-before-hardening-1/cases.json",
+      "bytes": 191817,
+      "sha256": "34d498c57ea63b21852e544e2e851364b2a3cce2f4ac3a55e12a781ea624456c"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/frozen-before-hardening-1/offline-bank-shape-validation.json",
+      "bytes": 1158,
+      "sha256": "a94b79a355b4e11f3a6070111412bc43d542f13bd0348aa1e91d912d74f6e715"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/frozen-before-hardening-1/README.md",
+      "bytes": 5646,
+      "sha256": "331781f21d69ba10a50e3e3ffb6e9323d169d7ba87b701875bacea3e951d2bbb"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/hardening-freeze-1.json",
+      "bytes": 2018,
+      "sha256": "102cc6e05fe5d2d354a4e194d12bcd18f2db5c9a6f1f504376420059b92b8246"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-fixtures-2/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-fixtures-2/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-fixtures-2/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-fixtures-2/synthetic-audit.json",
+      "bytes": 820,
+      "sha256": "07a4a296286fd9e11508135332f6481240a7609c79f377edae67bebcf7fb9bb2"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-fixtures-3/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-fixtures-3/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-fixtures-3/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-fixtures-3/synthetic-audit.json",
+      "bytes": 820,
+      "sha256": "07a4a296286fd9e11508135332f6481240a7609c79f377edae67bebcf7fb9bb2"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-audit-gate-review-2.py",
+      "bytes": 3801,
+      "sha256": "914def4264f0517a76e03a92ca6aa89177bc0b17e36ceef9e547bbd9d0b6e418"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-final-checks-3.json",
+      "bytes": 1292,
+      "sha256": "00449878acf5bf32205f7343b69220ed6f001a36f3c04737f46ac4132872b3f9"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-final-checks-3.py",
+      "bytes": 2118,
+      "sha256": "825e57a6a73cc09c7e2eb1b321d312f8c6c930327e23f3392259351d40ffd09c"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-final-test-audit-gate-offline.py",
+      "bytes": 3801,
+      "sha256": "2b32cc53782f0e26d363cd38a34a281f5aa760e14ab6b7b0a05937672b86bdfe"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-final-test-hardening-offline.py",
+      "bytes": 7104,
+      "sha256": "c4dd0547829d42836883ba68b0e5d3b21c3431435be35427834161ab56c0ee14"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-hardening-checks-3/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "1de22acacaf7c0dedbb0de1ddd690413196baf29e89816dda8482dd3b10f9977"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-hardening-checks-3/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-hardening-checks-3/results.json",
+      "bytes": 2207,
+      "sha256": "0d981d7b4e0ae20ae45c2d8ca0325d9f73b8ab6af7dd7dc2bdb856abc544cdc7"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-review-final-4.json",
+      "bytes": 6005,
+      "sha256": "5703c35fd4d0521c5bf0d8cc1bc638bc7c790bb47bfbd003a54fe8a579aaf9e5"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-review-findings-1.json",
+      "bytes": 3632,
+      "sha256": "77e2ebe12d8e264f00e31fa9033cf7d24eb264675ade009831806d73ae169388"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-static-review-1-observer.py",
+      "bytes": 23838,
+      "sha256": "af4ba27c1754d178389f11683075d124d9312352b4f6e570ee1ffd2dbd5d68f9"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-static-review-1.json",
+      "bytes": 1514,
+      "sha256": "9fc3202ebd980c2edf7ba16c41911842bfd767fc914619d8ef0d04f16e2937de"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/independent-static-review-1.py",
+      "bytes": 2930,
+      "sha256": "9d82a4609e3484ad65408e03c366632629fc9dafc7551185768869e4dc25942b"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-audit-gate-test-fixtures-1/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-audit-gate-test-fixtures-1/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-audit-gate-test-fixtures-1/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-audit-gate-test-fixtures-1/synthetic-audit.json",
+      "bytes": 820,
+      "sha256": "07a4a296286fd9e11508135332f6481240a7609c79f377edae67bebcf7fb9bb2"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-bank-shape-validation.json",
+      "bytes": 1158,
+      "sha256": "a94b79a355b4e11f3a6070111412bc43d542f13bd0348aa1e91d912d74f6e715"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-hardening-checks-1/executed-capture-public.py",
+      "bytes": 30693,
+      "sha256": "f178a98ce347b842fbfaf542568abe28249dd408931e859af397291421997b60"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-hardening-checks-1/executed-test-hardening-offline.py",
+      "bytes": 7012,
+      "sha256": "8b5ef51f58ecd55fbec67b908e79c2917bf5a7640920fb2ad01093fe20c2517e"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-hardening-checks-1/failure.json",
+      "bytes": 377,
+      "sha256": "51847944eaa36ce5af011d2182de5d758e1d208f2a8cc89790202a3d77449f66"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-hardening-checks-2/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "4eaa561af1ff6b3159fe0693ea7c2f3658cf7dd23da2db3c8a1079c651f0742f"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-hardening-checks-2/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/offline-hardening-checks-2/results.json",
+      "bytes": 2207,
+      "sha256": "d281b408b48abbceb1c6d30c98a72536cb6432bda82897a173d9396a6c4bd91a"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/README.md",
+      "bytes": 8381,
+      "sha256": "48ee4072764bda001509241e70bb618920dc650e2f74e57a33639dbf95e3efca"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/source-fixture-bank-spec.json",
+      "bytes": 10549,
+      "sha256": "f6f0cbc6e4867341661328069116acf448db45ed7d3f659dc74d3835a0424279"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/source-non-table-recipe.json",
+      "bytes": 1514,
+      "sha256": "1fa01e8ea5505099eade1d9ac70626531ee04835b6a728ebade37abbda046384"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/test-audit-gate-offline.py",
+      "bytes": 3802,
+      "sha256": "a74965532759f324154655cb9aa2e2b176fbfcfe92ca3a400110fc63a285e319"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/test-hardening-offline.py",
+      "bytes": 7100,
+      "sha256": "02ebf3ec7b30d59236e575b42c0dcd80579506138eadbc7e6e27ead296691455"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-prepared-1/timestamp-root-prepare-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/case-grouping-pandas-root-plan-review-1/validation.json",
+      "bytes": 6600,
+      "sha256": "599d9ca408d8196c1ded6e70d34238716a48fcf217dc9fcc2acd492e11977a90"
+    },
+    {
+      "path": "build/parity-closures/grouping-public-surface-prepared-1/observe-public-surface.py",
+      "bytes": 3512,
+      "sha256": "c4dcf097890e40e6f15a329bc3637d833108e2f5385bbf448a783ae2e521f047"
+    },
+    {
+      "path": "build/parity-closures/package-pandas-case-grouping-preparation.py",
+      "bytes": 7461,
+      "sha256": "ec1ed9057ea2852174027153f6fa959382d5e2b17d2c32dc9f20872ca8885dc8"
+    },
+    {
+      "path": "build/parity-closures/verify-pandas-case-grouping-saved-plans.py",
+      "bytes": 7351,
+      "sha256": "c2b4d7844f8493b39fc169d6c2c2363a3f923fba0bf3e96494bae1874fae5c94"
+    }
+  ],
+  "limitations": "Capsule completeness describes these own preparation artifacts only; historical completeness, algorithm behavior and parity closure are not asserted."
+}
