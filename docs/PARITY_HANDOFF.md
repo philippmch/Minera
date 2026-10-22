@@ -14,7 +14,145 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: all 380 original LOG variants calls reach API/UI — 2026-10-22
+## Current continuation: full 491-call pandas API acceptance and rendered UI checks — 2026-10-22
+
+The four source commits descend from `019946ea`: `674ca179` adds the closed
+pandas variants receipt profile; `a5f670dd` implements original backend controls;
+`f4f47975` adds complete native/direct/HTTP acceptance; `002e4de5` adds the editor,
+downloads, reuse and workflow contracts. Root source comparison (`37954f`, then
+the final heading clarification in `93ce63`) confirms 18 own paths match their
+committed bytes modulo CRLF/LF. The generated transport include is separately
+external (871,258 bytes; SHA256
+`21485a7601a24ff64c9ab544e0bb6f9160b659e8af9ac406ad781f3b46578a06`).
+Original native header, predicate, oracle and shared codecs are unchanged.
+The inherited two tracked coverage edits remain unstaged.
+
+The complete bank is **439 + 52 = 491** original calls: apply154;
+filter_variants_by_coverage_percentage113;
+filter_variants_by_maximum_coverage_percentage110; filter_variants_top_k114.
+All 357 complete frames and 134 complete native type/message diagnostics remain
+in scope. Root independently reconstructs all177 native snapshots, all491 whole
+native cases and their driver, including445 raw parameter arms,46 ordered-entry
+arms and34 actual supplied tables. No observed native projection losses were
+found. All original column_names are neutral singleNone; arbitrary pandas column
+names have no EventTable carrier and are not claimed.
+
+The exact original six-field receipt is module/method/input/args/kwargs/call_shape,
+with `dataframe-positional-plus-explicit-args-and-keywords`; source is separate
+from the one positional criterion. Sorted canonical IDs joined by LF with
+**no trailing LF** have SHA256
+`82df0e73830fdbedc81501b7d59384d16a7c203253bb2320a36c622f0e99efd3`.
+The root-admitted closed index resolves all491 outcomes, full plans, digest plans
+and intents with1964 complete raw slices and eight rehashed cache hits (`a3b031`).
+All121 receipt integrity tests pass (`bebdff`). Two preentry duplicate links are
+retained; their constructor equality and complete historical absence remain
+unproven. This checkpoint grants no new reference-call authority.
+
+`POST /api/reference-table-variants` delegates by call_json presence. Original
+pandas mode takes engine=pandas, membership/top_k/min_coverage/max_coverage,
+genuine native source_file, exact raw call_json and optional variants_file.
+The descriptor schema is `minera-pandas-variants-original-call-v1`, with one
+Packed criterion in args and ordered keyword_entries. Omitted/None/raw/ordered
+parameters, enum/string identity and typed admission dictionary ignored values
+retain their actual native carriers. All34 supplied frames are direct literal
+variants_df values referencing the real uploaded File. Actual caller controls
+before/after have six fields, with native_options_present=false; no private
+resolved-options mirror is substituted. The complete24-field response retains
+source before/after, auxiliary/result artifacts, actual control snapshots and
+exact call bytes. Original friendly selectors are null; friendly18 behavior
+remains separate. Python aliases, qualified errors/args and warning transport
+remain external; transport phases are not original observer phase claims.
+
+Root runtime acceptance passes five focused native/regression suites (`1bed5e`),
+all491 unchanged native outcomes plus491 direct and491 owned HTTP cases
+(`d84cd3`,44.70 seconds),36 focused frontend tests (`8264f6`), all199 frontend
+files /9916 tests (`39c160`) and TypeScript/Vite (`8c3ab2`). Owned headless browser
+acceptance (`43471f`) passes17 checks,14 actual HTTP requests including two held
+responses, and11 byte-exact downloads. It compares independently expected whole
+native subsets, typed wide integers, attributes, dtypes, index labels and actual
+auxiliary unions. Exact BOM/CRLF import, held-response and deferred-import
+cancellation, and genuine filtered File reuse pass. Both success/error rendered
+screenshots were inspected; listener PID ownership was verified and owned
+Chrome/server stopped with stdio drained.
+
+The initial build failure (`38f2c4`) was a test-only optional<string> reopen call.
+Its original source and terminal remain retained; adding `.value()` after full
+artifact equality fixed it, without a product change. Earlier Timestamp/NaT
+parser corrections and all prebuild revisions remain preserved. Independent
+browser review first requested complete expected subsets instead of row counts;
+the corrected recipe compares all fields with lossless numeric tokens. Final
+document review keeps full491 API acceptance distinct from bounded17 UI checks.
+
+Root terminal facts (`93ce63`) are
+`pandas-variants-original-call-finalization-1/root-facts.json`, SHA256
+`22448dbd7eb740fec80c601335e27a7919aff89f13796605992d7c38349462e9`.
+Additional seven compiled native artifact bindings (`be1be5`) are
+`native-built-artifact-bindings.json`, SHA256
+`cb27243745af9806658c502ec832f06d0345ce36cca434b23f35213712c7b09e`.
+Evidence commit `f6583d5c` contains the capsule and validation sidecar. Root
+package terminal `9ed836` seals
+`docs/retained-public-observation-pandas-variants-original-call-checkpoint.jsonl.gz`
+(908,358 bytes; SHA256
+`1ae7f7571ae9391a66dbfd7dc9d05a1cdf9afe67b5807b02517a85aa72bb2c22`).
+The capsule has199 own UTF8 members and66 external bindings. Its explicit scope
+is `pandas-variants-original-call-checkpoint-prepared-1/scope.json`, SHA256
+`dab3506de48ce18bf547a2981d026150bfe9168ffefd7c5d6511c2d48a77f7ca`.
+Root separately prepared196 opaque OWN candidate pins (`8013f3`) and executed
+the complete path/fullhash-alias scope freezer (`3ee8b4`) before packaging.
+Independent source review SHA256 is
+`77ff783ccaae3564d221d1d3370564ea2a967704821c3aa8a9be00e2d701fe37`.
+The standalone independent new-own-capsule readback passes (`168d51`), verifying
+all199 members, full hashes, strict UTF8, exact header/sidecar and current own
+bytes. Its create-once report is
+`pandas-variants-original-call-checkpoint-independent-readback-1/validation.json`,
+SHA256 `9bf64838d4bcf38b53e6a76084cb493abb6844ae0fb2aa8af488ff1afd5344d8`.
+Only the new own capsule was decompressed; no external payload was opened by
+packaging or readback. The sidecar SHA256 is
+`80a00ea71ce0dc0bbfea785d3020f91ac409132a0a26cc8e496f20ed6b777d8b`.
+
+No original archive was opened for this pandas continuation: root explicitly
+verified/admitted18 exact flat/native bindings, then separately admitted native
+oracle parsing. The unchanged integrity regression opens three prior LTL
+containers. Packaging/readback may open only their new own capsule, with all
+original records/plans/intents/audits/cases/oracle/generator/vector, raw browser
+artifacts, binaries and SQLite kept external. Earlier LOG archive access remains
+documented below; no global archive-zero claim is made. Original producers and
+generators were read as own source and never executed/imported. No new reference
+calls or reference implementation inspection occurred.
+
+Committed catalogue counts remain86 packages (46 complete /40 partial) and387
+modules (226 complete /161 partial): **201 strict open units**, six grouping banks
+and **565 unentered logical queries**. Full parity remains the objective.
+
+Next is the complete **411 =399+12 Polars variants** bank, including142 frames
+and all269 errors (258 apply /11 collect), all four functions,35 eager inputs,
+176 saved algorithm warning observations and528 declared native frame/category
+constructors. The exactly five-file plan2 is
+`pandas-variants-next-polars-variants-metadata-plan-2/`; original source declarations
+SHA256 is `032814ec3fbb419b464a97f36336b72ab61c89d4b114e337706a65636926894d`.
+Root own-metadata verification passes (`be1be5`), with no original payload opens
+or admission in that step. Plan1 and its earlier pre-document-update verification
+(`396904`) remain preserved. Root then reviewed and approved the separate new
+helpers (`034413`, `84be4f`, `3995f5`) and verified exactly15 opaque bindings in
+two passes (`e5391a`), before separate census admission (`3d8ca9`). Admission
+SHA256 is `806605030b89556bd3338fa796cbcd6753574030a4ef45b15a22011843677dab`.
+The all411 canonical census passes (`902af1`): every full audit plan, light intent,
+complete case recipe and source/result/category/kwargs/error/plan/warning domain
+is bound. Report SHA256 is
+`e27b1a567ac60b12285387bc04a3d6c28608cbf4d3025924b375cbae705b0d10` at
+`polars-variants-canonical-census-1/report.json`. Sorted IDs joined by LF with
+no trailing LF have SHA256
+`1e3b6c30324bdac74bbcf8660e1db4ddc46791c50b3f73de8f9bcbca6c986759`.
+The census derives20 before /20 after /10 result category observations and30
+unique projected category-bearing snapshots; the legacy30 counter's original
+definition remains explicitly unproven. Native driver/vector/generator were
+opaque only in these steps. Full528-constructor and411-case native mapping still
+needs its own subsequent semantic admission; no Polars product change or runtime
+acceptance is claimed yet. These later Polars receipts are separate from the
+pandas capsule. The older next pandas instructions below are historical and
+superseded by this checkpoint.
+
+## Previous checkpoint: all 380 original LOG variants calls reach API/UI — 2026-10-22
 
 Root package terminal `c51997` retains
 `docs/retained-public-observation-log-variants-original-call-checkpoint.jsonl.gz`
