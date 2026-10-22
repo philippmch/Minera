@@ -5,6 +5,7 @@
 #include "minera/log_attributes_filter.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
+#include "log_attributes_original_call_parser.hpp"
 #include <algorithm>
 #include <charconv>
 #include <cctype>
@@ -35,23 +36,69 @@ DiscoveryWorkbenchResponse execute_log_attributes_filter(const std::vector<Disco
   std::map<std::string,const DiscoveryWorkbenchPart*> fields;
   std::optional<EventLog> source,result,variants_source;
   std::optional<std::string> before,after,variants_before,variants_after,parameters_before,parameters_after;
+  std::optional<std::string> call_text,cache_before,cache_after,original_counts_echo,original_variants_echo,original_vc_echo;
   std::optional<bool> unchanged,variants_unchanged,parameters_unchanged;
+  std::optional<log_attributes_original_call_detail::Call> original_call;
+  std::optional<LogAttributesVariantInput> original_cache;
+  EventAttribute original_selector;
   LogAttributesFilterParameters parameters;
-  std::string operation,format,phase="control",open_key="concept:name",attribute_key="concept:name",raw_result,xes,xes_error,error_type,error;
+  std::string operation,format,phase="control",open_key="concept:name",attribute_key="concept:name",raw_result,xes,xes_error,error_type,error,call_mode;
   int status=200;
   const auto field=[&](const std::string& name,std::string fallback={}){const auto found=fields.find(name);return found==fields.end()?fallback:found->second->bytes;};
   const auto boolean=[&](const std::string& name,std::string fallback){const auto value=field(name,std::move(fallback));if(value!="true" && value!="false")throw std::invalid_argument(name+" must be true or false");return EventAttribute{"",value,AttributeKind::kBoolean};};
   try{
     if(!transport_error.empty())throw std::invalid_argument(std::string(transport_error));
-    static const std::set<std::string> allowed={"operation","source_file","source_format","case_id_column","activity_column","timestamp_column","delimiter","trim_fields","activity_key","attribute_key","positive","values_json","typed_values_json","lower","upper","criterion","case_id_key","case_id_glue","keep_once_per_case","stream_filter_key1","stream_filter_value1_json","stream_filter_key2","stream_filter_value2_json","counts_json","variants_file","variant_traces_json","variant_counts_json"};
+    static const std::set<std::string> allowed={"operation","source_file","source_format","case_id_column","activity_column","timestamp_column","delimiter","trim_fields","activity_key","attribute_key","positive","values_json","typed_values_json","lower","upper","criterion","case_id_key","case_id_glue","keep_once_per_case","stream_filter_key1","stream_filter_value1_json","stream_filter_key2","stream_filter_value2_json","counts_json","variants_file","variant_traces_json","variant_counts_json","call_json"};
     for(const auto* collection:{&query,&parts})for(const auto& part:*collection){
       if(!allowed.contains(part.name))throw std::invalid_argument("unknown log attributes control: "+part.name);
       if(part.file && part.name!="source_file" && part.name!="variants_file" && part.filename!=part.name+".txt")throw std::invalid_argument("ordinary log attributes controls must be text or canonical byte fields: "+part.name);
       if(!fields.emplace(part.name,&part).second)throw std::invalid_argument("duplicate log attributes control: "+part.name);
     }
+    call_mode=fields.contains("call_json")?"original":"friendly";
+    if(call_mode=="original")call_text=field("call_json");
     operation=field("operation");
     static const std::set<std::string> modes={"traces","events","numeric_traces","numeric_events","trace_values","top_activities","relative","threshold"};
     if(!modes.contains(operation)){operation.clear();throw std::invalid_argument("choose a supported log attributes operation");}
+    if(call_mode=="original") {
+      namespace original=log_attributes_original_call_detail;
+      for(const auto& [name,part]:fields){(void)part;if(name!="operation"&&name!="source_file"&&name!="variants_file"&&name!="call_json")throw std::invalid_argument("friendly controls are inactive for original LOG attributes calls: "+name);}
+      original_call=original::parse(*call_text,operation);auto& call=*original_call;
+      if(fields.contains("variants_file")!=call.needs_auxiliary)throw std::invalid_argument("variants_file is required exactly when original cache uses auxiliary trace handles");
+      const auto uploaded=fields.find("source_file");
+      if(uploaded==fields.end()||!uploaded->second->file)throw std::invalid_argument("source_file requires an uploaded native log File");
+      if(call.needs_auxiliary&&!fields.at("variants_file")->file)throw std::invalid_argument("variants_file requires an uploaded native log File");
+      for(const auto& part:query)if(part.name=="source_file"||part.name=="variants_file")throw std::invalid_argument(part.name+" must be a multipart File");
+      if(call.parameters)parameters_before=parameters_json(*call.parameters);
+      else if(call.raw_parameters)parameters_before=original::attribute_json(*call.raw_parameters);
+      if(operation=="threshold"){original_counts_echo=call.counts_echo;original_variants_echo=call.variants_echo;original_vc_echo=call.vc_echo;}
+      format="native_log";phase="source_import";source=parse_embedding_workbench_raw_log_json(uploaded->second->bytes);
+      bool found=false;
+      for(const auto& trace:source->traces){for(const auto& event:trace.events){
+        if(!event.activity_source_key.empty()){open_key=event.activity_source_key;found=true;break;}
+        if(event.activity_attribute){open_key=event.activity_attribute->key;found=true;break;}
+      }if(found)break;}
+      before=serialize_embedding_workbench_raw_log_json(*source);
+      if(call.needs_auxiliary){phase="auxiliary_import";variants_source=parse_embedding_workbench_raw_log_json(fields.at("variants_file")->bytes);variants_before=serialize_embedding_workbench_raw_log_json(*variants_source);}
+      if(operation=="threshold") {
+        original_cache=original::materialize(call,*source,variants_source);
+        original_selector=call.args.size()==3?call.args[2]:EventAttribute{"","concept:name"};
+        cache_before=original::cache_json(call.counts,*original_cache,call.args[0],original_selector);
+      }
+      phase="apply";
+      auto options=call.parameters?resolve_log_attributes_filter_parameters(*call.parameters):LogAttributesFilterOptions{};
+      if(call.raw_parameters)options.raw_parameters=*call.raw_parameters;
+      if(operation=="traces")result=filter_log_attributes_traces(*source,call.args[0],options);
+      else if(operation=="events")result=filter_log_attributes_events(*source,call.args[0],options);
+      else if(operation=="trace_values")result=filter_log_attributes_trace_values(*source,call.args[0],options);
+      else if(operation=="numeric_traces")result=filter_log_attributes_numeric(*source,call.args[0],call.args[1],options);
+      else if(operation=="numeric_events")result=filter_log_attributes_numeric_events(*source,call.args[0],call.args[1],options);
+      else if(operation=="top_activities") {
+        const auto maximum=call.args.empty()?EventAttribute{"","25",AttributeKind::kInt}:call.args[0];
+        if(call.parameters)result=filter_log_attributes_max_activities(*source,maximum,*call.parameters);
+        else result=filter_log_attributes_max_activities(*source,maximum,options);
+      }else if(operation=="relative")result=filter_log_attributes_relative_occurrence(*source,call.args[0],options);
+      else result=filter_log_attributes_threshold(*source,call.counts,*original_cache,call.args[0],call.args[1],original_selector);
+    }else {
     const bool membership=operation=="traces" || operation=="events" || operation=="trace_values",numeric=operation.starts_with("numeric_"),relative=operation=="relative",maximum=operation=="top_activities",threshold=operation=="threshold";
     const bool converter=operation=="events" || numeric || relative || maximum;
     const auto value_fields=static_cast<unsigned>(fields.contains("values_json"))+static_cast<unsigned>(fields.contains("typed_values_json"));
@@ -146,6 +193,7 @@ DiscoveryWorkbenchResponse execute_log_attributes_filter(const std::vector<Disco
     else if(maximum)result=filter_log_attributes_max_activities(*source,criterion,parameters);
     else if(relative)result=filter_log_attributes_relative_occurrence(*source,criterion,options);
     else result=filter_log_attributes_threshold(*source,supplied_counts,variants,vc,criterion,EventAttribute{"",attribute_key});
+    }
     phase="result_export";raw_result=serialize_embedding_workbench_raw_log_json(*result);
     try{XesExportOptions export_options;export_options.preserve_nulls=true;xes=serialize_xes(*result,export_options);}catch(const std::exception& e){xes_error=e.what();}
     phase="complete";
@@ -153,16 +201,22 @@ DiscoveryWorkbenchResponse execute_log_attributes_filter(const std::vector<Disco
   }catch(const std::exception& e){status=400;error_type="native_error";error=e.what();}
   if(source && before)try{after=serialize_embedding_workbench_raw_log_json(*source);unchanged=*before==*after;}catch(const std::exception&){}
   if(variants_source && variants_before)try{variants_after=serialize_embedding_workbench_raw_log_json(*variants_source);variants_unchanged=*variants_before==*variants_after;}catch(const std::exception&){}
-  if(parameters_before)try{parameters_after=parameters_json(parameters);parameters_unchanged=*parameters_before==*parameters_after;}catch(const std::exception&){}
+  if(parameters_before)try{
+    if(original_call){if(original_call->parameters)parameters_after=parameters_json(*original_call->parameters);else if(original_call->raw_parameters)parameters_after=log_attributes_original_call_detail::attribute_json(*original_call->raw_parameters);}
+    else parameters_after=parameters_json(parameters);
+    if(parameters_after)parameters_unchanged=*parameters_before==*parameters_after;
+  }catch(const std::exception&){}
+  if(cache_before&&original_call&&original_cache)try{cache_after=log_attributes_original_call_detail::cache_json(original_call->counts,*original_cache,original_call->args[0],original_selector);}catch(const std::exception&){}
   const auto text=[&](const std::string& value,bool present){return present?q(value):std::string("null");};
   const auto optional_text=[&](const std::optional<std::string>& value){return value?q(*value):std::string("null");};
   const auto optional_bool=[](const std::optional<bool>& value){return value?(*value?"true":"false"):"null";};
   return {status,"{\"family\":\"LOG_ATTRIBUTES_FILTER\",\"operation\":"+text(operation,!operation.empty())+",\"http_status\":"+std::to_string(status)+",\"phase\":"+q(phase)+
     ",\"source_format\":"+text(format,!format.empty())+",\"source\":"+(source?counts(*source):"null")+",\"result\":"+(result?counts(*result):"null")+
-    ",\"source_unchanged\":"+optional_bool(unchanged)+",\"activity_key\":"+text(open_key,source.has_value())+",\"filter_attribute_key\":"+text(attribute_key,source.has_value())+
+    ",\"source_unchanged\":"+optional_bool(unchanged)+",\"activity_key\":"+text(open_key,source.has_value())+",\"filter_attribute_key\":"+text(attribute_key,source.has_value()&&call_mode!="original")+
     ",\"source_log_json\":"+optional_text(before)+",\"source_after_log_json\":"+optional_text(after)+",\"parameters_before_json\":"+optional_text(parameters_before)+",\"parameters_after_json\":"+optional_text(parameters_after)+
     ",\"parameters_unchanged\":"+optional_bool(parameters_unchanged)+",\"variants_source_log_json\":"+optional_text(variants_before)+",\"variants_source_after_log_json\":"+optional_text(variants_after)+",\"variants_source_unchanged\":"+optional_bool(variants_unchanged)+
-    ",\"threshold_counts_json\":"+text(field("counts_json"),fields.contains("counts_json"))+",\"threshold_variants_map_json\":"+text(field("variant_traces_json"),fields.contains("variant_traces_json"))+",\"variant_counts_json\":"+text(field("variant_counts_json"),fields.contains("variant_counts_json"))+
+    ",\"threshold_counts_json\":"+(call_mode=="original"?optional_text(original_counts_echo):text(field("counts_json"),fields.contains("counts_json")))+",\"threshold_variants_map_json\":"+(call_mode=="original"?optional_text(original_variants_echo):text(field("variant_traces_json"),fields.contains("variant_traces_json")))+",\"variant_counts_json\":"+(call_mode=="original"?optional_text(original_vc_echo):text(field("variant_counts_json"),fields.contains("variant_counts_json")))+
+    ",\"call_mode\":"+text(call_mode,!call_mode.empty())+",\"call_json\":"+optional_text(call_text)+",\"threshold_cache_before_json\":"+optional_text(cache_before)+",\"threshold_cache_after_json\":"+optional_text(cache_after)+
     ",\"filtered_log_json\":"+text(raw_result,!raw_result.empty())+",\"filtered_xes\":"+text(xes,result.has_value() && xes_error.empty() && error.empty())+",\"xes_error\":"+text(xes_error,!xes_error.empty())+",\"error_type\":"+text(error_type,!error_type.empty())+",\"error\":"+text(error,!error.empty())+'}'};
 }
 }

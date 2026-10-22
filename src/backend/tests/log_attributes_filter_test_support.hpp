@@ -27,7 +27,66 @@ inline EventLog output(const DiscoveryWorkbenchResponse& response){
   const auto raw=text(response.json,"filtered_log_json");require(raw.has_value(),"missing full filtered log");
   const auto parsed=parse_embedding_workbench_raw_log_json(*raw);require(serialize_embedding_workbench_raw_log_json(parsed)==*raw,"full output lost on reopen");return parsed;
 }
+inline void original_workflows(const std::function<DiscoveryWorkbenchResponse(const std::vector<DiscoveryWorkbenchPart>&)>& run){
+  const auto source=source_log();const auto raw=serialize_embedding_workbench_raw_log_json(source);
+  const auto call=[](const std::string& args,const std::string& tail=std::string{}){return "{\"schema\":\"minera-log-attributes-original-call-v1\",\"args\":"+args+tail+'}';};
+  const auto invoke=[&](const std::string& operation,const std::string& json,std::vector<DiscoveryWorkbenchPart> extra=std::vector<DiscoveryWorkbenchPart>{}){
+    auto parts=request_log(source,operation,{field("call_json",json)});parts.insert(parts.end(),extra.begin(),extra.end());return run(parts);
+  };
+  const std::string values=R"([{"type":"list","value":[{"type":"string","value":"A"}]}])";
+  const std::string params=R"(,"parameter_entries":[{"key":"pm4py:param:attribute_key","enum_key":true,"value":{"type":"string","value":"work"}}])";
+  const std::string exact="\r\n "+call(values,params)+"\r\n";
+  auto bytes=request_log(source,"traces",{{"call_json","call_json.txt",exact,true}});
+  bytes[1].filename="misleading.csv";
+  const auto positive=run(bytes);require(output(positive).traces.size()==2,"original enum selector failed");
+  require(text(positive.json,"call_json")==exact,"original call text changed");contains(positive,"\"call_mode\":\"original\"");contains(positive,"\"source_format\":\"native_log\"");
+  contains(positive,"\"filter_attribute_key\":null");require(text(positive.json,"activity_key")=="work","opening activity role replaced by typed selector");
+  require(text(positive.json,"parameters_before_json")==text(positive.json,"parameters_after_json"),"unchanged caller parameters differ");
+  contains(positive,"\"threshold_cache_before_json\":null");contains(positive,"\"threshold_cache_after_json\":null");
+  const auto omitted=invoke("traces",call(values));require(omitted.status==200,"omitted parameters failed");contains(omitted,"\"parameters_before_json\":null");contains(omitted,"\"parameters_after_json\":null");contains(omitted,"\"parameters_unchanged\":null");
+  const auto empty=invoke("traces",call(values,R"(,"parameter_entries":[])"));require(empty.status==200,"empty dictionary failed");require(text(empty.json,"parameters_before_json").has_value(),"empty dictionary collapsed to omission");contains(empty,"\"parameters_unchanged\":true");
+  const auto na=invoke("traces",call(values,R"(,"parameter_value":{"type":"na"})"));require(na.status==400,"raw NA parameters accepted");contains(na,"\"phase\":\"apply\"");contains(na,"\"error_type\":\"TypeError\"");contains(na,"\"source_unchanged\":true");
+  require(text(na.json,"parameters_before_json").has_value()&&text(na.json,"parameters_before_json")==text(na.json,"parameters_after_json"),"raw parameters lost complete native artifact");
+  const auto maximum=invoke("top_activities",call(R"([{"type":"null"}])",R"(,"parameter_entries":[{"key":"pm4py:param:activity_key","enum_key":false,"value":{"type":"string","value":"work"}}])"));
+  require(maximum.status==400,"invalid original maximum accepted");contains(maximum,"\"phase\":\"apply\"");contains(maximum,"\"source_unchanged\":true");contains(maximum,"\"parameters_unchanged\":false");
+  require(text(maximum.json,"parameters_before_json")!=text(maximum.json,"parameters_after_json"),"maximum pre-error dictionary write hidden");
+  const auto full=invoke("top_activities",call(R"([{"type":"integer","value":"100"}])",R"(,"parameter_entries":[])"));
+  require(serialize_embedding_workbench_raw_log_json(output(full))==raw,"full maximum altered source");contains(full,"\"source_unchanged\":true");contains(full,"\"parameters_unchanged\":false");
+  require(invoke("top_activities",call("[]")).status==200,"omitted maximum default failed");
+  const std::string key=R"({"type":"tuple","value":[{"type":"string","value":"CACHE"}]})";
+  const std::string count=R"({"type":"attribute_counts","entries":[[{"type":"string","value":"A"},{"type":"integer","value":"0"}],[{"type":"string","value":"B"},{"type":"integer","value":"0"}],[{"type":"string","value":"D"},{"type":"integer","value":"0"}],[{"type":"null"},{"type":"integer","value":"9007199254740993"}]]})";
+  const std::string vc="{\"type\":\"list\",\"value\":[{\"type\":\"tuple\",\"value\":["+key+",{\"type\":\"integer\",\"value\":\"1\"}]}]}";
+  const auto cache=[&](const std::string& handle){return "{\"type\":\"variant_cache\",\"entries\":[{\"key\":"+key+",\"traces\":["+handle+"]}]}";};
+  const auto threshold=[&](const std::string& c,const std::string& v,const std::string& sequence){return call("["+c+","+v+","+sequence+R"(,{"type":"integer","value":"100"},{"type":"string","value":"work"}])");};
+  const auto source_cache=cache(R"({"source_trace_index":0})");
+  const auto retained=invoke("threshold",threshold(count,source_cache,vc));require(output(retained).traces.size()==2,"actual source trace cache exemption failed");
+  const auto before_cache=text(retained.json,"threshold_cache_before_json");require(before_cache&&before_cache==text(retained.json,"threshold_cache_after_json"),"actual complete threshold cache after differs");
+  require(before_cache->find("ordinary_value_json")!=std::string::npos&&before_cache->find("key_json")!=std::string::npos&&before_cache->find("traces_json")!=std::string::npos,"cache entry boundaries omitted");
+  require(text(retained.json,"threshold_counts_json")==count&&text(retained.json,"threshold_variants_map_json")==source_cache&&text(retained.json,"variant_counts_json")==vc,"raw cache descriptor slices changed");
+  EventLog auxiliary;auxiliary.traces={source.traces[0]};auxiliary.metadata.properties={{"aux","independent"}};
+  const auto auxiliary_cache=cache(R"({"auxiliary_trace_index":0})");
+  const auto aux=invoke("threshold",threshold(count,auxiliary_cache,vc),{{"variants_file","auxiliary.csv",serialize_embedding_workbench_raw_log_json(auxiliary),true}});
+  require(output(aux).traces.size()==2,"external full trace cache failed");require(text(aux.json,"variants_source_log_json")==serialize_embedding_workbench_raw_log_json(auxiliary),"auxiliary full context lost");
+  require(text(aux.json,"threshold_cache_before_json")==before_cache,"equal actual source/aux copied trace values produced different cache identity");
+  const auto bad_vc=invoke("threshold",threshold(count,source_cache,R"({"type":"list","value":[]})"));
+  require(bad_vc.status==400,"empty original vc accepted");contains(bad_vc,"\"phase\":\"apply\"");contains(bad_vc,"\"error_type\":\"IndexError\"");
+  require(text(bad_vc.json,"threshold_cache_before_json").has_value()&&text(bad_vc.json,"threshold_cache_before_json")==text(bad_vc.json,"threshold_cache_after_json"),"complete cache lost on native error");
+  const auto raw_variants=invoke("threshold",threshold(count,R"({"type":"null"})",R"({"type":"list","value":[]})"));
+  require(raw_variants.status==400,"malformed original variants accepted");contains(raw_variants,"\"phase\":\"apply\"");require(text(raw_variants.json,"threshold_cache_before_json").has_value(),"raw cache union not snapshotted");
+  for(const auto& json:std::vector<std::string>{"",R"({"schema":"bad","args":[]})",R"({"schema":"minera-log-attributes-original-call-v1","args":[],"args":[]})",call("[]"),call(values,R"(,"parameter_value":{"type":"null"},"parameter_entries":[])"),call(values,R"(,"parameter_entries":[{"key":"unknown","enum_key":false,"value":{"type":"null"}}])"),call(values,R"(,"parameter_entries":[{"key":"positive","enum_key":false,"value":{"type":"boolean","value":true}},{"key":"positive","enum_key":true,"value":{"type":"boolean","value":false}}])")}) {
+    const auto bad=invoke("traces",json);require(bad.status==400,"malformed original call accepted");contains(bad,"\"phase\":\"control\"");require(text(bad.json,"call_json")==json,"control-error original echo lost");
+  }
+  for(const auto& extra:std::vector<DiscoveryWorkbenchPart>{field("source_format","native_log"),field("positive","true"),field("attribute_key","work"),field("values_json","[]")}) {
+    const auto bad=invoke("traces",exact,{extra});require(bad.status==400,"mixed friendly/original accepted");require(text(bad.json,"call_json")==exact,"mixed control original echo lost");
+  }
+  const auto missing_aux=invoke("threshold",threshold(count,auxiliary_cache,vc));require(missing_aux.status==400,"missing auxiliary accepted");contains(missing_aux,"\"phase\":\"control\"");
+  const auto range=invoke("threshold",threshold(count,cache(R"({"source_trace_index":999})"),vc));require(range.status==400,"out-of-range source handle accepted");require(text(range.json,"source_log_json")==raw,"range error source snapshot lost");
+  for(const auto& handle:std::vector<std::string>{R"({"source_trace_index":true})",R"({"source_trace_index":"0"})",R"({"source_trace_index":0.0})",R"({"source_trace_index":0,"auxiliary_trace_index":0})"})require(invoke("threshold",threshold(count,cache(handle),vc)).status==400,"nonexact trace handle accepted");
+  auto wrong_file=bytes;wrong_file[2].filename="wrong.json";const auto rejected=run(wrong_file);require(rejected.status==400,"noncanonical call File accepted");contains(rejected,"\"call_mode\":null");contains(rejected,"\"call_json\":null");
+  const auto unknown=invoke("traces",exact,{field("unknown","x")});require(unknown.status==400,"unknown original control accepted");contains(unknown,"\"call_mode\":null");contains(unknown,"\"call_json\":null");
+}
 inline void workflows(const std::function<DiscoveryWorkbenchResponse(const std::vector<DiscoveryWorkbenchPart>&)>& run){
+  original_workflows(run);
   const auto source=source_log();const auto raw=serialize_embedding_workbench_raw_log_json(source);
   const std::string byte_literal(" literal\n\0Ω ",13);auto byte_source=source;
   for(auto& trace:byte_source.traces)for(auto& event:trace.events){event.activity_source_key=byte_literal;event.activity_attribute->key=byte_literal;}
