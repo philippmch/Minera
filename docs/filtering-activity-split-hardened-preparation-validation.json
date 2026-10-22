@@ -1,0 +1,505 @@
+{
+  "schema": "minera-filtering-activity-split-hardened-preparation-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/filtering-activity-split-hardened-preparation.json.gz",
+    "bytes": 175145,
+    "sha256": "9d4d12021408623c02767b8a1f45cbda571ef62347767d9a6be916c5f1e80d9f",
+    "members": 88,
+    "uncompressed_bytes": 3139492,
+    "uncompressed_sha256": "115a9da210daf3de856ce3414ae5b9cf7c73c4a8140a7c3119e2015563b3ca69"
+  },
+  "prepared_full_receipts": 140,
+  "new_logical_queries": 0,
+  "engines": [
+    {
+      "engine": "pandas",
+      "module": "pm4py.algo.filtering.pandas.activity_split.activity_split_filter",
+      "prepared_receipts": 61,
+      "ordered_receipts_sha256": "43f81e0b1c6c71adf5796477bb9a84d22d4ad70a741d56849d3972fbd8718bba",
+      "new_observer_sha256": "fce1df0eed607191e4427a48c00b20f1367046a590bf3b399759864b0bc953b1",
+      "full_plan_file_bytes_equal": true
+    },
+    {
+      "engine": "polars",
+      "module": "pm4py.algo.filtering.polars.activity_split.activity_split_filter",
+      "prepared_receipts": 79,
+      "ordered_receipts_sha256": "8ebf001d4371e7ccc5eb003043709d01fef0c6af25e8c124c51370b6f6a7739b",
+      "new_observer_sha256": "1294a8ad44a5df95366c7a0dbf199ce3ad189d54f7879be1e0690dd3d500e4e3",
+      "full_plan_file_bytes_equal": true
+    }
+  ],
+  "target_algorithm_calls": 0,
+  "source_collect_calls": 0,
+  "preentry_source_collect_calls": 0,
+  "result_collect_calls": 0,
+  "all_original_canonical_receipt_hashes_verified": true,
+  "all_fresh_original_receipt_bytes_equal": true,
+  "both_whole_plan_files_byte_equal": true,
+  "strict_complete_saved_receipt_validation": true,
+  "both_ordered_receipt_list_hashes_verified": true,
+  "frozen_script_cases_and_surface_verified": true,
+  "independent_extracted_checks": 54,
+  "all_member_utf8_bytes_hashes_round_trip_verified": true,
+  "all_source_bindings_rechecked_after_round_trip": true,
+  "all_original_evidence_capsule_bindings_unchanged": true,
+  "prior_capsules_opaque_hash_reverified": true,
+  "prior_capsules": [
+    {
+      "path": "docs/filtering-grouping-preparation.json.gz",
+      "bytes": 55701,
+      "sha256": "8ae44615941a0eb3c514f00f542da7a28831c65eb91dc9fd20e0f860e9646856"
+    },
+    {
+      "path": "docs/filtering-grouping-polars-preparation.json.gz",
+      "bytes": 54009,
+      "sha256": "3217251d4f9fb6bdb94fd0574f0866a5b4fb845bae82e9226d92b409318bdc97"
+    }
+  ],
+  "prior_barrier_validated": false,
+  "root_entry_certificate_issued": false,
+  "module_status_changes": 0,
+  "source_bindings": [
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-1/call-plan.jsonl",
+      "bytes": 411029,
+      "sha256": "8121578c5491e8cbe6f33c076ae42e04de6411aae0394f6d850194081d275bfd"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-1/dedup-audit.json",
+      "bytes": 8328,
+      "sha256": "813d1814f86ce0de964ebc5e0c3b0047ff0f5fd83adec9f39f7eb261630b2f9e"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-1/executed-cases.json",
+      "bytes": 9687,
+      "sha256": "e6ab52b6ce880724a7dd3eeb2b89bf949715ce21710bc1e8116f966d4fc18da8"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-1/executed-script.py",
+      "bytes": 23240,
+      "sha256": "b41f0cf80301d47dc3628587db8614c3873b5abfe165180694d0e65f75720d33"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-1/prior-receipt-search.json",
+      "bytes": 138,
+      "sha256": "bb561d0eb09c8771f39f610f27ebab7c812a639399efe6d24bbbfd3209f30d70"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-1/validation.json",
+      "bytes": 1084,
+      "sha256": "5e972f8b7b4ee41ff492e8032b176969f0538d3ef8ec2fcc0ed84a40570ea478"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-2/call-plan.jsonl",
+      "bytes": 411029,
+      "sha256": "8121578c5491e8cbe6f33c076ae42e04de6411aae0394f6d850194081d275bfd"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-2/dedup-audit.json",
+      "bytes": 8328,
+      "sha256": "813d1814f86ce0de964ebc5e0c3b0047ff0f5fd83adec9f39f7eb261630b2f9e"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-2/executed-cases.json",
+      "bytes": 9687,
+      "sha256": "e6ab52b6ce880724a7dd3eeb2b89bf949715ce21710bc1e8116f966d4fc18da8"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-2/executed-script.py",
+      "bytes": 29679,
+      "sha256": "fce1df0eed607191e4427a48c00b20f1367046a590bf3b399759864b0bc953b1"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-2/prior-receipt-search.json",
+      "bytes": 138,
+      "sha256": "bb561d0eb09c8771f39f610f27ebab7c812a639399efe6d24bbbfd3209f30d70"
+    },
+    {
+      "path": "build/filtering-activity-split-pandas-public-preentry-2/validation.json",
+      "bytes": 1084,
+      "sha256": "773420b6cbd25e54aa902d6a7d89076425944e9c57d157750bbe45968f1e5821"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-1/call-plan.jsonl",
+      "bytes": 361480,
+      "sha256": "4c3a96ac5d5dd82727494c10484ef19e289ba830d7027da90860caa1a3f661fb"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-1/dedup-audit.json",
+      "bytes": 10776,
+      "sha256": "70a3ace0c2f0ca6cb8555212a023ccd12a3dfccd016b0019f65aa7791cf043d8"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-1/executed-cases.json",
+      "bytes": 231378,
+      "sha256": "ffc58297bae674ddec64ec659a3bd65d66ead3d9de90c79521bc0267f44c98a5"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-1/executed-script.py",
+      "bytes": 23081,
+      "sha256": "fc9c9847f08534f94a9afa955cda37aa1d96628b0d13c5fa9ecef0d573906c34"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-1/prior-receipt-search.json",
+      "bytes": 138,
+      "sha256": "bb561d0eb09c8771f39f610f27ebab7c812a639399efe6d24bbbfd3209f30d70"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-1/validation.json",
+      "bytes": 1159,
+      "sha256": "b903f52575e1d4d2c1ea15f41a42d25c6d9ae97901313be2a3468ebc65a12961"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-2/call-plan.jsonl",
+      "bytes": 361480,
+      "sha256": "4c3a96ac5d5dd82727494c10484ef19e289ba830d7027da90860caa1a3f661fb"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-2/dedup-audit.json",
+      "bytes": 10776,
+      "sha256": "70a3ace0c2f0ca6cb8555212a023ccd12a3dfccd016b0019f65aa7791cf043d8"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-2/executed-cases.json",
+      "bytes": 231378,
+      "sha256": "ffc58297bae674ddec64ec659a3bd65d66ead3d9de90c79521bc0267f44c98a5"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-2/executed-script.py",
+      "bytes": 30506,
+      "sha256": "1294a8ad44a5df95366c7a0dbf199ce3ad189d54f7879be1e0690dd3d500e4e3"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-2/prior-receipt-search.json",
+      "bytes": 138,
+      "sha256": "bb561d0eb09c8771f39f610f27ebab7c812a639399efe6d24bbbfd3209f30d70"
+    },
+    {
+      "path": "build/filtering-activity-split-polars-public-preentry-2/validation.json",
+      "bytes": 1159,
+      "sha256": "f204ad54e66e7ff2ab2214542fa56c7cdb976bbb11065e459aaef793ecbd1dce"
+    },
+    {
+      "path": "build/grouping-public-surface-actual-1/capture.json",
+      "bytes": 22696,
+      "sha256": "f6bc24786f614d0391052235684949b5e4a227f0c42c660e43a0e8963e3b4c66"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/capture-pandas-public.py",
+      "bytes": 29679,
+      "sha256": "fce1df0eed607191e4427a48c00b20f1367046a590bf3b399759864b0bc953b1"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/capture-polars-public.py",
+      "bytes": 30506,
+      "sha256": "1294a8ad44a5df95366c7a0dbf199ce3ad189d54f7879be1e0690dd3d500e4e3"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/freeze-1.json",
+      "bytes": 6789,
+      "sha256": "d7d59674657a8be9dd7cff21f4d692534b851c03ec338abea2ebeb620aa7436a"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-pandas-audit-gate-checks-1/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-pandas-audit-gate-checks-1/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-pandas-audit-gate-checks-1/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-pandas-audit-gate-checks-1/synthetic-audit.json",
+      "bytes": 808,
+      "sha256": "dfb9b0685a107162c1128386e02c0bf5a3e441a1ed10e95a0606a1530dfc27ae"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-pandas-hardening-checks-1/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "b95a546e91c7151ca22bb1320204781d4b2546bdd8a84cef4dfa1de2b242b875"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-pandas-hardening-checks-1/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-pandas-hardening-checks-1/results.json",
+      "bytes": 1942,
+      "sha256": "5ecd6eae6f9f5017611e4a55fc654658720b072fdba3ea67737374208054c351"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-polars-audit-gate-checks-1/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-polars-audit-gate-checks-1/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-polars-audit-gate-checks-1/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-polars-audit-gate-checks-1/synthetic-audit.json",
+      "bytes": 808,
+      "sha256": "dfb9b0685a107162c1128386e02c0bf5a3e441a1ed10e95a0606a1530dfc27ae"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-polars-hardening-checks-1/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "09eb1690877aeb04a19bcf8763cd5b5fbc692c51d010f3675e1671f65b3b59fe"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-polars-hardening-checks-1/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-polars-hardening-checks-1/results.json",
+      "bytes": 2280,
+      "sha256": "5276778f503dca67ea57e90cdde3875a1241b1e3237e8fa97893f60c9970a7c1"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-review-checks-1/pandas-gate-only.diff",
+      "bytes": 9185,
+      "sha256": "132e4c1ef2f4cb826925789f0ba82bd7a885f787098d6815f18c6f2e8ab78531"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-review-checks-1/polars-gate-only.diff",
+      "bytes": 9618,
+      "sha256": "c9195b23066b5882f64a97eda22a1c40dd6556e0cca4799011ac79e734611302"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-review-checks-1/validation.json",
+      "bytes": 4184,
+      "sha256": "e96bb8db6cf262a1f131a123a89860d1d2775e79e566327b048b56c1f3075d83"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-review-checks-1.py",
+      "bytes": 5997,
+      "sha256": "6d7fb20f20694ac8a400944f0cf13b3a602470fc5f8de273af88629973f20697"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-review-final-1.json",
+      "bytes": 4650,
+      "sha256": "a60d5acfa3c1d3368d7865dbb2cda7d35c0582ed4643db60718cf4f4a2ec9cdf"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-test-pandas-audit-gate-offline.py",
+      "bytes": 3807,
+      "sha256": "0b8efc10d10f48bf0cd9535f5ae90c94c14b4c40a0234c99ae49a4826f90bad2"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-test-pandas-hardening-offline.py",
+      "bytes": 6297,
+      "sha256": "47f8d5f7bbb7d1a0ae8dd3d55ce263c85f608c20061a32b7763d0b43ddfbe08d"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-test-polars-audit-gate-offline.py",
+      "bytes": 3807,
+      "sha256": "852a859fe9d6269ffbe487f25779b010c3359ae4da60ca2caa7597bf0f5e8640"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/independent-test-polars-hardening-offline.py",
+      "bytes": 6954,
+      "sha256": "8efefc2b934cfc46b53b72b55a00f8a193d14b6239232c84478a0650548f7fe8"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/original-bindings.json",
+      "bytes": 954,
+      "sha256": "885218e61a5a7d24bc01a533b2d3ff02b5069a7fb2d29caf4b4e58403dd10d96"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/original-pandas-observer.py",
+      "bytes": 23240,
+      "sha256": "b41f0cf80301d47dc3628587db8614c3873b5abfe165180694d0e65f75720d33"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/original-polars-observer.py",
+      "bytes": 23081,
+      "sha256": "fc9c9847f08534f94a9afa955cda37aa1d96628b0d13c5fa9ecef0d573906c34"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-audit-gate-checks-1/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-audit-gate-checks-1/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-audit-gate-checks-1/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-audit-gate-checks-1/synthetic-audit.json",
+      "bytes": 808,
+      "sha256": "dfb9b0685a107162c1128386e02c0bf5a3e441a1ed10e95a0606a1530dfc27ae"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-cases.json",
+      "bytes": 9687,
+      "sha256": "e6ab52b6ce880724a7dd3eeb2b89bf949715ce21710bc1e8116f966d4fc18da8"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-hardening-checks-1/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "2587a1824693637290658c68146d2c4def7500f8af1377b19d25c1499c4514d6"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-hardening-checks-1/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-hardening-checks-1/results.json",
+      "bytes": 1942,
+      "sha256": "b9412389811eb05c25b530f1529ecf223e1130d2413357368a59b048a1775f52"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/pandas-root-prepare-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-audit-gate-checks-1/archive-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-audit-gate-checks-1/flat-test.json",
+      "bytes": 20,
+      "sha256": "3a904c0e11926af07de5af93d4e22dce6b61004fbf787fd8e6842eda44ba7658"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-audit-gate-checks-1/results.json",
+      "bytes": 842,
+      "sha256": "847de263606ba14a6480f692c8509afcfd49e6b896d44955cd41b912b77e0d6e"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-audit-gate-checks-1/synthetic-audit.json",
+      "bytes": 808,
+      "sha256": "dfb9b0685a107162c1128386e02c0bf5a3e441a1ed10e95a0606a1530dfc27ae"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-cases.json",
+      "bytes": 231378,
+      "sha256": "ffc58297bae674ddec64ec659a3bd65d66ead3d9de90c79521bc0267f44c98a5"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-hardening-checks-1/optimized.stderr",
+      "bytes": 1519,
+      "sha256": "1f81ed48f3c19f07689ea9fdd455b124289235cd68e04b1f24c67e0809db0c64"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-hardening-checks-1/optimized.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-hardening-checks-1/results.json",
+      "bytes": 2280,
+      "sha256": "ccd0008a5c7a87b03a3990e0c000d029853d0d6a526007072331a97bbabc904e"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/polars-root-prepare-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/preservation-and-gate-checks-1/validation.json",
+      "bytes": 4093,
+      "sha256": "678f932b7d964fbfa6c95a344c4752dc73b1a2593c531f69f38a8eb4e8b1da6c"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/README.md",
+      "bytes": 3898,
+      "sha256": "c0a86ee50b44981d62b64ef30698831e9339400e213e8506316b8c26585446b1"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/test-pandas-audit-gate-offline.py",
+      "bytes": 3795,
+      "sha256": "410d0afd6ba1771fca8d8b848cf74d67127ae8c1847e824450f017a6208bbc00"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/test-pandas-hardening-offline.py",
+      "bytes": 6285,
+      "sha256": "0471c2252ec3f4f8a47f332dd13b4fc89ae13600175c926963094ee668e534c7"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/test-polars-audit-gate-offline.py",
+      "bytes": 3795,
+      "sha256": "a7dd804a5b6b5e1a8c99b961c72fb294f2bdee4ee928d7a8f971d2f3028ea79e"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-prepared-2/test-polars-hardening-offline.py",
+      "bytes": 6942,
+      "sha256": "a4d50a34c6f35e81478c23c12ba610b0250c6b5922296b1a32448c6427dde92d"
+    },
+    {
+      "path": "build/parity-closures/activity-split-hardened-root-plan-review-1/validation.json",
+      "bytes": 11947,
+      "sha256": "0a41c12b89b08e83a197e1689dc12a1bb03e593309cea1e42d45aca319666c2d"
+    },
+    {
+      "path": "build/parity-closures/activity-split-next-review/observer-bank-spec.md",
+      "bytes": 5813,
+      "sha256": "6edef09f3d6c73d03ea339e97a3938158b4a83db8efdaca15d6294185d742d9c"
+    },
+    {
+      "path": "build/parity-closures/activity-split-next-review/recipe-contract.md",
+      "bytes": 7836,
+      "sha256": "bdfa1d883f9fa08f4349780682eda1b444597bf0bcbc74f36b6ae28715515d75"
+    },
+    {
+      "path": "build/parity-closures/activity-split-next-review/review.md",
+      "bytes": 5882,
+      "sha256": "0d15317800b3145cc1305a0e7ee0a956ad08b9f170b79824025dae4e93022df2"
+    },
+    {
+      "path": "build/parity-closures/activity-split-polars-next-review/recipe-contract.md",
+      "bytes": 6303,
+      "sha256": "102d6770c61f5ef7a4d0cec3610d1680e61ee80cfa4f5e707fe8e2524dce12e2"
+    },
+    {
+      "path": "build/parity-closures/grouping-public-surface-prepared-1/observe-public-surface.py",
+      "bytes": 3512,
+      "sha256": "c4dcf097890e40e6f15a329bc3637d833108e2f5385bbf448a783ae2e521f047"
+    },
+    {
+      "path": "build/parity-closures/package-activity-split-hardened-preparation.py",
+      "bytes": 7739,
+      "sha256": "e1564e555c2b765c1f906ac21d4c00df7000c8cbc708f8f76f49288826770a0a"
+    },
+    {
+      "path": "build/parity-closures/verify-activity-split-hardened-saved-plans.py",
+      "bytes": 7516,
+      "sha256": "3612cf38901059f744c9ad52f86ba3d54f339766b07f26d03665470734ec2241"
+    },
+    {
+      "path": "docs/filtering-grouping-polars-preparation-validation.json",
+      "bytes": 6647,
+      "sha256": "b7f0b3ce5867dea0ca09b00a1942404fa3a37c6beb9d50eddbda95ff6c73684f"
+    },
+    {
+      "path": "docs/filtering-grouping-preparation-validation.json",
+      "bytes": 553,
+      "sha256": "37f7f2af8e17d92d6f6acbfe08d643cf71451de212091ebcaca708f0ad813dac"
+    }
+  ],
+  "limitations": "Same 140 original logical queries in newly gated preparation only. No target outcomes, complete history, certificate or parity closure."
+}
