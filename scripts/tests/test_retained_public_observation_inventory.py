@@ -362,7 +362,7 @@ class ObservationInventoryTests(unittest.TestCase):
                             inventory.parse(io.BytesIO(raw), spec)
 
     def test_chunk_cache_hit_preserves_digest_key(self):
-        owned = Path(__file__).resolve().parents[2] / 'build/parity-closures/receipt-index-development'
+        owned = Path(__file__).resolve().parents[1] / 'test-work/receipt-index-development'
         owned.mkdir(parents=True, exist_ok=True)
         temporary = tempfile.TemporaryDirectory(prefix='inventory-chunk-cache-test-', dir=owned)
         self.addCleanup(temporary.cleanup)
@@ -462,7 +462,7 @@ class ObservationInventoryTests(unittest.TestCase):
         self.assertFalse(event['admitted'])
 
     def test_utf8_name_text_cache_identity_and_source_hash_validation(self):
-        owned = Path(__file__).resolve().parents[2] / 'build/parity-closures/streaming-envelope-development-2'
+        owned = Path(__file__).resolve().parents[1] / 'test-work/streaming-envelope-development-2'
         owned.mkdir(parents=True, exist_ok=True)
         temporary = tempfile.TemporaryDirectory(prefix='utf8-cache-test-', dir=owned)
         self.addCleanup(temporary.cleanup)
@@ -492,7 +492,7 @@ class ObservationInventoryTests(unittest.TestCase):
     def test_metadata_cache_reuse_moved_provenance_and_corruption_reparse(self):
         # Windows' managed redirected Temp permits writes but can reject atomic
         # rename. Exercise publication in the writable workspace used by CLI.
-        owned = Path(__file__).resolve().parents[2] / 'build/parity-closures/receipt-index-development'
+        owned = Path(__file__).resolve().parents[1] / 'test-work/receipt-index-development'
         owned.mkdir(parents=True, exist_ok=True)
         temporary = tempfile.TemporaryDirectory(prefix='inventory-cache-test-', dir=owned)
         self.addCleanup(temporary.cleanup)
@@ -556,6 +556,173 @@ class ObservationInventoryTests(unittest.TestCase):
         self.assertLess(peak, 2 * 1024 * 1024)
         self.assertLessEqual(stream.largest, 4096)
         self.assertEqual(inventory.gaps, 0)
+
+
+
+    def four_member(self, name='own/public.json', payload='FORBIDDEN_BASE64_PAYLOAD\\u0041'):
+        return {'data_base64': payload, 'name': name, 'byte_count': 3, 'sha256': 'a' * 64}
+
+    def four_spec(self, rows, count=None, header=True, **changes):
+        count = len(rows) if count is None else count
+        if header:
+            rows = [{'type': 'archive_header', 'parent_head': 'opaque', 'reference_commit': 'opaque',
+                     'member_count': count, 'summary': {'actual_calls': 'FORBIDDEN_HEADER_SUMMARY'},
+                     'binary_chunks': {'FORBIDDEN_BINARY_MAPPING': 'not interpreted'},
+                     'repository_source_bindings': {'FORBIDDEN_BINDINGS': 'opaque'}}, *rows]
+        controls = {'schema_review_sha256': M.FOUR_FIELD_REVIEW_SHA256,
+                    'expected_header_type': 'archive_header', 'expected_member_count': count}
+        return self.spec(b'\n'.join(M.canonical(item) for item in rows), format='jsonl',
+                         envelope_schema=M.FOUR_FIELD_SCHEMA, four_field_metadata=controls, **changes)
+
+    def test_four_field_data_first_one_byte_never_spools_decodes_or_unescapes(self):
+        value = self.four_member(payload='FORBIDDEN_BASE64_PAYLOAD Ω\\\r\n\x00')
+        original = M.json.loads
+        def loads(raw, *args, **kwargs):
+            if b'FORBIDDEN' in (raw.encode() if isinstance(raw, str) else raw):
+                raise AssertionError('opaque value unescaped')
+            return original(raw, *args, **kwargs)
+        with patch.object(M.json, 'loads', loads), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+            report = self.run_source(self.four_spec([value]), 1)
+        self.assertEqual(report['gaps'], 1)  # The header is always a gap.
+        event = next(e for e in self.events if e['kind'] == 'member')
+        self.assertEqual((event['path'], event['bytes'], event['sha256']), (value['name'], 3, 'a' * 64))
+        self.assertTrue(event['metadata_valid'])
+        self.assertEqual(event['identity_scope'], 'logical-member')
+        for key in ['admitted', 'payload_hash_verified', 'whole_source_file_binding_verified', 'whole_source_file_mapping_complete']:
+            self.assertFalse(event[key])
+        self.assertTrue(next(e for e in self.events if e['kind'] == 'container_structure')['declared_count_and_uniqueness_valid'])
+        self.assertNotIn('FORBIDDEN', json.dumps(self.events))
+        self.assertFalse(report['admission_complete'])
+        self.assertFalse(report['catalogue_audit_complete'])
+
+    def test_four_field_binary_slice_never_whole_source_or_chunk_identity(self):
+        rows = [self.four_member('binary/0-minera_core.lib/00000'), self.four_member('binary/0-minera_core.lib/00001'), self.four_member('own/empty.json') | {'byte_count': 0}]
+        report = self.run_source(self.four_spec(rows), 1)
+        self.assertEqual(report['gaps'], 1)
+        members = [e for e in self.events if e['kind'] == 'member']
+        self.assertEqual([e['logical_member_kind'] for e in members], ['binary-slice', 'binary-slice', 'logical-member'])
+        for event in members:
+            self.assertEqual(event['declared_logical_member_bytes'], event['bytes'])
+            self.assertFalse(event['whole_source_file_binding_verified'])
+            self.assertTrue(event['source_file_identity_unavailable'])
+            self.assertTrue(event['metadata_valid'])
+            self.assertFalse({'offset', 'chunk', 'chunks', 'declared_full_bytes', 'declared_full_sha256', 'whole_member_complete'} & set(event))
+        self.assertNotIn('chunk', report['counts'])
+
+    def test_four_field_direct_and_run_guards_precede_parser_or_source_open(self):
+        base = self.four_spec([self.four_member()])
+        for changes in [{'layout': 'records'}, {'layout': 'envelope'}, {'members': [{'path': 'own/public.json'}]}, {'format': 'json'}, {'four_field_metadata': {}}, {'four_field_metadata': None}]:
+            bad = base | changes
+            with self.subTest(changes=changes), patch.object(M, 'Parser', side_effect=AssertionError('parser constructed')), patch.object(M.Inventory, 'source', side_effect=AssertionError('source entered')), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+                self.assertGreater(self.run_source(bad)['gaps'], 0)
+                with self.assertRaises(ValueError):
+                    M.Inventory(self.events.append).parse(io.BytesIO(b'FORBIDDEN'), bad)
+        control = base['four_field_metadata']
+        for change in [{'expected_member_count': True}, {'expected_member_count': -1}, {'expected_member_count': 1.0}, {'expected_header_type': 'header'}, {'schema_review_sha256': '0' * 64}, {'extra': 1}]:
+            with self.subTest(control=change), patch.object(M, 'Parser', side_effect=AssertionError('parser constructed')):
+                with self.assertRaises(ValueError):
+                    M.Inventory(self.events.append).parse(io.BytesIO(b''), base | {'four_field_metadata': control | change})
+
+    def test_four_field_exact_fields_types_paths_and_sha(self):
+        value = self.four_member()
+        cases = [{'byte_count': True}, {'byte_count': -1}, {'byte_count': 1.5}, {'byte_count': '3'},
+                 {'sha256': 'A' * 64}, {'sha256': 123}, {'sha256': 'unknown'}, {'name': None},
+                 {'name': '../x'}, {'name': '/x'}, {'name': 'C:/x'}, {'name': 'own\\x'},
+                 {'data_base64': {'FORBIDDEN_NESTED': 'opaque'}}, {'kind': 'member'}, {'bytes': 3},
+                 {'path': value['name']}, {'extra': 'opaque'}, {'offset': 0}, {'chunk': 0, 'chunks': 1},
+                 {'module': MODULE, 'apply_returned': True}]
+        rows = [value | change for change in cases]
+        rows.extend({k: v for k, v in value.items() if k != field} for field in value)
+        for row_value in rows:
+            self.events.clear()
+            with self.subTest(row=row_value), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+                self.assertGreater(self.run_source(self.four_spec([row_value]), 1)['gaps'], 1)
+            event = next(e for e in self.events if e['kind'] == 'member')
+            self.assertFalse(event['metadata_valid'])
+        self.events.clear()
+        report = self.run_source(self.four_spec([self.four_member('pm4py/private.py')]))
+        self.assertEqual(report['gaps'], 1)
+        event = next(e for e in self.events if e['kind'] == 'member')
+        self.assertEqual(event['path_disposition'], 'excluded-path')
+        self.assertTrue(event['metadata_valid'])
+        self.assertFalse(event['admitted'])
+
+    def test_four_field_header_count_uniqueness_eof_checks_and_unknown_rows(self):
+        value = self.four_member()
+        for rows, count, header in [([value], 2, True), ([value, value], 2, True), ([value], 1, False), ([], 0, False)]:
+            self.events.clear()
+            with self.subTest(rows=rows, count=count, header=header):
+                self.assertGreater(self.run_source(self.four_spec(rows, count, header), 1)['gaps'], int(header))
+                self.assertFalse(next(e for e in self.events if e['kind'] == 'container_structure')['declared_count_and_uniqueness_valid'])
+        self.events.clear()
+        self.assertEqual(self.run_source(self.four_spec([], 0))['gaps'], 1)
+        self.assertTrue(next(e for e in self.events if e['kind'] == 'container_structure')['declared_count_and_uniqueness_valid'])
+        for mutation in ['late', 'duplicate', 'count-type', 'unknown-type', 'unknown-key']:
+            spec = self.four_spec([value]); path = self.root / spec['path']
+            header, member_data = path.read_bytes().split(b'\n')
+            if mutation == 'late': raw = member_data + b'\n' + header
+            elif mutation == 'duplicate': raw = header + b'\n' + header + b'\n' + member_data
+            else:
+                obj = json.loads(header)
+                if mutation == 'count-type': obj['member_count'] = True
+                elif mutation == 'unknown-type': obj['type'] = 'header'
+                else: obj['extra'] = 'FORBIDDEN'
+                raw = M.canonical(obj) + b'\n' + member_data
+            self.events.clear()
+            with self.subTest(mutation=mutation):
+                bad = self.spec(raw, format='jsonl', envelope_schema=M.FOUR_FIELD_SCHEMA, four_field_metadata=spec['four_field_metadata'])
+                self.assertGreater(self.run_source(bad, 1)['gaps'], 1)
+                self.assertFalse(next(e for e in self.events if e['kind'] == 'container_structure')['declared_count_and_uniqueness_valid'])
+
+    def test_four_field_duplicate_json_keys_are_parse_gap(self):
+        spec = self.four_spec([])
+        header = (self.root / spec['path']).read_bytes()
+        raw = header + b'\n{"name":"x","name":"y","sha256":"' + b'a' * 64 + b'","byte_count":0,"data_base64":"FORBIDDEN"}'
+        bad = self.spec(raw, format='jsonl', envelope_schema=M.FOUR_FIELD_SCHEMA, four_field_metadata=spec['four_field_metadata'] | {'expected_member_count': 1})
+        with patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+            self.assertTrue(any('duplicate envelope key' in e.get('reason', '') for e in (self.run_source(bad, 1) and self.events)))
+
+    def test_four_field_one_byte_bounded_stream_and_large_opaque_data(self):
+        payload = ('FORBIDDEN\\n\\u0041' * 250000).encode()
+        raw = b'{"data_base64":"' + payload + b'","name":"binary/0-a/00000","byte_count":7,"sha256":"' + b'a' * 64 + b'"}'
+        controls = {'schema_review_sha256': M.FOUR_FIELD_REVIEW_SHA256, 'expected_header_type': 'archive_header', 'expected_member_count': 1}
+        for chunk, data in [(1, raw[:0] + M.canonical(self.four_member())), (4096, raw)]:
+            self.events.clear()
+            inventory = M.Inventory(self.events.append, chunk_size=chunk)
+            stream = BoundedStream(data, chunk)
+            with patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+                tracemalloc.start()
+                try:
+                    inventory.parse(stream, {'layout': 'discover', 'format': 'jsonl', 'envelope_schema': M.FOUR_FIELD_SCHEMA, 'four_field_metadata': controls})
+                    peak = tracemalloc.get_traced_memory()[1]
+                finally: tracemalloc.stop()
+            self.assertLess(peak, 2 * 1024 * 1024)
+            self.assertLessEqual(stream.largest, chunk)
+            self.assertNotIn('FORBIDDEN', json.dumps(self.events))
+
+    def test_four_field_cache_one_byte_is_identical_and_bindings_invalidate(self):
+        owned = Path(__file__).resolve().parents[1] / 'test-work'
+        owned.mkdir(exist_ok=True)
+        temporary = tempfile.TemporaryDirectory(prefix='four-cache-', dir=owned)
+        self.addCleanup(temporary.cleanup)
+        cache = Path(temporary.name) / 'cache'
+        spec = self.four_spec([self.four_member()])
+        manifest = {'schema': M.MANIFEST, 'root': str(self.root), 'scope': 'synthetic four-field metadata', 'sources': [spec]}
+        first = M.run(manifest, self.events.append, 1, cache_dir=cache)
+        original = list(self.events); self.events.clear()
+        with patch.object(M.Inventory, 'parse', side_effect=AssertionError('cache miss')):
+            second = M.run(manifest, self.events.append, 1, cache_dir=cache)
+        self.assertEqual(first['gaps'], second['gaps'])
+        self.assertEqual(original, [e for e in self.events if e['kind'] != 'cache_hit'])
+        self.assertNotIn('FORBIDDEN', next(cache.glob('*.jsonl')).read_text())
+        for changed in [spec | {'four_field_metadata': spec['four_field_metadata'] | {'expected_member_count': 2}}, spec | {'envelope_schema': 'utf8-name-text-members-v1'}]:
+            self.events.clear(); manifest['sources'] = [changed]
+            result = M.run(manifest, self.events.append, 1, cache_dir=cache)
+            self.assertNotIn('cache_hit', result['counts'])
+        manifest['sources'] = [spec]
+        (self.root / spec['path']).write_bytes(b'changed')
+        with patch.object(M.Inventory, 'parse', side_effect=AssertionError('bad source parsed')):
+            self.assertGreater(M.run(manifest, self.events.append, 1, cache_dir=cache)['gaps'], 0)
 
 
 if __name__ == '__main__':
