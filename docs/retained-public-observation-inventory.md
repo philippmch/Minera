@@ -40,6 +40,15 @@ size is unavailable, so admission requires an independently reviewed exact size
 and verifies both the original envelope SHA and allowlist binding. The reviewed
 header requires `metadata_kind="manifest"`, `metadata_schema_version=1`.
 
+The explicit `utf8-name-text-members-v1` schema supports **discovery only**.
+It maps the reviewed own producer's exact `kind="member"`, `name`,
+`byte_count`, `sha256` and `text` fields. The size and hash describe the full
+logical member. Text remains lexically opaque: it is never spooled, unescaped,
+decoded or admitted. Header and tail declarations remain separate untrusted
+candidates and gaps; metadata validity does not verify member payload hashes.
+Both the command entry and direct `Inventory.parse` reject non-discovery
+layouts or member admission before constructing the parser.
+
 Two explicit chunk schemas support **discovery only**:
 
 | Schema | Declared identity |
@@ -47,6 +56,8 @@ Two explicit chunk schemas support **discovery only**:
 | `offset-full-member-base64-chunks-v1` | `member` names the file; `bytes`/`sha256` describe the full member, repeated with each decoded byte `offset`. |
 | `indexed-base64-chunks-v1` | `path` names the file; `bytes`/`sha256` describe this chunk, `file_sha256` the full member, and `chunk`/`chunks` the index/count. |
 
+Both chunk profiles reject non-discovery layouts and member admission at the
+command entry and direct `Inventory.parse`, before parsing or spooling data.
 Chunk data is neither decoded nor reassembled. Every chunk event states
 `payload_hash_verified=false` and `whole_member_complete=false`. Duplicate
 identities and inconsistent headers are gaps. Identity scope is one container

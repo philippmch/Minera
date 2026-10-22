@@ -346,6 +346,21 @@ class ObservationInventoryTests(unittest.TestCase):
         del undeclared['envelope_schema']
         self.assertGreater(self.run_source(undeclared)['gaps'], 0)
 
+    def test_direct_chunk_parse_rejects_admission_before_parser_or_payload_access(self):
+        for indexed in [False, True]:
+            value = self.chunk(indexed)
+            data_first = {'data': value['data'], **{key: item for key, item in value.items() if key != 'data'}}
+            raw = json.dumps(data_first).encode()
+            schema = 'indexed-base64-chunks-v1' if indexed else 'offset-full-member-base64-chunks-v1'
+            for changes in [{'layout': 'envelope'}, {'layout': 'records'},
+                            {'layout': 'discover', 'members': [{'path': 'public/full.json'}]}]:
+                with self.subTest(indexed=indexed, changes=changes):
+                    inventory = M.Inventory(self.events.append)
+                    spec = {'format': 'json', 'envelope_schema': schema, **changes}
+                    with patch.object(M, 'Parser', side_effect=AssertionError('parser created')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')):
+                        with self.assertRaisesRegex(ValueError, 'metadata discovery only'):
+                            inventory.parse(io.BytesIO(raw), spec)
+
     def test_chunk_cache_hit_preserves_digest_key(self):
         owned = Path(__file__).resolve().parents[2] / 'build/parity-closures/receipt-index-development'
         owned.mkdir(parents=True, exist_ok=True)
@@ -364,6 +379,111 @@ class ObservationInventoryTests(unittest.TestCase):
                 self.assertEqual(second['gaps'], 0)
                 hit = next(event for event in self.events if event['kind'] == 'cache_hit')
                 self.assertRegex(hit['cache_key'], r'^[0-9a-f]{64}$')
+
+    def utf8_text_member(self, name='own/public.json', text='FORBIDDEN_TEXT_PAYLOAD'):
+        payload = text.encode('utf-8')
+        return {'kind': 'member', 'name': name, 'byte_count': len(payload),
+                'sha256': M.digest(payload), 'text': text}
+
+    def utf8_text_spec(self, rows, **changes):
+        return self.spec(b'\n'.join(M.canonical(item) for item in rows), format='jsonl',
+                         envelope_schema='utf8-name-text-members-v1', **changes)
+
+    def test_utf8_name_text_discovery_maps_metadata_without_unescaping_or_spooling(self):
+        # Put the payload before its name to exercise the privacy boundary.
+        value = self.utf8_text_member(text='FORBIDDEN_TEXT_PAYLOAD Ω\\\r\n\x00')
+        ordered = {'text': value['text'], **{k: v for k, v in value.items() if k != 'text'}}
+        original_loads = M.json.loads
+        def guarded_loads(raw, *args, **kwargs):
+            if b'FORBIDDEN_TEXT_PAYLOAD' in (raw.encode() if isinstance(raw, str) else raw):
+                raise AssertionError('opaque text JSON-unescaped')
+            return original_loads(raw, *args, **kwargs)
+        with patch.object(M.json, 'loads', guarded_loads), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+            report = self.run_source(self.utf8_text_spec([ordered]), 1)
+        self.assertEqual(report['gaps'], 0)
+        event = next(event for event in self.events if event['kind'] == 'member')
+        self.assertEqual((event['path'], event['bytes'], event['sha256']), (value['name'], value['byte_count'], value['sha256']))
+        self.assertEqual(event['payload_fields'], {'text': 'string'})
+        self.assertFalse(event['admitted'])
+        self.assertFalse(event['original_size_unavailable'])
+        self.assertFalse(event['payload_hash_verified'])
+        self.assertTrue(event['metadata_valid'])
+        self.assertNotIn('FORBIDDEN_TEXT_PAYLOAD', json.dumps(self.events))
+
+    def test_utf8_name_text_headers_tail_and_public_summaries_remain_unadmitted(self):
+        header = {'kind': 'header', 'schema': 'minera.alpha-plus.process-law.utf8-members-jsonl',
+                  'version': 1, 'group': 'own-group', 'members': 1,
+                  'summary': {'result': 'FORBIDDEN_SUMMARY_VALUE', 'actual_calls': 0}}
+        tail = {'kind': 'tail', 'member_count': 1, 'total_member_bytes': 3, 'inventory_sha256': 'a' * 64}
+        report = self.run_source(self.utf8_text_spec([header, self.utf8_text_member(), tail]))
+        self.assertEqual(report['counts'], {'header_candidate': 2, 'gap': 2, 'member': 1})
+        candidates = [event for event in self.events if event['kind'] == 'header_candidate']
+        self.assertEqual([event['declared_metadata']['kind'] for event in candidates], ['header', 'tail'])
+        self.assertNotIn('FORBIDDEN_SUMMARY_VALUE', json.dumps(self.events))
+        self.assertFalse(report['admission_complete'])
+
+    def test_utf8_name_text_rejects_non_discovery_and_any_admission(self):
+        value = self.utf8_text_member()
+        for changes in [{'layout': 'envelope'}, {'layout': 'records'},
+                        {'members': [{'path': 'own/public.json', 'bytes': value['byte_count'], 'sha256': value['sha256']}]}]:
+            with self.subTest(changes=changes), patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+                self.assertGreater(self.run_source(self.utf8_text_spec([value], **changes))['gaps'], 0)
+        direct = M.Inventory(self.events.append)
+        with self.assertRaisesRegex(ValueError, 'metadata discovery only'):
+            direct.parse(io.BytesIO(M.canonical(value)), {'layout': 'envelope', 'format': 'json', 'envelope_schema': 'utf8-name-text-members-v1'})
+
+    def test_utf8_name_text_exact_fields_types_and_call_evidence_are_gaps(self):
+        value = self.utf8_text_member()
+        changes = [{'byte_count': True}, {'byte_count': -1}, {'byte_count': 1.5},
+                   {'sha256': 'unknown'}, {'text': {'nested': 'FORBIDDEN'}},
+                   {'extra': 'opaque'}, {'module': MODULE, 'function': 'apply', 'result': None},
+                   {'apply_returned': True}, {'kind': 'file'}, {'bytes': value['byte_count']}]
+        for change in changes:
+            with self.subTest(change=change):
+                self.assertGreater(self.run_source(self.utf8_text_spec([value | change]))['gaps'], 0)
+        for field in ['name', 'text', 'sha256', 'byte_count']:
+            with self.subTest(missing=field):
+                missing = dict(value)
+                del missing[field]
+                self.assertGreater(self.run_source(self.utf8_text_spec([missing]))['gaps'], 0)
+
+    def test_utf8_name_text_duplicate_and_unsafe_paths_rejected_excluded_stays_opaque(self):
+        value = self.utf8_text_member()
+        self.assertGreater(self.run_source(self.utf8_text_spec([value, value]))['gaps'], 0)
+        for path in ['../private.json', '/private.json', 'C:/private.json', 'own\\private.json']:
+            with self.subTest(path=path):
+                self.assertGreater(self.run_source(self.utf8_text_spec([self.utf8_text_member(path)]))['gaps'], 0)
+        self.events.clear()
+        with patch.object(M, 'decode_payload', side_effect=AssertionError('decode')), patch.object(M.tempfile, 'SpooledTemporaryFile', side_effect=AssertionError('spool')):
+            report = self.run_source(self.utf8_text_spec([self.utf8_text_member('pm4py/implementation.py')]))
+        self.assertEqual(report['gaps'], 0)
+        event = next(event for event in self.events if event['kind'] == 'member')
+        self.assertEqual(event['path_disposition'], 'excluded-path')
+        self.assertFalse(event['admitted'])
+
+    def test_utf8_name_text_cache_identity_and_source_hash_validation(self):
+        owned = Path(__file__).resolve().parents[2] / 'build/parity-closures/streaming-envelope-development-2'
+        owned.mkdir(parents=True, exist_ok=True)
+        temporary = tempfile.TemporaryDirectory(prefix='utf8-cache-test-', dir=owned)
+        self.addCleanup(temporary.cleanup)
+        cache = Path(temporary.name) / 'cache'
+        spec = self.utf8_text_spec([self.utf8_text_member()])
+        manifest = {'schema': M.MANIFEST, 'root': str(self.root), 'scope': 'UTF8 metadata cache test', 'sources': [spec]}
+        self.assertEqual(M.run(manifest, self.events.append, 3, cache_dir=cache)['gaps'], 0)
+        self.events.clear()
+        with patch.object(M.Inventory, 'parse', side_effect=AssertionError('cache miss')):
+            second = M.run(manifest, self.events.append, 3, cache_dir=cache)
+        self.assertEqual(second['counts']['cache_hit'], 1)
+        self.assertRegex(next(event['cache_key'] for event in self.events if event['kind'] == 'cache_hit'), r'^[0-9a-f]{64}$')
+        original_spec = dict(spec)
+        del spec['envelope_schema']
+        default = M.run(manifest, self.events.append, 3, cache_dir=cache)
+        self.assertGreater(default['gaps'], 0)
+        self.assertNotIn('cache_hit', default['counts'])
+        manifest['sources'] = [original_spec]
+        (self.root / original_spec['path']).write_bytes(b'changed')
+        with patch.object(M.Inventory, 'parse', side_effect=AssertionError('bad source parsed')):
+            self.assertGreater(M.run(manifest, self.events.append, 3, cache_dir=cache)['gaps'], 0)
 
     def test_sources_require_json_suffix_before_open(self):
         with self.assertRaisesRegex(ValueError, 'JSON/JSONL'):
