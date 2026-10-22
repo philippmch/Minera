@@ -14,7 +14,103 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: streaming history inventory — 2026-10-22
+## Current continuation: UTF8 history metadata and hardened gates — 2026-10-22
+
+`ec8a792f` adds discovery-only `utf8-name-text-members-v1` and prevents direct
+chunk admission before parser construction. `f94eb500` preserves hardened
+ActivitySplit recipes. All **65 receipt-tool tests** pass. The frozen parser is
+SHA256 `19623eb61014c866bc6a241b532adefbe985aa64ae00f2bda04a7988d4b64837`.
+No reference algorithms were called in this checkpoint.
+
+Root acceptance is under `build/parity-closures/streaming-envelope-root-acceptance-3/`.
+The actual LTL run (session **6440**, terminal0/drained) preserves all **1,401**
+original receipt identities, with zero gaps. Its verified cache replay has three
+hits. The legacy scale regression still finds 5,870 members with zero gaps.
+The direct-parse chunk bug, frozen predecessors, failed repro and independent
+fix review remain preserved rather than overwriting the earlier evidence.
+
+The UTF8 metadata correction (session **93699**, terminal0/drained) recovered
+**12,313 member names and full logical size declarations from 26 distinct
+nonempty contents**, including one explicitly mocked member. Twenty-five
+nonmock sources account for 12,312 members. Text stays lexically opaque;
+**52 header/tail candidates remain 52 gaps**. All 26 ordered declared inventory
+hashes/counts/totals independently match their tails, but payload hashes remain
+unverified and no members are admitted. Cache replay has 26 hits. The final raw
+event stream is 7,454,999 bytes, SHA256
+`f124a1ec5e65565e4110a15ab9baf658e0ba5cb73ee308e2a7c084177e4e3fb6`.
+The first selection incorrectly equated 31 boundary candidates with 31 nonempty
+sources; that failed assertion and the corrected 26-source selection are retained.
+Preserved in `20da383e`: `docs/retained-public-observation-utf8-checkpoint.jsonl.gz`,
+83 members / 4,144,576 bytes, SHA256
+`9c20cedd8d72ec893cdd1777f501315e8760877ca39f3668286dcf777a7cf224`.
+Root verified every saved member against its original exact bytes. Fresh/cache
+event sequences are exactly equal after removing the 26/3 `cache_hit` rows;
+no event fields were normalized. Pre-guard/final UTF8 and LTL event files also
+match byte-for-byte. Cache/SQLite files remain externally bound, not embedded.
+
+The bounded UTF8 flat-copy metadata projection is terminal0 under
+`grouping-utf8-member-projection-root-2/`. It preserves all 12,313 provenance
+edges, 3,023 declared identity keys, and **940 candidate JSON/JSONL hashes /
+13,731 paths**. Its 41,267,200-byte regenerable SQLite hash is
+`713ca5aa3979dbcd61a207244c66349983c765190d08657ac585dbb6525df873`.
+No matched payload was opened; all 52 gaps remain. The required root terminal
+receipt was issued only after session 93699 finished. This projection adds
+candidate locations, not public provenance or complete historical receipts.
+
+Own-producer schema review resolved the meaning of **776** four-field
+`name/sha256/byte_count/data_base64` declarations: sizes/hashes cover logical
+members. `binary/*` members can be slices of a larger file; do not treat a slice
+hash as the full binary hash. The adapter is still to implement. All **38**
+unsafe paths have scoped Windows-relative producer/sidecar dispositions; retain
+raw paths and do not globally normalize or admit them. Two duplicate path events
+are repeated native log declarations with equal bytes/hash, not target calls.
+
+The filename-priority catalogue under `grouping-history-target-provenance-2/`
+contains 423 candidate identities / 113,761 member/chunk provenance edges,
+257,455 alternate flat edges, 4,723 ranked flat paths and 1,860 unmatched ranked
+paths. Eleven own producers and three validation sidecars were classified.
+Filename ranking never establishes absence or completeness; the remaining
+baseline universe stays explicitly unknown. Large derived edge dumps and SQLite
+files remain regenerable, with exact bindings, rather than duplicated in Git.
+Preserved in `4c442074`: `docs/retained-history-metadata-provenance-checkpoint.jsonl.gz`,
+38 members / 332,513 bytes, SHA256
+`5b04b36c6b26effc5defd71de87df46160f7c33f9264fbfdd760093b9f94cb6a`.
+Its sidecar binds the two omitted large exports and two baseline databases.
+Root verified every embedded member against its current exact source bytes.
+
+Both hardened ActivitySplit recipes reject optimized Python before imports or
+output, reject incomplete saved receipts, and recompute exact receipt equality
+before an actual intent. Independent extracted checks: **54 passed**. Fresh root
+prepare-only outputs are `build/filtering-activity-split-{pandas,polars}-public-preentry-2/`.
+Their entire 61/79 plan files are byte-identical to the originals. Capsule:
+`docs/filtering-activity-split-hardened-preparation.json.gz`, 88 members / 175,145
+bytes, SHA256 `9d4d12021408623c02767b8a1f45cbda571ef62347767d9a6be916c5f1e80d9f`.
+Root checked every member against its original bytes. The six prepared modules
+still total **565** logical queries, all unentered, `prior_barrier_validated=false`,
+and no root entry certificate. The older assertion-based ActivitySplit recipes
+below are retained historical artifacts; use the hardened replacements for any
+future reviewed entry.
+
+The independent final projection/capsule review found no issues and rechecked
+all input/output hashes, nine SQL invariants, all 88 capsule members and 140
+strict canonical receipt identities:
+`grouping-utf8-projection-and-hardened-capsule-review-1/review.json`, SHA256
+`530c3826051047fba3ccc8479852e194389e6f4d43cdce18f22743fa69e112d1`.
+
+The full catalogue remains **46/86 packages and 226/387 modules complete; 201
+strict open units**. No status changed. Continue the relevant flat/archive audit:
+implement the explicitly scoped four-field adapter; review key/report and direct
+record schemas, unresolved headers and flat provenance; then reconstruct and
+hash-assert complete original receipts and deduplicate the whole candidate bank.
+Metadata inventories, source filename classifications and these zero-call plans
+cannot authorize algorithm entry. Preserve every prior failed attempt and
+create new output directories. **Do not restart the completed 2,844-source scan.**
+An isolated four-field adapter draft/review is now in progress under
+`streaming-four-field-development-1/`; it has not changed the accepted parser,
+run against a real archive, or granted any admission. Review and freeze it before
+any future root metadata run.
+
+## Previous checkpoint: streaming history inventory — 2026-10-22
 
 Clean checkpoints: `f9b514c8` adds the streaming inventory and 32 tests;
 `eca91620` preserves the zero-call Polars preparation; `56b8785d` retains real
