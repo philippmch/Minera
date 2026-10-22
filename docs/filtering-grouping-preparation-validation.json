@@ -1,0 +1,17 @@
+{
+  "schema": "minera-filtering-grouping-preparation-validation-v1",
+  "complete": true,
+  "archive": {
+    "path": "docs/filtering-grouping-preparation.json.gz",
+    "bytes": 55701,
+    "sha256": "8ae44615941a0eb3c514f00f542da7a28831c65eb91dc9fd20e0f860e9646856",
+    "members": 37
+  },
+  "target_algorithm_calls": 0,
+  "public_surface_modules": 6,
+  "prepared_full_receipts": 61,
+  "all_saved_receipt_hashes_verified": true,
+  "prior_barrier_validated": false,
+  "root_entry_certificate_issued": false,
+  "module_status_changes": 0
+}
