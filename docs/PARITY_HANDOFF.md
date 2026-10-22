@@ -14,7 +14,122 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: original typed pandas calls reach API/UI — 2026-10-22
+## Current continuation: all297 original LOG calls reach API/UI — 2026-10-22
+
+`fcb9d598` retains the checkpoint in
+`docs/retained-public-observation-log-original-call-checkpoint.jsonl.gz`
+(652,958 bytes; SHA256
+`66c9fd82dfb550a9477980896fed8c0b252aa916928f4ff784d26b169ddb1b3f`).
+Its validation sidecar is 160,816 bytes, SHA256
+`0b1286f65c1d33c448ef2f4d157793690979d39ac3742e025a5561f35652fd0c`.
+Root independently verified **203 own text members** and exact UTF8 round trips.
+There are **261 external declarations**. Original banks/archives, complete native
+oracles, generated vector includes, raw browser artifacts, screenshots and
+binaries remain external. The four own next-candidate metadata files are embedded
+by literal names; this does not admit candidate observations or their payloads.
+Root final acceptance is 202,277 bytes, SHA256
+`6f6666e8f793892d4c8d68a87b6a03470beff9810aa5c6442588bc3770fc9be4`.
+All runtime sessions are terminal/drained; root-facts retain the eleven actual
+successful terminal receipts and distinguish preserved failed attempts.
+
+Three clean source commits add original typed EventLog calls:
+`c2ba379f` adds strict backend transport and controls; `c856d3d2` adds UI/editor,
+helper and contract changes; `e06c43c` adds complete retained-call acceptance.
+`call_json` accepts `minera-log-ltl-original-call-v1` with ordered typed `args`.
+The four filters require one/three/two/one arguments; both timestamp helpers
+require two and forbid source and parameters by presence. Explicit null reaches
+native semantics; missing/extra arity is a transport control, not an invented
+reference binding diagnostic. Original filters require complete native EventLog
+JSON, while friendly CSV/XES/import and helper controls remain the default.
+
+Raw parameter values and the six known ordered string/enum option identities
+map to existing native carriers. LOG rejects repeated underlying names instead
+of inventing an unobserved enum/string collision policy. The LOG-private recursive
+codec preserves NaT as null/date/NativeDate NaT at nanosecond resolution and UUID
+as kId, including nesting. It leaves the shared pandas/Polars parsers and all
+three predicate sources unchanged. The original LOG oracle remains byte-identical:
+4,176,860 bytes, SHA256
+`7557ccd210fb886ec26f45083a81292dffe3ef980d8261ede13c2a38c1d0e4ec`.
+The shared 27-field envelope retains exact call bytes, null input kind and typed
+selector roles, complete source/source-after/result/helper/error artifacts and an
+independent imported activity role for filtered-log reopening.
+
+All six admitted LOG banks were reconstructed and independently checked:
+**297 original canonical IDs**, sorted SHA256
+`566c337e8c65cad2a73dc35d9dccfd5bd5d51515660e8dee834e4fbebdb232d3`.
+The fixture binds all **153 original snapshots**, **1,283 recursive typed values**,
+**six NaT and four UUID originals**, and all source/helper/error oracle links.
+New fixture SHA256:
+`45f57882b721f726605246af8da88daab6185d8c9d17a2ca6090bb5c00a87662`.
+The wrapper includes the unchanged original oracle, invokes its retained/storage
+controls directly, and never invokes its renamed unused main.
+
+Root acceptance is `build/parity-closures/ltl-log-original-call-acceptance-1/`.
+Terminal0/drained **7afca7** passes original native297 and **all297 direct plus
+all297 owned HTTP**: each transport compares **191 complete logs / 36 filter
+errors / 23 complete typed helper values / 47 helper errors**. It checks all27
+fields, source-before/after, complete raw-log serialize/reopen, helper attributes,
+request/control preservation and exact error type/full message. Original
+error.args remain in external receipts; this envelope exposes type/message.
+XES is independently
+checked as an optional own projection; it never replaces the native log oracle.
+Eager return/exception observations establish wire complete/true versus
+apply/false; no explicit saved phase or lazy collect domain is invented.
+Terminal0/drained **fda680** separately passes original LOG297, pandas429 native,
+pandas429 direct/HTTP, and Polars675 native/direct/HTTP regressions. All **192
+frontend files / 9,858 tests**, focused **49 tests**, TypeScript and production
+build pass. Independent backend and frontend/fixture reviews pass at report SHA
+prefixes `97d8e19d` and `8fb7cf62`.
+
+Actual rendered browser acceptance passes terminal0/drained **fdd8e9**:
+**23 checks / 21 relationship requests plus one actual /api/mine reopen**. It
+covers all six operations, source-less helpers, raw parameters, typed options,
+NaT/UUID/NA/null separation, complete raw helper true/false artifacts, exact large
+integer/CRLF imports and all source/result/helper/error/call/response downloads.
+A held actual native HTTP response is discarded after an editor change; a deferred
+own File import is discarded after an operation change. Reopening verifies exact
+FormData passed unchanged to native fetch, its full XES File and independent
+activity-role field, the actual mine response and navigation. Chromium omits
+multipart File postData in its network record; raw encoded wire-body inspection
+is not claimed. Both newly owned processes closed with stdio drained and listener
+PID ownership verified. Root inspected helper and filter success screenshots.
+Final server SHA256:
+`be85a226e724e347c65017d63c3fa04b845b18d8b20dd2525011338e45f996a8`.
+
+Preserved attempts include an initial private decoder ADL build ambiguity fixed
+by renaming only that adapter function. The direct control subtest passed in a
+mixed failing run whose sandboxed HTTP connection failed; the same route binary
+then passed with authorized owned-loopback access (**060300**). The failed mixed
+run is not a successful terminal receipt. Three browser harness failures retain
+the exact source-label locator, the mistaken safe-helper expectation and Chromium's
+missing multipart body. The existing helper has an empty cell key and therefore
+uses the exact raw-table fallback; whole-object expectations were derived from
+unchanged own constructors/serializers without weakening equality or changing
+native oracles. Static CSV-key alignment, exact reopening-field proof, helper
+status-contract corrections and unexecuted helper drafts are also preserved.
+The finalizer/packager has a separate passing independent source review; no
+original payload, archive member or algorithm was opened/executed by packaging.
+
+Full scope remains **86 packages / 387 modules**, **46 / 226 complete**, **201
+strict open units** and **565 unentered logical queries** across six banks.
+No new/replayed reference calls, public admission, history completeness, absence
+proof, root-entry certificate, catalogue promotion or full parity follows.
+Python key/alias identity and temporal/NaN provenance limits remain explicit.
+
+Next bounded plan is
+`build/parity-closures/admitted-next-product-after-log-ltl-review-1/report.json`,
+SHA256 `b1ac103500235707f35ba165b1291dfc4c7cec1b42c992f6aadfaffb055d9ad2`.
+It identifies the **complete280-call LOG attributes bank / all eight methods**
+as the next candidate. Basic native/friendly operations already exist; the gap
+is original typed/raw/ordered mutable caller parameters and complete supplied
+cache shapes. Its counts are prior metadata declarations, not a new canonical
+census. Root must first review/admit exactly the six existing observation banks,
+add the distinct closed observer adapter, reconstruct all280 original IDs and
+bind the unchanged accepted native oracle. No candidate payloads/IDs were opened
+or reconstructed by that plan. Continue the full280 scope after admission; do
+not replace it with convenient valid-cache or immutable-parameter subsets.
+
+## Previous checkpoint: original typed pandas calls reach API/UI — 2026-10-22
 
 `dacc2899` retains the checkpoint in
 `docs/retained-public-observation-pandas-original-call-checkpoint.jsonl.gz`
