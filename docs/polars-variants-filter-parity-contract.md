@@ -6,6 +6,73 @@
 `algo.filtering.polars.variants.variants_filter` in PM4Py 2.7.22 with Polars
 1.44.1. The canonical module remains **partial**, with the remaining gates below.
 
+## Original-call transport: full411 API acceptance and bounded browser checks
+
+The Polars original editor uses the root-frozen full411 wire: exactly engine,
+operation, source_file and call_json at `POST /api/reference-table-variants`.
+The raw descriptor contains schema `minera-polars-variants-original-call-v1`,
+authoritative DataFrame/LazyFrame input_kind and ordered keyword_entries, with
+the source supplied separately. All four public functions remain callable,
+including native unavailable-helper errors and omitted required operands.
+No friendly selector or hidden browser source-kind state overrides the call.
+Raw BOM/CRLF, integer tokens and parameter identities survive editor import,
+transport and exact-call download. Example loading is an explicit replacement.
+
+Original Polars25 fields are isolated from friendly18 and pandas original24.
+Actual eight-field caller controls retain source kind, keyword order, optional
+argument, parameter state and full raw/vector parameter objects, actual invoked
+arm, whether parameters were passed, and whether caller options were explicitly
+supplied. Missing-required calls use source,std::nullopt with implicit native
+default options and parameters_passed=false. Their unused constructed parameters
+remain in snapshots. Native diagnostic phase and actual invocation-returned
+state are recorded separately.
+
+The response-only returned_table_metadata_json artifact has exactly kind
+(EventTable or LazyEventTable), row_count_known, row_count and table_context_json.
+It is captured from the actual returned object before lazy materialization and
+does not add a scan. Complete unchanged-codec table_context_json preserves actual
+columns/types/attributes/metadata/index/categories with empty header rows,
+including its raw fallback/schema marker. Empty header rows make no empty-result
+claim. This diagnostic header can be downloaded but never reused as source/result
+data; only successful complete filtered_table_json becomes a genuine reusable
+File. Metadata can survive a subsequent collect error. Actual source/control
+before/after, exact call and raw response artifacts remain independently usable.
+
+Root's full411 runtime gate passed in67.91seconds: unchanged411 native cases plus
+two own native regressions,411 direct and411 owned HTTP calls. All142 complete
+frames and269 exact native type/phase/message diagnostics (258apply/11collect)
+pass, including35 eager and376 lazy inputs. All25 fields, eight actual caller
+fields and four returned metadata fields are checked; complete source/result/
+control/context artifacts reopen, including whole raw header context restoration.
+All528 mapped snapshot constructors remain bound. Effective native invocation
+arms are274 raw,134 ordered and3 missing-required defaults; the3 constructed
+unused raw parameter objects remain visible with parameters_passed=false.
+
+Nine focused native and legacy pandas491/friendly regression suites passed.
+Receipt validation passed146 integrity tests and the full411 index with1233 exact
+raw slices and6 freshly rehashed cache hits. Frontend checks passed57 focused
+tests, all201 files /9937 tests, TypeScript and production Vite build.
+
+The corrected owned headless browser passed18 bounded checks,16 actual HTTP
+requests and9 byte-exact downloads. Owned examples exercise all four functions,
+eager/lazy and collect-error state, full native context, missing versus None,
+unused/raw/ordered controls, exact raw import, cancellation and actual filtered
+File reuse. Browser examples are distinct from the complete411 native/direct/
+HTTP gate. Both rendered screenshots were inspected and owned server/Chrome
+processes stopped and drained.
+
+Earlier failed attempts remain preserved. The first fixture compile937714 needed
+only the test wrapper's missing public codec include (fixed006bda). The first
+browser57ab2a completed16 requests/9 downloads before its final pandas navigation
+miss: engine changes reset table behavior. The corrected recipe adds the variants
+selection after that switch and uses a fresh output folder; a191bb passes all18
+checks. Neither correction changed the native kernel, driver or oracle vectors.
+
+Original warnings, explain
+plans, Python identities, qualified exception prefixes/error.args and physical
+category runtime contexts remain external. This addition closes no catalogue
+unit:201 strict units and565 unentered grouping queries remain open.
+
 ## Membership and variant representation
 
 Membership defaults to case `case:concept:name`, activity `concept:name`,
