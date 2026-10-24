@@ -818,7 +818,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation, on
     const nextOptions = { ...options, evaluation_family: next };
     if (next === "precision" &&
         nextOptions.evaluation_alignment_variant === "recompos_maximal") {
-      nextOptions.evaluation_alignment_variant = "dijkstra_less_memory";
+      nextOptions.evaluation_alignment_variant = "state_equation_a_star";
       nextOptions.evaluation_alignment_max_total_states = undefined;
       nextOptions.evaluation_alignment_threshold_border_agreement = undefined;
       nextOptions.evaluation_alignment_use_cache = undefined;
@@ -895,7 +895,7 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation, on
   const usesAlignment = family === "replay_fitness" &&
     fitnessVariant !== "token_based";
   const alignmentVariant = options.evaluation_alignment_variant ??
-    "dijkstra_less_memory";
+    "state_equation_a_star";
   const generatorAlignment = alignmentVariant.startsWith("generator_");
   const discountedAlignment = alignmentVariant === "discounted_a_star";
   const decomposedAlignment = alignmentVariant === "recompos_maximal";

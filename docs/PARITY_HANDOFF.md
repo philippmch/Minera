@@ -18,15 +18,22 @@ uncovered banks only in new output directories.
 
 Fresh black-box capture from the cloud container (pip-installed pinned
 release), no retained bank reused. `docs/evaluation-reference-fixtures.json`
-holds 163 log/model pairs captured twice each;
-`minera_evaluation_reference_equivalence_tests` compares every evaluator.
-Simplicity (all three) and token precision are now complete. Fitness,
-generalization and composite agree except two asserted dependency gaps
-(token-replay hidden routing on `seed7_heuristics_noisy`; alignment search
-exhaustion on the unbounded `weighted_silent` net). Alignment and automaton
-precision depend on the reference's tie order among equally cheap alignments
-and stay open; next step is characterizing that order. Details: *Evaluation
-black-box equivalence* in `docs/reference-2.7.22-parity.md`.
+holds 163 log/model pairs, each evaluated on the net read back from its own
+PNML (reference replay order follows in-memory node order) in at least two
+fresh processes; `minera_evaluation_reference_equivalence_tests` compares
+every evaluator. Complete: all three simplicity variants, token,
+Align-ETConformance and automaton-after-align precision, the precision
+dispatcher, alignment fitness and the fitness dispatcher. Automaton precision
+is proven by validity and optimality across the reference's tie choices
+(152/156 attainable, 4 too large to enumerate with Minera's alignment checked
+optimal). Evaluator alignment fitness now defaults to state-equation A*.
+Align-ETC and automaton precision use the reference's name-ordered silent
+search (see the parity doc). Token fitness, generalization and composite
+agree except one asserted token-replay hidden-routing gap on
+`seed1_heuristics_noisy` (owned by token replay). Mined corpus nets depend on
+the capture process's hash seed, so a fresh capture can move that gap to
+another heuristics net. Details: *Evaluation black-box equivalence* in
+`docs/reference-2.7.22-parity.md`.
 
 ## Current continuation: full732 Polars timestamp API/UI acceptance — 2026-10-24
 

@@ -5,13 +5,19 @@
 
 #include "minera/evaluation.hpp"
 #include "minera/pnml.hpp"
+#include "../evaluation_internal.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <exception>
 #include <limits>
+#include <map>
+#include <queue>
+#include <random>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -91,14 +97,9 @@ constexpr KnownDivergence kKnownDivergences[] = {
     // Forward token replay routes hidden transitions differently on this
     // heuristics net; token fitness, generalization and the composite inherit
     // it. Owned by conformance token replay (exact routing still pending).
-    {"seed7_heuristics_noisy", "fitness TOKEN_BASED", "token-replay hidden routing"},
-    {"seed7_heuristics_noisy", "generalization GENERALIZATION_TOKEN", "token-replay hidden routing"},
-    {"seed7_heuristics_noisy", "composite default", "token-replay hidden routing"},
-    // A silent transition pumps tokens without bound. The reference search
-    // returns the optimal alignment, while every native alignment variant
-    // exhausts its state budget. Owned by the Petri alignment engines.
-    {"weighted_silent_", "fitness ALIGNMENT_BASED", "unbounded silent pump exhausts native search"},
-    {"weighted_silent_", "fitness default", "unbounded silent pump exhausts native search"},
+    {"seed1_heuristics_noisy", "fitness TOKEN_BASED", "token-replay hidden routing"},
+    {"seed1_heuristics_noisy", "generalization GENERALIZATION_TOKEN", "token-replay hidden routing"},
+    {"seed1_heuristics_noisy", "composite default", "token-replay hidden routing"},
 };
 
 const KnownDivergence* known_divergence(const ReferenceCase& reference, std::string_view metric) {
@@ -264,42 +265,375 @@ void precision_etconformance_token_equivalence() {
                                      &ReferenceCase::precision_token));
 }
 
-// Both alignment-based precision variants score markings taken from one
-// optimal (prefix) alignment. Where equally cheap alignments place visible or
-// silent moves differently, the reference value follows its search's tie
-// order, which is not a public contract. These variants are therefore
-// reported, not asserted, until that order is characterized.
-void precision_alignment_variants_agreement() {
-  const auto align = [] {
-    Tally tally;
-    for (const auto& item : loaded_cases()) {
-      const auto& expected = item.reference->precision_alignment;
-      if (expected.state == kUnresolved) continue;
-      ++tally.compared;
-      const auto result =
-          evaluate_precision(item.log, item.document, PrecisionVariant::ALIGN_ETCONFORMANCE);
-      if (difference(expected, result.computed, result.error, {result.precision}).empty())
-        ++tally.agreed;
+void precision_align_etconformance_equivalence() {
+  require_coverage("precision ALIGN_ETCONFORMANCE",
+                   compare_precision("precision ALIGN_ETCONFORMANCE",
+                                     PrecisionVariant::ALIGN_ETCONFORMANCE,
+                                     &ReferenceCase::precision_alignment));
+}
+
+void precision_default_dispatch_equivalence() {
+  require_coverage("precision default",
+                   compare_precision("precision default", PrecisionVariant::AUTO,
+                                     &ReferenceCase::precision_auto));
+}
+
+// Standard evaluator costs: synchronous 0, silent 1, log or visible model
+// move 10000.
+constexpr double kDeviationCost = 10000.0;
+
+double standard_cost(const PetriNet& net, const std::vector<AlignmentMove>& moves) {
+  double cost = 0.0;
+  for (const auto& move : moves) {
+    if (move.type == AlignmentMoveType::kLog) cost += kDeviationCost;
+    if (move.type != AlignmentMoveType::kModel) continue;
+    cost += net.transitions().at(move.transition).silent() ? 1.0 : kDeviationCost;
+  }
+  return cost;
+}
+
+// The automaton scores a projection only through its visible labels and the
+// labels available after each of them, so projections that agree on both are
+// interchangeable.
+using ProjectionKey = std::vector<std::pair<std::string, std::set<std::string>>>;
+
+struct AvailableLabels {
+  const PetriNet& net;
+  const std::vector<std::string>& names;
+  std::map<std::vector<int>, std::set<std::string>> cache;
+  const std::set<std::string>& operator()(const std::vector<int>& marking) {
+    auto found = cache.find(marking);
+    if (found == cache.end()) {
+      std::set<std::string> labels;
+      if (!detail::eventually_enabled_labels(net, marking, names, 100000, false, labels))
+        labels = {"<silent closure exhausted>"};
+      found = cache.emplace(marking, std::move(labels)).first;
     }
-    return tally;
-  }();
-  const auto automaton = [] {
-    Tally tally;
-    for (const auto& item : loaded_cases()) {
-      const auto& expected = item.reference->precision_automaton;
-      if (expected.state == kUnresolved) continue;
-      ++tally.compared;
-      const auto result =
-          evaluate_precision(item.log, item.document, PrecisionVariant::AUTOMATON_AFTER_ALIGN);
-      if (difference(expected, result.computed, result.error, {result.precision}).empty())
-        ++tally.agreed;
+    return found->second;
+  }
+};
+
+ProjectionKey projection_key(const std::vector<ProjectedAlignmentMove>& moves,
+                             AvailableLabels& available) {
+  ProjectionKey key;
+  for (const auto& move : moves) key.emplace_back(move.activity, available(move.marking_after));
+  return key;
+}
+
+struct OptimalProjections {
+  bool complete = true;  // every projection was enumerated
+  bool cost_known = false;
+  double cost = 0.0;
+  std::vector<std::vector<ProjectedAlignmentMove>> projections;
+};
+
+// Every distinct visible model projection of the optimal alignments of one
+// trace, from a forward search of the synchronous product followed by a walk
+// of its tight (cost-preserving) edges.
+OptimalProjections optimal_projections(const PetriNet& net, const std::vector<int>& initial,
+                                       const std::vector<int>& final_marking,
+                                       const std::vector<std::string>& trace,
+                                       AvailableLabels& available) {
+  constexpr std::size_t kMaxStates = 200000;
+  constexpr std::size_t kMaxProjections = 512;
+  OptimalProjections result;
+  struct State {
+    std::vector<int> marking;
+    std::size_t position;
+    double distance;
+  };
+  struct Edge {
+    std::size_t from;
+    std::size_t to;
+    std::size_t transition;  // npos for a log move
+    double cost;
+  };
+  std::vector<State> states{{initial, 0, 0.0}};
+  std::map<std::pair<std::vector<int>, std::size_t>, std::size_t> ids{{{initial, 0}, 0}};
+  using Item = std::pair<double, std::size_t>;
+  std::priority_queue<Item, std::vector<Item>, std::greater<>> queue;
+  queue.push({0.0, 0});
+  std::vector<bool> settled(1, false);
+  double best = kInf;
+  const auto successors = [&](std::size_t id, auto&& visit) {
+    const auto marking = states[id].marking;
+    const auto position = states[id].position;
+    if (position < trace.size())
+      visit(marking, position + 1, static_cast<std::size_t>(-1), kDeviationCost);
+    for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+      const auto& transition = net.transitions()[t];
+      if (!petri_transition_enabled(transition, marking)) continue;
+      auto next = marking;
+      fire_petri_transition(transition, next);
+      if (transition.silent()) {
+        visit(next, position, t, 1.0);
+        continue;
+      }
+      visit(next, position, t, kDeviationCost);
+      if (position < trace.size() && net.activities()[*transition.activity] == trace[position])
+        visit(next, position + 1, t, 0.0);
     }
-    return tally;
-  }();
-  std::printf("precision ALIGN_ETCONFORMANCE (report)    %3zu compared, %3zu agree\n",
-              align.compared, align.agreed);
-  std::printf("precision AUTOMATON_AFTER_ALIGN (report)  %3zu compared, %3zu agree\n",
-              automaton.compared, automaton.agreed);
+  };
+  while (!queue.empty()) {
+    const auto [distance, id] = queue.top();
+    queue.pop();
+    if (settled[id] || distance > states[id].distance) continue;
+    if (distance > best) break;
+    settled[id] = true;
+    if (states[id].position == trace.size() && states[id].marking == final_marking) {
+      best = distance;
+      continue;
+    }
+    successors(id, [&](const std::vector<int>& marking, std::size_t position, std::size_t,
+                       double cost) {
+      const auto key = std::make_pair(marking, position);
+      auto found = ids.find(key);
+      if (found == ids.end()) {
+        if (states.size() >= kMaxStates) {
+          result.complete = false;
+          return;
+        }
+        found = ids.emplace(key, states.size()).first;
+        states.push_back({marking, position, kInf});
+        settled.push_back(false);
+      }
+      if (distance + cost < states[found->second].distance) {
+        states[found->second].distance = distance + cost;
+        queue.push({distance + cost, found->second});
+      }
+    });
+    if (!result.complete) return result;
+  }
+  if (best == kInf) {
+    result.complete = false;
+    return result;
+  }
+  result.cost = best;
+  result.cost_known = true;
+  // Tight edges between settled states, then the states that reach the goal.
+  std::vector<Edge> tight;
+  std::vector<std::vector<std::size_t>> incoming(states.size());
+  for (std::size_t id = 0; id < states.size(); ++id) {
+    if (!settled[id] || states[id].distance > best) continue;
+    if (states[id].position == trace.size() && states[id].marking == final_marking) continue;
+    successors(id, [&](const std::vector<int>& marking, std::size_t position,
+                       std::size_t transition, double cost) {
+      const auto found = ids.find({marking, position});
+      if (found == ids.end() || !settled[found->second]) return;
+      if (states[id].distance + cost != states[found->second].distance) return;
+      incoming[found->second].push_back(tight.size());
+      tight.push_back({id, found->second, transition, cost});
+    });
+  }
+  std::vector<bool> useful(states.size(), false);
+  std::vector<std::size_t> stack;
+  for (std::size_t id = 0; id < states.size(); ++id) {
+    if (settled[id] && states[id].distance == best && states[id].position == trace.size() &&
+        states[id].marking == final_marking) {
+      useful[id] = true;
+      stack.push_back(id);
+    }
+  }
+  const auto goals = stack;
+  while (!stack.empty()) {
+    const auto id = stack.back();
+    stack.pop_back();
+    for (const auto edge : incoming[id]) {
+      if (useful[tight[edge].from]) continue;
+      useful[tight[edge].from] = true;
+      stack.push_back(tight[edge].from);
+    }
+  }
+  // Tight edges raise the distance or, at equal distance, the trace position,
+  // so this order visits every edge source before its target.
+  std::vector<std::size_t> order;
+  for (std::size_t id = 0; id < states.size(); ++id)
+    if (useful[id]) order.push_back(id);
+  std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+    return std::make_pair(states[a].distance, states[a].position) <
+           std::make_pair(states[b].distance, states[b].position);
+  });
+  std::map<std::size_t, std::map<ProjectionKey, std::vector<ProjectedAlignmentMove>>> reached;
+  reached[0][{}] = {};
+  for (const auto id : order) {
+    if (id == 0) continue;
+    auto& here = reached[id];
+    for (const auto edge_index : incoming[id]) {
+      const auto& edge = tight[edge_index];
+      if (!useful[edge.from]) continue;
+      for (const auto& [key, moves] : reached[edge.from]) {
+        auto extended = moves;
+        if (edge.transition != static_cast<std::size_t>(-1) &&
+            !net.transitions()[edge.transition].silent()) {
+          extended.push_back({net.activities()[*net.transitions()[edge.transition].activity],
+                              edge.transition, states[edge.from].marking, states[id].marking});
+        }
+        here.emplace(projection_key(extended, available), std::move(extended));
+        if (here.size() > kMaxProjections) {
+          result.complete = false;
+          return result;
+        }
+      }
+    }
+  }
+  std::map<ProjectionKey, std::vector<ProjectedAlignmentMove>> distinct;
+  for (const auto goal : goals)
+    for (const auto& [key, moves] : reached[goal]) distinct.emplace(key, moves);
+  for (auto& [key, moves] : distinct) result.projections.push_back(std::move(moves));
+  return result;
+}
+
+// Automaton-after-align scores one optimal alignment per trace variant, and
+// the reference picks among equally cheap alignments by its search order,
+// which is not a public contract. Each case therefore enumerates every optimal
+// alignment of every variant and scores their combinations with Minera's
+// automaton (all of them up to kMaxCombinations, otherwise a bounded search):
+// the reference value and Minera's value must both be attainable. An exact
+// match is counted separately.
+void precision_automaton_after_align_tie_contract() {
+  constexpr std::size_t kMaxCombinations = 4096;
+  constexpr std::size_t kSearchSteps = 5000;
+  Tally tally;
+  std::size_t exact = 0;
+  std::size_t optimal_only = 0;
+  for (const auto& item : loaded_cases()) {
+    const auto& expected = item.reference->precision_automaton;
+    if (expected.state == kUnresolved) continue;
+    ++tally.compared;
+    const auto native =
+        evaluate_precision(item.log, item.document, PrecisionVariant::AUTOMATON_AFTER_ALIGN);
+    const auto fail = [&](const std::string& detail) {
+      ++failures;
+      std::fprintf(stderr, "%s / precision AUTOMATON_AFTER_ALIGN: %s\n", item.reference->name,
+                   detail.c_str());
+    };
+    if (expected.state == kError || !native.computed) {
+      const auto detail = difference(expected, native.computed, native.error, {native.precision});
+      if (detail.empty()) ++tally.agreed, ++exact;
+      else fail(detail);
+      continue;
+    }
+    if (same(native.precision, expected.values[0])) ++exact;
+
+    std::vector<int> initial(item.document.initial_marking.begin(),
+                             item.document.initial_marking.end());
+    std::vector<int> final_marking(item.document.final_marking.begin(),
+                                   item.document.final_marking.end());
+    const auto& net = item.document.net;
+    AvailableLabels available_labels{net, item.document.transition_ids, {}};
+    // Distinct projections per variant. Minera's own alignment must be
+    // optimal and its projection one of them.
+    std::vector<std::vector<std::vector<ProjectedAlignmentMove>>> choices;
+    std::vector<std::uint64_t> counts;
+    std::vector<std::size_t> native_pick;
+    std::size_t combinations = 1;
+    bool valid = true;
+    bool complete = true;
+    for (const auto& chosen : native.alignment_result.variants) {
+      auto optimal =
+          optimal_projections(net, initial, final_marking, chosen.activities, available_labels);
+      if (!optimal.complete) {
+        // Too many optimal alignments to enumerate: Minera's alignment must
+        // still be optimal, and the reference choice stays unchecked.
+        complete = false;
+        if (!optimal.cost_known || standard_cost(net, chosen.moves) != optimal.cost) valid = false;
+        continue;
+      }
+      const auto chosen_key = projection_key(chosen.projected_model_moves, available_labels);
+      const auto own = std::find_if(optimal.projections.begin(), optimal.projections.end(),
+                                    [&](const auto& other) {
+                                      return projection_key(other, available_labels) == chosen_key;
+                                    });
+      if (standard_cost(net, chosen.moves) != optimal.cost || own == optimal.projections.end()) {
+        valid = false;
+        break;
+      }
+      native_pick.push_back(static_cast<std::size_t>(own - optimal.projections.begin()));
+      combinations = std::min(combinations * optimal.projections.size(), kMaxCombinations + 1);
+      choices.push_back(std::move(optimal.projections));
+      counts.push_back(chosen.count);
+    }
+    if (!valid) {
+      fail("Minera's alignment is not among the optimal alignments");
+      continue;
+    }
+    if (!complete) {
+      ++optimal_only;
+      std::printf("  %s: too many optimal alignments to enumerate; Minera's is optimal\n",
+                  item.reference->name);
+      continue;
+    }
+    const auto score_of = [&](const std::vector<std::size_t>& pick) {
+      std::vector<detail::AutomatonPrecisionPath> paths;
+      for (std::size_t v = 0; v < choices.size(); ++v)
+        paths.push_back({counts[v], choices[v][pick[v]]});
+      const auto score = detail::automaton_after_align_precision(
+          net, initial, paths, item.document.transition_ids, 100000, false,
+          &available_labels.cache);
+      return score.computed ? score.precision : kNaN;
+    };
+    const double target = expected.values[0];
+    const bool native_attainable = same(score_of(native_pick), native.precision);
+    bool reference_attainable = false;
+    if (combinations <= kMaxCombinations) {
+      std::vector<std::size_t> pick(choices.size(), 0);
+      while (!reference_attainable) {
+        reference_attainable = same(score_of(pick), target);
+        std::size_t v = 0;
+        while (v < pick.size() && ++pick[v] == choices[v].size()) pick[v++] = 0;
+        if (v == pick.size()) break;
+      }
+    } else {
+      // Too many combinations to enumerate: a seeded local search changes one
+      // variant's alignment at a time, keeping changes that do not move the
+      // score away from the reference value. It starts from Minera's choice
+      // and from uniform choices (the same rank of every variant's
+      // projections, in both directions).
+      std::vector<std::vector<std::size_t>> starts{native_pick};
+      for (std::size_t rank = 0; rank < 4; ++rank) {
+        std::vector<std::size_t> low, high;
+        for (const auto& options : choices) {
+          low.push_back(std::min(rank, options.size() - 1));
+          high.push_back(options.size() - 1 - std::min(rank, options.size() - 1));
+        }
+        starts.push_back(std::move(low));
+        starts.push_back(std::move(high));
+      }
+      std::mt19937 random(7);
+      for (auto pick : starts) {
+        double score = score_of(pick);
+        for (std::size_t step = 0; step < kSearchSteps && !same(score, target); ++step) {
+          const auto v = random() % pick.size();
+          const auto kept = pick[v];
+          pick[v] = random() % choices[v].size();
+          const double candidate = score_of(pick);
+          if (std::abs(candidate - target) <= std::abs(score - target)) score = candidate;
+          else pick[v] = kept;
+        }
+        reference_attainable = same(score, target);
+        if (reference_attainable) break;
+      }
+    }
+    if (reference_attainable && native_attainable) {
+      ++tally.agreed;
+    } else {
+      char buffer[200];
+      std::snprintf(buffer, sizeof buffer,
+                    "reference %.17g %s, Minera %.17g %s over %zu%s optimal choices",
+                    expected.values[0], reference_attainable ? "attainable" : "not attainable",
+                    native.precision, native_attainable ? "attainable" : "not attainable",
+                    combinations, combinations > kMaxCombinations ? "+ (searched)" : "");
+      fail(buffer);
+    }
+  }
+  std::printf("%-38s %3zu compared, %3zu attainable, %zu exact, %zu optimal only\n",
+              "precision AUTOMATON_AFTER_ALIGN (ties)", tally.compared, tally.agreed, exact,
+              optimal_only);
+  if (tally.compared < 100) {
+    ++failures;
+    std::fprintf(stderr, "precision AUTOMATON_AFTER_ALIGN compared only %zu cases\n",
+                 tally.compared);
+  }
 }
 
 void generalization_token_equivalence() {
@@ -371,7 +705,9 @@ int main() {
   replay_fitness_alignment_based_equivalence();
   replay_fitness_default_dispatch_equivalence();
   precision_etconformance_token_equivalence();
-  precision_alignment_variants_agreement();
+  precision_align_etconformance_equivalence();
+  precision_default_dispatch_equivalence();
+  precision_automaton_after_align_tie_contract();
   generalization_token_equivalence();
   simplicity_arc_degree_equivalence();
   simplicity_extended_cardoso_equivalence();

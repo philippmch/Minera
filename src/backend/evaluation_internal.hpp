@@ -1,0 +1,45 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+
+#include "minera/conformance.hpp"
+#include "minera/petri_net.hpp"
+
+namespace minera::detail {
+
+// One aligned trace variant as automaton-after-align precision sees it: the
+// variant's trace count and the visible model moves of one optimal alignment.
+struct AutomatonPrecisionPath {
+  std::uint64_t count = 0;
+  std::vector<ProjectedAlignmentMove> moves;
+};
+
+struct AutomatonPrecisionScore {
+  bool computed = true;
+  double precision = 1.0;
+};
+
+// Labels the evaluator observes as eventually enabled at a marking, searching
+// silent transitions in transition-name order (index order without names).
+bool eventually_enabled_labels(const PetriNet& net, const std::vector<int>& marking,
+                               const std::vector<std::string>& transition_names,
+                               std::size_t max_states, bool use_task_ids,
+                               std::set<std::string>& labels);
+
+// Scores the prefix automaton of the given alignments. Reference ties between
+// equally cheap alignments change the paths, so equivalence checks score every
+// optimal choice through this same function. A cache keeps the labels
+// available at each marking across calls on the same net and options.
+AutomatonPrecisionScore automaton_after_align_precision(
+    const PetriNet& net, const std::vector<int>& initial_marking,
+    const std::vector<AutomatonPrecisionPath>& paths,
+    const std::vector<std::string>& transition_names, std::size_t max_states,
+    bool use_task_ids,
+    std::map<std::vector<int>, std::set<std::string>>* available_cache = nullptr);
+
+}  // namespace minera::detail

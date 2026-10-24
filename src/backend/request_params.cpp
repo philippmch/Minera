@@ -1713,6 +1713,9 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
     if (!supplied("evaluation_alignment_cost_profile")) {
       alignment_options.cost_profile = AlignmentCostProfile::kStandard;
     }
+    if (!supplied("evaluation_alignment_variant")) {
+      alignment_options.variant = AlignmentVariant::kStateEquationAStar;
+    }
     params.replay_fitness_options.alignment_options =
         std::move(alignment_options);
   }

@@ -3,6 +3,7 @@
 #include "minera/pnml.hpp"
 #include "cyclomatic_unicode.hpp"
 #include "root_cause_unicode.hpp"
+#include "evaluation_internal.hpp"
 #include "petri_replay_internal.hpp"
 
 #include <algorithm>
@@ -69,17 +70,49 @@ std::vector<Marking> closure(const PetriNet& n, Marking start,
   return out;
 }
 
-bool enabled_labels(const PetriNet& n, const Marking& m, std::size_t cap,
-                    bool use_task_ids, std::set<std::string>& labels) {
+// Labels the pinned evaluator observes as eventually enabled from a marking.
+// It walks a worklist of transitions in name order. Every silent firing
+// appends the transitions enabled afterwards and moves each of them to that
+// newest marking, even while an earlier entry is still waiting. A transition
+// is handled once per marking, so a silent transition used on one branch can
+// be unavailable on another, and visible labels behind it are not reported.
+std::vector<std::size_t> transitions_in_name_order(const PetriNet& n,
+                                                   const std::vector<std::string>& names) {
+  std::vector<std::size_t> order(n.transitions().size());
+  std::iota(order.begin(), order.end(), std::size_t{0});
+  if (names.size() == order.size())
+    std::stable_sort(order.begin(), order.end(),
+                     [&](std::size_t a, std::size_t b) { return names[a] < names[b]; });
+  return order;
+}
+
+bool eventually_enabled_labels(const PetriNet& n, const Marking& m,
+                               const std::vector<std::size_t>& order, std::size_t cap,
+                               bool use_task_ids, std::set<std::string>& labels) {
   labels.clear();
-  std::vector<Marking> states;
-  if (!silent_closure(n, m, cap, states)) return false;
-  for (const auto& state : states) {
-    for (std::size_t i = 0; i < n.transitions().size(); ++i) {
-      const auto& t = n.transitions()[i];
-      if (t.silent() || !enabled(t, state)) continue;
-      labels.insert(use_task_ids ? "t" + std::to_string(i)
-                                 : n.activities()[*t.activity]);
+  if (cap == 0) return false;
+  std::vector<std::size_t> work;
+  std::vector<Marking> at(n.transitions().size());
+  for (const auto i : order) {
+    if (!enabled(n.transitions()[i], m)) continue;
+    work.push_back(i);
+    at[i] = m;
+  }
+  std::set<std::pair<std::size_t, Marking>> handled;
+  for (std::size_t k = 0; k < work.size(); ++k) {
+    const auto i = work[k];
+    if (!handled.emplace(i, at[i]).second) continue;
+    const auto& t = n.transitions()[i];
+    if (!t.silent()) {
+      labels.insert(use_task_ids ? "t" + std::to_string(i) : n.activities()[*t.activity]);
+      continue;
+    }
+    const auto next = fire(t, at[i]);
+    for (const auto j : order) {
+      if (!enabled(n.transitions()[j], next)) continue;
+      if (work.size() >= cap) return false;
+      work.push_back(j);
+      at[j] = next;
     }
   }
   return true;
@@ -552,7 +585,7 @@ bool has_reachable_final_marking(const PetriNet& net,
   EventLog probe;
   probe.traces.push_back(Trace{});
   AlignmentOptions options{
-      AlignmentVariant::kDijkstraLessMemory,
+      AlignmentVariant::kStateEquationAStar,
       AlignmentCostProfile::kStandard};
   options.initial_marking = initial_marking;
   options.final_marking = final_marking;
@@ -1440,6 +1473,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
 
   if (variant == PrecisionVariant::ALIGN_ETCONFORMANCE) {
     const auto prefix_net = unit_output_net(net);
+    const auto name_order = transitions_in_name_order(prefix_net, options.transition_names);
     const auto prefixes = collect_prefixes(log, activity_attribute);
     double enabled_total = 0.0;
     double escaping_total = 0.0;
@@ -1463,7 +1497,8 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
       std::set<std::string> available;
       for (const auto& marking : markings) {
         std::set<std::string> local;
-        if (!enabled_labels(prefix_net, marking, options.max_states, false, local)) {
+        if (!eventually_enabled_labels(prefix_net, marking, name_order, options.max_states,
+                                       false, local)) {
           out.computed = false;
           out.exhausted = true;
           out.error = "silent closure state cap exceeded";
@@ -1490,6 +1525,40 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
   }
   out.alignment_detail_present = true;
 
+  std::vector<detail::AutomatonPrecisionPath> paths;
+  paths.reserve(out.alignment_result.variants.size());
+  for (const auto& variant_alignment : out.alignment_result.variants)
+    paths.push_back({variant_alignment.count, variant_alignment.projected_model_moves});
+  const auto score = detail::automaton_after_align_precision(
+      net, initial_marking, paths, options.transition_names, options.max_states,
+      options.use_task_ids);
+  if (!score.computed) {
+    out.computed = false;
+    out.exhausted = true;
+    out.error = "silent closure state cap exceeded";
+    return out;
+  }
+  out.precision = score.precision;
+  return out;
+}
+}  // namespace
+
+namespace detail {
+
+bool eventually_enabled_labels(const PetriNet& net, const std::vector<int>& marking,
+                               const std::vector<std::string>& transition_names,
+                               std::size_t max_states, bool use_task_ids,
+                               std::set<std::string>& labels) {
+  return minera::eventually_enabled_labels(net, marking,
+                                           transitions_in_name_order(net, transition_names),
+                                           max_states, use_task_ids, labels);
+}
+
+AutomatonPrecisionScore automaton_after_align_precision(
+    const PetriNet& net, const std::vector<int>& initial_marking,
+    const std::vector<AutomatonPrecisionPath>& paths,
+    const std::vector<std::string>& transition_names, std::size_t max_states,
+    bool use_task_ids, std::map<std::vector<int>, std::set<std::string>>* available_cache) {
   // Automaton-after-align projects each optimal alignment to visible model
   // moves.  A shared prefix is weighted by variants that have another move;
   // terminal projected prefixes are never scored.
@@ -1500,14 +1569,14 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     std::vector<Marking> markings;
   };
   std::vector<Node> trie(1);
-  for (const auto& variant_alignment : out.alignment_result.variants) {
+  for (const auto& path : paths) {
     auto& root = trie[0];
-    root.frequency += variant_alignment.count;
+    root.frequency += path.count;
     root.markings.push_back(initial_marking);
     std::size_t node = 0;
-    for (std::size_t i = 0; i < variant_alignment.projected_model_moves.size(); ++i) {
-      const auto& move = variant_alignment.projected_model_moves[i];
-      const std::string symbol = options.use_task_ids
+    for (std::size_t i = 0; i < path.moves.size(); ++i) {
+      const auto& move = path.moves[i];
+      const std::string symbol = use_task_ids
                                      ? "t" + std::to_string(move.transition)
                                      : move.activity;
       trie[node].observed.insert(symbol);
@@ -1519,37 +1588,45 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
         child = trie[node].children.find(symbol);
       }
       node = child->second;
-      if (i + 1 < variant_alignment.projected_model_moves.size()) {
-        trie[node].frequency += variant_alignment.count;
+      if (i + 1 < path.moves.size()) {
+        trie[node].frequency += path.count;
         trie[node].markings.push_back(move.marking_after);
       }
     }
   }
+  const auto order = transitions_in_name_order(net, transition_names);
+  AutomatonPrecisionScore score;
   double enabled_total = 0.0;
   double escaping_total = 0.0;
   for (const auto& node : trie) {
     if (node.frequency == 0) continue;
     std::set<std::string> available;
     for (const auto& marking : node.markings) {
+      if (available_cache) {
+        if (const auto cached = available_cache->find(marking); cached != available_cache->end()) {
+          available.insert(cached->second.begin(), cached->second.end());
+          continue;
+        }
+      }
       std::set<std::string> local;
-      if (!enabled_labels(net, marking, options.max_states, options.use_task_ids, local)) {
-        out.computed = false;
-        out.exhausted = true;
-        out.error = "silent closure state cap exceeded";
-        return out;
+      if (!minera::eventually_enabled_labels(net, marking, order, max_states, use_task_ids, local)) {
+        score.computed = false;
+        return score;
       }
       available.insert(local.begin(), local.end());
+      if (available_cache) available_cache->emplace(marking, std::move(local));
     }
     enabled_total += double(node.frequency) * available.size();
     for (const auto& symbol : available)
       if (!node.observed.count(symbol)) escaping_total += double(node.frequency);
   }
-  out.precision = enabled_total == 0.0
-                     ? 1.0
-                     : std::clamp(1.0 - escaping_total / enabled_total, 0.0, 1.0);
-  return out;
+  score.precision = enabled_total == 0.0
+                        ? 1.0
+                        : std::clamp(1.0 - escaping_total / enabled_total, 0.0, 1.0);
+  return score;
 }
-}  // namespace
+
+}  // namespace detail
 
 PrecisionResult evaluate_precision(const EventLog& l, const PetriNet& n,
                                    PrecisionVariant v) {
