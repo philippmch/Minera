@@ -293,6 +293,54 @@ void precision_automaton_after_align_contract() {
   assert(close_to(result.precision, 1.0));
 }
 
+// After A, E needs the silent transition that also feeds a join, while G's
+// loop has its own silent transition. The pinned evaluator searches silent
+// transitions in name order and handles each transition once per marking,
+// moving waiting entries to the newest marking: when G's silent transition
+// sorts first ("s12" before "s9"), E is never reported as available.
+PnmlDocument silent_name_order_net(const std::string& to_join, const std::string& to_loop) {
+  const auto place = [](const std::string& id) { return "<place id=\"" + id + "\"/>"; };
+  const auto visible = [](const std::string& id) {
+    return "<transition id=\"" + id + "\"><name><text>" + id + "</text></name></transition>";
+  };
+  const auto silent = [](const std::string& id) {
+    return "<transition id=\"" + id + "\"><name><text>" + id +
+           "</text></name><toolspecific tool=\"ProM\" version=\"6.4\" "
+           "activity=\"$invisible$\" localNodeID=\"" + id + "\"/></transition>";
+  };
+  std::string arcs;
+  std::size_t index = 0;
+  for (const auto& [source, target] : std::vector<std::pair<std::string, std::string>>{
+           {"i", "A"}, {"A", "p11"}, {"A", "p16"}, {"A", "p7"}, {"p11", to_join},
+           {to_join, "p9"}, {"p16", to_loop}, {to_loop, "p15"}, {"p15", "G"}, {"G", "p16"},
+           {"p16", "join"}, {"p7", "join"}, {"p9", "join"}, {"join", "p5"}, {"p5", "go"},
+           {"go", "p18"}, {"p18", "E"}, {"E", "o"}})
+    arcs += "<arc id=\"a" + std::to_string(index++) + "\" source=\"" + source +
+            "\" target=\"" + target + "\"/>";
+  std::string places = "<place id=\"i\"><initialMarking><text>1</text></initialMarking></place>";
+  for (const auto* id : {"p11", "p16", "p7", "p9", "p15", "p5", "p18", "o"}) places += place(id);
+  PnmlImportOptions import;
+  import.public_marking_semantics = true;
+  return parse_pnml_document(
+      "<pnml><net id=\"order\"><page id=\"page\">" + places + visible("A") + visible("G") +
+          visible("E") + silent(to_join) + silent(to_loop) + silent("join") + silent("go") +
+          arcs + "</page><finalmarkings><marking><place idref=\"o\"><text>1</text></place>"
+          "</marking></finalmarkings></net></pnml>",
+      import);
+}
+
+void precision_silent_search_name_order_contract() {
+  const auto blocked = silent_name_order_net("s9", "s12");
+  const auto reached = silent_name_order_net("sa", "sz");
+  const auto align = PrecisionVariant::ALIGN_ETCONFORMANCE;
+  const auto automaton = PrecisionVariant::AUTOMATON_AFTER_ALIGN;
+  assert(close_to(evaluate_precision(log({{"A", "E"}}), blocked, align).precision, 0.5));
+  assert(close_to(evaluate_precision(log({{"A", "E"}}), reached, align).precision, 2.0 / 3.0));
+  assert(close_to(evaluate_precision(log({{"A", "E"}}), blocked, automaton).precision, 0.5));
+  assert(close_to(evaluate_precision(log({{"A", "E"}}), reached, automaton).precision,
+                  2.0 / 3.0));
+}
+
 void precision_initial_prefix_contract() {
   // The root prefix is scored as well as the marking after A: A is the only
   // initial choice, then B and C are both enabled and C escapes the log.
@@ -1823,6 +1871,7 @@ int main(int argc, char** argv) {
   precision_etconformance_token_contract();
   precision_align_etconformance_contract();
   precision_automaton_after_align_contract();
+  precision_silent_search_name_order_contract();
   precision_initial_prefix_contract();
   precision_excludes_unfit_prefix_contract();
   precision_task_ids_contract();

@@ -74,7 +74,7 @@ struct ReplayFitnessOptions {
   std::string activity_attribute = "concept:name";
   TokenReplayVariant token_replay_variant = TokenReplayVariant::kForward;
   AlignmentOptions alignment_options{
-      AlignmentVariant::kDijkstraLessMemory, AlignmentCostProfile::kStandard};
+      AlignmentVariant::kStateEquationAStar, AlignmentCostProfile::kStandard};
   // Engaging this option selects decomposed recomposition instead of the
   // ordinary Petri-net alignment engine.
   std::optional<DecomposedAlignmentOptions> decomposed_alignment_options;

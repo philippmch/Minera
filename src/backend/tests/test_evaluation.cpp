@@ -320,8 +320,7 @@ void default_variant_dispatch_follows_soundness() {
   auto prec=evaluate_precision(log({{"A","B"}}),sound);
   assert(fit.variant==ReplayFitnessVariant::ALIGNMENT_BASED);
   assert(fit.alignment_result.variant ==
-         AlignmentVariant::kDijkstraLessMemory);
-  assert(fit.alignment_result.diagnostics.lp_solved == 0);
+         AlignmentVariant::kStateEquationAStar);
   assert(prec.variant==PrecisionVariant::ALIGN_ETCONFORMANCE);
 
   ReplayFitnessOptions capped;

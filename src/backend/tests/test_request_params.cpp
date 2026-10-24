@@ -3578,7 +3578,7 @@ void parse_evaluation_params_defaults_and_variants() {
   assert(defaults.replay_fitness_options.token_replay_variant ==
          minera::TokenReplayVariant::kForward);
   assert(defaults.replay_fitness_options.alignment_options.variant ==
-         minera::AlignmentVariant::kDijkstraLessMemory);
+         minera::AlignmentVariant::kStateEquationAStar);
   assert(defaults.replay_fitness_options.alignment_options.cost_profile ==
          minera::AlignmentCostProfile::kStandard);
   assert(!defaults.replay_fitness_options.decomposed_alignment_options);

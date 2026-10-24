@@ -229,6 +229,10 @@ def capture(case):
         path = os.path.join(directory, 'net.pnml')
         pm4py.write_pnml(net, im, fm, path)
         pnml = Path(path).read_text(encoding='utf-8')
+        # Metrics are taken on the net read back from the shipped PNML: the
+        # reference's replay order follows its in-memory node order, so this
+        # makes the expected values belong to exactly the document tested.
+        net, im, fm = pm4py.read_pnml(path)
     params = {'show_progress_bar': False}
     calls = {
         'fitness_token': lambda: fitness.apply(log, net, im, fm, variant=fitness.Variants.TOKEN_BASED, parameters=params),
@@ -271,6 +275,10 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('docs/evaluation-reference-fixtures.json'))
     parser.add_argument('--seeds', type=int, default=12)
     parser.add_argument('--worker', type=Path)
+    parser.add_argument('--runs', type=int, default=2,
+                        help='independent children per case (at least 2)')
+    parser.add_argument('--recapture', action='append', default=[],
+                        help='case name to capture again (repeatable), e.g. with more --runs')
     args = parser.parse_args()
     if args.worker:
         save(args.output, capture(json.loads(args.worker.read_text(encoding='utf-8'))))
@@ -282,10 +290,19 @@ def main():
             'call_seconds': CALL_SECONDS, 'observations': [], 'unresolved': []}
     if args.output.exists():
         # Resume: an existing capture of the identical corpus keeps its records.
+        # Mined nets depend on the parent's hash seed, so a resume compares
+        # case names and reuses each recorded case's own inputs.
         previous = json.loads(args.output.read_text(encoding='utf-8'))
-        if previous['corpus_sha256'] != digest:
+        recorded = {r['name'] for r in previous['observations']} | {r['name'] for r in previous['unresolved']}
+        if previous['corpus_sha256'] != digest and not recorded <= {c['name'] for c in cases}:
             raise ValueError('Changed corpus: use a different output path')
+        stored = {r['name']: r for r in previous['observations']}
+        cases = [{k: stored[c['name']][k] for k in c} if c['name'] in stored else c for c in cases]
         data = previous
+    if args.runs < 2:
+        parser.error('--runs must be at least 2')
+    data['observations'] = [r for r in data['observations'] if r['name'] not in args.recapture]
+    data['unresolved'] = [r for r in data['unresolved'] if r['name'] not in args.recapture]
     done = {r['name'] for r in data['observations']} | {r['name'] for r in data['unresolved']}
     with tempfile.TemporaryDirectory() as work:
         for index, case in enumerate(cases):
@@ -294,10 +311,10 @@ def main():
             source = Path(work) / f'{index}.json'
             save(source, case)
             runs, reason, stderr = [], None, b''
-            # Two independent children (fresh hash randomization each): a
-            # metric whose public value differs between them is recorded as
+            # Independent children (fresh hash randomization each): a metric
+            # whose public value differs between any of them is recorded as
             # nondeterministic instead of as an expected result.
-            for attempt in range(2):
+            for attempt in range(args.runs):
                 output = Path(work) / f'{index}-{attempt}.json'
                 child = subprocess.Popen([sys.executable, '-I', '-B', str(Path(__file__).resolve()),
                                           '--worker', str(source), '--output', str(output)],
@@ -314,12 +331,16 @@ def main():
                 runs.append(json.loads(output.read_text(encoding='utf-8')))
             if reason is None:
                 merged = runs[0]
+                strip = lambda r: {k: v for k, v in r.items() if k != 'seconds'}
                 for key, first in merged['results'].items():
-                    second = runs[1]['results'][key]
-                    strip = lambda r: {k: v for k, v in r.items() if k != 'seconds'}
-                    if strip(first) != strip(second):
+                    observed = []
+                    for run in runs:
+                        if strip(run['results'][key]) not in observed:
+                            observed.append(strip(run['results'][key]))
+                    if len(observed) > 1:
                         merged['results'][key] = {'unresolved': 'nondeterministic',
-                                                  'observed': [strip(first), strip(second)],
+                                                  'observed': observed,
+                                                  'runs': len(runs),
                                                   'seconds': first['seconds']}
                 data['observations'].append(dict(case, **merged))
             else:

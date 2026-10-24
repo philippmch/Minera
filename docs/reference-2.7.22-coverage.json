@@ -3669,8 +3669,94 @@
           "symbol": "AUTOMATON_AFTER_ALIGN"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py"
+      ],
+      "proofs": {
+        "ETCONFORMANCE_TOKEN": {
+          "selector": "ETCONFORMANCE_TOKEN",
+          "binding": {
+            "selector": "ETCONFORMANCE_TOKEN",
+            "modules": [
+              "algo.evaluation.precision.variants.etconformance_token"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "ETCONFORMANCE_TOKEN"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "PrecisionVariant::ETCONFORMANCE_TOKEN"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "precision_etconformance_token_equivalence"
+            }
+          ]
+        },
+        "ALIGN_ETCONFORMANCE": {
+          "selector": "ALIGN_ETCONFORMANCE",
+          "binding": {
+            "selector": "ALIGN_ETCONFORMANCE",
+            "modules": [
+              "algo.evaluation.precision.variants.align_etconformance"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "ALIGN_ETCONFORMANCE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "PrecisionVariant::ALIGN_ETCONFORMANCE"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "precision_align_etconformance_equivalence"
+            }
+          ]
+        },
+        "AUTOMATON_AFTER_ALIGN": {
+          "selector": "AUTOMATON_AFTER_ALIGN",
+          "binding": {
+            "selector": "AUTOMATON_AFTER_ALIGN",
+            "modules": [
+              "algo.evaluation.precision.variants.automaton_after_align"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "AUTOMATON_AFTER_ALIGN"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "PrecisionVariant::AUTOMATON_AFTER_ALIGN"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "precision_automaton_after_align_tie_contract"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.evaluation.precision.dfg",
@@ -3797,6 +3883,7 @@
         "src/backend/evaluation.cpp",
         "src/backend/tests/test_evaluation_reference_equivalence.cpp",
         "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
         "scripts/capture-evaluation-reference.py",
         "scripts/generate-evaluation-reference-tests.py"
       ],
@@ -11428,8 +11515,33 @@
           "selector": "ALIGN_ETCONFORMANCE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.precision.variants.align_etconformance",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "PrecisionVariant::ALIGN_ETCONFORMANCE"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+            "executable": "minera_evaluation_reference_equivalence_tests",
+            "case": "precision_align_etconformance_equivalence"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.precision.variants.automaton_after_align",
@@ -11442,8 +11554,33 @@
           "selector": "AUTOMATON_AFTER_ALIGN"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.precision.variants.automaton_after_align",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "PrecisionVariant::AUTOMATON_AFTER_ALIGN"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+            "executable": "minera_evaluation_reference_equivalence_tests",
+            "case": "precision_automaton_after_align_tie_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.precision.variants.etconformance_token",
@@ -11463,6 +11600,7 @@
         "src/backend/evaluation.cpp",
         "src/backend/tests/test_evaluation_reference_equivalence.cpp",
         "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
         "scripts/capture-evaluation-reference.py",
         "scripts/generate-evaluation-reference-tests.py"
       ],
@@ -11494,8 +11632,33 @@
           "selector": "ALIGNMENT_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.replay_fitness.variants.alignment_based",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "ReplayFitnessVariant::ALIGNMENT_BASED"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+            "executable": "minera_evaluation_reference_equivalence_tests",
+            "case": "replay_fitness_alignment_based_equivalence"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.replay_fitness.variants.token_replay",
@@ -11610,6 +11773,7 @@
         "src/backend/evaluation.cpp",
         "src/backend/tests/test_evaluation_reference_equivalence.cpp",
         "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
         "scripts/capture-evaluation-reference.py",
         "scripts/generate-evaluation-reference-tests.py"
       ],
