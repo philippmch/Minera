@@ -1,0 +1,47 @@
+{
+  "schema": "minera-log-timestamp-original-call-checkpoint-manifest-v1",
+  "status": "pass",
+  "source_head": "bb0c79c0844be735ffc8752abddc1fd66c06c592",
+  "capsule": {
+    "bytes": 832341,
+    "path": "docs/retained-log-timestamp-original-call-checkpoint.jsonl.gz",
+    "sha256": "f487e3f6ce271eceb5548456efebaaf10b2c306b430c61a731a23f73c4cdf4a7"
+  },
+  "plan_sha256": "42b5e93bcb186db98ecf12417a43ef76f86bdb265dddd59379d0e1cf3c0cccf6",
+  "owned_members": 84,
+  "external_declarations": 21,
+  "complete_plan_embedded_in_capsule_header": true,
+  "write_tool_terminal": "6bec17",
+  "readback_tool_terminal": "ff388e",
+  "independent_readback": {
+    "absence_authority": false,
+    "all_decoded_complete_members_match_current_OWN_bytes": true,
+    "capsule": {
+      "bytes": 832341,
+      "path": "docs/retained-log-timestamp-original-call-checkpoint.jsonl.gz",
+      "sha256": "f487e3f6ce271eceb5548456efebaaf10b2c306b430c61a731a23f73c4cdf4a7"
+    },
+    "catalogue_promoted": false,
+    "external_declarations": 21,
+    "external_targets_followed": false,
+    "history_complete": false,
+    "new_call_authority": false,
+    "owned_members": 84,
+    "plan_sha256": "42b5e93bcb186db98ecf12417a43ef76f86bdb265dddd59379d0e1cf3c0cccf6",
+    "reference_calls": 0,
+    "schema": "minera-log-timestamp-checkpoint-independent-readback-v1",
+    "status": "pass"
+  },
+  "source_proof": {
+    "bytes": 5371,
+    "path": "build/parity-closures/log-timestamp-original-call-finalization-1/source-equality.json",
+    "sha256": "342ea09a92955e56e19d93dabd8b1f9c1756f75d8ac595e4a1adc2480dbdb591"
+  },
+  "source_proof_file_count": 16,
+  "external_targets_followed_during_package": false,
+  "readback_scope": "Decode all84 complete OWN members, verify whole pins/current bytes; compare21 inert declarations without target following",
+  "historical_input_limits": "Original observer/Python identity limitations remain; this checkpoint grants no catalogue promotion or new-call authority",
+  "strict_open": 201,
+  "unentered_queries": 565,
+  "reference_calls": 0
+}
