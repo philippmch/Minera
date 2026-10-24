@@ -53,16 +53,26 @@ naive-Datetime LazyFrame collect diagnostic and reordered-keyword import; four
 screenshots inspected. Report SHA256
 `e8229a7b1d2200c61fc93ab510c8b3555841ca8a8bb7f835ddedc0dfb44efff3`.
 
-An independent review agent was started on the Polars admission/transport
-scripts but stopped unfinished when work moved off this machine; no review
-result exists. ROOT review only, as for pandas.
+A post-execution independent source review of both table families now exists
+(`docs/table-timestamp-independent-review-1/`, review.json SHA256
+`f5bc6bd254167e97d6fe277a9fc44302e7a380c6596dc0923282e23dfce1edb8`). It ran in
+the cloud from the sealed checkpoint members only (original inputs absent) and
+found no blocking issue: oracle/vector pins, all 861/732 transport-vs-oracle
+cases, fresh-namespace mapper loading and the 23-field C++ checks hold. Minor,
+still open: M1 plan.py hardcodes five validation flags and drops non-suffix
+members silently; M2 the Polars census trusts the producer's input_unchanged
+flag instead of comparing an input-after snapshot (so Polars zero-mutation is
+producer-asserted, not independently measured); M3 path() skips the symlink
+check for nonexistent targets (uses fail safely); M4 pandas admission reads the
+plan declarations before their pin and unpinned bank validation.json. Notes
+N1-N6 are in review.md. Closing M2 needs the owner's build/ Polars records.
 `docs/retained-polars-timestamp-original-call-checkpoint.jsonl.gz` (132,754
 bytes, SHA256 `4fa340bd707be63119cc38eb9ae7ca6a756b3ea8d7ee004116b91f35d7b4fd18`)
 embeds 44 OWN members and declares 29 external pins; manifest SHA256
 `a609914576a9ae35ef6b2c6e1a738c0b5575b11e446025cc95b31b8511e3bf6d`.
 
-Next: optionally run the independent review of both table timestamp admission
-and transport scripts; otherwise continue with the next open requirement below.
+Next: continue with the next open requirement below. Fix M1-M4 in any future
+admission scripts; rerunning these banks' admission needs the owner's build/.
 The build/ evidence directories are gitignored and exist only on the owner's
 machine; the sealed checkpoints in docs/ carry their OWN members.
 
