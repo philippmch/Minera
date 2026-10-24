@@ -5,12 +5,12 @@ import {tableRepetitionCountText, type TableRepetitionEngine} from "../table-att
 import {defaultTableTimestampForm, requestTableTimestamp, tableTimestampArtifactFile, tableTimestampResponseFile, tableTimestampSourceExample,
   tableTimestampOperations, TABLE_TIMESTAMP_LABELS, TableTimestampRequestGate, type TableTimestampForm, type TableTimestampRun} from "../table-timestamp-filters";
 import {PandasTimestampOriginalCallWorkspace} from "./PandasTimestampOriginalCallWorkspace";
+import {PolarsTimestampOriginalCallWorkspace} from "./PolarsTimestampOriginalCallWorkspace";
 
 export function TableTimestampFilterWorkspace({engine, initialForm, initialCallMode = "friendly"}: {engine: TableRepetitionEngine; initialForm?: TableTimestampForm; initialCallMode?: "friendly" | "original"}) {
   const [mode, setMode] = useState(initialCallMode);
   useEffect(() => {setMode(initialCallMode);}, [engine, initialCallMode]);
-  if (engine !== "pandas") return <TableTimestampFriendlyWorkspace key={engine} engine={engine} initialForm={initialForm}/>;
-  return <><section className="panel query-workspace"><label className="filters-field"><span>Pandas timestamp call mode</span><select value={mode} onChange={event => setMode(event.target.value as "friendly" | "original")}><option value="friendly">Choose a time window with form controls</option><option value="original">Use an original typed call</option></select></label></section>{mode === "original" ? <PandasTimestampOriginalCallWorkspace/> : <TableTimestampFriendlyWorkspace key={engine} engine={engine} initialForm={initialForm}/>}</>;
+  return <><section className="panel query-workspace"><label className="filters-field"><span>{engine === "pandas" ? "Pandas" : "Polars"} timestamp call mode</span><select value={mode} onChange={event => setMode(event.target.value as "friendly" | "original")}><option value="friendly">Choose a time window with form controls</option><option value="original">Use an original typed call</option></select></label></section>{mode === "original" ? engine === "pandas" ? <PandasTimestampOriginalCallWorkspace/> : <PolarsTimestampOriginalCallWorkspace/> : <TableTimestampFriendlyWorkspace key={engine} engine={engine} initialForm={initialForm}/>}</>;
 }
 function TableTimestampFriendlyWorkspace({engine, initialForm}: {engine: TableRepetitionEngine; initialForm?: TableTimestampForm}) {
   const [source, setSource] = useState<File | null>(null), [form, setForm] = useState(() => initialForm ?? defaultTableTimestampForm(engine));
