@@ -31,6 +31,9 @@ struct LogAttributeRepetitionOptions {
 // Count present typed-equal cells in every trace, then evaluate the chained
 // minimum <= count <= maximum condition in that order. Missing cells do not
 // count; zero-count and empty traces may qualify. Full stored context survives.
+// An imported scalar with nested elements compares as the public mapping
+// {'value': scalar, 'children': mapping} (or a list of key/value pairs for
+// <values> children), recursively.
 [[nodiscard]] EventLog filter_log_attribute_value_repetition(
     const EventLog& source, const EventAttribute& target,
     const LogAttributeRepetitionOptions& options = {});

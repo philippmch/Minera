@@ -1,0 +1,86 @@
+{
+  "bank_seed": 20261024,
+  "banks": {
+    "log": {
+      "calls": 18433,
+      "distinct_outcomes": 36,
+      "failures": 0,
+      "file": "docs/attribute-repetition-domain-log-bank.json.gz",
+      "gzip_sha256": "7f4186ef348d9c5aa2f3197c4cddba96f3912a261eab6d0e10deee0580f6ad25",
+      "json_sha256": "4dfcf015b1617da954802a4daecb9bcae8750bfbb8768ad925e348b847d2d096",
+      "runtime": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.5",
+        "polars": "1.44.1",
+        "python": "3.11.17"
+      },
+      "stats": {
+        "calls": 18433,
+        "error": 2212,
+        "pass": 18433,
+        "result": 16221,
+        "stable": 18433
+      },
+      "unrepresentable_skipped": 0
+    },
+    "pandas": {
+      "calls": 28318,
+      "distinct_outcomes": 4439,
+      "failures": 0,
+      "file": "docs/attribute-repetition-domain-pandas-bank.json.gz",
+      "gzip_sha256": "561bde47f5f4c25ffc0a7812f0bd03a8b00ffaf043d847a4d8590bf1206fbaa2",
+      "json_sha256": "24cc6c2c1aeca3eb86ef3b3bef641c7a01a13eaa3c0da5bdeb29defdf202ea54",
+      "runtime": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.5",
+        "polars": "1.44.1",
+        "python": "3.11.17"
+      },
+      "stats": {
+        "calls": 28274,
+        "declared_rejection": 326,
+        "error": 5810,
+        "pass": 27948,
+        "rejected: pandas datetime column string targets must be ISO-8601 timestamps": 57,
+        "rejected: pandas repetition targets for typed columns must be scalars or row-aligned lists": 269,
+        "result": 22464,
+        "stable": 28274
+      },
+      "unrepresentable_skipped": 44
+    },
+    "polars": {
+      "calls": 25775,
+      "distinct_outcomes": 3704,
+      "failures": 0,
+      "file": "docs/attribute-repetition-domain-polars-bank.json.gz",
+      "gzip_sha256": "82fec5a591a7a40159dd03d63ff4e59cd4821259ff942b563e7ecb1c101c975f",
+      "json_sha256": "b872a87e35a7752fecca7e72f5847446bd62a08c0996691f6472627b65018062",
+      "runtime": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.5",
+        "polars": "1.44.1",
+        "python": "3.11.17"
+      },
+      "stats": {
+        "calls": 23701,
+        "error": 11015,
+        "pass": 23701,
+        "result": 12686,
+        "stable": 23692,
+        "varying": 9
+      },
+      "unrepresentable_skipped": 2074
+    }
+  },
+  "cases_per_engine": 6000,
+  "checker": "scripts/check-repetition-domain-bank.py",
+  "hash_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "native": "minera_repetition_batch",
+  "reference": "2.7.22"
+}

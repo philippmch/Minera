@@ -1122,6 +1122,13 @@ frontend form/serializer expose the same operation; focused tests cover
 multiple anchors, no-match traces, attributes, case-id synchronization, and
 invalid options.
 
+Attribute-value repetition domain banks (2026-10-24): the pandas and Polars
+companions are complete over disjoint seeded banks covering NumPy
+weak-scalar/array comparisons, categoricals, zoned datetimes, the Polars
+literal model, optimizer bound folding and diagnostics; the log module stays
+partial for the XES list/plain-dict carrier ambiguity. See
+[attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md).
+
 Attribute-value repetition evidence: a whole-trace filter counts matching
 activity, resource, lifecycle, timestamp, or generic event-attribute values
 and keeps traces inside an inclusive repetition range. The native operation

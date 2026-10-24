@@ -26,6 +26,13 @@ struct ParsedExactTimestamp {
 [[nodiscard]] std::optional<ParsedExactTimestamp> parse_timestamp_exact(
     std::string_view text);
 
+// Resolves a naive wall-clock timestamp in a dataframe timezone: "UTC", a
+// fixed "UTC+HH:MM"/"UTC-HH:MM" offset or an IANA zone name. Nonexistent and
+// ambiguous wall times have no single instant and return nullopt. Unknown
+// zone names throw std::invalid_argument.
+[[nodiscard]] std::optional<ParsedExactTimestamp> localize_timestamp_wall_time(
+    const ParsedExactTimestamp& wall, std::string_view zone);
+
 // Parses an ISO-8601 timestamp into seconds since the Unix epoch (UTC). Accepts
 // "YYYY-MM-DDTHH:MM:SS" with an optional space instead of the 'T' separator,
 // optional fractional seconds, and an optional timezone (a trailing 'Z' or a

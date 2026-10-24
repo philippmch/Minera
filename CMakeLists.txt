@@ -356,6 +356,10 @@ add_executable(minera_format_dataframe src/backend/tools/minera_format_dataframe
 target_link_libraries(minera_format_dataframe PRIVATE minera::core)
 target_compile_features(minera_format_dataframe PRIVATE cxx_std_20)
 
+add_executable(minera_repetition_batch src/backend/tools/minera_repetition_batch.cpp)
+target_link_libraries(minera_repetition_batch PRIVATE minera::core)
+target_compile_features(minera_repetition_batch PRIVATE cxx_std_20)
+
 add_executable(minera_knowledge src/backend/tools/minera_knowledge.cpp)
 add_executable(minera_model_context src/backend/tools/minera_model_context.cpp)
 target_link_libraries(minera_model_context PRIVATE minera::core)
@@ -602,6 +606,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_alpha_parity_contracts_tests PRIVATE cxx_std_20)
   target_compile_options(minera_alpha_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_alpha_parity_contracts_tests COMMAND minera_alpha_parity_contracts_tests)
+
+  add_executable(minera_attribute_repetition_parity_contracts_tests
+    src/backend/tests/test_attribute_repetition_parity_contracts.cpp
+  )
+  target_link_libraries(minera_attribute_repetition_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_attribute_repetition_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_attribute_repetition_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_attribute_repetition_parity_contracts_tests COMMAND minera_attribute_repetition_parity_contracts_tests)
 
   add_executable(minera_inductive_miner_tests
     src/backend/tests/test_inductive_miner.cpp

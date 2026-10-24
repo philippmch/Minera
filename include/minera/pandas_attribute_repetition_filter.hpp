@@ -34,7 +34,9 @@ class PandasAttributeRepetitionError : public std::invalid_argument {
 // Filter complete source rows by the count of matching values in their case.
 // Only cases observed among matching rows are eligible, including at minimum0.
 // Dataframe dtypes, categorical declarations, attributes and source index labels
-// are retained. Native tables have unique string column labels.
+// are retained. Native tables have unique string column labels. Typed numeric
+// columns compare scalars like NumPy weak Python scalars, categorical columns
+// like their categories, and datetime columns localize naive ISO strings.
 [[nodiscard]] EventTable filter_pandas_attribute_value_repetition(
     const EventTable& source, const EventAttribute& target,
     const PandasAttributeRepetitionOptions& options = {});

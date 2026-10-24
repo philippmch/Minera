@@ -64,8 +64,59 @@ bool set_kind(const EventAttribute& value) {
          value.container == AttributeContainerKind::kFrozenSet;
 }
 
+bool wrapped(const EventAttribute& value) {
+  return value.container == AttributeContainerKind::kScalar &&
+         (value.scalar_wrapper || value.scalar_children_list || !value.children.empty());
+}
+
+// The public value of an imported scalar with nested elements is the mapping
+// {'value': scalar, 'children': mapping-or-pair-list}; nested wrappers recurse.
+EventAttribute public_view(const EventAttribute& value) {
+  if (!wrapped(value)) {
+    if (value.children.empty()) return value;
+    auto copy = value;
+    for (auto& child : copy.children) child = public_view(child);
+    return copy;
+  }
+  EventAttribute scalar = value;
+  scalar.key = "value";
+  scalar.children.clear();
+  scalar.scalar_wrapper = false;
+  scalar.scalar_children_list = false;
+  EventAttribute children{"children", ""};
+  if (value.scalar_children_list) {
+    children.container = AttributeContainerKind::kList;
+    for (std::size_t i = 0; i < value.children.size(); ++i) {
+      EventAttribute pair{std::to_string(i), ""};
+      pair.container = AttributeContainerKind::kTuple;
+      pair.children.push_back(EventAttribute{"0", value.children[i].key});
+      auto item = public_view(value.children[i]);
+      item.key = "1";
+      pair.children.push_back(std::move(item));
+      children.children.push_back(std::move(pair));
+    }
+  } else {
+    children.container = AttributeContainerKind::kContainer;
+    // Later duplicate keys replace earlier values, as in a dictionary.
+    for (const auto& child : value.children) {
+      const auto existing = std::find_if(children.children.begin(), children.children.end(),
+                                         [&](const auto& item) { return item.key == child.key; });
+      if (existing != children.children.end()) *existing = public_view(child);
+      else children.children.push_back(public_view(child));
+    }
+  }
+  EventAttribute result{value.key, ""};
+  result.container = AttributeContainerKind::kContainer;
+  result.children.push_back(std::move(scalar));
+  result.children.push_back(std::move(children));
+  return result;
+}
+
 bool equal(const EventAttribute& left, const EventAttribute& right,
            bool nested = false) {
+  if (wrapped(left) || wrapped(right))
+    return equal(wrapped(left) ? public_view(left) : left,
+                 wrapped(right) ? public_view(right) : right, nested);
   if (left.is_null || right.is_null) return left.is_null && right.is_null;
   if (is_native_na_attribute(left) || is_native_na_attribute(right)) {
     if (nested && is_native_na_attribute(left) && is_native_na_attribute(right)) return true;
@@ -74,10 +125,6 @@ bool equal(const EventAttribute& left, const EventAttribute& right,
     if (left.container == AttributeContainerKind::kScalar && right.container == AttributeContainerKind::kScalar)
       throw std::invalid_argument("boolean value of NA is ambiguous");
   }
-  if (left.scalar_wrapper || right.scalar_wrapper ||
-      left.scalar_children_list || right.scalar_children_list)
-    throw std::invalid_argument(
-        "attribute repetition target comparison requires ordinary values");
   if (set_kind(left) || set_kind(right)) {
     if (!set_kind(left) || !set_kind(right)) return false;
     const auto a = root_cause_set_members(left);

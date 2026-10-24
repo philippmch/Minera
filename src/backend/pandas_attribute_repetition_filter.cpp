@@ -2,10 +2,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cctype>
+#include <cstdlib>
+#include <limits>
 #include <optional>
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <variant>
 
 #include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
@@ -102,14 +106,111 @@ bool same_instant(const ParsedExactTimestamp& a, const ParsedExactTimestamp& b) 
   return a.timezone_aware==b.timezone_aware && a.seconds==b.seconds && a.nanoseconds==b.nanoseconds;
 }
 
+// A datetime column parses a string target and localizes a naive result to
+// the column timezone; wall times without a single instant match nothing.
+std::optional<ParsedExactTimestamp> column_instant(const EventAttribute& target,
+                                                   const std::optional<std::string>& zone) {
+  if (date(target)) return instant(target);
+  auto parsed=parse_timestamp_exact(target.value);
+  if (!parsed) throw std::invalid_argument(
+      "pandas datetime column string targets must be ISO-8601 timestamps");
+  if (zone && !parsed->timezone_aware) return localize_timestamp_wall_time(*parsed,*zone);
+  return parsed;
+}
+
+// NumPy comparison family of a typed numeric column (or categorical categories).
+enum class NumericFamily { kNone, kInteger, kFloat32, kFloat64, kBoolean, kCategoricalNumber, kCategoricalBoolean, kDouble };
+
+NumericFamily numeric_family(std::string_view dtype) {
+  std::string lower(dtype);
+  for (auto& c:lower) c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  if (lower=="bool" || lower=="boolean") return NumericFamily::kBoolean;
+  if (lower=="float32") return NumericFamily::kFloat32;
+  if (lower=="float64") return NumericFamily::kFloat64;
+  if (lower.starts_with("int") || lower.starts_with("uint")) return NumericFamily::kInteger;
+  return NumericFamily::kNone;
+}
+
+// A scalar number as an exact integer (booleans are 0/1) or a double.
+std::optional<std::variant<TokenInteger,double>> number(const EventAttribute& value) {
+  if (value.container!=AttributeContainerKind::kScalar || value.is_null || is_native_na_attribute(value)) return std::nullopt;
+  if (const auto* flag=std::get_if<bool>(&value.typed_value)) return TokenInteger(*flag ? 1 : 0);
+  if (value.kind==AttributeKind::kBoolean) return TokenInteger(value.value=="true" || value.value=="True" ? 1 : 0);
+  if (const auto* whole=std::get_if<std::int64_t>(&value.typed_value)) return TokenInteger(*whole);
+  if (const auto* whole=std::get_if<std::uint64_t>(&value.typed_value)) return TokenInteger(*whole);
+  if (const auto* real=std::get_if<double>(&value.typed_value)) return *real;
+  if (value.kind==AttributeKind::kInt) return TokenInteger(value.value);
+  if (value.kind==AttributeKind::kFloat) return native_attribute_number(value);
+  return std::nullopt;
+}
+
+bool boolean_scalar(const EventAttribute& value) {
+  return value.container==AttributeContainerKind::kScalar &&
+         (value.kind==AttributeKind::kBoolean || std::holds_alternative<bool>(value.typed_value));
+}
+
+double as_double(const std::variant<TokenInteger,double>& value) {
+  if (const auto* real=std::get_if<double>(&value)) return *real;
+  return std::strtod(std::get<TokenInteger>(value).decimal().c_str(),nullptr);
+}
+
+float as_float32(const std::variant<TokenInteger,double>& value) {
+  if (const auto* whole=std::get_if<TokenInteger>(&value)) return std::strtof(whole->decimal().c_str(),nullptr);
+  const double real=std::get<double>(value);
+  // Round-to-nearest overflow threshold of binary32.
+  if (std::fabs(real)>=0x1.ffffffp127) return std::copysign(HUGE_VALF,real);
+  return static_cast<float>(real);
+}
+
+// NumPy 2 compares a typed column with a weak Python scalar: integers exactly,
+// integer columns with floats in float64, float32 columns in float32.
+std::optional<bool> numeric_equal(const EventAttribute& cell, const EventAttribute& target, NumericFamily family) {
+  if (family==NumericFamily::kNone) return std::nullopt;
+  if (family==NumericFamily::kCategoricalBoolean) return boolean_scalar(target) && root_cause_scalar_keys_equal(cell,target);
+  if (family==NumericFamily::kCategoricalNumber && boolean_scalar(target)) return false;
+  const auto a=number(cell),b=number(target);
+  if (!a || !b) return std::nullopt;
+  if (family==NumericFamily::kCategoricalNumber) return std::nullopt;
+  if (family==NumericFamily::kFloat32) return as_float32(*a)==as_float32(*b);
+  if (family==NumericFamily::kDouble) return as_double(*a)==as_double(*b);
+  if (std::holds_alternative<TokenInteger>(*a) && std::holds_alternative<TokenInteger>(*b))
+    return std::get<TokenInteger>(*a)==std::get<TokenInteger>(*b);
+  return as_double(*a)==as_double(*b);
+}
+
+// A row-aligned list becomes a NumPy array first: any float makes it float64
+// (every element compared in float64), integers stay exact unless the column
+// is floating, and lists with other values become object arrays compared per
+// element, where a float32 column element is already a Python float.
+NumericFamily vector_family(const EventAttribute& target, NumericFamily column) {
+  if (column==NumericFamily::kNone || column==NumericFamily::kCategoricalNumber ||
+      column==NumericFamily::kCategoricalBoolean) return column;
+  bool any_float=false, numeric=true;
+  for (const auto& child:target.children) {
+    const auto value=number(child);
+    if (!value) { numeric=false; break; }
+    if (std::holds_alternative<double>(*value)) any_float=true;
+    else if (!boolean_scalar(child)) {
+      const auto& whole=std::get<TokenInteger>(*value);
+      if (whole<TokenInteger(std::numeric_limits<std::int64_t>::min()) ||
+          whole>TokenInteger(std::numeric_limits<std::uint64_t>::max())) numeric=false;
+    }
+  }
+  if (!numeric) return column==NumericFamily::kFloat32 ? NumericFamily::kFloat64 : column;
+  if (any_float) return NumericFamily::kDouble;
+  return column==NumericFamily::kFloat32 || column==NumericFamily::kFloat64 ? NumericFamily::kDouble : column;
+}
+
 bool scalar_equal(const EventAttribute& left, const EventAttribute& right,
-                    bool datetime_column) {
+                    bool datetime_column, const std::optional<std::string>& zone,
+                    NumericFamily family=NumericFamily::kNone) {
   if (missing(left) || missing(right)) return false;
+  if (const auto numeric=numeric_equal(left,right,family)) return *numeric;
   if (datetime_column) {
     const auto a=instant(left);
     if (!date(right) && (right.kind!=AttributeKind::kString ||
                         right.container!=AttributeContainerKind::kScalar)) return false;
-    const auto b=instant(right);
+    const auto b=column_instant(right,zone);
     return a && b && same_instant(*a,*b);
   }
   if (date(left) || date(right)) {
@@ -190,13 +291,35 @@ EventTable filter_pandas_attribute_value_repetition(
   if (vector_query && target.children.size()!=source.rows.size())
     error("ValueError","('Lengths must match to compare', ("+std::to_string(source.rows.size())+
         ",), ("+std::to_string(target.children.size())+",))");
+  const std::string_view dtype=source.dtypes.empty() ? std::string_view("object") : std::string_view(source.dtypes[selected]);
+  if (target.container!=AttributeContainerKind::kScalar && !vector_query && dtype!="object")
+    // Typed columns treat tuples, sets and maps as dtype-specific array-likes.
+    throw std::invalid_argument("pandas repetition targets for typed columns must be scalars or row-aligned lists");
+  if ((dtype=="bool" || dtype=="boolean") && !vector_query && target.kind==AttributeKind::kInt &&
+      !target.is_null && !std::holds_alternative<std::int64_t>(target.typed_value))
+    error("OverflowError","Python int too large to convert to C long");
   const auto grouped=column(source,options.case_id_key,true);
-  const bool datetime_column=!source.dtypes.empty() && source.dtypes[selected].starts_with("datetime64");
+  // A categorical column compares like its categories, except that numeric
+  // categories never equal booleans and boolean categories only booleans.
+  std::string_view compared=dtype;
+  bool categorical=false;
+  if (dtype=="category" && selected<source.categorical_dtypes.size() && source.categorical_dtypes[selected]) {
+    compared=source.categorical_dtypes[selected]->categories_dtype;
+    categorical=true;
+  }
+  const bool datetime_column=compared.starts_with("datetime64");
+  std::optional<std::string> zone;
+  if (datetime_column) if (const auto comma=compared.find(", "); comma!=std::string_view::npos)
+    zone=std::string(compared.substr(comma+2,compared.size()-comma-3));
+  auto family=numeric_family(compared);
+  if (categorical && family!=NumericFamily::kNone)
+    family=family==NumericFamily::kBoolean ? NumericFamily::kCategoricalBoolean : NumericFamily::kCategoricalNumber;
+  if (vector_query) family=categorical ? NumericFamily::kNone : vector_family(target,family);
   std::unordered_map<std::string,std::uint64_t> counts;
   for (std::size_t i=0;i<source.rows.size();++i) {
     const auto& candidate=source.rows[i][selected];
     const auto& wanted=vector_query ? target.children[i] : target;
-    if (!candidate || !scalar_equal(*candidate,wanted,datetime_column)) continue;
+    if (!candidate || !scalar_equal(*candidate,wanted,datetime_column,zone,family)) continue;
     const auto& key=source.rows[i][grouped];
     if (!key || missing(*key)) continue;
     ++counts[group_key(*key)];
