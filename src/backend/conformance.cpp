@@ -3802,6 +3802,19 @@ TokenReplayDiagnostics replay_token_diagnostics(
 
 namespace {
 
+// The reference keeps one "activity not in model" flag for a whole forward
+// replay: once a variant with such an activity was replayed, every variant
+// replayed after it is unfit too. Groups are row indices in replay order.
+void carry_unknown_activity_unfitness(
+    std::vector<TokenReplayTraceDiagnostics>& rows,
+    const std::vector<std::vector<std::size_t>>& groups) {
+  bool seen = false;
+  for (const auto& group : groups) {
+    for (const auto row : group) seen |= !rows[row].unknown_event_indices.empty();
+    if (seen) for (const auto row : group) rows[row].trace_is_fit = false;
+  }
+}
+
 std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
     const EventLog& event_log, const PetriNet& net, TokenReplayOptions options,
     bool calculate_fitness, bool full_result = false) {
@@ -3884,7 +3897,30 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
 
 std::vector<TokenReplayTraceDiagnostics> replay_token_traces(
     const EventLog& event_log, const PetriNet& net, TokenReplayOptions options) {
-  return replay_token_trace_rows(event_log, net, std::move(options), true);
+  const bool carry = options.variant == TokenReplayVariant::kForward &&
+      options.consider_activities_not_in_model_in_fitness;
+  const auto activity_attribute = options.activity_attribute;
+  auto rows = replay_token_trace_rows(event_log, net, std::move(options), true);
+  if (!carry) return rows;
+  // Variants replay by descending frequency, ties by descending activity tuple.
+  using Key = std::vector<std::optional<std::string>>;
+  std::map<Key, std::vector<std::size_t>> by_key;
+  for (std::size_t t = 0; t < event_log.traces.size(); ++t) {
+    Key key;
+    for (const auto& event : event_log.traces[t].events)
+      key.push_back(selected_replay_activity(event, activity_attribute).display_name);
+    by_key[std::move(key)].push_back(t);
+  }
+  std::vector<std::pair<const Key*, std::vector<std::size_t>>> variants;
+  for (auto& [key, group] : by_key) variants.emplace_back(&key, std::move(group));
+  std::stable_sort(variants.begin(), variants.end(), [](const auto& a, const auto& b) {
+    if (a.second.size() != b.second.size()) return a.second.size() > b.second.size();
+    return *b.first < *a.first;
+  });
+  std::vector<std::vector<std::size_t>> groups;
+  for (auto& variant : variants) groups.push_back(std::move(variant.second));
+  carry_unknown_activity_unfitness(rows, groups);
+  return rows;
 }
 
 TokenReplayResult replay_token_result(
@@ -4055,6 +4091,12 @@ TokenReplayResult replay_token_result(
     row.trace_index = source;
     row.case_id = log.traces[source].case_id;
     result.traces.push_back(std::move(row));
+  }
+  if (options.consider_activities_not_in_model_in_fitness) {
+    std::vector<std::vector<std::size_t>> groups;
+    if (grouped) for (const auto variant : order) groups.push_back(variants[variant].sources);
+    else for (std::size_t source = 0; source < log.traces.size(); ++source) groups.push_back({source});
+    carry_unknown_activity_unfitness(result.traces, groups);
   }
   if (!options.enable_pltr_fitness) return result;
 

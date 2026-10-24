@@ -3401,8 +3401,13 @@ tallies over 4140 rows; table in the parity doc). Regenerate with
 `python scripts/generate-process-tree-alignment-parity-fixture.py docs/reference-2.7.22-conformance-parity-bank.json.gz docs/reference-2.7.22-process-tree-alignment-bank.json.gz --output src/backend/tests/process_tree_alignment_parity_cases.inc`.
 The four process-tree modules stay partial: each remaining row is a place where
 the reference is not cost-optimal (search-graph pruning, DP loop cache, MILP
-tau-body root loops, approximated activity-set splits). Next: decomposed
-alignments and the forward `consider_activities_not_in_model_in_fitness`
-cross-trace effect.
+tau-body root loops, approximated activity-set splits).
+Decomposed RECOMPOS_MAXIMAL is now bound in the conformance contract: bwc
+exact on every row, cost and fitness pinned at 770 equal / 39 differing of 809
+(the reference composition duplicates or drops moves and has unexplained
+costs). Forward replay with `consider_activities_not_in_model_in_fitness` now
+reproduces the reference's log-wide flag (variants by descending frequency,
+then descending activity tuple; after the first variant with an unknown
+activity everything is unfit) and all its rows are bound.
 `minera_petri_analysis_tests` crashed on main too: `positive_invariant_diagnostics`
 iterated the transitions of a temporary net; fixed by binding it first.
