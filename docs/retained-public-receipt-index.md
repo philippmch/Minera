@@ -303,3 +303,62 @@ This checkpoint changes no package or module status. Full parity remains open:
 86 packages / 387 modules in scope and 201 strict open units. Activity splitting
 and consecutive/timestamp case grouping are the next prepared family; their
 zero-call public surface and offline recipes do not constitute runtime parity.
+
+<!-- BEGIN CLOSED LOG TIMESTAMP PROFILE -->
+## LOG timestamp observer profile
+
+`log-timestamp-packed-v1` / `minera-log-timestamp-observer-receipt-v1`
+is a distinct closed profile for
+`pm4py.algo.filtering.log.timestamp.timestamp_filter`. Its canonical receipt
+contains exactly module, function, args, kwargs and
+`call_shape=positional_args_keyword_controls`. It retains all thirteen public
+functions: seven log filters, four genuine indexed Trace predicates and two
+exception stubs. Bool predicates remain scalar outcomes. A full backing log is
+required to validate observed trace/source indices; a canonical plan alone does
+not invent a backing log or an executed outcome.
+
+The eighteen-tag producer Packed grammar retains complete log/trace metadata,
+ordered typed keys, containers, datetime fold/offset, null domains, byte strings
+and exact scalar payloads. Root's separate admitted full-bank census observed
+fifteen of those tags across the three original banks. All complete source and
+caller controls before/after, mutation flags, qualified error type/message/typed
+args and warning category/message are validated, including mutations preceding
+errors. Aggregate controls changes can come from the mutable source embedded
+in args; they do not imply kwargs or positional-tail changes.
+
+Returned logs retain returned-input identity, source trace aliases and the
+producer's sparse event-position evidence. There is one flattened list per
+returned trace: unaliased copied events contribute no position, and a repeated
+source identity can contribute multiple positions. It is not a dense list with
+one entry for every returned event. The adapter validates compatible full source
+and result snapshots without inferring Python identity from value equality.
+
+Digest audits supply only case/hash declarations through `digest-plan-v1` with
+`records_key=receipts`; they remain module-free digest-only plans. Light intents
+retain their exact index/module/function/case/hash identity and acquire no
+fabricated operands. Unknown fields, mixed terminals, wrong-family tags,
+contradictory flags and incomplete outcomes stay blocking gaps. The prior nine
+profiles and their callables are preserved apart from isolated schema gates.
+
+The prepared root acceptance is bounded to the exact original public326,
+converter12 and forwarding4 flat banks. Root's canonical census reports342
+unique calls,135 log returns,48 bool returns,159 errors,93 predicate calls,
+38 source and aggregate-control changes,0 kwargs/tail changes and0 warnings.
+The expected sorted receipt-set SHA256 is
+`b61e2093aa21d996449e23051695d06061a4212bd2188ab5aed11a61fd482f67`.
+Root acceptance resolves all342 outcomes, all342 light intents and all342
+module-free digest plans, verifies1,026 complete raw slices and freshly rehashes
+all nine sources for nine cache hits. The new27 synthetic integrity tests and
+all173 prior/new receipt integrity tests pass. Root separately verifies the
+complete116-log/249-trace/342-case native fixture and its unchanged baseline;
+that native result does not substitute for later API/UI acceptance.
+The test module is `scripts.tests.test_retained_public_receipt_log_timestamp`.
+
+This index does not grant semantic admission, replay a reference call, map the
+native oracle or establish historical absence. Root must separately bind the
+current semantic admission, successful census and reviewed sources. The earlier
+audit timing remains explicit:326 were reconstructed before converter12;
+converter12 was reconstructed only after forwarding4. No all338-preentry
+reconstruction, history completeness, new-call authority or catalogue promotion
+is claimed. All201 strict units and565 unentered queries remain open.
+<!-- END CLOSED LOG TIMESTAMP PROFILE -->
