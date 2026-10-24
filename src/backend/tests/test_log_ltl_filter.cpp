@@ -6,11 +6,29 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#ifndef _WIN32
+#include <cstdlib>
+#include <ctime>
+#endif
 using namespace minera;
 #if defined(_MSC_VER)
 #define MINERA_NOINLINE __declspec(noinline)
 #else
 #define MINERA_NOINLINE __attribute__((noinline))
+#endif
+
+#ifndef _WIN32
+namespace {
+// Naive datetimes convert through the process local timezone, and the
+// retained captures were recorded on a "W. Europe Standard Time" host.  Pin
+// the matching zone so the expected naive/aware timing results do not depend
+// on the machine running the tests.
+const bool capture_timezone_pinned = [] {
+  setenv("TZ", "Europe/Berlin", 1);
+  tzset();
+  return true;
+}();
+}  // namespace
 #endif
 namespace {
 std::string bytes(std::string_view hex){std::string out;for(std::size_t i=0;i<hex.size();i+=2){const auto digit=[](char c){return c<='9'?c-'0':c-'a'+10;};out.push_back(static_cast<char>(16*digit(hex[i])+digit(hex[i+1])));}return out;}
