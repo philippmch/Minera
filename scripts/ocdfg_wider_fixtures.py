@@ -150,3 +150,79 @@ def ocel2_json(fixture):
                     "relationships": by_event.get(event_id, [])}
                    for event_id, activity, time in fixture["events"]],
     }
+
+
+# Second disjoint bank: per-value offsets in one column, nanosecond columns and
+# integer identifiers. Identifiers use an ``x`` prefix (or integers above
+# 800,000) and timestamps lie in 2033-2034, disjoint from the first bank.
+MIXED_OFFSETS = [datetime.timezone(datetime.timedelta(minutes=minutes))
+                 for minutes in (0, 120, -300, 330, 765, -570)]
+
+
+def _round2_fixture(name, seed, mode, *, events_range, objects_range, base):
+    rng = random.Random(seed)
+    activities = [f"x{seed}-act{index}" for index in range(rng.randint(3, 6))]
+    types = [f"x{seed}-type{index}" for index in range(rng.randint(1, 3))]
+    integer_ids = mode == "int-ids"
+    object_ids = [900000 + seed * 100 + index if integer_ids else f"x{seed}-o{index}"
+                  for index in range(rng.randint(*objects_range))]
+    objects = [(object_id, rng.choice(types)) for object_id in object_ids]
+    current = base
+    events = []
+    for index in range(rng.randint(*events_range)):
+        if not events or rng.random() >= 0.15:
+            current += datetime.timedelta(seconds=round(rng.expovariate(1.0 / 40000.0)))
+        nanoseconds = 0
+        if mode == "ns":
+            # Mix whole microseconds, submicrosecond remainders and ties that
+            # differ only below one microsecond.
+            nanoseconds = rng.choice([0, 1, 999, 1000, 1001, rng.randrange(1, 10**9)])
+        moment = current
+        if mode == "mixed-offsets":
+            zone = rng.choice(MIXED_OFFSETS)
+            local = moment.replace(tzinfo=datetime.timezone.utc).astimezone(zone)
+            text = local.strftime("%Y-%m-%dT%H:%M:%S")
+            offset = local.strftime("%z")
+            text += "Z" if offset == "+0000" else offset[:3] + ":" + offset[3:]
+        else:
+            text = moment.strftime("%Y-%m-%dT%H:%M:%S")
+            if mode == "ns":
+                text += f".{nanoseconds:09d}"
+            text += "Z"
+        event_id = 800000 + seed * 1000 + index if integer_ids else f"x{seed}-e{index}"
+        events.append((event_id, rng.choice(activities), text))
+    relations = []
+    for event_id, _, _ in events:
+        for object_id, _ in rng.sample(objects, k=min(len(objects), rng.choice([0, 1, 2, 2, 3]))):
+            relations.append((event_id, object_id, rng.choice(["x-a", "x-b"])))
+    order = list(range(len(events)))
+    if seed % 2:
+        rng.shuffle(order)
+    events = [events[index] for index in order]
+    rank = {event[0]: index for index, event in enumerate(events)}
+    relations.sort(key=lambda relation: rank[relation[0]])
+    return {"name": name, "zone": mode, "mode": mode, "events": events,
+            "objects": objects, "relations": relations}
+
+
+def fixtures_round2():
+    result = []
+    seed = 7300
+    base = datetime.datetime(2033, 6, 3, 15, 10)  # Friday afternoon
+    for mode, count in (("mixed-offsets", 10), ("ns", 10), ("int-ids", 8)):
+        for index in range(count):
+            seed += 1
+            result.append(_round2_fixture(
+                f"{mode}-{index:02d}", seed, mode, events_range=(15, 110),
+                objects_range=(3, 25), base=base))
+    return result
+
+
+def native_ocel2_json(fixture):
+    """Standard OCEL 2.0 JSON; integer identifiers use their decimal text."""
+    as_text = lambda value: str(value)
+    textual = dict(fixture)
+    textual["events"] = [(as_text(e), a, t) for e, a, t in fixture["events"]]
+    textual["objects"] = [(as_text(o), k) for o, k in fixture["objects"]]
+    textual["relations"] = [(as_text(e), as_text(o), q) for e, o, q in fixture["relations"]]
+    return ocel2_json(textual)

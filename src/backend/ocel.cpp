@@ -3,7 +3,6 @@
 #include "minera/conformance.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
-#include "business_hours.hpp"
 #include "ocpn_projection.hpp"
 
 #include <algorithm>
@@ -27,20 +26,14 @@ namespace minera {
 namespace {
 
 // Default elapsed edge timing. Exact parsing keeps microseconds that a
-// double epoch value loses at present-day magnitudes; the floor of a negative
-// submicrosecond remainder matches the typed timing path. Shapes the exact
-// parser rejects keep the historic double projection.
+// double epoch value loses at present-day magnitudes, and the conversion is
+// shared with the typed timing path. Shapes the exact parser rejects keep the
+// historic double projection.
 std::optional<double> legacy_edge_elapsed(const std::string& from_text,
                                           const std::string& to_text) {
   const auto from = parse_timestamp_exact(from_text);
   const auto to = parse_timestamp_exact(to_text);
-  if (from && to) {
-    const auto nanos = static_cast<std::int64_t>(to->nanoseconds) - from->nanoseconds;
-    auto fraction = nanos / 1000;
-    if (nanos < 0 && nanos % 1000) --fraction;
-    return detail::epoch_seconds_from_microseconds(
-        (to->seconds - from->seconds) * 1000000 + fraction);
-  }
+  if (from && to) return ocdfg_elapsed_seconds(*from, *to);
   const auto from_seconds = parse_timestamp(from_text);
   const auto to_seconds = parse_timestamp(to_text);
   if (from_seconds && to_seconds) return *to_seconds - *from_seconds;

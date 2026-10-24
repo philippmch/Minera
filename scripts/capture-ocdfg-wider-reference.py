@@ -16,7 +16,9 @@ import warnings
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ocdfg_wider_fixtures import PROFILES, fixtures  # noqa: E402
+from ocdfg_wider_fixtures import PROFILES, fixtures, fixtures_round2  # noqa: E402
+
+BANKS = {"wider": fixtures, "round2": fixtures_round2}
 
 REFERENCE_COMMIT = "0715c31f3f1d85924107d6aa5329806db69df899"
 
@@ -73,10 +75,19 @@ def canonical(graph):
 
 def build_ocel(pm4py, pandas, fixture):
     from pm4py.objects.ocel.obj import OCEL
+    texts = [event[2] for event in fixture["events"]]
+    mode = fixture.get("mode")
+    if mode == "mixed-offsets":
+        # One column holding Timestamps with different fixed offsets.
+        timestamps = pandas.Series([pandas.Timestamp(text) for text in texts], dtype=object)
+    elif mode == "ns":
+        timestamps = pandas.to_datetime(texts, format="ISO8601").as_unit("ns")
+    else:
+        timestamps = pandas.to_datetime(texts, format="ISO8601")
     events = pandas.DataFrame({
         "ocel:eid": [event[0] for event in fixture["events"]],
         "ocel:activity": [event[1] for event in fixture["events"]],
-        "ocel:timestamp": pandas.to_datetime([event[2] for event in fixture["events"]], format="ISO8601"),
+        "ocel:timestamp": timestamps,
     })
     objects = pandas.DataFrame({
         "ocel:oid": [obj[0] for obj in fixture["objects"]],
@@ -97,14 +108,14 @@ def build_ocel(pm4py, pandas, fixture):
     return OCEL(events=events, objects=objects, relations=relations), str(events["ocel:timestamp"].dtype)
 
 
-def capture_one():
+def capture_one(bank_name):
     warnings.filterwarnings("ignore")
     import pandas
     import pm4py
     if (pm4py.__version__, pandas.__version__) != ("2.7.22", "3.0.5"):
         raise RuntimeError("requires pm4py==2.7.22 and pandas==3.0.5")
     rows = []
-    for fixture in fixtures():
+    for fixture in BANKS[bank_name]():
         ocel, dtype = build_ocel(pm4py, pandas, fixture)
         for profile, (business_hours, slots) in PROFILES.items():
             kwargs = {"business_hours": business_hours}
@@ -125,16 +136,17 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--seeds", default="0,1,2,3")
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument("--bank", choices=sorted(BANKS), default="wider")
     args = parser.parse_args()
     if args.worker:
-        Path(args.output).write_text(json.dumps(capture_one(), ensure_ascii=False))
+        Path(args.output).write_text(json.dumps(capture_one(args.bank), ensure_ascii=False))
         return
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     captures = []
     for seed in args.seeds.split(","):
         part = output.with_suffix(f".seed{seed}.json")
-        subprocess.run([sys.executable, "-I", "-B", __file__, "--worker", "--output", str(part)],
+        subprocess.run([sys.executable, "-I", "-B", __file__, "--worker", "--bank", args.bank, "--output", str(part)],
                        env={**os.environ, "PYTHONHASHSEED": seed, "TZ": "UTC"}, check=True)
         captures.append(json.loads(part.read_text()))
         part.unlink()
@@ -147,7 +159,8 @@ def main():
         "reference_commit": REFERENCE_COMMIT,
         "versions": {"pm4py": captures[0]["pm4py"], "pandas": captures[0]["pandas"]},
         "seeds": [capture["seed"] for capture in captures],
-        "fixtures_sha256": hashlib.sha256(json.dumps(fixtures(), ensure_ascii=False).encode()).hexdigest(),
+        "bank": args.bank,
+        "fixtures_sha256": hashlib.sha256(json.dumps(BANKS[args.bank](), ensure_ascii=False).encode()).hexdigest(),
         "rows": [dict(row, stable_across_seeds=stable) for row, stable in zip(first, stability)],
         "unstable_variants": {
             f"{row['fixture']}/{row['profile']}": [capture["rows"][index] for capture in captures]

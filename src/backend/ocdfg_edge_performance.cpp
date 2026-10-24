@@ -24,13 +24,7 @@ std::vector<BusinessHourSlot> slots(const OcdfgBusinessHourSlots& value){
  return merged;
 }
 std::int64_t wall_microseconds(const ParsedExactTimestamp& value){return value.seconds*1000000+static_cast<std::int64_t>(value.offset_minutes)*60000000+value.nanoseconds/1000;}
-double elapsed(const ParsedExactTimestamp& a,const ParsedExactTimestamp& b){
- // pandas Timedelta.total_seconds() retains microseconds, including the floor
- // of a negative submicrosecond difference, before converting to binary64.
- const auto nanos=static_cast<std::int64_t>(b.nanoseconds)-a.nanoseconds;
- auto fraction=nanos/1000;if(nanos<0&&nanos%1000)--fraction;
- return detail::epoch_seconds_from_microseconds((b.seconds-a.seconds)*1000000+fraction);
-}
+double elapsed(const ParsedExactTimestamp& a,const ParsedExactTimestamp& b){return ocdfg_elapsed_seconds(a,b);}
 bool has_column(const Ocel& log,const std::string& key){
  if(log.table_columns.events)return std::find(log.table_columns.events->begin(),log.table_columns.events->end(),key)!=log.table_columns.events->end();
  if(key=="ocel:eid"||key=="ocel:activity"||key=="ocel:timestamp")return true;
@@ -100,5 +94,17 @@ std::vector<double> calculate_ocdfg_edge_performance(const Ocel& log,const std::
   events.push_back(std::move(event));
  }
  return calculate_ocdfg_edge_performance(events,couples,options);
+}
+double ocdfg_elapsed_seconds(const ParsedExactTimestamp& a,const ParsedExactTimestamp& b){
+ // Floor the nanosecond difference to microseconds, split it into days,
+ // seconds and microseconds with nonnegative remainders, then sum in that
+ // order. Whole days and seconds stay exact; only the fraction rounds.
+ const auto nanos=static_cast<std::int64_t>(b.nanoseconds)-a.nanoseconds;
+ auto fraction=nanos/1000;if(nanos<0&&nanos%1000)--fraction;
+ const std::int64_t micros=(b.seconds-a.seconds)*1000000+fraction;
+ constexpr std::int64_t per_day=86400LL*1000000;
+ auto days=micros/per_day,rest=micros%per_day;if(rest<0){rest+=per_day;--days;}
+ const auto whole=days*86400+rest/1000000;
+ return static_cast<double>(whole)+static_cast<double>(rest%1000000)/1e6;
 }
 } // namespace minera
