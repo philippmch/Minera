@@ -48,7 +48,7 @@ void check(){
   rejected("filter_traces_starting",call(window),"unknown operation accepted");
   rejected("apply_events","{","malformed JSON accepted");
   const auto polars=execute_table_timestamp_filter({{"engine","","polars",false},{"operation","","apply_events",false},{"source_file","source.json",table(),true},{"call_json","call_json.txt",call(window),true}});
-  require(polars.status==400&&polars.json.find("\"engine\":null")!=std::string::npos&&polars.json.find("\"call_json\":")!=std::string::npos,"foreign engine accepted or raw call lost");
+  require(polars.status==400&&polars.json.find("\"engine\":\"polars\"")!=std::string::npos&&polars.json.find("original Polars timestamp call_json")!=std::string::npos&&polars.json.find("\"phase\":\"control\"")!=std::string::npos,"pandas descriptor accepted by the Polars original route");
   const auto query=execute_table_timestamp_filter({{"engine","","pandas",false},{"operation","","apply_events",false},{"call_json","call_json.txt",call(window),true}},{{"source_file","","{}",false}});
   require(query.status==400&&query.json.find("must be a multipart File")!=std::string::npos,"query source accepted");
 }
