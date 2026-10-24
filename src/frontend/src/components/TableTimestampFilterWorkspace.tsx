@@ -4,8 +4,15 @@ import {referenceLogFilterPickedFile, referenceLogFilterStringText} from "../ref
 import {tableRepetitionCountText, type TableRepetitionEngine} from "../table-attribute-repetition";
 import {defaultTableTimestampForm, requestTableTimestamp, tableTimestampArtifactFile, tableTimestampResponseFile, tableTimestampSourceExample,
   tableTimestampOperations, TABLE_TIMESTAMP_LABELS, TableTimestampRequestGate, type TableTimestampForm, type TableTimestampRun} from "../table-timestamp-filters";
+import {PandasTimestampOriginalCallWorkspace} from "./PandasTimestampOriginalCallWorkspace";
 
-export function TableTimestampFilterWorkspace({engine, initialForm}: {engine: TableRepetitionEngine; initialForm?: TableTimestampForm}) {
+export function TableTimestampFilterWorkspace({engine, initialForm, initialCallMode = "friendly"}: {engine: TableRepetitionEngine; initialForm?: TableTimestampForm; initialCallMode?: "friendly" | "original"}) {
+  const [mode, setMode] = useState(initialCallMode);
+  useEffect(() => {setMode(initialCallMode);}, [engine, initialCallMode]);
+  if (engine !== "pandas") return <TableTimestampFriendlyWorkspace key={engine} engine={engine} initialForm={initialForm}/>;
+  return <><section className="panel query-workspace"><label className="filters-field"><span>Pandas timestamp call mode</span><select value={mode} onChange={event => setMode(event.target.value as "friendly" | "original")}><option value="friendly">Choose a time window with form controls</option><option value="original">Use an original typed call</option></select></label></section>{mode === "original" ? <PandasTimestampOriginalCallWorkspace/> : <TableTimestampFriendlyWorkspace key={engine} engine={engine} initialForm={initialForm}/>}</>;
+}
+function TableTimestampFriendlyWorkspace({engine, initialForm}: {engine: TableRepetitionEngine; initialForm?: TableTimestampForm}) {
   const [source, setSource] = useState<File | null>(null), [form, setForm] = useState(() => initialForm ?? defaultTableTimestampForm(engine));
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null), [run, setRun] = useState<TableTimestampRun | null>(null);
   const gate = useRef(new TableTimestampRequestGate()), request = useRef<AbortController | null>(null), current = useRef({source, form}); current.current = {source, form};
