@@ -1353,10 +1353,53 @@ Open divergences:
 - Forward replay with `consider_activities_not_in_model_in_fitness=True`
   marks some traces unfit depending on other traces of the same log, a
   cross-trace effect native does not reproduce. Forward replay stays partial.
-- Process-tree alignments (search graph, dynamic programming, MILP,
-  approximated) and decomposed `RECOMPOS_MAXIMAL` are captured in the banks
-  but not yet bound; costs and fitness match for the search-graph variant,
-  alignments do not.
+- Decomposed `RECOMPOS_MAXIMAL` is captured in the banks but not yet bound.
+
+### Process-tree alignments
+
+`src/backend/tests/test_process_tree_alignment_parity_contracts.cpp`
+(`minera_process_tree_alignment_parity_contracts_tests`) binds all four
+variants to the 60 trees of the first bank plus
+`docs/reference-2.7.22-process-tree-alignment-bank.json.gz` (400 seeded random
+trees, seed 99, 9 traces each, three hash seeds; captured with
+`--families tree:` and generated into `process_tree_alignment_parity_cases.inc`
+by `scripts/generate-process-tree-alignment-parity-fixture.py`). Each of the
+4140 rows per variant is classified as equal (cost and fitness), native
+cheaper, native costlier, or equal cost with another fitness, and the tallies
+are pinned:
+
+| Variant | Equal | Native cheaper | Native costlier | Fitness only |
+|---|---|---|---|---|
+| `SEARCH_GRAPH_PT` | 4112 | 28 | 0 | 0 |
+| `DYNAMIC_PROGRAMMING` | 4126 | 11 | 3 | 0 |
+| `MILP` | 4116 | 10 | 0 | 14 |
+| `APPROXIMATED_ORIGINAL` | 3976 | 164 | 0 | 0 |
+
+Reference behaviour found by probing and now implemented:
+
+- Fitness is `1 - cost / (len + floor)` without clamping (it can be negative).
+  The floor is the variant's own empty-trace cost, except for
+  `APPROXIMATED_ORIGINAL`, whose floor reads n-ary operators as right-nested
+  binary ones: 10000 per visible leaf, 1 per tau leaf, 2 per binary operator,
+  a loop running its body once, an XOR taking its cheapest child at that
+  child's depth (this matches all 4140 rows).
+- `SEARCH_GRAPH_PT` alignments list each executed tau leaf as a silent model
+  move. Native alignments are checked to replay the trace and to be a word of
+  the tree with its tau leaves at the reported cost.
+- `DYNAMIC_PROGRAMMING` loops: an empty segment skips the loop at no cost; any
+  other segment is an optional leading redo, the body, (redo, body) rounds
+  whose redo consumes at least one event, and an optional extra body.
+
+Remaining divergences, all where the reference is not cost-optimal or
+inconsistent: the search-graph search prunes some optimal paths (sync moves
+taken first, nested loops behind a silent redo); the DP reuses a cached loop
+iteration for a reordered segment; MILP gives the empty trace a positive cost
+on root loops with a tau body and uses it as the fitness floor; the
+approximated variant splits traces over subtrees by its activity-set
+heuristic, while native splits optimally. Reference alignments of the DP,
+MILP and approximated variants omit silent and some model moves and are not
+bound; the search-graph tie choice and its occasional dropped log moves after
+a tau move are not bound either.
 
 ## XES importer-variant evidence
 
@@ -5263,10 +5306,12 @@ fallbacks. This preserves the reference implementation's behavioral questions wi
 Python implementation; `MILP` does not claim to invoke literal PuLP.
 
 * `SEARCH_GRAPH_PT` is the default residual-expression Dijkstra search, using
-  canonical interned residuals for stable, collision-free state identity.
+  canonical interned residuals for stable, collision-free state identity. Tau
+  leaves are explicit silent steps and appear as model moves without a label.
 * `DYNAMIC_PROGRAMMING` recursively aligns subtrees with memoized subtree/trace
-  pairs; loops use the exact residual fallback. Optional global caching has a
-  positive `batch_size` and `clear_cache` controls periodic eviction.
+  pairs; loops follow the reference's segment rule (see the conformance bank
+  evidence). Optional global caching has a positive `batch_size` and
+  `clear_cache` controls periodic eviction.
 * `MILP` is an exact integer shortest-path residual A*/branch-and-bound
   equivalent to the pinned unit-cost MILP objective. It is dependency-free and
   performs no external LP solves (`lp_solved` therefore remains zero); native

@@ -3381,7 +3381,14 @@ token replay are bound to three black-box banks by
 evidence" in the parity doc for the contract, the reference semantics found
 and the open items. Regenerate the fixture with
 `python scripts/generate-conformance-parity-fixture.py <the three docs/*-bank.json.gz> --output src/backend/tests/conformance_parity_reference_cases.inc`.
-Next: bind the captured process-tree and decomposed observations, and the
-forward `consider_activities_not_in_model_in_fitness` cross-trace effect.
+Process-tree alignments are bound by
+`minera_process_tree_alignment_parity_contracts_tests` (pinned per-variant
+tallies over 4140 rows; table in the parity doc). Regenerate with
+`python scripts/generate-process-tree-alignment-parity-fixture.py docs/reference-2.7.22-conformance-parity-bank.json.gz docs/reference-2.7.22-process-tree-alignment-bank.json.gz --output src/backend/tests/process_tree_alignment_parity_cases.inc`.
+The four process-tree modules stay partial: each remaining row is a place where
+the reference is not cost-optimal (search-graph pruning, DP loop cache, MILP
+tau-body root loops, approximated activity-set splits). Next: decomposed
+alignments and the forward `consider_activities_not_in_model_in_fitness`
+cross-trace effect.
 `minera_petri_analysis_tests` crashed on main too: `positive_invariant_diagnostics`
 iterated the transitions of a temporary net; fixed by binding it first.
