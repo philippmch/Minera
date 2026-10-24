@@ -80,11 +80,12 @@ EventAttribute target(const JsonValue& value, std::string key = {}) {
   if (value.kind != JsonValue::object) throw std::invalid_argument("Repetition target requires a typed JSON object");
   for (const auto& [name, child] : value.fields) {
     (void)child;
-    if (name != "type" && name != "value") throw std::invalid_argument("Unknown repetition target field: " + name);
+    if (name != "type" && name != "value" && name != "timezone") throw std::invalid_argument("Unknown repetition target field: " + name);
   }
   const auto tag = value.fields.find("type");
   if (tag == value.fields.end() || tag->second.kind != JsonValue::string) throw std::invalid_argument("Repetition target requires a string type");
   const auto& type = tag->second.text;
+  if (type != "date" && value.fields.contains("timezone")) throw std::invalid_argument("Only datetime repetition targets carry a timezone");
   EventAttribute result{std::move(key), ""};
   const auto payload = value.fields.find("value");
   if (type == "null" || type == "na") {
@@ -130,7 +131,12 @@ EventAttribute target(const JsonValue& value, std::string key = {}) {
     const auto parsed = parse_timestamp_exact(data.text);
     if (!parsed) throw std::invalid_argument("Invalid repetition datetime target");
     result.kind = AttributeKind::kDate; result.value = data.text;
-    result.typed_value = NativeDate{data.text, NativeDateResolution::kNanosecond}; return result;
+    NativeDate date{data.text, NativeDateResolution::kNanosecond};
+    if (const auto zone = value.fields.find("timezone"); zone != value.fields.end()) {
+      if (zone->second.kind != JsonValue::string) throw std::invalid_argument("Repetition datetime timezone must be a string");
+      date.timezone = zone->second.text;
+    }
+    result.typed_value = std::move(date); return result;
   }
   if (type == "map" && data.kind == JsonValue::object) {
     result.container = AttributeContainerKind::kContainer;

@@ -34,10 +34,13 @@ class PolarsAttributeRepetitionError : public std::invalid_argument {
   const std::string message;
 };
 
-// Bounded visible Polars frame companion: declared String, signed/unsigned
-// integer, Float64, Boolean, Null, Categorical, Date and microsecond datetime
-// columns. Retains complete rows and dtypes; categorical dictionaries and
-// physical query plans are outside the observed contract. Polars has no index;
+// Visible Polars frame companion over String, Int8-64, UInt8-64, Float32/64,
+// Boolean, Null, Categorical, Enum, Date and ms/us/ns Datetime columns with
+// optional zones. The literal model follows Python value conversion (integer
+// class, fixed offsets as UTC, named zones kept, nanoseconds floored to
+// microseconds); comparisons, coercion errors and their rendered expressions
+// follow the column x literal matrix, including the optimizer folding integer
+// bounds with minimum above maximum to an empty count. Polars has no index;
 // native indexed tables reject instead of silently discarding their index.
 [[nodiscard]] EventTable filter_polars_attribute_value_repetition(
     const EventTable& source, const EventAttribute& target,

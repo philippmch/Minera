@@ -11935,8 +11935,49 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/pandas_attribute_repetition_filter.hpp",
+        "src/backend/pandas_attribute_repetition_filter.cpp",
+        "src/backend/table_attribute_repetition_workbench.cpp",
+        "scripts/repetition_domain.py",
+        "scripts/capture-repetition-domain-bank.py",
+        "scripts/check-repetition-domain-bank.py",
+        "src/backend/tools/minera_repetition_batch.cpp",
+        "src/backend/tests/test_attribute_repetition_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.attr_value_repetition.filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_attribute_repetition_filter.hpp",
+            "symbol": "filter_pandas_attribute_value_repetition"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "pandas_numeric_columns_compare_weak_python_scalars"
+          },
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "pandas_categorical_columns_compare_like_their_categories"
+          },
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "pandas_datetime_columns_localize_naive_strings_to_named_zones"
+          },
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "pandas_boolean_columns_reject_integers_beyond_c_long"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.attributes.attributes_filter",
@@ -12115,8 +12156,54 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/polars_attribute_repetition_filter.hpp",
+        "src/backend/polars_attribute_repetition_filter.cpp",
+        "src/backend/table_attribute_repetition_workbench.cpp",
+        "scripts/repetition_domain.py",
+        "scripts/capture-repetition-domain-bank.py",
+        "scripts/check-repetition-domain-bank.py",
+        "src/backend/tools/minera_repetition_batch.cpp",
+        "src/backend/tests/test_attribute_repetition_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.attr_value_repetition.filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_attribute_repetition_filter.hpp",
+            "symbol": "filter_polars_attribute_value_repetition"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "polars_named_zone_literals_compare_only_with_the_same_zone"
+          },
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "polars_contradictory_integer_bounds_fold_before_comparison"
+          },
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "polars_string_bound_diagnostics_render_simplified_count_comparisons"
+          },
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "polars_integers_beyond_int128_fail_when_the_literal_is_built"
+          },
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "polars_single_row_nan_case_joins_nothing"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.attributes.attributes_filter",

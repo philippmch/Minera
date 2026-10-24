@@ -3277,6 +3277,23 @@ native now rejects them. `algo.discovery.alpha.variants.plus` and package
 strict open units. Contract and limits: "Alpha+ cleanup selection contract"
 in the parity doc; hashes in `docs/alpha-plus-cleanup-validation.json`.
 
+## Attribute repetition domain checkpoint — 2026-10-24
+
+Cloud container, pinned runtime (polars 1.44.1 added to the reference venv);
+no retained `build/` bank was used or replayed. Disjoint seeded banks, bank
+seed 20261024, hash seeds 0-4, 6,000 cases per engine, all at zero failures:
+Polars 23,701 calls, pandas 28,274 (326 declared rejections), log 18,433 (XES sources). Fixes: the
+Polars companion was rewritten from a probed column x literal matrix (all
+integer widths, Float32, Enum, ns/ms/zoned Datetime, literal classes, zone
+abbreviations, bound simplification and contradictory-bound folding,
+did-you-mean, NaN single-row join); pandas compares like NumPy weak scalars and
+arrays, categoricals like their categories, and localizes naive strings to
+named zones; log compares XES value/children wrappers as public mappings.
+Tools: `scripts/{repetition_domain,capture-repetition-domain-bank,
+check-repetition-domain-bank}.py` and `minera_repetition_batch`. pandas and
+Polars rows are promoted (229/387 modules, 197 strict open units); the log row
+stays partial. See `docs/attribute-repetition-domain-parity.md`.
+
 ## Next open requirements
 
 - Keep all LTL declared gaps open. Reuse the 16 executed banks above; never replay
@@ -3320,11 +3337,10 @@ in the parity doc; hashes in `docs/alpha-plus-cleanup-validation.json`.
 - Keep arbitrary relation dataframe cells, dtype/storage domains, non-string
   grouping IDs and actual performance benchmarking explicit. The new timing
   companion supports string identities; do not silently coerce other domains.
-- Continue the three repetition modules' declared gaps. Ordinary log values,
-  byte targets, container/date/byte bounds, unhashable selectors and literal
-  pandas missing-key diagnostics now have disjoint acceptance. Custom equality
-  objects, wrapper storage/identity graphs, arbitrary table schemas/dtypes,
-  categorical dictionaries and Polars physical plans remain open as documented.
+- Close the log repetition row: give XES `<list>`/`<container>` values a
+  native representation distinct from plain dicts (importer-wide change),
+  then extend the log domain bank to them. Custom-equality objects and
+  nonstring dict keys remain outside the carrier.
 - All other partial rows, connectors/platforms, solvers, rendered UI and
   performance requirements remain in scope until their own evidence closes.
 

@@ -174,23 +174,26 @@ earlier fixture fall inside it with every alternative observed. The Alpha+
 module and the Alpha package are complete; see "Alpha+ cleanup selection
 contract" in [reference-2.7.22-parity.md](reference-2.7.22-parity.md).
 
-Coverage is now **47 complete / 39 partial packages**, **227 complete / 160
-partial modules**, and **199 open strict coverage units**, down from 228.
+The pandas and Polars attribute-value repetition companions are complete.
+Disjoint seeded banks (6,000 cases per engine, five hash seeds) cover the
+column x value domains their contracts left open: NumPy weak-scalar and array
+comparisons, categorical categories, named-zone datetimes, the Polars literal
+model, optimizer bound folding and rendered diagnostics. Every checked call
+passes; the log module stays partial for the XES list/plain-dict carrier
+ambiguity. See
+[attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md).
+
+Coverage is now **47 complete / 39 partial packages**, **229 complete / 158
+partial modules**, and **197 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 
 ## Active requirements
 
-- The Polars repetition companion passes 105 retained full outcomes, including
-  exact apply/collect diagnostics, literal columns and restartable lazy input.
-  The canonical row remains partial for unobserved dtype, dictionary and query
-  plan domains; see
-  [polars-attribute-repetition-parity-contract.md](polars-attribute-repetition-parity-contract.md).
-- The pandas repetition companion passes all 123 retained complete table
-  projections and sixteen native diagnostics, preserving row order, source
-  indices, dtypes, categorical declarations and attributes. The canonical row
-  remains partial for its remaining object/schema domains; see
-  [pandas-attribute-repetition-parity-contract.md](pandas-attribute-repetition-parity-contract.md).
+- The log repetition module remains partial: a public XES `<list>` value
+  shares its native representation with a plain dict, and custom-equality
+  objects are outside the carrier; see
+  [attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md).
 - The usable OCDFG working-time increment is delivered, with default/custom/empty
   schedules, exact timing options and locale-independent signed-zero JSON.
   Sixty retained timing cases, eight discovery outcomes and owned HTTP checks
