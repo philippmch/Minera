@@ -1,0 +1,353 @@
+{
+ "authority": {
+  "catalogue_promoted": false,
+  "history_complete": false,
+  "new_call_authority": false,
+  "reference_calls": 0
+ },
+ "checkpoint": {
+  "bytes": 123429,
+  "path": "docs/retained-pandas-timestamp-original-call-checkpoint.jsonl.gz",
+  "sha256": "b8fef0494a8bada19a9a81fd3c60d8cef6a7b8c4fcf83948515f997ab1ac4769"
+ },
+ "closed_readback": "pass",
+ "external": [
+  {
+   "bytes": 1964359,
+   "path": "src/backend/tests/pandas_timestamp_workbench_public_vectors.inc",
+   "sha256": "71286e69b3d31c944fabebbf0b5fa13bf583d71a29073aa328ac19e3389b0d01"
+  },
+  {
+   "bytes": 17338368,
+   "path": "build/Release/minera_server.exe",
+   "sha256": "f6d00c9c9911436d1a4d0a6127ec7eb616bb461445de66196b2a14f8bc2c76a9"
+  },
+  {
+   "bytes": 19549696,
+   "path": "build/Release/minera_pandas_timestamp_workbench_public_tests.exe",
+   "sha256": "5e3f705218c61551f373ce5079249db6e2ef4a4bd58d7fa36068110f442b4445"
+  },
+  {
+   "bytes": 18209,
+   "path": "build/filtering-timestamp-pandas-public-prepared-1/capture-public.py",
+   "sha256": "6748b765d1966fe45499aab2ca1d79ef36d46f1bab7022ac795f0ea131c4a826"
+  },
+  {
+   "bytes": 155488,
+   "path": "build/filtering-timestamp-pandas-public-prepared-1/cases.json",
+   "sha256": "76c9611c04e05f64f798cb823ca94d340802d0d4178e783558904b49acc4ee79"
+  },
+  {
+   "bytes": 8409330,
+   "path": "build/filtering-timestamp-pandas-public-actual-1/records.jsonl",
+   "sha256": "2231e64e9d1ef0a54846ed5e6b52a3cbe34e030976f7fe1266f39b5cc377e2ec"
+  },
+  {
+   "bytes": 85235,
+   "path": "build/filtering-timestamp-pandas-public-actual-1/dedup-audit.json",
+   "sha256": "5e23002ced638b5b5e422e5fb2865f5dd1af7050627a0b7247acfd30ac431797"
+  },
+  {
+   "bytes": 4115802,
+   "path": "build/filtering-timestamp-pandas-public-actual-1/call-plan.jsonl",
+   "sha256": "7f6a5bb902b5b7b65bb6cdfd770d9023aed76ea413865d39ed61b803584a9f9b"
+  },
+  {
+   "bytes": 133829,
+   "path": "build/filtering-timestamp-pandas-public-actual-1/call-intents.jsonl",
+   "sha256": "5168c3a731342b3d2b68654b047c11f48f0fa7d621ddd5fdd3f8ac0a7a87d049"
+  },
+  {
+   "bytes": 18294,
+   "path": "build/filtering-timestamp-pandas-canonical-prepared-1/capture-public.py",
+   "sha256": "16e9ebf47fab46b934998e3d60162bfc609749d4566fba6a4ee4f7468c2de1e9"
+  },
+  {
+   "bytes": 124090,
+   "path": "build/filtering-timestamp-pandas-canonical-prepared-1/cases.json",
+   "sha256": "5a70ee03e3e702b50b7ead46122da8f0b0aa4b81e7afa87df3941b4538c7dfd3"
+  },
+  {
+   "bytes": 7595068,
+   "path": "build/filtering-timestamp-pandas-canonical-public-actual-1/records.jsonl",
+   "sha256": "4d2e28c3b89114cc26f0f655811fcbb1ce0cf57b2582545adfd81ab9cec092bb"
+  },
+  {
+   "bytes": 66813,
+   "path": "build/filtering-timestamp-pandas-canonical-public-actual-1/dedup-audit.json",
+   "sha256": "d257fb34314e80b50cb568a75b1c31cb438de394998e2586432be51463ad25a1"
+  },
+  {
+   "bytes": 3218621,
+   "path": "build/filtering-timestamp-pandas-canonical-public-actual-1/call-plan.jsonl",
+   "sha256": "8c783fa3493d35de4dbcb551b63772e3fb1d3bf630578cbe331474f8fe3b8548"
+  },
+  {
+   "bytes": 104772,
+   "path": "build/filtering-timestamp-pandas-canonical-public-actual-1/call-intents.jsonl",
+   "sha256": "4f2a39be6c3e756b9b1829fdb759be88d71f3b8d26a30b03b0a1502775cae370"
+  },
+  {
+   "bytes": 697190,
+   "path": "build/parity-closures/timestamp-production-http-1/records.jsonl",
+   "sha256": "4715b1d28260ea4be561698d5efd4340e98c66f89a21f4e2fa74457f7fc56aa0"
+  },
+  {
+   "bytes": 814712,
+   "path": "build/parity-closures/timestamp-production-http-2/records.jsonl",
+   "sha256": "b9c810da644095972242cb8df98646d72ce85f58c69d8dc85a7db115586848e9"
+  },
+  {
+   "bytes": 10390,
+   "path": "build/filtering-timestamp-pandas-public-prepared-1/generate-native-tests.py",
+   "sha256": "bd54d57e710b617a1cc04d743548befc869921fb684bb0a257c1e01984555844"
+  },
+  {
+   "bytes": 1971807,
+   "path": "src/backend/tests/test_pandas_timestamp_filter.cpp",
+   "sha256": "400cb6422b1d66fc66a6431e513f3c101b8e991f9184fd883e9d3a04e620104f"
+  },
+  {
+   "bytes": 10390,
+   "path": "build/parity-closures/pandas-timestamp-initial-native-1/generate-native-tests.py",
+   "sha256": "bd54d57e710b617a1cc04d743548befc869921fb684bb0a257c1e01984555844"
+  },
+  {
+   "bytes": 1971807,
+   "path": "build/parity-closures/pandas-timestamp-initial-native-1/test_pandas_timestamp_filter.cpp",
+   "sha256": "400cb6422b1d66fc66a6431e513f3c101b8e991f9184fd883e9d3a04e620104f"
+  }
+ ],
+ "external_classification": "declared original payload/compiled identities; not embedded, not followed",
+ "external_declarations": 21,
+ "member_bindings": [
+  {
+   "bytes": 9188,
+   "path": "build/parity-closures/table-timestamp-next-plan-source-1/plan.py",
+   "sha256": "cbce9ea8bba1babe59bb2b3991dad33d72d6506c4919b74d6e674f91982fb4f1"
+  },
+  {
+   "bytes": 5152,
+   "path": "build/parity-closures/log-timestamp-next-table-timestamp-metadata-plan-1/report.json",
+   "sha256": "e86e9c820e1be0dc1766e31633fe41f2cd6b81fcfdaa9fdca933e509d8d23c77"
+  },
+  {
+   "bytes": 3573,
+   "path": "build/parity-closures/log-timestamp-next-table-timestamp-metadata-plan-1/public-signature-map.json",
+   "sha256": "50aefa2c85fd08507e228f40fec53bbb08900a8b19f49085f53768f4551930d3"
+  },
+  {
+   "bytes": 9011,
+   "path": "build/parity-closures/log-timestamp-next-table-timestamp-metadata-plan-1/source-declarations.json",
+   "sha256": "2010d3183ce11a69f48eb5b79fd1362a25ea6bbfa1cfb7510c9cc7fbf8c49b3e"
+  },
+  {
+   "bytes": 3714,
+   "path": "build/parity-closures/log-timestamp-next-table-timestamp-metadata-plan-1/preparation.json",
+   "sha256": "79f905aa082ad58b38179d9e84fec2a1c7fa810c1b5b53ff776faba215771c3f"
+  },
+  {
+   "bytes": 1286,
+   "path": "build/parity-closures/log-timestamp-next-table-timestamp-metadata-plan-1/validation.json",
+   "sha256": "1a36b18e0af10ccd63219d94ebfb1d4746d5bcb0679b63d6d7ae1123a1005c77"
+  },
+  {
+   "bytes": 13728,
+   "path": "build/parity-closures/pandas-timestamp-full861-admission-prepared-1/map-native.py",
+   "sha256": "82063a90477ed3c7b710d1c2696a5ed5526fbc7f2e8df8edaa94c1f9cdf138df"
+  },
+  {
+   "bytes": 5552,
+   "path": "build/parity-closures/pandas-timestamp-full861-admission-prepared-1/admit-root.py",
+   "sha256": "03b75229def9e074b3265dc9c9973ceea05fa1e39cc1ea8c4a14e68097e6590c"
+  },
+  {
+   "bytes": 6532,
+   "path": "build/parity-closures/pandas-timestamp-full861-root-admission-1/report.json",
+   "sha256": "557d5179f770a82cc6e13882db94e530e05bbf3bbd52b08db4e3b51dacf54a89"
+  },
+  {
+   "bytes": 3625,
+   "path": "build/parity-closures/pandas-timestamp-full861-root-admission-1/opaque-gate.json",
+   "sha256": "c397572ab9cb4e946d0f239e3b34fbf83b276a7d545bb0e8a9517158e117081c"
+  },
+  {
+   "bytes": 1181,
+   "path": "build/parity-closures/pandas-timestamp-full861-root-admission-1/census.json",
+   "sha256": "928466e2e7aeee5d8166d998f672219f5e944edd02d3ebc5efb9b45dd4604284"
+  },
+  {
+   "bytes": 225989,
+   "path": "build/parity-closures/pandas-timestamp-full861-root-admission-1/mapping.json",
+   "sha256": "8f92e2d6f42625cb5fc4f09b54fa1638e8ba063579c96c7577fbe3635600b9ca"
+  },
+  {
+   "bytes": 1305,
+   "path": "build/parity-closures/pandas-timestamp-full861-admission-run-1.log",
+   "sha256": "41aaf835cda2a62cbf9bc7b6b96a71c2669f6b85ab6939b0b39a61adcb871e7d"
+  },
+  {
+   "bytes": 2388,
+   "path": "build/parity-closures/pandas-timestamp-original-call-wire-frozen-1/wire.json",
+   "sha256": "ebadb6348de83db33d47a7988f3ff310e4a52b5acc34773480fb151a94f82904"
+  },
+  {
+   "bytes": 8331,
+   "path": "build/parity-closures/pandas-timestamp-transport-prepared-1/generate-root.py",
+   "sha256": "007132100d340be169f2b1303e36774e8dad1a0d515b5509de445c240e4880cd"
+  },
+  {
+   "bytes": 4683,
+   "path": "build/parity-closures/pandas-timestamp-transport-generated-1/report.json",
+   "sha256": "9b4e85d2abf151c5f9462412779e92bf5599998f3e3bafc557386a462c758cd7"
+  },
+  {
+   "bytes": 496,
+   "path": "build/parity-closures/pandas-timestamp-transport-run-1.log",
+   "sha256": "7d8a28e28e6c054635dc30cc2ab458bd3913e36bd8ffac73250d80b6d79447d6"
+  },
+  {
+   "bytes": 204,
+   "path": "build/parity-closures/pandas-timestamp-cmake-configure-1.log",
+   "sha256": "8108c73069dfaf03d43924dce52edd3294f648fb2deafc53192d3f13b64be740"
+  },
+  {
+   "bytes": 1254,
+   "path": "build/parity-closures/pandas-timestamp-native-build-1.log",
+   "sha256": "e09aa26c396cc9dc007ee907a68f0d2094dc08f6d454500cf170165ae334ae5f"
+  },
+  {
+   "bytes": 286,
+   "path": "build/parity-closures/pandas-timestamp-small-direct-1.log",
+   "sha256": "6383cef81ed20ede761dbf73add8f2be9a19b31f488679e470b1272892eb9d26"
+  },
+  {
+   "bytes": 596,
+   "path": "build/parity-closures/pandas-timestamp-public-build-1.log",
+   "sha256": "c61c0e53e09130431ec40c16f56545d2823259158575639ba70f42eb89cf2d1a"
+  },
+  {
+   "bytes": 1831,
+   "path": "build/parity-closures/pandas-timestamp-native-ctest-1.log",
+   "sha256": "f948c2d16d2752b71381633e0aa284ec88055261aa6dea7b147e80a3b94147f4"
+  },
+  {
+   "bytes": 548,
+   "path": "build/parity-closures/pandas-timestamp-oracle-build-1.log",
+   "sha256": "a0c921e6d12af74b5e012da1d5c76d9f3aa4a1a61329df383180ac55515fd94b"
+  },
+  {
+   "bytes": 3085,
+   "path": "build/parity-closures/pandas-timestamp-native-ctest-2.log",
+   "sha256": "6efd1749bdb60255cd92fd26c6d2f45a6e86ebd9fdec91b969cdbe28c5102049"
+  },
+  {
+   "bytes": 245,
+   "path": "build/parity-closures/pandas-timestamp-server-build-1.log",
+   "sha256": "4f42a7ea71db87e30ccb6f057776ff1295f03b2bd7b5e52f7c7b3250058e1550"
+  },
+  {
+   "bytes": 230,
+   "path": "build/parity-closures/pandas-timestamp-frontend-focused-1.log",
+   "sha256": "f2d65bc395f1c268ecf2d1611b2ea09a51fe47b5717da8fd7af9f4fb7cde882a"
+  },
+  {
+   "bytes": 0,
+   "path": "build/parity-closures/pandas-timestamp-frontend-tsc-1.log",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "bytes": 0,
+   "path": "build/parity-closures/pandas-timestamp-frontend-tsc-2.log",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "bytes": 8803,
+   "path": "build/parity-closures/pandas-timestamp-frontend-vite-1.log",
+   "sha256": "447866b43f8b652a79e7621ce7096d457873efdb65257921eb7a1972d2eb2636"
+  },
+  {
+   "bytes": 254,
+   "path": "build/parity-closures/pandas-timestamp-frontend-full-1.log",
+   "sha256": "314d027b770287e24e00b9fbce616b3312c034a2dbec4f9212b5c73d24dd855e"
+  },
+  {
+   "bytes": 17477,
+   "path": "build/parity-closures/pandas-timestamp-browser-owned-1.cjs",
+   "sha256": "08db1a5730bd062deec2da821df3eff46dad2ac7e754269d221d1f3bd6a39629"
+  },
+  {
+   "bytes": 73,
+   "path": "build/parity-closures/pandas-timestamp-browser-run-1.log",
+   "sha256": "5fe06d5de63761b1b724d04e8e0118256910acafd7ab250443a49d8a1185faf4"
+  },
+  {
+   "bytes": 8880,
+   "path": "build/parity-closures/pandas-timestamp-browser-output-1/report.json",
+   "sha256": "20bc40764022af0fcef8605a1e6c802936cb9bdde2d54a0dec1d87a5d86cae37"
+  },
+  {
+   "bytes": 14199,
+   "path": "src/backend/pandas_timestamp_original_call_parser.hpp",
+   "sha256": "a1033ec1f4dd88b6d6308490d58934f7bdc92e318491d4bf9673da236c879efc"
+  },
+  {
+   "bytes": 6425,
+   "path": "src/backend/pandas_timestamp_original_call_workbench.hpp",
+   "sha256": "dde652f6bdee6651151064d66e33521bab34309b9776d56d0539286cff01e64a"
+  },
+  {
+   "bytes": 8458,
+   "path": "src/backend/table_timestamp_filter_workbench.cpp",
+   "sha256": "7c47cb1c265b2afc38679e74dbd06fe384a3631d3268c767cf79dd505f349f5e"
+  },
+  {
+   "bytes": 7124,
+   "path": "src/backend/tests/test_pandas_timestamp_original_call_controls.cpp",
+   "sha256": "a8131ac2038abe48e5d9385ece6b56f2949248d3c9dbf48bc52221a2d0ea070b"
+  },
+  {
+   "bytes": 13292,
+   "path": "src/backend/tests/test_pandas_timestamp_workbench_public.cpp",
+   "sha256": "e0809b529b5204b1d111bf1d11a84e07a9bc3032abbeb2b529700444fd00eab4"
+  },
+  {
+   "bytes": 11992,
+   "path": "src/frontend/src/pandas-timestamp-original-call.ts",
+   "sha256": "85f1f6c06cd95d23e21e0b48a45859780df0bcc1123f9d4ccff033ccbaf796fe"
+  },
+  {
+   "bytes": 11017,
+   "path": "src/frontend/src/components/PandasTimestampOriginalCallWorkspace.tsx",
+   "sha256": "878c07aeab7b275b1ba7779ecd987e089d7c052bf96893b3b627cafc7555f099"
+  },
+  {
+   "bytes": 10683,
+   "path": "src/frontend/src/components/TableTimestampFilterWorkspace.tsx",
+   "sha256": "6aee0420ef49a4225c7fd55b60890fc6cddca55493b5f793136da02b2535e5f3"
+  },
+  {
+   "bytes": 12540,
+   "path": "src/frontend/tests/pandas-timestamp-original-call.test.ts",
+   "sha256": "03b418bb387bb9c3366c953a7a0bf851b24b0dd82d3562b960cf9a81b00fcb24"
+  },
+  {
+   "bytes": 3974,
+   "path": "docs/pandas-timestamp-original-call-workflow.md",
+   "sha256": "136d21601c3a90cfa8242d7a3f994d4e110fa40d1836da69b3d0c08bc7a56608"
+  }
+ ],
+ "members": 43,
+ "packager": {
+  "bytes": 5264,
+  "path": "build/parity-closures/pandas-timestamp-checkpoint-prepared-1/package.py",
+  "sha256": "4164ce7c3ff5fe7edce2f9f06c08c6856aa12fdc621c73b030b390b53c721e76"
+ },
+ "schema": "minera-pandas-timestamp-original-call-checkpoint-v1",
+ "scope": {
+  "calls": 861,
+  "errors": 559,
+  "native_direct_http_each": 861,
+  "tables": 302
+ }
+}
