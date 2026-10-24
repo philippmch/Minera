@@ -14,7 +14,7 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: full 342-call LOG timestamp admission and canonical census — 2026-10-24
+## Current continuation: full 342-call LOG timestamp index and native basis — 2026-10-24
 
 The sealed Polars checkpoint below is pushed. Actual remote readback `a3467c`
 verifies main at `94e0772eaa827e26343559121d2b542ed9728fb6`, including separate
@@ -76,12 +76,68 @@ path/count/overlap booleans. Independent final review is7,178 bytes, SHA256
 The prior metadata discovery/truncation disclosure and326/338 audit-timing
 correction remain intact; no complete-history, absence or new-call authority.
 
-Next: separately root-admit native oracle parsing after complete mapper source/
-IO review, independently map the entire monolithic oracle, all342 cases and all
-116/249 constructors, then expose and test original-call API/UI behavior.
-Parallel source-only work is preparing the native mapper and a distinct closed
-timestamp receipt-index profile. Neither worker reads original payloads or runs
-helpers/tests. The original kernel/oracle and capture producers remain unchanged.
+Root's separate native semantic admission is5,118 bytes, SHA256
+`12f4f9e2cdeb2b82abf2168589d8955deff1a119212b98da19f10e480c195934`.
+Whole native mapping `2b9903` passes the entire2,043,334-byte monolithic fixture:
+all116 log builders,249 trace builders,342 whole cases, support, dispatcher,
+storage controls and main. Reconstructed and current oracle SHA256 both equal
+`4578ca764ccf6d1f0e94d1443d47a4ff7b48c1f738e599362c29f017d6821e25`;
+only CRLF/LF normalization is permitted and no normalization difference occurs.
+Report `log-timestamp-full342-native-mapping-1/report.json` is5,554 bytes, SHA256
+`90c0c82a88199c1d2bde28fb4b0644802723a92d6df1d61c3c4b5b9dea094fb9`.
+Its hash-only mappings are315,906 bytes, SHA256
+`bf523b0a8f9900ad3686dcf2dd2c24918bc189053d0b15c1a2dd202db2edefb4`.
+Root preserved the author's source before adding exact independent-review-body/
+current-source checks and finite JSON-number validation; independent source
+review2 passes at5,853 bytes, SHA256
+`7adf4c127e45ff13a719767402a04bbdfb2c3d3ff1124c200ca06dd00e4ab7d6`.
+
+Actual predicates use27 distinct Trace control snapshots in186 before/after
+placements for93 calls. Native source mutations split20 successful log results
+and18 errors. Native construction projects49 option assignments:28 literal
+timestamp selectors,7 enum selectors and14 positive values. Three parameter
+entries are ignored and seven non-dict parameter values do not project. Ten
+generic stubs use the source-only/default-parameter call form and ignore eight
+kwargs objects. Python error args/type modules, object identity/aliases,
+datetime fold/offset metadata and full caller controls after invocation remain
+explicit original-observer domains outside the old native assertions.
+
+The unchanged native baseline builds (`4ff8c5`) and passes all342 retained cases
+plus its storage controls (`ec4d68`,1.07seconds). Owned test binary is2,533,888
+bytes, SHA256 `c272a32f3ff912a08fbf16533192172f2c56f83640a7129f6f673551bd66b796`.
+No test process/session remains live. Kernel, oracle and capture producers are
+unchanged; no old producer or GEN was executed/imported.
+
+The distinct `log-timestamp-packed-v1` receipt profile passes new27 synthetic
+integrity tests (`0efa11`) and all173 prior/new integrity tests (`4c6182`).
+Root inverse-source and AST proof (`e4ca83`) preserves all nine previous profiles
+after removing only the new profile/schema/doc mention and three dispatch gates.
+Full342 index acceptance `071413` resolves342 actual outcomes,342 exact light
+intents and342 module-free digest-only plans, verifies1,026 complete raw slices
+and freshly rehashes all nine sources for nine cache hits. Validation is
+`log-timestamp-admitted-index-acceptance-1/validation.json`,6,541 bytes, SHA256
+`9ef7b75ce55ccb43d5e090db61bd50b57a61fd91c00bc8528339de73695b7038`.
+The15,519,744-byte SQLite database is an external original-payload artifact,
+SHA256 `233acff3d826edac5d1ca70be998bf66ec6f6305cd84abef21991580bbbd7b21`.
+
+Index partitions retain each bank's complete original public_surface/runtime
+objects. Root separately admits and extracts the three exact validation metadata
+files (`999a44`), with no referenced path following. Safe OWN extraction is
+`log-timestamp-index-provenance-1/retained-provenance.json`,32,348 bytes, SHA256
+`f858db476d429dc917b83cd16469f04b35e67fbb76fdca2efdef5479292ecb8a`.
+The earlier incomplete common-signature manifest/runner stays preserved as a
+source draft. Tested index code/new tests remain unchanged; the guide's final
+edit only records the actual completed runtime checks after acceptance.
+Source commit is `63aa4664c3ac4a62b0a045ac10f4db7201db5747`. Root compares all
+three adopted source files to their committed bytes modulo CRLF/LF only:
+`log-timestamp-index-prepared-1/root-source-commit-proof.json`,1,838 bytes, SHA256
+`219f58ccd14cac2ed025e5d5cdcb841742d4a72250fc6077e43a63b449a90fe6`.
+
+Next: freeze the exact native original-call API/UI wire, expose all13 functions
+and verify every342 case through native/direct/owned HTTP acceptance plus the
+rendered workflow. Backend wire design is source-only work under
+`log-timestamp-original-call-design-prepared-1/`; no API/UI implementation or
+acceptance is claimed. Full201/565 scope and all authority limits remain intact.
 
 ## Previous checkpoint: full 411-call Polars variants API acceptance and rendered UI checks — 2026-10-23
 
