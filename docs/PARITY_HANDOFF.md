@@ -3286,8 +3286,14 @@ Rendered application interaction remains unverified.
 - Continue the wider OCDFG gate. Reuse the retained 77-call bank at
   `build/parity-closures/ocdfg-performance-public-actual-1/capture.json`;
   all retained timing/discovery/aggregation/strict-selector outcomes now have
-  acceptance. Design only new disjoint inputs for remaining domains. This
-  seventy-seven-outcome slice does not establish whole-module closure.
+  acceptance. A disjoint 53-log, five-profile discovery bank (265 public
+  outcomes, stable across hash seeds 0-3) now matches all 318 native outcomes
+  after the default elapsed path stopped losing microseconds; the bank is in
+  `docs/ocdfg-wider-discovery-evidence.json.gz` and the scripts rebuild it in
+  the cloud. Do not replay it. See `docs/ocdfg-wider-discovery-parity.md`.
+  Still open: mixed offsets in one column, nanosecond columns, importer
+  timezone handling, holiday calendars and benchmarking. Neither slice
+  establishes whole-module closure.
 - Keep arbitrary relation dataframe cells, dtype/storage domains, non-string
   grouping IDs and actual performance benchmarking explicit. The new timing
   companion supports string identities; do not silently coerce other domains.
