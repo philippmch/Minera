@@ -1,0 +1,203 @@
+{
+  "schema": "minera.alpha-plus.cleanup-selection-validation",
+  "version": 1,
+  "date": "2026-10-24",
+  "reference": {
+    "tag": "2.7.22",
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899",
+    "runtime": "Python 3.11.17 (Linux x86_64)",
+    "packages": {
+      "pm4py": "2.7.22",
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "networkx": "3.6.1",
+      "PuLP": "2.9.0"
+    },
+    "entry_point": "pm4py.algo.discovery.alpha.variants.plus.apply(log, parameters={'remove_unconnected': bool})"
+  },
+  "captures": [
+    {
+      "path": "docs/alpha-plus-cleanup-bank-a.json.gz",
+      "sha256": "fd53cea536bf084f654676996fcbf38d6b12de9d30e8e279732b08d5c88c4825",
+      "command": "capture-alpha-plus-cleanup-bank.py --cases 300 --seeds 8 --calls 3",
+      "rerun_byte_identical": true
+    },
+    {
+      "path": "docs/alpha-plus-cleanup-bank-b.json.gz",
+      "sha256": "cf3ff1e0700048cf73654a0e10e3f5c4564697ce1c564aa166cf2dff2c86d9e4",
+      "command": "capture-alpha-plus-cleanup-bank.py --cases 400 --seeds 16 --calls 3 --bank-seed 7340 --labels u,v,w,x,y --max-traces 4 --max-length 6",
+      "rerun_byte_identical": true
+    }
+  ],
+  "disjointness": "Every case contains an ordinary label; bank A uses p..s, bank B u..y, earlier corpora a, b, L, M and label_*. Pairwise literal overlap is zero.",
+  "native": {
+    "build": "cmake -G Ninja -DCMAKE_BUILD_TYPE=Release, g++ 13 on Linux",
+    "executable": "minera_export",
+    "sources": {
+      "include/minera/alpha_miner.hpp": "609229dc1615b1f081f28b23c16f7f96aa2c45a1402acce8c6e786a21c07c682",
+      "src/backend/alpha_miner.cpp": "f9103b560da09feab64e8b8de0b39a6446a2b97485ec5451b0b28f6e2371e94f",
+      "include/minera/alpha_result_json.hpp": "5e9ad4bee51069a7dbc8a40a3654df4c7375e666732bc1e43975ea641c296243",
+      "src/backend/alpha_result_json.cpp": "21573a5d36506dfb770065e46af42ab7b500e786ccac7a4393b2d9e25cc44f02",
+      "src/backend/tools/minera_export.cpp": "01a1f061ac481badcbbaf0e75e39216c6c062e107c89e08eaf177b34fcf90d97",
+      "scripts/capture-alpha-plus-cleanup-bank.py": "8e88de588c880c04058f5ac1700a1fd91216e96515c9a8577e94b5a46e49fdeb",
+      "scripts/check-alpha-plus-cleanup-bank.py": "b029da13477fa23a2fedac2d0925545f6d5f9e58ebb50f67ee9945a991989b6a",
+      "scripts/capture-alpha-plus-reference.py": "96080e3367faf984f761b8a6b36e68c1ef5dba86e4d51fa9c72dcf5999eb81fe"
+    }
+  },
+  "contract": [
+    "Every public outcome lies in the native enumerated support (failures compare by presence).",
+    "Cells with a single enumerated outcome are bound exactly.",
+    "The native default result is deterministic and equals the first enumerated alternative.",
+    "Cells with several enumerated outcomes bind no particular public choice."
+  ],
+  "pre_fix_native_failures": "In a preliminary bank A capture (before the ordinary-label filter), the native build without the empty-reduced-trace rejection had 12 public-only failure cells (3 logs x cleanup x order).",
+  "audits": [
+    {
+      "bank": "docs/alpha-plus-cleanup-bank-a.json.gz",
+      "bank_sha256": "dd011d478c940bb23a9b0548c4cb1ec61a439d1c1f372967f81163a91be0ae81",
+      "reference": "2.7.22",
+      "python": "3.11.17",
+      "hash_seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "trace_orders": [
+        "original",
+        "reversed"
+      ],
+      "calls_per_cell": 3,
+      "stats": {
+        "cells": 1200,
+        "constant_public_native_equal": 1056,
+        "enumerated_outcomes": 1152,
+        "enumerated_outcomes_observed": 1152,
+        "native_alternatives": 1172,
+        "native_pre_choice_failures": 96,
+        "native_support_multiple": 48,
+        "native_support_singleton": 1056,
+        "public_calls": 28800,
+        "public_constant": 1152,
+        "public_name_collision_cells": 288,
+        "public_varying": 48,
+        "varying_public_native_observed": 48
+      },
+      "failures": []
+    },
+    {
+      "bank": "docs/alpha-plus-cleanup-bank-b.json.gz",
+      "bank_sha256": "3ba346efa5c59f12ce9fe47853046cfa0bafbe851a40ab4d8dee14f021285363",
+      "reference": "2.7.22",
+      "python": "3.11.17",
+      "hash_seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "trace_orders": [
+        "original",
+        "reversed"
+      ],
+      "calls_per_cell": 3,
+      "stats": {
+        "cells": 1600,
+        "constant_public_native_equal": 1280,
+        "enumerated_outcomes": 1512,
+        "enumerated_outcomes_observed": 1512,
+        "native_alternatives": 1528,
+        "native_pre_choice_failures": 204,
+        "native_support_multiple": 116,
+        "native_support_singleton": 1280,
+        "public_calls": 76800,
+        "public_constant": 1484,
+        "public_name_collision_cells": 468,
+        "public_varying": 116,
+        "varying_public_native_observed": 116
+      },
+      "failures": []
+    },
+    {
+      "bank": "docs/alpha-plus-reference-fixtures.json",
+      "bank_sha256": "4ddb2e5ac840f6940adbd96e2a2d344a2ab0d84434b859bfc0572d1c81165bd2",
+      "reference": "2.7.22",
+      "python": null,
+      "hash_seeds": [
+        {
+          "python_hash_seed": "0",
+          "sha256": "2cd42f6f1b7eb4e5477f3212f959037c6653db0f3b677f8d7341c80fec93389a",
+          "rows": 784,
+          "samples_per_row": 20
+        },
+        {
+          "python_hash_seed": "1",
+          "sha256": "8fa8a6c6d6cee4abc21190d3f4d9f6e5d47e11e355a5f8cace019a3dce5ac1d2",
+          "rows": 784,
+          "samples_per_row": 20
+        },
+        {
+          "python_hash_seed": "2",
+          "sha256": "e73045ede7589256fa50f61a92021c3619573e9058d82dfe5ee5ebc1b2293d56",
+          "rows": 784,
+          "samples_per_row": 20
+        },
+        {
+          "python_hash_seed": "3",
+          "sha256": "229a9dc7fe299b4eecb3e315449244e05a0d14f108027312e9ef99371065db7e",
+          "rows": 784,
+          "samples_per_row": 20
+        },
+        {
+          "python_hash_seed": "4",
+          "sha256": "c4b8bb7e8e8026bee2926da6f3e0f5397d3ac6c05eeb083906155fde0e5b1177",
+          "rows": 784,
+          "samples_per_row": 20
+        }
+      ],
+      "trace_orders": [
+        "original"
+      ],
+      "calls_per_cell": null,
+      "stats": {
+        "cells": 774,
+        "constant_public_native_equal": 612,
+        "enumerated_outcomes": 756,
+        "enumerated_outcomes_observed": 756,
+        "native_alternatives": 756,
+        "native_pre_choice_failures": 90,
+        "native_support_multiple": 72,
+        "native_support_singleton": 612,
+        "public_calls": 846,
+        "public_constant": 702,
+        "public_name_collision_cells": 92,
+        "public_varying": 72,
+        "varying_public_native_observed": 72
+      },
+      "failures": []
+    }
+  ],
+  "limits": [
+    "Finite banks; support completeness is observed, not proved.",
+    "Structural-name summaries can equate distinct graphs in cells with duplicate place names.",
+    "Process-law and final-joint archives were not re-audited against the enumeration.",
+    "Per-process public choices and their frequencies are allocation artifacts outside the contract."
+  ]
+}
