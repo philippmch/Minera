@@ -9,7 +9,7 @@ sha256, provenance='own-public-observation', format ('json', 'jsonl',
 ('receipt-v1', 'pandas-before-v1', 'polars-receipt-v1', 'log-attributes-packed-v1',
 'pandas-attributes-before-v1', 'polars-attributes-receipt-v1',
 'log-variants-packed-v1', 'pandas-variants-before-v1',
-'polars-variants-receipt-v1', or 'digest-plan-v1'),
+'polars-variants-receipt-v1', 'log-timestamp-packed-v1', or 'digest-plan-v1'),
 receipt_schema, reference, runtime, and role
 ('observations', 'plans', or 'intents'). JSON object wrappers require records_key;
 otherwise JSON must be one record or an array of records. Envelope sources also
@@ -55,6 +55,7 @@ SCHEMAS = {
     'log-variants-packed-v1': ('minera-log-variants-observer-receipt-v1', 'positional_args_keyword_controls'),
     'pandas-variants-before-v1': ('minera-pandas-variants-observer-receipt-v1', 'dataframe-positional-plus-explicit-args-and-keywords'),
     'polars-variants-receipt-v1': ('minera-polars-variants-observer-receipt-v1', 'source_positional_all_options_keyword'),
+    'log-timestamp-packed-v1': ('minera-log-timestamp-observer-receipt-v1', 'positional_args_keyword_controls'),
 }
 LOG_ATTRIBUTES_MODULE = 'pm4py.algo.filtering.log.attributes.attributes_filter'
 LOG_ATTRIBUTES_ARITIES = {
@@ -1789,6 +1790,317 @@ def _polars_variants_entry(row, receipt):
         _polars_variants_messages(row['warnings'])
 
 
+# BEGIN CLOSED LOG TIMESTAMP PROFILE
+LOG_TIMESTAMP_MODULE = 'pm4py.algo.filtering.log.timestamp.timestamp_filter'
+LOG_TIMESTAMP_ARITIES = {'apply': 1, 'apply_auto_filter': 1, 'apply_events': 3,
+    'filter_on_trace_attribute': 3, 'filter_traces_attribute_in_timeframe': 5,
+    'filter_traces_completing_in_timeframe': 3, 'filter_traces_contained': 3,
+    'filter_traces_intersecting': 3, 'filter_traces_starting_in_timeframe': 3,
+    'has_attribute_in_timeframe': 6, 'is_contained': 4, 'is_intersecting': 4, 'trace_attr_is_contained': 4}
+LOG_TIMESTAMP_PREDICATES = {'has_attribute_in_timeframe', 'is_contained', 'is_intersecting', 'trace_attr_is_contained'}
+LOG_TIMESTAMP_CASE_FIELDS = {'name','function','attribute','attribute_value','attribute_values','dt1','dt2',
+    'empty_trace_attributes','event_overrides','kwargs','missing_attribute','missing_timestamp',
+    'missing_trace_attribute_keys','missing_trace_timestamp','parameters','parameters_mode','sequences',
+    'timestamp_key','trace_attribute_overrides','trace_timestamp'}
+LOG_TIMESTAMP_ENTRY_FIELDS = {'input_before','controls_before','input_after','controls_after',
+    'input_unchanged','controls_unchanged','warnings','apply_returned'}
+LOG_TIMESTAMP_TERMINALS = {'error','result','result_kind','value_result','result_value','output','return',
+    'returned','exception','error_type','returned_input_identity','trace_aliases_source','event_source_positions'}
+
+
+def _log_timestamp_need(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def _log_timestamp_exact(value, fields):
+    _log_timestamp_need(type(value) is dict and set(value) == set(fields), 'unknown/incomplete LOG timestamp fields')
+
+
+def _log_timestamp_trace(value, source=None, depth=0):
+    _log_timestamp_exact(value, {'attributes','properties','events'})
+    _log_timestamp_need(depth <= 256 and type(value['events']) is list, 'LOG timestamp trace events/depth')
+    for key in ('attributes','properties'):
+        _log_timestamp_packed(value[key], source, depth+1, 'dict')
+    for event in value['events']:
+        _log_timestamp_packed(event, source, depth+1, 'dict')
+
+
+def _log_timestamp_snapshot(value, source=None, depth=0):
+    _log_timestamp_exact(value, {'attributes','extensions','classifiers','omni_present','properties','traces'})
+    _log_timestamp_need(depth <= 256 and type(value['traces']) is list, 'LOG timestamp complete source traces')
+    for key in ('attributes','extensions','classifiers','omni_present','properties'):
+        _log_timestamp_packed(value[key], source, depth+1, 'dict')
+    for trace in value['traces']:
+        _log_timestamp_trace(trace, source, depth+1)
+
+
+def _log_timestamp_packed(value, source=None, depth=0, expected=None):
+    _log_timestamp_need(depth <= 256 and type(value) is dict and type(value.get('type')) is str,
+                        'LOG timestamp Packed value absent/deep')
+    kind = value['type']
+    _log_timestamp_need(expected is None or kind == expected, 'LOG timestamp Packed operand kind')
+    if kind in {'NoneType','str','bool','int'}:
+        _log_timestamp_exact(value, {'type','value'})
+        _log_timestamp_need(type(value['value']) is {'NoneType':type(None),'str':str,'bool':bool,'int':int}[kind], 'LOG timestamp scalar payload')
+    elif kind == 'float':
+        _log_timestamp_exact(value, {'type','hex'})
+        try:
+            _log_timestamp_need(type(value['hex']) is str and float.fromhex(value['hex']).hex() == value['hex'], 'LOG timestamp original float hex')
+        except (ValueError, OverflowError):
+            raise ValueError('LOG timestamp invalid float hex') from None
+    elif kind == 'bytes':
+        _log_timestamp_exact(value, {'type','hex'})
+        _log_timestamp_need(type(value['hex']) is str and re.fullmatch('(?:[0-9a-f]{2})*', value['hex']) is not None, 'LOG timestamp byte hex')
+    elif kind in {'native_na','nat'}:
+        _log_timestamp_exact(value, {'type'})
+    elif kind == 'uuid':
+        _log_timestamp_exact(value, {'type','value'})
+        _log_timestamp_need(type(value['value']) is str and re.fullmatch('[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', value['value']), 'LOG timestamp UUID')
+    elif kind == 'datetime':
+        _log_timestamp_exact(value, {'type','iso','fold','offset_seconds'})
+        _log_timestamp_need(type(value['iso']) is str and type(value['fold']) is int and value['fold'] in (0,1), 'LOG timestamp datetime fields')
+        try:
+            offset = datetime.datetime.fromisoformat(value['iso']).utcoffset()
+        except (ValueError, OverflowError):
+            raise ValueError('LOG timestamp invalid datetime iso') from None
+        seconds = value['offset_seconds']
+        _log_timestamp_need((seconds is None or type(seconds) in (int,float) and math.isfinite(seconds)) and
+            seconds == (None if offset is None else offset.total_seconds()), 'LOG timestamp datetime offset mismatch')
+    elif kind == 'enum':
+        _log_timestamp_exact(value, {'type','module','name','value'})
+        _log_timestamp_need(value['module'] == LOG_TIMESTAMP_MODULE and value['name'] == 'TIMESTAMP_KEY' and
+            value['value'] == {'type':'str','value':'pm4py:param:timestamp_key'}, 'LOG timestamp enum identity')
+    elif kind in {'list','tuple','set','frozenset'}:
+        _log_timestamp_exact(value, {'type','values'})
+        _log_timestamp_need(type(value['values']) is list, 'LOG timestamp sequence values')
+        for child in value['values']:
+            _log_timestamp_packed(child, source, depth+1)
+        if kind in {'set','frozenset'}:
+            _log_timestamp_need(value['values'] == sorted(value['values'], key=lambda item:json.dumps(item,sort_keys=True)), 'LOG timestamp original set order')
+    elif kind == 'dict':
+        _log_timestamp_exact(value, {'type','items'})
+        _log_timestamp_need(type(value['items']) is list, 'LOG timestamp ordered dictionary')
+        for pair in value['items']:
+            _log_timestamp_need(type(pair) is list and len(pair) == 2, 'LOG timestamp typed dictionary pair')
+            for child in pair:
+                _log_timestamp_packed(child, source, depth+1)
+    elif kind == 'log':
+        _log_timestamp_exact(value, {'type','snapshot'})
+        _log_timestamp_snapshot(value['snapshot'], source, depth+1)
+    elif kind == 'trace':
+        _log_timestamp_exact(value, {'type','snapshot','source_trace_index'})
+        _log_timestamp_trace(value['snapshot'], source, depth+1)
+        index = value['source_trace_index']
+        _log_timestamp_need(index is None or type(index) is int and index >= 0, 'LOG timestamp trace source index')
+        if source is not None and index is not None:
+            _log_timestamp_need(index < len(source['traces']) and value['snapshot'] == source['traces'][index], 'LOG timestamp trace/source snapshot mismatch')
+    else:
+        raise ValueError('unknown LOG timestamp producer Packed tag')
+
+
+def _log_timestamp_kwargs(value, source=None):
+    _log_timestamp_packed(value, source, expected='dict')
+    names = []
+    for key, child in value['items']:
+        _log_timestamp_need(key == {'type':'str','value':'parameters'} and key['value'] not in names,
+                            'unknown/duplicate LOG timestamp supplied keyword')
+        names.append(key['value'])
+
+
+def _log_timestamp_source(args, source, function):
+    first = args['values'][0]
+    if function in LOG_TIMESTAMP_PREDICATES:
+        _log_timestamp_need(first['type'] == 'trace' and type(first['source_trace_index']) is int,
+                            'LOG timestamp predicate needs genuine indexed Trace')
+        if source is not None:
+            index = first['source_trace_index']
+            _log_timestamp_need(0 <= index < len(source['traces']) and first['snapshot'] == source['traces'][index],
+                                'LOG timestamp predicate full source binding')
+    else:
+        _log_timestamp_need(first['type'] == 'log' and (source is None or first['snapshot'] == source),
+                            'LOG timestamp filter/stub full EventLog source')
+
+
+def _log_timestamp_receipt(receipt, source=None):
+    _log_timestamp_exact(receipt, {'module','function','args','kwargs','call_shape'})
+    _log_timestamp_need(receipt['module'] == LOG_TIMESTAMP_MODULE and type(receipt['function']) is str and
+        receipt['function'] in LOG_TIMESTAMP_ARITIES and receipt['call_shape'] == SCHEMAS['log-timestamp-packed-v1'][1],
+        'unknown LOG timestamp canonical identity')
+    _log_timestamp_packed(receipt['args'], source, expected='list')
+    _log_timestamp_need(len(receipt['args']['values']) == LOG_TIMESTAMP_ARITIES[receipt['function']], 'LOG timestamp supplied arity')
+    _log_timestamp_source(receipt['args'], source, receipt['function'])
+    _log_timestamp_kwargs(receipt['kwargs'], source)
+
+
+def _log_timestamp_case(case, receipt):
+    _log_timestamp_need(type(case) is dict and not set(case)-LOG_TIMESTAMP_CASE_FIELDS and
+        type(case.get('name')) is str and bool(case['name']) and case.get('function') == receipt['function'],
+        'LOG timestamp full producer case metadata')
+
+
+def _log_timestamp_controls(value, source, receipt):
+    _log_timestamp_exact(value, {'args','kwargs'})
+    _log_timestamp_packed(value['args'], source, expected='list')
+    _log_timestamp_need(len(value['args']['values']) == len(receipt['args']['values']), 'LOG timestamp after positional arity')
+    _log_timestamp_source(value['args'], source, receipt['function'])
+    _log_timestamp_kwargs(value['kwargs'], source)
+    _log_timestamp_need([pair[0] for pair in value['kwargs']['items']] == [pair[0] for pair in receipt['kwargs']['items']],
+                        'LOG timestamp after keyword identities')
+
+
+def _log_timestamp_warnings(value):
+    _log_timestamp_need(type(value) is list, 'LOG timestamp warnings missing')
+    for warning in value:
+        _log_timestamp_exact(warning, {'category','message'})
+        _log_timestamp_need(all(type(warning[key]) is str for key in ('category','message')), 'LOG timestamp warning metadata')
+
+
+def _log_timestamp_outcome(row, receipt):
+    base = {'index','module','case','receipt_sha256','receipt','input_before','controls_before','warnings',
+            'input_after','controls_after','input_unchanged','controls_unchanged'}
+    terminal = {'error'} if 'error' in row else {'result_kind','result','returned_input_identity','trace_aliases_source','event_source_positions'} if 'result' in row else {'result_kind','value_result'}
+    _log_timestamp_exact(row, base|terminal)
+    _log_timestamp_need(type(row['index']) is int and row['index'] > 0 and row['module'] == LOG_TIMESTAMP_MODULE, 'LOG timestamp outcome index/module')
+    _log_timestamp_case(row['case'], receipt)
+    before = row['input_before'];after = row['input_after']
+    _log_timestamp_snapshot(before, before);_log_timestamp_snapshot(after, after)
+    _log_timestamp_receipt(receipt, before)
+    _log_timestamp_need(row['controls_before'] == {'args':receipt['args'],'kwargs':receipt['kwargs']}, 'LOG timestamp complete before controls')
+    _log_timestamp_controls(row['controls_after'], after, receipt)
+    for key, truth in [('input_unchanged',before == after),('controls_unchanged',row['controls_before'] == row['controls_after'])]:
+        _log_timestamp_need(type(row[key]) is bool and row[key] == truth, 'LOG timestamp mutation flag contradiction')
+    _log_timestamp_warnings(row['warnings'])
+    if 'error' in row:
+        error = row['error'];_log_timestamp_exact(error, {'type','message','args'})
+        _log_timestamp_need(type(error['type']) is str and re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+',error['type']) and type(error['message']) is str,
+                            'LOG timestamp full qualified error/message')
+        _log_timestamp_packed(error['args'], after, expected='tuple')
+        return
+    if 'result' not in row:
+        _log_timestamp_need(receipt['function'] in LOG_TIMESTAMP_PREDICATES and row['result_kind'] == 'value', 'LOG timestamp predicate bool result identity')
+        _log_timestamp_packed(row['value_result'], after, expected='bool')
+        return
+    _log_timestamp_need(receipt['function'] not in LOG_TIMESTAMP_PREDICATES and row['result_kind'] == 'log' and
+        type(row['returned_input_identity']) is bool, 'LOG timestamp returned EventLog identity')
+    _log_timestamp_snapshot(row['result'], after)
+    aliases = row['trace_aliases_source'];positions = row['event_source_positions'];traces = row['result']['traces']
+    _log_timestamp_need(type(aliases) is list and len(aliases) == len(traces) and all(type(value) is bool for value in aliases) and
+        type(positions) is list and len(positions) == len(traces), 'LOG timestamp full alias outer shape')
+    if row['returned_input_identity']:
+        _log_timestamp_need(row['result'] == after and all(aliases), 'LOG timestamp returned-input contradiction')
+    for trace, alias, group in zip(traces,aliases,positions):
+        _log_timestamp_need(not alias or trace in after['traces'], 'LOG timestamp trace alias/source contradiction')
+        _log_timestamp_need(type(group) is list, 'LOG timestamp flattened sparse event aliases')
+        mapped = []
+        for pair in group:
+            _log_timestamp_need(type(pair) is list and len(pair) == 2 and all(type(index) is int for index in pair), 'LOG timestamp source event index pair')
+            ti,ei = pair
+            _log_timestamp_need(0 <= ti < len(after['traces']) and 0 <= ei < len(after['traces'][ti]['events']), 'LOG timestamp source event bounds')
+            mapped.append(after['traces'][ti]['events'][ei])
+        # Producer flattens zero/one/multiple identity matches per event into
+        # one list per result trace. Copied events may contribute zero pairs.
+        reachable = {0}
+        for event in trace['events']:
+            following = set() if alias else set(reachable)
+            for start in reachable:
+                for end in range(start,len(mapped)):
+                    if mapped[end] != event:
+                        break
+                    if end > start and tuple(group[end]) <= tuple(group[end-1]):
+                        break
+                    following.add(end+1)
+            reachable = following
+        _log_timestamp_need(len(mapped) in reachable, 'LOG timestamp flattened sparse aliases contradict full result')
+
+
+def _log_timestamp_audit(data, spec):
+    _log_timestamp_need(spec['adapter'] == 'digest-plan-v1' and spec['role'] == 'plans' and spec.get('records_key') == 'receipts',
+                        'LOG timestamp digest audit selector/role')
+    audit = load_json(data)
+    _log_timestamp_exact(audit, {'planned','prior_paths','prior_receipt_count','duplicates','prior_overlaps','receipts'})
+    _log_timestamp_need(type(audit['planned']) is int and audit['planned'] > 0 and type(audit['prior_receipt_count']) is int and
+        audit['prior_receipt_count'] >= 0 and type(audit['prior_paths']) is list and type(audit['receipts']) is list and
+        type(audit['duplicates']) is list and audit['prior_overlaps'] == [], 'LOG timestamp full digest-audit grammar')
+    paths = audit['prior_paths']
+    _log_timestamp_need(all(type(path) is str for path in paths) and len(paths) == len(set(paths)), 'LOG timestamp prior declaration paths')
+    for path in paths:
+        safe_path(path)
+    cases = {};digests = set()
+    for row in audit['receipts']:
+        _log_timestamp_exact(row, {'case','receipt_sha256'})
+        _log_timestamp_need(type(row['case']) is str and row['case'] and row['case'] not in cases and
+            type(row['receipt_sha256']) is str and re.fullmatch('[0-9a-f]{64}',row['receipt_sha256']) and row['receipt_sha256'] not in digests,
+            'LOG timestamp duplicate/invalid digest plan')
+        cases[row['case']] = row['receipt_sha256'];digests.add(row['receipt_sha256'])
+    duplicates = set()
+    for row in audit['duplicates']:
+        _log_timestamp_exact(row, {'first','duplicate','receipt_sha256'})
+        _log_timestamp_need(type(row['first']) is str and row['first'] in cases and cases[row['first']] == row['receipt_sha256'] and
+            type(row['duplicate']) is str and row['duplicate'] and row['duplicate'] not in cases and row['duplicate'] not in duplicates,
+            'LOG timestamp duplicate candidate declaration')
+        duplicates.add(row['duplicate'])
+    _log_timestamp_need(audit['planned'] == len(cases)+len(duplicates), 'LOG timestamp planned digest count')
+
+
+def _log_timestamp_entry(row, receipt):
+    allowed = {'index','module','case','receipt_sha256','receipt'}|LOG_TIMESTAMP_ENTRY_FIELDS
+    _log_timestamp_need(not set(row)-allowed and any(key in row for key in ('input_after','controls_after','apply_returned')),
+                        'LOG timestamp partial entry requires explicit entry evidence')
+    _log_timestamp_need(type(row.get('index')) is int and row['index'] > 0 and row.get('module') == LOG_TIMESTAMP_MODULE, 'LOG timestamp partial index/module')
+    _log_timestamp_case(row['case'],receipt)
+    before = row.get('input_before')
+    if before is not None:
+        _log_timestamp_snapshot(before,before);_log_timestamp_receipt(receipt,before)
+    if 'controls_before' in row:
+        _log_timestamp_need(row['controls_before'] == {'args':receipt['args'],'kwargs':receipt['kwargs']}, 'LOG timestamp partial before controls')
+    after = row.get('input_after')
+    if after is not None:
+        _log_timestamp_snapshot(after,after)
+    if 'controls_after' in row:
+        _log_timestamp_need(after is not None, 'LOG timestamp partial controls require full after source')
+        _log_timestamp_controls(row['controls_after'],after,receipt)
+    for key in ('input_unchanged','controls_unchanged','apply_returned'):
+        if key in row:
+            _log_timestamp_need(type(row[key]) is bool, 'LOG timestamp partial entry boolean')
+    if 'input_unchanged' in row:
+        _log_timestamp_need(before is not None and after is not None and row['input_unchanged'] == (before == after), 'LOG timestamp partial source mutation flag')
+    if 'controls_unchanged' in row:
+        _log_timestamp_need('controls_after' in row and row['controls_unchanged'] == ({'args':receipt['args'],'kwargs':receipt['kwargs']} == row['controls_after']), 'LOG timestamp partial controls mutation flag')
+    if 'warnings' in row:
+        _log_timestamp_warnings(row['warnings'])
+
+
+def _log_timestamp_adapt(row, spec):
+    digest = row.get('receipt_sha256');role = spec['role']
+    _log_timestamp_need(type(digest) is str and re.fullmatch('[0-9a-f]{64}',digest), 'LOG timestamp receipt digest missing')
+    if spec['adapter'] == 'digest-plan-v1':
+        _log_timestamp_need(role == 'plans', 'LOG timestamp digest plans require plan provenance')
+        _log_timestamp_exact(row, {'case','receipt_sha256'})
+        _log_timestamp_need(type(row['case']) is str and row['case'], 'LOG timestamp digest plan case identifier')
+        return None,None,None,digest,'digest_only_plan'
+    _log_timestamp_need(spec['adapter'] == 'log-timestamp-packed-v1', 'LOG timestamp requires closed Packed adapter')
+    if 'receipt' not in row:
+        _log_timestamp_need(role == 'intents', 'LOG timestamp full receipt absent')
+        _log_timestamp_exact(row, {'index','module','function','case','receipt_sha256'})
+        _log_timestamp_need(type(row['index']) is int and row['index'] > 0 and row['module'] == LOG_TIMESTAMP_MODULE and
+            type(row['function']) is str and row['function'] in LOG_TIMESTAMP_ARITIES and type(row['case']) is str and row['case'], 'LOG timestamp exact light-intent identity')
+        return row['module'],row['function'],None,digest,'entered_without_outcome'
+    receipt = row['receipt'];_log_timestamp_receipt(receipt,row.get('input_before'))
+    raw = canonical(receipt);_log_timestamp_need(sha(raw) == digest, 'LOG timestamp original canonical digest mismatch')
+    if set(row)&LOG_TIMESTAMP_TERMINALS:
+        _log_timestamp_outcome(row,receipt);status = 'actual_outcome'
+    elif set(row)&LOG_TIMESTAMP_ENTRY_FIELDS:
+        _log_timestamp_entry(row,receipt);status = 'entered_without_outcome'
+    else:
+        _log_timestamp_need(role in {'plans','intents'}, 'LOG timestamp before-only row has no terminal or entry evidence')
+        _log_timestamp_exact(row, {'case','receipt','receipt_sha256'})
+        _log_timestamp_need(type(row['case']) is str and row['case'], 'LOG timestamp canonical plan case')
+        status = 'planned_only' if role == 'plans' else 'entered_without_outcome'
+    return LOG_TIMESTAMP_MODULE,receipt['function'],raw,digest,status
+# END CLOSED LOG TIMESTAMP PROFILE
+
+
 def adapt(row, spec):
     if not isinstance(row, dict):
         raise ValueError('record must be an object')
@@ -1802,6 +2114,8 @@ def adapt(row, spec):
             raise ValueError('unknown original receipt schema')
     elif spec.get('receipt_schema') != SCHEMAS[adapter][0]:
         raise ValueError('unknown original receipt schema for adapter')
+    if spec.get('receipt_schema') == SCHEMAS['log-timestamp-packed-v1'][0]:
+        return _log_timestamp_adapt(row, spec)
     if spec.get('receipt_schema') == SCHEMAS['pandas-variants-before-v1'][0]:
         return _pandas_variants_adapt(row, spec)
     if spec.get('receipt_schema') == SCHEMAS['polars-variants-receipt-v1'][0]:
@@ -1972,6 +2286,8 @@ class Index:
                 if not spec.get(field):
                     raise ValueError('missing declared ' + field)
             partition = canonical([spec['reference'], spec['runtime']]).decode()
+            if spec['receipt_schema'] == SCHEMAS['log-timestamp-packed-v1'][0] and spec.get('records_key') is not None:
+                _log_timestamp_audit(data, spec)
             if spec['receipt_schema'] == SCHEMAS['pandas-variants-before-v1'][0] and spec.get('records_key') is not None:
                 _pandas_variants_audit(data, spec)
             if spec['receipt_schema'] == SCHEMAS['polars-variants-receipt-v1'][0] and spec.get('records_key') is not None:
@@ -2014,6 +2330,12 @@ class Index:
                         if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
                             hints.append(row['receipt']['module'])
                         if any(hint != POLARS_ATTRIBUTES_MODULE for hint in hints):
+                            gap_row = None
+                    if spec['receipt_schema'] == SCHEMAS['log-timestamp-packed-v1'][0] and isinstance(row, dict):
+                        hints = [row['module']] if 'module' in row else []
+                        if isinstance(row.get('receipt'), dict) and 'module' in row['receipt']:
+                            hints.append(row['receipt']['module'])
+                        if any(hint != LOG_TIMESTAMP_MODULE for hint in hints):
                             gap_row = None
                     if spec['receipt_schema'] == SCHEMAS['log-variants-packed-v1'][0] and isinstance(row, dict):
                         hints = [row['module']] if 'module' in row else []
