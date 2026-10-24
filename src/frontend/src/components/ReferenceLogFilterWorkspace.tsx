@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from "react";
 import {LtlFilterWorkspace} from "./LtlFilterWorkspace";
 import {LogAttributesFilterWorkspace} from "./LogAttributesFilterWorkspace";
 import {LogVariantsFilterWorkspace} from "./LogVariantsFilterWorkspace";
+import {LogTimestampOriginalCallWorkspace} from "./LogTimestampOriginalCallWorkspace";
 import {TableAttributeRepetitionWorkspace} from "./TableAttributeRepetitionWorkspace";
 import type {TableRepetitionEngine} from "../table-attribute-repetition";
 import {downloadQueryBlob} from "../log-query";
@@ -18,12 +19,12 @@ export interface ReferenceLogFilterWorkspaceProps {
   initialOperation?: ReferenceLogFilterOperation;
   initialForm?: ReferenceLogFilterForm;
   initialEngine?: "log" | TableRepetitionEngine;
-  initialLogFamily?: "existing" | "attributes" | "ltl" | "variants";
+  initialLogFamily?: "existing" | "attributes" | "ltl" | "variants" | "timestamp";
 }
 export function ReferenceLogFilterWorkspace(props: ReferenceLogFilterWorkspaceProps) {
   const [engine, setEngine] = useState<"log" | TableRepetitionEngine>(props.initialEngine ?? "log");
-  const [logFamily,setLogFamily] = useState<"existing"|"attributes"|"ltl"|"variants">(props.initialLogFamily ?? "existing");
-  return <><section className="panel query-workspace"><label className="filters-field"><span>Filter data model</span><select value={engine} onChange={event => setEngine(event.target.value as "log" | TableRepetitionEngine)}><option value="log">Event log</option><option value="pandas">pandas dataframe</option><option value="polars">Polars</option></select></label>{engine === "log" && <label className="filters-field"><span>Event log filter family</span><select value={logFamily} onChange={event=>setLogFamily(event.target.value as "existing"|"attributes"|"ltl"|"variants")}><option value="existing">Sequences, cases, paths, time and variants</option><option value="attributes">Event and trace attributes</option><option value="ltl">Activity relationships and performers</option><option value="variants">Original activity-variant calls</option></select></label>}</section>{engine === "log" ? logFamily === "variants" ? <LogVariantsFilterWorkspace/> : logFamily === "ltl" ? <LtlFilterWorkspace engine="log" onOpenLog={props.onOpenLog}/> : logFamily === "attributes" ? <LogAttributesFilterWorkspace onOpenLog={props.onOpenLog}/> : <ReferenceLogFilterLogWorkspace {...props}/> : <TableAttributeRepetitionWorkspace key={engine} engine={engine}/>}</>;
+  const [logFamily,setLogFamily] = useState<"existing"|"attributes"|"ltl"|"variants"|"timestamp">(props.initialLogFamily ?? "existing");
+  return <><section className="panel query-workspace"><label className="filters-field"><span>Filter data model</span><select value={engine} onChange={event => setEngine(event.target.value as "log" | TableRepetitionEngine)}><option value="log">Event log</option><option value="pandas">pandas dataframe</option><option value="polars">Polars</option></select></label>{engine === "log" && <label className="filters-field"><span>Event log filter family</span><select value={logFamily} onChange={event=>setLogFamily(event.target.value as "existing"|"attributes"|"ltl"|"variants"|"timestamp")}><option value="existing">Sequences, cases, paths, time and variants</option><option value="attributes">Event and trace attributes</option><option value="ltl">Activity relationships and performers</option><option value="variants">Original activity-variant calls</option><option value="timestamp">Original timestamp calls</option></select></label>}</section>{engine === "log" ? logFamily === "timestamp" ? <LogTimestampOriginalCallWorkspace/> : logFamily === "variants" ? <LogVariantsFilterWorkspace/> : logFamily === "ltl" ? <LtlFilterWorkspace engine="log" onOpenLog={props.onOpenLog}/> : logFamily === "attributes" ? <LogAttributesFilterWorkspace onOpenLog={props.onOpenLog}/> : <ReferenceLogFilterLogWorkspace {...props}/> : <TableAttributeRepetitionWorkspace key={engine} engine={engine}/>}</>;
 }
 function ReferenceLogFilterLogWorkspace({onOpenLog, initialOperation = "rework", initialForm}: ReferenceLogFilterWorkspaceProps) {
   const [source, setSource] = useState<File | null>(null);
