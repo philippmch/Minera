@@ -14,7 +14,76 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: full342 LOG timestamp API/UI acceptance — 2026-10-24
+## Current continuation: full861 pandas timestamp API/UI acceptance — 2026-10-24
+
+The LOG timestamp checkpoint below is on origin/main. The
+next family is the table timestamp pair; pandas is done, Polars is next. Full
+scope remains 86 packages / 387 modules, 201 strict open units and 565
+unentered grouping queries. No catalogue row was promoted; offline structural
+validation passes unchanged 46/40 packages and 226/161 modules.
+
+Source-only plan: `log-timestamp-next-table-timestamp-metadata-plan-1/` (source
+`table-timestamp-next-plan-source-1/plan.py`) reads only OWN bank validation,
+acceptance bindings, contracts and headers. It records pandas 861 (302/559)
+and Polars 732 (229/503) totals and copies 18 pandas and 26 Polars declared
+original whole-file pins without opening them. Validation SHA256
+`1a36b18e0af10ccd63219d94ebfb1d4746d5bcb0679b63d6d7ae1123a1005c77`.
+
+ROOT pandas admission (`pandas-timestamp-full861-admission-prepared-1/`) binds
+all 18 declared originals to their pins before any decode, then recomputes
+every canonical receipt: 861 distinct, intents/audit/plan aligned, 302 tables /
+559 errors, zero mutations and warnings. Functions: apply 7, apply_auto_filter
+7, apply_events 131, attribute 156, completing 128, contained/intersecting/
+starting 144 each. Parameter states: mapping 779, entries 36, raw 20, null 14,
+omitted 12. The independent OWN mapper (never oldGEN) rebuilds the unchanged
+1,971,807-byte native oracle byte-exact (117 snapshots). Report SHA256
+`557d5179f770a82cc6e13882db94e530e05bbf3bbd52b08db4e3b51dacf54a89` at
+`pandas-timestamp-full861-root-admission-1/report.json`. The admission was
+reviewed by ROOT only; no separate independent-review agent was used.
+
+Wire is frozen in `pandas-timestamp-original-call-wire-frozen-1/wire.json` and
+documented in `docs/pandas-timestamp-original-call-workflow.md`:
+`/api/reference-table-timestamp` enters original mode when `call_json` is
+present; descriptor `minera-pandas-timestamp-original-call-v1` holds exact
+arity args and an optional `parameters` entry. Enum-keyed dictionaries use the
+ordered parameter vector; other values the raw arm (helpers always raw). The
+23-field response adds call, controls before/after and call projection.
+Backend commit `c5ac33b6`; frontend/doc commit `493f3ae5`.
+
+ROOT transport generation re-binds every original, reproduces the census and
+whole oracle, then emits the 1,964,359-byte external fixture once (SHA256
+`71286e69b3d31c944fabebbf0b5fa13bf583d71a29073aa328ac19e3389b0d01`); report
+`pandas-timestamp-transport-generated-1/report.json`. CTest run 1 had the
+standalone oracle target unbuilt in `build/` (Not Run) while the other four
+passed; it is preserved. Run 2 (`pandas-timestamp-native-ctest-2.log`) passes
+all five: oracle 302/559, controls, 861 native + 861 direct + 861 owned HTTP
+(46.33 s) and both existing table timestamp workbench/route suites. Production
+server builds; SHA256
+`f6d00c9c9911436d1a4d0a6127ec7eb616bb461445de66196b2a14f8bc2c76a9`.
+
+Frontend: focused 21, TypeScript, Vite (`pandas-timestamp-frontend-dist-1`) and
+full 203 files / 9,963 tests pass. Owned headless browser
+(`pandas-timestamp-browser-owned-1.cjs`) passes 22 checks, 17 requests and 12
+byte-exact downloads: all six filters with independent row selections, typed
+and enum examples, helper and parser diagnostics, malformed control text,
+BOM/CRLF/wide import, operation retention, held cancel/edit races, genuine
+filtered File reuse, mobile layout and the preserved friendly form. All three
+screenshots were inspected; owned server and Chrome stopped. Report 8,880
+bytes, SHA256 `20bc40764022af0fcef8605a1e6c802936cb9bdde2d54a0dec1d87a5d86cae37`.
+
+`docs/retained-pandas-timestamp-original-call-checkpoint.jsonl.gz` (123,429
+bytes, SHA256 `b8fef0494a8bada19a9a81fd3c60d8cef6a7b8c4fcf83948515f997ab1ac4769`)
+embeds 43 OWN members and declares 21 external pins; closed readback passes.
+Manifest SHA256
+`f04aecbd32df58908f02ef1aa94068c9d2811d3d4b52107b2e9ddeed700f3029`.
+
+Next: separate ROOT admission of the 26 declared Polars originals (three
+banks, 732 calls, eager/lazy and apply/collect phases), census and whole-native
+fixture mapping, then the same original-call wire/UI/transport/browser
+pattern. Do not replay retained banks. Push of the four local pandas commits
+awaits owner approval.
+
+## Previous checkpoint: full342 LOG timestamp API/UI acceptance — 2026-10-24
 
 All13 original LOG timestamp functions now have an original-call API and a
 rendered workbench. Backend/acceptance commit is `a8dd00b0`; frontend/workflow
