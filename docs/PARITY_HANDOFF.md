@@ -14,7 +14,123 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: full 342-call LOG timestamp index and native basis — 2026-10-24
+## Current continuation: full342 LOG timestamp API/UI acceptance — 2026-10-24
+
+All13 original LOG timestamp functions now have an original-call API and a
+rendered workbench. Backend/acceptance commit is `a8dd00b0`; frontend/workflow
+commit is `bb0c79c0844be735ffc8752abddc1fd66c06c592`; evidence commit is
+`53f9d675`. Full scope remains86 packages /387 modules,201 strict open units
+and565 unentered grouping queries. No catalogue row was promoted.
+
+`POST /api/reference-log-timestamp` requires exactly operation, genuine native
+source_file and raw call_json, without query controls or duplicate parts. The
+descriptor is `minera-log-timestamp-original-call-v1`, with non-source args,
+ordered keyword_entries and a nullable source_trace_index. Predicates receive
+the actual source.traces reference. The seven filters receive an explicitly
+passed caller-owned Options object even when parameters are omitted or raw;
+ordered literal/enum timestamp and positive entries assign its actual members.
+The two source-only helpers retain their implicit default call syntax, marked
+`implicit_default_not_inspected`. Unused descriptor values remain metadata.
+The18-tag grammar and15 native attribute tags remain distinct. Kernel, public
+native header, original oracle and shared codecs are unchanged.
+
+The exact25-field response records native_returned/result_kind independently
+from export. Actual source, operand and Options snapshots are captured before
+and after success or native failure. Optional enum selector absence is null;
+predicate trace wrappers are inspection artifacts. Full source-after mutations
+survive native errors. Internal inspection/export failures use500 and preserve
+primary native diagnostics; frontend500 handling has synthetic acceptance,
+while actual internal fault injection remains unverified. Value comparisons
+do not imply Python object identity. Workflow contract is
+`docs/log-timestamp-original-call-workflow.md`.
+
+ROOT fully reviewed the new transport generator/IO and independent source
+review, then separately reverified all13 complete original inputs twice before
+admission. Admission SHA256 is
+`5d6563d91079567b96533d132965e497c7e729282de97864460dfecd62d2be00` at
+`log-timestamp-transport-prepared-1/root-admission.json`. Generation `e96d92`
+passes complete census identities/placements, complete mapping and the entire
+unchanged2,043,334-byte oracle before emitting new342 transport vectors. The
+1,583,109-byte external fixture has SHA256
+`64527cf7e8d514e380488e5bc87167581bfabe2ee940cd2ff0fabfb9da50e3e4`;
+generation report is3,771 bytes, SHA256
+`3b297e5164df5d09fd0c0adb42ba34668082a183470727b4e55de9cc45387aaa`
+at `log-timestamp-transport-generated-1/report.json`. No old capture producer,
+oldGEN or reference implementation was imported/executed; no new reference call.
+
+The generator's first source draft stays in source-revision-1. Independent
+review found a filesystem-loader bytecode/current-byte issue and dangling-link
+path admission before execution. Final source compiles only pinned OWN mapper
+bytes in a fresh namespace, uses lstat checks and rechecks every complete input.
+It constructs Options only for the seven filters. Independent review is
+`log-timestamp-transport-independent-source-review-1/review.json`.
+
+Native acceptance `c38dcd` passes all four new suites in76.43seconds. The full
+public suite passes342 original native cases plus storage controls,342 direct
+workbench and342 owned HTTP cases. Independent native invocations supply actual
+operand/Options/source controls rather than product-parser mirrors. Every25
+field value, full135 returned logs,48 Boolean values,159 complete native errors
+and38 source/control mutations agree. All native source/result/cell/control
+artifacts reopen; descriptor/projection JSON and successful XES reopen too.
+Five rebuilt prior regression suites pass `0de233` in71.73seconds: complete
+log-variants public transport, table-timestamp workbench/route and friendly
+log-filter workbench/route. Logs are `log-timestamp-native-{ctest,regression}-1.log`.
+
+Production server initially failed compilation because ROOT's new route include
+needed its public header before the anonymous namespace. The original failure
+is preserved in log-timestamp-native-build-1.log. Final server build `ea742d`
+passes with executable SHA256
+`fde42651ec0f45eb352fe5535431f272bb5dd19d7041204fccbf609e498885c3`.
+No native/oracle/fixture change was needed after full342 acceptance.
+
+Frontend full suite `8486a5` passes202 files /9951 tests. Review then fixes two
+small issues: predicate examples now use aware Z/offset0 bounds, and current-call
+downloads use nativeStringBytes to match diagnostic submission bytes. Final
+focused33 tests, TypeScript and Vite pass `7cba76`; the full9951 run precedes
+these two separately covered fixes. Imported BOM/CRLF and wide integer tokens
+remain untouched, including when operations change. Only complete successful
+genuine returned native log Files can be reused. Bool false and all available
+error artifacts remain visible/downloadable. Final build is
+`log-timestamp-frontend-dist-2`, with checks in log-timestamp-frontend-*-final-*.
+
+Owned headless browser `8d1187` passes18 checks,13 HTTP requests including two
+held responses, and12 byte-exact downloads. Four predicates, explicit false,
+source-only diagnostics, full independently expected log/source/error mutation,
+BOM/CRLF/uint64 import, operation retention, deferred import, cancel/edit races,
+genuine returned File reuse and mobile layout pass. All three screenshots were
+inspected. Listener PID12976 and Chrome30516 were verified/owned, stopped and
+stdio drained; the existing application was not replaced. Report is7,926 bytes
+at `log-timestamp-browser-output-1/report.json`. Browser scenarios supplement
+the complete342 native/direct/HTTP bank.
+
+ROOT source equality `9a3bfe` verifies all16 adopted source/vector paths against
+their committed bytes, permitting CRLF/LF only. Proof is5,371 bytes, SHA256
+`342ea09a92955e56e19d93dabd8b1f9c1756f75d8ac595e4a1adc2480dbdb591`,
+at `log-timestamp-original-call-finalization-1/source-equality.json`.
+Offline structural catalogue validation `ce8e59` passes unchanged46/40 packages
+and226/161 modules. Inherited coverage/journal dirt and caches remain unstaged.
+
+`docs/retained-log-timestamp-original-call-checkpoint.jsonl.gz` is832,341 bytes,
+SHA256 `f487e3f6ce271eceb5548456efebaaf10b2c306b430c61a731a23f73c4cdf4a7`.
+It retains84 complete OWN source/metadata members and21 inert external
+declarations, with the complete plan embedded in its header. Writer `6bec17`
+and independent closed readback `ff388e` pass all complete member bindings and
+current OWN bytes without following any external target. Sidecar is
+`docs/retained-log-timestamp-original-call-checkpoint.manifest.json`, SHA256
+`58d2e5b93d0569bd02bebcefdcb22fe03dedd1d444519a1c5a7c95b57c2e5164`.
+Original records/oracle/vector/database/archive targets are declarations during
+this packaging phase, never reclassified as OWN payload. Python qualified
+error modules/args, identities/aliases, warning machinery, unobserved domains
+and history/absence/new-call authority remain outside this native checkpoint.
+
+Next: continue a source-only next-family timestamp/table plan using retained
+receipt metadata, then ROOT admission before any original payload access.
+Keep the complete201/565 scope and the earlier discovery/audit-timing disclosure
+below. Do not replay retained banks or rerun historical readbacks against new
+source snapshots. Push/readback completion is recorded separately under
+log-timestamp-original-call-finalization-1, outside the already sealed capsule.
+
+## Previous checkpoint: full 342-call LOG timestamp index and native basis — 2026-10-24
 
 The sealed Polars checkpoint below is pushed. Actual remote readback `a3467c`
 verifies main at `94e0772eaa827e26343559121d2b542ed9728fb6`, including separate
