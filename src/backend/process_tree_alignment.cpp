@@ -6,7 +6,9 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <map>
 #include <memory>
@@ -48,7 +50,7 @@ std::string selected_activity(const Event& event,
 struct Expr;
 using EP = std::shared_ptr<const Expr>;
 struct Expr {
-  enum Kind { Epsilon, Activity, Sequence, Xor, Parallel, Star } kind;
+  enum Kind { Epsilon, Activity, Tau, Sequence, Xor, Parallel, Star } kind;
   std::string label, key;
   std::vector<EP> children;
   bool nullable = false;
@@ -56,12 +58,16 @@ struct Expr {
 };
 
 struct ExprFactory {
+  // When set, tau leaves compile to explicit silent steps so alignments list
+  // them as model moves without a label, as SEARCH_GRAPH_PT does.
+  bool explicit_tau = false;
   std::map<std::string, EP> pool;
   EP intern(Expr e) {
     auto it = pool.find(e.key); if (it != pool.end()) return it->second;
     EP p = std::make_shared<Expr>(std::move(e)); pool.emplace(p->key, p); return p;
   }
   EP eps() { Expr e; e.kind=Expr::Epsilon; e.key="e"; e.nullable=true; return intern(std::move(e)); }
+  EP tau() { Expr e; e.kind=Expr::Tau; e.key="t"; return intern(std::move(e)); }
   EP act(const std::string& l) { Expr e; e.kind=Expr::Activity; e.label=l; e.key="a"+std::to_string(l.size())+":"+l; e.min_visible=1; return intern(std::move(e)); }
   EP seq(std::vector<EP> xs) {
     std::vector<EP> flat; for (auto& x: xs) { if (x->kind==Expr::Sequence) flat.insert(flat.end(),x->children.begin(),x->children.end()); else if (x->kind!=Expr::Epsilon) flat.push_back(x); }
@@ -112,7 +118,7 @@ void validate(const ProcessTreeNode& n, const ProcessTree& t, ProcessTreeAlignme
 
 EP compile(const ProcessTreeNode& n, const ProcessTree& t, ExprFactory& f) {
   switch(n.op){
-    case Op::kActivity:return f.act(t.activities()[n.activity]); case Op::kTau:return f.eps();
+    case Op::kActivity:return f.act(t.activities()[n.activity]); case Op::kTau:return f.explicit_tau?f.tau():f.eps();
     case Op::kSequence:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.seq(x);}
     case Op::kExclusive:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.xorr(x);}
     case Op::kInclusiveChoice:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.inclusive(x);}
@@ -122,21 +128,24 @@ EP compile(const ProcessTreeNode& n, const ProcessTree& t, ExprFactory& f) {
   } return f.eps();
 }
 
-using Deriv = std::pair<std::string,EP>;
+// A derivative step: the label consumed (empty and silent for a tau leaf) and
+// the residual expression.
+struct Deriv { std::string first; EP second; bool silent = false; };
 std::vector<Deriv> derivatives(const EP& e, ExprFactory& f, std::unordered_map<std::string,std::vector<Deriv>>& memo) {
   auto mi=memo.find(e->key); if(mi!=memo.end()) return mi->second; std::vector<Deriv> out;
   switch(e->kind){
     case Expr::Activity: out.push_back({e->label,f.eps()}); break;
+    case Expr::Tau: out.push_back({"",f.eps(),true}); break;
     case Expr::Epsilon: break;
     case Expr::Xor: for(auto& c:e->children){auto d=derivatives(c,f,memo);out.insert(out.end(),d.begin(),d.end());} break;
     case Expr::Sequence:{
-      for(std::size_t i=0;i<e->children.size();++i){auto d=derivatives(e->children[i],f,memo);EP tail=f.seq(std::vector<EP>(e->children.begin()+i+1,e->children.end()));for(auto& q:d)out.push_back({q.first,f.seq({q.second,tail})});if(!e->children[i]->nullable)break;}
+      for(std::size_t i=0;i<e->children.size();++i){auto d=derivatives(e->children[i],f,memo);EP tail=f.seq(std::vector<EP>(e->children.begin()+i+1,e->children.end()));for(auto& q:d)out.push_back({q.first,f.seq({q.second,tail}),q.silent});if(!e->children[i]->nullable)break;}
       break;}
     case Expr::Parallel:
-      for(std::size_t i=0;i<e->children.size();++i){auto d=derivatives(e->children[i],f,memo);for(auto& q:d){auto cs=e->children;cs[i]=q.second;out.push_back({q.first,f.par(cs)});}} break;
-    case Expr::Star:{auto d=derivatives(e->children[0],f,memo);for(auto&q:d)out.push_back({q.first,f.seq({q.second,e})});break;}
+      for(std::size_t i=0;i<e->children.size();++i){auto d=derivatives(e->children[i],f,memo);for(auto& q:d){auto cs=e->children;cs[i]=q.second;out.push_back({q.first,f.par(cs),q.silent});}} break;
+    case Expr::Star:{auto d=derivatives(e->children[0],f,memo);for(auto&q:d)out.push_back({q.first,f.seq({q.second,e}),q.silent});break;}
   }
-  std::sort(out.begin(),out.end(),[](const Deriv&a,const Deriv&b){return a.first==b.first?a.second->key<b.second->key:a.first<b.first;}); out.erase(std::unique(out.begin(),out.end(),[](const Deriv&a,const Deriv&b){return a.first==b.first&&a.second->key==b.second->key;}),out.end()); memo[e->key]=out; return out;
+  std::sort(out.begin(),out.end(),[](const Deriv&a,const Deriv&b){return std::tie(a.silent,a.first,a.second->key)<std::tie(b.silent,b.first,b.second->key);}); out.erase(std::unique(out.begin(),out.end(),[](const Deriv&a,const Deriv&b){return a.silent==b.silent&&a.first==b.first&&a.second->key==b.second->key;}),out.end()); memo[e->key]=out; return out;
 }
 
 struct Limits {
@@ -183,7 +192,7 @@ SearchOut search(const std::vector<std::string>& tr, EP root, ExprFactory& fac, 
   while(!pq.empty()){auto n=pq.top();pq.pop();auto k=std::make_pair(n.i,n.r->key);if(best[k]!=n.g)continue;if(!lim.ok())break;diag.visited_states++;if(n.i==tr.size()&&n.r->nullable){got=true;goal=k;gn=n;break;}auto ds=derivatives(n.r,fac,dm);
     auto push=[&](std::size_t ni,EP nr,std::size_t ng,int mt,const std::string& lab){auto kk=std::make_pair(ni,nr->key);auto it=best.find(kk);if(it!=best.end()&&it->second<=ng)return;best[kk]=ng;prev[kk]={k,mt,lab};pq.push({ng+heur(ni,nr),ng,ni,sid++,nr});diag.queued_states++;diag.traversed_arcs++;};
     if(n.i<tr.size())push(n.i+1,n.r,n.g+1,1,tr[n.i]);
-    for(auto& d:ds){push(n.i,d.second,n.g+1,2,d.first);if(n.i<tr.size()&&d.first==tr[n.i])push(n.i+1,d.second,n.g,0,d.first);}
+    for(auto& d:ds){if(d.silent){push(n.i,d.second,n.g,3,d.first);continue;}push(n.i,d.second,n.g+1,2,d.first);if(n.i<tr.size()&&d.first==tr[n.i])push(n.i+1,d.second,n.g,0,d.first);}
   }
   SearchOut out;out.found=got;if(!got)return out;out.cost=gn.g;
   std::vector<std::tuple<int,std::string>> rev; auto cur=goal; while(cur.first!=0||cur.second!=root->key){auto it=prev.find(cur);if(it==prev.end())break;rev.emplace_back(it->second.move,it->second.lab);cur=it->second.from;} std::reverse(rev.begin(),rev.end());
@@ -213,6 +222,32 @@ std::set<std::string> descendant_labels(const ProcessTreeNode& node,
     }
   }
   return labels;
+}
+
+// APPROXIMATED_ORIGINAL fitness floor: the cheapest model run of the tree read
+// as nested binary operators (n-ary operators nest to the right), where a
+// visible leaf costs 10000, a tau leaf 1 and every binary operator 2. A loop
+// runs its body once. The reference divides a trace's cost by this floor
+// plus the trace length.
+std::uint64_t approximation_floor(const ProcessTreeNode& node) {
+  switch (node.op) {
+    case Op::kActivity: return 10000;
+    case Op::kTau: return 1;
+    case Op::kExclusive: {
+      const std::size_t n = node.children.size();
+      std::uint64_t best = std::numeric_limits<std::uint64_t>::max();
+      for (std::size_t i = 0; i < n; ++i)
+        best = std::min<std::uint64_t>(
+            best, approximation_floor(node.children[i]) + 2 * std::min(i + 1, n - 1));
+      return best;
+    }
+    case Op::kLoop: return approximation_floor(node.children.front()) + 2;
+    default: {
+      std::uint64_t total = 2 * (node.children.size() - 1);
+      for (const auto& child : node.children) total += approximation_floor(child);
+      return total;
+    }
+  }
 }
 
 std::size_t node_height(const ProcessTreeNode& node) {
@@ -317,6 +352,74 @@ struct RecursiveAligner {
       if (!best.found || candidate.cost < best.cost) best = std::move(candidate);
     }
     cache.emplace(key, best);
+    return best;
+  }
+
+  static SearchOut joined(std::initializer_list<const SearchOut*> parts) {
+    SearchOut out;
+    out.found = true;
+    for (const auto* part : parts) {
+      if (!part->found) return {};
+      out.cost += part->cost;
+      out.moves.insert(out.moves.end(), part->moves.begin(), part->moves.end());
+    }
+    return out;
+  }
+
+  // DYNAMIC_PROGRAMMING loop, as the reference evaluates it: an empty segment
+  // skips the loop, any other segment is an optional leading redo, the body,
+  // any number of (redo, body) rounds whose redo consumes at least one event,
+  // and an optional extra body at the end.
+  SearchOut align_loop(const ProcessTreeNode& node, const Word& trace) {
+    SearchOut empty;
+    empty.found = true;
+    if (trace.empty()) return empty;
+    const std::size_t n = trace.size();
+    const auto part = [&](std::size_t from, std::size_t to) {
+      return Word(trace.begin() + static_cast<std::ptrdiff_t>(from),
+                  trace.begin() + static_cast<std::ptrdiff_t>(to));
+    };
+    const auto body = [&](std::size_t from, std::size_t to) {
+      return align(node.children.front(), part(from, to), false);
+    };
+    const auto redo = [&](std::size_t from, std::size_t to) {
+      SearchOut best;
+      for (std::size_t r = 1; r < node.children.size(); ++r) {
+        auto candidate = align(node.children[r], part(from, to), false);
+        if (!candidate.found) return SearchOut{};
+        if (!best.found || candidate.cost < best.cost) best = std::move(candidate);
+      }
+      return best;
+    };
+    const auto keep = [](SearchOut& best, SearchOut candidate) {
+      if (candidate.found && (!best.found || candidate.cost < best.cost))
+        best = std::move(candidate);
+    };
+    // after[s]: the cheapest completion once a body ended at s.
+    std::vector<SearchOut> after(n + 1);
+    for (std::size_t s = n + 1; s-- > 0;) {
+      SearchOut best = s == n ? empty : body(s, n);
+      for (std::size_t e = s + 1; e <= n; ++e) {
+        const auto r = redo(s, e);
+        if (!r.found) continue;
+        for (std::size_t e2 = e; e2 <= n; ++e2) {
+          const auto b = body(e, e2);
+          keep(best, joined({&r, &b, &after[e2]}));
+        }
+      }
+      if (limits.exhausted || limits.timed_out) return {};
+      after[s] = std::move(best);
+    }
+    SearchOut best;
+    for (std::size_t lead = 0; lead <= n; ++lead) {
+      const auto r = lead == 0 ? empty : redo(0, lead);
+      if (!r.found) continue;
+      for (std::size_t end = lead; end <= n; ++end) {
+        const auto b = body(lead, end);
+        keep(best, joined({&r, &b, &after[end]}));
+      }
+    }
+    if (limits.exhausted || limits.timed_out) return {};
     return best;
   }
 
@@ -463,8 +566,12 @@ struct RecursiveAligner {
         out = exact_subtree(node, trace);
         break;
       case Op::kLoop:
-        if (approximate) ++approximation_loop_fallbacks;
-        out = exact_subtree(node, trace);
+        if (approximate) {
+          ++approximation_loop_fallbacks;
+          out = exact_subtree(node, trace);
+        } else {
+          out = align_loop(node, trace);
+        }
         break;
     }
     if (out.found) memo.emplace(key, out);
@@ -509,9 +616,24 @@ ProcessTreeAlignmentResult align_process_tree(
   std::size_t height = 0;
   validate(tree.root(), tree, options.variant, height);
   ExprFactory expressions;
+  expressions.explicit_tau =
+      options.variant == ProcessTreeAlignmentVariant::kSearchGraphPt;
   const auto root = compile(tree.root(), tree, expressions);
-  const std::size_t minimum_model_cost = root->min_visible;
   const auto total_start = Clock::now();
+  // A trace's fitness is 1 - cost / (length + floor), where the floor is the
+  // variant's own cost for the empty trace (the approximated variant uses its
+  // binary-operator floor instead).
+  std::uint64_t model_floor = root->min_visible;
+  if (options.variant == ProcessTreeAlignmentVariant::kApproximatedOriginal) {
+    model_floor = approximation_floor(tree.root());
+  } else if (options.variant == ProcessTreeAlignmentVariant::kDynamicProgramming) {
+    Limits limits{options, total_start, total_start};
+    std::map<MemoKey, SearchOut> memo;
+    RecursiveAligner recursive{tree, options, expressions, limits,
+                               result.diagnostics, memo};
+    const auto empty = recursive.align(tree.root(), {}, false);
+    if (empty.found) model_floor = empty.cost;
+  }
 
   std::map<MemoKey, SearchOut> global_memo;
   std::map<Word, ProcessTreeTraceAlignment> variant_cache;
@@ -576,11 +698,13 @@ ProcessTreeAlignmentResult align_process_tree(
     if (aligned.found) {
       row.cost = aligned.cost;
       row.moves = std::move(aligned.moves);
-      const std::size_t denominator = row.trace.size() + minimum_model_cost;
+      // Not clamped: like the reference, a trace whose cost exceeds its
+      // length plus the floor gets a negative fitness.
+      const std::size_t denominator = row.trace.size() + model_floor;
       row.fitness = denominator == 0
                         ? 0.0
-                        : std::max(0.0, 1.0 - static_cast<double>(row.cost) /
-                                                  static_cast<double>(denominator));
+                        : 1.0 - static_cast<double>(row.cost) /
+                                    static_cast<double>(denominator);
       result.total_cost += row.cost;
       ++result.diagnostics.traces_aligned;
       variant_cache.emplace(row.trace, row);
@@ -601,7 +725,7 @@ ProcessTreeAlignmentResult align_process_tree(
 
   std::size_t denominator = 0;
   for (const auto& trace : log.traces)
-    denominator += trace.events.size() + minimum_model_cost;
+    denominator += trace.events.size() + model_floor;
   result.fitness = !result.computed || denominator == 0
                        ? 0.0
                        : std::max(0.0, 1.0 -

@@ -224,6 +224,10 @@ void plus_interior_one_loop_has_a_fresh_self_only_place() {
       assert(repeated.transitions()[i].outputs == net.transitions()[i].outputs);
     }
   }
+  // Single start and end activities leave no tied cleanup choice.
+  const auto alternatives = enumerate_alpha_plus_cleanup_alternatives(source);
+  assert(alternatives.size() == 1 && alternatives[0].result);
+  assert(places(alternatives[0].result->net) == expected);
 }
 
 void plus_keeps_an_end_boundary_without_one_loops() {

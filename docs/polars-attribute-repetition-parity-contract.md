@@ -61,6 +61,10 @@ complete diagnostic suggestion heuristics remain outside this checkpoint.
 Native categorical metadata can travel unchanged without establishing a
 reference dictionary comparison. These boundaries keep the module partial.
 
+The domain-bank continuation in
+[attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md)
+supersedes the boundary paragraphs above where they differ.
+
 ## Retained observations and native acceptance
 
 Root executed two disjoint banks against PM4Py 2.7.22 and Polars 1.44.1. The

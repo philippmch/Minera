@@ -1,0 +1,400 @@
+{
+ "authority": {
+  "catalogue_promoted": false,
+  "history_complete": false,
+  "new_call_authority": false,
+  "reference_calls": 0
+ },
+ "checkpoint": {
+  "bytes": 132754,
+  "path": "docs/retained-polars-timestamp-original-call-checkpoint.jsonl.gz",
+  "sha256": "4fa340bd707be63119cc38eb9ae7ca6a756b3ea8d7ee004116b91f35d7b4fd18"
+ },
+ "closed_readback": "pass",
+ "external": [
+  {
+   "bytes": 3426683,
+   "path": "src/backend/tests/polars_timestamp_workbench_public_vectors.inc",
+   "sha256": "4097e4411063410c6a2513667cefffb2de2fca3ab99fd07ec0e6607f3ccad65e"
+  },
+  {
+   "bytes": 17396736,
+   "path": "build/Release/minera_server.exe",
+   "sha256": "f5ba2af8c265249d7e152052625b0b1d225324b4ab83915eea4eae7384abd7a6"
+  },
+  {
+   "bytes": 44924416,
+   "path": "build/Release/minera_polars_timestamp_workbench_public_tests.exe",
+   "sha256": "8e054ff4525c3664226fab949c39c36c3a2f1ef6ef55d1c90cc1cc40bc40ff4a"
+  },
+  {
+   "bytes": 65435,
+   "path": "build/filtering-timestamp-polars-public-actual-1/call-intents.jsonl",
+   "sha256": "5816f9bf7e7e52ace6703f4a0fa36edcd711654944baf55093258243200b05fb"
+  },
+  {
+   "bytes": 4608789,
+   "path": "build/filtering-timestamp-polars-public-actual-1/dedup-audit.json",
+   "sha256": "cc8941f20a7b55b8b973e7123f43181c199b8331aef406cded3fd413dd15fb0b"
+  },
+  {
+   "bytes": 5867724,
+   "path": "build/filtering-timestamp-polars-public-actual-1/records.jsonl",
+   "sha256": "dcd77defaa82f6d79c665e8baa8fe4417e7107bd058f0114a1597e27072c95ee"
+  },
+  {
+   "bytes": 14598,
+   "path": "build/filtering-timestamp-polars-public-prepared-1/capture-public.py",
+   "sha256": "39db45ad3e952ad900a5f24269b046761a6f36616bb31c9e006c6cf0ac2c1338"
+  },
+  {
+   "bytes": 671649,
+   "path": "build/filtering-timestamp-polars-public-prepared-1/cases.json",
+   "sha256": "de1df0203da7dc108c7fc382c21d73544bddf1dc11f5ef22cd9ae5311dbd823f"
+  },
+  {
+   "bytes": 8646,
+   "path": "build/filtering-timestamp-polars-public-prepared-1/generate-native-tests.py",
+   "sha256": "62e696eae89942f0c3c17ccb07a31cc250dc234975ff580cbac7327e9932fce8"
+  },
+  {
+   "bytes": 8003,
+   "path": "build/filtering-timestamp-polars-public-prepared-1/prepare-cases.py",
+   "sha256": "dd03dd4e3abc48041e761c8a49a7926bea9da81dc4480798a93ba3e897ee220b"
+  },
+  {
+   "bytes": 66493,
+   "path": "build/filtering-timestamp-polars-utc-public-actual-1/call-intents.jsonl",
+   "sha256": "b0994c604bf76d7f48a5c00ea9412341bea86f97831d47eab906f24e60970e33"
+  },
+  {
+   "bytes": 4672119,
+   "path": "build/filtering-timestamp-polars-utc-public-actual-1/dedup-audit.json",
+   "sha256": "c59a2cc23fc665caabcb5ffa68d47f7a9fa1950427460a3bf5816fdd242d3bf3"
+  },
+  {
+   "bytes": 6541250,
+   "path": "build/filtering-timestamp-polars-utc-public-actual-1/records.jsonl",
+   "sha256": "ab1f043315c7f9b0f9310426a49fd59d9057257f856d003009a910908107c5f5"
+  },
+  {
+   "bytes": 15231,
+   "path": "build/filtering-timestamp-polars-utc-public-prepared-1/capture-public.py",
+   "sha256": "87136a9cf64836fdf303b91a11bb5c2fba00c6f1ef1cbc75613a144768930e95"
+  },
+  {
+   "bytes": 698653,
+   "path": "build/filtering-timestamp-polars-utc-public-prepared-1/cases.json",
+   "sha256": "f11c722bd9732e043b1cca15ab5a55449cc4b15a5f587f0ed91ab39c388638af"
+  },
+  {
+   "bytes": 3385,
+   "path": "build/filtering-timestamp-polars-utc-public-prepared-1/prepare-cases.py",
+   "sha256": "706d421edbd1a247dfc38542111c2aa4709630bd07bad3dc4443eb9aa62a6ee1"
+  },
+  {
+   "bytes": 2445,
+   "path": "build/filtering-timestamp-polars-numeric-public-actual-1/call-intents.jsonl",
+   "sha256": "7c42685f238b27d0b731f9036bd6d1445d214bcf64d38b6b327f45244f5b49c4"
+  },
+  {
+   "bytes": 199723,
+   "path": "build/filtering-timestamp-polars-numeric-public-actual-1/dedup-audit.json",
+   "sha256": "d4ea92f0eb89058ae866e098b971b0a684f4c3d5ad8825fcd37decb767aa27df"
+  },
+  {
+   "bytes": 295194,
+   "path": "build/filtering-timestamp-polars-numeric-public-actual-1/records.jsonl",
+   "sha256": "27a982d32315fc0ea4b1c7cdff549c8e61710d7ea97d14e6e11c5b0170493666"
+  },
+  {
+   "bytes": 15308,
+   "path": "build/filtering-timestamp-polars-numeric-public-prepared-1/capture-public.py",
+   "sha256": "b79f2d030d81f6eed574a0688c6bf8a4c50e37d5f2cbc266ecc488ed095041fd"
+  },
+  {
+   "bytes": 22928,
+   "path": "build/filtering-timestamp-polars-numeric-public-prepared-1/cases.json",
+   "sha256": "bb80caab465501077b561882f043ce4fcdfeb6220a435755a7c70d28c17ed630"
+  },
+  {
+   "bytes": 2410,
+   "path": "build/filtering-timestamp-polars-numeric-public-prepared-1/prepare-cases.py",
+   "sha256": "d5b358d54107ccbbc9df0dbce5b45630ca7418fb324eeeac55065747f83760a2"
+  },
+  {
+   "bytes": 7533,
+   "path": "src/backend/tests/test_polars_timestamp_filter.cpp",
+   "sha256": "a197c6d56cdadab5b14edabbf3ace922c7dfa438cad3363d46b1db88f7920608"
+  },
+  {
+   "bytes": 11579792,
+   "path": "src/backend/tests/polars_timestamp_filter_public_vectors.inc",
+   "sha256": "b3e9fa582b8bb1455df28bf7bd23269b0b336e0b9c12c8ad73821fa7248ff0dc"
+  },
+  {
+   "bytes": 8573,
+   "path": "build/parity-closures/polars-timestamp-filter-acceptance/pre-numeric-boundary/generate-native-tests.py",
+   "sha256": "6b05d51b1710a357e451c1934ad67ae6e3137ee7489c6d705719ac2a69b81846"
+  },
+  {
+   "bytes": 11244765,
+   "path": "build/parity-closures/polars-timestamp-filter-acceptance/pre-numeric-boundary/polars_timestamp_filter_public_vectors.inc",
+   "sha256": "6f2ef2424350a22921a339aed39de2453157db248daf50c7d2d329fc7fd84cd1"
+  },
+  {
+   "bytes": 7533,
+   "path": "build/parity-closures/polars-timestamp-filter-acceptance/pre-numeric-boundary/test_polars_timestamp_filter.cpp",
+   "sha256": "93d26c6c2067f34502ef4fbdfb97e8cf17d66135da2ac21d0ef28494a013d51c"
+  },
+  {
+   "bytes": 814712,
+   "path": "build/parity-closures/timestamp-production-http-2/records.jsonl",
+   "sha256": "b9c810da644095972242cb8df98646d72ce85f58c69d8dc85a7db115586848e9"
+  },
+  {
+   "bytes": 697190,
+   "path": "build/parity-closures/timestamp-production-http-1/records.jsonl",
+   "sha256": "4715b1d28260ea4be561698d5efd4340e98c66f89a21f4e2fa74457f7fc56aa0"
+  }
+ ],
+ "external_classification": "declared original payload/compiled identities; not embedded, not followed",
+ "external_declarations": 29,
+ "member_bindings": [
+  {
+   "bytes": 14403,
+   "path": "build/parity-closures/polars-timestamp-full732-admission-prepared-1/map-native.py",
+   "sha256": "f8a9e248b2f5424ee8afcd82e7e8a00562f3060f56732db9427bb74a511d1c9b"
+  },
+  {
+   "bytes": 4986,
+   "path": "build/parity-closures/polars-timestamp-full732-admission-prepared-1/admit-root.py",
+   "sha256": "ad5b8eb2f1ff14595dd8106ce3dde1b13cd974b4e9ac75f049f84f0bfe3f4837"
+  },
+  {
+   "bytes": 14007,
+   "path": "build/parity-closures/polars-timestamp-full732-admission-prepared-1/source-revision-1/map-native.py",
+   "sha256": "ad453b9cb363206ed9923fb0ea03ead13c33b4cecb445bda642e4d610ce0b70f"
+  },
+  {
+   "bytes": 4986,
+   "path": "build/parity-closures/polars-timestamp-full732-admission-prepared-1/source-revision-1/admit-root.py",
+   "sha256": "ad5b8eb2f1ff14595dd8106ce3dde1b13cd974b4e9ac75f049f84f0bfe3f4837"
+  },
+  {
+   "bytes": 8346,
+   "path": "build/parity-closures/polars-timestamp-full732-root-admission-1/report.json",
+   "sha256": "76e3970ce6e3454c579e56c3a44379862e9de25b276ab8ee886755bee6bc3d9a"
+  },
+  {
+   "bytes": 5249,
+   "path": "build/parity-closures/polars-timestamp-full732-root-admission-1/opaque-gate.json",
+   "sha256": "6b5dfca08ac7df926284ba6266a323020337efc97a5fdd729cb95b2dba118f05"
+  },
+  {
+   "bytes": 1402,
+   "path": "build/parity-closures/polars-timestamp-full732-root-admission-1/census.json",
+   "sha256": "c541a1e0ef04ada1fbca0a091fdde9e2414cd4a2efd7bcac029539bab3e89c39"
+  },
+  {
+   "bytes": 213221,
+   "path": "build/parity-closures/polars-timestamp-full732-root-admission-1/mapping.json",
+   "sha256": "6ba2d4fbf287ff96ed891dd945a69579eb1df60b2ff26d70bb98879f611d4a46"
+  },
+  {
+   "bytes": 109,
+   "path": "build/parity-closures/polars-timestamp-full732-admission-run-1.log",
+   "sha256": "a49b50d8b3c6ae525194219c9d419d6e879b6c4d2ea1b746fe87dc5128dafc11"
+  },
+  {
+   "bytes": 1512,
+   "path": "build/parity-closures/polars-timestamp-full732-admission-run-2.log",
+   "sha256": "9368f22b14dd88e8739801c09b4710520b0a549e58a3719f0745f456b3c7e3ea"
+  },
+  {
+   "bytes": 9599,
+   "path": "build/parity-closures/polars-timestamp-transport-prepared-1/generate-root.py",
+   "sha256": "aab3a327cf71280dfd2e8d7ea79b11e879e07e434873cd6c9a0f81332528de23"
+  },
+  {
+   "bytes": 5124,
+   "path": "build/parity-closures/polars-timestamp-transport-prepared-1/test-check.cpp.txt",
+   "sha256": "635d1393f051cf9e5e3949d1afedddfb1c4804b3d4fa731a27438b83f0fe3623"
+  },
+  {
+   "bytes": 1310,
+   "path": "build/parity-closures/polars-timestamp-transport-prepared-1/test-controls.cpp.txt",
+   "sha256": "5c487e9d682959d28ce65386d7fa85308b01f7bcea5a610d2b9cbdc0a47d18c4"
+  },
+  {
+   "bytes": 6338,
+   "path": "build/parity-closures/polars-timestamp-transport-generated-1/report.json",
+   "sha256": "d851e1410705ec27d7c87e58e8bc35bdb21b9954ad8cd2e7d411ad4c7f0b5d0b"
+  },
+  {
+   "bytes": 523,
+   "path": "build/parity-closures/polars-timestamp-transport-run-1.log",
+   "sha256": "386cd6ffc6de948ef86bbe50df921b7ab05756bcd8c3821cc28cd9288b71e9bc"
+  },
+  {
+   "bytes": 204,
+   "path": "build/parity-closures/polars-timestamp-cmake-configure-1.log",
+   "sha256": "465d8e0567c97a396a5fcdafd7bd25de65e1306269f7ce156edfb9bd487f11ab"
+  },
+  {
+   "bytes": 216,
+   "path": "build/parity-closures/polars-timestamp-cmake-configure-2.log",
+   "sha256": "7962310f8e93ed536a7342dcddf836aa518d837af3565a4a9dda28d60d254bbf"
+  },
+  {
+   "bytes": 979,
+   "path": "build/parity-closures/polars-timestamp-native-build-1.log",
+   "sha256": "5963ed2dcd71f0f8dae994d729513d2e71bc24a3eb5195c7861c3f8e7c07da7c"
+  },
+  {
+   "bytes": 1458,
+   "path": "build/parity-closures/polars-timestamp-native-build-2.log",
+   "sha256": "694c08e3818b0c83f28717df9274bd06703ff86d3971183a8eeaf1a4785bf23d"
+  },
+  {
+   "bytes": 541,
+   "path": "build/parity-closures/polars-timestamp-native-build-3.log",
+   "sha256": "a96c3b048e7a876f657466d65c56db1c4df2e1a2ce71d13940901b6ace4acd80"
+  },
+  {
+   "bytes": 390,
+   "path": "build/parity-closures/polars-timestamp-small-direct-1.log",
+   "sha256": "a6ceed0d1edd3aa893cd907a3179fa91dfd3ac9c0d350b01d526732cb2721413"
+  },
+  {
+   "bytes": 162157,
+   "path": "build/parity-closures/polars-timestamp-public-build-1.log",
+   "sha256": "396a3ffa17062460dc8f08f40a48cd76e67abefbce4dd1e5e8f0001dc5774964"
+  },
+  {
+   "bytes": 1065,
+   "path": "build/parity-closures/polars-timestamp-public-build-2.log",
+   "sha256": "46b50f00f1d64e4399c3f6bd5cb1ee00eec2696044332999c1284b53caa43aa7"
+  },
+  {
+   "bytes": 245,
+   "path": "build/parity-closures/polars-timestamp-server-build-1.log",
+   "sha256": "4f42a7ea71db87e30ccb6f057776ff1295f03b2bd7b5e52f7c7b3250058e1550"
+  },
+  {
+   "bytes": 6183,
+   "path": "build/parity-closures/polars-timestamp-native-ctest-1.log",
+   "sha256": "fe129d4ff83338f583b31d25c5d3424ca73319a228703698fd7bdd16ae0b5fa6"
+  },
+  {
+   "bytes": 4753,
+   "path": "build/parity-closures/polars-timestamp-native-ctest-2.log",
+   "sha256": "8c8d6d014011c51d167f48e9fc9a63390409461ad6b03a7bec352ab633e164be"
+  },
+  {
+   "bytes": 230,
+   "path": "build/parity-closures/polars-timestamp-frontend-focused-1.log",
+   "sha256": "bb9516b19aa92ce15d8e744bb18f8584545d50aa450be6ac83659f8146416e58"
+  },
+  {
+   "bytes": 0,
+   "path": "build/parity-closures/polars-timestamp-frontend-tsc-1.log",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "bytes": 8810,
+   "path": "build/parity-closures/polars-timestamp-frontend-vite-1.log",
+   "sha256": "b0373479b6794428f3bc2867a3248c6a3ea62d02fac2c902eec202c2acf8307c"
+  },
+  {
+   "bytes": 254,
+   "path": "build/parity-closures/polars-timestamp-frontend-full-1.log",
+   "sha256": "4d58d762eb47adcd2c3d776a4a0c0292f14e01044b02951a9e97d13e56b312fe"
+  },
+  {
+   "bytes": 18618,
+   "path": "build/parity-closures/polars-timestamp-browser-owned-1.cjs",
+   "sha256": "9bc5e67b1702d67c772d0d77df4a8d838897d69053d7817c48751ed1172077ac"
+  },
+  {
+   "bytes": 73,
+   "path": "build/parity-closures/polars-timestamp-browser-run-1.log",
+   "sha256": "d823ad16c5457c0018e5e932b1335066cba0b36d7cad3748a0e6796a9a3ea050"
+  },
+  {
+   "bytes": 8824,
+   "path": "build/parity-closures/polars-timestamp-browser-output-1/report.json",
+   "sha256": "e8229a7b1d2200c61fc93ab510c8b3555841ca8a8bb7f835ddedc0dfb44efff3"
+  },
+  {
+   "bytes": 13548,
+   "path": "src/backend/polars_timestamp_original_call_parser.hpp",
+   "sha256": "224b128b517667fcca2f587ffb8e43323c02e7e88e378eab201da45c0300d527"
+  },
+  {
+   "bytes": 7062,
+   "path": "src/backend/polars_timestamp_original_call_workbench.hpp",
+   "sha256": "e264c3cbd7f7a7ed65f61e3a5fa168ce699940adacdd25d482020a36ca277421"
+  },
+  {
+   "bytes": 8934,
+   "path": "src/backend/table_timestamp_filter_workbench.cpp",
+   "sha256": "f43ca27cdf996a1dd37b62c3ba03af60af63e71c44a70841de2c1dd0881beabd"
+  },
+  {
+   "bytes": 5779,
+   "path": "src/backend/tests/test_polars_timestamp_original_call_controls.cpp",
+   "sha256": "ea34847c2f1f992e81cd4f06dab029a2834376cc42d394bced4f825e8018ea05"
+  },
+  {
+   "bytes": 13719,
+   "path": "src/backend/tests/test_polars_timestamp_workbench_public.cpp",
+   "sha256": "7bab7f27f3e5d439e18061b99ed7469d7dbc81d3abe3e91c833544e8f718d862"
+  },
+  {
+   "bytes": 7228,
+   "path": "src/backend/tests/test_pandas_timestamp_original_call_controls.cpp",
+   "sha256": "173fe47e1481fab50473a338b304ad183a40c4c12c56f6df8fc1ae7f5580534e"
+  },
+  {
+   "bytes": 12074,
+   "path": "src/frontend/src/polars-timestamp-original-call.ts",
+   "sha256": "ec9861c1dd1e8544b47ceb3b319fb66d5bfeeabaea37d97fe7ae6689a8ec6049"
+  },
+  {
+   "bytes": 11280,
+   "path": "src/frontend/src/components/PolarsTimestampOriginalCallWorkspace.tsx",
+   "sha256": "e12252e8870f67b86b51c27d0680b384c4afd6d0d10e3afb807dcc1fa0dd1007"
+  },
+  {
+   "bytes": 10752,
+   "path": "src/frontend/src/components/TableTimestampFilterWorkspace.tsx",
+   "sha256": "92c37e5cecfb9a6bffc47a6481f79657771c1b988cc7d8d1620e18cc5b9a462e"
+  },
+  {
+   "bytes": 8676,
+   "path": "src/frontend/tests/polars-timestamp-original-call.test.ts",
+   "sha256": "916ab090815e8977176e846ecfb233cf550733d25bbb5ab61717be7e2b3ec384"
+  },
+  {
+   "bytes": 3730,
+   "path": "docs/polars-timestamp-original-call-workflow.md",
+   "sha256": "013e894a9dd8abbd83169e1c75a48f8727d4a72d906bff125e20d09222def1ef"
+  }
+ ],
+ "members": 44,
+ "packager": {
+  "bytes": 5524,
+  "path": "build/parity-closures/polars-timestamp-checkpoint-prepared-1/package.py",
+  "sha256": "386f6ed92db513a4ebd0e3d30f9c7c436e8492ae4e3b74e54090e317a82d8958"
+ },
+ "schema": "minera-polars-timestamp-original-call-checkpoint-v1",
+ "scope": {
+  "apply_errors": 427,
+  "calls": 732,
+  "collect_errors": 76,
+  "errors": 503,
+  "frames": 229,
+  "native_direct_http_each": 732
+ }
+}

@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <iterator>
 #include <optional>
-#include <random>
+#include <functional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -629,8 +629,17 @@ PetriNet discover_alpha_classic(const EventLog& log,
   return build_classic_net(activities, footprint, false, &transition_labels);
 }
 
-AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
-                             const AlphaMinerOptions& options) {
+namespace {
+
+// Picks one index into a list of tied incident transitions; the result is
+// ignored when the list is empty.
+using AlphaPlusCleanupChooser =
+    std::function<std::size_t(const std::vector<std::size_t>&)>;
+
+AlphaPlusDiscoveryResult alpha_plus_with_cleanup_choices(
+    const EventLog& log, const AlphaMinerOptions& options,
+    const AlphaPlusCleanupChooser& choose_index,
+    std::vector<std::optional<std::string>>* chosen_names) {
   check_alpha_row_limit(log, options);
   const std::string selector = options.activity_attribute.empty()
                                    ? "concept:name"
@@ -667,6 +676,12 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
   const Footprint full = build_footprint(boundary_log, nullptr, true);
   std::vector<bool> loops(n, false);
   for (std::size_t a = 0; a < n; ++a) loops[a] = full.follows[a][a];
+  // Reserved boundary labels can themselves be loops; a trace whose every
+  // label is a loop then has no reduced endpoints and fails publicly.
+  for (const auto& sequence : boundary_log.traces)
+    if (std::all_of(sequence.begin(), sequence.end(),
+                    [&](std::size_t label) { return loops[label]; }))
+      throw std::invalid_argument("Alpha+: boundary reduction leaves an empty trace");
   const auto reduced = build_footprint(boundary_log, &loops, true);
   if (reduced.starts.empty() || reduced.ends.empty())
     throw std::invalid_argument("Alpha+: boundary reduction leaves no endpoints");
@@ -777,15 +792,16 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
         result.push_back(t);
     return result;
   };
-  // The public implementation selects an identity-ordered incident arc.
-  // Allocation identity is not portable; sample tied incident choices.
-  // Uniform independent draws model observed alternatives, not the unverified
-  // allocation-dependent probabilities or correlations of the reference.
-  const auto choose = [](const std::vector<std::size_t>& candidates) {
+  // The public implementation selects an identity-ordered incident arc;
+  // allocation identity is not portable, so callers pick the tied candidate.
+  const auto choose = [&](const std::vector<std::size_t>& candidates) {
+    // The chooser also observes empty stages, which always fail.
+    const auto index = choose_index(candidates);
     if (candidates.empty())
       throw std::invalid_argument("Alpha+: boundary cleanup has no incident transition");
-    static thread_local std::mt19937_64 generator(std::random_device{}());
-    return candidates[std::uniform_int_distribution<std::size_t>(0, candidates.size() - 1)(generator)];
+    const auto chosen = candidates.at(index);
+    if (chosen_names) chosen_names->push_back(ids.names[chosen]);
+    return chosen;
   };
   std::size_t initial = 0;
   const auto first = choose(incident(0, inputs));
@@ -870,6 +886,50 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
   net.set_discovery_markings(std::move(markings));
 
   return result;
+}
+
+}  // namespace
+
+AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
+                             const AlphaMinerOptions& options) {
+  // Deterministic member of the public support: the first tied transition
+  // in first-seen label order, with the boundary labels last.
+  return alpha_plus_with_cleanup_choices(
+      log, options, [](const auto&) { return std::size_t{0}; }, nullptr);
+}
+
+std::vector<AlphaPlusCleanupAlternative> enumerate_alpha_plus_cleanup_alternatives(
+    const EventLog& log, const AlphaMinerOptions& options) {
+  // Odometer over every reachable sequence of tied choices. Each run replays
+  // the fixed prefix and takes the first candidate at later stages.
+  std::vector<AlphaPlusCleanupAlternative> alternatives;
+  std::vector<std::size_t> path;
+  while (true) {
+    std::vector<std::size_t> sizes;
+    const auto scripted = [&](const std::vector<std::size_t>& candidates) {
+      const auto stage = sizes.size();
+      sizes.push_back(candidates.size());
+      return stage < path.size() ? path[stage] : std::size_t{0};
+    };
+    AlphaPlusCleanupAlternative alternative;
+    try {
+      alternative.result = alpha_plus_with_cleanup_choices(
+          log, options, scripted, &alternative.selected_transitions);
+    } catch (const std::invalid_argument& error) {
+      // Failures before any tied choice are not cleanup alternatives.
+      if (sizes.empty()) throw;
+      alternative.error = error.what();
+    }
+    alternatives.push_back(std::move(alternative));
+    path.resize(sizes.size(), 0);
+    // A stage with no candidates records size zero and has no successor.
+    std::size_t stage = path.size();
+    while (stage > 0 && path[stage - 1] + 1 >= sizes[stage - 1]) --stage;
+    if (stage == 0) break;
+    path.resize(stage);
+    ++path[stage - 1];
+  }
+  return alternatives;
 }
 
 PetriNet discover_alpha_plus(const EventLog& log,

@@ -729,6 +729,7 @@ int usage(const char* program) {
                "                            scaling to huge logs)\n"
                "  --alpha-variant <id>      classic (default) or plus (short loops)\n"
                "  --alpha-plus-result      Emit Alpha+ graph with live/detached markings\n"
+               "  --alpha-plus-alternatives Emit every Alpha+ boundary-cleanup alternative\n"
                "  --alpha-activity-attribute <name> Event field used as activity\n"
                "  --alpha-remove-unconnected <bool> Drop unconnected Alpha transitions\n"
                "  --alpha-max-rows-to-materialize <n> Alpha input event cap\n"
@@ -2040,6 +2041,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   bool alpha_plus_result = false;
+  bool alpha_plus_alternatives = false;
   minera::HeuristicMinerOptions heuristic_options;
   minera::PowlDiscoveryOptions powl_options;
   minera::TransitionSystemOptions transition_options;
@@ -5158,8 +5160,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       } else {
         inductive_options.case_id_key = selector;
       }
-    } else if (arg == "--alpha-variant" || arg == "--alpha-plus-result") {
+    } else if (arg == "--alpha-variant" || arg == "--alpha-plus-result" ||
+               arg == "--alpha-plus-alternatives") {
       if (arg == "--alpha-plus-result") alpha_plus_result = true;
+      else if (arg == "--alpha-plus-alternatives") alpha_plus_result = alpha_plus_alternatives = true;
       else {
         const auto* value = next();
         if (!value) return usage(argv[0]);
@@ -6440,8 +6444,11 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       return 0;
     }
     if (alpha_plus_result) {
-      const auto body = minera::alpha_plus_result_json(
-          minera::discover_alpha_plus_result(log, alpha_options));
+      const auto body = alpha_plus_alternatives
+          ? minera::alpha_plus_cleanup_alternatives_json(
+                minera::enumerate_alpha_plus_cleanup_alternatives(log, alpha_options))
+          : minera::alpha_plus_result_json(
+                minera::discover_alpha_plus_result(log, alpha_options));
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);

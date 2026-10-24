@@ -113,6 +113,10 @@ Each member records its original byte count and SHA-256; eleven direct native
 and frontend source/test files are bound to their accepted checkpoint contents.
 
 
+The domain-bank continuation in
+[attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md)
+supersedes the boundary paragraphs above where they differ.
+
 ## Ordinary native-value continuation
 
 A fresh bank at `build/filtering-attribute-repetition-log-ordinary-public-actual-1`

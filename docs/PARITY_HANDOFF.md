@@ -28,7 +28,138 @@ precision depend on the reference's tie order among equally cheap alignments
 and stay open; next step is characterizing that order. Details: *Evaluation
 black-box equivalence* in `docs/reference-2.7.22-parity.md`.
 
-## Current continuation: full342 LOG timestamp API/UI acceptance — 2026-10-24
+## Current continuation: full732 Polars timestamp API/UI acceptance — 2026-10-24
+
+The pandas timestamp checkpoint below is on origin/main. The Polars half of
+the table timestamp family is now complete as well. Scope is unchanged:
+86 packages / 387 modules, 201 strict open units, 565 unentered queries; no
+catalogue row was promoted.
+
+ROOT Polars admission (`polars-timestamp-full732-admission-prepared-1/`) binds
+all 26 declared originals before any decode. The first run stopped before any
+output because the census assumed a fixed keyword order; that source revision
+and its log are preserved (`source-revision-1`, `...-admission-run-1.log`). The
+corrected census accepts any order of the required keywords and records it.
+Result: 732 distinct receipts, 229 frames / 503 errors (427 apply, 76 collect),
+26 eager / 706 lazy, 2 algorithm warnings, zero mutations. The independent
+mapper rebuilds the unchanged 11,579,792-byte vector oracle byte-exact (885
+frames). Report SHA256
+`76e3970ce6e3454c579e56c3a44379862e9de25b276ab8ee886755bee6bc3d9a`.
+
+Wire: `docs/polars-timestamp-original-call-workflow.md`. Descriptor
+`minera-polars-timestamp-original-call-v1` holds `source_kind`
+(DataFrame/LazyFrame) and ordered `keyword_entries`; any parameter dictionary
+uses the ordered binding vector for the four filters, while the helpers flatten
+it to one raw value. Lazy schema errors report `collect` with apply returned.
+Transport fixture: 3,426,683 bytes, SHA256
+`4097e4411063410c6a2513667cefffb2de2fca3ab99fd07ec0e6607f3ccad65e`.
+
+CTest run 1 left the two large Polars targets unbuilt (the new test missed the
+workbench JSON header and namespace); both logs are preserved. Run 2
+(`polars-timestamp-native-ctest-2.log`) passes all 8 timestamp suites,
+including 732 native + 732 direct + 732 owned HTTP Polars calls (53.5 s) and the
+pandas 861 bank. The pandas controls test assertion for a Polars-engine
+original call was updated because that call now reaches the Polars route.
+Server SHA256 `f5ba2af8c265249d7e152052625b0b1d225324b4ab83915eea4eae7384abd7a6`.
+Frontend: focused 27, TypeScript, Vite and full 204 files / 9,969 tests pass.
+Owned browser: 23 checks, 17 requests, 12 byte-exact downloads, including the
+naive-Datetime LazyFrame collect diagnostic and reordered-keyword import; four
+screenshots inspected. Report SHA256
+`e8229a7b1d2200c61fc93ab510c8b3555841ca8a8bb7f835ddedc0dfb44efff3`.
+
+A post-execution independent source review of both table families now exists
+(`docs/table-timestamp-independent-review-1/`, review.json SHA256
+`f5bc6bd254167e97d6fe277a9fc44302e7a380c6596dc0923282e23dfce1edb8`). It ran in
+the cloud from the sealed checkpoint members only (original inputs absent) and
+found no blocking issue: oracle/vector pins, all 861/732 transport-vs-oracle
+cases, fresh-namespace mapper loading and the 23-field C++ checks hold. Minor,
+still open: M1 plan.py hardcodes five validation flags and drops non-suffix
+members silently; M2 the Polars census trusts the producer's input_unchanged
+flag instead of comparing an input-after snapshot (so Polars zero-mutation is
+producer-asserted, not independently measured); M3 path() skips the symlink
+check for nonexistent targets (uses fail safely); M4 pandas admission reads the
+plan declarations before their pin and unpinned bank validation.json. Notes
+N1-N6 are in review.md. Closing M2 needs the owner's build/ Polars records.
+`docs/retained-polars-timestamp-original-call-checkpoint.jsonl.gz` (132,754
+bytes, SHA256 `4fa340bd707be63119cc38eb9ae7ca6a756b3ea8d7ee004116b91f35d7b4fd18`)
+embeds 44 OWN members and declares 29 external pins; manifest SHA256
+`a609914576a9ae35ef6b2c6e1a738c0b5575b11e446025cc95b31b8511e3bf6d`.
+
+Next: continue with the next open requirement below. Fix M1-M4 in any future
+admission scripts; rerunning these banks' admission needs the owner's build/.
+The build/ evidence directories are gitignored and exist only on the owner's
+machine; the sealed checkpoints in docs/ carry their OWN members.
+
+## Previous checkpoint: full861 pandas timestamp API/UI acceptance — 2026-10-24
+
+The LOG timestamp checkpoint below is on origin/main. The
+next family is the table timestamp pair; pandas is done, Polars is next. Full
+scope remains 86 packages / 387 modules, 201 strict open units and 565
+unentered grouping queries. No catalogue row was promoted; offline structural
+validation passes unchanged 46/40 packages and 226/161 modules.
+
+Source-only plan: `log-timestamp-next-table-timestamp-metadata-plan-1/` (source
+`table-timestamp-next-plan-source-1/plan.py`) reads only OWN bank validation,
+acceptance bindings, contracts and headers. It records pandas 861 (302/559)
+and Polars 732 (229/503) totals and copies 18 pandas and 26 Polars declared
+original whole-file pins without opening them. Validation SHA256
+`1a36b18e0af10ccd63219d94ebfb1d4746d5bcb0679b63d6d7ae1123a1005c77`.
+
+ROOT pandas admission (`pandas-timestamp-full861-admission-prepared-1/`) binds
+all 18 declared originals to their pins before any decode, then recomputes
+every canonical receipt: 861 distinct, intents/audit/plan aligned, 302 tables /
+559 errors, zero mutations and warnings. Functions: apply 7, apply_auto_filter
+7, apply_events 131, attribute 156, completing 128, contained/intersecting/
+starting 144 each. Parameter states: mapping 779, entries 36, raw 20, null 14,
+omitted 12. The independent OWN mapper (never oldGEN) rebuilds the unchanged
+1,971,807-byte native oracle byte-exact (117 snapshots). Report SHA256
+`557d5179f770a82cc6e13882db94e530e05bbf3bbd52b08db4e3b51dacf54a89` at
+`pandas-timestamp-full861-root-admission-1/report.json`. The admission was
+reviewed by ROOT only; no separate independent-review agent was used.
+
+Wire is frozen in `pandas-timestamp-original-call-wire-frozen-1/wire.json` and
+documented in `docs/pandas-timestamp-original-call-workflow.md`:
+`/api/reference-table-timestamp` enters original mode when `call_json` is
+present; descriptor `minera-pandas-timestamp-original-call-v1` holds exact
+arity args and an optional `parameters` entry. Enum-keyed dictionaries use the
+ordered parameter vector; other values the raw arm (helpers always raw). The
+23-field response adds call, controls before/after and call projection.
+Backend commit `c5ac33b6`; frontend/doc commit `493f3ae5`.
+
+ROOT transport generation re-binds every original, reproduces the census and
+whole oracle, then emits the 1,964,359-byte external fixture once (SHA256
+`71286e69b3d31c944fabebbf0b5fa13bf583d71a29073aa328ac19e3389b0d01`); report
+`pandas-timestamp-transport-generated-1/report.json`. CTest run 1 had the
+standalone oracle target unbuilt in `build/` (Not Run) while the other four
+passed; it is preserved. Run 2 (`pandas-timestamp-native-ctest-2.log`) passes
+all five: oracle 302/559, controls, 861 native + 861 direct + 861 owned HTTP
+(46.33 s) and both existing table timestamp workbench/route suites. Production
+server builds; SHA256
+`f6d00c9c9911436d1a4d0a6127ec7eb616bb461445de66196b2a14f8bc2c76a9`.
+
+Frontend: focused 21, TypeScript, Vite (`pandas-timestamp-frontend-dist-1`) and
+full 203 files / 9,963 tests pass. Owned headless browser
+(`pandas-timestamp-browser-owned-1.cjs`) passes 22 checks, 17 requests and 12
+byte-exact downloads: all six filters with independent row selections, typed
+and enum examples, helper and parser diagnostics, malformed control text,
+BOM/CRLF/wide import, operation retention, held cancel/edit races, genuine
+filtered File reuse, mobile layout and the preserved friendly form. All three
+screenshots were inspected; owned server and Chrome stopped. Report 8,880
+bytes, SHA256 `20bc40764022af0fcef8605a1e6c802936cb9bdde2d54a0dec1d87a5d86cae37`.
+
+`docs/retained-pandas-timestamp-original-call-checkpoint.jsonl.gz` (123,429
+bytes, SHA256 `b8fef0494a8bada19a9a81fd3c60d8cef6a7b8c4fcf83948515f997ab1ac4769`)
+embeds 43 OWN members and declares 21 external pins; closed readback passes.
+Manifest SHA256
+`f04aecbd32df58908f02ef1aa94068c9d2811d3d4b52107b2e9ddeed700f3029`.
+
+Next: separate ROOT admission of the 26 declared Polars originals (three
+banks, 732 calls, eager/lazy and apply/collect phases), census and whole-native
+fixture mapping, then the same original-call wire/UI/transport/browser
+pattern. Do not replay retained banks. Push of the four local pandas commits
+awaits owner approval.
+
+## Previous checkpoint: full342 LOG timestamp API/UI acceptance — 2026-10-24
 
 All13 original LOG timestamp functions now have an original-call API and a
 rendered workbench. Backend/acceptance commit is `a8dd00b0`; frontend/workflow
@@ -3141,6 +3272,42 @@ test client's `httplib::detail::encode_url` truncates NUL. Production
 URLSearchParams and server decoding passed actual NUL transport acceptance.
 Rendered application interaction remains unverified.
 
+## Alpha+ cleanup selection checkpoint — 2026-10-24
+
+Resolved in the cloud container (Python 3.11.17, pinned pip dependencies,
+Linux Release build); no retained `build/` bank was used or replayed.
+Boundary cleanup is now deterministic: the first tied transition in
+first-seen label order. `enumerate_alpha_plus_cleanup_alternatives` and CLI
+`--alpha-plus-alternatives` return its exact support. Two new disjoint banks,
+`docs/alpha-plus-cleanup-bank-{a,b}.json.gz` (2,800 cells, 105,600 public
+calls, 8 and 16 hash seeds, both trace orders), and the older merged fixture
+all audit with zero failures through `scripts/check-alpha-plus-cleanup-bank.py`.
+Every public outcome is an enumerated alternative and every alternative was
+observed. Public cells vary exactly where the enumeration has several
+outcomes; all others are bound exactly. The audit also found that logs with a
+trace made only of loop labels (both boundary labels looping) must fail, and
+native now rejects them. `algo.discovery.alpha.variants.plus` and package
+`algo.discovery.alpha` are promoted: 47/86 packages, 227/387 modules, 199
+strict open units. Contract and limits: "Alpha+ cleanup selection contract"
+in the parity doc; hashes in `docs/alpha-plus-cleanup-validation.json`.
+
+## Attribute repetition domain checkpoint — 2026-10-24
+
+Cloud container, pinned runtime (polars 1.44.1 added to the reference venv);
+no retained `build/` bank was used or replayed. Disjoint seeded banks, bank
+seed 20261024, hash seeds 0-4, 6,000 cases per engine, all at zero failures:
+Polars 23,701 calls, pandas 28,274 (326 declared rejections), log 18,433 (XES sources). Fixes: the
+Polars companion was rewritten from a probed column x literal matrix (all
+integer widths, Float32, Enum, ns/ms/zoned Datetime, literal classes, zone
+abbreviations, bound simplification and contradictory-bound folding,
+did-you-mean, NaN single-row join); pandas compares like NumPy weak scalars and
+arrays, categoricals like their categories, and localizes naive strings to
+named zones; log compares XES value/children wrappers as public mappings.
+Tools: `scripts/{repetition_domain,capture-repetition-domain-bank,
+check-repetition-domain-bank}.py` and `minera_repetition_batch`. pandas and
+Polars rows are promoted (229/387 modules, 197 strict open units); the log row
+stays partial. See `docs/attribute-repetition-domain-parity.md`.
+
 ## Next open requirements
 
 - Keep all LTL declared gaps open. Reuse the 16 executed banks above; never replay
@@ -3169,19 +3336,25 @@ Rendered application interaction remains unverified.
 - Continue the wider OCDFG gate. Reuse the retained 77-call bank at
   `build/parity-closures/ocdfg-performance-public-actual-1/capture.json`;
   all retained timing/discovery/aggregation/strict-selector outcomes now have
-  acceptance. Design only new disjoint inputs for remaining domains. This
-  seventy-seven-outcome slice does not establish whole-module closure.
+  acceptance. A disjoint 53-log, five-profile discovery bank (265 public
+  outcomes, stable across hash seeds 0-3) now matches all 318 native outcomes
+  after the default elapsed path stopped losing microseconds; the bank is in
+  `docs/ocdfg-wider-discovery-evidence.json.gz` and the scripts rebuild it in
+  the cloud. Do not replay it. See `docs/ocdfg-wider-discovery-parity.md`.
+  A second disjoint 28-log bank (140 outcomes) covers per-value offsets in
+  one column, nanosecond columns and integer IDs; all 168 native outcomes
+  match after elapsed time adopted the public whole-seconds-plus-fraction
+  rounding. Discovery takes no holiday calendar. The public OCEL 2.0 JSON
+  reader drops offsets (recorded, not copied; it is outside the `algo`
+  catalogue). Still open: mixed int/str IDs, missing IDs, arbitrary relation
+  dtypes and benchmarking. No slice establishes whole-module closure.
 - Keep arbitrary relation dataframe cells, dtype/storage domains, non-string
   grouping IDs and actual performance benchmarking explicit. The new timing
   companion supports string identities; do not silently coerce other domains.
-- Continue the three repetition modules' declared gaps. Ordinary log values,
-  byte targets, container/date/byte bounds, unhashable selectors and literal
-  pandas missing-key diagnostics now have disjoint acceptance. Custom equality
-  objects, wrapper storage/identity graphs, arbitrary table schemas/dtypes,
-  categorical dictionaries and Polars physical plans remain open as documented.
-- Resolve Alpha+ identity-dependent cleanup selection. Both returned graph
-  shapes occur in broader captures; the old single-process 28/64 mismatch
-  count does not establish 28 incorrect models.
+- Close the log repetition row: give XES `<list>`/`<container>` values a
+  native representation distinct from plain dicts (importer-wide change),
+  then extend the log domain bank to them. Custom-equality objects and
+  nonstring dict keys remain outside the carrier.
 - All other partial rows, connectors/platforms, solvers, rendered UI and
   performance requirements remain in scope until their own evidence closes.
 
@@ -3213,3 +3386,23 @@ rejection of server replacement and a browser permission gate. Do not retry
 those rejected actions through another shell or disguise. Owned temporary HTTP
 acceptance is separate evidence. Recheck listeners/PIDs before relying on
 historical running-app identities.
+
+## Conformance parity banks (2026-10-24, cloud container)
+
+Petri alignments (all six search variants), DFG classic and forward/backwards
+token replay are bound to three black-box banks by
+`minera_conformance_parity_contracts_tests`; see "Conformance parity bank
+evidence" in the parity doc for the contract, the reference semantics found
+and the open items. Regenerate the fixture with
+`python scripts/generate-conformance-parity-fixture.py <the three docs/*-bank.json.gz> --output src/backend/tests/conformance_parity_reference_cases.inc`.
+Process-tree alignments are bound by
+`minera_process_tree_alignment_parity_contracts_tests` (pinned per-variant
+tallies over 4140 rows; table in the parity doc). Regenerate with
+`python scripts/generate-process-tree-alignment-parity-fixture.py docs/reference-2.7.22-conformance-parity-bank.json.gz docs/reference-2.7.22-process-tree-alignment-bank.json.gz --output src/backend/tests/process_tree_alignment_parity_cases.inc`.
+The four process-tree modules stay partial: each remaining row is a place where
+the reference is not cost-optimal (search-graph pruning, DP loop cache, MILP
+tau-body root loops, approximated activity-set splits). Next: decomposed
+alignments and the forward `consider_activities_not_in_model_in_fitness`
+cross-trace effect.
+`minera_petri_analysis_tests` crashed on main too: `positive_invariant_diagnostics`
+iterated the transitions of a temporary net; fixed by binding it first.

@@ -62,6 +62,10 @@ The latter comparison domain currently rejects explicitly. These boundaries
 keep the canonical pandas row partial even though every retained native
 projection and representable diagnostic passes.
 
+The domain-bank continuation in
+[attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md)
+supersedes the boundary paragraphs above where they differ.
+
 ## Retained public observations and native acceptance
 
 Root attempted planning once at

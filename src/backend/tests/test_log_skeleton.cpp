@@ -431,7 +431,7 @@ void thresholds_use_binary64_arithmetic() {
 void flat_inputs_variants_and_diagnostics_are_equivalent() {
   EventLog source;
   for (const auto& [case_id, activities] :
-       std::vector<std::pair<const char*, std::initializer_list<const char*>>>{
+       std::vector<std::pair<const char*, std::vector<const char*>>>{
            {"c1", {"A", "B"}}, {"c2", {"A"}}}) {
     Trace trace;
     trace.case_id = case_id;

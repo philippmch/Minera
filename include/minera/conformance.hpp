@@ -255,8 +255,9 @@ struct TokenReplayOptions {
   // the corresponding role and contain one nonnegative count per root place.
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
-  // Controls routing before visible events in both variations. Final routing
-  // remains independent; the backwards variation never routes at trace end.
+  // Controls routing before visible events in forward replay. The backwards
+  // variation always routes (the reference ignores this parameter there) and
+  // never routes at trace end.
   bool walk_through_hidden_transitions = true;
   bool include_trace_diagnostics = false;
   // Flat input case selector. Already grouped Trace boundaries remain authoritative.

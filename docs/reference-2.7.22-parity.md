@@ -47,8 +47,8 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 47
-complete and 39 partial dispatcher rows, plus 228 complete and 159 partial
+adapter, integration, or missing are complete. The current manifest records 48
+complete and 38 partial dispatcher rows, plus 238 complete and 149 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
@@ -56,7 +56,7 @@ POWL discovery, 13-module footprints discovery/conformance, and the 19-module
 temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
 classic Declare/log-skeleton discovery and conformance, with distinct
 registered tests, plus the replay-duration diagnostic support module and the
-backwards token-replay variation and CLASSIC heuristic discovery; 198 coverage
+backwards token-replay variation and CLASSIC heuristic discovery; 187 coverage
 units still require exact proof.
 A release may
 additionally run the strict gate:
@@ -123,14 +123,14 @@ are reconciled.
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial (remaining replay proof)** — native place/transition/arc usage deltas, supplied-PNML CLI input, explicit markings including zero-valued key metadata, selectors, weighted/extended arcs, color helpers, and token-flood cleaning have registered coverage; partial hidden routes and replay limits have public evidence, while resource-unresolved models remain outside the comparison proof |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Complete** — module and dispatcher contracts cover all seven public functions, eight apply parameters, typed labels, signed controls, EventLog/EventTable adapters, diagnostics and RNG continuation; exact proofs and reviewed ordering distinctions are recorded in `docs/bose-parity-contract.md` |
-| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
-| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
-| Conformance: replay | forward token replay and backwards token replay | **Partial (duration support complete; replay proof pending)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, while exact routing/flood-cleaning and root-cause support remain pending |
+| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete for the six search variants (log enrichment pending)** — all six variants are explicitly selectable and `align_petri_trace` reproduces the reference per-trace cost, best-worst cost, fitness, unreachable-marking and error behavior, including cost functions, arc-weight handling and the less-memory pruning, against three black-box banks (see "Conformance parity bank evidence"); less-memory Dijkstra with legacy unit costs remains the generic default of `check_alignment` |
+| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors; DFG classic is bound to the conformance parity banks (alignment, cost and visited states), while process-tree and decomposed results are captured there but not yet bound |
+| Conformance: replay | forward token replay and backwards token replay | **Partial (duration support complete; replay proof pending)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, while root-cause support remains pending; forward and backwards replay rows, including routing and flood cleaning under each public option, are bound to the conformance parity banks except forward `consider_activities_not_in_model_in_fitness`, an open cross-trace divergence |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
-| Discovery: Alpha | classic and Alpha+ | **Partial (classic, abstraction, and endpoint modules complete)** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with full public/native process captures; its selection law remains partial because native repeated calls vary where the observed public cells stay stable |
+| Discovery: Alpha | classic and Alpha+ | **Complete** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with full public/native process captures; identity-ordered boundary cleanup is enumerated exactly, the native default is a deterministic member of that support, and two new disjoint public banks plus the earlier merged fixture fall inside it, with every enumerated outcome observed (see "Alpha+ cleanup selection contract") |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **CLASSIC complete; dispatcher and PLUSPLUS partial** — CLASSIC public EventLog/DFG object and Petri routes, typed returned fields, order, noise pruning and conversion have saved native/public proof; separate dispatcher and PLUSPLUS obligations remain |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
@@ -452,8 +452,11 @@ All reduced trace endpoints connect to the source/sink, and hidden boundary
 transitions retain reverse arcs. Initial cleanup requires a single-output
 successor with an exclusive target producer; final cleanup requires an
 exclusive prior-place consumer whose producers have no other outputs.
-The enhanced variant and its dispatcher remain partial. Its
-optional cleanup removes only completely disconnected visible transitions.
+A boundary log in which some trace consists only of loop labels (possible
+only when both reserved boundary labels are themselves loops) fails before
+cleanup, as the public runtime does for every hash seed and trace order.
+The optional `remove_unconnected` cleanup removes only completely
+disconnected visible transitions.
 
 `--alpha-plus-result` and `POST /api/discover-alpha-plus` expose the raw graph
 and markings as JSON, with activity selection, optional cleanup, and row caps.
@@ -468,10 +471,9 @@ outputs from the pinned 2.7.22 runtime. The durable
 seeds 0 through 4 and 20 calls per row. The 784-row corpus contains 774 distinct
 cases; 72 cases vary across these seeds. Repeating a fixed seed produced no
 additional observed alternatives in this capture.
-Boundary cleanup samples incident choices independently and uniformly as an
-approximation to reference ordering. Membership in sampled support does not
-prove full support, selection probabilities, or correlation equivalence;
-these remain open parity requirements.
+Boundary cleanup originally sampled incident choices uniformly; it is now
+deterministic and its full support is enumerated, as described in
+"Alpha+ cleanup selection contract" below.
 The integrated audit sampled 7,740 native results across all 774 distinct
 cases. Against seed 0 alone, 374 results were outside observed support; all
 7,740 were within the merged five-seed support, with no malformed results.
@@ -1120,6 +1122,13 @@ frontend form/serializer expose the same operation; focused tests cover
 multiple anchors, no-match traces, attributes, case-id synchronization, and
 invalid options.
 
+Attribute-value repetition domain banks (2026-10-24): the pandas and Polars
+companions are complete over disjoint seeded banks covering NumPy
+weak-scalar/array comparisons, categoricals, zoned datetimes, the Polars
+literal model, optimizer bound folding and diagnostics; the log module stays
+partial for the XES list/plain-dict carrier ambiguity. See
+[attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md).
+
 Attribute-value repetition evidence: a whole-trace filter counts matching
 activity, resource, lifecycle, timestamp, or generic event-attribute values
 and keeps traces inside an inclusive repetition range. The native operation
@@ -1267,6 +1276,130 @@ separately exercises the classic and extended equations, workflow validation,
 the full Woflan pipeline, all three marking graphs, graph edges, structural
 pairs, invariant bases, S-components, and uniform and weighted invariants. Exact
 selector and module proofs tie those cases to distinct public declarations.
+
+## Conformance parity bank evidence
+
+Petri-net alignments, DFG alignment and forward/backwards token replay are
+bound to black-box captures of the pinned reference in
+`src/backend/tests/test_conformance_parity_contracts.cpp`
+(`minera_conformance_parity_contracts_tests`). Three banks feed the generated
+fixture `conformance_parity_reference_cases.inc`:
+
+- `docs/reference-2.7.22-conformance-parity-bank.json.gz`: 60 seeded random
+  process trees converted to workflow nets, 9 traces each.
+- `docs/reference-2.7.22-conformance-parity-nets-bank.json.gz`: 40 nets
+  discovered by the alpha, heuristics and ILP miners plus nets with duplicate
+  labels (frozen in `docs/reference-2.7.22-conformance-parity-nets.json.gz`),
+  with random model, sync and trace cost functions.
+- `docs/reference-2.7.22-conformance-parity-external-bank.json.gz`: the
+  weighted silent-pump and noisy heuristics nets from the quality-metrics
+  fixtures (`docs/reference-2.7.22-conformance-parity-external-nets.json.gz`).
+
+Each bank merges independent captures under different `PYTHONHASHSEED` values
+and PNML element orders (`scripts/capture-conformance-parity-reference.py`,
+`scripts/merge-conformance-parity-reference.py`,
+`scripts/generate-conformance-parity-fixture.py`). The contract:
+
+- Where every run agreed, native must equal the reference; where runs differ,
+  native must equal one of the observed values. Calls the reference could not
+  finish within the capture time limit bind nothing.
+- Petri enum variants bind cost, best-worst cost and fitness exactly, plus no
+  alignment (unreachable final marking) and the discounted variant's error.
+  The returned alignment must be a valid run of the net whose cost under the
+  variant's cost function is the reported cost. Which of several equally
+  cheap alignments is returned is a reference tie choice that changes with
+  hash seed and PNML order, so it is not bound.
+- The reference discounted A* is not always optimal. Where native differs
+  from it, native must be no more expensive than every observed run.
+- Generators bind the cost and require every reference alignment to be among
+  the native ones, unless either side stopped at its 64-alignment limit.
+- DFG classic binds the alignment, cost and visited-state count.
+- Replay binds every per-trace row (fitness, activated transitions, problems,
+  enabled transitions, reached marking, token counters) for the default
+  options and each public option toggled, except
+  `consider_activities_not_in_model_in_fitness`, below.
+
+Reference semantics established black-box and implemented natively:
+
+- fitness = 1 - floor(cost / 10000) / floor(bwc / 10000), 0 when the
+  denominator is 0. bwc is the variant's cost for the empty trace plus 10000
+  per event, or plus the supplied trace costs. Less-memory adds only supplied
+  trace costs; discounted reports the sum of supplied trace costs (0 by
+  default) and always searches with unit costs discounted by 2^-index,
+  ignoring cost functions.
+- Less-memory charges a silent move 1 only when a visible transition whose
+  label occurs in the trace has all of its input places among the silent
+  transition's input places (an empty preset included), else 0. Its generator
+  charges 1. Both run a pruned Dijkstra over (marking, trace position) that
+  skips a marking already closed at the same or a later position; this is not
+  always optimal and the reference reports the pruned cost.
+- Every variant except less-memory and its generator reads each ordinary arc
+  as weight 1. Less-memory honors arc weights, which lets silent cycles pump
+  tokens; the reference then usually does not terminate.
+- Unreachable final marking: enum variants return no alignment, generators an
+  empty list, discounted raises.
+- Backwards replay ignores `walk_through_hidden_trans`.
+- Replay orders routing candidates and the enabled-transition worklist by
+  transition and place name, so callers must pass the PNML ids as
+  `TokenReplayOptions::transition_names` and `place_names`.
+
+Reference nondeterminism: equal-cost alignment choice, generator enumeration
+order, search counters, discounted costs on some nets and forward-replay
+silent routing on nets with competing silent paths (25 of 30 rows of the
+noisy heuristics net vary with the hash seed) all change between runs.
+
+Open divergences:
+
+- Forward replay with `consider_activities_not_in_model_in_fitness=True`
+  marks some traces unfit depending on other traces of the same log, a
+  cross-trace effect native does not reproduce. Forward replay stays partial.
+- Decomposed `RECOMPOS_MAXIMAL` is captured in the banks but not yet bound.
+
+### Process-tree alignments
+
+`src/backend/tests/test_process_tree_alignment_parity_contracts.cpp`
+(`minera_process_tree_alignment_parity_contracts_tests`) binds all four
+variants to the 60 trees of the first bank plus
+`docs/reference-2.7.22-process-tree-alignment-bank.json.gz` (400 seeded random
+trees, seed 99, 9 traces each, three hash seeds; captured with
+`--families tree:` and generated into `process_tree_alignment_parity_cases.inc`
+by `scripts/generate-process-tree-alignment-parity-fixture.py`). Each of the
+4140 rows per variant is classified as equal (cost and fitness), native
+cheaper, native costlier, or equal cost with another fitness, and the tallies
+are pinned:
+
+| Variant | Equal | Native cheaper | Native costlier | Fitness only |
+|---|---|---|---|---|
+| `SEARCH_GRAPH_PT` | 4112 | 28 | 0 | 0 |
+| `DYNAMIC_PROGRAMMING` | 4126 | 11 | 3 | 0 |
+| `MILP` | 4116 | 10 | 0 | 14 |
+| `APPROXIMATED_ORIGINAL` | 3976 | 164 | 0 | 0 |
+
+Reference behaviour found by probing and now implemented:
+
+- Fitness is `1 - cost / (len + floor)` without clamping (it can be negative).
+  The floor is the variant's own empty-trace cost, except for
+  `APPROXIMATED_ORIGINAL`, whose floor reads n-ary operators as right-nested
+  binary ones: 10000 per visible leaf, 1 per tau leaf, 2 per binary operator,
+  a loop running its body once, an XOR taking its cheapest child at that
+  child's depth (this matches all 4140 rows).
+- `SEARCH_GRAPH_PT` alignments list each executed tau leaf as a silent model
+  move. Native alignments are checked to replay the trace and to be a word of
+  the tree with its tau leaves at the reported cost.
+- `DYNAMIC_PROGRAMMING` loops: an empty segment skips the loop at no cost; any
+  other segment is an optional leading redo, the body, (redo, body) rounds
+  whose redo consumes at least one event, and an optional extra body.
+
+Remaining divergences, all where the reference is not cost-optimal or
+inconsistent: the search-graph search prunes some optimal paths (sync moves
+taken first, nested loops behind a silent redo); the DP reuses a cached loop
+iteration for a reordered segment; MILP gives the empty trace a positive cost
+on root loops with a tau body and uses it as the fitness floor; the
+approximated variant splits traces over subtrees by its activity-set
+heuristic, while native splits optimally. Reference alignments of the DP,
+MILP and approximated variants omit silent and some model moves and are not
+bound; the search-graph tie choice and its occasional dropped log moves after
+a tau move are not bound either.
 
 ## XES importer-variant evidence
 
@@ -5220,10 +5353,12 @@ fallbacks. This preserves the reference implementation's behavioral questions wi
 Python implementation; `MILP` does not claim to invoke literal PuLP.
 
 * `SEARCH_GRAPH_PT` is the default residual-expression Dijkstra search, using
-  canonical interned residuals for stable, collision-free state identity.
+  canonical interned residuals for stable, collision-free state identity. Tau
+  leaves are explicit silent steps and appear as model moves without a label.
 * `DYNAMIC_PROGRAMMING` recursively aligns subtrees with memoized subtree/trace
-  pairs; loops use the exact residual fallback. Optional global caching has a
-  positive `batch_size` and `clear_cache` controls periodic eviction.
+  pairs; loops follow the reference's segment rule (see the conformance bank
+  evidence). Optional global caching has a positive `batch_size` and
+  `clear_cache` controls periodic eviction.
 * `MILP` is an exact integer shortest-path residual A*/branch-and-bound
   equivalent to the pinned unit-cost MILP objective. It is dependency-free and
   performs no external LP solves (`lp_solved` therefore remains zero); native
@@ -6887,6 +7022,70 @@ members and 1,225 native members. Both archives are below the size guard and
 use deterministic gzip. Alpha+ remains partial; the 228 open coverage units
 are unchanged. Final and joint selection laws still need evidence beyond
 this finite pilot.
+
+### Alpha+ cleanup selection contract (2026-10-24)
+
+Boundary cleanup makes two tied choices: one transition consuming from the
+source and, after the initial reduction, one transition producing into the
+sink. The public runtime orders these ties by object identity. Its choice is
+stable within a process and for a given `PYTHONHASHSEED` across fresh
+processes (byte-identical bank reruns), but it changes with hash seed, label
+names and trace-list order, because those change allocation history. It is
+therefore not a function of the log and is not reproduced per process.
+
+The native contract instead has three parts:
+
+* `enumerate_alpha_plus_cleanup_alternatives` (CLI
+  `--alpha-plus-alternatives`) returns every reachable choice sequence with
+  its chosen labels and either the raw result or the cleanup failure. This
+  is the exact native support.
+* `discover_alpha_plus_result` and every adapter built on it take the first
+  tie in first-seen label order (boundary labels last). The result is the
+  first enumerated alternative and is identical across repeated calls,
+  matching the public within-process stability. The previous uniform random
+  draw is removed.
+* Where the enumeration has one outcome, the public outcome must be constant
+  and equal to it. Where it has several, the public outcome may be any of
+  them, and native binds none in particular.
+
+`scripts/capture-alpha-plus-cleanup-bank.py` captured two new banks on the
+pinned runtime (Python 3.11.17 on Linux, pandas 3.0.5, numpy 2.4.6, scipy
+1.17.1, networkx 3.6.1, PuLP 2.9.0). Bank A has 300 generated logs over `p`
+to `s` with 8 hash seeds. Bank B has 400 logs over `u` to `y`, with up to four
+traces of length six and 16 hash seeds. Both include reserved boundary labels,
+immediate repetitions, both cleanup settings, original and reversed trace
+lists, and three fresh calls per process. Every case contains an ordinary
+label, so the banks are disjoint from each other and from all earlier Alpha+
+corpora. `scripts/check-alpha-plus-cleanup-bank.py` audits a bank, or the
+earlier merged fixture, against the native enumeration without the reference
+runtime:
+
+| Bank | Cells | Public calls | Public varying | Native multi-outcome | Enumerated outcomes observed | Failures |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | 1,200 | 28,800 | 48 | 48 | 1,152 / 1,152 | 0 |
+| B | 1,600 | 76,800 | 116 | 116 | 1,512 / 1,512 | 0 |
+| `alpha-plus-reference-fixtures.json` | 774 | merged support, 5 seeds × 20 calls | 72 | 72 | 756 / 756 | 0 |
+
+No public cell varied within a process. Every public outcome is a native
+alternative, every native alternative was observed publicly, and the cells
+that vary publicly are exactly the cells whose enumeration has more than one
+outcome. All other cells are bound exactly. The deterministic native result
+was stable over three repeats and equal to the first alternative in every
+cell. Failures compare by presence, not by Python/C++ class or message.
+
+The audit also found a defect. In a preliminary bank A capture (before
+the ordinary-label filter), twelve cells failed in every public process
+while native returned graphs. They came from three logs, each with both
+boundary labels looping and a trace that reduced to nothing. Native now rejects such
+logs before cleanup. Hash records and per-bank statistics are in
+`docs/alpha-plus-cleanup-validation.json`.
+
+Limits: the banks are finite, and the summary normalization compares
+structural names. Cells with duplicate place names (288 in A, 468 in B, 92 in
+the fixture) can equate distinct graphs. The older process-law and
+final-joint archives use a different raw graph schema and were not re-audited
+against the enumeration. The reference's per-process choice and its
+frequency across seeds are allocation artifacts and are outside the contract.
 
 ### PLUSPLUS returned sojourn map and node flags
 

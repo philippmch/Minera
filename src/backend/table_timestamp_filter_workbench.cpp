@@ -4,6 +4,8 @@
 #include "minera/log_attribute_repetition_controls.hpp"
 #include "minera/pandas_timestamp_filter.hpp"
 #include "minera/polars_timestamp_filter.hpp"
+#include "pandas_timestamp_original_call_workbench.hpp"
+#include "polars_timestamp_original_call_workbench.hpp"
 #include <map>
 #include <optional>
 #include <set>
@@ -18,6 +20,15 @@ std::string counts(const EventTable& table) {
 DiscoveryWorkbenchResponse execute_table_timestamp_filter(
     const std::vector<DiscoveryWorkbenchPart>& parts,
     const std::vector<DiscoveryWorkbenchPart>& query, std::string_view transport_error) {
+  bool original_call = false; const DiscoveryWorkbenchPart* original_engine = nullptr; std::size_t original_engine_count = 0;
+  for (const auto* collection : {&query, &parts}) for (const auto& part : *collection) {
+    if (part.name == "call_json") original_call = true;
+    if (part.name == "engine") {original_engine = &part; ++original_engine_count;}
+  }
+  if (original_call) {
+    if (original_engine_count == 1 && original_engine->bytes == "polars") return execute_polars_timestamp_original_call(parts, query, transport_error);
+    return execute_pandas_timestamp_original_call(parts, query, transport_error);
+  }
   std::map<std::string, const DiscoveryWorkbenchPart*> fields;
   std::optional<EventTable> source, result;
   std::optional<std::string> before;

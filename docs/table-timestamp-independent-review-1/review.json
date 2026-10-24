@@ -1,0 +1,117 @@
+{
+ "schema": "minera-independent-source-review-v1",
+ "scope": "table timestamp (pandas full861, polars full732) ROOT plan/admission/transport scripts and committed C++ consumers",
+ "reference_source_inspected": false,
+ "originals_available": false,
+ "harness": [
+  "harness/pandas_census.py",
+  "harness/polars_census.py",
+  "harness/pathcheck.py",
+  "harness/xcheck.py"
+ ],
+ "verdict": "no blocking finding; recorded acceptance stands",
+ "blocking": 0,
+ "minor": 4,
+ "notes": 6,
+ "findings": [
+  {
+   "id": "M1",
+   "severity": "minor",
+   "file": "build/parity-closures/table-timestamp-next-plan-source-1/plan.py",
+   "line": "105-107 (also 46,55,57; 28-31,56)",
+   "description": "The validation 'checks' are written as literals, not computed: exact_four_owned_outputs_before_validation, pandas861_and_polars732_totals_match_safe_metadata, no_original_content_or_hash, no_reference_import_or_call and no_build_tests_browser_git are all hard-coded True. This is the same class of issue as the earlier precedent where a census hardcoded an audit verification flag. Only the totals flag is backed by the assert at line 63. The plan also reads its metadata through plain Path.read_bytes with no closed-path or lstat checks, and it builds the declared-original set from a suffix whitelist (ORIGINAL_SUFFIXES). Any binding member that does not match a suffix is dropped silently, with no count of dropped members in the output.",
+   "evidence": "The validation.json checks are literal booleans in the source. The only computed value is declared_original_pins {pandas:18, polars:26}. I checked: source-declarations.json has 18/26 unique paths, and its sha 2010d318... matches both validation.json and the plan_declarations pins in the admission reports. The suffix-filter completeness cannot be confirmed because check-bindings.json is not available.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "M2",
+   "severity": "minor",
+   "file": "build/parity-closures/polars-timestamp-full732-admission-prepared-1/map-native.py",
+   "line": 65,
+   "description": "The Polars census's no_mutation check relies on the producer's input_unchanged flag. Unlike the pandas mapper (line 80), it never compares an input-after snapshot to input_before, so 'mutations: 0' is not independently recomputed for the source frame. Keyword mutation is compared directly (kwargs_after == kwargs_before).",
+   "evidence": "Synthetic harness polars_census.py: a row whose input_after differs from input_before while input_unchanged stays True gives PASS with mutations=0. The same tamper in the pandas harness is rejected with snapshot_after_equal. A kwargs_after change is rejected in both.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "M3",
+   "severity": "minor",
+   "file": "build/parity-closures/{pandas-timestamp-full861-admission-prepared-1/admit-root.py:32, polars-timestamp-full732-admission-prepared-1/admit-root.py:32, pandas-timestamp-transport-prepared-1/generate-root.py:30, polars-timestamp-transport-prepared-1/generate-root.py:30}",
+   "line": "30/32",
+   "description": "path() runs its symlink/reparse check only when target.exists(), and exists() follows links, so a dangling symlink passes path() without the check. This is the same pattern as the precedent dangling-link finding. In practice every consumer fails closed: read_bytes raises FileNotFoundError, mkdir and open('xb') raise FileExistsError, and nothing is created at the target. Check and use are also separate steps, so there is a small check-then-use race. An lstat-first check (os.lstat in try/except, then S_ISLNK and the reparse bit) would close this.",
+   "evidence": "Harness pathcheck.py, run against the real drivers: symlinked file, symlinked directory component and outside-escape links are rejected with no_reparse; '..' and absolute paths are rejected with closed_relative_path. A dangling link is returned by path(), but its read, mkdir and xb-open all fail, and the link target ('nowhere') is never created.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "M4",
+   "severity": "minor",
+   "file": "build/parity-closures/pandas-timestamp-full861-admission-prepared-1/admit-root.py",
+   "line": "41, 53",
+   "description": "Two inputs reach the driver without a binding check before use. (a) The plan declarations file is decoded and used as the source of all pins before it is checked against its recorded pin (2010d318...); it is only recorded afterwards and re-compared at the end. (b) Each bank's validation.json, a path outside the declared set, is read and decoded with no pin and no recheck, and is used only as a cross-check against records_sha256. Both are OWN metadata, and the recorded pins agree after the fact, so the effect is on rigor, not on the result.",
+   "evidence": "The report's plan_declarations sha 2010d3183c... equals the plan validation.json artifact binding. bank validation.json pins exist only in the plan's preparation.json (637cdc35..., 4f38efb9...) and are not rechecked by admit-root.py.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "N1",
+   "severity": "note",
+   "file": "build/parity-closures/pandas-timestamp-full861-admission-prepared-1/admit-root.py",
+   "line": "58-61",
+   "description": "The pandas whole-oracle comparison takes the first 2,526 bytes (the includes and helpers up to the first snapshot_0) from the oracle itself instead of reconstructing them. This is disclosed as oracle_prelude_adopted_bytes. I read the prelude by hand: full_table_equal compares complete serialized JSON and throws on any difference, and the helpers construct values without short-circuiting, so nothing in it makes the test vacuous. The Polars mapper reconstructs its oracle completely, including the three '// Frozen receipt SHA256' header lines, which match the declared records pins.",
+   "evidence": "report.json oracle_prelude_adopted_bytes=2526. The polars vectors header lines dcd77def..., ab1f0431... and 27a982d3... equal the declared records.jsonl pins.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "N2",
+   "severity": "note",
+   "file": "all four ROOT drivers",
+   "line": "main()",
+   "description": "The mapper and admission pins arrive as argv values, and the run logs record only the JSON result, not the command line. So it cannot be confirmed whether python -I/-B was used. Exposure is low: the mapper is exec(compile(pinned bytes)) in a fresh ModuleType, with no filesystem loader and no bytecode, and the mapper itself imports only stdlib modules (collections, hashlib, json, math). Separately, the driver pin is taken from Path(__file__).read_bytes() at the end of the run and is not compared with the bytes that started executing.",
+   "evidence": "The run logs contain only {status, census|fixture, report}. I re-hashed the extracted driver and mapper bytes and they equal the report pins: pandas admit 03b75229, mapper 82063a90, generator 00713210; polars admit ad5b8eb2, mapper f8a9e248 (CRLF bytes), generator aab3a327.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "N3",
+   "severity": "note",
+   "file": "admit-root.py / generate-root.py (both families)",
+   "line": "report dicts",
+   "description": "Several report booleans are literals: all_bound_before_decode, oracle_whole_file_compared, census_reproduced, producer_generator_imported_or_executed=False and reference_calls=0. Unlike M1, each one is guaranteed by control flow, because every corresponding need() runs before any output is written, and the code contains no import or exec of producer, generator or reference code. The census values mutations:0 (both mappers) and warnings:0 (pandas) are literals backed by need() rejections, while the Polars algorithm_warnings count is computed (2).",
+   "evidence": "Code reading, plus synthetic rejections in pandas_census.py: duplicate, mutation, warning, gap, exclusive-terminal, removed-candidate, stale-sha and index-order cases are all rejected.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "N4",
+   "severity": "note",
+   "file": "build/parity-closures/polars-timestamp-full732-admission-prepared-1/map-native.py",
+   "line": "26-33, 61",
+   "description": "The Polars tags() does not validate the shape of enum, dict or sequence values (the pandas version does), and the Polars intent rows are not checked for module. Downstream, the C++ parser rejects malformed enums for the transport descriptors, but the census itself would accept and count such a value.",
+   "evidence": "Synthetic: an enum key without module/name gives PASS in polars_census.py.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "N5",
+   "severity": "note",
+   "file": "src/backend/{pandas,polars}_timestamp_original_call_workbench.hpp; tests/test_{pandas,polars}_timestamp_workbench_public.cpp",
+   "line": "workbench 57-58/44-45; tests 95-97/97-99",
+   "description": "source_unchanged and controls_unchanged come from re-serializing a source and a parsed call that the native API receives by const reference, so they are structurally always true. The tests' flag(...,true) assertions on them therefore carry little signal. Every other field of the 23-field envelope is checked: the exact key set, status, phase, apply_returned against the record (Polars), the full table, the full error type and message, independently serialized controls before and after, the projection, and reopening of the artifacts. I found no self-comparison, no loop that never runs, and no ignored field. Note that the census guarantees zero mutations in the bank anyway.",
+   "evidence": "Committed tests list all 23 keys and require fields.size()==23. The prepared test-check.cpp.txt and test-controls.cpp.txt equal the committed Polars test lines 73-105 and 57-64 (CR stripped). All tests use timestamp_need, which throws, and the CMake test targets get -UNDEBUG, so the oracles' assert() calls are live.",
+   "invalidates_acceptance": false
+  },
+  {
+   "id": "N6",
+   "severity": "note",
+   "file": "mappers/generators",
+   "line": "pandas map 186-190; polars map 179; generators 66-67/73-75",
+   "description": "Diagnostics are compared by the last segment of the error type plus the message, and the Polars comparison adds phase. Python error args and module are not compared, and Polars' 2 algorithm warnings have no native representation. Both are disclosed in PARITY_HANDOFF and in the polars-timestamp contract (lines 137-138). The Polars datetime fold/offset_seconds fields are accepted by the parser and then dropped, the same way the mapper drops them.",
+   "evidence": "Code reading; docs/polars-timestamp-filter-parity-contract.md:137-138.",
+   "invalidates_acceptance": false
+  }
+ ],
+ "verified": [
+  "All 18 pandas and 26 Polars declared paths are unique. Committed src/backend/tests/test_pandas_timestamp_filter.cpp (LF, 1,963,945 bytes, 7,862 lines) becomes, after LF->CRLF, exactly the declared pin (1,971,807 bytes, sha 400cb642...), and its LF sha 32c8d99a... equals report oracle_lf_sha256: the change is CRLF/LF only.",
+  "Committed test_polars_timestamp_filter.cpp (7,533 bytes) and polars_timestamp_filter_public_vectors.inc (11,579,792 bytes, b3e9fa58...) equal their declared pins exactly. The vectors contain 885 frames and 732 cases, as the census says.",
+  "The committed pandas_timestamp_workbench_public_vectors.inc (1,964,359 bytes, 71286e69...) and polars_timestamp_workbench_public_vectors.inc (3,426,683 bytes, 4097e441...) equal the generation-report fixture pins exactly.",
+  "Every extracted script, report and output re-hashes to the pins recorded in the reports and in PARITY_HANDOFF: admission reports 557d5179 and 76e3970c, transport reports 9b4e85d2 and d851e141, and census, mapping and gate outputs.",
+  "Cross-checked from committed files only: in all 861 pandas and 732 Polars transport cases, the input snapshot, expected result snapshot, native function and full error type/phase/message equal the admitted oracle case with the same index (0 mismatches). There are 706 lazy cases, and every one materializes. Expected values come from the original records, never from the code under test.",
+  "Neither generator nor mapper imports or executes capture-public.py, generate-native-tests.py, prepare-cases.py or the reference library. The old generators are only read as whole bytes for binding.",
+  "The Polars source-revision-1 differs only in the keyword-order census rule (positional prefix versus set equality, plus a recorded order histogram). Its failed run log (keyword_order:dt1,dt2,attribute,attribute_value) is preserved, and admit-root.py is byte-identical between the two revisions."
+ ]
+}

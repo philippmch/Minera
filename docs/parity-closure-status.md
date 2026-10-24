@@ -17,7 +17,7 @@ TypeScript and Vite pass. Original native, frontend and HTTP harness failures
 remain retained with unchanged native expected outcomes. The log recipe's
 overstated prior-receipt audit timing is explicitly corrected and preserved;
 independent reconstruction found no replay. The three canonical modules remain
-partial with 201 strict open units across the full catalogue. See
+partial; 199 strict open units remain across the full catalogue. See
 [timestamp-filter-workflow.md](timestamp-filter-workflow.md) and its contracts.
 Rendered browser interaction remains unverified.
 
@@ -168,23 +168,32 @@ These are semantic module closures, including missing helper implementations
 and repairs. They do not complete their parent families. Detailed contracts
 and evidence limits are linked from each module's coverage record.
 
-Coverage is now **46 complete / 40 partial packages**, **226 complete / 161
-partial modules**, and **201 open strict coverage units**, down from 228.
+Alpha+ cleanup selection is resolved: boundary cleanup is deterministic, its
+exact support is enumerable, and two new disjoint public banks plus the
+earlier fixture fall inside it with every alternative observed. The Alpha+
+module and the Alpha package are complete; see "Alpha+ cleanup selection
+contract" in [reference-2.7.22-parity.md](reference-2.7.22-parity.md).
+
+The pandas and Polars attribute-value repetition companions are complete.
+Disjoint seeded banks (6,000 cases per engine, five hash seeds) cover the
+column x value domains their contracts left open: NumPy weak-scalar and array
+comparisons, categorical categories, named-zone datetimes, the Polars literal
+model, optimizer bound folding and rendered diagnostics. Every checked call
+passes; the log module stays partial for the XES list/plain-dict carrier
+ambiguity. See
+[attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md).
+
+Coverage is now **47 complete / 39 partial packages**, **229 complete / 158
+partial modules**, and **197 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 
 ## Active requirements
 
-- The Polars repetition companion passes 105 retained full outcomes, including
-  exact apply/collect diagnostics, literal columns and restartable lazy input.
-  The canonical row remains partial for unobserved dtype, dictionary and query
-  plan domains; see
-  [polars-attribute-repetition-parity-contract.md](polars-attribute-repetition-parity-contract.md).
-- The pandas repetition companion passes all 123 retained complete table
-  projections and sixteen native diagnostics, preserving row order, source
-  indices, dtypes, categorical declarations and attributes. The canonical row
-  remains partial for its remaining object/schema domains; see
-  [pandas-attribute-repetition-parity-contract.md](pandas-attribute-repetition-parity-contract.md).
+- The log repetition module remains partial: a public XES `<list>` value
+  shares its native representation with a plain dict, and custom-equality
+  objects are outside the carrier; see
+  [attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md).
 - The usable OCDFG working-time increment is delivered, with default/custom/empty
   schedules, exact timing options and locale-independent signed-zero JSON.
   Sixty retained timing cases, eight discovery outcomes and owned HTTP checks
@@ -197,9 +206,12 @@ The machine-readable source of truth is
   Vite and eight production HTTP cases pass. These bounded results leave the
   wider module and rendered browser gate open; see
   [ocdfg-edge-metrics-parity-contract.md](ocdfg-edge-metrics-parity-contract.md).
-- Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
-  count compares one reference process; both returned graph shapes occur in
-  the broader public captures, so it is not evidence of 28 incorrect models.
+- Two disjoint wider OCDFG discovery banks (81 logs, five timing profiles,
+  405 public outcomes) match all 486 native outcomes, covering offsets,
+  nanosecond columns and integer IDs, after microsecond and rounding fixes
+  in elapsed time; the CLI now takes the same timing controls as the HTTP
+  route. The module stays partial; see
+  [ocdfg-wider-discovery-parity.md](ocdfg-wider-discovery-parity.md).
 - Keep all other partial rows, rendered UI, connector/platform, solver and
   performance requirements open until their own evidence supports closure.
 

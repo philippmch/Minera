@@ -1,6 +1,7 @@
 #include "minera/timestamp.hpp"
 
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -341,6 +342,34 @@ std::string format_timestamp_microseconds(double epoch_seconds) {
   char fraction_text[9];
   std::snprintf(fraction_text, sizeof(fraction_text), ".%06lldZ", micros);
   result.replace(result.size() - 5, 5, fraction_text);
+  return result;
+}
+
+std::optional<ParsedExactTimestamp> localize_timestamp_wall_time(
+    const ParsedExactTimestamp& wall, std::string_view zone) {
+  auto result = wall;
+  result.timezone_aware = true;
+  if (zone == "UTC") { result.offset_minutes = 0; return result; }
+  if (zone.size() == 9 && zone.starts_with("UTC") && (zone[3] == '+' || zone[3] == '-') &&
+      zone[6] == ':') {
+    const auto digit = [&](std::size_t at) {
+      if (!std::isdigit(static_cast<unsigned char>(zone[at])))
+        throw std::invalid_argument("invalid fixed timezone offset");
+      return zone[at] - '0';
+    };
+    const int minutes = (digit(4) * 10 + digit(5)) * 60 + digit(7) * 10 + digit(8);
+    result.offset_minutes = zone[3] == '-' ? -minutes : minutes;
+    result.seconds -= std::int64_t{result.offset_minutes} * 60;
+    return result;
+  }
+  const std::chrono::time_zone* resolved = nullptr;
+  try { resolved = std::chrono::locate_zone(zone); }
+  catch (const std::runtime_error&) { throw std::invalid_argument("unknown timezone: " + std::string(zone)); }
+  const auto info = resolved->get_info(std::chrono::local_seconds{std::chrono::seconds{wall.seconds}});
+  if (info.result != std::chrono::local_info::unique) return std::nullopt;
+  const auto offset = std::chrono::duration_cast<std::chrono::seconds>(info.first.offset).count();
+  result.offset_minutes = static_cast<std::int32_t>(offset / 60);
+  result.seconds -= offset;
   return result;
 }
 

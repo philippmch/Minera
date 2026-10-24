@@ -162,4 +162,15 @@ void timing_json_roundtrip() {
   assert(serialize_ocdfg_json(parsed) == json);
 }
 } // namespace
-int main(){public_timing_vectors();public_discovery_vectors();practical_timing_contract();missing_datetime_adapter_contract();canonical_and_scalar_adapter_contract();timing_json_roundtrip();std::cout<<"OCDFG edge performance: 60 retained public timing cells, eight discovery outcomes, native missing/scalar/canonical-role adapters, practical working-time controls and bitwise JSON roundtrip passed\n";}
+void elapsed_component_rounding(){
+ // Observed in the second wider bank: a negative sub-day interval sums its
+ // whole seconds (-1) and microsecond fraction (0.480211) separately.
+ const auto earlier=date("2033-06-18T04:39:39.519788362Z"),later=date("2033-06-18T04:39:39.000000001Z");
+ same_values({ocdfg_elapsed_seconds(earlier,later)},{-1.0+0.480211});
+ assert(ocdfg_elapsed_seconds(earlier,later)!=-0.519789);
+ same_values({ocdfg_elapsed_seconds(later,earlier)},{0.519788});
+ // Submicrosecond differences floor to whole microseconds in both directions.
+ same_values({ocdfg_elapsed_seconds(date("2033-06-18T04:39:39.000000001Z"),date("2033-06-18T04:39:39.000000002Z"))},{0.0});
+ same_values({ocdfg_elapsed_seconds(date("2033-06-18T04:39:39.000000002Z"),date("2033-06-18T04:39:39.000000001Z"))},{-1.0+0.999999});
+}
+int main(){elapsed_component_rounding();public_timing_vectors();public_discovery_vectors();practical_timing_contract();missing_datetime_adapter_contract();canonical_and_scalar_adapter_contract();timing_json_roundtrip();std::cout<<"OCDFG edge performance: 60 retained public timing cells, eight discovery outcomes, native missing/scalar/canonical-role adapters, practical working-time controls and bitwise JSON roundtrip passed\n";}

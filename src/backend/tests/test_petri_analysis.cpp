@@ -345,10 +345,11 @@ void positive_invariant_diagnostics() {
   const auto parallel = analyze_soundness(parallel_net());
   assert(parallel.s_components.has_value());
   assert(parallel.uncovered_places.empty());
+  const auto parallel_model = parallel_net();
   for (const auto& invariant : parallel.place_invariant_basis) {
     assert(std::all_of(invariant.begin(), invariant.end(),
                        [](double value) { return value >= -1e-8; }));
-    for (const auto& transition : parallel_net().transitions()) {
+    for (const auto& transition : parallel_model.transitions()) {
       double consumed = 0.0;
       double produced = 0.0;
       for (const auto p : transition.inputs) consumed += invariant[p];

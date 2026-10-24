@@ -191,3 +191,13 @@ identity are recorded but lie outside the native dictionary carrier. Native
 warnings, Python object identity and physical category identity are not claimed.
 No extra reference calls were made during native implementation. The whole
 module remains partial.
+
+## Original-call API and workflow
+
+All 732 retained calls are also reachable through the original-call mode of
+`/api/reference-table-timestamp` and the rendered table timestamp workspace;
+see `polars-timestamp-original-call-workflow.md`. The transport fixture is
+generated only after ROOT re-binds every admitted original and rebuilds the
+unchanged native vector oracle. All 229 frames and 503 diagnostics (427 apply,
+76 collect) agree natively, through the direct workbench and over owned HTTP.
+This adds no reference observations and does not change the partial status.

@@ -180,6 +180,7 @@ add_library(minera_core
   src/backend/embeddings.cpp
   src/backend/event_data.cpp
   src/backend/edit_distance_alignment.cpp
+  src/backend/petri_trace_alignment.cpp
   src/backend/evaluation.cpp
   src/backend/event_ordering.cpp
   src/backend/eventually_follows.cpp
@@ -355,6 +356,10 @@ target_compile_features(minera_log_util PRIVATE cxx_std_20)
 add_executable(minera_format_dataframe src/backend/tools/minera_format_dataframe.cpp)
 target_link_libraries(minera_format_dataframe PRIVATE minera::core)
 target_compile_features(minera_format_dataframe PRIVATE cxx_std_20)
+
+add_executable(minera_repetition_batch src/backend/tools/minera_repetition_batch.cpp)
+target_link_libraries(minera_repetition_batch PRIVATE minera::core)
+target_compile_features(minera_repetition_batch PRIVATE cxx_std_20)
 
 add_executable(minera_knowledge src/backend/tools/minera_knowledge.cpp)
 add_executable(minera_model_context src/backend/tools/minera_model_context.cpp)
@@ -603,6 +608,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_alpha_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_alpha_parity_contracts_tests COMMAND minera_alpha_parity_contracts_tests)
 
+  add_executable(minera_attribute_repetition_parity_contracts_tests
+    src/backend/tests/test_attribute_repetition_parity_contracts.cpp
+  )
+  target_link_libraries(minera_attribute_repetition_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_attribute_repetition_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_attribute_repetition_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_attribute_repetition_parity_contracts_tests COMMAND minera_attribute_repetition_parity_contracts_tests)
+
   add_executable(minera_inductive_miner_tests
     src/backend/tests/test_inductive_miner.cpp
   )
@@ -622,6 +635,24 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_inductive_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_inductive_parity_contracts_tests
            COMMAND minera_inductive_parity_contracts_tests)
+
+  add_executable(minera_conformance_parity_contracts_tests
+    src/backend/tests/test_conformance_parity_contracts.cpp
+  )
+  target_link_libraries(minera_conformance_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_conformance_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_conformance_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_conformance_parity_contracts_tests
+           COMMAND minera_conformance_parity_contracts_tests)
+
+  add_executable(minera_process_tree_alignment_parity_contracts_tests
+    src/backend/tests/test_process_tree_alignment_parity_contracts.cpp
+  )
+  target_link_libraries(minera_process_tree_alignment_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_process_tree_alignment_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_process_tree_alignment_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_process_tree_alignment_parity_contracts_tests
+           COMMAND minera_process_tree_alignment_parity_contracts_tests)
 
   add_executable(minera_xes_io_tests
     src/backend/tests/test_xes_io.cpp
@@ -1079,7 +1110,7 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_polars_categorical_table_metadata_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_polars_categorical_table_metadata_tests COMMAND minera_polars_categorical_table_metadata_tests)
 
-  foreach(unit log_ltl_filter pandas_ltl_filter polars_ltl_filter log_ltl_workbench_public pandas_ltl_workbench_public ltl_filter_workbench ltl_filter_route log_attributes_filter pandas_attributes_filter polars_attributes_filter log_attributes_filter_workbench log_attributes_filter_route log_attributes_workbench_public table_attributes_filter_workbench table_attributes_filter_route pandas_attributes_workbench_public pandas_attributes_original_call_controls polars_attributes_original_call_controls polars_attributes_workbench_public log_variants_filter log_variants_filter_workbench log_variants_filter_route log_variants_original_call_controls log_variants_workbench_public pandas_variants_filter pandas_variants_original_call_controls pandas_variants_original_call_workbench pandas_variants_original_call_route pandas_variants_workbench_public polars_variants_filter polars_variants_original_call_controls polars_variants_original_call_workbench polars_variants_original_call_route polars_variants_workbench_public table_variants_filter_workbench table_variants_filter_route log_timestamp_filter log_timestamp_original_call_controls log_timestamp_filter_workbench log_timestamp_filter_route log_timestamp_workbench_public pandas_timestamp_filter polars_timestamp_filter table_timestamp_filter_workbench table_timestamp_filter_route log_paths_filter pandas_paths_filter polars_paths_filter table_paths_filter_workbench table_paths_filter_route log_case_filter pandas_case_filter polars_case_filter table_case_filter_workbench table_case_filter_route)
+  foreach(unit log_ltl_filter pandas_ltl_filter polars_ltl_filter log_ltl_workbench_public pandas_ltl_workbench_public ltl_filter_workbench ltl_filter_route log_attributes_filter pandas_attributes_filter polars_attributes_filter log_attributes_filter_workbench log_attributes_filter_route log_attributes_workbench_public table_attributes_filter_workbench table_attributes_filter_route pandas_attributes_workbench_public pandas_attributes_original_call_controls polars_attributes_original_call_controls polars_attributes_workbench_public log_variants_filter log_variants_filter_workbench log_variants_filter_route log_variants_original_call_controls log_variants_workbench_public pandas_variants_filter pandas_variants_original_call_controls pandas_variants_original_call_workbench pandas_variants_original_call_route pandas_variants_workbench_public polars_variants_filter polars_variants_original_call_controls polars_variants_original_call_workbench polars_variants_original_call_route polars_variants_workbench_public table_variants_filter_workbench table_variants_filter_route log_timestamp_filter log_timestamp_original_call_controls log_timestamp_filter_workbench log_timestamp_filter_route log_timestamp_workbench_public pandas_timestamp_filter pandas_timestamp_original_call_controls pandas_timestamp_workbench_public polars_timestamp_filter polars_timestamp_original_call_controls polars_timestamp_workbench_public table_timestamp_filter_workbench table_timestamp_filter_route log_paths_filter pandas_paths_filter polars_paths_filter table_paths_filter_workbench table_paths_filter_route log_case_filter pandas_case_filter polars_case_filter table_case_filter_workbench table_case_filter_route)
     add_executable(minera_${unit}_tests src/backend/tests/test_${unit}.cpp)
     target_link_libraries(minera_${unit}_tests PRIVATE minera::core Threads::Threads)
     target_include_directories(minera_${unit}_tests PRIVATE third_party)
@@ -1088,7 +1119,7 @@ if(MINERA_BUILD_TESTS)
     if(MSVC)
       target_compile_options(minera_${unit}_tests PRIVATE /bigobj)
     endif()
-    if(MSVC AND unit MATCHES "^((log|pandas|polars)_ltl_filter|(log|pandas)_ltl_workbench_public|(log|pandas|polars)_attributes_workbench_public|(log|pandas|polars)_variants_workbench_public|log_timestamp_workbench_public)$")
+    if(MSVC AND unit MATCHES "^((log|pandas|polars)_ltl_filter|(log|pandas)_ltl_workbench_public|(log|pandas|polars)_attributes_workbench_public|(log|pandas|polars)_variants_workbench_public|(log|pandas|polars)_timestamp_workbench_public)$")
       target_compile_options(minera_${unit}_tests PRIVATE /Od)
     endif()
     add_test(NAME minera_${unit}_tests COMMAND minera_${unit}_tests)
