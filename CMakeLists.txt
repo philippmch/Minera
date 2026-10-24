@@ -1891,6 +1891,15 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_evaluation_parity_contracts_tests
            COMMAND minera_evaluation_parity_contracts_tests)
 
+  add_executable(minera_evaluation_reference_equivalence_tests
+    src/backend/tests/test_evaluation_reference_equivalence.cpp
+  )
+  target_link_libraries(minera_evaluation_reference_equivalence_tests PRIVATE minera::core)
+  target_compile_features(minera_evaluation_reference_equivalence_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_evaluation_reference_equivalence_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_evaluation_reference_equivalence_tests
+           COMMAND minera_evaluation_reference_equivalence_tests)
+
   add_executable(minera_extended_cardoso_module_tests
     src/backend/tests/test_extended_cardoso_module.cpp
   )
