@@ -12,7 +12,10 @@
 // tie choice, so alignments are checked for validity and cost instead. The
 // reference DISCOUNTED_A_STAR search is not always optimal; where native
 // differs from it, native must reach a cost no higher than any run.
+// Decomposed alignments are bound by the best-worst cost of every row and a
+// pinned cost and fitness tally (see the contract below).
 #include "minera/conformance.hpp"
+#include "minera/decomposed_alignment.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/petri_trace_alignment.hpp"
 #include "minera/pnml.hpp"
@@ -22,6 +25,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -87,6 +91,14 @@ struct ReplayFamily {
   std::vector<std::vector<ReplayExpectation>> rows;  // admissible rows per trace
 };
 
+// Absent from the reference result (bwc and fitness of the empty trace).
+constexpr double kAbsent = std::numeric_limits<double>::quiet_NaN();
+
+struct DecomposedExpectation {
+  std::size_t trace;
+  std::vector<std::tuple<double, double, double>> admissible;  // cost, bwc, fitness
+};
+
 struct ConformanceParityCase {
   std::string name;
   std::string tree;
@@ -105,6 +117,7 @@ struct ConformanceParityCase {
   std::vector<GeneratorExpectation> generators;
   std::vector<DfgExpectation> dfg;
   std::vector<ReplayFamily> replay;
+  std::vector<DecomposedExpectation> decomposed;
 };
 
 #include "conformance_parity_reference_cases.inc"
@@ -467,6 +480,8 @@ void apply_replay_option(TokenReplayOptions& options, const std::string& option)
   else if (option == "walk_through_hidden_trans=False") options.walk_through_hidden_transitions = false;
   else if (option == "stop_immediately_unfit=True") options.stop_immediately_unfit = true;
   else if (option == "cleaning_token_flood=True") options.cleaning_token_flood = true;
+  else if (option == "consider_activities_not_in_model_in_fitness=True")
+    options.consider_activities_not_in_model_in_fitness = true;
   else if (option == "exhaustive_invisible_exploration=True")
     options.exhaustive_invisible_exploration = true;
   else throw std::invalid_argument("unknown replay option " + option);
@@ -523,6 +538,48 @@ void backwards_token_replay_reference_contract() {
   replay_family_contract(TokenReplayVariant::kBackwards);
 }
 
+// The reference recomposition is not reproducible from its outputs alone: it
+// sometimes reports moves twice or drops them, and on a few traces its cost
+// has no optimal explanation (on ->('h', X('f','c'), tau) the trace [f,h]
+// costs one log move while [f,h,f] costs nothing). Native implements the
+// documented rules (maximal decomposition, components that see no event are
+// skipped, events of unknown activities are dropped, disagreeing components
+// are merged) and must agree on the best-worst cost of every row; the cost
+// and fitness agreement is pinned as a tally.
+void decomposed_recompos_maximal_reference_contract() {
+  std::size_t rows = 0, equal = 0, differ = 0;
+  for (const auto& c : conformance_parity_cases()) {
+    if (c.decomposed.empty()) continue;
+    const auto net = parse_pnml(pnml(c));
+    for (const auto& expected : c.decomposed) {
+      // The reference aligns each trace in a log of its own.
+      const auto actual = align_decomposed(event_log({c.traces[expected.trace]}), net);
+      assert(actual.traces.size() == 1);
+      const auto& row = actual.traces.front();
+      const bool empty = c.traces[expected.trace].empty();
+      assert(std::all_of(expected.admissible.begin(), expected.admissible.end(), [&](const auto& t) {
+        return empty ? std::isnan(std::get<1>(t)) && std::isnan(std::get<2>(t))
+                     : same(std::get<1>(t), row.best_worst_cost);
+      }));
+      // Fitness discounts silent moves: 1 - (cost - silent moves) / bwc.
+      if (!empty) {
+        double visible = row.cost;
+        for (const auto& move : row.alignment)
+          if (!(move.log && *move.log != ">>") && !(move.model && *move.model != ">>")) visible -= DecomposedAlignmentOptions{}.tau_model_cost;
+        assert(same(row.fitness, 1.0 - visible / row.best_worst_cost));
+      }
+      const bool match = std::any_of(expected.admissible.begin(), expected.admissible.end(), [&](const auto& t) {
+        return same(std::get<0>(t), row.cost) && (empty || same(std::get<2>(t), row.fitness));
+      });
+      ++(match ? equal : differ);
+      ++rows;
+    }
+  }
+  assert(rows == kDecomposedRows);
+  std::cout << "decomposed RECOMPOS_MAXIMAL: " << equal << " equal, " << differ << " differ\n";
+  assert(equal == 770 && differ == 39);
+}
+
 }  // namespace
 
 int main() {
@@ -535,5 +592,6 @@ int main() {
   dfg_classic_alignment_reference_contract();
   token_replay_reference_contract();
   backwards_token_replay_reference_contract();
+  decomposed_recompos_maximal_reference_contract();
   return 0;
 }

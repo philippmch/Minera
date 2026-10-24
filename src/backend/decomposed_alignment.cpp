@@ -219,7 +219,6 @@ DagResult compose_dag(const std::vector<SearchResult>& aligns,
       previous = id;
     }
   }
-  // If no local projection owns a trace event, retain it as one global log move.
   // Two different transitions cannot both claim one synchronous trace event.
   // Mark their owner components for a merge so recomposition can be retried.
   std::map<std::pair<std::size_t,std::string>, std::pair<std::size_t,std::set<std::size_t>>> sync_claims;
@@ -235,12 +234,8 @@ DagResult compose_dag(const std::vector<SearchResult>& aligns,
     }
     claim.second.insert(node.components.begin(), node.components.end());
   }
-  std::vector<bool> consumed(names.size(), false);
-  for (const auto& indices : projected_indices) for (auto i : indices) if (i < consumed.size()) consumed[i] = true;
-  for (std::size_t i = 0; i < names.size(); ++i) if (!consumed[i]) {
-    EventKey key; key.kind = EventKind::kLog; key.trace_index = i; key.label = names[i]; key.component = npos;
-    auto it = ids.find(key); if (it == ids.end()) { std::size_t id = nodes.size(); ids.emplace(key,id); nodes.push_back(EventNode{key,{names[i],std::string(">>"),npos},{}, {}}); }
-  }
+  // Events of activities that no component knows are dropped, as the
+  // reference does: no projection sees them.
   struct Ready {
     std::size_t id;
     const std::vector<EventNode>* nodes;
@@ -294,7 +289,11 @@ DecomposedAlignmentResult align_decomposed(const EventLog& log,const PetriNet& n
   // Empty trace computes the standard best-worst cost using the decomposed model.
   // BWC is a whole-net replay metric; it is not used to generate result moves.
   std::vector<std::size_t> all_places(net.place_count()), all_trans(net.transitions().size()); std::iota(all_places.begin(),all_places.end(),0); std::iota(all_trans.begin(),all_trans.end(),0);
-  auto full_local=make_local(net,all_places,all_trans,initial,final); auto bw_search=search(full_local,{},o,deadline,out.diagnostics); if(!bw_search.found){out.complete=false;out.timed_out=bw_search.timed_out;out.exhausted=bw_search.exhausted; for(const auto& src:log.traces){DecomposedAlignmentTrace row; row.complete=false; row.timed_out=bw_search.timed_out; row.exhausted=bw_search.exhausted; for(const auto&e:src.events) row.activities.push_back(selected_activity(e, o.activity_attribute)); out.traces.push_back(std::move(row));} return out;} double bw=bw_search.cost; out.best_worst_cost=bw;
+  // The best-worst cost counts the visible model moves of the cheapest run only.
+  auto full_local=make_local(net,all_places,all_trans,initial,final); auto bw_search=search(full_local,{},o,deadline,out.diagnostics);
+  // A final marking that no run reaches leaves only the log moves in the best-worst cost.
+  const bool bw_unreachable=!bw_search.found&&!bw_search.timed_out&&!bw_search.exhausted;
+  if(!bw_search.found&&!bw_unreachable){out.complete=false;out.timed_out=bw_search.timed_out;out.exhausted=bw_search.exhausted; for(const auto& src:log.traces){DecomposedAlignmentTrace row; row.complete=false; row.timed_out=bw_search.timed_out; row.exhausted=bw_search.exhausted; for(const auto&e:src.events) row.activities.push_back(selected_activity(e, o.activity_attribute)); out.traces.push_back(std::move(row));} return out;} double bw=0; for(const auto& m:bw_search.moves) if(m.model && *m.model!=">>") bw+=move_cost(m,o); out.best_worst_cost=bw;
   using VecHash=std::function<std::size_t(const std::vector<std::string>&)>; std::unordered_map<std::vector<std::string>,DecomposedAlignmentTrace,VecHash> row_cache(0,[](const auto&v){std::size_t h=0;for(const auto&s:v)for(unsigned char c:s)h=h*131+c;return h;});
   double total_worst=0; std::size_t total_states=bw_search.visited; bool global_state_abort = total_states > o.max_total_states; if (global_state_abort) { out.complete=false; out.exhausted=true; } std::unordered_map<std::string,SearchResult> component_cache;
   for(const auto& src:log.traces){ std::vector<std::string> names; names.reserve(src.events.size()); for(const auto&e:src.events) names.push_back(selected_activity(e, o.activity_attribute));
@@ -316,16 +315,22 @@ DecomposedAlignmentResult align_decomposed(const EventLog& log,const PetriNet& n
     if(o.use_cache) ++out.diagnostics.cache_misses;
     std::vector<Region> active=comps; std::vector<std::vector<std::string>> projected; std::vector<std::vector<std::size_t>> projected_indices; std::vector<SearchResult> aligns; std::vector<LocalNet> locals; bool aborted=false, forced_timeout=false, forced_exhausted=false; std::size_t trace_disagreements=0;
     for(;;){ projected.clear(); projected_indices.clear(); aligns.clear(); locals.clear(); for(const auto& c:active){auto l=make_local(net,c.places,c.transitions,initial,final); std::vector<std::string> p; std::vector<std::size_t> pi; for(std::size_t i=0;i<names.size();++i) if(l.labels.count(names[i])) { p.push_back(names[i]); pi.push_back(i); } projected.push_back(p); projected_indices.push_back(pi); SearchResult sr; bool executed=false;
+      // Like the reference, a component that sees none of the trace's events
+      // is not aligned at all and contributes no moves.
+      if (p.empty()) { sr.found=true; aligns.push_back(std::move(sr)); locals.push_back(std::move(l)); continue; }
       if (std::chrono::steady_clock::now() >= trace_deadline) { sr.timed_out=true; forced_timeout=true; aborted=true; aligns.push_back(std::move(sr)); locals.push_back(std::move(l)); break; }
       auto key=cache_key(l,p,o); if(o.use_cache){auto hit=component_cache.find(key); if(hit!=component_cache.end()){sr=hit->second; ++out.diagnostics.cache_hits;} else {++out.diagnostics.cache_misses; executed=true; sr=search(l,p,o,trace_deadline,out.diagnostics); if (sr.found && !sr.timed_out && !sr.exhausted) component_cache.emplace(key,sr);}} else {executed=true; sr=search(l,p,o,trace_deadline,out.diagnostics);} aligns.push_back(std::move(sr)); locals.push_back(std::move(l)); if(executed) total_states+=aligns.back().visited; if (aligns.back().timed_out) { forced_timeout=true; aborted=true; break; } if(total_states>o.max_total_states){out.complete=false;out.exhausted=true;forced_exhausted=true;global_state_abort=true;aborted=true;break;}} if(aborted)break;
-std::unordered_map<std::string,std::vector<std::pair<std::size_t,std::vector<int>>>> statuses; std::unordered_map<std::string,std::vector<std::size_t>> owners; std::vector<std::unordered_map<std::string,std::vector<int>>> per(active.size()); for(std::size_t ci=0;ci<active.size();++ci){for(const auto&lab:locals[ci].labels) owners[lab].push_back(ci); for(const auto&m:aligns[ci].moves) if(m.model&&*m.model!=">>"){auto&v=per[ci][*m.model];v.push_back(m.synchronous()?0:1);}} for(auto&kv:owners) if(kv.second.size()>1) for(auto ci:kv.second) statuses[kv.first].push_back({ci,per[ci][kv.first]});
+std::unordered_map<std::string,std::vector<std::pair<std::size_t,std::vector<int>>>> statuses; std::unordered_map<std::string,std::vector<std::size_t>> owners; std::vector<std::unordered_map<std::string,std::vector<int>>> per(active.size()); for(std::size_t ci=0;ci<active.size();++ci){if(projected[ci].empty()) continue; for(const auto&lab:locals[ci].labels) owners[lab].push_back(ci); for(const auto&m:aligns[ci].moves) if(m.model&&*m.model!=">>"){auto&v=per[ci][*m.model];v.push_back(m.synchronous()?0:1);}} for(auto&kv:owners) if(kv.second.size()>1) for(auto ci:kv.second) statuses[kv.first].push_back({ci,per[ci][kv.first]});
       std::set<std::size_t> merge_set; bool disagree=false; for(auto&kv:statuses){if(kv.second.size()<2)continue; const auto&base=kv.second.front().second; bool bad=false; for(std::size_t j=1;j<kv.second.size();++j) if(kv.second[j].second!=base) bad=true; if(bad){disagree=true;++out.diagnostics.border_disagreements; ++trace_disagreements; for(const auto&entry:kv.second) merge_set.insert(entry.first);}}
       auto dag_check = compose_dag(aligns, projected_indices, names, o); if(!dag_check.acyclic){disagree=true;++out.diagnostics.border_disagreements; ++trace_disagreements; merge_set.insert(dag_check.cycle_components.begin(),dag_check.cycle_components.end());}
       if(!disagree) break; ++out.diagnostics.agreement_iterations; if(trace_disagreements>o.threshold_border_agreement){out.complete=false;out.diagnostics.note="border agreement threshold exceeded";aborted=true;break;} if(merge_set.size()<2) break; ++out.diagnostics.merges; Region merged; for(auto i:merge_set){merged.places.insert(merged.places.end(),active[i].places.begin(),active[i].places.end()); merged.transitions.insert(merged.transitions.end(),active[i].transitions.begin(),active[i].transitions.end());} std::sort(merged.places.begin(),merged.places.end()); merged.places.erase(std::unique(merged.places.begin(),merged.places.end()),merged.places.end()); std::sort(merged.transitions.begin(),merged.transitions.end()); merged.transitions.erase(std::unique(merged.transitions.begin(),merged.transitions.end()),merged.transitions.end()); std::vector<Region> next; for(std::size_t i=0;i<active.size();++i) if(!merge_set.count(i)) next.push_back(active[i]); next.push_back(std::move(merged)); active=std::move(next);
     }
     if(aborted) { DecomposedAlignmentTrace row; row.activities=names; row.complete=false; row.exhausted=forced_exhausted; row.timed_out=forced_timeout; for (const auto& sr: aligns) { row.exhausted|=sr.exhausted; row.timed_out|=sr.timed_out; } row.best_worst_cost=trace_worst; double worst=trace_worst; row.fitness=worst<=1e-12?1.0:0.0; total_worst+=worst; out.traces.push_back(std::move(row)); out.complete=false; out.timed_out|=forced_timeout; out.exhausted|=forced_exhausted; continue; } DecomposedAlignmentTrace row; row.activities=names; row.complete=true; for(auto&sr:aligns){row.complete&=sr.found;row.timed_out|=sr.timed_out;row.exhausted|=sr.exhausted;}
     auto dag = compose_dag(aligns, projected_indices, names, o); if(!dag.acyclic){row.complete=false;out.complete=false;}
-    row.alignment=std::move(dag.moves); row.cost=dag.cost; row.best_worst_cost=trace_worst; double worst=trace_worst; row.fitness=worst<=1e-12?1.0:std::clamp(1.0-row.cost/worst,0.0,1.0); out.total_cost+=row.cost; total_worst+=worst; out.traces.push_back(row); if(o.use_cache && row.complete)row_cache.emplace(names,row); if(!row.complete){out.complete=false;out.timed_out|=row.timed_out;out.exhausted|=row.exhausted;}
+    // A component without any alignment empties the whole result, as in the reference.
+    if(!row.complete && std::any_of(aligns.begin(),aligns.end(),[](const SearchResult& sr){return !sr.found&&!sr.timed_out&&!sr.exhausted;})){dag.moves.clear();dag.cost=0;}
+    // Silent moves count in the cost but not against the fitness.
+    row.alignment=std::move(dag.moves); row.cost=dag.cost; row.best_worst_cost=trace_worst; double worst=trace_worst; double visible_cost=row.cost; for(const auto& m:row.alignment) if(!(m.log && *m.log!=">>") && !(m.model && *m.model!=">>")) visible_cost-=move_cost(m,o); row.fitness=worst<=1e-12?1.0:1.0-std::max(0.0,visible_cost)/worst; out.total_cost+=row.cost; total_worst+=worst; out.traces.push_back(row); if(o.use_cache && row.complete)row_cache.emplace(names,row); if(!row.complete){out.complete=false;out.timed_out|=row.timed_out;out.exhausted|=row.exhausted;}
   }
   out.fitness=total_worst<=1e-12?1.0:std::clamp(1.0-out.total_cost/total_worst,0.0,1.0); return out;
 }

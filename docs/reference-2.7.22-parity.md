@@ -1316,8 +1316,14 @@ and PNML element orders (`scripts/capture-conformance-parity-reference.py`,
 - DFG classic binds the alignment, cost and visited-state count.
 - Replay binds every per-trace row (fitness, activated transitions, problems,
   enabled transitions, reached marking, token counters) for the default
-  options and each public option toggled, except
-  `consider_activities_not_in_model_in_fitness`, below.
+  options and each public option toggled.
+- Decomposed `RECOMPOS_MAXIMAL` (each trace aligned in a log of its own, as
+  captured) binds the best-worst cost of every row exactly and pins the cost
+  and fitness agreement as a tally: 770 of 809 rows equal, 39 differ. The
+  reference composition is not reproducible from its outputs: it reports some
+  moves twice or drops them, and a few costs have no optimal explanation (on
+  `->('h', X('f','c'), tau)` the trace [f,h] costs one log move while
+  [f,h,f], [c,h,f] and [f,h,c] cost nothing).
 
 Reference semantics established black-box and implemented natively:
 
@@ -1339,6 +1345,21 @@ Reference semantics established black-box and implemented natively:
 - Unreachable final marking: enum variants return no alignment, generators an
   empty list, discounted raises.
 - Backwards replay ignores `walk_through_hidden_trans`.
+- Forward replay with `consider_activities_not_in_model_in_fitness=True`
+  keeps one flag for the whole log: variants replay by descending frequency,
+  ties by descending activity tuple, and once a variant holding an activity
+  outside the model was replayed, it and every later variant are unfit. Trace
+  fitness values are unchanged. This matched all 390 bound rows.
+- Decomposed `RECOMPOS_MAXIMAL` uses the maximal decomposition (places joined
+  through silent and duplicate-label transitions). A component that sees no
+  event of the trace is not aligned, events of activities outside the net are
+  dropped, and components that disagree on a border activity are merged and
+  realigned. bwc is 10000 per event plus the visible moves of the cheapest
+  model run (silent moves excluded; log moves only when the final marking is
+  unreachable). The cost includes silent moves (1 each) but fitness does not:
+  fitness = 1 - (cost - silent moves) / bwc, unclamped. The empty trace has
+  cost 0 and no bwc or fitness. A component without any alignment empties
+  the result (cost 0).
 - Replay orders routing candidates and the enabled-transition worklist by
   transition and place name, so callers must pass the PNML ids as
   `TokenReplayOptions::transition_names` and `place_names`.
@@ -1350,10 +1371,8 @@ noisy heuristics net vary with the hash seed) all change between runs.
 
 Open divergences:
 
-- Forward replay with `consider_activities_not_in_model_in_fitness=True`
-  marks some traces unfit depending on other traces of the same log, a
-  cross-trace effect native does not reproduce. Forward replay stays partial.
-- Decomposed `RECOMPOS_MAXIMAL` is captured in the banks but not yet bound.
+- Decomposed `RECOMPOS_MAXIMAL` differs on 39 of 809 rows in cost and
+  fitness (above).
 
 ### Process-tree alignments
 

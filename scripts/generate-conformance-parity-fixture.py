@@ -14,6 +14,9 @@ Only observations that the contract binds are emitted:
   * DFG classic: the stable alignment, cost and visited states per trace.
   * Token replay (forward, backwards, each public option toggled): admissible
     rows per trace, or the error.
+  * Decomposed RECOMPOS_MAXIMAL, each trace aligned in a log of its own: the
+    admissible (cost, bwc, fitness) tuples per trace. The reference reports
+    neither bwc nor fitness for the empty trace; those are emitted as NaN.
 Calls that hit the capture's time limit bind nothing and are skipped.
 """
 import argparse
@@ -35,10 +38,9 @@ GENERATOR_VARIANTS = {
 }
 # The capture stops generator enumeration after this many alignments.
 GENERATOR_LIMIT = 64
-# Replay options the native options struct can express. The reference's
-# consider_activities_not_in_model_in_fitness marks traces unfit based on other
-# traces of the log; it is a documented open divergence and is not bound.
+# Replay options the native options struct can express.
 REPLAY_OPTIONS = {
+    "consider_activities_not_in_model_in_fitness=True": "consider_activities_not_in_model_in_fitness = true",
     "consider_remaining_in_fitness=False": "consider_remaining_in_fitness = false",
     "try_to_reach_final_marking_through_hidden=False": "try_to_reach_final_marking_through_hidden = false",
     "walk_through_hidden_trans=False": "walk_through_hidden_transitions = false",
@@ -100,7 +102,7 @@ def replay_row(row):
 
 
 COUNTS = dict.fromkeys(["kDfgRows", "kForwardReplayRows", "kForwardReplayErrors",
-                        "kBackwardsReplayRows", "kBackwardsReplayErrors"], 0)
+                        "kBackwardsReplayRows", "kBackwardsReplayErrors", "kDecomposedRows"], 0)
 # Rows per enum variant (AlignmentVariant order) and Outcome, and per generator.
 PETRI_ROWS = {v: {"kAlignment": 0, "kNone": 0, "kError": 0} for v in ENUM_VARIANTS.values()}
 GENERATOR_ROWS = {v: [0, 0] for v in GENERATOR_VARIANTS.values()}  # rows, empty rows
@@ -187,6 +189,19 @@ def case_function(index, case):
             out.append(f"  c.dfg.push_back({{{trace},false,{{}},0.0,0}});")
         else:
             out.append(f"  c.dfg.push_back({{{trace},true,{moves(r['alignment'])},{num(r['cost'])},{r['visited_states']}}});")
+    for trace, entry in enumerate(obs.get("decomposed:RECOMPOS_MAXIMAL", [])):
+        runs = values(entry)
+        if any("result" not in v for v in runs):
+            out.append(f"  // decomposed trace {trace}: reference timed out")
+            continue
+        admissible = []
+        for v in runs:
+            r = v["result"][0]
+            code = "{" + ",".join(num(r[k]) if k in r else "kAbsent" for k in ("cost", "bwc", "fitness")) + "}"
+            if code not in admissible:
+                admissible.append(code)
+        COUNTS["kDecomposedRows"] += 1
+        out.append(f"  c.decomposed.push_back({{{trace},{{{','.join(admissible)}}}}});")
     for family in sorted(f for f in obs if f.startswith("replay:")):
         spec = replay_family(family)
         if spec is None:
