@@ -3383,5 +3383,5 @@ and the open items. Regenerate the fixture with
 `python scripts/generate-conformance-parity-fixture.py <the three docs/*-bank.json.gz> --output src/backend/tests/conformance_parity_reference_cases.inc`.
 Next: bind the captured process-tree and decomposed observations, and the
 forward `consider_activities_not_in_model_in_fitness` cross-trace effect.
-`minera_petri_analysis_tests` segfaults in `positive_invariant_diagnostics`
-on this branch (code not touched here; not yet checked on main).
+`minera_petri_analysis_tests` crashed on main too: `positive_invariant_diagnostics`
+iterated the transitions of a temporary net; fixed by binding it first.
