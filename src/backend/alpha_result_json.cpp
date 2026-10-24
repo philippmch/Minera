@@ -103,4 +103,27 @@ std::string alpha_plus_result_json(const AlphaPlusDiscoveryResult& result) {
   out << '}';
   return out.str();
 }
+
+std::string alpha_plus_cleanup_alternatives_json(
+    const std::vector<AlphaPlusCleanupAlternative>& alternatives) {
+  std::ostringstream out;
+  out << "{\"family\":\"ALPHA_PLUS_CLEANUP_ALTERNATIVES\",\"alternatives\":[";
+  for (std::size_t i = 0; i < alternatives.size(); ++i) {
+    const auto& alternative = alternatives[i];
+    if (alternative.result.has_value() == !alternative.error.empty())
+      throw std::invalid_argument("Alpha+ alternative: exactly one of result and error is required");
+    if (i) out << ',';
+    out << "{\"selected_transitions\":";
+    names(out, alternative.selected_transitions);
+    out << ",\"result\":";
+    if (alternative.result) out << alpha_plus_result_json(*alternative.result);
+    else out << "null";
+    out << ",\"error\":";
+    if (alternative.result) out << "null";
+    else text(out, alternative.error);
+    out << '}';
+  }
+  out << "]}";
+  return out.str();
+}
 }

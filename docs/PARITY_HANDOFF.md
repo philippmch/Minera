@@ -3258,6 +3258,25 @@ test client's `httplib::detail::encode_url` truncates NUL. Production
 URLSearchParams and server decoding passed actual NUL transport acceptance.
 Rendered application interaction remains unverified.
 
+## Alpha+ cleanup selection checkpoint — 2026-10-24
+
+Resolved in the cloud container (Python 3.11.17, pinned pip dependencies,
+Linux Release build); no retained `build/` bank was used or replayed.
+Boundary cleanup is now deterministic: the first tied transition in
+first-seen label order. `enumerate_alpha_plus_cleanup_alternatives` and CLI
+`--alpha-plus-alternatives` return its exact support. Two new disjoint banks,
+`docs/alpha-plus-cleanup-bank-{a,b}.json.gz` (2,800 cells, 105,600 public
+calls, 8 and 16 hash seeds, both trace orders), and the older merged fixture
+all audit with zero failures through `scripts/check-alpha-plus-cleanup-bank.py`.
+Every public outcome is an enumerated alternative and every alternative was
+observed. Public cells vary exactly where the enumeration has several
+outcomes; all others are bound exactly. The audit also found that logs with a
+trace made only of loop labels (both boundary labels looping) must fail, and
+native now rejects them. `algo.discovery.alpha.variants.plus` and package
+`algo.discovery.alpha` are promoted: 47/86 packages, 227/387 modules, 199
+strict open units. Contract and limits: "Alpha+ cleanup selection contract"
+in the parity doc; hashes in `docs/alpha-plus-cleanup-validation.json`.
+
 ## Next open requirements
 
 - Keep all LTL declared gaps open. Reuse the 16 executed banks above; never replay
@@ -3306,9 +3325,6 @@ Rendered application interaction remains unverified.
   pandas missing-key diagnostics now have disjoint acceptance. Custom equality
   objects, wrapper storage/identity graphs, arbitrary table schemas/dtypes,
   categorical dictionaries and Polars physical plans remain open as documented.
-- Resolve Alpha+ identity-dependent cleanup selection. Both returned graph
-  shapes occur in broader captures; the old single-process 28/64 mismatch
-  count does not establish 28 incorrect models.
 - All other partial rows, connectors/platforms, solvers, rendered UI and
   performance requirements remain in scope until their own evidence closes.
 

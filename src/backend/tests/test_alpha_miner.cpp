@@ -1,4 +1,5 @@
 #include "minera/alpha_miner.hpp"
+#include "minera/alpha_result_json.hpp"
 #include "minera/conformance.hpp"
 #include "minera/model_decoration.hpp"
 
@@ -377,6 +378,74 @@ void alpha_default_projection_remains_compatible() {
   }
 }
 
+void alpha_plus_cleanup_choice_is_deterministic_and_enumerated() {
+  const auto source = log({trace({"a"}), trace({"artificial_end"})});
+  const auto alternatives = enumerate_alpha_plus_cleanup_alternatives(source);
+  assert(alternatives.size() == 2);
+  std::size_t detached = 0;
+  for (const auto& alternative : alternatives) {
+    assert(alternative.result && alternative.error.empty());
+    assert(alternative.selected_transitions.size() == 2);
+    assert(alternative.selected_transitions[0] == "artificial_start");
+    detached += alternative.result->detached_initial_marking.size();
+  }
+  assert(detached == 1);
+  assert(alternatives[0].selected_transitions[1] == "a");
+  assert(alternatives[1].selected_transitions[1] == "artificial_start");
+  const auto first = alpha_plus_result_json(*alternatives[0].result);
+  for (int repeat = 0; repeat < 8; ++repeat)
+    assert(alpha_plus_result_json(discover_alpha_plus_result(source)) == first);
+  const auto net = discover_alpha_plus(source);
+  assert(net.place_count() == alternatives[0].result->net.place_count());
+  assert(net.transitions().size() == alternatives[0].result->net.transitions().size());
+  assert(alpha_plus_cleanup_alternatives_json(alternatives).find(
+             "\"selected_transitions\":[\"artificial_start\",\"a\"]") != std::string::npos);
+
+  // A sink left without an incident transition is an error alternative.
+  const auto mixed = enumerate_alpha_plus_cleanup_alternatives(
+      log({trace({"artificial_start", "artificial_start", "x"}), trace({})}));
+  assert(mixed.size() == 2);
+  assert(mixed[0].result && !mixed[1].result && !mixed[1].error.empty());
+  assert(mixed[1].selected_transitions.size() == 1);
+
+  // Failures before any tied choice propagate from the enumeration.
+  bool rejected = false;
+  try { (void)enumerate_alpha_plus_cleanup_alternatives(EventLog{}); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
+void alpha_plus_rejects_traces_reduced_to_nothing() {
+  // When both reserved boundary labels are loops, a trace made only of loop
+  // labels reduces to nothing; the public runtime fails for every choice.
+  for (const bool cleanup : {false, true}) {
+    AlphaMinerOptions options;
+    options.remove_unconnected = cleanup;
+    for (const auto& source :
+         {log({trace({"artificial_start", "artificial_start", "artificial_end", "artificial_end"}),
+               trace({"x"})}),
+          log({trace({"artificial_end"}),
+               trace({"artificial_start", "r", "r", "s", "artificial_start",
+                      "artificial_start", "q"})}),
+          log({trace({}), trace({"p", "artificial_start", "artificial_start", "q", "q",
+                                 "artificial_start", "artificial_start", "artificial_end"}),
+               trace({"q", "r"})})}) {
+      bool rejected = false;
+      try { (void)discover_alpha_plus_result(source, options); }
+      catch (const std::invalid_argument&) { rejected = true; }
+      assert(rejected);
+      rejected = false;
+      try { (void)enumerate_alpha_plus_cleanup_alternatives(source, options); }
+      catch (const std::invalid_argument&) { rejected = true; }
+      assert(rejected);
+    }
+    // One looping boundary label alone keeps every reduced trace non-empty.
+    const auto kept = discover_alpha_plus_result(
+        log({trace({}), trace({"x", "artificial_end", "artificial_end"})}), options);
+    assert(transition_for(kept.net, "x") != nullptr);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -510,5 +579,7 @@ int main() {
   alpha_plus_leaves_adjacent_distinct_loop_runs_unconnected();
   alpha_custom_projection_drives_model_decoration();
   alpha_default_projection_remains_compatible();
+  alpha_plus_cleanup_choice_is_deterministic_and_enumerated();
+  alpha_plus_rejects_traces_reduced_to_nothing();
   return 0;
 }

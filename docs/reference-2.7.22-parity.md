@@ -130,7 +130,7 @@ are reconciled.
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
-| Discovery: Alpha | classic and Alpha+ | **Partial (classic, abstraction, and endpoint modules complete)** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with full public/native process captures; its selection law remains partial because native repeated calls vary where the observed public cells stay stable |
+| Discovery: Alpha | classic and Alpha+ | **Complete** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with full public/native process captures; identity-ordered boundary cleanup is enumerated exactly, the native default is a deterministic member of that support, and two new disjoint public banks plus the earlier merged fixture fall inside it, with every enumerated outcome observed (see "Alpha+ cleanup selection contract") |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **CLASSIC complete; dispatcher and PLUSPLUS partial** — CLASSIC public EventLog/DFG object and Petri routes, typed returned fields, order, noise pruning and conversion have saved native/public proof; separate dispatcher and PLUSPLUS obligations remain |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
@@ -452,8 +452,11 @@ All reduced trace endpoints connect to the source/sink, and hidden boundary
 transitions retain reverse arcs. Initial cleanup requires a single-output
 successor with an exclusive target producer; final cleanup requires an
 exclusive prior-place consumer whose producers have no other outputs.
-The enhanced variant and its dispatcher remain partial. Its
-optional cleanup removes only completely disconnected visible transitions.
+A boundary log in which some trace consists only of loop labels (possible
+only when both reserved boundary labels are themselves loops) fails before
+cleanup, as the public runtime does for every hash seed and trace order.
+The optional `remove_unconnected` cleanup removes only completely
+disconnected visible transitions.
 
 `--alpha-plus-result` and `POST /api/discover-alpha-plus` expose the raw graph
 and markings as JSON, with activity selection, optional cleanup, and row caps.
@@ -468,10 +471,9 @@ outputs from the pinned 2.7.22 runtime. The durable
 seeds 0 through 4 and 20 calls per row. The 784-row corpus contains 774 distinct
 cases; 72 cases vary across these seeds. Repeating a fixed seed produced no
 additional observed alternatives in this capture.
-Boundary cleanup samples incident choices independently and uniformly as an
-approximation to reference ordering. Membership in sampled support does not
-prove full support, selection probabilities, or correlation equivalence;
-these remain open parity requirements.
+Boundary cleanup originally sampled incident choices uniformly; it is now
+deterministic and its full support is enumerated, as described in
+"Alpha+ cleanup selection contract" below.
 The integrated audit sampled 7,740 native results across all 774 distinct
 cases. Against seed 0 alone, 374 results were outside observed support; all
 7,740 were within the merged five-seed support, with no malformed results.
@@ -6840,6 +6842,70 @@ members and 1,225 native members. Both archives are below the size guard and
 use deterministic gzip. Alpha+ remains partial; the 228 open coverage units
 are unchanged. Final and joint selection laws still need evidence beyond
 this finite pilot.
+
+### Alpha+ cleanup selection contract (2026-10-24)
+
+Boundary cleanup makes two tied choices: one transition consuming from the
+source and, after the initial reduction, one transition producing into the
+sink. The public runtime orders these ties by object identity. Its choice is
+stable within a process and for a given `PYTHONHASHSEED` across fresh
+processes (byte-identical bank reruns), but it changes with hash seed, label
+names and trace-list order, because those change allocation history. It is
+therefore not a function of the log and is not reproduced per process.
+
+The native contract instead has three parts:
+
+* `enumerate_alpha_plus_cleanup_alternatives` (CLI
+  `--alpha-plus-alternatives`) returns every reachable choice sequence with
+  its chosen labels and either the raw result or the cleanup failure. This
+  is the exact native support.
+* `discover_alpha_plus_result` and every adapter built on it take the first
+  tie in first-seen label order (boundary labels last). The result is the
+  first enumerated alternative and is identical across repeated calls,
+  matching the public within-process stability. The previous uniform random
+  draw is removed.
+* Where the enumeration has one outcome, the public outcome must be constant
+  and equal to it. Where it has several, the public outcome may be any of
+  them, and native binds none in particular.
+
+`scripts/capture-alpha-plus-cleanup-bank.py` captured two new banks on the
+pinned runtime (Python 3.11.17 on Linux, pandas 3.0.5, numpy 2.4.6, scipy
+1.17.1, networkx 3.6.1, PuLP 2.9.0). Bank A has 300 generated logs over `p`
+to `s` with 8 hash seeds. Bank B has 400 logs over `u` to `y`, with up to four
+traces of length six and 16 hash seeds. Both include reserved boundary labels,
+immediate repetitions, both cleanup settings, original and reversed trace
+lists, and three fresh calls per process. Every case contains an ordinary
+label, so the banks are disjoint from each other and from all earlier Alpha+
+corpora. `scripts/check-alpha-plus-cleanup-bank.py` audits a bank, or the
+earlier merged fixture, against the native enumeration without the reference
+runtime:
+
+| Bank | Cells | Public calls | Public varying | Native multi-outcome | Enumerated outcomes observed | Failures |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | 1,200 | 28,800 | 48 | 48 | 1,152 / 1,152 | 0 |
+| B | 1,600 | 76,800 | 116 | 116 | 1,512 / 1,512 | 0 |
+| `alpha-plus-reference-fixtures.json` | 774 | merged support, 5 seeds × 20 calls | 72 | 72 | 756 / 756 | 0 |
+
+No public cell varied within a process. Every public outcome is a native
+alternative, every native alternative was observed publicly, and the cells
+that vary publicly are exactly the cells whose enumeration has more than one
+outcome. All other cells are bound exactly. The deterministic native result
+was stable over three repeats and equal to the first alternative in every
+cell. Failures compare by presence, not by Python/C++ class or message.
+
+The audit also found a defect. In a preliminary bank A capture (before
+the ordinary-label filter), twelve cells failed in every public process
+while native returned graphs. They came from three logs, each with both
+boundary labels looping and a trace that reduced to nothing. Native now rejects such
+logs before cleanup. Hash records and per-bank statistics are in
+`docs/alpha-plus-cleanup-validation.json`.
+
+Limits: the banks are finite, and the summary normalization compares
+structural names. Cells with duplicate place names (288 in A, 468 in B, 92 in
+the fixture) can equate distinct graphs. The older process-law and
+final-joint archives use a different raw graph schema and were not re-audited
+against the enumeration. The reference's per-process choice and its
+frequency across seeds are allocation artifacts and are outside the contract.
 
 ### PLUSPLUS returned sojourn map and node flags
 

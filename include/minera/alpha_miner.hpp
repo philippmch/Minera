@@ -117,6 +117,21 @@ struct AlphaPlusDiscoveryResult {
 // root/detached marking identities in PetriNet::discovery_markings().
 [[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(
     const EventLog& event_log, const AlphaMinerOptions& options = {});
+// Boundary cleanup picks one incident transition of the source and then of
+// the sink. The public runtime orders these ties by object identity, which
+// varies with allocation history; discover_alpha_plus_result deterministically
+// takes the first tie in first-seen label order (boundary labels last).
+// The enumeration returns one entry for every reachable sequence of tied
+// choices, including choices that leave the sink with no incident transition.
+struct AlphaPlusCleanupAlternative {
+  // Labels of the chosen source-side and sink-side transitions, in order.
+  std::vector<std::optional<std::string>> selected_transitions;
+  std::optional<AlphaPlusDiscoveryResult> result;
+  std::string error;  // Set exactly when result is empty.
+};
+[[nodiscard]] std::vector<AlphaPlusCleanupAlternative>
+enumerate_alpha_plus_cleanup_alternatives(
+    const EventLog& event_log, const AlphaMinerOptions& options = {});
 // Flat entry points use the same input projection as native Alpha+ discovery
 // and return its complete place names and live/detached markings in one run.
 [[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result(

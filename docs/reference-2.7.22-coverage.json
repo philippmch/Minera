@@ -1343,7 +1343,7 @@
           "symbol": "ALPHA_VERSION_PLUS"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
       "artifacts": [
         "include/minera/alpha_miner.hpp",
@@ -1396,6 +1396,10 @@
             {
               "path": "include/minera/alpha_miner.hpp",
               "symbol": "discover_alpha_plus"
+            },
+            {
+              "path": "include/minera/alpha_miner.hpp",
+              "symbol": "enumerate_alpha_plus_cleanup_alternatives"
             }
           ],
           "tests": [
@@ -1403,6 +1407,11 @@
               "path": "src/backend/tests/test_alpha_parity_contracts.cpp",
               "executable": "minera_alpha_parity_contracts_tests",
               "case": "plus_interior_one_loop_has_a_fresh_self_only_place"
+            },
+            {
+              "path": "src/backend/tests/test_alpha_miner.cpp",
+              "executable": "minera_alpha_miner_tests",
+              "case": "alpha_plus_cleanup_choice_is_deterministic_and_enumerated"
             }
           ]
         }
@@ -7475,7 +7484,7 @@
           "selector": "ALPHA_VERSION_PLUS"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
       "artifacts": [
         "include/minera/alpha_miner.hpp",
@@ -7492,7 +7501,9 @@
         "src/frontend/src/alpha-result.ts",
         "scripts/capture-alpha-plus-reference.py",
         "scripts/check-alpha-plus-sampled-support.py",
-        "scripts/check-alpha-plus-model-transports.py"
+        "scripts/check-alpha-plus-model-transports.py",
+        "scripts/capture-alpha-plus-cleanup-bank.py",
+        "scripts/check-alpha-plus-cleanup-bank.py"
       ],
       "proofs": {
         "module": "algo.discovery.alpha.variants.plus",
@@ -7500,6 +7511,10 @@
           {
             "path": "include/minera/alpha_miner.hpp",
             "symbol": "discover_alpha_plus"
+          },
+          {
+            "path": "include/minera/alpha_miner.hpp",
+            "symbol": "enumerate_alpha_plus_cleanup_alternatives"
           }
         ],
         "tests": [
@@ -7507,6 +7522,11 @@
             "path": "src/backend/tests/test_alpha_parity_contracts.cpp",
             "executable": "minera_alpha_parity_contracts_tests",
             "case": "plus_interior_one_loop_has_a_fresh_self_only_place"
+          },
+          {
+            "path": "src/backend/tests/test_alpha_miner.cpp",
+            "executable": "minera_alpha_miner_tests",
+            "case": "alpha_plus_cleanup_choice_is_deterministic_and_enumerated"
           }
         ]
       }
