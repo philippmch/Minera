@@ -25,6 +25,13 @@ class OcdfgPerformanceError : public std::invalid_argument {
       : std::invalid_argument(message), type(std::move(type)) {}
   const std::string type;
 };
+// Signed elapsed seconds between two instants, floored to microseconds and
+// converted the way a timedelta's day/second/microsecond components sum:
+// whole seconds first, then the microsecond fraction. A negative interval
+// therefore keeps the cancellation the public results show, e.g. -0.519789 s
+// is -1 + 0.480211, not the correctly rounded quotient.
+[[nodiscard]] double ocdfg_elapsed_seconds(const ParsedExactTimestamp& from,
+                                           const ParsedExactTimestamp& to);
 [[nodiscard]] std::vector<double> calculate_ocdfg_edge_performance(
     const std::vector<OcdfgPerformanceEvent>& events,
     const std::vector<std::pair<std::string, std::string>>& event_couples,

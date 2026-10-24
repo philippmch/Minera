@@ -197,10 +197,11 @@ The machine-readable source of truth is
   Vite and eight production HTTP cases pass. These bounded results leave the
   wider module and rendered browser gate open; see
   [ocdfg-edge-metrics-parity-contract.md](ocdfg-edge-metrics-parity-contract.md).
-- A disjoint wider OCDFG discovery bank (53 logs, five timing profiles, 265
-  public outcomes) matches all 318 native outcomes, after a microsecond fix
-  on the default elapsed path; the CLI now takes the same timing controls as
-  the HTTP route. The module stays partial; see
+- Two disjoint wider OCDFG discovery banks (81 logs, five timing profiles,
+  405 public outcomes) match all 486 native outcomes, covering offsets,
+  nanosecond columns and integer IDs, after microsecond and rounding fixes
+  in elapsed time; the CLI now takes the same timing controls as the HTTP
+  route. The module stays partial; see
   [ocdfg-wider-discovery-parity.md](ocdfg-wider-discovery-parity.md).
 - Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
   count compares one reference process; both returned graph shapes occur in

@@ -14,7 +14,9 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ocdfg_wider_fixtures import PROFILES, fixtures, ocel2_json  # noqa: E402
+from ocdfg_wider_fixtures import PROFILES, fixtures, fixtures_round2, native_ocel2_json  # noqa: E402
+
+BANKS = {"wider": fixtures, "round2": fixtures_round2}
 
 
 def _pairs(values):
@@ -64,6 +66,34 @@ def canonical_native(graph):
     }
 
 
+def _text(value):
+    if isinstance(value, list):
+        return [_text(item) for item in value]
+    return value if isinstance(value, str) else str(value)
+
+
+def textual_reference(result):
+    """Native identifiers are text; integer reference IDs compare as decimals.
+
+    Sets are re-sorted after the conversion; ordered association lists keep
+    their reference order.
+    """
+    converted = {}
+    for field, value in result.items():
+        if field in ("activities_indep", "activities_ot", "start_activities", "end_activities", "edges"):
+            converted[field] = {}
+            for key, metric in value.items():
+                entry = {}
+                for name, items in metric.items():
+                    items = _text(items)
+                    ordered = name == "total_objects" and field != "edges"
+                    entry[name] = items if ordered or name.startswith("performance_") else sorted(items)
+                converted[field][key] = entry
+        else:
+            converted[field] = value
+    return converted
+
+
 def native_arguments(profile, legacy):
     business_hours, slots = PROFILES[profile]
     if legacy:
@@ -97,9 +127,10 @@ def main():
     parser.add_argument("--capture", required=True)
     parser.add_argument("--cli", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--bank", choices=sorted(BANKS), default="wider")
     args = parser.parse_args()
     bank = json.loads(Path(args.capture).read_text())
-    bank_fixtures = fixtures()
+    bank_fixtures = BANKS[args.bank]()
     digest = hashlib.sha256(json.dumps(bank_fixtures, ensure_ascii=False).encode()).hexdigest()
     if digest != bank["fixtures_sha256"]:
         raise SystemExit("fixture generator no longer matches the captured bank")
@@ -110,7 +141,7 @@ def main():
         for row in bank["rows"]:
             path = Path(scratch) / (row["fixture"] + ".json")
             if not path.exists():
-                path.write_text(json.dumps(ocel2_json(by_name[row["fixture"]]), ensure_ascii=False),
+                path.write_text(json.dumps(native_ocel2_json(by_name[row["fixture"]]), ensure_ascii=False),
                                 encoding="utf-8")
             variants = [False] + ([True] if row["profile"] == "elapsed" else [])
             for legacy in variants:
@@ -127,7 +158,7 @@ def main():
                     outcome["reference_error"] = row["error"]
                 else:
                     actual = canonical_native(json.loads(completed.stdout))
-                    found = differences(row["result"], actual)
+                    found = differences(textual_reference(row["result"]), actual)
                     outcome["match"] = not found
                     if found:
                         outcome["differences"] = found[:20]

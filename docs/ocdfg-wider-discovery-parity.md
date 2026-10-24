@@ -69,14 +69,60 @@ projection, and missing timestamps are still skipped. After the repair, all
 318 native outcomes match: 265 typed-timing outcomes and 53 default-path
 outcomes.
 
-`docs/ocdfg-wider-discovery-evidence.json.gz` holds the full bank, the native
-report, the hashes of the three scripts and the build/test receipts.
+`docs/ocdfg-wider-discovery-evidence.json.gz` holds both banks, both native
+reports, the reader observations, the script and source hashes and the
+OCEL/OCDFG test log.
+
+## Second bank: offsets, nanoseconds and integer IDs
+
+`fixtures_round2()` adds 28 more disjoint logs (1,822 events, `x` prefixes or
+integers above 800,000, timestamps in 2033-2034) under the same five
+profiles, for 140 public outcomes. All were identical across hash seeds 0-3
+and none raised an error.
+
+- Ten logs keep one timestamp column with per-value offsets (`Z`, `+02:00`,
+  `-05:00`, `+05:30`, `+12:45`, `-09:30`), so the column has object dtype.
+  Elapsed time uses the real instant, and working time uses each value's own
+  local wall clock. Native already matched both.
+- Ten logs use nanosecond columns with remainders of 1, 999, 1,000, 1,001 ns
+  and random values, including ties that differ only below a microsecond.
+  Differences floor to whole microseconds.
+- Eight logs use integer event and object IDs. Native IDs are text, so the
+  check compares the reference IDs as decimal text and re-sorts sets.
+  Ordered association lists keep their reference order. A column that mixes
+  `1` and `"1"` would collide in the text carrier and is outside this
+  contract.
+
+Four nanosecond outcomes first failed by one ulp. The public elapsed value is
+not the correctly rounded quotient of microseconds by 10^6. It is the sum of
+whole seconds and the microsecond fraction, after flooring to microseconds:
+-0.519789 s comes out as `-1 + 0.480211`, which is -0.5197890000000001. A
+black-box sweep of 200,000 random intervals in each of the ns, us, ms and s
+units agreed with that sum every time. The first bank never hit a case where
+the two roundings differ. `ocdfg_elapsed_seconds` now does this sum, and both
+the typed-timing path and the default path use it. All 168 native outcomes of
+the second bank and all 318 of the first match, the 60 retained timing cells
+still pass, and a new regression case pins the -0.519789 s and -1 us values.
+
+## Calendars and the OCEL 2.0 JSON reader
+
+`pm4py.discover_ocdfg` takes only `business_hours` and
+`business_hour_slots`, and the discovery variant exposes only the activity,
+object-type and compute-performance parameters. No holiday calendar reaches
+discovery. The earlier timing bank already showed that calendar arguments to
+the edge-performance helper are inert, and native keeps that.
+
+`scripts/capture-ocel2-json-offset-reference.py` records what the public OCEL
+2.0 JSON reader does with offsets. It drops the offset, keeps the wall-clock
+fields, truncates to microseconds and labels the result UTC. Mixed-offset
+input therefore loses real elapsed time: `16:30+02:00` to `08:30-05:00` three
+days later reads as 230,400 s, not 255,600 s. Minera's reader keeps the real
+instant, which every other algorithm relies on. The reader is outside the
+`algo` catalogue this contract covers, so the difference is recorded, not
+copied.
 
 ## Still open
 
-This bank uses string identifiers, one timestamp offset per log and canonical
-column names. Mixed offsets in one column, nanosecond-resolution columns,
-non-string or missing identifiers, arbitrary relation cell dtypes, holiday
-calendars and performance benchmarking remain separate gates, as do the
-importer timezone behavior above and rendered UI checks. No coverage row is
-promoted.
+Mixed `int`/`str` ID columns, missing identifiers, arbitrary relation cell
+dtypes, the reader difference above, performance benchmarking and rendered
+UI checks remain open. No coverage row is promoted.
