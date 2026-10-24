@@ -30,6 +30,8 @@ enum class ProcessTreeAlignmentMoveType {
   MODEL = kModel,
 };
 
+// SEARCH_GRAPH_PT lists every executed tau leaf as a kModel move whose
+// model_activity is empty; it costs nothing.
 struct ProcessTreeAlignmentMove {
   ProcessTreeAlignmentMoveType type = ProcessTreeAlignmentMoveType::kSynchronous;
   std::string log_activity;
@@ -67,6 +69,10 @@ struct ProcessTreeAlignmentOptions {
   std::string activity_attribute = "concept:name";
 };
 
+// fitness = 1 - cost / (trace length + floor), not clamped, where the floor is
+// the variant's cost for the empty trace; APPROXIMATED_ORIGINAL uses the
+// reference's binary-operator floor instead (10000 per visible leaf, 1 per tau
+// leaf, 2 per binary operator).
 struct ProcessTreeTraceAlignment {
   std::vector<std::string> trace;
   std::vector<ProcessTreeAlignmentMove> moves;
