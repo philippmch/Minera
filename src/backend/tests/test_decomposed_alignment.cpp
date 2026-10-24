@@ -53,9 +53,12 @@ int main() {
   assert(exact.diagnostics.components > 1 && exact.diagnostics.merges == 0);
   assert(exact.traces[0].alignment[0].synchronous() && exact.traces[0].alignment[1].synchronous());
   auto dev = align_decomposed(log_of({{"x"}}), n);
-  assert(dev.complete && dev.traces[0].cost == 30000.0 && dev.traces[0].fitness < 1.0);
+  // As in the reference, events of activities outside the net are dropped and
+  // components that see no event are not aligned, so nothing is charged.
+  assert(dev.complete && dev.traces[0].cost == 0.0 && dev.traces[0].alignment.empty());
+  assert(dev.traces[0].best_worst_cost == 30000.0 && dev.traces[0].fitness == 1.0);
   auto empty = align_decomposed(log_of({{}}), n);
-  assert(empty.complete && empty.traces[0].alignment.size() == 2);
+  assert(empty.complete && empty.traces[0].cost == 0.0 && empty.traces[0].alignment.empty());
   for (const auto& m : empty.traces[0].alignment) assert(m.log && *m.log == ">>");
   auto timeout = align_decomposed(log_of({{"a"}}), n, [] { DecomposedAlignmentOptions o; o.max_states=1; return o; }());
   assert(!timeout.complete && timeout.exhausted);
@@ -64,7 +67,7 @@ int main() {
   assert(dup.total_cost == 0.0 && dup.fitness == 1.0);
   auto same_empty = align_decomposed(log_of({{}}), same_label_chain());
   auto same_exact = align_decomposed(log_of({{"a","a"}}), same_label_chain());
-  assert(same_empty.complete && same_empty.traces[0].cost==20000.0 && same_empty.traces[0].alignment.size()==2);
+  assert(same_empty.complete && same_empty.traces[0].cost==0.0 && same_empty.traces[0].alignment.empty());
   assert(same_exact.complete && same_exact.traces[0].cost==0.0 && same_exact.traces[0].alignment.size()==2);
 
   // A boundary label projected twice in one region but once in its neighbour
@@ -115,10 +118,11 @@ int main() {
   assert(two_unknown.traces.size()==2 && two_unknown.total_cost==2*one_unknown.total_cost && two_unknown.fitness==one_unknown.fitness);
   DecomposedAlignmentOptions custom; custom.model_move_cost=5000; custom.log_move_cost=2000;
   auto custom_unknown = align_decomposed(log_of({{"x"}}), n, custom);
-  assert(custom_unknown.best_worst_cost==10000.0 && custom_unknown.traces[0].cost==12000.0 && custom_unknown.traces[0].best_worst_cost==12000.0 && custom_unknown.traces[0].fitness==0.0);
+  assert(custom_unknown.best_worst_cost==10000.0 && custom_unknown.traces[0].cost==0.0 && custom_unknown.traces[0].best_worst_cost==12000.0 && custom_unknown.traces[0].fitness==1.0);
+  // Silent moves count in the cost but not in the best-worst cost or fitness.
   custom.tau_model_cost=7;
   auto custom_tau = align_decomposed(log_of({{"a"}}), zero_input_split(), [&] { auto x=custom; x.initial_marking={0,0,0}; x.final_marking={0,0,1}; return x; }());
-  assert(custom_tau.complete && custom_tau.best_worst_cost==5007.0 && custom_tau.traces[0].cost==7.0 && custom_tau.traces[0].best_worst_cost==7007.0);
+  assert(custom_tau.complete && custom_tau.best_worst_cost==5000.0 && custom_tau.traces[0].cost==7.0 && custom_tau.traces[0].best_worst_cost==7000.0 && custom_tau.traces[0].fitness==1.0);
 
   // The decomposed search and recomposition use the configured generic
   // activity field for every projected trace.

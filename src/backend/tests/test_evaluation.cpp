@@ -803,9 +803,15 @@ void replay_fitness_excludes_unknown_activities_by_default() {
   const auto included = evaluate_replay_fitness(
       l, n, ReplayFitnessVariant::TOKEN_BASED, include_unknown);
   assert(included.computed && included.trace_count == 2);
-  // The opt-in policy changes fit classification, not token fitness.
+  // The opt-in policy changes fit classification, not token fitness. As in
+  // the reference, the flag carries over to variants replayed later: the
+  // longer variant sorts first, so the fitting one is unfit too.
   assert(included.fitness == excluded.fitness);
-  assert(included.fitting_traces == 1);
+  assert(included.fitting_traces == 0);
+  const auto fitting_first = evaluate_replay_fitness(
+      log({{"A", "B"}, {"A", "B"}, {"A", "B", "UNUSED", "X"}}), n,
+      ReplayFitnessVariant::TOKEN_BASED, include_unknown);
+  assert(fitting_first.fitting_traces == 2);
 
   // The generic API uses the same default: unknown labels are not token moves.
   const auto generic = check_conformance(l, n);
