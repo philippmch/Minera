@@ -1,4 +1,4 @@
-# Full parity continuation — 2026-10-21–23
+# Full parity continuation — 2026-10-21–24
 
 Resume in `C:/Users/pmoch/Documents/Minera`, branch `main`.
 
@@ -14,7 +14,76 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: full 411-call Polars variants API acceptance and rendered UI checks — 2026-10-23
+## Current continuation: full 342-call LOG timestamp admission and canonical census — 2026-10-24
+
+The sealed Polars checkpoint below is pushed. Actual remote readback `a3467c`
+verifies main at `94e0772eaa827e26343559121d2b542ed9728fb6`, including separate
+evidence `b5584f01` and handoff `94e0772e` commits. The inherited two coverage
+edits remain unstaged. Full scope remains201 strict open units and565 unentered
+grouping queries; no catalogue promotion follows from the new timestamp work.
+
+The complete timestamp bank is342 retained calls (326 public +12 converter +4
+forwarding), all13 functions. Its previously missing10 whole bindings are now
+recovered and current bytes verified. Root first reviewed the entire new
+recovery helper/IO and independent source review, then opaquely admitted only
+`docs/log-timestamp-filter-public.json.gz` (782,843 bytes; SHA256
+`5bf07e1c85251d670fc22f9cd10acc6b1f4d0c3c0a5b2a5226a558fe4d8b3ee7`).
+Separate structural recovery `20baf8`, after container admission `66d5e2`, reads
+28 member headers and lexically skips their encoded payload string tokens.
+It traverses41,666,835 decompressed container bytes, including41,661,359 encoded
+payload-token bytes, with no member payload semantic decoding, parsing or hash
+verification and no named member target following. The checks archive remains
+unopened. Recovered pins are declarations only:
+`log-timestamp-public-header-recovery-1/recovered-missing-pins.json`,10,139 bytes,
+SHA256 `2b8ead71e8a5d5155903d30229464ea73fc922db48649af24fd5eec4b34e1303`.
+
+The separately reviewed root opaque helper verifies all20 current whole target
+bindings twice (`b2de96`): each bank's records/intents/digest audit/cases/producer/
+validation plus oldGEN and the monolithic native oracle. This phase decodes no
+target bytes, opens no archives and executes no producer, generator or reference
+code. Proof is `log-timestamp-full342-opaque-gate-1/opaque-gate.json`,10,011 bytes,
+SHA256 `8609dc53a250660cb8ce31d87d8f8aca9367eb0bc8f5b9ceb303831a227ca703`.
+
+Root then separately admits exactly12 records/intents/digest audit/cases files
+for the independently reviewed canonical census. Admission is4,288 bytes,
+SHA256 `395dd076efea8a03243cb7e89544c359041d1ea21c24bc87e2d63bdd092c955a`, at
+`log-timestamp-full342-admission-prepared-1/root-semantic-admission.json`.
+Census `19157b` passes all342 distinct canonical IDs, zero case/canonical
+duplicates and zero audit/entry alignment gaps. All original whole bytes are
+bound before parsing and rechecked afterwards. Its complete report is
+`log-timestamp-full342-canonical-census-1/report.json`,14,772 bytes, SHA256
+`f24ada2b1515fb5b158041e9c175c8ca166874c51b8c4fa6fa281e080ab1ff26`.
+Canonical fields are exactly module,function,args,kwargs,call_shape with
+`positional_args_keyword_controls`; sorted IDs joined by LF without trailing LF
+have SHA256 `b61e2093aa21d996449e23051695d06061a4212bd2188ab5aed11a61fd482f67`.
+
+Measured outcomes are135 complete logs,48 Boolean values and159 full qualified
+diagnostics, with93 predicate calls and zero warnings. All38 input/control
+mutations occur in the source embedded in args0; kwargs and positional tails
+do not mutate. Complete alias evidence uses sparse flattened identity-match
+positions per returned trace, so pair counts can differ from event counts.
+The census measures15 actually observed Packed tags from the18-tag producer
+grammar,116 distinct complete log snapshots,249 source-derived trace helpers
+and819 snapshot placements. Snapshot attributes have zero nonstring top-key
+drops; three parameter entries lie outside the oldGEN selector/positive
+projection. These measurements do not prove native representability.
+
+The census's initial source incorrectly hardcoded one audit verification flag.
+Both reviews found it before execution; the original source/IO/preparation stay
+preserved under `source-revision-2`. The corrected source reports actual separate
+path/count/overlap booleans. Independent final review is7,178 bytes, SHA256
+`9f4a226ba3ac6f7b29c09a675a840a53594e2aff8a15e611fe89adb00431132d`.
+The prior metadata discovery/truncation disclosure and326/338 audit-timing
+correction remain intact; no complete-history, absence or new-call authority.
+
+Next: separately root-admit native oracle parsing after complete mapper source/
+IO review, independently map the entire monolithic oracle, all342 cases and all
+116/249 constructors, then expose and test original-call API/UI behavior.
+Parallel source-only work is preparing the native mapper and a distinct closed
+timestamp receipt-index profile. Neither worker reads original payloads or runs
+helpers/tests. The original kernel/oracle and capture producers remain unchanged.
+
+## Previous checkpoint: full 411-call Polars variants API acceptance and rendered UI checks — 2026-10-23
 
 Four focused source commits descend from `20cfd7f9`: `8f4c70f8` adds the closed
 Polars receipt index, `eca48a77` adds exact native original-call controls,
