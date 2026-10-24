@@ -30,6 +30,16 @@ from pathlib import Path
 REFERENCE_COMMIT = "0715c31f3f1d85924107d6aa5329806db69df899"
 ALPHABET = "abcdefgh"
 GENERATOR_LIMIT = 64
+# Public token-replay parameters, each toggled away from its default.
+REPLAY_OPTIONS = [("consider_remaining_in_fitness", False),
+                  ("try_to_reach_final_marking_through_hidden", False),
+                  ("walk_through_hidden_trans", False),
+                  ("stop_immediately_unfit", True),
+                  ("cleaning_token_flood", True),
+                  ("consider_activities_not_in_model_in_fitness", True),
+                  ("exhaustive_invisible_exploration", True)]
+BACKWARDS_OPTIONS = {"consider_remaining_in_fitness", "try_to_reach_final_marking_through_hidden",
+                     "walk_through_hidden_trans", "stop_immediately_unfit", "cleaning_token_flood"}
 EXPECTED_VERSIONS = {"pm4py": "2.7.22", "pandas": "3.0.5", "numpy": "2.4.6",
                      "scipy": "1.17.1", "networkx": "3.6.1", "pulp": "2.9.0"}
 
@@ -134,6 +144,78 @@ def build_corpus(seed, count):
             words.append(noisy(rng.choice(words[:3]), rng))
         words.append([])
         cases.append(dict(name=f"tree-{len(cases):03d}", tree=text, traces=words))
+    return cases
+
+
+def tractable(net, im, fm, words):
+    """Discovered nets can make the reference search explode (unbounded or
+    huge state spaces). Such models would only yield timeouts, so the corpus
+    keeps nets whose default alignments of the samples finish quickly."""
+    from pm4py.algo.conformance.alignments.petri_net import algorithm as pn
+    for word in words[:3] + [[]]:
+        for variant in (pn.Variants.VERSION_STATE_EQUATION_A_STAR,
+                        pn.Variants.VERSION_DIJKSTRA_LESS_MEMORY):
+            outcome = record(lambda: pn.apply(as_log([word])[0], net, im, fm, variant=variant), 2)
+            if "timeout" in outcome:
+                return False
+    return True
+
+
+def build_net_corpus(seed, count):
+    """Non-tree-shaped models, frozen to PNML text with neutral element ids.
+
+    Alpha, heuristics and ILP nets are discovered from language samples of a
+    random tree; duplicate-label trees are converted directly. Element ids are
+    rewritten to p<i>/t<i> so every capture run reads byte-identical inputs.
+    Each case also carries random cost functions for the cost-parameter
+    families (keyed by transition id; trace costs per trace and position)."""
+    import pm4py
+    from pm4py.objects.process_tree.utils.generic import parse
+    rng = random.Random(seed)
+    kinds = ["alpha", "heuristics", "ilp", "duplicate"]
+    cases = []
+    seen = set()
+    while len(cases) < count:
+        kind = kinds[len(cases) % len(kinds)]
+        size = rng.choice([3, 4, 5, 6])
+        if kind == "duplicate":
+            labels = [rng.choice(ALPHABET[:size]) for _ in range(size + 2)]
+        else:
+            labels = list(ALPHABET[:size]); rng.shuffle(labels)
+        text = random_tree(rng, rng.choice([2, 3, 3]), labels)
+        if (kind, text) in seen or text.count("'") < 4:
+            continue
+        seen.add((kind, text))
+        tree = parse(text)
+        sample = [sample_language(tree, rng) for _ in range(8)]
+        with silenced():
+            if kind == "duplicate":
+                net, im, fm = pm4py.convert_to_petri_net(tree)
+            else:
+                discover = dict(alpha=pm4py.discover_petri_net_alpha,
+                                heuristics=pm4py.discover_petri_net_heuristics,
+                                ilp=pm4py.discover_petri_net_ilp)[kind]
+                net, im, fm = discover(as_log([w for w in sample if w] or [["a"]]))
+        if not fm or not im or not tractable(net, im, fm, sample):
+            continue
+        for i, place in enumerate(sorted(net.places, key=lambda p: p.name)):
+            place.name = f"p{i}"
+        for i, transition in enumerate(sorted(net.transitions,
+                                              key=lambda t: (t.label is None, t.label or "", t.name))):
+            transition.name = f"t{i}"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.pnml"
+            pm4py.write_pnml(net, im, fm, str(path))
+            pnml = path.read_text(encoding="utf-8")
+        words = sample[:3] + [noisy(rng.choice(sample[:3]), rng) for _ in range(5)] + [[]]
+        costs = dict(
+            model={t.name: (rng.choice([0, 1, 2]) if t.label is None else rng.randint(1, 9))
+                   for t in net.transitions},
+            sync={t.name: rng.choice([0, 0, 1]) for t in net.transitions if t.label is not None},
+            trace=[[rng.randint(1, 9) for _ in w] for w in words])
+        cases.append(dict(name=f"{kind}-{len(cases):03d}", kind=kind,
+                          tree=text if kind == "duplicate" else None,
+                          model_pnml=pnml, traces=words, costs=costs))
     return cases
 
 
@@ -262,7 +344,11 @@ def observe(case, families=None, permutation=0):
     from pm4py.objects.log.obj import EventLog
 
     with tempfile.TemporaryDirectory() as directory:
-        case["pnml"], case["ptml"] = serialize_models(case["tree"], directory)
+        if "model_pnml" in case:
+            case["pnml"] = case["model_pnml"]
+            case["ptml"] = None
+        else:
+            case["pnml"], case["ptml"] = serialize_models(case["tree"], directory)
         case["pnml"] = permute_pnml(case["pnml"], permutation, case["name"])
         (Path(directory) / "model.pnml").write_text(case["pnml"], encoding="utf-8")
         net, im, fm = pm4py.read_pnml(str(Path(directory) / "model.pnml"))
@@ -288,7 +374,35 @@ def observe(case, families=None, permutation=0):
             rows.append(record(run))
         out["petri:" + name] = rows
 
-    for variant in pt.Variants if want("tree:") else ():
+    if "costs" in case:
+        by_name = {t.name: t for t in net.transitions}
+        model_costs = {by_name[n]: c for n, c in case["costs"]["model"].items()}
+        sync_costs = {by_name[n]: c for n, c in case["costs"]["sync"].items()}
+        for variant in [v for v in pn.Variants if want("petricost:" + v.name)]:
+            rows = []
+            for t, trace_costs in zip(log, case["costs"]["trace"]):
+                parameters = {"model_cost_function": model_costs,
+                              "trace_cost_function": list(trace_costs)}
+                if variant != pn.Variants.VERSION_DIJKSTRA_LESS_MEMORY:
+                    parameters["sync_cost_function"] = sync_costs
+                rows.append(record(lambda t=t, parameters=parameters: alignment_row(
+                    pn.apply(t, net, im, fm, variant=variant, parameters=parameters))))
+            out["petricost:" + variant.name] = rows
+        for name, module in (("GENERATOR_DIJKSTRA_LESS_MEMORY", gen_less),
+                             ("GENERATOR_DIJKSTRA_NO_HEURISTICS", gen_no)) if want("petricost:GENERATOR") else ():
+            rows = []
+            for t, trace_costs in zip(log, case["costs"]["trace"]):
+                parameters = {"model_cost_function": model_costs,
+                              "trace_cost_function": list(trace_costs)}
+                if module is gen_no:
+                    parameters["sync_cost_function"] = sync_costs
+                def run(t=t, parameters=parameters):
+                    return [alignment_row(r) for r in itertools.islice(
+                        module.apply(t, net, im, fm, parameters=parameters), GENERATOR_LIMIT)]
+                rows.append(record(run))
+            out["petricost:" + name] = rows
+
+    for variant in pt.Variants if want("tree:") and case["tree"] else ():
         def run_tree(variant=variant):
             results = pt.apply(log, parse(case["tree"]), variant=variant)
             return [alignment_row(r) for r in results]
@@ -313,8 +427,8 @@ def observe(case, families=None, permutation=0):
                                 recompos_maximal.apply(EventLog([t]), net, im, fm)], 5)
             for t in log]
 
-    def replay(variant, log):
-        rows = tbr.apply(log, net, im, fm, variant=variant)
+    def replay(variant, log, parameters=None):
+        rows = tbr.apply(log, net, im, fm, variant=variant, parameters=parameters)
         result = []
         for row in rows:
             # Variations differ in which keys they report; absent keys stay absent.
@@ -343,6 +457,15 @@ def observe(case, families=None, permutation=0):
         nonempty = EventLog([t for t in log if len(t)])
         out["replay:BACKWARDS:nonempty"] = record(
             lambda: replay(tbr.Variants.BACKWARDS, nonempty))
+        if "costs" in case:  # the net corpus also exercises replay parameters
+            for option, value in REPLAY_OPTIONS:
+                for variant in (tbr.Variants.TOKEN_REPLAY, tbr.Variants.BACKWARDS):
+                    if variant == tbr.Variants.BACKWARDS and option not in BACKWARDS_OPTIONS:
+                        continue
+                    source = log if variant == tbr.Variants.TOKEN_REPLAY else nonempty
+                    out[f"replay:{variant.name}:{option}={value}"] = record(
+                        lambda variant=variant, source=source, option=option, value=value:
+                        replay(variant, source, {option: value}))
     return out
 
 
@@ -358,6 +481,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=2722)
     parser.add_argument("--count", type=int, default=60)
+    parser.add_argument("--corpus", choices=["trees", "nets"], default="trees")
+    parser.add_argument("--models", type=Path,
+                        help="frozen corpus file: read it when present, else write the built corpus")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--permutation", type=int, default=0,
                         help="nonzero: shuffle PNML element order with this seed")
@@ -367,7 +493,19 @@ def main():
     warnings.filterwarnings("ignore")
     os.environ.setdefault("TQDM_DISABLE", "1")
     runtime = versions()
-    cases = build_corpus(args.seed, args.count)
+    if args.models and args.models.exists():
+        cases = json.loads(gzip.decompress(args.models.read_bytes()))["cases"]
+    else:
+        cases = (build_corpus if args.corpus == "trees" else build_net_corpus)(args.seed, args.count)
+        if args.models:
+            # Discovery and conversion are not reproducible across processes
+            # (generated ids, set order), so the first run freezes its inputs.
+            frozen = [{k: case[k] for k in ("name", "kind", "tree", "model_pnml", "traces", "costs")
+                       if k in case} for case in cases]
+            data = json.dumps(dict(seed=args.seed, corpus=args.corpus, cases=frozen),
+                              sort_keys=True, separators=(",", ":")).encode()
+            with gzip.GzipFile(filename="", mode="wb", fileobj=args.models.open("wb"), mtime=0) as sink:
+                sink.write(data)
     for index, case in enumerate(cases):
         case["observations"] = observe(
             case, tuple(args.families.split(",")) if args.families else None,
@@ -376,7 +514,7 @@ def main():
     payload = dict(reference_version="2.7.22", reference_commit=REFERENCE_COMMIT,
                    runtime=runtime, python=sys.version.split()[0],
                    hash_seed=os.environ.get("PYTHONHASHSEED"),
-                   seed=args.seed, permutation=args.permutation, cases=cases)
+                   seed=args.seed, corpus=args.corpus, permutation=args.permutation, cases=cases)
     data = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=lambda o: {"unserializable": type(o).__name__, "repr": str(o)}).encode()
     with gzip.GzipFile(filename="", mode="wb", fileobj=args.output.open("wb"), mtime=0) as sink:
         sink.write(data)

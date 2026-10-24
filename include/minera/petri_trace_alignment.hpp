@@ -27,8 +27,10 @@ struct PetriTraceAlignment {
   // Variant cost units: STATE_EQUATION_A_STAR, DIJKSTRA_NO_HEURISTICS and the
   // generators charge 10000 per log or visible model move and 1 per silent
   // model move; DIJKSTRA_LESS_MEMORY charges a silent move 1 only when a
-  // visible transition sharing one of its input places has a label occurring
-  // in the trace, else 0; DISCOUNTED_A_STAR charges 2^-depth per non-sync move.
+  // visible transition whose input places are all inputs of the silent one has
+  // a label occurring in the trace, else 0; DISCOUNTED_A_STAR charges 2^-depth
+  // per non-sync move. All variants except DIJKSTRA_LESS_MEMORY and its
+  // generator read every ordinary arc as weight 1, as the reference does.
   double cost = 0.0;
   // Best-worst cost and fitness are reported by the four enum variants only.
   // fitness = 1 - floor(cost / 10000) / floor(bwc / 10000), or 0 when the
@@ -46,6 +48,13 @@ struct PetriTraceAlignmentOptions {
   std::size_t max_states = 200000;
   // Generator variants: maximum number of equal-cost alignments returned.
   std::size_t max_alignments = 64;
+  // Optional cost functions (the reference model/sync/trace cost function
+  // parameters). Nonempty vectors hold one cost per transition or per trace
+  // event and replace the variant's default costs. Sync costs are ignored by
+  // DIJKSTRA_LESS_MEMORY, which has no sync cost function.
+  std::vector<double> model_costs;
+  std::vector<double> sync_costs;
+  std::vector<double> trace_costs;
 };
 
 // Aligns one trace (activity labels) with the reference variant semantics.

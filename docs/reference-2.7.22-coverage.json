@@ -6507,8 +6507,29 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_alignment.hpp",
+        "src/backend/dfg_alignment.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.dfg.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_alignment.hpp",
+            "symbol": "align_trace_on_dfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_conformance_parity_contracts.cpp",
+            "executable": "minera_conformance_parity_contracts_tests",
+            "case": "dfg_classic_alignment_reference_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.edit_distance.variants.edit_distance",
@@ -6573,8 +6594,31 @@
           "selector": "VERSION_DIJKSTRA_LESS_MEMORY"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "include/minera/petri_trace_alignment.hpp",
+        "src/backend/conformance.cpp",
+        "src/backend/petri_trace_alignment.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.petri_net.variants.dijkstra_less_memory",
+        "implementation": [
+          {
+            "path": "include/minera/conformance.hpp",
+            "symbol": "kDijkstraLessMemory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_conformance_parity_contracts.cpp",
+            "executable": "minera_conformance_parity_contracts_tests",
+            "case": "dijkstra_less_memory_reference_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.petri_net.variants.dijkstra_no_heuristics",
@@ -6587,8 +6631,31 @@
           "selector": "VERSION_DIJKSTRA_NO_HEURISTICS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "include/minera/petri_trace_alignment.hpp",
+        "src/backend/conformance.cpp",
+        "src/backend/petri_trace_alignment.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.petri_net.variants.dijkstra_no_heuristics",
+        "implementation": [
+          {
+            "path": "include/minera/conformance.hpp",
+            "symbol": "kDijkstraNoHeuristics"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_conformance_parity_contracts.cpp",
+            "executable": "minera_conformance_parity_contracts_tests",
+            "case": "dijkstra_no_heuristics_reference_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.petri_net.variants.discounted_a_star",
@@ -6601,8 +6668,31 @@
           "selector": "VERSION_DISCOUNTED_A_STAR"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "include/minera/petri_trace_alignment.hpp",
+        "src/backend/conformance.cpp",
+        "src/backend/petri_trace_alignment.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.petri_net.variants.discounted_a_star",
+        "implementation": [
+          {
+            "path": "include/minera/conformance.hpp",
+            "symbol": "kDiscountedAStar"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_conformance_parity_contracts.cpp",
+            "executable": "minera_conformance_parity_contracts_tests",
+            "case": "discounted_a_star_reference_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.petri_net.variants.generator_dijkstra_less_memory",
@@ -6610,8 +6700,31 @@
       "owner": "algo.conformance.alignments.petri_net",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "include/minera/petri_trace_alignment.hpp",
+        "src/backend/conformance.cpp",
+        "src/backend/petri_trace_alignment.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.petri_net.variants.generator_dijkstra_less_memory",
+        "implementation": [
+          {
+            "path": "include/minera/conformance.hpp",
+            "symbol": "kGeneratorDijkstraLessMemory"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_conformance_parity_contracts.cpp",
+            "executable": "minera_conformance_parity_contracts_tests",
+            "case": "generator_dijkstra_less_memory_reference_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.petri_net.variants.generator_dijkstra_no_heuristics",
@@ -6619,8 +6732,31 @@
       "owner": "algo.conformance.alignments.petri_net",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "include/minera/petri_trace_alignment.hpp",
+        "src/backend/conformance.cpp",
+        "src/backend/petri_trace_alignment.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.petri_net.variants.generator_dijkstra_no_heuristics",
+        "implementation": [
+          {
+            "path": "include/minera/conformance.hpp",
+            "symbol": "kGeneratorDijkstraNoHeuristics"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_conformance_parity_contracts.cpp",
+            "executable": "minera_conformance_parity_contracts_tests",
+            "case": "generator_dijkstra_no_heuristics_reference_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.petri_net.variants.state_equation_a_star",
@@ -6633,8 +6769,31 @@
           "selector": "VERSION_STATE_EQUATION_A_STAR"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "include/minera/petri_trace_alignment.hpp",
+        "src/backend/conformance.cpp",
+        "src/backend/petri_trace_alignment.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.petri_net.variants.state_equation_a_star",
+        "implementation": [
+          {
+            "path": "include/minera/conformance.hpp",
+            "symbol": "kStateEquationAStar"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_conformance_parity_contracts.cpp",
+            "executable": "minera_conformance_parity_contracts_tests",
+            "case": "state_equation_a_star_reference_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.process_tree.util.search_graph_pt_frequency_annotation",

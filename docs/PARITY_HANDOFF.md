@@ -3372,3 +3372,16 @@ rejection of server replacement and a browser permission gate. Do not retry
 those rejected actions through another shell or disguise. Owned temporary HTTP
 acceptance is separate evidence. Recheck listeners/PIDs before relying on
 historical running-app identities.
+
+## Conformance parity banks (2026-10-24, cloud container)
+
+Petri alignments (all six search variants), DFG classic and forward/backwards
+token replay are bound to three black-box banks by
+`minera_conformance_parity_contracts_tests`; see "Conformance parity bank
+evidence" in the parity doc for the contract, the reference semantics found
+and the open items. Regenerate the fixture with
+`python scripts/generate-conformance-parity-fixture.py <the three docs/*-bank.json.gz> --output src/backend/tests/conformance_parity_reference_cases.inc`.
+Next: bind the captured process-tree and decomposed observations, and the
+forward `consider_activities_not_in_model_in_fitness` cross-trace effect.
+`minera_petri_analysis_tests` segfaults in `positive_invariant_diagnostics`
+on this branch (code not touched here; not yet checked on main).
