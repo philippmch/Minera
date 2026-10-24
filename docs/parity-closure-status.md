@@ -17,7 +17,7 @@ TypeScript and Vite pass. Original native, frontend and HTTP harness failures
 remain retained with unchanged native expected outcomes. The log recipe's
 overstated prior-receipt audit timing is explicitly corrected and preserved;
 independent reconstruction found no replay. The three canonical modules remain
-partial with 201 strict open units across the full catalogue. See
+partial; 199 strict open units remain across the full catalogue. See
 [timestamp-filter-workflow.md](timestamp-filter-workflow.md) and its contracts.
 Rendered browser interaction remains unverified.
 
@@ -168,8 +168,14 @@ These are semantic module closures, including missing helper implementations
 and repairs. They do not complete their parent families. Detailed contracts
 and evidence limits are linked from each module's coverage record.
 
-Coverage is now **46 complete / 40 partial packages**, **226 complete / 161
-partial modules**, and **201 open strict coverage units**, down from 228.
+Alpha+ cleanup selection is resolved: boundary cleanup is deterministic, its
+exact support is enumerable, and two new disjoint public banks plus the
+earlier fixture fall inside it with every alternative observed. The Alpha+
+module and the Alpha package are complete; see "Alpha+ cleanup selection
+contract" in [reference-2.7.22-parity.md](reference-2.7.22-parity.md).
+
+Coverage is now **47 complete / 39 partial packages**, **227 complete / 160
+partial modules**, and **199 open strict coverage units**, down from 228.
 The machine-readable source of truth is
 [reference-2.7.22-coverage.json](reference-2.7.22-coverage.json).
 
@@ -203,9 +209,6 @@ The machine-readable source of truth is
   in elapsed time; the CLI now takes the same timing controls as the HTTP
   route. The module stays partial; see
   [ocdfg-wider-discovery-parity.md](ocdfg-wider-discovery-parity.md).
-- Resolve Alpha+ identity-dependent cleanup selection. The old 28/64 mismatch
-  count compares one reference process; both returned graph shapes occur in
-  the broader public captures, so it is not evidence of 28 incorrect models.
 - Keep all other partial rows, rendered UI, connector/platform, solver and
   performance requirements open until their own evidence supports closure.
 
