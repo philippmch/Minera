@@ -14,7 +14,59 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
-## Current continuation: full861 pandas timestamp API/UI acceptance — 2026-10-24
+## Current continuation: full732 Polars timestamp API/UI acceptance — 2026-10-24
+
+The pandas timestamp checkpoint below is on origin/main. The Polars half of
+the table timestamp family is now complete as well. Scope is unchanged:
+86 packages / 387 modules, 201 strict open units, 565 unentered queries; no
+catalogue row was promoted.
+
+ROOT Polars admission (`polars-timestamp-full732-admission-prepared-1/`) binds
+all 26 declared originals before any decode. The first run stopped before any
+output because the census assumed a fixed keyword order; that source revision
+and its log are preserved (`source-revision-1`, `...-admission-run-1.log`). The
+corrected census accepts any order of the required keywords and records it.
+Result: 732 distinct receipts, 229 frames / 503 errors (427 apply, 76 collect),
+26 eager / 706 lazy, 2 algorithm warnings, zero mutations. The independent
+mapper rebuilds the unchanged 11,579,792-byte vector oracle byte-exact (885
+frames). Report SHA256
+`76e3970ce6e3454c579e56c3a44379862e9de25b276ab8ee886755bee6bc3d9a`.
+
+Wire: `docs/polars-timestamp-original-call-workflow.md`. Descriptor
+`minera-polars-timestamp-original-call-v1` holds `source_kind`
+(DataFrame/LazyFrame) and ordered `keyword_entries`; any parameter dictionary
+uses the ordered binding vector for the four filters, while the helpers flatten
+it to one raw value. Lazy schema errors report `collect` with apply returned.
+Transport fixture: 3,426,683 bytes, SHA256
+`4097e4411063410c6a2513667cefffb2de2fca3ab99fd07ec0e6607f3ccad65e`.
+
+CTest run 1 left the two large Polars targets unbuilt (the new test missed the
+workbench JSON header and namespace); both logs are preserved. Run 2
+(`polars-timestamp-native-ctest-2.log`) passes all 8 timestamp suites,
+including 732 native + 732 direct + 732 owned HTTP Polars calls (53.5 s) and the
+pandas 861 bank. The pandas controls test assertion for a Polars-engine
+original call was updated because that call now reaches the Polars route.
+Server SHA256 `f5ba2af8c265249d7e152052625b0b1d225324b4ab83915eea4eae7384abd7a6`.
+Frontend: focused 27, TypeScript, Vite and full 204 files / 9,969 tests pass.
+Owned browser: 23 checks, 17 requests, 12 byte-exact downloads, including the
+naive-Datetime LazyFrame collect diagnostic and reordered-keyword import; four
+screenshots inspected. Report SHA256
+`e8229a7b1d2200c61fc93ab510c8b3555841ca8a8bb7f835ddedc0dfb44efff3`.
+
+An independent review agent was started on the Polars admission/transport
+scripts but stopped unfinished when work moved off this machine; no review
+result exists. ROOT review only, as for pandas.
+`docs/retained-polars-timestamp-original-call-checkpoint.jsonl.gz` (132,754
+bytes, SHA256 `4fa340bd707be63119cc38eb9ae7ca6a756b3ea8d7ee004116b91f35d7b4fd18`)
+embeds 44 OWN members and declares 29 external pins; manifest SHA256
+`a609914576a9ae35ef6b2c6e1a738c0b5575b11e446025cc95b31b8511e3bf6d`.
+
+Next: optionally run the independent review of both table timestamp admission
+and transport scripts; otherwise continue with the next open requirement below.
+The build/ evidence directories are gitignored and exist only on the owner's
+machine; the sealed checkpoints in docs/ carry their OWN members.
+
+## Previous checkpoint: full861 pandas timestamp API/UI acceptance — 2026-10-24
 
 The LOG timestamp checkpoint below is on origin/main. The
 next family is the table timestamp pair; pandas is done, Polars is next. Full
