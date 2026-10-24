@@ -655,8 +655,11 @@ class Replayer {
       const std::vector<std::optional<std::size_t>>& trace,
       std::vector<std::uint64_t>* executions = nullptr,
       bool stop_immediately_unfit = false,
-      bool walk_through_hidden_transitions = true,
+      bool /*walk_through_hidden_transitions*/ = true,
       TokenReplayTraceDiagnostics* diagnostics = nullptr) const {
+    // The reference backwards variation always walks silent transitions; its
+    // walk_through_hidden_trans parameter has no observable effect.
+    constexpr bool walk_through_hidden_transitions = true;
     Marking marking = initial_marking();
     BackwardsOutcome outcome;
     auto& counts = outcome.counts;
@@ -2317,12 +2320,15 @@ class Aligner {
     incidence_.resize(net_.transitions().size());
     for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
       std::unordered_map<std::size_t, double> column;
-      for (const std::size_t place : net_.transitions()[t].inputs) {
-        column[place] -= 1.0;
-      }
-      for (const std::size_t place : net_.transitions()[t].outputs) {
-        column[place] += 1.0;
-      }
+      const auto& transition = net_.transitions()[t];
+      const auto signed_weight = [](PetriArcWeight weight) {
+        const auto magnitude = static_cast<double>(weight.magnitude);
+        return weight.negative ? -magnitude : magnitude;
+      };
+      for (std::size_t k = 0; k < transition.inputs.size(); ++k)
+        column[transition.inputs[k]] -= signed_weight(transition.input_arc_weight(k));
+      for (std::size_t k = 0; k < transition.outputs.size(); ++k)
+        column[transition.outputs[k]] += signed_weight(transition.output_arc_weight(k));
       for (const auto& [place, coef] : column) {
         if (coef != 0.0) incidence_[t].emplace_back(place, coef);
       }
@@ -2345,6 +2351,15 @@ class Aligner {
     if (const auto cost = shortest_model_run(options, deadline, preflight_exhausted)) {
       reachable_ = true;
       empty_run_cost_ = *cost;
+    } else if (preflight_exhausted) {
+      // Silent cycles that pump tokens (weighted arcs) make the uniform-cost
+      // run unbounded; retry as A* over markings that can still reach the
+      // final marking by the marking equation.
+      preflight_exhausted = false;
+      if (const auto pruned = pruned_model_run(options, deadline, preflight_exhausted)) {
+        reachable_ = true;
+        empty_run_cost_ = *pruned;
+      }
     }
     reachability_exhausted_ = preflight_exhausted;
   }
@@ -3101,6 +3116,12 @@ class Aligner {
     std::size_t arcs = 0;
     bool invalid_cost = false;
     std::size_t queued_total = 0;
+    // Queued nodes carry their whole path. Unbounded nets whose discounted
+    // edge costs vanish with depth would otherwise exhaust memory long before
+    // the expansion budget; past this many stored path states the search
+    // gives up as capped.
+    constexpr std::size_t kStoredPathEntryCap = 5'000'000;
+    std::size_t stored_path_entries = 0;
     double goal_cost = std::numeric_limits<double>::infinity();
     std::vector<Node> goals;
     const auto move_key = [](const std::vector<AlignmentMove>& moves) {
@@ -3119,7 +3140,8 @@ class Aligner {
              std::chrono::duration<double>(Clock::now() - start_time).count() >=
                  options.max_time_seconds;
     };
-    while (!frontier.empty() && expanded < budget && !timed_out()) {
+    while (!frontier.empty() && expanded < budget && !timed_out() &&
+           stored_path_entries < kStoredPathEntryCap) {
       Node node = frontier.top();
       frontier.pop();
       const auto it_best = best.find(node.state);
@@ -3199,6 +3221,7 @@ class Aligner {
             if (child.cost >= old->second - 1e-9) {
               // Discounted equal-cost arrivals remain queued so depth tie
               // ordering can select the deeper pinned path.
+              stored_path_entries += child.path_states.size();
               frontier.push(std::move(child));
               ++queued_total;
               return;
@@ -3210,6 +3233,7 @@ class Aligner {
         } else if (child.cost > old->second + 1e-9) {
           return;
         }
+        stored_path_entries += child.path_states.size();
         frontier.push(std::move(child));
         ++queued_total;
       };
@@ -3350,6 +3374,63 @@ class Aligner {
     }
     exhausted = !frontier.empty();
     return std::nullopt;  // final marking unreachable: the net is not a sound WF-net
+  }
+
+  // shortest_model_run as an A* whose heuristic is the marking-equation bound
+  // on the visible transitions still to fire; markings from which the final
+  // marking is unreachable by the marking equation are dropped.
+  [[nodiscard]] std::optional<std::uint64_t> pruned_model_run(
+      const AlignmentOptions& options,
+      std::chrono::steady_clock::time_point deadline,
+      bool& exhausted) const {
+    const std::size_t tcount = net_.transitions().size();
+    std::vector<double> c(tcount, 0.0);
+    for (std::size_t t = 0; t < tcount; ++t) c[t] = net_.transitions()[t].silent() ? 0.0 : 1.0;
+    const auto bound = [&](const Marking& marking) -> std::optional<std::uint64_t> {
+      std::vector<std::vector<double>> a(marking.size(), std::vector<double>(tcount, 0.0));
+      std::vector<double> b(marking.size(), 0.0);
+      for (std::size_t p = 0; p < marking.size(); ++p) b[p] = double(final_[p] - marking[p]);
+      for (std::size_t t = 0; t < tcount; ++t)
+        for (const auto& [p, coef] : incidence_[t]) a[p][t] = coef;
+      const auto lp = solve_lp(std::move(a), std::move(b), c);
+      if (lp.aborted) return 0;
+      if (!lp.feasible) return std::nullopt;
+      return static_cast<std::uint64_t>(std::max(0.0, std::ceil(lp.objective - 1e-6)));
+    };
+    using Entry = std::tuple<std::uint64_t, std::uint64_t, Marking>;  // f, g, marking
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
+    std::unordered_map<Marking, std::uint64_t, MarkingHash> best{{initial_, 0}};
+    const auto start_bound = bound(initial_);
+    if (!start_bound) return std::nullopt;
+    frontier.push({*start_bound, 0, initial_});
+    const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
+                                                        : options.max_states;
+    std::size_t expanded = 0;
+    while (!frontier.empty() && expanded < budget) {
+      if (std::chrono::steady_clock::now() >= deadline) {
+        exhausted = true;
+        return std::nullopt;
+      }
+      ++expanded;
+      auto [f, cost, marking] = frontier.top();
+      frontier.pop();
+      const auto it = best.find(marking);
+      if (it != best.end() && cost > it->second) continue;
+      if (marking == final_) return cost;
+      for (std::size_t t = 0; t < tcount; ++t) {
+        if (!enabled(marking, t)) continue;
+        Marking next = fire(marking, t);
+        const std::uint64_t next_cost = cost + (net_.transitions()[t].silent() ? 0 : 1);
+        const auto found = best.find(next);
+        if (found != best.end() && found->second <= next_cost) continue;
+        const auto h = bound(next);
+        if (!h) continue;
+        best[next] = next_cost;
+        frontier.push({next_cost + *h, next_cost, std::move(next)});
+      }
+    }
+    exhausted = !frontier.empty();
+    return std::nullopt;
   }
 
   const PetriNet& net_;

@@ -439,11 +439,13 @@ void backward_contract_and_duplicate_labels() {
   expect_backwards_fitness_undefined(invalid_rows, net, options);
   consistent(log_of({{"a"}, {"a", "a"}}), net, options);
   const auto hidden = sequential(true);
+  // The reference backwards variation ignores walk_through_hidden_trans: the
+  // silent entry still fires and the visible steps replay without problems.
   options.walk_through_hidden_transitions = false;
   options.stop_immediately_unfit = true;
   row = replay_token_traces(log_of({{"a", "b"}}), hidden, options).front();
-  assert((row.activated_transitions == std::vector<std::size_t>{1}));
-  assert(row.replay_stopped && row.replayed_events == 1);
+  assert((row.activated_transitions == std::vector<std::size_t>{0, 1, 2}));
+  assert(!row.replay_stopped && row.replayed_events == 2);
   consistent(log_of({{"a", "b"}}), hidden, options);
 }
 

@@ -41,7 +41,13 @@ def parse_net(pnml):
             name = node.find(".//{*}text") if node.find(".//{*}text") is not None else node.find(".//text")
             transitions.append([node.attrib["id"], None if silent else name.text])
         elif kind == "arc":
-            arcs.append([node.attrib["source"], node.attrib["target"]])
+            arc = [node.attrib["source"], node.attrib["target"]]
+            weight = [t for t in node.iter() if local(t.tag) == "inscription"]
+            if weight:  # only non-unit weights are kept, as a third element
+                value = int([t for t in weight[0].iter() if local(t.tag) == "text"][0].text)
+                if value != 1:
+                    arc.append(value)
+            arcs.append(arc)
     for marking in root.iter():
         if local(marking.tag) == "finalmarkings":
             for place in marking.iter():
@@ -56,7 +62,7 @@ def parse_net(pnml):
     # Element order follows generated identifiers, so it is canonicalized.
     return dict(places=sorted(places),
                 transitions=sorted([[rename[n], l] for n, l in transitions]),
-                arcs=sorted([[rename.get(s, s), rename.get(t, t)] for s, t in arcs]),
+                arcs=sorted([[rename.get(a[0], a[0]), rename.get(a[1], a[1])] + a[2:] for a in arcs]),
                 initial=sorted(initial.items()), final=sorted(final.items())), rename
 
 
@@ -136,11 +142,16 @@ def main():
                 summary[key] = summary.get(key, 0) + 1
                 merged.append({"stable": distinct[0]} if stable else {"unstable": distinct})
             observations[family] = merged if per_trace else merged[0]
-        cases.append(dict(name=base["name"], tree=base["tree"], traces=base["traces"],
-                          dfg=base["dfg"], net=nets[0][0], observations=observations))
+        case = dict(name=base["name"], tree=base["tree"], traces=base["traces"],
+                    dfg=base["dfg"], net=nets[0][0], observations=observations)
+        if "costs" in base:  # net corpus: frozen ids, so costs need no renaming
+            case["kind"] = base["kind"]
+            case["costs"] = base["costs"]
+        cases.append(case)
     payload = dict(reference_version=first["reference_version"],
                    reference_commit=first["reference_commit"], runtime=first["runtime"],
                    python=first["python"], seed=first["seed"],
+                   corpus=first.get("corpus", "trees"),
                    runs=[dict(source=run["source"], hash_seed=run["hash_seed"],
                               permutation=run.get("permutation", 0)) for run in runs],
                    summary=summary, cases=cases)

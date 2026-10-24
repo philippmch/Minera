@@ -123,9 +123,9 @@ are reconciled.
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial (remaining replay proof)** — native place/transition/arc usage deltas, supplied-PNML CLI input, explicit markings including zero-valued key metadata, selectors, weighted/extended arcs, color helpers, and token-flood cleaning have registered coverage; partial hidden routes and replay limits have public evidence, while resource-unresolved models remain outside the comparison proof |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Complete** — module and dispatcher contracts cover all seven public functions, eight apply parameters, typed labels, signed controls, EventLog/EventTable adapters, diagnostics and RNG continuation; exact proofs and reviewed ordering distinctions are recorded in `docs/bose-parity-contract.md` |
-| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Partial (implemented core; proof pending)** — all six variants are explicitly selectable; less-memory Dijkstra with legacy unit costs is the generic default, with named event activity fields available at replay time |
-| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors |
-| Conformance: replay | forward token replay and backwards token replay | **Partial (duration support complete; replay proof pending)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, while exact routing/flood-cleaning and root-cause support remain pending |
+| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete for the six search variants (log enrichment pending)** — all six variants are explicitly selectable and `align_petri_trace` reproduces the reference per-trace cost, best-worst cost, fitness, unreachable-marking and error behavior, including cost functions, arc-weight handling and the less-memory pruning, against three black-box banks (see "Conformance parity bank evidence"); less-memory Dijkstra with legacy unit costs remains the generic default of `check_alignment` |
+| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors; DFG classic is bound to the conformance parity banks (alignment, cost and visited states), while process-tree and decomposed results are captured there but not yet bound |
+| Conformance: replay | forward token replay and backwards token replay | **Partial (duration support complete; replay proof pending)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, while root-cause support remains pending; forward and backwards replay rows, including routing and flood cleaning under each public option, are bound to the conformance parity banks except forward `consider_activities_not_in_model_in_fitness`, an open cross-trace divergence |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
@@ -1276,6 +1276,87 @@ separately exercises the classic and extended equations, workflow validation,
 the full Woflan pipeline, all three marking graphs, graph edges, structural
 pairs, invariant bases, S-components, and uniform and weighted invariants. Exact
 selector and module proofs tie those cases to distinct public declarations.
+
+## Conformance parity bank evidence
+
+Petri-net alignments, DFG alignment and forward/backwards token replay are
+bound to black-box captures of the pinned reference in
+`src/backend/tests/test_conformance_parity_contracts.cpp`
+(`minera_conformance_parity_contracts_tests`). Three banks feed the generated
+fixture `conformance_parity_reference_cases.inc`:
+
+- `docs/reference-2.7.22-conformance-parity-bank.json.gz`: 60 seeded random
+  process trees converted to workflow nets, 9 traces each.
+- `docs/reference-2.7.22-conformance-parity-nets-bank.json.gz`: 40 nets
+  discovered by the alpha, heuristics and ILP miners plus nets with duplicate
+  labels (frozen in `docs/reference-2.7.22-conformance-parity-nets.json.gz`),
+  with random model, sync and trace cost functions.
+- `docs/reference-2.7.22-conformance-parity-external-bank.json.gz`: the
+  weighted silent-pump and noisy heuristics nets from the quality-metrics
+  fixtures (`docs/reference-2.7.22-conformance-parity-external-nets.json.gz`).
+
+Each bank merges independent captures under different `PYTHONHASHSEED` values
+and PNML element orders (`scripts/capture-conformance-parity-reference.py`,
+`scripts/merge-conformance-parity-reference.py`,
+`scripts/generate-conformance-parity-fixture.py`). The contract:
+
+- Where every run agreed, native must equal the reference; where runs differ,
+  native must equal one of the observed values. Calls the reference could not
+  finish within the capture time limit bind nothing.
+- Petri enum variants bind cost, best-worst cost and fitness exactly, plus no
+  alignment (unreachable final marking) and the discounted variant's error.
+  The returned alignment must be a valid run of the net whose cost under the
+  variant's cost function is the reported cost. Which of several equally
+  cheap alignments is returned is a reference tie choice that changes with
+  hash seed and PNML order, so it is not bound.
+- The reference discounted A* is not always optimal. Where native differs
+  from it, native must be no more expensive than every observed run.
+- Generators bind the cost and require every reference alignment to be among
+  the native ones, unless either side stopped at its 64-alignment limit.
+- DFG classic binds the alignment, cost and visited-state count.
+- Replay binds every per-trace row (fitness, activated transitions, problems,
+  enabled transitions, reached marking, token counters) for the default
+  options and each public option toggled, except
+  `consider_activities_not_in_model_in_fitness`, below.
+
+Reference semantics established black-box and implemented natively:
+
+- fitness = 1 - floor(cost / 10000) / floor(bwc / 10000), 0 when the
+  denominator is 0. bwc is the variant's cost for the empty trace plus 10000
+  per event, or plus the supplied trace costs. Less-memory adds only supplied
+  trace costs; discounted reports the sum of supplied trace costs (0 by
+  default) and always searches with unit costs discounted by 2^-index,
+  ignoring cost functions.
+- Less-memory charges a silent move 1 only when a visible transition whose
+  label occurs in the trace has all of its input places among the silent
+  transition's input places (an empty preset included), else 0. Its generator
+  charges 1. Both run a pruned Dijkstra over (marking, trace position) that
+  skips a marking already closed at the same or a later position; this is not
+  always optimal and the reference reports the pruned cost.
+- Every variant except less-memory and its generator reads each ordinary arc
+  as weight 1. Less-memory honors arc weights, which lets silent cycles pump
+  tokens; the reference then usually does not terminate.
+- Unreachable final marking: enum variants return no alignment, generators an
+  empty list, discounted raises.
+- Backwards replay ignores `walk_through_hidden_trans`.
+- Replay orders routing candidates and the enabled-transition worklist by
+  transition and place name, so callers must pass the PNML ids as
+  `TokenReplayOptions::transition_names` and `place_names`.
+
+Reference nondeterminism: equal-cost alignment choice, generator enumeration
+order, search counters, discounted costs on some nets and forward-replay
+silent routing on nets with competing silent paths (25 of 30 rows of the
+noisy heuristics net vary with the hash seed) all change between runs.
+
+Open divergences:
+
+- Forward replay with `consider_activities_not_in_model_in_fitness=True`
+  marks some traces unfit depending on other traces of the same log, a
+  cross-trace effect native does not reproduce. Forward replay stays partial.
+- Process-tree alignments (search graph, dynamic programming, MILP,
+  approximated) and decomposed `RECOMPOS_MAXIMAL` are captured in the banks
+  but not yet bound; costs and fitness match for the search-graph variant,
+  alignments do not.
 
 ## XES importer-variant evidence
 
