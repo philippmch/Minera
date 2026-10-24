@@ -820,8 +820,24 @@ ReplayFitnessResult evaluate_replay_fitness(
     out.fitting_traces = out.alignment_result.fitting_traces;
     out.total_cost = out.alignment_result.total_cost;
     double average = 0.0;
-    for (const auto& alignment_variant : out.alignment_result.variants) {
-      average += alignment_variant.fitness * double(alignment_variant.count);
+    if (alignment_options.cost_profile == AlignmentCostProfile::kStandard) {
+      // The reference evaluator scores each trace on whole standard moves:
+      // 1 - floor(cost / 10000) / floor(best-worst / 10000), so silent-move
+      // epsilons never lower a trace below unit fitness. A trace whose
+      // best-worst cost has no whole standard move scores zero. Log fitness
+      // keeps the raw summed costs.
+      out.fitting_traces = 0;
+      for (const auto& alignment_variant : out.alignment_result.variants) {
+        const double worst = std::floor(alignment_variant.worst_cost / 10000.0);
+        const double fitness =
+            worst > 0.0 ? 1.0 - std::floor(alignment_variant.cost / 10000.0) / worst : 0.0;
+        average += fitness * double(alignment_variant.count);
+        if (fitness == 1.0) out.fitting_traces += alignment_variant.count;
+      }
+    } else {
+      for (const auto& alignment_variant : out.alignment_result.variants) {
+        average += alignment_variant.fitness * double(alignment_variant.count);
+      }
     }
     out.average_trace_fitness = average / double(out.trace_count);
     if (!out.computed) {
@@ -1278,6 +1294,32 @@ StopAlignmentResult align_to_stop_prefix(const PetriNet& net,
   return result;
 }
 
+// Align-ETConformance observes prefix states in which every ordinary output
+// arc produces a single token, while input arcs keep their weights (observed on
+// the pinned public evaluator with weighted arcs). Repeated output endpoints
+// therefore also collapse to one produced token.
+PetriNet unit_output_net(const PetriNet& net) {
+  PetriNet copy = net;
+  for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+    const auto& transition = net.transitions()[index];
+    std::vector<PetriArcWeight> outputs;
+    std::set<std::size_t> seen;
+    bool changed = false;
+    for (std::size_t arc = 0; arc < transition.outputs.size(); ++arc) {
+      const auto weight = transition.output_arc_weight(arc);
+      if (weight.negative || weight.magnitude == 0) {
+        outputs.push_back(weight);
+        continue;
+      }
+      const bool first = seen.insert(transition.outputs[arc]).second;
+      outputs.push_back({first ? 1 : 0, false});
+      changed = changed || !first || weight.magnitude != 1;
+    }
+    if (changed) copy.set_ordinary_arc_weights(index, transition.input_weights, std::move(outputs));
+  }
+  return copy;
+}
+
 PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net,
                                          PrecisionVariant variant,
                                          const PrecisionOptions& options) {
@@ -1397,6 +1439,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
   }
 
   if (variant == PrecisionVariant::ALIGN_ETCONFORMANCE) {
+    const auto prefix_net = unit_output_net(net);
     const auto prefixes = collect_prefixes(log, activity_attribute);
     double enabled_total = 0.0;
     double escaping_total = 0.0;
@@ -1407,7 +1450,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
         markings.push_back(initial_marking);
       } else {
         auto stop = align_to_stop_prefix(
-            net, prefix, initial_marking, options.max_states);
+            prefix_net, prefix, initial_marking, options.max_states);
         if (!stop.computed) {
           out.computed = false;
           out.exhausted = stop.exhausted;
@@ -1420,7 +1463,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
       std::set<std::string> available;
       for (const auto& marking : markings) {
         std::set<std::string> local;
-        if (!enabled_labels(net, marking, options.max_states, false, local)) {
+        if (!enabled_labels(prefix_net, marking, options.max_states, false, local)) {
           out.computed = false;
           out.exhausted = true;
           out.error = "silent closure state cap exceeded";
@@ -1529,7 +1572,30 @@ PrecisionResult evaluate_precision(const EventLog& l, const PetriNet& n,
 PrecisionResult evaluate_precision(const EventLog& log, const PnmlDocument& document,
                                    PrecisionVariant variant, const PrecisionOptions& options) {
   auto supplied = options;
-  if (!inherit_document_token_markings(document, supplied)) {
+  if (variant != PrecisionVariant::ETCONFORMANCE_TOKEN) {
+    // Alignment-based (and automatically dispatched) precision searches use
+    // native int markings, as replay fitness does for its alignment variants.
+    const auto set_marking = [&](const TokenMarking& marking, auto& legacy, const auto& exact) {
+      if (exact || !legacy.empty()) return true;
+      for (const auto value : marking) {
+        if (value < 0 || value > std::numeric_limits<int>::max()) return false;
+        legacy.push_back(static_cast<int>(value));
+      }
+      return true;
+    };
+    if (!set_marking(document.initial_marking, supplied.initial_marking,
+                     supplied.exact_initial_marking) ||
+        !set_marking(document.final_marking, supplied.final_marking,
+                     supplied.exact_final_marking)) {
+      PrecisionResult out;
+      out.variant = variant;
+      out.computed = false;
+      out.error = "PNML marking exceeds alignment token range";
+      return out;
+    }
+    if (supplied.place_names.empty()) supplied.place_names = document.place_ids;
+    if (supplied.transition_names.empty()) supplied.transition_names = document.transition_ids;
+  } else if (!inherit_document_token_markings(document, supplied)) {
     PrecisionResult out;
     out.variant = variant;
     out.computed = false;

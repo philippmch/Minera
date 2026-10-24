@@ -47,8 +47,8 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 46
-complete and 40 partial dispatcher rows, plus 199 complete and 188 partial
+adapter, integration, or missing are complete. The current manifest records 47
+complete and 39 partial dispatcher rows, plus 228 complete and 159 partial
 non-dispatcher module rows. The completed module group covers the implemented
 simulation, core transformation, Petri-analysis, organizational, statistical
 DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
@@ -56,7 +56,7 @@ POWL discovery, 13-module footprints discovery/conformance, and the 19-module
 temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
 classic Declare/log-skeleton discovery and conformance, with distinct
 registered tests, plus the replay-duration diagnostic support module and the
-backwards token-replay variation and CLASSIC heuristic discovery; 228 coverage
+backwards token-replay variation and CLASSIC heuristic discovery; 198 coverage
 units still require exact proof.
 A release may
 additionally run the strict gate:
@@ -140,7 +140,7 @@ are reconciled.
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete** — view-based transition systems cover sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, occurrence data, flat and trace inputs, and explicit activity/case selectors; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum log/dataframe/lazyframe connected and disconnected projections; batches | **Complete** — strict native temporal discovery and permissive bundled analysis, all six canonical spectrum projections with adapter-specific sampling and timestamp behavior, all three batch adapters and five classifications, and every activity/resource/time/case/event selector have registered native plus production integration contracts |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
-| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (independent distance and DFG-precision modules complete)** — the stochastic-language distance selector and standalone DFG precision evaluator now have registered implementation and contract proofs, including their flat/lazy input and option semantics; the shared replay, alignment-precision, generalization, simplicity, and composite packages remain partial while their downstream conformance dependencies are audited variation by variation |
+| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (simplicity, token precision, distance and DFG precision complete)** — a 163-case black-box equivalence suite against the pinned public evaluators proves all three simplicity variants and token precision exactly; replay fitness, generalization, and the composite agree everywhere except two listed dependency gaps (token-replay hidden routing on one heuristics net, and native alignment search exhaustion on an unbounded silent pump); alignment and automaton precision follow the reference search's tie order between equally cheap alignments and remain open (see *Evaluation black-box equivalence*) |
 | Label splitting | contextual | **Partial (implemented core; proof pending)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
 | Merging | case relations | **Partial (implemented core; proof pending)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Complete** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) have native/JSON/CLI/server/frontend adapters; focused contracts prove LOG/PANDAS adapters, custom selectors, diagnostics, common role records, and all eight SNA selectors |
@@ -3313,6 +3313,53 @@ deterministically. The accelerated setting normalizes unequal positive totals,
 whereas strict or fallback execution retains the equal-total precondition;
 normalization is reported in the result. The selected variant and execution
 mode are carried through native, JSON, CLI, server, and typed frontend contracts.
+
+### Evaluation black-box equivalence
+
+`scripts/capture-evaluation-reference.py` builds a deterministic corpus of 163
+log/model pairs: 14 hand-built nets (sequence, choice, parallelism, silent
+loops and skips, duplicate labels, an unsound dead branch, weighted arcs, a
+flower, multi-token markings, and an unbounded silent pump) against fitting,
+noisy, and looping logs, plus inductive, alpha, and heuristics nets discovered
+from twelve generated process trees with clean and noise-injected logs. For each
+pair it records every public replay-fitness, precision, generalization,
+simplicity, and composite selector (and both automatic dispatchers) from the
+pinned release, together with the reference PNML export. Each case runs twice in
+fresh processes; a value that differs between them is recorded as
+nondeterministic, and a call over 30 seconds as unresolved, rather than as an
+expectation. The capture is `docs/evaluation-reference-fixtures.json`;
+`scripts/generate-evaluation-reference-tests.py` turns it into
+`src/backend/tests/evaluation_reference_cases.inc`, and
+`minera_evaluation_reference_equivalence_tests` imports each PNML with public
+marking semantics, replays the same traces, and compares every number (or the
+rejection) within 1e-9 relative tolerance.
+
+Results: arc-degree, extended Cardoso, and extended cyclomatic simplicity (163,
+163, and 148 cases) and token precision (160 cases) agree exactly. Token and
+alignment replay fitness, the fitness dispatcher, generalization, and the
+composite agree on every case except two listed divergences, which the suite
+asserts so the list cannot go stale: forward token replay routes hidden
+transitions differently on one heuristics net (owned by token replay), and on
+the unbounded silent pump every native alignment variant exhausts its state
+budget where the reference returns the optimal alignment (owned by the
+alignment engines).
+
+The suite fixed three evaluator divergences. Alignment fitness scores each
+trace on whole standard moves, `1 - floor(cost / 10000) / floor(bwc / 10000)`,
+so silent-move costs never make a trace unfit, and a trace with no whole
+best-worst move scores zero; log fitness keeps the raw summed costs.
+Alignment-based precision on a PNML document now uses its markings as native
+alignment markings instead of rejecting them. Align-ETConformance observes
+prefix states in which each ordinary output arc produces one token while input
+arcs keep their weights.
+
+Alignment and automaton precision remain open. Both score markings from one
+optimal (prefix) alignment, and the reference picks among equally cheap
+alignments by its search order: for example, it projects both `A,B,C` and
+`A,C,B` on an `A` then `B`-or-`C` net to `A,B`, yet completes `A,X` with a
+model move on `C`. Placement of silent moves is affected the same way. The
+suite reports their agreement (154/160 and 112/161) without asserting it until
+that order is characterized.
 
 ## PNML document export evidence
 

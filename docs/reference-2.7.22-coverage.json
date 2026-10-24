@@ -3781,8 +3781,93 @@
           "symbol": "EXTENDED_CYCLOMATIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py"
+      ],
+      "proofs": {
+        "SIMPLICITY_ARC_DEGREE": {
+          "selector": "SIMPLICITY_ARC_DEGREE",
+          "binding": {
+            "selector": "SIMPLICITY_ARC_DEGREE",
+            "modules": [
+              "algo.evaluation.simplicity.variants.arc_degree"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "SIMPLICITY_ARC_DEGREE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "SimplicityVariant::ARC_DEGREE"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "simplicity_arc_degree_equivalence"
+            }
+          ]
+        },
+        "EXTENDED_CARDOSO": {
+          "selector": "EXTENDED_CARDOSO",
+          "binding": {
+            "selector": "EXTENDED_CARDOSO",
+            "modules": [
+              "algo.evaluation.simplicity.variants.extended_cardoso"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "EXTENDED_CARDOSO"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "SimplicityVariant::EXTENDED_CARDOSO"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "simplicity_extended_cardoso_equivalence"
+            }
+          ]
+        },
+        "EXTENDED_CYCLOMATIC": {
+          "selector": "EXTENDED_CYCLOMATIC",
+          "binding": {
+            "selector": "EXTENDED_CYCLOMATIC",
+            "modules": [
+              "algo.evaluation.simplicity.variants.extended_cyclomatic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "EXTENDED_CYCLOMATIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "SimplicityVariant::EXTENDED_CYCLOMATIC"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "simplicity_extended_cyclomatic_equivalence"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.label_splitting",
@@ -11192,8 +11277,32 @@
           "selector": "ETCONFORMANCE_TOKEN"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.precision.variants.etconformance_token",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "PrecisionVariant::ETCONFORMANCE_TOKEN"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+            "executable": "minera_evaluation_reference_equivalence_tests",
+            "case": "precision_etconformance_token_equivalence"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.replay_fitness.variants.alignment_based",
@@ -11315,8 +11424,32 @@
           "selector": "EXTENDED_CYCLOMATIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.simplicity.variants.extended_cyclomatic",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "SimplicityVariant::EXTENDED_CYCLOMATIC"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+            "executable": "minera_evaluation_reference_equivalence_tests",
+            "case": "simplicity_extended_cyclomatic_equivalence"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.common.attributes.attributes_common",

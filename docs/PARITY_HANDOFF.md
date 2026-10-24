@@ -14,6 +14,20 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Model quality metrics equivalence — 2026-10-24
+
+Fresh black-box capture from the cloud container (pip-installed pinned
+release), no retained bank reused. `docs/evaluation-reference-fixtures.json`
+holds 163 log/model pairs captured twice each;
+`minera_evaluation_reference_equivalence_tests` compares every evaluator.
+Simplicity (all three) and token precision are now complete. Fitness,
+generalization and composite agree except two asserted dependency gaps
+(token-replay hidden routing on `seed7_heuristics_noisy`; alignment search
+exhaustion on the unbounded `weighted_silent` net). Alignment and automaton
+precision depend on the reference's tie order among equally cheap alignments
+and stay open; next step is characterizing that order. Details: *Evaluation
+black-box equivalence* in `docs/reference-2.7.22-parity.md`.
+
 ## Current continuation: full342 LOG timestamp API/UI acceptance — 2026-10-24
 
 All13 original LOG timestamp functions now have an original-call API and a
