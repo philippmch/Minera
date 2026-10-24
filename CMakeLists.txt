@@ -180,6 +180,7 @@ add_library(minera_core
   src/backend/embeddings.cpp
   src/backend/event_data.cpp
   src/backend/edit_distance_alignment.cpp
+  src/backend/petri_trace_alignment.cpp
   src/backend/evaluation.cpp
   src/backend/event_ordering.cpp
   src/backend/eventually_follows.cpp
@@ -634,6 +635,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_inductive_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_inductive_parity_contracts_tests
            COMMAND minera_inductive_parity_contracts_tests)
+
+  add_executable(minera_conformance_parity_contracts_tests
+    src/backend/tests/test_conformance_parity_contracts.cpp
+  )
+  target_link_libraries(minera_conformance_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_conformance_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_conformance_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_conformance_parity_contracts_tests
+           COMMAND minera_conformance_parity_contracts_tests)
 
   add_executable(minera_xes_io_tests
     src/backend/tests/test_xes_io.cpp
