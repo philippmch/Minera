@@ -105,3 +105,13 @@ This finite checkpoint does not establish arbitrary pandas extension/object
 classes, duplicate/non-string dataframe column labels, unobserved timezone
 replacement behavior, every parser spelling, unsupported MultiIndex variants,
 or every warning-producing input. Those remain explicit canonical-module gaps.
+
+## Original-call API and workflow
+
+All 861 retained calls are also reachable through the original-call mode of
+`/api/reference-table-timestamp` and the rendered table timestamp workspace;
+see `pandas-timestamp-original-call-workflow.md`. The transport fixture is
+generated only after ROOT re-binds every admitted original and rebuilds the
+unchanged native oracle. All 302 tables and 559 diagnostics agree natively,
+through the direct workbench and over owned HTTP. This adds no reference
+observations and does not change the partial module status.
