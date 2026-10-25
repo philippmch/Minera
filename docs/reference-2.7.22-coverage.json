@@ -9154,8 +9154,30 @@
           "selector": "MILP"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_milp_reference.hpp",
+        "src/backend/process_tree_milp_reference.cpp",
+        "src/backend/tests/test_process_tree_milp_parity.cpp",
+        "scripts/capture-process-tree-milp-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.process_tree.variants.milp",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_milp_reference.hpp",
+            "symbol": "reference_milp_alignments"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_milp_parity.cpp",
+            "executable": "minera_process_tree_milp_parity_tests",
+            "case": "milp_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.process_tree.variants.search_graph_pt",

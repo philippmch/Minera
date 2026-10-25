@@ -176,6 +176,18 @@ preorder leaf list there and uses `apply` only on trees with unique labels.
 The annotation rule was corrected: per alignment, ENABLED counts, or OPEN
 counts when there is no ENABLED assignment.
 
+## Process-tree MILP variant — 2026-10-25
+
+Bank `docs/process-tree-milp-bank.txt.gz` (300 trees, 1,500 traces, graphs,
+programs, CBC solutions and `apply` results) passes in
+`minera_process_tree_milp_parity_tests` (about 14 s) through
+`include/minera/process_tree_milp_reference.hpp`. Graph, programs and
+solution extraction are exact; the native branch and bound matches costs and
+fitness within 1e-6 (68 of 1,460 optima tie to another alignment). Module
+`...process_tree.variants.milp` promoted. Infeasible programs (empty trace,
+root loop with a tau do) throw natively where the reference reports CBC
+leftovers. Remaining in the package: APPROXIMATED_ORIGINAL and its utils.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

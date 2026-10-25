@@ -1420,8 +1420,8 @@ on root loops with a tau body and uses it as the fitness floor; the
 approximated variant splits traces over subtrees by its activity-set
 heuristic, while native splits optimally. Reference alignments of the DP,
 MILP and approximated variants omit silent and some model moves and are not
-bound here (the search-graph variant is matched exactly by the reference port
-below).
+bound by these tallies (the search-graph and MILP variants are matched by the
+reference ports below).
 
 ### Search-graph variant, replay semantics and frequency annotation
 
@@ -1485,6 +1485,44 @@ Reference behaviour found by probing (the header lists the full rules):
 The replay covers the four operators SEARCH_GRAPH_PT aligns (binary loops).
 The older native `align_process_tree` keeps its optimal search for the CLI
 and server; the contract tallies above still bind it.
+
+### MILP variant
+
+`include/minera/process_tree_milp_reference.hpp` ports
+`ProcessTreeAligner` of `variants/milp` as observed from its inputs and
+outputs: the flow graph built from the tree, the mixed-integer program handed
+to `pm4py.util.lp.solver`, the alignment read back from a solution, and
+`apply`. `scripts/capture-process-tree-milp-bank.py` captures 300 random trees
+(the empty trace plus 4 random traces each, 1500 traces, hash seeds 0 to 3)
+into `docs/process-tree-milp-bank.txt.gz`, and
+`minera_process_tree_milp_parity_tests` checks:
+
+- the graph (nodes with source/sink/split/join flags, inverse capacities and
+  shuffle groups; edges in networkx order with labels, capacities and costs)
+  exactly for all 300 trees;
+- every one of the 1180 distinct programs exactly (objective, bounds,
+  integrality, equality and inequality rows and right-hand sides);
+- the alignment and cost extracted from the reference's own solution exactly
+  (1166 solutions);
+- the native solver's optimum against the reported cost within 1e-6 on 1460
+  traces, with a well-formed alignment of the same length; 1392 give the same
+  alignment and 68 sync other events at the same optimal cost;
+- `align`'s cache (298 repeated traces need no solve), the 33 programs without
+  variables (a tau root, cost None) and the 7 infeasible programs;
+- `apply` on 1430 traces: costs and fitness within 1e-6, the 11 trees where
+  the reference raises (a tau root, where the empty trace's None cost meets
+  arithmetic), and the 3 trees whose fitness floor comes from an infeasible
+  empty-trace program.
+
+The rules are in the header comment. The native solver is a dependency-free
+best-first branch and bound over a bounded primal simplex; tying every flow
+of a shuffle-group row to its share of the group's binary keeps the
+relaxations tight (the gap drops from about 10% to about 1%) and the bank runs
+in about 14 s. Divergences: CBC reports values to about 1e-8, so costs and
+fitness are bound within 1e-6; optimal ties may pick another alignment; and an
+infeasible program (the empty trace on a root loop with a tau do) makes the
+reference report whatever CBC left behind, where native throws. The older
+native `MILP` selector keeps its exact residual search for the CLI and server.
 
 ## XES importer-variant evidence
 
