@@ -148,31 +148,36 @@ EventTable table_of(const BankCase& item) {
   return table;
 }
 
-template <typename Source>
-std::string compare(const BankCase& item, const Source& source) {
-  const auto keys = keys_of(item);
-  const auto groups = outcome([&] { return json(organizational_groups_from_log(source, keys)); });
-  const auto res_act = outcome([&] {
-    const auto [by_resource, by_activity] = organizational_res_act_from_log(source, keys);
-    return "{\"t\":[" + json(by_resource) + "," + json(by_activity) + "]}";
-  });
-  const auto resources = outcome([&] { return json(organizational_resources_from_log(source, keys)); });
+std::string compare(const BankCase& item, const std::string& groups, const std::string& res_act,
+                    const std::string& resources) {
   if (groups != item.groups) return "groups " + groups + " expected " + item.groups;
   if (res_act != item.res_act) return "res_act " + res_act + " expected " + item.res_act;
   if (resources != item.resources) return "resources " + resources + " expected " + item.resources;
   return {};
 }
 
+std::string json(const std::pair<OrganizationalNested, OrganizationalNested>& res_act) {
+  return "{\"t\":[" + json(res_act.first) + "," + json(res_act.second) + "]}";
+}
+
 // The three functions on an EventLog.
 std::string check_log(const BankCase& item) {
   ++counts[0];
-  return compare(item, log_of(item));
+  const auto log = log_of(item);
+  const auto keys = keys_of(item);
+  return compare(item, outcome([&] { return json(organizational_groups_from_log(log, keys)); }),
+                 outcome([&] { return json(organizational_res_act_from_log(log, keys)); }),
+                 outcome([&] { return json(organizational_resources_from_log(log, keys)); }));
 }
 
 // The three functions on a DataFrame.
 std::string check_table(const BankCase& item) {
   ++counts[1];
-  return compare(item, table_of(item));
+  const auto table = table_of(item);
+  const auto keys = keys_of(item);
+  return compare(item, outcome([&] { return json(organizational_groups_from_log(table, keys)); }),
+                 outcome([&] { return json(organizational_res_act_from_log(table, keys)); }),
+                 outcome([&] { return json(organizational_resources_from_log(table, keys)); }));
 }
 
 }  // namespace
