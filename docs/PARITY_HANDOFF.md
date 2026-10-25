@@ -20,6 +20,12 @@ Thread "Close remaining discovery parity gaps" owns `algo.discovery.ilp`,
 `algo.discovery.genetic` and the interleavings util
 `merge_dataframe_rel_cases`. Other threads: please pick different packages.
 
+## In progress — filtering gaps (claimed 2026-10-25)
+
+Thread "Close remaining filter and log parity gaps" owns the partial
+`support:filtering` modules (`algo.filtering.{common,dfg,log,pandas,polars}.*`).
+Other threads: please pick different packages.
+
 ## Decision mining — 2026-10-25
 
 New bank `docs/decision-mining-bank.json.gz` (632 decision points, under a
