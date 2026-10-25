@@ -1,4 +1,6 @@
 #include "minera/polars_variants_filter.hpp"
+#include "polars_column_hint.hpp"
+#include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -103,6 +105,14 @@ std::string python_type(const EventAttribute& value) {
   if (real(value)) return "float";
   if (date(value)) return "datetime";
   return "str";
+}
+// The type name CPython's own TypeError and AttributeError messages print.
+std::string core_type(const EventAttribute& value) {
+  if (!collection(value) && !null(value) && date(value)) {
+    const auto* native = std::get_if<NativeDate>(&value.typed_value);
+    return (native ? native->value : value.value).size() == 10 ? "datetime.date" : "datetime.datetime";
+  }
+  return python_type(value);
 }
 
 
@@ -213,11 +223,11 @@ std::vector<EventAttribute> iter(const EventAttribute& value) {
   if(value.container==AttributeContainerKind::kContainer){std::vector<EventAttribute> keys;for(const auto& child:value.children)keys.push_back({"",child.key});return keys;}
   if(collection(value))return value.children;
   if(text(value)){std::vector<EventAttribute> chars;for(std::size_t i=0;i<value.value.size();){const auto c=static_cast<unsigned char>(value.value[i]);const auto n=c<0x80?1:c<0xe0?2:c<0xf0?3:4;chars.push_back({"",value.value.substr(i,n)});i+=n;}return chars;}
-  fail("TypeError","apply","'"+python_type(value)+"' object is not iterable");
+  fail("TypeError","apply","'"+core_type(value)+"' object is not iterable");
 }
 std::string join_type(const EventAttribute& value) {
   if(date(value)){const auto lexical=std::get_if<NativeDate>(&value.typed_value)?std::get<NativeDate>(value.typed_value).value:value.value;return lexical.size()==10?"datetime.date":"datetime.datetime";}
-  return python_type(value);
+  return core_type(value);
 }
 std::string join(const EventAttribute& sequence) {
   if(!collection(sequence)&&!text(sequence))fail("TypeError","apply","can only join an iterable");
@@ -228,7 +238,7 @@ std::string join(const EventAttribute& sequence) {
 std::vector<std::string> admitted(const EventAttribute& values){std::vector<std::string> result;for(const auto& sequence:iter(values))result.push_back(join(sequence));return result;}
 std::string contexts(const std::vector<std::string>& nodes){std::string out="\n\nThis error occurred with the following context stack:\n";for(std::size_t i=0;i<nodes.size();++i)out+="\t["+std::to_string(i+1)+"] '"+nodes[i]+"'\n";return out;}
 std::string sort_plan(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics){return "SORT BY [col("+quote(options.case_id_key.value)+"), col("+quote(statistics?options.timestamp_key.value:"time:timestamp")+")]\n  "+frame_plan(source);}
-std::string missing_prefix(const std::string& key,const std::vector<std::string>& columns){std::string out="unable to find column "+debug_quote(key)+"; valid columns: [";for(std::size_t i=0;i<columns.size();++i){if(i)out+=", ";out+=debug_quote(columns[i]);}out+=']';for(const auto& candidate:columns)if(!candidate.empty()&&candidate.size()<key.size()&&key.ends_with(candidate)&&5*candidate.size()>=2*(key.size()+candidate.size())){out+="\n\nDid you mean "+debug_quote(candidate)+'?';break;}return out;}
+std::string missing_prefix(const std::string& key,const std::vector<std::string>& columns){std::string out="unable to find column "+debug_quote(key)+"; valid columns: [";for(std::size_t i=0;i<columns.size();++i){if(i)out+=", ";out+=debug_quote(columns[i]);}out+=']';if (const auto hint = detail::polars_column_hint(key, columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';return out;}
 [[noreturn]] void missing(const EventTable& source,const std::string& key,bool activity,bool statistics,const PolarsVariantsFilterOptions& options,const std::string& phase,bool eager_source){
   if(eager_source){
     const auto prefix=missing_prefix(key,source.columns);
@@ -280,19 +290,28 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& opti
 EventTable collect(const EventTable& source,const std::vector<std::string>& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
   const auto groups=grouped(source,options,false,phase);std::unordered_map<std::string,bool> matches;
   for(const auto& group:groups.groups)matches.emplace(group.key,!group.absent&&std::find(labels.begin(),labels.end(),group.label)!=labels.end());
-  auto result=source;result.rows.clear();for(const auto& row:source.rows){const auto key=group_key(row[groups.case_at],groups.case_dtype);if(matches.at(key)==truth(options.positive))result.rows.push_back(row);}return result;
+  auto result=source;result.rows.clear();
+  // The kept case ids join back in sorted case order. An inner join whose
+  // source frame is no taller than that list yields the list's order, each
+  // case followed by its rows.
+  std::vector<std::string> kept;for(const auto& group:groups.groups)if(matches.at(group.key))kept.push_back(group.key);
+  if(truth(options.positive)&&source.rows.size()<=kept.size()){
+    for(const auto& key:kept)for(const auto& row:source.rows)if(group_key(row[groups.case_at],groups.case_dtype)==key)result.rows.push_back(row);
+    return result;
+  }
+  for(const auto& row:source.rows){const auto key=group_key(row[groups.case_at],groups.case_dtype);if(matches.at(key)==truth(options.positive))result.rows.push_back(row);}return result;
 }
 LazyEventTable lazy(const LazyEventTable& source,std::vector<std::string> labels,const PolarsVariantsFilterOptions& options){
   validate(options);return LazyEventTable(source.columns(),[source,labels=std::move(labels),options](const auto& consume){const auto result=collect(source.materialize(),labels,options,"collect");for(const auto& row:result.rows)consume(row);},source.attributes(),source.metadata(),std::nullopt,source.dtypes(),source.index(),source.categorical_dtypes());
 }
 bool py_equal(const Cell& a,const Cell& b){if(!a||null(*a))return !b||null(*b);if(!b||null(*b))return false;if((integer(*a)||boolean(*a))&&(integer(*b)||boolean(*b)))return exact(*a)==exact(*b);if((real(*a)||integer(*a)||boolean(*a))&&(real(*b)||integer(*b)||boolean(*b)))return number(*a)==number(*b);if(date(*a)&&date(*b))return compare(a,b,Dtype::kDate)==0;return text(*a)&&text(*b)?a->value==b->value:a==b;}
 bool py_less(const Cell& a,const Cell& b){
-  if(!a||null(*a)||!b||null(*b))fail("TypeError","apply","'<' not supported between instances of '"+std::string(!a||null(*a)?"NoneType":python_type(*a))+"' and '"+std::string(!b||null(*b)?"NoneType":python_type(*b))+"'");
+  if(!a||null(*a)||!b||null(*b))fail("TypeError","apply","'<' not supported between instances of '"+std::string(!a||null(*a)?"NoneType":core_type(*a))+"' and '"+std::string(!b||null(*b)?"NoneType":core_type(*b))+"'");
   if((integer(*a)||boolean(*a))&&(integer(*b)||boolean(*b)))return exact(*a)<exact(*b);
   if((real(*a)||integer(*a)||boolean(*a))&&(real(*b)||integer(*b)||boolean(*b)))return number(*a)<number(*b);
   if(text(*a)&&text(*b))return a->value<b->value;
   if(date(*a)&&date(*b))return compare(a,b,Dtype::kDate)<0;
-  fail("TypeError","apply","'<' not supported between instances of '"+python_type(*a)+"' and '"+python_type(*b)+"'");
+  fail("TypeError","apply","'<' not supported between instances of '"+core_type(*a)+"' and '"+core_type(*b)+"'");
 }
 bool tuple_less(const std::vector<Cell>& a,const std::vector<Cell>& b){for(std::size_t i=0;i<std::min(a.size(),b.size());++i){if(py_equal(a[i],b[i]))continue;return py_less(a[i],b[i]);}return a.size()<b.size();}
 struct Variant{std::vector<Cell> activities;std::size_t count=0;};
@@ -321,16 +340,15 @@ std::vector<std::string> top_labels(const EventTable& source,const EventAttribut
   const auto count=variants.size();std::size_t take=count;
   if(integer(maximum)||boolean(maximum)){const auto k=exact(maximum);if(k<TokenInteger(count)){const auto length=k<TokenInteger(0)?TokenInteger(count)+k:k;take=length<TokenInteger(0)?0:static_cast<std::size_t>(length);}}
   else if(real(maximum)){if(!(static_cast<double>(count)<number(maximum)))fail("TypeError","apply","slice indices must be integers or None or have an __index__ method");}
-  else fail("TypeError","apply","'<' not supported between instances of 'int' and '"+python_type(maximum)+"'");
+  else fail("TypeError","apply","'<' not supported between instances of 'int' and '"+core_type(maximum)+"'");
   std::vector<std::string> result;
   for(std::size_t i=0;i<take;++i){EventAttribute sequence;sequence.container=AttributeContainerKind::kTuple;for(const auto& cell:variants[i].activities){EventAttribute value;if(cell)value=*cell;else value.is_null=true;sequence.children.push_back(std::move(value));}result.push_back(join(sequence));}return result;
 }
 std::vector<PolarsVariantsFilterParameter> parameters(const EventAttribute& value){
   if(null(value))return {};
   if(value.container==AttributeContainerKind::kContainer){std::vector<PolarsVariantsFilterParameter> result;for(const auto& child:value.children)result.push_back({child.key,child,false});return result;}
-  if(value.container==AttributeContainerKind::kList){if(value.children.empty())return {};fail("TypeError","apply","list indices must be integers or slices, not str");}
-  if(text(value))fail("TypeError","apply","string indices must be integers, not 'str'");
-  fail("TypeError","apply","'"+python_type(value)+"' object is not iterable");
+  detail::check_parameter_carrier(value, [](const std::string& type, const std::string& message) { fail(type, "apply", message); });
+  return {};
 }
 PolarsVariantsFilterOptions statistics_parameters(const std::vector<PolarsVariantsFilterParameter>& values) {
   // The public statistics companion unrolls keys in insertion order. Final

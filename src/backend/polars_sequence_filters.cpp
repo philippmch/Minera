@@ -1,4 +1,5 @@
 #include "minera/polars_sequence_filters.hpp"
+#include "polars_column_hint.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -134,13 +135,7 @@ struct Plan {
     message += debug_quote(valid[i]);
   }
   message += ']';
-  for (const auto& candidate : valid) {
-    if (!candidate.empty() && candidate.size() < key.size() && key.ends_with(candidate) &&
-        5 * candidate.size() >= 2 * (key.size() + candidate.size())) {
-      message += "\n\nDid you mean " + debug_quote(candidate) + '?';
-      break;
-    }
-  }
+  if (const auto hint = detail::polars_column_hint(key, valid)) message += "\n\nDid you mean " + debug_quote(*hint) + '?';
   const auto source = plan.source.empty() ? frame_plan(df.columns) : plan.source;
   fail("ColumnNotFoundError", message + resolved(plan.node, plan.above.empty() ? source : plan.above + "\n  " + source,
                                                  plan.stack));

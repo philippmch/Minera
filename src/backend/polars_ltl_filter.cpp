@@ -1,4 +1,7 @@
 #include "minera/polars_ltl_filter.hpp"
+#include "polars_list_literal.hpp"
+#include "polars_column_hint.hpp"
+#include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -109,6 +112,14 @@ std::string python_type(const EventAttribute& value) {
   if (date(value)) return "datetime";
   return "str";
 }
+// The type name CPython's own TypeError and AttributeError messages print.
+std::string core_type(const EventAttribute& value) {
+  if (!collection(value) && !null(value) && date(value)) {
+    const auto* native = std::get_if<NativeDate>(&value.typed_value);
+    return (native ? native->value : value.value).size() == 10 ? "datetime.date" : "datetime.datetime";
+  }
+  return python_type(value);
+}
 
 
 Dtype dtype(const std::string& value) {
@@ -189,16 +200,16 @@ std::vector<EventAttribute> iter(const EventAttribute& value) {
     }
     return chars;
   }
-  fail("TypeError", "apply", "'" + python_type(value) + "' object is not iterable");
+  fail("TypeError", "apply", "'" + core_type(value) + "' object is not iterable");
 }
 EventAttribute item(const EventAttribute& value, std::size_t at) {
   if (value.container == AttributeContainerKind::kContainer) fail("KeyError", "apply", std::to_string(at));
   if (text(value) || value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) {
     const auto values = iter(value);
     if (at < values.size()) return values[at];
-    fail("IndexError", "apply", (text(value) ? "string" : python_type(value)) + " index out of range");
+    fail("IndexError", "apply", (text(value) ? "string" : core_type(value)) + " index out of range");
   }
-  fail("TypeError", "apply", "'" + python_type(value) + "' object is not subscriptable");
+  fail("TypeError", "apply", "'" + core_type(value) + "' object is not subscriptable");
 }
 
 bool sequence_rule(Op op) { return op == Op::kEventuallyFollows || op == Op::kNext; }
@@ -277,7 +288,7 @@ std::string missing_message(const EventTable& source, const std::string& key, bo
   for (std::size_t i = 0; i < source.columns.size(); ++i) { if (i) out += ", "; out += debug_quote(source.columns[i]); }
   if (index) { if (!source.columns.empty()) out += ", "; out += "\"_index\""; }
   out += ']';
-  if (key == "case:concept:name" && std::find(source.columns.begin(), source.columns.end(), "concept:name") != source.columns.end()) out += "\n\nDid you mean \"concept:name\"?";
+  if (const auto hint = detail::polars_column_hint(key, source.columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';
   return out;
 }
 std::optional<std::size_t> column(const EventTable& source, const EventAttribute& role) {
@@ -295,12 +306,8 @@ std::vector<PolarsLtlFilterParameter> parameters(const EventAttribute& value) {
     for (const auto& child : value.children) out.push_back({child.key, child, false});
     return out;
   }
-  if (value.container == AttributeContainerKind::kList) {
-    if (value.children.empty()) return {};
-    fail("TypeError", "apply", "list indices must be integers or slices, not str");
-  }
-  if (text(value)) fail("TypeError", "apply", "string indices must be integers, not 'str'");
-  fail("TypeError", "apply", "'" + python_type(value) + "' object is not iterable");
+  detail::check_parameter_carrier(value, [](const std::string& type, const std::string& message) { fail(type, "apply", message); });
+  return {};
 }
 Prepared prepare(const PolarsLtlFilterCall& call) {
   if (!call.values) fail("TypeError", "apply", function_name(call.operation) + "() missing 1 required positional argument: '" +
@@ -323,7 +330,7 @@ Prepared prepare(const PolarsLtlFilterCall& call) {
   if (out.operation == Op::kDifferentPersons) out.values = {out.original};
   else {
     if (out.operation != Op::kEventuallyFollows && !text(out.original) && !collection(out.original))
-      fail("TypeError", "apply", "object of type '" + python_type(out.original) + "' has no len()");
+      fail("TypeError", "apply", "object of type '" + core_type(out.original) + "' has no len()");
     out.values = iter(out.original);
     if (out.operation != Op::kNext && out.values.size() > 1) for (std::size_t i = 0; i < out.values.size(); ++i) (void)item(out.original, i);
   }
@@ -338,16 +345,63 @@ Prepared prepare(const PolarsLtlFilterCall& call) {
   }
   if (!sequence_rule(out.operation) && null(o.case_id_key) && (out.operation != Op::kFourEyes || out.values.size() > 1))
     fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
+  // A list activity becomes a Series literal when its filter is built.
+  if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1))
+    for (const auto& query : out.values)
+      if (query.container == AttributeContainerKind::kList || query.container == AttributeContainerKind::kTuple)
+        if (const auto error = detail::polars_list_literal(query).error) fail("TypeError", "apply", *error);
   return out;
 }
 
+// Replaces the context stack of a rendered diagnostic.
+std::string restack(std::string text, const std::vector<std::string>& nodes) {
+  const auto at = text.find("This error occurred with the following context stack:\n");
+  if (at == std::string::npos) return text;
+  text.resize(at);
+  text += "This error occurred with the following context stack:\n";
+  for (std::size_t i = 0; i < nodes.size(); ++i)
+    text += "\t[" + std::to_string(i + 1) + "] '" + nodes[i] + (nodes[i].ends_with("' failed") ? "\n" : "'\n");
+  return text;
+}
+void repeat(std::vector<std::string>& nodes, std::ptrdiff_t times, std::initializer_list<const char*> items) {
+  for (std::ptrdiff_t i = 0; i < times; ++i) nodes.insert(nodes.end(), items.begin(), items.end());
+}
+// eventually_follows chains one join per later activity; a failure at the
+// filter of activity `at` skips the joins of the activities before it.
+std::vector<std::string> eventually_stack(const Prepared& p, std::size_t at, bool filter, bool empty_join = false) {
+  const auto n = static_cast<std::ptrdiff_t>(p.values.size());
+  std::vector<std::string> nodes;
+  if (filter) nodes.push_back("filter' failed");
+  if (empty_join) nodes.push_back("join");
+  else nodes.insert(nodes.end(), {"select", "unique", "join right", "join"});
+  repeat(nodes, n - 1 - static_cast<std::ptrdiff_t>(at), {"join left", "join"});
+  nodes.insert(nodes.end(), {"select", "unique"});
+  repeat(nodes, n - 1, {"join left", "join"});
+  nodes.insert(nodes.end(), {"join right", "join", "select"});
+  return nodes;
+}
+// four_eyes_principle joins every activity pair; a negative filter filters
+// its first pair join.
+std::vector<std::string> four_eyes_stack(const Prepared& p, bool filter) {
+  std::vector<std::string> nodes;
+  if (filter) nodes.push_back("filter' failed");
+  nodes.insert(nodes.end(), {"select", "unique", "join left", "join"});
+  if (truth(p.options.positive)) nodes.insert(nodes.end(), {"select", "unique", "join left", "join"});
+  else nodes.insert(nodes.end(), {"filter", "select", "unique"});
+  const auto pairs = static_cast<std::ptrdiff_t>(p.values.size() * (p.values.size() - 1) / 2);
+  repeat(nodes, pairs - 1, {"join left", "join"});
+  nodes.insert(nodes.end(), {"join right", "join"});
+  return nodes;
+}
 std::string missing_tail(const EventTable& source, const Prepared& p, bool eager, bool sorting, bool attribute) {
   if (eager) return p.operation == Op::kDifferentPersons && !attribute ? render(kDifferentEagerGroupTail, source, p) : "";
-  if (p.operation == Op::kEventuallyFollows) return render(sorting ? kEventSortTail : kEventAttributeTail, source, p);
+  if (p.operation == Op::kEventuallyFollows)
+    return sorting ? render(kEventSortTail, source, p) : restack(render(kEventAttributeTail, source, p), eventually_stack(p, 0, false));
   if (p.operation == Op::kNext) return sorting ? render(kNextSortTail, source, p) : "";
-  if (p.operation == Op::kFourEyes) return render(attribute ? kFourAttributeTail : kFourMissingTail, source, p);
+  if (p.operation == Op::kFourEyes) return restack(render(attribute ? kFourAttributeTail : kFourMissingTail, source, p), four_eyes_stack(p, false));
   return render(attribute ? kDifferentAttributeTail : kDifferentMissingTail, source, p);
 }
+void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false);
 void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   source.validate();
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars LTL requires every column dtype");
@@ -380,12 +434,17 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
       fail("IndexError", "apply", "index " + exact(o.attribute_key).decimal() + " is out of bounds for DataFrame of height " + std::to_string(height));
     }
   }
-  required(o.attribute_key, false, true);
+  // eventually_follows without activities builds no attribute filter.
+  const bool no_filter = p.operation == Op::kEventuallyFollows && p.values.empty();
+  if (!no_filter) required(o.attribute_key, false, true);
+  // The attribute filter resolves before the case and resource columns.
+  if (p.operation == Op::kDifferentPersons && text(o.attribute_key)) validate_queries(source, p, eager, true);
   if (!sequence_rule(p.operation)) { required(o.case_id_key, false, false); required(o.resource_key, false, false); }
   if (collection(o.case_id_key)) {
-    fail("InvalidOperationError", phase, render(p.operation == Op::kEventuallyFollows ? kEventEmptyJoin : p.operation == Op::kFourEyes ? kFourEmptyJoin : kDifferentEmptyJoin,source,p));
+    if (p.operation == Op::kEventuallyFollows) fail("InvalidOperationError", phase, restack(render(kEventEmptyJoin, source, p), eventually_stack(p, 0, false, true)));
+    fail("InvalidOperationError", phase, render(p.operation == Op::kFourEyes ? kFourEmptyJoin : kDifferentEmptyJoin,source,p));
   }
-  if (p.operation != Op::kNext && collection(o.attribute_key)) {
+  if (p.operation != Op::kNext && collection(o.attribute_key) && !no_filter) {
     fail("ComputeError", phase, "The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names or a column dtype match not hitting any dtypes in the DataFrame" + missing_tail(source,p,eager,false,true));
   }
   if (integer(o.case_id_key) && p.operation != Op::kDifferentPersons) {
@@ -393,21 +452,22 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     fail("DuplicateError", phase, render(p.operation==Op::kEventuallyFollows?kEventLiteralJoin:kFourLiteralJoin,source,p));
   }
 }
-void validate_queries(const EventTable& source, const Prepared& p, bool eager) {
-  if (p.operation == Op::kNext || (p.operation == Op::kFourEyes && p.values.size() < 2)) return;
+void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only) {
+  if (p.operation == Op::kNext || (p.operation == Op::kFourEyes && p.values.size() < 2) || p.values.empty()) return;
   const auto ai = *column(source,p.options.attribute_key);
   if (dtype(source.dtypes[ai]) != Dtype::kString && dtype(source.dtypes[ai]) != Dtype::kEnum) return;
   const auto phase=eager?"apply":"collect";
-  for (const auto& query:p.values) {
+  for (std::size_t at = 0; at < p.values.size(); ++at) {
+    const auto& query = p.values[at];
     const auto expr="col("+quote(p.options.attribute_key.value)+") == "+literal(query);
-    if (integer(query) || real(query)) {
+    if ((integer(query) || real(query)) && !resolution_only) {
       const auto kind=real(query)?"f64":exact(query)>=TokenInteger(-2147483648LL)&&exact(query)<=TokenInteger(2147483647LL)?"i32":"i64";
       fail("ComputeError",phase,"cannot compare string with numeric type ("+std::string(kind)+")\n\nThis error occurred in the following expression:\n\t[(col("+quote(p.options.attribute_key.value)+")) == ("+literal(query)+")]\n");
     }
     if ((collection(query) && query.container != AttributeContainerKind::kContainer) || date(query)) {
-      const auto prefix=date(query)?"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)":"cannot cast List type (inner: 'String', to: 'String')";
+      const auto prefix=date(query)?"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)":"cannot cast List type (inner: '"+detail::polars_list_literal(query).inner+"', to: 'String')";
       const auto expression=expr+(date(query)?"":".cast(String)");
-      fail("InvalidOperationError",phase,std::string(prefix)+(eager?"":render(p.operation==Op::kEventuallyFollows?kEventFilterTail:kDifferentFilterTail,source,p,expression)));
+      fail("InvalidOperationError",phase,std::string(prefix)+(eager?"":(p.operation==Op::kEventuallyFollows?restack(render(kEventFilterTail,source,p,expression),eventually_stack(p,at,true)):render(kDifferentFilterTail,source,p,expression))));
     }
   }
 }

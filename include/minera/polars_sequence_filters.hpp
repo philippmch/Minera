@@ -39,6 +39,10 @@ inline constexpr std::string_view kPolarsFilterDefaultTimestampKey = "time:times
 inline constexpr std::string_view kPolarsFilterCaseIdKeyParameter = "pm4py:param:case_id_key";
 inline constexpr std::string_view kPolarsFilterActivityKeyParameter = "pm4py:param:activity_key";
 inline constexpr std::string_view kPolarsFilterTimestampKeyParameter = "pm4py:param:timestamp_key";
+inline constexpr std::string_view kPolarsFilterAttributeKeyParameter = "pm4py:param:attribute_key";
+inline constexpr std::string_view kPolarsFilterResourceKeyParameter = "pm4py:param:resource_key";
+inline constexpr std::string_view kPolarsFilterDefaultResourceKey = "org:resource";
+inline constexpr std::string_view kPolarsFilterDefaultVariantSep = ",";
 inline constexpr std::string_view kPolarsFilterGroupedDataframe = "grouped_dataframe";
 inline constexpr std::string_view kPolarsFilterReturnEaCountDictAutofilter = "return_ea_count_dict_autofilter";
 

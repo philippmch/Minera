@@ -1,4 +1,7 @@
 #include "minera/polars_between_filter.hpp"
+#include "polars_column_hint.hpp"
+#include "polars_list_literal.hpp"
+#include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -102,6 +105,14 @@ std::string python_type(const EventAttribute& value) {
   if (date(value)) return "datetime";
   return "str";
 }
+// The type name CPython's own TypeError and AttributeError messages print.
+std::string core_type(const EventAttribute& value) {
+  if (!collection(value) && !null(value) && date(value)) {
+    const auto* native = std::get_if<NativeDate>(&value.typed_value);
+    return (native ? native->value : value.value).size() == 10 ? "datetime.date" : "datetime.datetime";
+  }
+  return python_type(value);
+}
 
 std::vector<EventAttribute> anchors(const EventAttribute& value) {
   if (!collection(value)) return {value};
@@ -135,7 +146,7 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
   const auto& key = options.case_id_key;
   if (null(key)) fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (!text(key)) {
-    if (collection(key)) fail("TypeError", "apply", "'" + python_type(key) + "' object is not an instance of 'str'");
+    if (collection(key)) fail("TypeError", "apply", "'" + core_type(key) + "' object is not an instance of 'str'");
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(key) + "'.");
   }
   (void)activity_key(options.activity_key);
@@ -187,12 +198,7 @@ std::string indexed_plan(const EventTable& source, const std::string& key, const
     message += debug_quote(columns[i]);
   }
   message += ']';
-  for (const auto& candidate : columns) {
-    if (!candidate.empty() && candidate.size() < name.size() && name.ends_with(candidate) &&
-        5 * candidate.size() >= 2 * (candidate.size() + name.size())) {
-      message += "\n\nDid you mean " + debug_quote(candidate) + '?'; break;
-    }
-  }
+  if (const auto hint = detail::polars_column_hint(name, columns)) message += "\n\nDid you mean " + debug_quote(*hint) + '?';
   if (phase == "collect") {
     message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n";
     message += indexed ? indexed_plan(source, key, "") : frame_plan(source);
@@ -209,9 +215,20 @@ std::string literal(const EventAttribute& value) {
   if (real(value)) return real_text(number(value));
   return quote(value.value);
 }
-std::string anchor_expression(const EventAttribute& value) {
-  if (!collection(value) && !text(value) && !null(value) && !date(value)) {
-    return '[' + std::string(integer(value) ? "dyn int: " : real(value) ? "dyn float: " : "") + literal(value) + ".implode()]";
+// A scalar anchor is imploded into a list; once resolved, the plan prints the
+// bare scalar.
+std::string anchor_expression(const EventAttribute& value, bool resolved = false) {
+  if (!collection(value) && !text(value) && !null(value)) {
+    std::string scalar;
+    if (date(value)) {
+      const auto* native = std::get_if<NativeDate>(&value.typed_value);
+      auto text = native ? native->value : value.value;
+      if (text.size() > 10) text[10] = ' ';
+      scalar = text.size() > 19 ? text.substr(0, 19) + " UTC" : text;
+    } else {
+      scalar = std::string(integer(value) ? "dyn int: " : real(value) ? "dyn float: " : "") + literal(value);
+    }
+    return '[' + scalar + (resolved ? "]" : ".implode()]");
   }
   std::string output = "[[";
   const auto values = anchors(value);
@@ -229,7 +246,7 @@ std::string anchor_dtype(const EventAttribute& value) {
   if (boolean(*first)) return "Boolean";
   if (integer(*first)) return collection(value) ? "Int64" : "Unknown(Int(" + exact(*first).decimal() + "))";
   if (real(*first)) return collection(value) ? "Float64" : "Unknown(Float)";
-  return "Date";
+  return detail::polars_literal_dtype(*first);
 }
 bool compatible(const EventAttribute& query, Dtype kind) {
   for (const auto& value : anchors(query)) {
@@ -245,13 +262,14 @@ bool compatible(const EventAttribute& query, Dtype kind) {
 void validate_membership(const EventTable& source, std::size_t at, const std::string& key,
                          const EventAttribute& act1, const EventAttribute& act2, const std::string& phase) {
   const auto kind = dtype(source.dtypes[at]);
-  const EventAttribute* incompatible = !compatible(act1, kind) ? &act1 : !compatible(act2, kind) ? &act2 : nullptr;
+  // The second anchor resolves last and is reported first.
+  const EventAttribute* incompatible = !compatible(act2, kind) ? &act2 : !compatible(act1, kind) ? &act1 : nullptr;
   if (!incompatible) return;
   auto data_type = source.dtypes[at];
   if (data_type.starts_with("Datetime(")) data_type = "Datetime('\xCE\xBCs')";
   std::string message = "'is_in' cannot check for List(" + anchor_dtype(*incompatible) + ") values in " + data_type + " data";
   message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n WITH_COLUMNS:\n [col(" +
-             quote(source.columns[at]) + ").is_in(" + anchor_expression(act1) + ").alias(\"_is_act1\"), col(" +
+             quote(source.columns[at]) + ").is_in(" + anchor_expression(act1, incompatible == &act2) + ").alias(\"_is_act1\"), col(" +
              quote(source.columns[at]) + ").is_in(" + anchor_expression(act2) + ").alias(\"_is_act2\")] \n" +
              indexed_plan(source, key, "  ") + stack(false, true);
   fail("InvalidOperationError", phase, message);
@@ -280,6 +298,7 @@ void validate_separator(const EventTable& source, const std::string& key, const 
   if (!collection(separator) || separator.container == AttributeContainerKind::kContainer) return;
   const auto expression = anchor_expression(separator);
   auto message = interpolate(kSeparatorListDiagnostic, {
+      {"(inner: 'String',", "(inner: '" + detail::polars_list_literal(separator).inner + "',"},
       {"%CASE%", quote(key)}, {"%ACTIVITY%", quote(activity)},
       {"%ANCHOR1%", anchor_expression(act1)}, {"%ANCHOR2%", anchor_expression(act2)},
       {"%SEPARATOR%", expression.substr(1, expression.size() - 2)}, {"%FRAME%", frame_plan(source)}});
@@ -356,6 +375,10 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
 }
 EventTable collect(const EventTable& source, const EventAttribute& act1, const EventAttribute& act2,
                    const PolarsBetweenOptions& options, const std::string& phase) {
+  // Python builds the anchor and separator literals before Polars runs.
+  for (const auto* value : {&act1, &act2, &options.subcase_concat_str})
+    if (collection(*value) && value->container != AttributeContainerKind::kContainer)
+      if (const auto error = detail::polars_list_literal(*value).error) fail("TypeError", phase, *error);
   source.validate();
   if (source.index) throw std::invalid_argument("Native Polars between tables cannot have dataframe index metadata");
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars between requires declared column dtypes");
@@ -439,6 +462,30 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
 }
 
 }  // namespace
+
+PolarsBetweenOptions resolve_polars_between_parameters(const std::vector<PolarsBetweenParameter>& parameters) {
+  PolarsBetweenOptions options;
+  for (const bool enum_key : {false, true}) for (const auto& parameter : parameters) {
+    if (parameter.enum_key != enum_key) continue;
+    if (parameter.key == "pm4py:param:case_id_key") options.case_id_key = parameter.value;
+    else if (parameter.key == "pm4py:param:activity_key") options.activity_key = parameter.value;
+    else if (parameter.key == "subcase_concat_str") options.subcase_concat_str = parameter.value;
+  }
+  return options;
+}
+
+PolarsBetweenOptions resolve_polars_between_parameter_value(const EventAttribute& parameters) {
+  if (null(parameters)) return {};
+  if (parameters.container == AttributeContainerKind::kContainer) {
+    std::vector<PolarsBetweenParameter> items;
+    for (const auto& child : parameters.children) items.push_back({child.key, child, false});
+    return resolve_polars_between_parameters(items);
+  }
+  detail::check_parameter_carrier(parameters, [](const std::string& type, const std::string& message) {
+    throw PolarsBetweenError(type, "apply", message);
+  });
+  return {};
+}
 
 EventTable filter_polars_between(const EventTable& source, const EventAttribute& act1,
                                 const EventAttribute& act2, const PolarsBetweenOptions& options) {

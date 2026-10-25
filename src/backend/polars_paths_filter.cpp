@@ -1,4 +1,8 @@
 #include "minera/polars_paths_filter.hpp"
+#include "polars_list_literal.hpp"
+#include "polars_float_text.hpp"
+#include "polars_column_hint.hpp"
+#include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -102,6 +106,14 @@ std::string python_type(const EventAttribute& value) {
   if (date(value)) return "datetime";
   return "str";
 }
+// The type name CPython's own TypeError and AttributeError messages print.
+std::string core_type(const EventAttribute& value) {
+  if (!collection(value) && !null(value) && date(value)) {
+    const auto* native = std::get_if<NativeDate>(&value.typed_value);
+    return (native ? native->value : value.value).size() == 10 ? "datetime.date" : "datetime.datetime";
+  }
+  return python_type(value);
+}
 
 
 Dtype dtype(const std::string& value) {
@@ -204,21 +216,21 @@ std::vector<EventAttribute> iter(const EventAttribute& value) {
     }
     return chars;
   }
-  fail("TypeError", "apply", "'" + python_type(value) + "' object is not iterable");
+  fail("TypeError", "apply", "'" + core_type(value) + "' object is not iterable");
 }
 EventAttribute item(const EventAttribute& value, std::size_t at) {
   if (value.container == AttributeContainerKind::kContainer) fail("KeyError", "apply", std::to_string(at));
   if (text(value) || value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) {
     const auto values = iter(value);
     if (at < values.size()) return values[at];
-    fail("IndexError", "apply", (text(value) ? "string" : python_type(value)) + " index out of range");
+    fail("IndexError", "apply", (text(value) ? "string" : core_type(value)) + " index out of range");
   }
-  fail("TypeError", "apply", "'" + python_type(value) + "' object is not subscriptable");
+  fail("TypeError", "apply", "'" + core_type(value) + "' object is not subscriptable");
 }
 std::string path_text(const EventAttribute& value) {
   const auto left = item(value, 0), right = item(value, 1);
-  if (!text(left)) fail("TypeError", "apply", "unsupported operand type(s) for +: '" + python_type(left) + "' and 'str'");
-  if (!text(right)) fail("TypeError", "apply", "can only concatenate str (not \"" + python_type(right) + "\") to str");
+  if (!text(left)) fail("TypeError", "apply", "unsupported operand type(s) for +: '" + core_type(left) + "' and 'str'");
+  if (!text(right)) fail("TypeError", "apply", "can only concatenate str (not \"" + core_type(right) + "\") to str");
   return left.value + ',' + right.value;
 }
 std::vector<std::string> paths(const EventAttribute& value, bool performance) {
@@ -237,6 +249,11 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
   auto result = paths(value, performance);
   validate_column(options.case_id_key); validate_column(options.timestamp_key); validate_column(options.attribute_key);
   if (!performance && options.target_attribute_key) validate_column(*options.target_attribute_key);
+  // A list bound becomes a Series literal when the performance filter is built.
+  if (performance)
+    for (const auto* bound : {&options.min_performance, &options.max_performance})
+      if (bound->container == AttributeContainerKind::kList || bound->container == AttributeContainerKind::kTuple)
+        if (const auto error = detail::polars_list_literal(*bound).error) fail("TypeError", "apply", *error);
   return result;
 }
 std::string contexts(const std::vector<std::string>& nodes) {
@@ -251,11 +268,7 @@ std::string missing_prefix(const std::string& key, const std::vector<std::string
   std::string out = "unable to find column " + debug_quote(key) + "; valid columns: [";
   for (std::size_t i = 0; i < columns.size(); ++i) { if (i) out += ", "; out += debug_quote(columns[i]); }
   out += ']';
-  for (const auto& candidate : columns) {
-    if (!candidate.empty() && candidate.size() < key.size() && key.ends_with(candidate) && 5 * candidate.size() >= 2 * (key.size() + candidate.size())) {
-      out += "\n\nDid you mean " + debug_quote(candidate) + '?'; break;
-    }
-  }
+  if (const auto hint = detail::polars_column_hint(key, columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';
   return out + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n";
 }
 [[noreturn]] void missing(const EventTable& source, const std::string& key, bool after_sort, const PolarsPathsFilterOptions& options, const std::string& phase) {
@@ -287,6 +300,14 @@ std::string missing_prefix(const std::string& key, const std::vector<std::string
   }
   fail("ColumnNotFoundError", phase, missing_prefix(name, columns) + plan + contexts(nodes));
 }
+// A datetime bound compares with the duration as epoch microseconds (naive
+// read as UTC).
+std::int64_t date_micros(const EventAttribute& value) {
+  const auto* native = std::get_if<NativeDate>(&value.typed_value);
+  const auto parsed = parse_timestamp_microseconds(native ? native->value : value.value);
+  if (!parsed) throw std::invalid_argument("Native Polars path bound requires a valid datetime");
+  return *parsed;
+}
 std::string literal(const EventAttribute& value) {
   if (null(value)) return "null";
   if (collection(value)) {
@@ -302,7 +323,15 @@ void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFi
   if (!text(bound) && !collection(bound)) return;
   const std::string cmp = upper ? "<=" : ">=";
   std::string message = text(bound) ? "cannot compare string with numeric type (i64)" : "could not evaluate '" + cmp + "' comparison between series '@@duration' of dtype: Int64 and series 'literal' of dtype: List(Null)";
-  const auto expression = [](const EventAttribute& v, const std::string& comparison) { return "[(col(\"@@duration\")) " + comparison + " (" + literal(v) + ")]"; };
+  // The duration is Int64: a float bound casts the column.
+  const auto expression = [](const EventAttribute& v, const std::string& comparison) {
+    if (!null(v) && !collection(v) && !text(v)) {
+      if (date(v)) return "[(col(\"@@duration\")) " + comparison + " (" + std::to_string(date_micros(v)) + ")]";
+      if (boolean(v)) return "[(col(\"@@duration\")) " + comparison + " (" + exact(v).decimal() + ")]";
+      if (real(v)) return "[(col(\"@@duration\").cast(Float64)) " + comparison + " (" + detail::polars_plan_float(number(v)) + ")]";
+    }
+    return "[(col(\"@@duration\")) " + comparison + " (" + literal(v) + ")]";
+  };
   message += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, cmp) + "\nwhile evaluating this larger expression:\n\t[([(" + expression(options.min_performance, ">=") + ") & (" + expression(options.max_performance, "<=") + ")]) & ([(col(\"@@path\")) == (" + quote(path) + ")])]\n";
   fail(text(bound) ? "ComputeError" : "SchemaError", phase, message);
 }
@@ -320,6 +349,7 @@ void validate_time(const std::string& dtype, const PolarsPathsFilterOptions& opt
 }
 bool bound_matches(std::int64_t value, const EventAttribute& bound, bool upper) {
   if (null(bound)) return false;
+  if (date(bound)) return upper ? value <= date_micros(bound) : value >= date_micros(bound);
   if (integer(bound) || boolean(bound)) return upper ? TokenInteger(value) <= exact(bound) : TokenInteger(value) >= exact(bound);
   const auto limit = number(bound); if (std::isnan(limit)) return upper;
   return upper ? static_cast<double>(value) <= limit : static_cast<double>(value) >= limit;
@@ -355,6 +385,8 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
   const auto* case_dictionary = case_ranks ? &*case_ranks : nullptr;
   const auto* time_dictionary = *time_at == case_at ? case_dictionary : time_ranks ? &*time_ranks : nullptr;
   if (performance) { validate_time(source.dtypes[*time_at], options, phase); validate_bound(options.min_performance, false, options, paths.front(), phase); validate_bound(options.max_performance, true, options, paths.front(), phase); }
+  // No admitted path keeps no case: a negative filter returns the frame as it is.
+  if (!performance && paths.empty() && !truth(options.positive)) return source;
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);
   std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) {
     const auto by_case = compare(source.rows[a][case_at], source.rows[b][case_at], case_kind, case_dictionary);
@@ -396,9 +428,8 @@ LazyEventTable lazy(const LazyEventTable& source, const EventAttribute& path, bo
 std::vector<PolarsPathsFilterParameter> parameters(const EventAttribute& value) {
   if (null(value)) return {};
   if (value.container == AttributeContainerKind::kContainer) { std::vector<PolarsPathsFilterParameter> result; for (const auto& child : value.children) result.push_back({child.key, child, false}); return result; }
-  if (value.container == AttributeContainerKind::kList) { if (value.children.empty()) return {}; fail("TypeError", "apply", "list indices must be integers or slices, not str"); }
-  if (boolean(value)) fail("TypeError", "apply", "'bool' object is not iterable");
-  throw std::invalid_argument("Native Polars path parameter carrier outside observed dictionary/null/bool/list domain");
+  detail::check_parameter_carrier(value, [](const std::string& type, const std::string& message) { fail(type, "apply", message); });
+  return {};
 }
 EventAttribute dictionary_keys(const PolarsPathsFilterDictionary& dictionary) {
   EventAttribute result; result.container = AttributeContainerKind::kList;

@@ -1,14 +1,21 @@
 #include "minera/polars_attributes_filter.hpp"
+#include "polars_column_hint.hpp"
+#include "polars_float_text.hpp"
+#include "polars_list_literal.hpp"
+#include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
 #include <bit>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 
 #include "minera/timestamp.hpp"
 #include "minera/token_integer.hpp"
@@ -50,6 +57,14 @@ std::string python_type(const EventAttribute& v) {
   if (real(v)) return "float";
   if (date(v)) return "datetime";
   return "str";
+}
+// The type name CPython's own TypeError and AttributeError messages print.
+std::string core_type(const EventAttribute& v) {
+  if (!collection(v) && !null(v) && date(v)) {
+    const auto* native = std::get_if<NativeDate>(&v.typed_value);
+    return (native ? native->value : v.value).size() == 10 ? "datetime.date" : "datetime.datetime";
+  }
+  return python_type(v);
 }
 std::string quote(const std::string& v) { return '"' + v + '"'; }
 std::string debug_quote(const std::string& v) {
@@ -130,15 +145,28 @@ std::string filter_plan(const EventTable& table,const std::string& expression) {
 std::string expression_literal(const EventAttribute& value,bool dynamic=false,bool decimal=false) {
   if(null(value))return "null";
   if(collection(value)) {
-    std::string out="[";for(std::size_t i=0;i<value.children.size();++i){if(i)out+=", ";out+=expression_literal(value.children[i]);}return out+"]";
+    // Polars prints the first two and the last item of a longer list.
+    const auto& items=value.children;std::string out="[";
+    for(std::size_t i=0;i<items.size();++i) {
+      if(items.size()>3&&i==2){out+=", \xe2\x80\xa6 "+expression_literal(items.back());break;}
+      if(i)out+=", ";out+=expression_literal(items[i]);
+    }
+    return out+"]";
   }
   if(boolean(value))return truth(value)?"true":"false";
+  if(date(value)) {
+    const auto* native=std::get_if<NativeDate>(&value.typed_value);auto text=native?native->value:value.value;
+    if(text.size()>10)text[10]=' ';
+    return text.size()>19?text.substr(0,19)+" UTC":text;
+  }
   if(integer(value))return decimal?real_text(number(value))+ (real_text(number(value)).find('.')==std::string::npos?".0":"") : (dynamic?"dyn int: ":"")+exact(value).decimal();
   if(real(value)) {auto out=real_text(number(value));if(decimal && std::isfinite(number(value)) && out.find_first_of(".eE")==std::string::npos)out+=".0";return std::string(dynamic?"dyn float: ":"")+out;}
   return quote(value.value);
 }
 std::string membership_expr(const std::string& key,const EventAttribute& values,bool positive) {
   std::string operand;
+  // Polars folds membership in an empty literal list to a false literal.
+  if(positive&&collection(values)&&values.container!=AttributeContainerKind::kContainer&&values.children.empty())return "false.alias("+quote(key)+")";
   if(text(values))operand="col("+quote(values.value)+").implode()";
   else if(collection(values)) {
     if(values.container==AttributeContainerKind::kContainer) {
@@ -150,7 +178,7 @@ std::string membership_expr(const std::string& key,const EventAttribute& values,
 std::string column_prefix(const EventTable& source,const std::string& key) {
   std::string out="unable to find column "+quote(key)+"; valid columns: [";
   for(std::size_t i=0;i<source.columns.size();++i){if(i)out+=", ";out+=debug_quote(source.columns[i]);}out+="]";
-  if(key=="case:concept:name"&&std::find(source.columns.begin(),source.columns.end(),"concept:name")!=source.columns.end())out+="\n\nDid you mean \"concept:name\"?";
+  if (const auto hint = detail::polars_column_hint(key, source.columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';
   return out;
 }
 std::optional<std::size_t> index_of(const EventTable& table,const std::string& name) {
@@ -158,6 +186,7 @@ std::optional<std::size_t> index_of(const EventTable& table,const std::string& n
 }
 void col_selector(const EventAttribute& value) {
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
+  if(collection(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply","'"+python_type(item)+"' object is not an instance of 'str'");
   if(collection(value)&&!value.children.empty())throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
 }
 PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call) {
@@ -173,10 +202,10 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call) {
     const auto& v=*call.parameter_value;
     if(collection(v)&&v.container==AttributeContainerKind::kContainer) {
       std::vector<PolarsAttributesFilterParameter> items;for(const auto& child:v.children)items.push_back({child.key,child,false});call.parameters=std::move(items);
-    } else if(collection(v)&&v.children.empty())call.parameters=std::vector<PolarsAttributesFilterParameter>{};
-    else if(collection(v))fail("TypeError","apply","list indices must be integers or slices, not str");
-    else if(text(v))fail("TypeError","apply","string indices must be integers, not 'str'");
-    else fail("TypeError","apply","'"+python_type(v)+"' object is not iterable");
+    } else {
+      detail::check_parameter_carrier(v,[](const std::string& type,const std::string& message){fail(type,"apply",message);});
+      call.parameters=std::vector<PolarsAttributesFilterParameter>{};
+    }
   }
   if(call.parameters) {
     const auto& values=*call.parameters;
@@ -192,13 +221,22 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call) {
   }
   if(!statistics(op)) {
     col_selector(call.options.attribute_key);
+    auto literal=[](const EventAttribute& v){if(collection(v)&&v.container!=AttributeContainerKind::kContainer)if(const auto error=detail::polars_list_literal(v).error)fail("TypeError","apply",*error);};
+    if(call.values)literal(*call.values);
+    if(numeric(op)) {
+      // Python builds the bound literals, then each stream filter's column and literal.
+      literal(*call.lower);literal(*call.upper);
+      if(op==Op::kNumericTraces)for(auto [key,value]:std::vector<std::pair<const std::optional<EventAttribute>*,const std::optional<EventAttribute>*>>{{&call.options.stream_filter_key1,&call.options.stream_filter_value1},{&call.options.stream_filter_key2,&call.options.stream_filter_value2}}) {
+        if(!*key||null(**key))continue;
+        col_selector(**key);if(*value)literal(**value);
+      }
+    }
     if(traced(op)) {
       const auto& key=call.options.case_id_key;
       if(null(key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
       if(!text(key)&&!collection(key)&&!integer(key))col_selector(key);
     }
   }
-  if(op==Op::kRelative)col_selector(call.options.attribute_key);
   return call;
 }
 std::string source_dtype(const EventTable& table,std::size_t column) {
@@ -227,6 +265,8 @@ EventTable select_rows(const EventTable& source,const std::vector<bool>& selecte
   EventTable out=source;out.rows.clear();if(out.index)out.index->labels.clear();
   for(std::size_t i=0;i<source.rows.size();++i)if(selected[i]){out.rows.push_back(source.rows[i]);if(out.index)out.index->labels.push_back(source.index->labels[i]);}return out;
 }
+struct Leaf { std::string column, op, dtype; EventAttribute value; };
+struct Expr { std::optional<Leaf> leaf; std::string op; std::vector<Expr> kids; };
 struct Predicate {
   PolarsAttributesFilterCall call;
   std::size_t column=0;
@@ -234,6 +274,8 @@ struct Predicate {
   std::string dtype, case_dtype;
   bool literal_case=false;
   std::vector<EventAttribute> values;
+  std::vector<Expr> chain;
+  bool empty=false;
 };
 std::string list_dtype(const EventAttribute& query) {
   if(!collection(query)) {
@@ -241,12 +283,13 @@ std::string list_dtype(const EventAttribute& query) {
     if(integer(query))return "Unknown(Int("+exact(query).decimal()+"))";
     if(real(query))return "Unknown(Float)";
     if(null(query))return "Null";
+    if(date(query))return detail::polars_literal_dtype(query);
     return "String";
   }
   if(query.container==AttributeContainerKind::kContainer)return "String";
   for(const auto& v:query.children)if(!null(v)) {
     if(collection(v))return "List("+list_dtype(v)+")";
-    if(boolean(v))return "Boolean";if(integer(v))return "Int64";if(real(v))return "Float64";if(date(v))return v.value.size()==10?"Date":"Datetime('us', 'UTC')";return "String";
+    return detail::polars_literal_dtype(v);
   }
   return "Null";
 }
@@ -256,16 +299,220 @@ std::string membership_type(std::string dtype) {
   if(dtype.starts_with("Enum("))return "Enum";
   return dtype;
 }
-std::string numeric_expr(const std::string& key,const EventAttribute& bound,const std::string& cmp,const std::string& dtype) {
-  const bool decimal=dtype=="Float64"&&(integer(bound)||real(bound)||boolean(bound));
-  return "[(col("+quote(key)+")) "+cmp+" ("+expression_literal(bound,!decimal&&!text(bound)&&!collection(bound)&&!null(bound),decimal)+")]";
+int total_compare(double a,double b) {
+  if(std::isnan(a))return std::isnan(b)?0:1;if(std::isnan(b))return -1;return a<b?-1:a>b?1:0;
 }
-std::string numeric_plan(const EventTable& table,const PolarsAttributesFilterCall& call,const std::string& dtype) {
-  const auto& key=call.options.attribute_key.value;
-  const auto low=expression_literal(*call.lower,false,dtype=="Float64"),high=expression_literal(*call.upper,false,dtype=="Float64");
-  return "FILTER col("+quote(key)+") <= "+high+"\nFROM\n  FILTER col("+quote(key)+") >= "+low+"\n  FROM\n    "+frame_plan(table);
+// Numeric filters: Python builds the bound (and, for traces, stream equality)
+// filters, Polars resolves them bottom-up, then evaluates the predicate
+// pushdown merge of the chain.
+Expr leaf_expr(const std::string& column,const std::string& op,const EventAttribute& value) { return Expr{Leaf{column,op,"",value},"",{}}; }
+Expr binary(Expr a,const std::string& op,Expr b) { Expr out;out.op=op;out.kids.push_back(std::move(a));out.kids.push_back(std::move(b));return out; }
+template<class F> void each_leaf(Expr& e,F&& f) { if(e.leaf)f(*e.leaf);else for(auto& k:e.kids)each_leaf(k,f); }
+template<class F> void each_leaf(const Expr& e,F&& f) { if(e.leaf)f(*e.leaf);else for(const auto& k:e.kids)each_leaf(k,f); }
+using detail::polars_dyn_float;
+using detail::polars_plan_float;
+std::string date_text(const EventAttribute& v) { const auto* native=std::get_if<NativeDate>(&v.typed_value);return native?native->value:v.value; }
+std::int64_t date_micros(const EventAttribute& v) {
+  const auto parsed=parse_timestamp_microseconds(date_text(v));
+  if(!parsed)throw std::invalid_argument("Native Polars numeric bound requires a valid datetime");return *parsed;
+}
+std::string datetime_literal(const EventAttribute& v) {
+  auto text=date_text(v);
+  if(text.size()==19){text[10]=' ';return text;}
+  if(text.size()==25&&text.ends_with("+00:00")){text[10]=' ';return text.substr(0,19)+" UTC";}
+  throw std::invalid_argument("Native Polars numeric bound datetime outside observed domain");
+}
+bool numeric_dtype(const std::string& dtype) { return dtype=="Int64"||dtype=="Float64"; }
+bool null_leaf(const Leaf& l) { return null(l.value); }
+// The (lhs, rhs) operands Polars prints once the literal is coerced to the
+// column; a None literal folds the comparison to a null column.
+std::pair<std::string,std::string> operands(const Leaf& l,bool cast_list=false) {
+  const auto column="col("+quote(l.column)+")";
+  const auto& v=l.value;
+  if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
+    if(collection(v))return {column,expression_literal(v)+(cast_list?".cast(String)":"")};
+    if(date(v))return {column,datetime_literal(v)};
+    if(boolean(v))return {column,quote(truth(v)?"true":"false")};
+    if(integer(v))return {column,"dyn int: "+exact(v).decimal()};
+    if(real(v))return {column,"dyn float: "+polars_dyn_float(number(v))};
+    return {column,quote(v.value)};
+  }
+  if(!numeric_dtype(l.dtype))throw std::invalid_argument("Native Polars numeric filter supports String, Int64 and Float64 columns");
+  if(collection(v))return {column,expression_literal(v)};
+  if(text(v))return {column,quote(v.value)};
+  if(l.dtype=="Int64") {
+    if(real(v))return {column+".cast(Float64)",polars_plan_float(number(v))};
+    if(date(v))return {column,std::to_string(date_micros(v))};
+    return {column,exact(v).decimal()};
+  }
+  if(date(v))return {column,polars_plan_float(static_cast<double>(date_micros(v)))};
+  return {column,polars_plan_float(number(v))};
+}
+std::string null_text(const Leaf& l) { return "null.repeat([col("+quote(l.column)+").len()])"; }
+std::string plan_text(const Expr& e,const Leaf* cast=nullptr) {
+  if(e.leaf){if(null_leaf(*e.leaf))return null_text(*e.leaf);const auto [a,b]=operands(*e.leaf,cast==&*e.leaf);return a+" "+e.leaf->op+" "+b;}
+  auto wrap=[&](const Expr& k){const auto t=plan_text(k,cast);return k.leaf&&null_leaf(*k.leaf)?t:"("+t+")";};
+  return wrap(e.kids[0])+" "+e.op+" "+wrap(e.kids[1]);
+}
+std::string error_text(const Expr& e) {
+  if(e.leaf){if(null_leaf(*e.leaf))return null_text(*e.leaf);const auto [a,b]=operands(*e.leaf);return "[("+a+") "+e.leaf->op+" ("+b+")]";}
+  return "[("+error_text(e.kids[0])+") "+e.op+" ("+error_text(e.kids[1])+")]";
+}
+std::string chain_plan(const EventTable& table,const std::vector<std::string>& filters) {
+  std::string out,indent;
+  for(auto p=filters.rbegin();p!=filters.rend();++p){out+=indent+"FILTER "+*p+"\n"+indent+"FROM\n";indent+="  ";}
+  return out+indent+frame_plan(table);
+}
+const Expr* leaf_node(const Expr& e) { return e.leaf?&e:nullptr; }
+// Predicate pushdown: walking down, a filter joins the pending predicates; a
+// filter on a null column stays in place with the pending ones. Predicates
+// combine per column name (bytewise order), lower filters to the left.
+std::string predicate_column(const Expr& e) { std::string out;each_leaf(e,[&](const Leaf& l){if(out.empty())out=l.column;});return out; }
+Expr combine(const std::vector<Expr>& items) {
+  std::map<std::string,std::vector<const Expr*>> groups;
+  for(const auto& item:items)groups[predicate_column(item)].push_back(&item);
+  std::optional<Expr> out;
+  for(const auto& [name,group]:groups) {
+    Expr acc=*group[0];for(std::size_t i=1;i<group.size();++i)acc=binary(*group[i],"&",std::move(acc));
+    out=out?binary(std::move(*out),"&",std::move(acc)):std::move(acc);
+  }
+  return *out;
+}
+std::vector<Expr> pushdown(const std::vector<Expr>& chain) {
+  std::vector<Expr> nodes,pending;
+  for(auto p=chain.rbegin();p!=chain.rend();++p) {
+    if(p->leaf&&null_leaf(*p->leaf)) {
+      std::vector<Expr> items{*p};items.insert(items.end(),pending.begin(),pending.end());
+      nodes.push_back(combine(items));pending.clear();
+    } else pending.push_back(*p);
+  }
+  if(!pending.empty())nodes.push_back(combine(pending));
+  std::reverse(nodes.begin(),nodes.end());return nodes;
+}
+std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
+  const auto& v=l.value;
+  if(null(v))return {};
+  if(l.dtype=="String") {
+    if(integer(v)&&!boolean(v)){const auto n=exact(v);const bool small=n>=TokenInteger(std::numeric_limits<std::int32_t>::min())&&n<=TokenInteger(std::numeric_limits<std::int32_t>::max());return std::pair<std::string,std::string>{"ComputeError",std::string("cannot compare string with numeric type (")+(small?"i32":"i64")+")"};}
+    if(real(v))return std::pair<std::string,std::string>{"ComputeError","cannot compare string with numeric type (f64)"};
+    return {};
+  }
+  if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
+    if((integer(v)&&!boolean(v))||real(v))return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with "+std::string(real(v)?"f64":"i32")};
+    return {};
+  }
+  if(text(v))return std::pair<std::string,std::string>{"ComputeError",std::string("cannot compare string with numeric type (")+(l.dtype=="Float64"?"f64":"i64")+")"};
+  if(collection(v))return std::pair<std::string,std::string>{"SchemaError","could not evaluate "+(l.op=="=="?std::string():"'"+l.op+"' ")+"comparison between series '"+l.column+"' of dtype: "+l.dtype+" and series 'literal' of dtype: List("+detail::polars_list_literal(v).inner+")"};
+  return {};
+}
+std::optional<std::pair<std::string,std::string>> first_error(const Expr& e,const Expr*& at) {
+  if(e.leaf){auto error=leaf_error(*e.leaf);if(error)at=&e;return error;}
+  for(const auto& k:e.kids)if(auto error=first_error(k,at))return error;
+  return {};
+}
+// Kleene truth of a comparison: -1 null, 0 false, 1 true.
+int leaf_truth(const Leaf& l,const EventAttribute& v) {
+  if(null(v)||null(l.value))return -1;
+  const auto& b=l.value;int c=0;
+  if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
+    const auto rhs=boolean(b)?std::string(truth(b)?"true":"false"):b.value;c=v.value.compare(rhs);c=c<0?-1:c>0?1:0;
+  } else if(l.dtype=="Int64"&&!real(b)) {
+    const TokenInteger x=exact(v),y=date(b)?TokenInteger(date_micros(b)):exact(b);c=x<y?-1:y<x?1:0;
+  } else c=total_compare(number(v),date(b)?static_cast<double>(date_micros(b)):number(b));
+  const auto& op=l.op;
+  return op==">="?c>=0:op=="<="?c<=0:op==">"?c>0:op=="<"?c<0:c==0;
+}
+// A literal comparable with another on the same coerced operand, as Polars'
+// range simplification sees it.
+std::optional<std::variant<std::string,TokenInteger,double>> range_value(const Leaf& l) {
+  const auto& v=l.value;
+  if(null(v)||collection(v))return {};
+  if(l.dtype=="String"){if(text(v))return v.value;if(boolean(v))return std::string(truth(v)?"true":"false");return {};}
+  if(text(v))return {};
+  if(l.dtype=="Int64"&&!real(v))return date(v)?TokenInteger(date_micros(v)):exact(v);
+  return date(v)?static_cast<double>(date_micros(v)):number(v);
+}
+bool empty_range(const Expr& node) {
+  std::vector<const Leaf*> leaves;each_leaf(node,[&](const Leaf& l){leaves.push_back(&l);});
+  if(node.op=="|")return false;
+  for(const auto* lo:leaves)for(const auto* hi:leaves) {
+    if(lo->op!=">="||hi->op!="<="||lo->column!=hi->column||null_leaf(*lo)||null_leaf(*hi)||operands(*lo).first!=operands(*hi).first)continue;
+    const auto a=range_value(*lo),b=range_value(*hi);
+    if(!a||!b||a->index()!=b->index())continue;
+    if(const auto* x=std::get_if<double>(&*a)){if(total_compare(*x,std::get<double>(*b))>0)return true;}
+    else if(*b<*a)return true;
+  }
+  return false;
+}
+int truth_of(const Expr& e,const EventTable& source,std::size_t row) {
+  if(e.leaf)return leaf_truth(*e.leaf,cell(source,row,*index_of(source,e.leaf->column)));
+  const int a=truth_of(e.kids[0],source,row),b=truth_of(e.kids[1],source,row);
+  if(e.op=="&")return a==0||b==0?0:a<0||b<0?-1:1;
+  return a==1||b==1?1:a<0||b<0?-1:0;
+}
+Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager) {
+  const auto op=call.operation;const bool trace=op==Op::kNumericTraces;const auto& attr=call.options.attribute_key;
+  // One level per Python filter call: the bounds, then each stream filter.
+  std::vector<std::vector<Expr>> levels;std::vector<const EventAttribute*> keys{&attr};
+  if(trace||truth(call.options.positive))levels.push_back({leaf_expr(attr.value,">=",*call.lower),leaf_expr(attr.value,"<=",*call.upper)});
+  else levels.push_back({binary(leaf_expr(attr.value,"<",*call.lower),"|",leaf_expr(attr.value,">",*call.upper))});
+  if(trace)for(auto [key,value]:std::vector<std::pair<const std::optional<EventAttribute>*,const std::optional<EventAttribute>*>>{{&call.options.stream_filter_key1,&call.options.stream_filter_value1},{&call.options.stream_filter_key2,&call.options.stream_filter_value2}}) {
+    if(!*key||null(**key))continue;
+    levels.push_back({leaf_expr((**key).value,"==",*value?**value:nil())});keys.push_back(&**key);
+  }
+  const auto fail_at=[&](std::size_t level,bool typed,const std::string& type,const std::string& message,const std::string& plan) {
+    std::string suffix;
+    if(!eager) {
+      std::vector<std::string> nodes;if(typed)nodes.push_back("'filter' failed");
+      if(trace) {
+        for(std::size_t i=level+1;i<levels.size();++i)nodes.push_back("'filter'");
+        nodes.insert(nodes.end(),{"'select'","'unique'","'join right'","'join'"});suffix=resolved("'join'",plan,nodes);
+      } else suffix=resolved(typed?"'filter' failed":"THIS_NODE",plan,nodes);
+    }
+    fail(type,phase(eager),message+suffix);
+  };
+  Predicate p{call,0};std::vector<std::string> resolved_filters;
+  for(std::size_t i=0;i<levels.size();++i) {
+    const auto& key=*keys[i];
+    if(collection(key))fail_at(i,false,"ComputeError","The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names or a column dtype match not hitting any dtypes in the DataFrame",chain_plan(source,resolved_filters));
+    const auto column=index_of(source,key.value);
+    if(!column)fail_at(i,false,"ColumnNotFoundError",column_prefix(source,key.value),chain_plan(source,resolved_filters));
+    if(i==0){p.column=*column;p.dtype=source_dtype(source,*column);}
+    for(auto node:levels[i]) {
+      const auto dtype=source_dtype(source,*column);
+      each_leaf(node,[&](Leaf& l){l.dtype=dtype;});
+      const Leaf* bad=nullptr;std::string message;
+      each_leaf(node,[&](const Leaf& l) {
+        if(bad||l.dtype!="String"||(!collection(l.value)&&!date(l.value)))return;
+        bad=&l;
+        message=collection(l.value)?"cannot cast List type (inner: '"+detail::polars_list_literal(l.value).inner+"', to: 'String')"
+                                   :"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)";
+      });
+      if(bad){auto with=resolved_filters;with.push_back(plan_text(node,bad));fail_at(i,true,"InvalidOperationError",message,chain_plan(source,with));}
+      resolved_filters.push_back(plan_text(node));p.chain.push_back(std::move(node));
+    }
+  }
+  if(trace) {
+    const auto& role=call.options.case_id_key;
+    if(collection(role))fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
+    if(integer(role))p.literal_case=true;
+    else {
+      const auto c=index_of(source,role.value);
+      if(!c)fail("ColumnNotFoundError",phase(eager),column_prefix(source,role.value)+(eager?"":resolved("'join'",chain_plan(source,resolved_filters),join_stack())));
+      p.case_column=c;p.case_dtype=source_dtype(source,*c);
+    }
+  }
+  for(const auto& node:pushdown(p.chain)) {
+    // The optimizer drops a merged filter whose bounds leave an empty range.
+    if(empty_range(node)){p.empty=true;continue;}
+    const Expr* at=nullptr;
+    if(const auto error=first_error(node,at))
+      fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
+  }
+  return p;
 }
 Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager) {
+  if(numeric(call.operation))return numeric_predicate(source,call,eager);
   const auto op=call.operation;const bool trace=traced(op);const auto& attr=call.options.attribute_key;
   const auto suffix=[&](const std::string& plan,bool failed=false) {
     if(eager)return std::string{};
@@ -275,24 +522,7 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
   const auto column=index_of(source,attr.value);
   if(!column)fail("ColumnNotFoundError",phase(eager),column_prefix(source,attr.value)+suffix(frame_plan(source)));
   Predicate p{call,*column};p.dtype=source_dtype(source,p.column);
-  if(numeric(op)) {
-    const auto& low=*call.lower;const auto& high=*call.upper;
-    const auto expr1=numeric_expr(attr.value,low,">=",p.dtype),expr2=numeric_expr(attr.value,high,"<=",p.dtype);
-    const auto combined="[("+expr1+") & ("+expr2+")]";
-    const bool string_column=p.dtype=="String",categorical=p.dtype.starts_with("Categorical")||p.dtype.starts_with("Enum(");
-    const EventAttribute* bad=nullptr;std::string badexpr;
-    if((string_column||categorical)&&!text(low)&&!null(low)){bad=&low;badexpr=expr1;}
-    else if((string_column||categorical)&&!text(high)&&!null(high)){bad=&high;badexpr=expr2;}
-    else if(!string_column&&!categorical&&(text(low)||collection(low))){bad=&low;badexpr=expr1;}
-    else if(!string_column&&!categorical&&(text(high)||collection(high))){bad=&high;badexpr=expr2;}
-    if(bad) {
-      std::string type="ComputeError",message;
-      if(collection(*bad)){type="SchemaError";message="could not evaluate '>=' comparison between series '"+attr.value+"' of dtype: "+p.dtype+" and series 'literal' of dtype: List(Null)";}
-      else if(categorical)message="cannot compare categorical with "+std::string(real(*bad)?"f64":"i32");
-      else message="cannot compare string with numeric type ("+std::string(p.dtype=="Float64"||real(*bad)?"f64":"i32")+")";
-      fail(type,phase(eager),message+"\n\nThis error occurred in the following expression:\n\t"+badexpr+"\nwhile evaluating this larger expression:\n\t"+combined+"\n");
-    }
-  } else {
+  {
     const auto& query=*call.values;
     if(text(query)&&!index_of(source,query.value))fail("ColumnNotFoundError",phase(eager),column_prefix(source,query.value)+suffix(frame_plan(source)));
     const auto qdtype=list_dtype(query);bool compatible=qdtype=="Null"||p.dtype=="Null";
@@ -301,7 +531,7 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     else if(qdtype=="Boolean")compatible=p.dtype=="Boolean"||p.dtype=="Null";
     else if(qdtype=="Date")compatible=p.dtype=="Date"||p.dtype=="Null";
     else if(qdtype.starts_with("Datetime("))compatible=p.dtype.starts_with("Datetime(")||p.dtype=="Null";
-    if(!compatible)fail("InvalidOperationError",phase(eager),"'is_in' cannot check for List("+qdtype+") values in "+membership_type(p.dtype)+" data"+suffix(filter_plan(source,membership_expr(attr.value,query,truth(call.options.positive))),true));
+    if(!compatible)fail("InvalidOperationError",phase(eager),"'is_in' cannot check for List("+qdtype+") values in "+membership_type(p.dtype)+" data"+suffix(filter_plan(source,membership_expr(attr.value,query,trace||truth(call.options.positive))),true));
     if(collection(query)) {
       if(query.container==AttributeContainerKind::kContainer)for(const auto& v:query.children)p.values.push_back(EventAttribute{"",v.key});
       else p.values=query.children;
@@ -310,51 +540,24 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
   if(trace) {
     const auto& role=call.options.case_id_key;
     if(collection(role))fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
-    const auto plan=numeric(op)?numeric_plan(source,call,p.dtype):filter_plan(source,membership_expr(attr.value,*call.values,true));
+    const auto plan=filter_plan(source,membership_expr(attr.value,*call.values,true));
     if(integer(role))p.literal_case=true;
     else {
       const auto c=index_of(source,role.value);
       if(!c)fail("ColumnNotFoundError",phase(eager),column_prefix(source,role.value)+suffix(plan));
       p.case_column=c;p.case_dtype=source_dtype(source,*c);
     }
-    if(op==Op::kNumericTraces)for(auto [role,out]:std::vector<std::pair<const std::optional<EventAttribute>*,std::optional<std::size_t>*>>{{&call.options.stream_filter_key1,&p.stream1},{&call.options.stream_filter_key2,&p.stream2}}) {
-      if(!*role||null(**role))continue;col_selector(**role);
-      const auto idx=index_of(source,(**role).value);if(!idx)fail("ColumnNotFoundError",phase(eager),column_prefix(source,(**role).value)+suffix(plan));*out=idx;
-    }
   }
   return p;
-}
-int total_compare(double a,double b) {
-  if(std::isnan(a))return std::isnan(b)?0:1;if(std::isnan(b))return -1;return a<b?-1:a>b?1:0;
-}
-int compare_number(const EventAttribute& v,const EventAttribute& bound,const std::string& dtype) {
-  if(dtype=="Float64")return total_compare(number(v),number(bound));
-  if((integer(v)||boolean(v))&&(integer(bound)||boolean(bound)))return exact(v)<exact(bound)?-1:exact(bound)<exact(v)?1:0;
-  if(date(v)) {
-    const auto stamp=parse_timestamp_microseconds(v.value);if(!stamp)throw std::invalid_argument("Declared temporal Polars attribute cell must be valid");
-    const auto n=dtype=="Date"?*stamp/86400000000LL:*stamp;
-    if(integer(bound)||boolean(bound)){const TokenInteger a(n),b=exact(bound);return a<b?-1:b<a?1:0;}
-    return total_compare(static_cast<double>(n),number(bound));
-  }
-  return total_compare(number(v),number(bound));
 }
 std::vector<bool> matching(const EventTable& source,const Predicate& p) {
   const auto op=p.call.operation;const bool positive=truth(p.call.options.positive);std::vector<bool> flags(source.size(),false);
   for(std::size_t i=0;i<source.size();++i) {
     const auto v=cell(source,i,p.column);bool yes=false;
-    if(numeric(op)) {
-      const auto& a=*p.call.lower;const auto& b=*p.call.upper;
-      if(!null(v)&&!null(a)&&!null(b)) {
-        if(text(v)&&text(a)&&text(b))yes=v.value>=a.value&&v.value<=b.value;
-        else yes=compare_number(v,a,p.dtype)>=0&&compare_number(v,b,p.dtype)<=0;
-        if(!positive&&!traced(op))yes=!yes;
-      }
-    } else {
+    if(numeric(op))yes=!p.empty&&std::all_of(p.chain.begin(),p.chain.end(),[&](const Expr& node){return truth_of(node,source,i)==1;});
+    else {
       if(!null(v)) {for(const auto& q:p.values)if(!null(q)&&scalar_equal(v,q)){yes=true;break;}if(!positive&&!traced(op))yes=!yes;}
       else if(p.values.empty()&&collection(*p.call.values)&&!positive&&!traced(op))yes=true;
-    }
-    if(op==Op::kNumericTraces&&yes)for(auto [column,query]:std::vector<std::pair<std::optional<std::size_t>,const std::optional<EventAttribute>*>>{{p.stream1,&p.call.options.stream_filter_value1},{p.stream2,&p.call.options.stream_filter_value2}})if(column) {
-      if(!*query||null(**query)||null(cell(source,i,*column))||!scalar_equal(cell(source,i,*column),**query))yes=false;
     }
     flags[i]=yes;
   }
@@ -384,19 +587,29 @@ EventTable filtered(const EventTable& source,const Predicate& query) {
 }
 struct CountColumn { std::optional<std::size_t> column, cases;EventAttribute literal;std::string dtype;bool once=false; };
 CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,const PolarsAttributesFilterOptions& options,bool relative=false) {
-  if(collection(attr))fail("IndexError","apply","tuple index out of range");
   CountColumn result;result.literal=attr;result.once=options.keep_once_per_case&&truth(*options.keep_once_per_case);
   const auto groupnodes=result.once?std::vector<std::string>{"'group_by'","'group_by'"}:std::vector<std::string>{"'group_by'"};
+  if(collection(attr)) {
+    if(attr.children.empty())fail("IndexError","apply","tuple index out of range");
+    // A key list groups by each of its items.
+    if(result.once)if(const auto error=detail::polars_list_literal(attr).error)fail("TypeError","apply",*error);
+    for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
+      if(!result.once)fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+    throw std::invalid_argument("Native Polars attribute counts accept a single key");
+  }
+  // Per-case counts group by [case, attribute]: the case key resolves first.
+  if(result.once) {
+    col_selector(options.case_id_key);
+    if(collection(options.case_id_key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
+    result.cases=index_of(source,options.case_id_key.value);
+    if(!result.cases)fail("ColumnNotFoundError","apply",column_prefix(source,options.case_id_key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+  }
   if(text(attr)) {
     result.column=index_of(source,attr.value);
     if(!result.column)fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved("'group_by'",frame_plan(source),groupnodes));
     result.dtype=source_dtype(source,*result.column);
   }
   if(result.once) {
-    col_selector(options.case_id_key);
-    if(collection(options.case_id_key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
-    result.cases=index_of(source,options.case_id_key.value);
-    if(!result.cases)fail("ColumnNotFoundError","apply",column_prefix(source,options.case_id_key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
     if(result.column==result.cases)fail("DuplicateError","apply","group_by keys contained duplicate output name '"+attr.value+"'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved("'group_by'",frame_plan(source),groupnodes));
   }
   return result;
@@ -413,6 +626,8 @@ PolarsAttributeCounts counts_from(const EventTable& source,const CountColumn& co
     auto [it,inserted]=positions.emplace(key,out.size());if(inserted)out.push_back({clean_value(v),count_value(0)});
     auto& n=out[it->second].count;const auto count=static_cast<std::uint64_t>(exact(n));n=count_value(count+1);
   }
+  // Grouping an empty frame by a literal still yields the literal's group.
+  if(!col.column&&!col.once&&out.empty())out.push_back({clean_value(col.literal),count_value(0)});
   return out;
 }
 std::size_t distinct_case_count(const EventTable& source,const EventAttribute& key) {
@@ -432,7 +647,7 @@ PolarsAttributeCounts cache_counts(const PolarsAttributeCountCache& cache) {
     }
     return normalized;
   }
-  const auto& v=std::get<EventAttribute>(cache);if(!collection(v)||v.container!=AttributeContainerKind::kContainer)fail("AttributeError","apply","'"+python_type(v)+"' object has no attribute 'items'");
+  const auto& v=std::get<EventAttribute>(cache);if(!collection(v)||v.container!=AttributeContainerKind::kContainer)fail("AttributeError","apply","'"+core_type(v)+"' object has no attribute 'items'");
   PolarsAttributeCounts out;for(const auto& child:v.children)out.push_back({EventAttribute{"",child.key},child});return out;
 }
 bool python_ge(const EventAttribute& a,const EventAttribute& b) {
@@ -442,7 +657,7 @@ bool python_ge(const EventAttribute& a,const EventAttribute& b) {
     return number(a)>=number(b);
   }
   if(text(a)&&text(b))return a.value>=b.value;
-  fail("TypeError","apply","'>=' not supported between instances of '"+python_type(a)+"' and '"+python_type(b)+"'");
+  fail("TypeError","apply","'>=' not supported between instances of '"+core_type(a)+"' and '"+core_type(b)+"'");
 }
 bool variant_contains(const EventAttribute& variant,const EventAttribute& key) {
   if(collection(variant)) {
@@ -450,10 +665,10 @@ bool variant_contains(const EventAttribute& variant,const EventAttribute& key) {
     for(const auto& child:variant.children)if(scalar_equal(child,key))return true;return false;
   }
   if(text(variant)) {
-    if(!text(key))fail("TypeError","apply","'in <string>' requires string as left operand, not "+python_type(key));
+    if(!text(key))fail("TypeError","apply","'in <string>' requires string as left operand, not "+core_type(key));
     return variant.value.find(key.value)!=std::string::npos;
   }
-  fail("TypeError","apply","argument of type '"+python_type(variant)+"' is not iterable");
+  fail("TypeError","apply","argument of type '"+core_type(variant)+"' is not iterable");
 }
 struct StatisticalSelection { EventAttribute attribute,values; bool unchanged=false; };
 StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager) {
@@ -480,7 +695,7 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
     if(!null(maximum)) {
       if(text(maximum))fail("TypeError","apply","'<' not supported between instances of 'str' and 'int'");
-      if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+python_type(maximum)+"' object cannot be interpreted as an integer");
+      if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
       const auto n=exact(maximum);
       if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");
       if(n>TokenInteger(std::numeric_limits<std::int64_t>::max()))fail("OverflowError","apply","number too large to fit in target type");
@@ -496,7 +711,9 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     const auto& stake=*call.stake;std::size_t denominator=0;
     const bool case_denominator=!options.keep_once_per_case||truth(*options.keep_once_per_case);
     denominator=case_denominator?distinct_case_count(source,options.case_id_key):source.size();
-    if(null(stake))fail("TypeError","apply","unsupported operand type(s) for *: 'NoneType' and 'int'");
+    // The stake multiplies the denominator once per counted value.
+    if(counts.empty())return selection;
+    if(null(stake)||date(stake))fail("TypeError","apply","unsupported operand type(s) for *: '"+core_type(stake)+"' and 'int'");
     if(text(stake)||collection(stake))threshold=stake;
     else {threshold=EventAttribute{"",real_text(number(stake)*static_cast<double>(denominator)),AttributeKind::kFloat};threshold.typed_value=number(stake)*static_cast<double>(denominator);}
   } else threshold=*call.threshold;
@@ -509,6 +726,7 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
 }
 EventTable stats_output(const EventTable& source,const PolarsAttributesFilterCall& call,const StatisticalSelection& selection,bool eager) {
   if(selection.unchanged)return source;
+  if(call.operation==Op::kRelative)col_selector(selection.attribute);
   auto filtering=call;filtering.operation=Op::kEvents;filtering.values=selection.values;filtering.options.attribute_key=selection.attribute;
   if(call.operation!=Op::kRelative)filtering.options.positive=EventAttribute{"","true",AttributeKind::kBoolean};
   return select_rows(source,matching(source,predicate(source,filtering,eager)));

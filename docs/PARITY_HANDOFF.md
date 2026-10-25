@@ -286,6 +286,23 @@ twelve modules are promoted.
 Next in this thread: the Polars attributes, between, cases, ltl, paths,
 timestamp and variants filters.
 
+## Polars attributes/between/cases/ltl/paths/timestamp/variants — 2026-10-25
+
+New bank `docs/polars-filter-bank.json.gz` (3,000 frames, 82,819 public calls
+over every function and constant of the seven modules; about 8 minutes to
+capture, three runs per hash seed) passes in
+`minera_polars_filter_bank_parity_tests`, replayed through the
+`LazyEventTable` APIs. The pilots with seeds 7 and 9 pass too. The numeric
+attribute filters were rewritten around the Polars plan: Python build errors,
+bottom-up plan resolution, then predicate pushdown merging (filters on a null
+literal stay in place, predicates combine per column in bytewise order) and
+Kleene evaluation. New shared helpers: `polars_column_hint.hpp`,
+`polars_list_literal.hpp`, `polars_float_text.hpp`. Two outputs depend on
+`group_by` order (`filter_df_keeping_spno_activities` ties, `filter_on_ncases`
+on Categorical ids) and are checked by invariants. Details in
+`docs/polars-filter-domain-parity.md`. All seven modules are promoted, which
+completes `algo.filtering`.
+
 ## EventLog filtering modules — 2026-10-25
 
 New bank `docs/log-filter-domain-bank.json.gz` (6,000 XES cases, 240,450

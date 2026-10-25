@@ -15022,6 +15022,24 @@ and the limits are in
 [polars-sequence-filter-domain-parity.md](polars-sequence-filter-domain-parity.md).
 All twelve modules are complete.
 
+## Polars attribute, between, case, ltl, paths, timestamp and variants filters bank (2026-10-25)
+
+The seven Polars modules `attributes.attributes_filter`,
+`between.between_filter`, `cases.case_filter`, `ltl.ltl_checker`,
+`paths.paths_filter`, `timestamp.timestamp_filter` and
+`variants.variants_filter` (all under `algo.filtering.polars`) are bound to a
+seeded public-call bank, `docs/polars-filter-bank.json.gz` (82,819 calls,
+hash seeds 0-3, three runs each). It is replayed by
+`minera_polars_filter_bank_parity_tests` through the `LazyEventTable` APIs.
+Frames compare exactly through the normalized event-table JSON, errors by
+class and full message; calls whose reference row or entry order changes
+between runs compare sorted, and the two `group_by` cuts that vary
+(`filter_df_keeping_spno_activities` ties, `filter_on_ncases` on Categorical
+case ids) are checked by a selection invariant. The domain, the behaviour
+found and the limits are in
+[polars-filter-domain-parity.md](polars-filter-domain-parity.md). All seven
+modules are complete.
+
 ## Genetic discovery bank (2026-10-25)
 
 `scripts/capture-genetic-discovery-bank.py` (seed 20261025, three hash seeds;

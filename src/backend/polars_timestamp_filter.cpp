@@ -1,4 +1,7 @@
 #include "minera/polars_timestamp_filter.hpp"
+#include "polars_column_hint.hpp"
+#include "polars_list_literal.hpp"
+#include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -53,6 +56,14 @@ std::string python_type(const EventAttribute& v) {
   if (real(v)) return "float";
   if (date(v)) return "datetime";
   return "str";
+}
+// The type name CPython's own TypeError and AttributeError messages print.
+std::string core_type(const EventAttribute& v) {
+  if (!collection(v) && !null(v) && date(v)) {
+    const auto* native = std::get_if<NativeDate>(&v.typed_value);
+    return (native ? native->value : v.value).size() == 10 ? "datetime.date" : "datetime.datetime";
+  }
+  return python_type(v);
 }
 std::string quote(const std::string& v) { return '"' + v + '"'; }
 std::string debug_quote(const std::string& v) {
@@ -144,7 +155,7 @@ ParsedExactTimestamp bound(const EventAttribute& value) {
     if(!parsed)throw std::invalid_argument("Native Polars timestamp bound requires valid typed datetime");
     auto result=*parsed;result.seconds+=std::int64_t(result.offset_minutes)*60;result.offset_minutes=0;result.timezone_aware=true;return result;
   }
-  if(!text(value))fail("AttributeError","apply","'"+python_type(value)+"' object has no attribute 'replace'");
+  if(!text(value))fail("AttributeError","apply","'"+core_type(value)+"' object has no attribute 'replace'");
   const auto invalid=[&]()->ParsedExactTimestamp{fail("ValueError","apply","time data '"+value.value+"' does not match format '%Y-%m-%d %H:%M:%S'");};
   std::istringstream input(value.value);input.imbue(std::locale::classic());std::tm calendar{};
   calendar.tm_year=std::numeric_limits<int>::min();calendar.tm_mon=calendar.tm_mday=calendar.tm_hour=calendar.tm_min=calendar.tm_sec=-1;
@@ -202,7 +213,7 @@ std::string filtered_plan(const EventTable& source,const Query& q,bool upper) {
 std::string missing_prefix(const std::string& key,const std::vector<std::string>& columns) {
   std::string out="unable to find column "+debug_quote(key)+"; valid columns: [";
   for(std::size_t i=0;i<columns.size();++i){if(i)out+=", ";out+=debug_quote(columns[i]);}out+=']';
-  for(const auto& candidate:columns)if(!candidate.empty()&&candidate.size()<key.size()&&key.ends_with(candidate)&&5*candidate.size()>=2*(key.size()+candidate.size())){out+="\n\nDid you mean "+debug_quote(candidate)+'?';break;}
+  if (const auto hint = detail::polars_column_hint(key, columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';
   return out;
 }
 [[noreturn]] void missing(const EventTable& source,const std::string& key,const Query& q,const std::string& phase,bool case_key=false) {
@@ -246,10 +257,23 @@ void attribute_dtype(const EventTable& source,std::size_t at,const Query& q,cons
     const auto type=string?(integer(q.value)?"i32":"f64"):dt=="Float64"?"f64":dt=="UInt64"?"u64":"i64";
     fail("ComputeError",phase,"cannot compare string with numeric type ("+std::string(type)+")\n\nThis error occurred in the following expression:\n\t"+compare_expr(q.attribute.value,"==",literal(q.value,true))+"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n');
   }
-  if(string&&q.value.container==AttributeContainerKind::kList) {
-    const auto inner=q.value.children.empty()?"Null":"String";
-    const auto plan="FILTER col("+quote(q.attribute.value)+") == "+literal(q.value)+".cast(String)\nFROM\n  "+frame_plan(source);
-    fail("InvalidOperationError",phase,"cannot cast List type (inner: '"+std::string(inner)+"', to: 'String')"+resolved(q.op,plan,nodes(q.op,true),true));
+}
+// Resolving the attribute filter, the lowest node, rejects list and datetime
+// values on a String column.
+void attribute_resolution(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
+  const auto& dt=source.dtypes[at];const bool string=dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(");
+  if(!string)return;
+  const auto& v=q.value;
+  if(v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple) {
+    const auto plan="FILTER col("+quote(q.attribute.value)+") == "+literal(v)+".cast(String)\nFROM\n  "+frame_plan(source);
+    fail("InvalidOperationError",phase,"cannot cast List type (inner: '"+detail::polars_list_literal(v).inner+"', to: 'String')"+resolved(q.op,plan,nodes(q.op,true),true));
+  }
+  if(v.container==AttributeContainerKind::kScalar&&date(v)) {
+    const auto* native=std::get_if<NativeDate>(&v.typed_value);auto text=native?native->value:v.value;
+    if(text.size()>10)text[10]=' ';
+    text=text.size()>19?text.substr(0,19)+" UTC":text;
+    const auto plan="FILTER col("+quote(q.attribute.value)+") == "+text+"\nFROM\n  "+frame_plan(source);
+    fail("InvalidOperationError",phase,"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)"+resolved(q.op,plan,nodes(q.op,true),true));
   }
 }
 ParsedExactTimestamp physical_instant(std::int64_t micros) {
@@ -297,6 +321,9 @@ bool attribute_match(const std::optional<EventAttribute>& cell,const std::string
 }
 EventTable collect(const EventTable& source,const Query& q,const std::string& phase) {
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars timestamp filters require declared dtypes and no dataframe index");
+  // Python builds the attribute value literal first.
+  if(q.op==Operation::kAttribute&&(q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple))
+    if(const auto error=detail::polars_list_literal(q.value).error)fail("TypeError",phase,*error);
   const auto position=[&](const std::string& name,bool case_key=false){auto p=std::find(source.columns.begin(),source.columns.end(),name);if(p==source.columns.end())missing(source,name,q,phase,case_key);return static_cast<std::size_t>(p-source.columns.begin());};
   const bool constant=q.op!=Operation::kEvents&&integer(q.options.case_id_key);
   if(q.op!=Operation::kEvents&&collection(q.options.case_id_key)) {
@@ -309,6 +336,7 @@ EventTable collect(const EventTable& source,const Query& q,const std::string& ph
   if(q.op==Operation::kAttribute){if(collection(q.attribute))empty_selector(source,q,phase,false);attr_at=position(q.attribute.value);}
   if(collection(q.options.timestamp_key))empty_selector(source,q,phase,true);
   const auto time_at=position(q.options.timestamp_key.value);
+  if(attr_at)attribute_resolution(source,*attr_at,q,phase);
   if(q.op==Operation::kAttribute&&!constant)case_at=position(q.options.case_id_key.value,true);
   auto result=source;result.rows.clear();
   // Lazy predicate simplification occurs before comparing the temporal schemas.
@@ -344,8 +372,8 @@ LazyEventTable lazy(const LazyEventTable& source,Operation op,const EventAttribu
 std::vector<PolarsTimestampFilterParameter> parameters(const EventAttribute& value) {
   if(null(value))return {};
   if(value.container==AttributeContainerKind::kContainer){std::vector<PolarsTimestampFilterParameter> result;for(const auto& child:value.children)result.push_back({child.key,child,false});return result;}
-  if(value.container==AttributeContainerKind::kList){if(value.children.empty())return {};fail("TypeError","apply","list indices must be integers or slices, not str");}
-  fail("TypeError","apply","'"+python_type(value)+"' object is not iterable");
+  detail::check_parameter_carrier(value, [](const std::string& type, const std::string& message) { fail(type, "apply", message); });
+  return {};
 }
 }  // namespace
 

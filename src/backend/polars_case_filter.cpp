@@ -1,4 +1,8 @@
 #include "minera/polars_case_filter.hpp"
+#include "polars_column_hint.hpp"
+#include "polars_float_text.hpp"
+#include "polars_list_literal.hpp"
+#include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -49,6 +53,14 @@ std::string python_type(const EventAttribute& v) {
   if (date(v)) return "datetime";
   return "str";
 }
+// The type name CPython's own TypeError and AttributeError messages print.
+std::string core_type(const EventAttribute& v) {
+  if (!collection(v) && !null(v) && date(v)) {
+    const auto* native = std::get_if<NativeDate>(&v.typed_value);
+    return (native ? native->value : v.value).size() == 10 ? "datetime.date" : "datetime.datetime";
+  }
+  return python_type(v);
+}
 std::string quote(const std::string& v) { return '"' + v + '"'; }
 std::string debug_quote(const std::string& v) {
   std::string result = "\"";
@@ -72,6 +84,14 @@ std::string real_text(double value) {
   if (converted.ec != std::errc{}) throw std::invalid_argument("Unsupported native Polars numeric text");
   return std::string(buffer, converted.ptr);
 }
+// A datetime bound compares as its epoch microseconds (a naive one read as
+// UTC wall-clock time).
+std::int64_t date_micros(const EventAttribute& value) {
+  const auto* native = std::get_if<NativeDate>(&value.typed_value);
+  const auto parsed = parse_timestamp_microseconds(native ? native->value : value.value);
+  if (!parsed) throw std::invalid_argument("Native Polars case bound requires a valid datetime");
+  return *parsed;
+}
 std::string literal(const EventAttribute& value) {
   if (null(value)) return "null";
   if (collection(value)) {
@@ -81,6 +101,7 @@ std::string literal(const EventAttribute& value) {
   if (boolean(value)) return truth(value) ? "true" : "false";
   if (integer(value)) return exact(value).decimal();
   if (real(value)) return real_text(number(value));
+  if (date(value)) return std::to_string(date_micros(value));
   return quote(value.value);
 }
 std::string frame_plan(const EventTable& source) {
@@ -94,21 +115,25 @@ std::string contexts(const std::vector<std::string>& nodes) {
   for (std::size_t i = 0; i < nodes.size(); ++i) out += "\t[" + std::to_string(i + 1) + "] '" + nodes[i] + "'\n";
   return out;
 }
-std::vector<std::string> nodes(Operation op) {
+std::vector<std::string> nodes(Operation op, bool upper = false) {
   if (op == Operation::kCount) return {"group_by", "select", "slice", "select", "join right", "join"};
+  // case size filters the upper bound on its own when one is given.
+  if (op == Operation::kSize && upper) return {"group_by", "filter", "filter", "select", "join right", "join"};
   if (op == Operation::kSize) return {"group_by", "filter", "select", "join right", "join"};
   return {"group_by", "with_columns", "filter", "select", "join right", "join"};
 }
-[[noreturn]] void missing(const EventTable& source, const std::string& key, Operation op, const std::string& phase) {
+[[noreturn]] void missing(const EventTable& source, const std::string& key, Operation op, const std::string& phase, bool upper = false) {
   std::string message = "unable to find column " + debug_quote(key) + "; valid columns: [";
   for (std::size_t i = 0; i < source.columns.size(); ++i) { if (i) message += ", "; message += debug_quote(source.columns[i]); }
   message += ']';
-  for (const auto& candidate : source.columns) {
-    if (!candidate.empty() && candidate.size() < key.size() && key.ends_with(candidate) && 5 * candidate.size() >= 2 * (key.size() + candidate.size())) {
-      message += "\n\nDid you mean " + debug_quote(candidate) + '?'; break;
-    }
-  }
-  fail("ColumnNotFoundError", phase, message + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n" + frame_plan(source) + contexts(nodes(op)));
+  if (const auto hint = detail::polars_column_hint(key, source.columns)) message += "\n\nDid you mean " + debug_quote(*hint) + '?';
+  fail("ColumnNotFoundError", phase, message + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n" + frame_plan(source) + contexts(nodes(op, upper)));
+}
+// Python builds the bound literals before any Polars step.
+void validate_literals(const EventAttribute& low, const EventAttribute& high) {
+  for (const auto* value : {&low, &high})
+    if (collection(*value) && value->container != AttributeContainerKind::kContainer)
+      if (const auto error = detail::polars_list_literal(*value).error) fail("TypeError", "apply", *error);
 }
 void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseFilterOptions& options) {
   if (op == Operation::kPerformance && truth(options.business_hours))
@@ -117,7 +142,7 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(options.timestamp_key) + "'.");
   if (op == Operation::kCount && !null(bound)) {
     if (text(bound)) fail("TypeError", "apply", "'<' not supported between instances of 'str' and 'int'");
-    if (!integer(bound) && !boolean(bound)) fail("TypeError", "apply", "'" + python_type(bound) + "' object cannot be interpreted as an integer");
+    if (!integer(bound) && !boolean(bound)) fail("TypeError", "apply", "'" + core_type(bound) + "' object cannot be interpreted as an integer");
     if (exact(bound) < TokenInteger(0)) fail("ValueError", "apply", "negative slice lengths (" + exact(bound).decimal() + ") are invalid for LazyFrame");
   }
   if (null(options.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
@@ -131,7 +156,14 @@ void validate_bound(const EventAttribute& bound, const EventAttribute& other, bo
   std::string error;
   if (text(bound)) error = "cannot compare string with numeric type (" + std::string(op == Operation::kSize ? "u32" : "i64") + ")";
   else error = "could not evaluate '" + cmp + "' comparison between series '" + column + "' of dtype: " + std::string(op == Operation::kSize ? "UInt32" : "Int64") + " and series 'literal' of dtype: List(Null)";
-  const auto expression = [&](const EventAttribute& v, const std::string& comparison) { return "[(col(" + quote(column) + ")) " + comparison + " (" + literal(v) + ")]"; };
+  const auto expression = [&](const EventAttribute& v, const std::string& comparison) {
+    // The case duration is Int64: a float bound casts the column.
+    if (op == Operation::kPerformance && !null(v) && !collection(v) && !text(v)) {
+      if (real(v)) return "[(col(" + quote(column) + ").cast(Float64)) " + comparison + " (" + detail::polars_plan_float(number(v)) + ")]";
+      if (boolean(v)) return "[(col(" + quote(column) + ")) " + comparison + " (" + exact(v).decimal() + ")]";
+    }
+    return "[(col(" + quote(column) + ")) " + comparison + " (" + literal(v) + ")]";
+  };
   error += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, cmp) + '\n';
   if (op == Operation::kPerformance) error += "while evaluating this larger expression:\n\t[(" + expression(upper ? other : bound, ">=") + ") & (" + expression(upper ? bound : other, "<=") + ")]\n";
   fail(text(bound) ? "ComputeError" : "SchemaError", phase, std::move(error));
@@ -139,6 +171,7 @@ void validate_bound(const EventAttribute& bound, const EventAttribute& other, bo
 bool compare_bound(std::int64_t value, const EventAttribute& bound, bool upper) {
   if (null(bound)) return false;
   if (integer(bound) || boolean(bound)) return upper ? TokenInteger(value) <= exact(bound) : TokenInteger(value) >= exact(bound);
+  if (date(bound)) return upper ? value <= date_micros(bound) : value >= date_micros(bound);
   const auto limit = number(bound);
   if (std::isnan(limit)) return upper;
   return upper ? static_cast<double>(value) <= limit : static_cast<double>(value) >= limit;
@@ -179,7 +212,7 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   const bool constant = integer(options.case_id_key);
   const auto position = [&](const std::string& key) {
     const auto found = std::find(source.columns.begin(), source.columns.end(), key);
-    if (found == source.columns.end()) missing(source, key, op, phase);
+    if (found == source.columns.end()) missing(source, key, op, phase, !null(high));
     return static_cast<std::size_t>(found - source.columns.begin());
   };
   const auto case_at = constant ? 0 : position(options.case_id_key.value);
@@ -236,6 +269,7 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
 }
 LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& options) {
   validate_apply(op, low, options);
+  validate_literals(low, high);
   auto columns = source.columns(); auto dtypes = source.dtypes(); auto categories = source.categorical_dtypes();
   if (integer(options.case_id_key)) { columns.push_back("literal"); if (!dtypes.empty()) dtypes.push_back("Int32"); if (!categories.empty()) categories.push_back(std::nullopt); }
   return LazyEventTable(std::move(columns), [source, op, low, high, options](const auto& consume) {
@@ -244,7 +278,9 @@ LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttri
   }, source.attributes(), source.metadata(), std::nullopt, std::move(dtypes), source.index(), std::move(categories));
 }
 EventTable eager(const EventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& options) {
-  validate_apply(op, low, options); return collect(source, op, low, high, options, "apply");
+  validate_apply(op, low, options);
+  validate_literals(low, high);
+  return collect(source, op, low, high, options, "apply");
 }
 std::vector<PolarsCaseFilterParameter> parameter_value(const EventAttribute& value) {
   if (null(value)) return {};
@@ -253,11 +289,8 @@ std::vector<PolarsCaseFilterParameter> parameter_value(const EventAttribute& val
     for (const auto& child : value.children) result.push_back({child.key, child, false});
     return result;
   }
-  if (value.container == AttributeContainerKind::kList) {
-    if (value.children.empty()) return {};
-    fail("TypeError", "apply", "list indices must be integers or slices, not str");
-  }
-  fail("TypeError", "apply", "'" + python_type(value) + "' object is not iterable");
+  detail::check_parameter_carrier(value, [](const std::string& type, const std::string& message) { fail(type, "apply", message); });
+  return {};
 }
 }  // namespace
 

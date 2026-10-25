@@ -16125,8 +16125,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/polars-attributes-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/polars-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_attributes_filter.hpp",
+        "src/backend/polars_attributes_filter.cpp",
+        "scripts/polars_filter_domain.py",
+        "scripts/capture-polars-filter-bank.py",
+        "src/backend/tests/test_polars_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.attributes.attributes_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_attributes_filter.hpp",
+            "symbol": "invoke_polars_attributes_filter"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_filter_bank_parity.cpp",
+            "executable": "minera_polars_filter_bank_parity_tests",
+            "case": "attributes_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.between.between_filter",
@@ -16134,8 +16157,39 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/polars-between-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/polars-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_between_filter.hpp",
+        "src/backend/polars_between_filter.cpp",
+        "scripts/polars_filter_domain.py",
+        "scripts/capture-polars-filter-bank.py",
+        "src/backend/tests/test_polars_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.between.between_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_between_filter.hpp",
+            "symbol": "resolve_polars_between_parameters"
+          },
+          {
+            "path": "include/minera/polars_between_filter.hpp",
+            "symbol": "resolve_polars_between_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_between_filter.hpp",
+            "symbol": "filter_polars_between"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_filter_bank_parity.cpp",
+            "executable": "minera_polars_filter_bank_parity_tests",
+            "case": "between_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.cases.case_filter",
@@ -16143,8 +16197,55 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/polars-case-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/polars-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_case_filter.hpp",
+        "src/backend/polars_case_filter.cpp",
+        "scripts/polars_filter_domain.py",
+        "scripts/capture-polars-filter-bank.py",
+        "src/backend/tests/test_polars_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.cases.case_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_case_filter.hpp",
+            "symbol": "filter_polars_case_performance_parameters"
+          },
+          {
+            "path": "include/minera/polars_case_filter.hpp",
+            "symbol": "filter_polars_case_performance_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_case_filter.hpp",
+            "symbol": "apply_polars_case_filter"
+          },
+          {
+            "path": "include/minera/polars_case_filter.hpp",
+            "symbol": "auto_filter_polars_cases"
+          },
+          {
+            "path": "include/minera/polars_case_filter.hpp",
+            "symbol": "filter_polars_ncases"
+          },
+          {
+            "path": "include/minera/polars_case_filter.hpp",
+            "symbol": "filter_polars_case_size"
+          },
+          {
+            "path": "include/minera/polars_case_filter.hpp",
+            "symbol": "filter_polars_case_performance"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_filter_bank_parity.cpp",
+            "executable": "minera_polars_filter_bank_parity_tests",
+            "case": "cases_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.consecutive_act_case_grouping.consecutive_act_case_grouping_filter",
@@ -16264,8 +16365,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/polars-ltl-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/polars-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_ltl_filter.hpp",
+        "src/backend/polars_ltl_filter.cpp",
+        "scripts/polars_filter_domain.py",
+        "scripts/capture-polars-filter-bank.py",
+        "src/backend/tests/test_polars_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.ltl.ltl_checker",
+        "implementation": [
+          {
+            "path": "include/minera/polars_ltl_filter.hpp",
+            "symbol": "invoke_polars_ltl_filter"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_filter_bank_parity.cpp",
+            "executable": "minera_polars_filter_bank_parity_tests",
+            "case": "ltl_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.paths.paths_filter",
@@ -16273,8 +16397,43 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/polars-paths-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/polars-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_paths_filter.hpp",
+        "src/backend/polars_paths_filter.cpp",
+        "scripts/polars_filter_domain.py",
+        "scripts/capture-polars-filter-bank.py",
+        "src/backend/tests/test_polars_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.paths.paths_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_paths_filter.hpp",
+            "symbol": "filter_polars_paths_parameters"
+          },
+          {
+            "path": "include/minera/polars_paths_filter.hpp",
+            "symbol": "filter_polars_paths_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_paths_filter.hpp",
+            "symbol": "filter_polars_path_performance_parameters"
+          },
+          {
+            "path": "include/minera/polars_paths_filter.hpp",
+            "symbol": "filter_polars_path_performance_parameter_value"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_filter_bank_parity.cpp",
+            "executable": "minera_polars_filter_bank_parity_tests",
+            "case": "paths_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.polars_filtering_constants",
@@ -16514,8 +16673,67 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/polars-timestamp-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/polars-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_timestamp_filter.hpp",
+        "src/backend/polars_timestamp_filter.cpp",
+        "scripts/polars_filter_domain.py",
+        "scripts/capture-polars-filter-bank.py",
+        "src/backend/tests/test_polars_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.timestamp.timestamp_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "apply_polars_timestamp_filter"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "auto_filter_polars_timestamp"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "filter_polars_timestamp_attribute_parameters"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "filter_polars_timestamp_attribute_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "filter_polars_timestamp_contained_parameters"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "filter_polars_timestamp_contained_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "filter_polars_timestamp_intersecting_parameters"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "filter_polars_timestamp_intersecting_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "filter_polars_timestamp_events_parameters"
+          },
+          {
+            "path": "include/minera/polars_timestamp_filter.hpp",
+            "symbol": "filter_polars_timestamp_events_parameter_value"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_filter_bank_parity.cpp",
+            "executable": "minera_polars_filter_bank_parity_tests",
+            "case": "timestamp_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.traces.trace_filter",
@@ -16559,8 +16777,59 @@
       "owner": "support:filtering",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/polars-variants-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/polars-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_variants_filter.hpp",
+        "src/backend/polars_variants_filter.cpp",
+        "scripts/polars_filter_domain.py",
+        "scripts/capture-polars-filter-bank.py",
+        "src/backend/tests/test_polars_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.variants.variants_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_variants_filter.hpp",
+            "symbol": "auto_filter_polars_variants_parameters"
+          },
+          {
+            "path": "include/minera/polars_variants_filter.hpp",
+            "symbol": "auto_filter_polars_variants_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_variants_filter.hpp",
+            "symbol": "filter_polars_variants_parameters"
+          },
+          {
+            "path": "include/minera/polars_variants_filter.hpp",
+            "symbol": "filter_polars_variants_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_variants_filter.hpp",
+            "symbol": "filter_polars_variants_from_list_parameters"
+          },
+          {
+            "path": "include/minera/polars_variants_filter.hpp",
+            "symbol": "filter_polars_variants_from_list_parameter_value"
+          },
+          {
+            "path": "include/minera/polars_variants_filter.hpp",
+            "symbol": "filter_polars_variants_top_k_parameters"
+          },
+          {
+            "path": "include/minera/polars_variants_filter.hpp",
+            "symbol": "filter_polars_variants_top_k_parameter_value"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_filter_bank_parity.cpp",
+            "executable": "minera_polars_filter_bank_parity_tests",
+            "case": "variants_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.label_splitting.variants.contextual",
