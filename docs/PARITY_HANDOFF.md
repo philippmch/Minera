@@ -26,6 +26,18 @@ are checked to be optimal roundings. `mine_ilp` and its adapters are
 unchanged (follow-up: wire `reference_ilp_net` into JSON/CLI/server).
 Package promoted: 76/86 packages, 284/387 modules.
 
+## Genetic discovery — 2026-10-25
+
+New bank `docs/genetic-discovery-bank.json.gz` (5,742 calls, about 6 minutes
+to capture plus two hash-seed replays) passes in
+`minera_genetic_discovery_parity_tests` through
+include/minera/genetic_reference.hpp: src/sink sets, matrix2petrinet,
+partition utils and tournament fitness exactly; individuals, crossover,
+mutate, repair and apply by invariants (model in the parity doc). Token
+replay ties need the reference place names, which the bank records.
+`mine_genetic` is unchanged (follow-up: route it through the reference blocks).
+Package promoted: 77/86 packages, 286/387 modules.
+
 ## In progress — discovery gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" owns `algo.discovery.ilp`,

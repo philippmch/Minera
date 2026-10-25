@@ -208,6 +208,7 @@ add_library(minera_core
   src/backend/inductive_miner.cpp
   src/backend/ilp_miner.cpp
   src/backend/ilp_reference.cpp
+  src/backend/genetic_reference.cpp
   src/backend/interval_tree.cpp
   src/backend/overlap.cpp
   src/backend/label_splitting.cpp
@@ -922,6 +923,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ilp_discovery_parity_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ilp_discovery_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ilp_discovery_parity_tests COMMAND minera_ilp_discovery_parity_tests)
+
+  add_executable(minera_genetic_discovery_parity_tests
+    src/backend/tests/test_genetic_discovery_parity.cpp
+  )
+  target_link_libraries(minera_genetic_discovery_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_genetic_discovery_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_genetic_discovery_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_genetic_discovery_parity_tests COMMAND minera_genetic_discovery_parity_tests)
 
   add_executable(minera_trace_variant_query_tests
     src/backend/tests/test_trace_variant_query.cpp

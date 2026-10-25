@@ -2989,8 +2989,43 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/genetic_reference.hpp",
+        "src/backend/genetic_reference.cpp",
+        "src/backend/tests/test_genetic_discovery_parity.cpp",
+        "src/backend/tests/genetic_discovery_bank_cases.inc",
+        "scripts/capture-genetic-discovery-bank.py",
+        "scripts/generate-genetic-discovery-bank-tests.py"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.genetic.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/genetic_reference.hpp",
+              "symbol": "reference_genetic_tournament"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_genetic_discovery_parity.cpp",
+              "executable": "minera_genetic_discovery_parity_tests",
+              "case": "check"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.heuristics",
@@ -10550,8 +10585,29 @@
       "owner": "algo.discovery.genetic",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/genetic_reference.hpp",
+        "src/backend/genetic_reference.cpp",
+        "src/backend/tests/test_genetic_discovery_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.genetic.util",
+        "implementation": [
+          {
+            "path": "include/minera/genetic_reference.hpp",
+            "symbol": "reference_genetic_add_singleton_partition"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_genetic_discovery_parity.cpp",
+            "executable": "minera_genetic_discovery_parity_tests",
+            "case": "check_partition"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.genetic.variants.classic",
@@ -10564,8 +10620,29 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/genetic_reference.hpp",
+        "src/backend/genetic_reference.cpp",
+        "src/backend/tests/test_genetic_discovery_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.genetic.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/genetic_reference.hpp",
+            "symbol": "reference_genetic_net"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_genetic_discovery_parity.cpp",
+            "executable": "minera_genetic_discovery_parity_tests",
+            "case": "check"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.heuristics.variants.classic",

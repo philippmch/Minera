@@ -134,7 +134,7 @@ are reconciled.
 | Discovery: Alpha | classic and Alpha+ | **Complete** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with full public/native process captures; identity-ordered boundary cleanup is enumerated exactly, the native default is a deterministic member of that support, and two new disjoint public banks plus the earlier merged fixture fall inside it, with every enumerated outcome observed (see "Alpha+ cleanup selection contract") |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete** (both variants and the dispatcher) — CLASSIC public EventLog/DFG object and Petri routes, typed returned fields, order, noise pruning and conversion have saved native/public proof; PLUSPLUS and the dispatcher are bound by `minera_heuristics_plusplus_parity_tests` (see "Heuristics Miner++ bank"): every public HeuristicsNet field and node connection of the EventLog and dispatcher DataFrame routes under six parameter sets, Petri results of both forms up to renaming of places and silent transitions, and the pandas route's pair-free errors |
-| Discovery: optimization | ILP classic and Genetic classic | **Partial (ILP classic complete)** — `reference_ilp_net` reproduces the reference ILP nets (1,169-call bank, see "ILP discovery bank"); bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
+| Discovery: optimization | ILP classic and Genetic classic | **Complete for ILP and Genetic classic** — `reference_ilp_net` reproduces the reference ILP nets (1,169-call bank, see "ILP discovery bank") and include/minera/genetic_reference.hpp the genetic miner's deterministic steps plus invariants for its seeded-random operators (5,742-call bank, see "Genetic discovery bank"); bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion; the bounded `mine_genetic`/`mine_ilp` adapters do not yet route through the reference building blocks |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete** — all 18 Declare templates and all six log-skeleton constraint families retain their weighted threshold, vacuity, ordering, and diagnostic contracts; grouped logs, streams, eager/lazy tables, strict custom activity/case selectors, and log-skeleton variant lists are supported by distinct registered proofs |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, graph utilities, both causal variants, all three correlation variants, and all three minimum-self-distance adapters with witnesses have focused native contracts plus JSON/CLI/server/frontend integration; eventually-follows is covered as a native statistical extension outside the algorithm-dispatch catalog |
 | Discovery: footprints | log entire/trace-by-trace, eager dataframe, lazy dataframe, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete** — all eight selectors have distinct registered contracts and production dispatch; eager/lazy ordering differences, activity/case/time/index selectors, explicit Petri markings, and inclusive-choice bottom-up behavior are covered |
@@ -15006,3 +15006,54 @@ through the normalized event-table JSON, including dtypes and the index. The
 domain, the behaviour found and the limits are in
 [pandas-sequence-filter-domain-parity.md](pandas-sequence-filter-domain-parity.md).
 All twelve modules are complete.
+
+## Genetic discovery bank (2026-10-25)
+
+`scripts/capture-genetic-discovery-bank.py` (seed 20261025, three hash seeds;
+deterministic outputs are recomputed on the stored inputs under seeds 1 and 2
+and must agree) records 5,742 calls into `docs/genetic-discovery-bank.json.gz`:
+1,900 `get_src_sink_sets_for_wfnet`, 1,902 `matrix2petrinet` (2 KeyErrors),
+400 partition edits (`add_singleton_partition`,
+`remove_transition_from_partitions`), 260 `tournament` populations, 1,200
+evolutionary operator outputs (`individuals`, `crossover`, `mutate`, `repair`)
+and 80 `algo.discovery.genetic.algorithm.apply` runs (14 reference errors). The
+fixture drives `minera_genetic_discovery_parity_tests` against
+include/minera/genetic_reference.hpp with 0 failures.
+
+Contract: sources/sinks, nets (place keys and transition multisets, markings,
+errors), partition edits and tournament fitness (within 1e-12) and order are
+exact. The operators and the GA loop are seeded-random and depend on Python's
+string-hash seed, so their outputs are bound by invariants: every individual,
+crossover and mutate output is well formed (keys are exactly T, partitions
+nonempty, drawn from T, disjoint, not repeated, and y in some O[x] iff x in
+some I[y]); mutate keeps the edge set and crossover edges are a subset of the
+parents'; repair (which appends bare singletons, may duplicate and edits in
+place) keeps mirrored links and nonempty partitions drawn from T. For apply,
+the returned net must be the conversion of the matrix it encodes (T in
+first-occurrence order in the log) and its fitness must equal the maximum of
+the last `log_csv` row; generations are not monotone. Some runs raise
+ValueError "Sample larger than population or is negative" or IndexError.
+
+Reference behaviour found (black box):
+- Sources/sinks: sources come from the output partitions only, sinks from the
+  input partitions only. Walking T in order, each transition's partitions
+  join the first graph that contains it (or a fresh graph headed by it), and
+  graphs headed by one of those members are merged into it; the result is
+  the graph heads in list order.
+- matrix2petrinet: a shared place (X, Y) needs X in I[y] for every y in Y and
+  Y in O[x] for every x in X, then is pruned to a fixpoint when a producer
+  has an outgoing edge or a consumer an incoming edge no shared place covers,
+  or when an uncovered output partition of a producer strictly contains Y
+  (symmetrically for inputs). Uncovered partitions strictly inside a covered
+  one vanish; the rest become o(x, Y) and i(y, X) places joined by one silent
+  transition per uncovered edge. Place i feeds the sources, the sinks feed o.
+- Fitness is 0.4 * average trace fitness + 0.6 * fitting-trace share under
+  token replay; the tournament sorts stably by descending fitness. Replay
+  breaks equal-length silent-path ties by place name, so the native replay
+  receives the reference place names (frozenset reprs, set reprs for apply
+  nets) and the observed arc order; the bank records both.
+- Random non-mirrored matrices can make the reference token replay loop
+  forever, so fitness cases use well-formed or GA-made matrices.
+
+`mine_genetic` and its adapters are unchanged (follow-up: wire the reference
+building blocks into the bounded miner).
