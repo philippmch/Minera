@@ -1423,6 +1423,42 @@ MILP and approximated variants omit silent and some model moves and are not
 bound; the search-graph tie choice and its occasional dropped log moves after
 a tau move are not bound either.
 
+### Search-graph replay semantics and frequency annotation
+
+`include/minera/process_tree_search_graph_reference.hpp`
+(`ProcessTreeReplaySemantics`, `reference_search_graph_frequency_annotation`)
+ports `algo.conformance.alignments.process_tree.util.search_graph_pt_replay_semantics`
+and `search_graph_pt_frequency_annotation`. The bank
+`docs/process-tree-search-graph-bank.txt.gz`
+(`scripts/capture-process-tree-search-graph-bank.py`, 1,200 seeded trees,
+four hash seeds that must agree) records 60,000 calls from random walks over
+the replay states (every predicate, vertex move, `transform_tree` and
+shortest path) plus 400 SEARCH_GRAPH_PT searches with their search-state
+chains and the annotation the reference wrote.
+`minera_process_tree_search_graph_parity_tests` matches every replay path and
+state and every annotation.
+
+Reference behaviour found by probing (the header lists the full rules):
+
+- Process trees compare structurally, so a sequence child's position is its
+  first equal sibling's: in `->('a', 'a')` the second `a` can be enabled as
+  soon as the sequence opens, while `shortest_path_to_enable` closes the
+  earlier siblings by real position first.
+- Closing a choice with no child started runs the first child whose own
+  closing opens the fewest visible leaves (tau children win).
+- Enabling a closed node resets the nearest enclosing loop whose redo is not
+  that closed node; when that loop is not open, opening it is the whole reset.
+- The annotation walks `get_bottomup_nodes`, which keeps one node per
+  structural class (leaves breadth first, then parents whose children are
+  all kept), so equal subtrees pool their counts onto one node and the others
+  get no properties. A node's `num_events` counts ENABLED assignments in the
+  chains' paths (OPEN for the root); `num_cases` counts alignments with at
+  least one. In 6 of the 400 searches the reference hands a search state a
+  path that does not replay from its parent state; the annotation still
+  matches there.
+
+The replay covers the four operators SEARCH_GRAPH_PT aligns (binary loops).
+
 ## XES importer-variant evidence
 
 The native importer explicitly accepts `ITERPARSE`, `LINE_BY_LINE`,

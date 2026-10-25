@@ -9019,8 +9019,30 @@
       "owner": "algo.conformance.alignments.process_tree",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_search_graph_reference.hpp",
+        "src/backend/process_tree_search_graph_reference.cpp",
+        "src/backend/tests/test_process_tree_search_graph_parity.cpp",
+        "scripts/capture-process-tree-search-graph-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.process_tree.util.search_graph_pt_frequency_annotation",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_search_graph_reference.hpp",
+            "symbol": "reference_search_graph_frequency_annotation"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_search_graph_parity.cpp",
+            "executable": "minera_process_tree_search_graph_parity_tests",
+            "case": "frequency_annotation_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.process_tree.util.search_graph_pt_replay_semantics",
@@ -9028,8 +9050,30 @@
       "owner": "algo.conformance.alignments.process_tree",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_search_graph_reference.hpp",
+        "src/backend/process_tree_search_graph_reference.cpp",
+        "src/backend/tests/test_process_tree_search_graph_parity.cpp",
+        "scripts/capture-process-tree-search-graph-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.process_tree.util.search_graph_pt_replay_semantics",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_search_graph_reference.hpp",
+            "symbol": "ProcessTreeReplaySemantics"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_search_graph_parity.cpp",
+            "executable": "minera_process_tree_search_graph_parity_tests",
+            "case": "replay_semantics_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.process_tree.variants.approximated.calculate_a_sa_ea_sets",
