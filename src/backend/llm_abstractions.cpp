@@ -11,6 +11,7 @@
 #include <numeric>
 #include <optional>
 #include <stdexcept>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -18,6 +19,7 @@
 
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_features.hpp"
+#include "minera/ocel_features.hpp"
 #include "minera/timestamp.hpp"
 #include "root_cause_unicode.hpp"
 
@@ -482,6 +484,96 @@ std::string performance_text(const std::vector<double>& values, const LlmAbstrac
 
 double seconds_between(std::int64_t from, std::int64_t to) { return static_cast<double>(to - from) / 1e6; }
 
+// Feature columns described by count of positive values and their quantiles,
+// by descending count, coefficient of variation and description.
+std::string describe_features(const std::vector<std::string>& descriptions,
+                              const std::vector<std::vector<double>>& columns, std::string text,
+                              std::size_t max_len) {
+  struct Entry {
+    std::size_t count;
+    double variation;
+    std::string description, line;
+  };
+  std::vector<Entry> entries;
+  for (std::size_t column = 0; column < columns.size(); ++column) {
+    std::vector<double> values;
+    for (const double value : columns[column])
+      if (value > 0.0) values.push_back(value);
+    if (values.empty()) continue;
+    const double variation = numpy_std(values) / numpy_mean(values);
+    entries.push_back({values.size(), variation, descriptions[column],
+                       descriptions[column] + ":    number of non-zero values: " + std::to_string(values.size()) +
+                           " ; quantiles of the non-zero: " + quantile_dict(values, py_float) + "\n"});
+  }
+  std::stable_sort(entries.begin(), entries.end(), [](const Entry& left, const Entry& right) {
+    if (left.count != right.count) return left.count > right.count;
+    if (left.variation != right.variation) return left.variation > right.variation;
+    return left.description > right.description;
+  });
+  for (const auto& entry : entries) {
+    if (code_points(text) > max_len) break;
+    text += entry.line;
+  }
+  return text;
+}
+
+std::vector<std::string> split_text(std::string_view text, char separator) {
+  std::vector<std::string> parts;
+  std::size_t start = 0;
+  for (std::size_t at; (at = text.find(separator, start)) != std::string_view::npos; start = at + 1)
+    parts.emplace_back(text.substr(start, at - start));
+  parts.emplace_back(text.substr(start));
+  return parts;
+}
+
+// Description of a log-to-features column name.
+std::string log_feature_description(const std::string& name) {
+  if (name.starts_with("succession:")) {
+    const auto parts = split_text(std::string_view(name).substr(11), '@');
+    const auto pair = split_text(parts.back(), '#');
+    return "Succession '" + pair.front() + "' -> '" + pair.back() + "' for the Values of the Attribute '" +
+           parts.front() + "'";
+  }
+  if (name.starts_with("trace:") || name.starts_with("event:")) {
+    const std::string scope = name.starts_with("trace:") ? "Case" : "Event";
+    const auto parts = split_text(std::string_view(name).substr(6), '@');
+    return parts.size() == 1 ? "Values for " + scope + " Attribute '" + parts.front() + "'"
+                             : "Value '" + parts.back() + "' for " + scope + " Attribute '" + parts.front() + "'";
+  }
+  return "None";
+}
+
+// Description of an object feature column; the reference swaps the two
+// inheritance-graph texts and names the descendants graph in one of them.
+std::string object_feature_description(const std::string& name) {
+  static const std::map<std::string, std::string> fixed{
+      {"@@object_lifecycle_length", "Number of events in the lifecycle of the object"},
+      {"@@object_lifecycle_duration", "Duration of the lifecycle of the object"},
+      {"@@object_lifecycle_start_timestamp", "Start timestamp of the lifecycle of the object"},
+      {"@@object_lifecycle_end_timestamp", "Completion timestamp of the lifecycle of the object"},
+      {"@@object_degree_centrality", "Degree centrality of the object in the object interaction graph"},
+      {"@@object_general_interaction_graph", "Number of objects related in the object interaction graph"},
+      {"@@object_general_descendants_graph_ascendants",
+       "Number of objects which precede the current object in the object descendants graph"},
+      {"@@object_general_descendants_graph_descendants",
+       "Number of objects which follow the current object in the object descendants graph"},
+      {"@@object_general_inheritance_graph_ascendants",
+       "Number of objects which follow the current object in the object inheritance graph"},
+      {"@@object_general_inheritance_graph_descendants",
+       "Number of objects which precede the current object in the object descendants graph"},
+      {"@@object_cobirth", "Number of objects starting their lifecycle together with the current object"},
+      {"@@object_codeath", "Number of objects ending their lifecycle together with the current object"},
+      {"@@object_lifecycle_unq_act", "Number of unique activities in the lifecycle of the object"},
+  };
+  if (const auto found = fixed.find(name); found != fixed.end()) return found->second;
+  constexpr std::string_view activity = "@@ocel_lif_activity_", interaction = "@@object_interaction_graph_";
+  if (name.starts_with(activity)) return "Number of occurrences of the activity " + name.substr(activity.size());
+  if (name.starts_with(interaction))
+    return "Number of object of type " + name.substr(interaction.size()) +
+           " related to the current object in the object interaction graph";
+  return name;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -692,59 +784,16 @@ std::string llm_log_variants_description(const EventLog& log, const LlmAbstracti
 
 std::string llm_log_features_description(const EventLog& log, const LlmAbstractionOptions& options) {
   const auto features = trace_based_log_features(log);
-  struct Entry {
-    std::size_t count;
-    double variation;
-    std::string description, line;
-  };
-  std::vector<Entry> entries;
-  for (std::size_t column = 0; column < features.feature_names.size(); ++column) {
-    std::vector<double> values;
-    for (const auto& row : features.trace_rows) {
+  std::vector<std::string> descriptions;
+  std::vector<std::vector<double>> columns(features.feature_names.size());
+  for (const auto& name : features.feature_names) descriptions.push_back(log_feature_description(name));
+  for (const auto& row : features.trace_rows)
+    for (std::size_t column = 0; column < columns.size(); ++column) {
       const auto* value = std::get_if<double>(&row.at(column));
-      if (value && *value != 0.0) values.push_back(*value);
+      columns[column].push_back(value ? *value : 0.0);
     }
-    if (values.empty()) continue;
-    const auto& name = features.feature_names[column];
-    std::string description;
-    const auto split = [](std::string_view text, char separator) {
-      std::vector<std::string> parts;
-      std::size_t start = 0;
-      for (std::size_t at; (at = text.find(separator, start)) != std::string_view::npos; start = at + 1)
-        parts.emplace_back(text.substr(start, at - start));
-      parts.emplace_back(text.substr(start));
-      return parts;
-    };
-    if (name.starts_with("succession:")) {
-      const auto parts = split(std::string_view(name).substr(11), '@');
-      const auto pair = split(parts.back(), '#');
-      description = "Succession '" + pair.front() + "' -> '" + pair.back() + "' for the Values of the Attribute '" +
-                    parts.front() + "'";
-    } else if (name.starts_with("trace:") || name.starts_with("event:")) {
-      const std::string scope = name.starts_with("trace:") ? "Case" : "Event";
-      const auto parts = split(std::string_view(name).substr(6), '@');
-      description = parts.size() == 1 ? "Values for " + scope + " Attribute '" + parts.front() + "'"
-                                      : "Value '" + parts.back() + "' for " + scope + " Attribute '" +
-                                            parts.front() + "'";
-    } else {
-      description = "None";
-    }
-    const double variation = numpy_std(values) / numpy_mean(values);
-    entries.push_back({values.size(), variation, description,
-                       description + ":    number of non-zero values: " + std::to_string(values.size()) +
-                           " ; quantiles of the non-zero: " + quantile_dict(values, py_float) + "\n"});
-  }
-  std::sort(entries.begin(), entries.end(), [](const Entry& left, const Entry& right) {
-    if (left.count != right.count) return left.count > right.count;
-    if (left.variation != right.variation) return left.variation > right.variation;
-    return left.description > right.description;
-  });
-  std::string text = options.include_header ? "\n Given the following features:\n\n" : "\n";
-  for (const auto& entry : entries) {
-    if (code_points(text) > options.max_len) break;
-    text += entry.line;
-  }
-  return text;
+  return describe_features(descriptions, columns,
+                           options.include_header ? "\n Given the following features:\n\n" : "\n", options.max_len);
 }
 
 std::string llm_event_stream_description(const EventLog& log, const LlmAbstractionOptions& options) {
@@ -817,6 +866,92 @@ std::string llm_log_skeleton_description(const EventLog& log, const LlmAbstracti
   text += "\n\n";
   pairs("Directly-Follows Constraints", model.directly_follows);
   return text;
+}
+
+std::string llm_ocel_ocdfg_description(const Ocel& log, const LlmAbstractionOptions& options) {
+  if (!options.include_header) return "\n\n";
+  const auto graph = discover_ocdfg_classic(log, options.compute_edges_performance);
+  struct Edge {
+    std::size_t events, objects;
+    double duration;
+    const std::string* type;
+    const std::pair<std::string, std::string>* arc;
+  };
+  std::vector<Edge> edges;
+  for (const auto& [type, arcs] : graph.edges)
+    for (const auto& [arc, metric] : arcs) {
+      if (!options.compute_edges_performance)
+        throw std::invalid_argument("the OCDFG description needs edge performance");
+      const auto& samples = metric.performance_event_couples.empty() ? metric.performance
+                                                                     : metric.performance_event_couples;
+      edges.push_back({metric.event_couples.size(), metric.unique_objects.size(),
+                       samples.empty() ? NAN : numpy_mean(samples), &type, &arc});
+    }
+  std::sort(edges.begin(), edges.end(), [](const Edge& left, const Edge& right) {
+    if (left.events != right.events) return left.events > right.events;
+    if (left.duration != right.duration) return left.duration > right.duration;
+    if (*left.type != *right.type) return *left.type > *right.type;
+    return *left.arc > *right.arc;
+  });
+  std::vector<std::pair<std::string, std::string>> kept;  // object type, lines
+  std::size_t measure = 0;
+  for (const auto& edge : edges) {
+    if (measure > options.max_len) break;
+    std::string line = "  \"" + edge.arc->first + "\" -> \"" + edge.arc->second +
+                       "\" (frequency (number of events) = " + std::to_string(edge.events) +
+                       ", frequency (number of objects) = " + std::to_string(edge.objects);
+    if (options.include_performance) {
+      std::array<char, 400> buffer{};
+      const auto result =
+          std::to_chars(buffer.data(), buffer.data() + buffer.size(), edge.duration, std::chars_format::fixed, 2);
+      line += ", duration = " + (std::isnan(edge.duration) ? std::string("nan") : std::string(buffer.data(), result.ptr));
+    }
+    line += ")\n";
+    measure += code_points(line);
+    auto group = std::find_if(kept.begin(), kept.end(), [&](const auto& entry) { return entry.first == *edge.type; });
+    if (group == kept.end()) {
+      kept.emplace_back(*edge.type, "");
+      group = std::prev(kept.end());
+    }
+    group->second += line;
+  }
+  std::string text =
+      "\nIf I have an object-centric event log with the following directly follows graph (split between the "
+      "different object types):\n\n";
+  for (const auto& [type, lines] : kept) text += "Object type: " + type + "\n" + lines + "\n";
+  return text;
+}
+
+std::string llm_ocel_features_description(const Ocel& log, const std::string& object_type,
+                                          const LlmAbstractionOptions& options) {
+  OcelFeatureOptions feature_options;
+  feature_options.feature_name_style = OcelFeatureNameStyle::kCompatibility;
+  feature_options.filter_per_type = object_type;
+  feature_options.include_all_object_features = true;
+  // The reference graph families look up every event's objects and raise
+  // KeyError for an event without any.
+  std::set<std::string> related;
+  for (const auto& relation : log.relations) related.insert(relation.event_id);
+  for (const auto& event : log.events)
+    if (!related.contains(event.id)) throw std::out_of_range("event without objects: " + event.id);
+  const auto table = extract_ocel_features(log, OcelFeatureVariant::kObjects, feature_options);
+  // The reference default has no object-type indicators or attribute counts.
+  std::vector<std::string> descriptions;
+  std::vector<std::vector<double>> columns;
+  for (std::size_t column = 0; column < table.feature_names.size(); ++column) {
+    const auto& name = table.feature_names[column];
+    if (name.starts_with("@@object_type_") || name == "@@object_num_attributes") continue;
+    descriptions.push_back(object_feature_description(name));
+    auto& values = columns.emplace_back();
+    for (const auto& row : table.values) values.push_back(row.at(column));
+  }
+  const std::string header =
+      "\n Beforehand, a bit of notions. Given an object-centric event log, the object interaction graph connects "
+      "objects that are related in at least an event. The object descendants graph connects objects related in at "
+      "least an event, when the lifecycle of the second object starts after the lifecycle of the first. The object "
+      "inheritance graph connects objects when there an event that ends the lifecycle of the first object and "
+      "starts the lifecycle of the second one. \n\n Given the following features:\n\n";
+  return describe_features(descriptions, columns, options.include_header ? header : "\n", options.max_len);
 }
 
 }  // namespace minera

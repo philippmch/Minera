@@ -56,6 +56,15 @@ now one-hot encodes mixed string/number attributes. Six support modules
 promoted: 283/387 with the filtering bank. Left in `algo.querying.llm.abstractions`: ocel_fea_descr and
 ocel_ocdfg_descr.
 
+## OCEL LLM abstractions — 2026-10-25
+
+New bank `docs/llm-ocel-abstractions-bank.json.gz` (1,794 calls over the
+OCDFG and object-feature descriptions) passes byte for byte in
+`minera_llm_ocel_abstractions_parity_tests`. Native object degree centrality
+now normalizes over interacting objects only, as the reference does. The
+whole `algo.querying.llm.abstractions` support set is complete. Next for this
+thread: `algo.simulation.montecarlo`, then the log_to_features leftovers.
+
 ## Profile clustering — 2026-10-25
 
 New bank `docs/profile-clustering-bank.json.gz` (300 logs) passes in

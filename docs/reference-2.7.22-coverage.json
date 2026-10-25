@@ -15871,8 +15871,32 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_abstractions.hpp",
+        "src/backend/llm_abstractions.cpp",
+        "src/backend/tests/test_llm_ocel_abstractions_parity.cpp",
+        "src/backend/tests/fixtures/llm_ocel_abstractions_bank.txt",
+        "scripts/capture-llm-ocel-abstractions-bank.py",
+        "scripts/generate-llm-ocel-abstractions-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.ocel_fea_descr",
+        "implementation": [
+          {
+            "path": "include/minera/llm_abstractions.hpp",
+            "symbol": "llm_ocel_features_description"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_ocel_abstractions_parity.cpp",
+            "executable": "minera_llm_ocel_abstractions_parity_tests",
+            "case": "ocel_features_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.ocel_ocdfg_descr",
@@ -15880,8 +15904,32 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_abstractions.hpp",
+        "src/backend/llm_abstractions.cpp",
+        "src/backend/tests/test_llm_ocel_abstractions_parity.cpp",
+        "src/backend/tests/fixtures/llm_ocel_abstractions_bank.txt",
+        "scripts/capture-llm-ocel-abstractions-bank.py",
+        "scripts/generate-llm-ocel-abstractions-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.ocel_ocdfg_descr",
+        "implementation": [
+          {
+            "path": "include/minera/llm_abstractions.hpp",
+            "symbol": "llm_ocel_ocdfg_description"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_ocel_abstractions_parity.cpp",
+            "executable": "minera_llm_ocel_abstractions_parity_tests",
+            "case": "ocel_ocdfg_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.stream_to_descr",

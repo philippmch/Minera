@@ -835,8 +835,9 @@ The `interaction_graph_source` selector chooses the edge source for normalized
 degree, per-object-type interaction counts, and neighboring-object min/max
 projections: `event_cooccurrence` uses only objects sharing an event, while
 `event_and_o2o` enables the union with explicit O2O links. Event co-occurrence
-is the default when the selector is omitted, and degree normalization uses only
-active graph nodes; declared isolated objects remain zero. An explicitly supplied selector
+is the default when the selector is omitted, and degree normalization counts only
+objects with at least one interaction (the reference graph is built from its
+edges) and scales by the reciprocal of n - 1; objects without one remain zero. An explicitly supplied selector
 is strictly limited to OBJECTS, or to the
 related-object EVENTS context, and does not alter the separate general graph
 scalar families, which remain event-cooccurrence based.
@@ -14893,3 +14894,42 @@ Contract decisions:
 - The older `mine_ilp` (native boundaries, noise filter, integer regions) and
   its adapters stay as documented extensions; `reference_ilp_net` is not yet
   wired into JSON/CLI/server. The package is complete.
+
+
+## OCEL LLM-abstraction bank (2026-10-25)
+
+`scripts/capture-llm-ocel-abstractions-bank.py` (seed 20261034, 150 seeded
+OCELs from the OCEL graph generator, four hash seeds) calls the public
+`ocel_ocdfg_descr` (six parameter sets) and `ocel_fea_descr` (default, and
+`max_len` 600 without header, once per object type), 1,794 calls in all, each
+on a freshly built OCEL. The fixture
+`src/backend/tests/fixtures/llm_ocel_abstractions_bank.txt` drives
+`minera_llm_ocel_abstractions_parity_tests` against
+`llm_ocel_ocdfg_description` and `llm_ocel_features_description`; all calls
+match byte for byte (488 raise, as the reference does). Outputs do not move
+with the hash seed.
+
+Reference behaviour found (black box):
+
+- OCDFG: the edges of all object types are sorted together by event-couple
+  count, mean event-couple duration, object type and edge, descending. A line
+  `  "a" -> "b" (frequency (number of events) = n, frequency (number of
+  objects) = m, duration = x.xx)` is added while the summed line lengths do
+  not exceed `max_len` (checked before each line); types print as
+  `Object type: T` blocks in the order of their first kept edge. The duration
+  still orders the edges without `include_performance`. Without
+  `include_header` the text is just two newlines. With
+  `compute_edges_performance` off the reference raises KeyError whenever the
+  graph has an edge, whatever `include_performance` says.
+- Features: the default object features filtered to the type (lifecycle
+  length, duration, start and end timestamps, degree centrality, interaction,
+  descendants, inheritance, cobirth and codeath graphs, lifecycle activities,
+  per-type interactions and unique activities; no type indicators or attribute
+  counts), described like the log features with positive values only. The
+  reference describes the inheritance ascendants as "follow ... inheritance
+  graph" and the inheritance descendants as "precede ... descendants graph";
+  Minera prints the same text. An OCEL with an event without objects raises
+  KeyError for every object type; native throws `std::out_of_range`.
+
+The bank also corrected native object degree centrality (now counted over
+interacting objects only and scaled as `degree * (1 / (n - 1))`).

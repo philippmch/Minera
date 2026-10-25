@@ -776,11 +776,15 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       for (std::size_t row = 0; row < neighbors.size(); ++row)
         if (active_objects.contains(row))
           degree[row] = static_cast<double>(neighbors[row].size());
-      const auto denominator = active_objects.size() > 1
-                                   ? static_cast<double>(active_objects.size() - 1)
-                                   : 1.0;
+      // The reference graph holds only objects with an interaction, and
+      // scales by the reciprocal of n - 1, so values such as 3 * 0.2 keep
+      // its rounding.
+      std::size_t nodes = 0;
+      for (std::size_t row = 0; row < neighbors.size(); ++row)
+        if (active_objects.contains(row) && !neighbors[row].empty()) ++nodes;
+      const auto scale = nodes > 1 ? 1.0 / static_cast<double>(nodes - 1) : 1.0;
       for (std::size_t row = 0; row < degree.size(); ++row)
-        if (active_objects.contains(row)) degree[row] /= denominator;
+        if (active_objects.contains(row)) degree[row] *= scale;
       builder.add("@@object_degree_centrality", std::move(degree));
     }
     if (include_interaction_by_type_features) {

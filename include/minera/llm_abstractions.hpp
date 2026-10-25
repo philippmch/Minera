@@ -4,6 +4,7 @@
 #include <string>
 
 #include "minera/event_log.hpp"
+#include "minera/ocel.hpp"
 
 namespace minera {
 
@@ -22,6 +23,9 @@ struct LlmAbstractionOptions {
   // throws std::invalid_argument; an unknown secondary one is left out.
   std::string primary_performance_aggregation = "mean";
   std::string secondary_performance_aggregation;
+  // OCDFG discovery setting; without edge performance the reference
+  // description raises once the graph has an edge.
+  bool compute_edges_performance = true;
 };
 
 // Float and datetime columns of the event table (event attributes plus case:
@@ -58,5 +62,17 @@ struct LlmAbstractionOptions {
 // first appearance in the log.
 [[nodiscard]] std::string llm_log_skeleton_description(const EventLog& log,
                                                        const LlmAbstractionOptions& options = {});
+
+// Object-centric directly-follows edges of every object type, by descending
+// event-couple count, mean duration, object type and edge, as many as max_len
+// allows, grouped by object type in order of their first listed edge.
+// Without include_header the reference prints no graph at all.
+[[nodiscard]] std::string llm_ocel_ocdfg_description(const Ocel& log, const LlmAbstractionOptions& options = {});
+
+// Default object features of the objects of one type, described like the
+// log features (count of positive values, quantiles, descending count,
+// coefficient of variation and description).
+[[nodiscard]] std::string llm_ocel_features_description(const Ocel& log, const std::string& object_type,
+                                                        const LlmAbstractionOptions& options = {});
 
 }  // namespace minera
