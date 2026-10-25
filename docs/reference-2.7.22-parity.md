@@ -1634,6 +1634,24 @@ and rows with an empty activity are dropped only after those conversions;
 Firefox divides the microsecond integer by 10^6 (correctly rounded) and lets
 `datetime.fromtimestamp` round half-even to microseconds.
 
+Database connectors: 300 seeded cases each for Camunda (real
+`act_hi_procinst`/`act_hi_actinst` tables in SQLite, ISO-like start times in
+four shapes with NULL and invalid values), SAP accounting (BKPF/BSAD/BSAK,
+with and without a schema prefix, compact `YYYYMMDD HHMMSS` stamps) and SAP
+order-to-cash (whose Oracle SQL SQLite cannot run, so the cursor answers with
+staged rows). The bank records the SQL text the reference issued, the rows
+its cursor returned and that it closed the connection. Native issues the same
+SQL text (the SAP queries with every `OWNED.` replaced by the prefix), reads
+the rows as `pandas.read_sql` types them, closes the connection and formats
+with the native `format_dataframe`: all 900 frames match exactly. The bank
+exposed three formatter gaps, now fixed: the public parser also accepts the
+compact `YYYY`, `YYYYMMDD` and `YYYYMMDD HHMMSS` shapes; date columns are
+converted on the whole table before rows missing a case, activity or
+timestamp are dropped (a dropped row still keeps its column text or sets its
+unit); and a canonical case or activity column whose values all parse as
+dates (SAP document numbers such as `0001`) is converted and then printed as
+pandas prints a timestamp (`0001-01-01 00:00:00+00:00`).
+
 ## XES importer-variant evidence
 
 The native importer explicitly accepts `ITERPARSE`, `LINE_BY_LINE`,

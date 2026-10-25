@@ -10085,8 +10085,31 @@
           "selector": "camunda_workflow"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp",
+        "include/minera/dataframe_format.hpp",
+        "src/backend/dataframe_format.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.variants.camunda_workflow",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_camunda_workflow"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "camunda_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.variants.chrome_history",
@@ -10211,8 +10234,31 @@
           "selector": "sap_accounting"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp",
+        "include/minera/dataframe_format.hpp",
+        "src/backend/dataframe_format.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.variants.sap_accounting",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_sap_accounting"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "sap_accounting_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.variants.sap_o2c",
@@ -10225,8 +10271,31 @@
           "selector": "sap_o2c"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp",
+        "include/minera/dataframe_format.hpp",
+        "src/backend/dataframe_format.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.variants.sap_o2c",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_sap_o2c"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "sap_o2c_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.variants.windows_events",

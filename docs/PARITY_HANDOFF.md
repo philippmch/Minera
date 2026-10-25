@@ -216,14 +216,15 @@ promoted. The older `align_decomposed` used by the CLI and server is unchanged.
 
 Thread "Close remaining algorithm parity gaps" owns `algo.connectors.*`,
 `algo.transformation.to_embeddings.*` and `algo.querying.llm.connectors.*`.
-Chrome and Firefox history are bound to `docs/connector-bank.txt.gz`
-(`minera_connector_parity_tests`, 1,200 seeded databases, exact frames and
-exception types) through `include/minera/connector_reference.hpp`. Camunda and
-SAP accounting behave as pandas.read_sql of their SQL followed by
-pm4py.format_dataframe with default keys (0 differences on 500 fuzzed
-databases), and the connection is closed afterwards; SAP order-to-cash uses
-Oracle SQL (DECODE, parenthesized unions), so its bank stubs the query
-result.
+Chrome and Firefox history, Camunda and both SAP connectors are bound to
+`docs/connector-bank.txt.gz` (`minera_connector_parity_tests`, 1,200 seeded
+databases plus 900 recorded database-connector calls, exact frames, SQL text,
+connection close and exception types) through
+`include/minera/connector_reference.hpp`. The database connectors are
+read_sql of a fixed SQL text plus format_dataframe; the bank found three
+native `format_dataframe` gaps (compact dates, conversion before dropping
+incomplete rows, date-like canonical identifiers), fixed in
+`src/backend/dataframe_format.cpp`.
 
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 

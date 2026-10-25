@@ -25,12 +25,21 @@
 // NULL becomes '', a NULL duration 0.0 seconds. Columns are typed as pandas
 // infers them from the row values (ints with a NULL become float64, a column
 // of NULLs object), and the frame is sorted by timestamp, ties by @@index.
+//
+// The database connectors (variants.camunda_workflow, sap_accounting and
+// sap_o2c) issue one fixed SQL text through the DB-API connection they are
+// given (the SAP ones with every "OWNED." replaced by the prefix parameter),
+// read the result as pandas.read_sql does, close the connection and return
+// pm4py.format_dataframe of that table with the default keys.
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace minera {
@@ -52,6 +61,30 @@ struct ConnectorReferenceFrame {
   std::vector<std::vector<std::optional<std::string>>> rows;
   bool operator==(const ConnectorReferenceFrame&) const = default;
 };
+
+// A DB-API value: None, int, float or str.
+using ConnectorReferenceCell = std::variant<std::monostate, std::int64_t, double, std::string>;
+
+struct ConnectorReferenceResultSet {
+  std::vector<std::string> names;
+  std::vector<std::vector<ConnectorReferenceCell>> rows;
+};
+
+// The connection a database connector is given: execute runs one SQL text
+// and returns the cursor's result; close is called once afterwards.
+struct ConnectorReferenceConnection {
+  std::function<ConnectorReferenceResultSet(const std::string& sql)> execute;
+  std::function<void()> close;
+};
+
+// The SQL text a database connector issues.
+[[nodiscard]] std::string reference_database_connector_query(const std::string& connector, const std::string& prefix = {});
+
+[[nodiscard]] ConnectorReferenceFrame reference_camunda_workflow(const ConnectorReferenceConnection& connection);
+[[nodiscard]] ConnectorReferenceFrame reference_sap_accounting(const ConnectorReferenceConnection& connection,
+                                                               const std::string& prefix = {});
+[[nodiscard]] ConnectorReferenceFrame reference_sap_o2c(const ConnectorReferenceConnection& connection,
+                                                        const std::string& prefix = {});
 
 [[nodiscard]] ConnectorReferenceFrame reference_chrome_history(const std::filesystem::path& database);
 [[nodiscard]] ConnectorReferenceFrame reference_firefox_history(const std::filesystem::path& database);

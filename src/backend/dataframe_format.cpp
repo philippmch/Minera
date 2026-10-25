@@ -144,8 +144,26 @@ void civil_from_days(std::int64_t days, std::int64_t& year, unsigned& month,
   year += month <= 2;
 }
 
+// The compact shapes YYYY, YYYYMMDD and YYYYMMDD HHMMSS, which the public
+// mixed-format parser also accepts, in ISO spelling.
+std::string expand_compact_timestamp(std::string text) {
+  auto digits = [&](std::size_t from, std::size_t count) {
+    for (std::size_t k = from; k < from + count; ++k)
+      if (k >= text.size() || text[k] < '0' || text[k] > '9') return false;
+    return true;
+  };
+  if (text.size() == 4 && digits(0, 4)) return text + "-01-01";
+  if (text.size() != 8 && text.size() != 15) return text;
+  if (!digits(0, 8)) return text;
+  if (text.size() == 15 && (text[8] != ' ' || !digits(9, 6))) return text;
+  std::string out = text.substr(0, 4) + "-" + text.substr(4, 2) + "-" + text.substr(6, 2);
+  if (text.size() == 15)
+    out += " " + text.substr(9, 2) + ":" + text.substr(11, 2) + ":" + text.substr(13, 2);
+  return out;
+}
+
 std::optional<ExactTimestamp> parse_iso_timestamp(std::string text) {
-  text = trim_ascii(std::move(text));
+  text = expand_compact_timestamp(trim_ascii(std::move(text)));
   if (text.empty() || !parse_timestamp(text)) return std::nullopt;
 
   std::int64_t nanoseconds = 0;
@@ -719,24 +737,32 @@ EventTable format_dataframe(EventTable& input,
     working.dtypes = std::move(inferred);
   }
 
-  // Rows missing any required value are omitted before date conversion.
-  std::vector<std::size_t> kept;
-  kept.reserve(working.rows.size());
-  for (std::size_t row = 0; row < working.rows.size(); ++row) {
-    if (!cell_missing(working.rows[row][case_column]) &&
-        !cell_missing(working.rows[row][activity_column]) &&
-        !cell_missing(working.rows[row][timestamp_column]))
-      kept.push_back(row);
-  }
-  EventTable result = working;
-  result.rows.clear();
-  for (const auto row : kept) result.rows.push_back(working.rows[row]);
-
+  // Dates are converted on the whole table (a row dropped below still decides
+  // whether its column converts and at which unit); rows missing any required
+  // value are omitted afterwards.
   // Canonical identifiers are always pandas string dtype. Convert source
   // timestamp/start columns and the canonical timestamp projection only when
   // every non-null value is parseable; invalid text remains text.
-  convert_column_to_strings(result, canonical_case);
-  convert_column_to_strings(result, canonical_activity);
+  // A canonical identifier column whose values all parse as dates (a column
+  // of four-digit years, say) is converted first and then printed as pandas
+  // prints a timestamp.
+  auto identifier_strings = [&](std::size_t column, bool custom) {
+    if (!custom) {
+      convert_column_to_dates(working, column, options.timestamp_format);
+      if (working.dtypes[column].rfind("datetime64", 0) == 0) {
+        for (auto& row : working.rows) {
+          if (cell_missing(row[column])) continue;
+          auto& cell = *row[column];
+          if (cell.value.size() > 10 && cell.value[10] == 'T') cell.value[10] = ' ';
+          cell.typed_value = std::monostate{};
+          cell.kind = AttributeKind::kString;
+        }
+      }
+    }
+    convert_column_to_strings(working, column);
+  };
+  identifier_strings(canonical_case, custom_case);
+  identifier_strings(canonical_activity, custom_activity);
 
   // Source selector columns are eligible date columns. Empty custom source
   // schemas are intentionally included: pandas converts an empty object/string
@@ -753,21 +779,33 @@ EventTable format_dataframe(EventTable& input,
   if (custom_activity) add_candidate(activity_column);
   add_candidate(timestamp_column);
   if (start_source) add_candidate(*start_source);
-  for (std::size_t column = 0; column < result.columns.size(); ++column) {
+  for (std::size_t column = 0; column < working.columns.size(); ++column) {
     if (column == canonical_case || column == canonical_activity) continue;
     add_candidate(column);
   }
   for (const auto column : date_candidates) {
-    if (column < result.columns.size())
-      convert_column_to_dates(result, column, options.timestamp_format);
+    if (column < working.columns.size())
+      convert_column_to_dates(working, column, options.timestamp_format);
   }
   // A custom timestamp selector may have been copied to the canonical column;
   // both columns carry the same normalized date values and dtype.
-  if (canonical_timestamp < result.columns.size()) {
+  if (canonical_timestamp < working.columns.size()) {
     if (canonical_timestamp != timestamp_column)
-      convert_column_to_dates(result, canonical_timestamp,
+      convert_column_to_dates(working, canonical_timestamp,
                               options.timestamp_format);
   }
+
+  std::vector<std::size_t> kept;
+  kept.reserve(working.rows.size());
+  for (std::size_t row = 0; row < working.rows.size(); ++row) {
+    if (!cell_missing(working.rows[row][case_column]) &&
+        !cell_missing(working.rows[row][activity_column]) &&
+        !cell_missing(working.rows[row][timestamp_column]))
+      kept.push_back(row);
+  }
+  EventTable result = working;
+  result.rows.clear();
+  for (const auto row : kept) result.rows.push_back(working.rows[row]);
 
   // A successful object-to-date conversion can introduce NaT (the reserved
   // minimum signed nanosecond value). Required timestamp NaTs drop their rows.

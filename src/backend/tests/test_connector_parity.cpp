@@ -206,6 +206,57 @@ void firefox_case(const BankCase& item, const std::filesystem::path& directory, 
                      [](const std::filesystem::path& path) { return reference_firefox_history(path); });
 }
 
+template <typename Connector>
+void database_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures, Connector connector) {
+  const auto& source = item.source;
+  const auto prefix = source.get("prefix")->text;
+  ConnectorReferenceResultSet result;
+  if (const auto* names = source.get("names"); names && names->kind == Json::kArray)
+    for (const auto& n : names->items) result.names.push_back(n.text);
+  for (const auto& row : source.get("rows")->items) {
+    result.rows.emplace_back();
+    for (const auto& cell : row.items) {
+      if (cell.kind == Json::kString) result.rows.back().emplace_back(cell.text);
+      else if (cell.kind == Json::kNumber) result.rows.back().emplace_back(static_cast<std::int64_t>(cell.number));
+      else result.rows.back().emplace_back(std::monostate{});
+    }
+  }
+  std::string problem;
+  bool closed = false;
+  ConnectorReferenceConnection connection;
+  connection.execute = [&](const std::string& sql) {
+    if (sql != source.get("sql")->text) problem = "SQL text differs";
+    return result;
+  };
+  connection.close = [&] { closed = true; };
+  const auto* raises = item.frame.get("raises");
+  try {
+    const auto mine = connector(connection, prefix);
+    if (raises) problem = "native returns where the reference raises " + raises->text;
+    else if (problem.empty()) problem = difference(mine, frame_of(item.frame));
+  } catch (const ConnectorReferenceError& error) {
+    if (!raises) problem = std::string("native raises ") + error.what();
+  }
+  if (problem.empty() && closed != source.get("closed")->boolean) problem = "connection close differs";
+  if (!problem.empty()) failures.push_back(item.name + ": " + problem);
+  else ++(raises ? tally.raising : tally.frames)[item.kind];
+}
+
+void camunda_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures) {
+  database_case(item, tally, failures,
+                [](const ConnectorReferenceConnection& c, const std::string&) { return reference_camunda_workflow(c); });
+}
+
+void sap_accounting_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures) {
+  database_case(item, tally, failures,
+                [](const ConnectorReferenceConnection& c, const std::string& p) { return reference_sap_accounting(c, p); });
+}
+
+void sap_o2c_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures) {
+  database_case(item, tally, failures,
+                [](const ConnectorReferenceConnection& c, const std::string& p) { return reference_sap_o2c(c, p); });
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -221,6 +272,9 @@ int main(int argc, char** argv) {
     try {
       if (item.kind == "chrome_history") chrome_case(item, directory, tally, failures);
       else if (item.kind == "firefox_history") firefox_case(item, directory, tally, failures);
+      else if (item.kind == "camunda_workflow") camunda_case(item, tally, failures);
+      else if (item.kind == "sap_accounting") sap_accounting_case(item, tally, failures);
+      else if (item.kind == "sap_o2c") sap_o2c_case(item, tally, failures);
       else failures.push_back(item.name + ": unknown connector " + item.kind);
     } catch (const std::exception& error) {
       failures.push_back(item.name + ": " + error.what());

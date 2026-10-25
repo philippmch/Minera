@@ -9,6 +9,8 @@
 #include <memory>
 #include <numeric>
 
+#include "database_history_queries.hpp"
+#include "minera/dataframe_format.hpp"
 #include "minera/filtering_common.hpp"
 
 #ifdef MINERA_HAS_SQLITE
@@ -316,7 +318,119 @@ const char* const kChromeTransitions[] = {"LINK",  "TYPED",      "AUTO_BOOKMARK"
 const char* const kFirefoxVisitTypes[] = {"LINK",          "TYPED",    "BOOKMARK",    "EMBED",  "REDIRECT_PERM",
                                           "REDIRECT_TEMP", "DOWNLOAD", "FRAMED_LINK", "RELOAD", "USER_TYPED"};
 
+// pandas.read_sql of a DB-API result: one column per name, typed from its
+// Python values.
+EventTable read_sql(const ConnectorReferenceResultSet& result) {
+  EventTable table;
+  table.columns = result.names;
+  table.rows.assign(result.rows.size(), {});
+  for (std::size_t c = 0; c < result.names.size(); ++c) {
+    bool any = false, text = true, integer = true, number = true, none = false;
+    for (const auto& row : result.rows) {
+      const auto& cell = row.at(c);
+      if (std::holds_alternative<std::monostate>(cell)) {
+        none = true;
+        continue;
+      }
+      any = true;
+      text = text && std::holds_alternative<std::string>(cell);
+      integer = integer && std::holds_alternative<std::int64_t>(cell);
+      number = number && !std::holds_alternative<std::string>(cell);
+    }
+    std::string dtype = "object";
+    if (any && text) dtype = "str";
+    else if (any && integer && !none) dtype = "int64";
+    else if (any && number) dtype = "float64";
+    table.dtypes.push_back(dtype);
+    const auto& key = result.names[c];
+    for (std::size_t r = 0; r < result.rows.size(); ++r) {
+      const auto& cell = result.rows[r][c];
+      EventAttribute attribute{key, "", AttributeKind::kString};
+      if (const auto* v = std::get_if<std::string>(&cell)) {
+        attribute.value = *v;
+      } else if (const auto* i = std::get_if<std::int64_t>(&cell)) {
+        if (dtype == "float64") {
+          attribute.kind = AttributeKind::kFloat;
+          attribute.value = filtering_float_repr(static_cast<double>(*i));
+          attribute.typed_value = static_cast<double>(*i);
+        } else {
+          attribute.kind = AttributeKind::kInt;
+          attribute.value = std::to_string(*i);
+          attribute.typed_value = *i;
+        }
+      } else if (const auto* d = std::get_if<double>(&cell)) {
+        attribute.kind = AttributeKind::kFloat;
+        attribute.value = filtering_float_repr(*d);
+        attribute.typed_value = *d;
+      } else if (dtype == "float64") {
+        attribute.kind = AttributeKind::kFloat;
+        attribute.value = "nan";
+        attribute.typed_value = std::numeric_limits<double>::quiet_NaN();
+      } else {
+        attribute.is_null = true;
+        attribute.first_class_state = FirstClassAttributeState::kNull;
+      }
+      table.rows[r].push_back(std::move(attribute));
+    }
+  }
+  table.categorical_dtypes.assign(table.columns.size(), std::nullopt);
+  return table;
+}
+
+std::optional<std::string> printed(const std::optional<EventAttribute>& cell, const std::string& dtype) {
+  if (!cell || cell->is_null) return std::nullopt;
+  if (dtype.rfind("datetime64", 0) == 0) {
+    auto text = cell->value;
+    if (text.empty() || text == "NaT") return std::nullopt;
+    if (text.size() > 10 && text[10] == 'T') text[10] = ' ';
+    return text;
+  }
+  if (dtype == "float64" && (cell->value == "nan" || cell->value == "NaN")) return std::nullopt;
+  return cell->value;
+}
+
+ConnectorReferenceFrame database_frame(const ConnectorReferenceConnection& connection, const std::string& sql) {
+  const auto result = connection.execute(sql);
+  auto table = read_sql(result);
+  if (connection.close) connection.close();
+  const auto formatted = format_dataframe(table);
+  ConnectorReferenceFrame frame;
+  frame.columns = formatted.columns;
+  frame.dtypes = formatted.dtypes;
+  for (std::size_t r = 0; r < formatted.rows.size(); ++r) {
+    frame.index.push_back(r);
+    std::vector<std::optional<std::string>> row;
+    for (std::size_t c = 0; c < formatted.columns.size(); ++c)
+      row.push_back(printed(c < formatted.rows[r].size() ? formatted.rows[r][c] : std::nullopt, formatted.dtypes[c]));
+    frame.rows.push_back(std::move(row));
+  }
+  return frame;
+}
+
 }  // namespace
+
+std::string reference_database_connector_query(const std::string& connector, const std::string& prefix) {
+  std::string query;
+  if (connector == "camunda_workflow") return database_history_detail::camunda_workflow_query;
+  if (connector == "sap_accounting") query = database_history_detail::sap_accounting_query;
+  else if (connector == "sap_o2c") query = database_history_detail::sap_o2c_query;
+  else throw std::invalid_argument("unknown database connector: " + connector);
+  const std::string owned = "OWNED.";
+  for (auto at = query.find(owned); at != std::string::npos; at = query.find(owned, at + prefix.size())) query.replace(at, owned.size(), prefix);
+  return query;
+}
+
+ConnectorReferenceFrame reference_camunda_workflow(const ConnectorReferenceConnection& connection) {
+  return database_frame(connection, reference_database_connector_query("camunda_workflow"));
+}
+
+ConnectorReferenceFrame reference_sap_accounting(const ConnectorReferenceConnection& connection, const std::string& prefix) {
+  return database_frame(connection, reference_database_connector_query("sap_accounting", prefix));
+}
+
+ConnectorReferenceFrame reference_sap_o2c(const ConnectorReferenceConnection& connection, const std::string& prefix) {
+  return database_frame(connection, reference_database_connector_query("sap_o2c", prefix));
+}
 
 ConnectorReferenceFrame reference_chrome_history(const std::filesystem::path& database) {
 #ifndef MINERA_HAS_SQLITE

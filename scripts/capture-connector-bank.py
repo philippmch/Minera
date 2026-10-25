@@ -13,7 +13,10 @@ minera_connector_parity_tests:
 
   C name
   K connector
-  S json   the SQLite database as iterdump statements (browser history)
+  S json   the SQLite database as iterdump statements (browser history), or
+           {"prefix", "sql", "names", "rows", "closed"}: the SQL the
+           reference issued, the columns and rows its cursor returned and
+           whether it closed the connection (database connectors)
   F json   {"columns", "dtypes", "index", "rows"} of the returned dataframe
            (values as str of a timestamp, repr of a float, True/False, null
            for a missing value), or {"raises": "ExceptionType: message"}
@@ -31,7 +34,7 @@ import warnings
 
 warnings.filterwarnings('ignore')
 import pandas as pd
-from pm4py.algo.connectors.variants import chrome_history, firefox_history
+from pm4py.algo.connectors.variants import camunda_workflow, chrome_history, firefox_history, sap_accounting, sap_o2c
 
 BANK_SEED = 20261030
 ROOT = Path(__file__).resolve().parent.parent
@@ -105,6 +108,134 @@ def browser_cases(count, directory):
     return cases
 
 
+# Database connectors: the reference runs its SQL through a DB-API
+# connection. The capture hands it a SQLite connection whose cursor records the
+# SQL text, the column names and the rows it returns (for order-to-cash, whose
+# Oracle SQL SQLite cannot run, the cursor answers with staged rows instead),
+# and whether the connection is closed.
+class Recorder:
+    stage = None
+    log = {}
+
+
+class RecordingCursor(sqlite3.Cursor):
+    def execute(self, sql, *args):
+        Recorder.log['sql'] = sql
+        return super().execute(Recorder.stage or sql, *args)
+
+    def _record(self, rows):
+        Recorder.log.setdefault('rows', []).extend([list(r) for r in rows])
+        Recorder.log['names'] = [d[0] for d in self.description]
+        return rows
+
+    def fetchall(self):
+        return self._record(super().fetchall())
+
+    def fetchmany(self, *args):
+        return self._record(super().fetchmany(*args))
+
+
+class RecordingConnection(sqlite3.Connection):
+    def cursor(self, factory=RecordingCursor):
+        return super().cursor(factory)
+
+    def close(self):
+        Recorder.log['closed'] = True
+        return super().close()
+
+
+def maybe(values, none=0.08):
+    return None if R.random() < none else R.choice(values)
+
+
+def camunda_time():
+    k = R.random()
+    if k < 0.06:
+        return None
+    if k < 0.08:
+        return R.choice(['', 'x', '2023-13-01 00:00:00'])
+    y, mo, d, h, mi, s = R.randint(2000, 2030), R.randint(1, 12), R.randint(1, 28), R.randint(0, 23), R.randint(0, 59), R.randint(0, 59)
+    return R.choice(['%04d-%02d-%02d %02d:%02d:%02d', '%04d-%02d-%02d %02d:%02d:%02d.123', '%04d-%02d-%02dT%02d:%02d:%02d',
+                     '%04d-%02d-%02d %02d:%02d:%02d.000456']) % (y, mo, d, h, mi, s)
+
+
+def sap_date():
+    return None if R.random() < 0.05 else '%04d%02d%02d' % (R.randint(2018, 2024), R.randint(1, 12), R.randint(1, 28))
+
+
+def sap_time():
+    return None if R.random() < 0.05 else '%02d%02d%02d' % (R.randint(0, 23), R.randint(0, 59), R.randint(0, 59))
+
+
+def database_case(kind):
+    con = sqlite3.connect(':memory:', factory=RecordingConnection)
+    run = sqlite3.Connection.execute
+    params = {}
+    Recorder.stage = None
+    Recorder.log = {}
+    # Rows are kept consistent within a run so that formatting sees one timestamp shape per column.
+    if kind == 'camunda_workflow':
+        con.executescript('create table act_hi_procinst(PROC_INST_ID_ text, PROC_DEF_KEY_ text);'
+                          'create table act_hi_actinst(PROC_INST_ID_ text, EXECUTION_ID_ text, ACT_NAME_ text, START_TIME_ text, ASSIGNEE_ text);')
+        uniform = R.random() < 0.6
+        shape = camunda_time()
+        for p in range(R.randint(0, 3)):
+            run(con, 'insert into act_hi_procinst values(?,?)', ('p%d' % p, maybe(['k1', 'k2'])))
+        for a in range(R.randint(0, 8)):
+            t = camunda_time()
+            if uniform and t and shape:
+                t = shape[:10] + t[10:len(shape)] if len(t) >= len(shape) else t
+            run(con, 'insert into act_hi_actinst values(?,?,?,?,?)',
+                ('p%d' % R.randint(0, 3), maybe(['e1', 'e2', 'e3']), maybe(['A', 'B', 'C', '']), t, maybe(['u', 'v'], 0.3)))
+        module = camunda_workflow
+    elif kind == 'sap_accounting':
+        prefix = R.choice(['', '', 'SAPSR3.'])
+        if prefix:
+            params['prefix'] = prefix
+            con.execute("attach ':memory:' as SAPSR3")
+        con.executescript(f'create table {prefix}BKPF(MANDT,BUKRS,GJAHR,BELNR,BLART,CPUDT,CPUTM,USNAM);'
+                          f'create table {prefix}BSAD(MANDT,BUKRS,GJAHR,AUGBL,AUGDT);'
+                          f'create table {prefix}BSAK(MANDT,BUKRS,GJAHR,AUGBL,AUGDT);')
+        for k in range(R.randint(0, 5)):
+            run(con, f'insert into {prefix}BKPF values(?,?,?,?,?,?,?,?)',
+                ('100', maybe(['1000', '2000'], 0.05), '2023', maybe(['D1', 'D2', 'D3'], 0.05), maybe(['RV', 'KR', 'DZ'], 0.05),
+                 sap_date(), sap_time(), maybe(['U1', 'U2'])))
+        for table in ('BSAD', 'BSAK'):
+            for k in range(R.randint(0, 3)):
+                run(con, f'insert into {prefix}{table} values(?,?,?,?,?)',
+                    ('100', maybe(['1000', '2000'], 0.05), '2023', maybe(['D1', 'D2', 'D3'], 0.05), sap_date()))
+        module = sap_accounting
+    else:
+        if R.random() < 0.3:
+            params['prefix'] = 'SAPSR3.'
+        Recorder.stage = 'SELECT * FROM staged'
+        con.executescript('create table staged("case:concept:name","concept:name","time:timestamp","org:resource")')
+        for k in range(R.randint(0, 8)):
+            date, time = sap_date(), sap_time()
+            stamp = None if date is None else (date + ' ' + time if time and R.random() < 0.85 else date)
+            run(con, 'insert into staged values(?,?,?,?)',
+                (maybe(['0001', '0002', '0003'], 0.05), maybe(['Create Sales Document', 'Create Delivery', 'Create Billing', 'Change Order'], 0.05),
+                 stamp, maybe(['U1', 'U2'])))
+        module = sap_o2c
+    con.commit()
+    try:
+        result = ser(module.apply(con, params))
+    except Exception as error:
+        result = {'raises': f'{type(error).__name__}: {error}'}
+    source = {'prefix': params.get('prefix', ''), 'sql': Recorder.log.get('sql'), 'names': Recorder.log.get('names'),
+              'rows': Recorder.log.get('rows', []), 'closed': Recorder.log.get('closed', False)}
+    return source, result
+
+
+def database_cases(count):
+    cases = []
+    for k in range(count):
+        for kind in ('camunda_workflow', 'sap_accounting', 'sap_o2c'):
+            source, result = database_case(kind)
+            cases.append((f'{kind}{k}', kind, source, result))
+    return cases
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--count', type=int, default=600)
@@ -113,6 +244,7 @@ def main():
     lines, summary = [], {}
     with tempfile.TemporaryDirectory() as directory:
         cases = browser_cases(args.count, directory)
+    cases += database_cases(args.count // 2)
     for name, kind, dump, result in cases:
         lines += [f'C {name}', f'K {kind}', 'S ' + json.dumps(dump, ensure_ascii=False),
                   'F ' + json.dumps(result, ensure_ascii=False, separators=(',', ':'))]
