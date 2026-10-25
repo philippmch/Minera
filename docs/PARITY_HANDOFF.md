@@ -258,9 +258,11 @@ Other threads: please pick different packages.
 
 ## In progress — clustering and features (claimed 2026-10-25)
 
-Thread "Continue parity toward 2.7.22" owns
-`algo.transformation.log_to_features` leftovers (temporal_lazy, LLE util),
-the OCEL LLM abstractions and `algo.simulation.montecarlo` (both done).
+Thread "Continue parity toward 2.7.22" did the OCEL LLM abstractions and
+`algo.simulation.montecarlo` (both done). The `algo.transformation.
+log_to_features` leftovers (temporal_lazy, LLE util) were reassigned on
+2026-10-25 to thread "Close remaining algorithm parity gaps", since the
+original thread had gone idle.
 
 ## LLM log abstractions — 2026-10-25
 
