@@ -146,7 +146,7 @@ are reconciled.
 | Merging | case relations | **Complete** — the PANDAS variation matches a 440-call public bank (values, dtypes, index labels and raising calls) under default and custom keys, and keeps native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Complete** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) have native/JSON/CLI/server/frontend adapters; focused contracts prove LOG/PANDAS adapters, custom selectors, diagnostics, common role records, and all eight SNA selectors |
 | Reduction | process-tree transition-reduction based; ordinary Petri-net silent-transition reduction | **Complete for TREE_TR_BASED** — the reference walk and fold are bound by a 6,000-call bank (see "Process-tree reduction bank"); `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, and custom activity keys are exposed through JSON/CLI/server/frontend adapters. Ordinary PNML reduction exposes the complete structural fixed-point rule family through native, standalone CLI, multipart local-server, and typed frontend APIs, including deterministic single-entry/single-exit/series transition and place fusion, positively marked invariant-place elimination, duplicate silent-transition fusion, inert self-loop elimination, extended-arc preservation, redundant reset cleanup, and opt-in parallel-place fusion and abstraction; result diagnostics include remapped markings, place aliases, and reduced PNML. Marking-aware PNML import/export preserves arbitrary nonnegative initial/final vectors through reduction, while legacy conformance import remains strict to single-token workflow nets. |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial overall; tree generation plus Petri, process-tree, DFG, Declare and OCPN (EXTENSIVE, see "OCPN extensive playout bank") playout complete** — Petri basic/stochastic/extensive, Declare classic, both DFG variants, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation, including deterministic multi-model batches), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; completed catalog packages are backed by manifest-enforced native/request/JSON/CLI/server/frontend/test artifacts; Declare now uses nonnegative bounded native options, a shared strict server/request parser, and a dedicated frontend serializer instead of incorrectly emitting process-tree field names; DFG performance playout counts completed versus truncated/deadlocked traces and treats an invisible end-boundary transition after the visible-event cap as successful termination; bounded OCPN playout plus native causal-net obligation search support independent/shared/synchronized projections, marker groups, cardinality, key constraints, independent activity/binding/transition branching caps, reachability, binding sequences, and per-trace object suffixing through native, CLI, multipart local-server, and frontend adapters; broader simulation/model-family coverage remains |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial overall; tree generation plus Petri, process-tree, DFG, Declare, OCPN (EXTENSIVE, see "OCPN extensive playout bank") and OC causal net (EXTENSIVE, see "OC causal net extensive playout bank") playout complete** — Petri basic/stochastic/extensive, Declare classic, both DFG variants, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation, including deterministic multi-model batches), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; completed catalog packages are backed by manifest-enforced native/request/JSON/CLI/server/frontend/test artifacts; Declare now uses nonnegative bounded native options, a shared strict server/request parser, and a dedicated frontend serializer instead of incorrectly emitting process-tree field names; DFG performance playout counts completed versus truncated/deadlocked traces and treats an invisible end-boundary transition after the visible-event cap as successful termination; bounded OCPN playout plus native causal-net obligation search support independent/shared/synchronized projections, marker groups, cardinality, key constraints, independent activity/binding/transition branching caps, reachability, binding sequences, and per-trace object suffixing through native, CLI, multipart local-server, and frontend adapters; broader simulation/model-family coverage remains |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; event rows infer typed attributes with bounded categorical cardinality, use canonical `event:key@value` names, and are rectangular across traces; trace extraction now defaults to trace-based rows, infers complete typed case attributes, scopes missing categorical values to traces with no observed value, and exposes selectable activity/succession representations, categorical cardinality bounds, case identifiers, duration/timing/path/workload/concurrency extras, and epsilon controls through native, JSON, CLI, server, and typed frontend adapters; trace timing extras enumerate only observed direct/indirect paths (including self-loops), honor the configured start timestamp, and retain the last valid positive occurrence; work-in-progress and resource-workload extras count overlapping cases, while concurrency extras count other events using the configured start timestamp; temporal rows now provide arrival/finish-rate, service/waiting/sojourn, rework, case/resource, and legacy compact projections with explicit feature schemas plus calendar frequencies (`W`, `MS`, `QE`, and related aliases) and fixed-width compatibility; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, both OCEL description variants with timestamp controls, all three bounded OCEL event/object/events-object feature tables with shared activity, timestamp, relation, endpoint, independently selectable lifecycle metrics and relation-stream lifecycle paths, deterministic object-specific relation-prefix length/timediff/one-hot activity columns, interaction, and custom attribute option groups, object-type filtering, optional per-object-type interaction counts, and opt-in interaction/descendants/inheritance/cobirth/codeath graph scalar columns for OBJECTS, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; numeric transformer model runtimes and broader OCEL feature parameters remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
@@ -15249,3 +15249,44 @@ Reference behaviour found (black box):
 - The trace order follows hash-seeded set iteration; the bank records the
   traces sorted. Fractional branching factors are drawn at random and are
   not part of the bank.
+
+## OC causal net extensive playout bank (2026-10-25)
+
+`scripts/capture-oc-causal-net-playout-bank.py` (seed 20261025, four hash
+seeds) builds 800 seeded object-centric causal nets (one or two object types,
+up to three activities, one or two marker groups per side, cardinalities 0..2
+or unbounded, shared or own marker keys) through the public
+`create_oc_causal_net`; the factory rejects 467 of them. The public
+`algo.simulation.playout.oc_causal_net` EXTENSIVE apply runs under one and
+two bindings per activity: RETURN_SEQUENCES (sorted canonical binding
+sequences), the default OCEL and OBJECTS_UNIQUE_PER_SEQUENCE (trace-order
+independent content) into `docs/oc-causal-net-playout-bank.txt.gz`. Calls
+over 5 seconds are marked as timeouts, calls whose result depends on the hash
+seed as varying. `minera_oc_causal_net_playout_parity_tests` compares
+include/minera/oc_causal_net_reference_playout.hpp: 1,807 calls, 0 failures
+(191 timed out or varying). Nets converted from mined OCPNs name their
+activities differently under every hash seed, so the bank leaves them out.
+
+Reference behaviour found (black box):
+- The state is a multiset of obligations (from, to, type, object). Every
+  given object starts with an obligation to START_<type>; a sequence is
+  complete when none is left, and every complete binding sequence is
+  returned.
+- START_<type> consumes the start obligations of any non-empty set of its
+  objects. Another activity picks one input group and, per marker, a set of
+  obligated objects within the marker's cardinality; its objects of a type
+  are the union of those sets and must not all be empty. It then picks one
+  output group with a marker for every bound type and, per marker, a subset
+  within the cardinality, so that each type's markers cover exactly its bound
+  objects. Markers of one group with the same key and type take disjoint
+  sets; key 0 is a key of its own. Equal bindings count once.
+- Each activity binds at most MAX_BINDINGS_PER_ACTIVITY times per sequence.
+- Errors: a type without START_<type> raises KeyError; unless no object is
+  given, an activity other than START_<type> without input groups raises
+  KeyError at the first search step (which one, when several, depends on the
+  hash seed); an activity other than END_<type> without output groups raises
+  KeyError once one of its input groups can be bound.
+- The OCEL lists every binding except START/END ones as `event_<n>`, one
+  second apart from 10,000,001 seconds after the epoch, with one relation per
+  consumed obligation (an object consumed from two activities is related
+  twice), renamed `<id>_<sequence>` when unique.

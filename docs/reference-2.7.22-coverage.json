@@ -6228,8 +6228,41 @@
           "symbol": "EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "EXTENSIVE": {
+          "selector": "EXTENSIVE",
+          "binding": {
+            "selector": "EXTENSIVE",
+            "modules": [
+              "algo.simulation.playout.oc_causal_net.variants.extensive"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "EXTENSIVE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/oc_causal_net_reference_playout.hpp",
+              "symbol": "reference_oc_causal_net_playout"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_oc_causal_net_playout_parity.cpp",
+              "executable": "minera_oc_causal_net_playout_parity_tests",
+              "case": "check_playout"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/oc_causal_net_reference_playout.hpp",
+        "src/backend/oc_causal_net_reference_playout.cpp",
+        "src/backend/tests/test_oc_causal_net_playout_parity.cpp",
+        "scripts/capture-oc-causal-net-playout-bank.py"
+      ]
     },
     {
       "package": "algo.simulation.playout.ocpn",
@@ -17139,8 +17172,30 @@
           "selector": "EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/oc_causal_net_reference_playout.hpp",
+        "src/backend/oc_causal_net_reference_playout.cpp",
+        "src/backend/tests/test_oc_causal_net_playout_parity.cpp",
+        "scripts/capture-oc-causal-net-playout-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.oc_causal_net.variants.extensive",
+        "implementation": [
+          {
+            "path": "include/minera/oc_causal_net_reference_playout.hpp",
+            "symbol": "reference_oc_causal_net_sequences"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_oc_causal_net_playout_parity.cpp",
+            "executable": "minera_oc_causal_net_playout_parity_tests",
+            "case": "check_sequences"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.ocpn.variants.extensive",

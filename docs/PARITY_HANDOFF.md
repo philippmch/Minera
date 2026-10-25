@@ -90,6 +90,16 @@ Package `algo.simulation.playout.ocpn` promoted. The older
 `ocpn_extensive_playout` (its own object choices, caps and timestamps) still
 backs the CLI/server.
 
+## OC causal net extensive playout — 2026-10-25
+
+New bank `docs/oc-causal-net-playout-bank.txt.gz` (800 seeded nets, 1,807
+compared calls, about four minutes to capture, seconds to run) passes in
+`minera_oc_causal_net_playout_parity_tests` through the new
+include/minera/oc_causal_net_reference_playout.hpp (model and the KeyError
+rules in the parity doc). Package `algo.simulation.playout.oc_causal_net`
+promoted. The older native causal-net playout (its own caps and branching)
+still backs the CLI/server.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns
