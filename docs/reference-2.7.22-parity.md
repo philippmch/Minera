@@ -14947,3 +14947,48 @@ results, errors and in-place mutations compare exactly. The domain, the
 comparison rules and the native behaviour are in
 [filtering-common-domain-parity.md](filtering-common-domain-parity.md). All
 four modules are complete.
+
+## Seeded Monte Carlo bank (2026-10-25)
+
+`scripts/capture-monte-carlo-numpy-bank.py` (seed 20261035) runs 240 seeded
+public PETRI_SEMAPH_FIFO simulations after `numpy.random.seed`: 150 with
+explicit stochastic maps over every public random-variable family (chains,
+choices, two choices, parallel branches, loops, silent bypasses; positive,
+negative and zero weights; shared resource capacities one to three) and 90
+that fit their map from a seeded source log (two thirds with an explicit
+arrival ratio, the rest inferred). Each call runs six times on freshly built
+nets under four hash seeds, and every distinct outcome is kept (427). The
+fixture `src/backend/tests/fixtures/monte_carlo_numpy_bank.txt` drives
+`minera_monte_carlo_numpy_parity_tests`: with `numpy_legacy_seed` native
+reproduces every trace (activities and microsecond timestamps), the case
+execution times, their median and the total time for 426 outcomes.
+
+Reference behaviour found (black box):
+
+- All draws come from numpy's legacy global generator (`random` seeding has
+  no effect). Native `NumpyLegacyRandom` (src/backend/numpy_legacy_random.hpp)
+  implements the published numpy algorithms (MT19937 init_genrand, 53-bit
+  doubles, polar normal with its cached value, legacy exponential and gamma)
+  and matches numpy bit for bit.
+- Per firing, in scheduler order: one `numpy.random.choice` over the enabled
+  transitions with probabilities weight / sum (1 / n for a zero sum; negative
+  probabilities raise ValueError), then the service time. The laws are
+  `mu + sigma * z` (no draw when sigma is 0), `loc + scale * E`,
+  `loc + scale * U`, `loc + scale * G(a)` and `loc + scale * exp(s * z)`; a
+  negative value is redrawn.
+- The enabled transitions reach the choice in Python set order, which follows
+  object identity and changes between runs of one process. The test accepts an
+  outcome when some transition order (`numpy_choice_order`) reproduces it.
+- `total_cases_time` runs from the first event of the first case, not the
+  earliest event of any case, to the latest event; native now does the same
+  (all 370 earlier scheduler observations agree).
+- Map fitting from a log: a hidden firing passes on the latest time of the
+  tokens it consumes (a zero sample) unless that token came from the first
+  event of the trace or the initial marking, in which case the hidden firing
+  and its outputs stay untimed. Native fitting now follows this; the earlier
+  stochastic-fit checks (64) still pass.
+
+Contract: exact. One outcome (mc-081, a parallel net with capacity-one
+resources) has one firing whose native resource wait is later than the
+reference's under every choice order; the test pins it as the only residual.
+The seeded mode is a native option for now (not yet in JSON, CLI or server).

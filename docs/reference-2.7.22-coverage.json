@@ -5983,8 +5983,45 @@
           "symbol": "PETRI_SEMAPH_FIFO"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/monte_carlo.hpp",
+        "src/backend/monte_carlo.cpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/stochastic_map.cpp",
+        "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
+        "src/backend/tests/fixtures/monte_carlo_numpy_bank.txt",
+        "scripts/capture-monte-carlo-numpy-bank.py",
+        "scripts/generate-monte-carlo-numpy-bank-tests.py"
+      ],
+      "proofs": {
+        "PETRI_SEMAPH_FIFO": {
+          "selector": "PETRI_SEMAPH_FIFO",
+          "binding": {
+            "selector": "PETRI_SEMAPH_FIFO",
+            "modules": [
+              "algo.simulation.montecarlo.variants.petri_semaph_fifo"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PETRI_SEMAPH_FIFO"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/monte_carlo.hpp",
+              "symbol": "MonteCarloOptions::numpy_legacy_seed"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
+              "executable": "minera_monte_carlo_numpy_parity_tests",
+              "case": "monte_carlo_numpy_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.simulation.playout.declare",
@@ -16379,8 +16416,34 @@
       "owner": "algo.simulation.montecarlo",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/monte_carlo.hpp",
+        "src/backend/monte_carlo.cpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/stochastic_map.cpp",
+        "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
+        "src/backend/tests/fixtures/monte_carlo_numpy_bank.txt",
+        "scripts/capture-monte-carlo-numpy-bank.py",
+        "scripts/generate-monte-carlo-numpy-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.simulation.montecarlo.utils.replay",
+        "implementation": [
+          {
+            "path": "include/minera/monte_carlo.hpp",
+            "symbol": "fit_monte_carlo_options"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
+            "executable": "minera_monte_carlo_numpy_parity_tests",
+            "case": "monte_carlo_fitted_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.montecarlo.variants.petri_semaph_fifo",
@@ -16393,8 +16456,34 @@
           "selector": "PETRI_SEMAPH_FIFO"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/monte_carlo.hpp",
+        "src/backend/monte_carlo.cpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/stochastic_map.cpp",
+        "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
+        "src/backend/tests/fixtures/monte_carlo_numpy_bank.txt",
+        "scripts/capture-monte-carlo-numpy-bank.py",
+        "scripts/generate-monte-carlo-numpy-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.simulation.montecarlo.variants.petri_semaph_fifo",
+        "implementation": [
+          {
+            "path": "include/minera/monte_carlo.hpp",
+            "symbol": "MonteCarloOptions::numpy_legacy_seed"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
+            "executable": "minera_monte_carlo_numpy_parity_tests",
+            "case": "monte_carlo_numpy_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.declare.variants.classic",

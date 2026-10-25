@@ -12,6 +12,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <tuple>
 #include <utility>
 
 #include "minera/timestamp.hpp"
@@ -521,7 +522,9 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       std::copy(options.replay.initial_marking.begin(),
                 options.replay.initial_marking.end(), marking.begin());
     }
-    std::vector<std::deque<std::optional<std::int64_t>>> arrivals(net.place_count());
+    // Each token keeps its time and the index of the event that produced it.
+    std::vector<std::deque<std::pair<std::optional<std::int64_t>, std::size_t>>> arrivals(
+        net.place_count());
     auto initial_arrivals = marking;
     const auto first_time = trace.events.empty() ? std::nullopt
                                                  : selected_time(trace.events.front());
@@ -535,19 +538,23 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       ++stats.activations;
       const auto& transition = net.transitions()[transition_index];
       std::optional<std::int64_t> arrival;
+      std::size_t arrival_source = 0;
       std::vector<bool> consumed(net.place_count(), false);
       for (const auto place : transition.inputs) {
         if (!consumed[place]) {
           std::optional<std::int64_t> consumed_time;
+          std::size_t source = 0;
           if (initial_arrivals[place] > 0) {
             --initial_arrivals[place];
             consumed_time = first_time;
           } else if (!arrivals[place].empty()) {
-            consumed_time = arrivals[place].front();
+            std::tie(consumed_time, source) = arrivals[place].front();
             arrivals[place].pop_front();
           }
-          if (consumed_time && (!arrival || *consumed_time > *arrival))
+          if (consumed_time && (!arrival || *consumed_time > *arrival)) {
             arrival = consumed_time;
+            arrival_source = source;
+          }
         }
         consumed[place] = true;
         if (marking[place] > 0) --marking[place];
@@ -558,7 +565,18 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         initial_arrivals[place] = 0;
       }
       std::optional<std::int64_t> time;
-      if (transition.activity && event_index < trace.events.size()) {
+      std::size_t time_source = event_index;
+      if (!transition.activity) {
+        // A hidden firing passes its latest input time on, unless that token
+        // came from the first event (or the initial marking): the reference
+        // then leaves the hidden firing and its outputs untimed.
+        if (arrival && arrival_source > 0) {
+          time = arrival;
+          time_source = arrival_source;
+          stats.performance.push_back(0.0);
+          stats.log_indices.push_back(trace_index);
+        }
+      } else if (event_index < trace.events.size()) {
         const auto& event = trace.events[event_index];
         time = selected_time(event);
         if (time && arrival) {
@@ -574,7 +592,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         if (marking[place] == std::numeric_limits<std::uint64_t>::max())
           throw std::overflow_error("stochastic map: marking overflow");
         ++marking[place];
-        if (!produced[place]) arrivals[place].push_back(time);
+        if (!produced[place]) arrivals[place].emplace_back(time, time_source);
         produced[place] = true;
       }
     }

@@ -42,8 +42,7 @@ Other threads: please pick different packages.
 
 Thread "Continue parity toward 2.7.22" owns
 `algo.transformation.log_to_features` leftovers (temporal_lazy, LLE util),
-the OCEL LLM abstractions (ocel_fea_descr, ocel_ocdfg_descr) and
-`algo.simulation.montecarlo` next.
+the OCEL LLM abstractions and `algo.simulation.montecarlo` (both done).
 
 ## LLM log abstractions — 2026-10-25
 
@@ -55,6 +54,18 @@ because the public abstractions mutate their input. Native feature inference
 now one-hot encodes mixed string/number attributes. Six support modules
 promoted: 283/387 with the filtering bank. Left in `algo.querying.llm.abstractions`: ocel_fea_descr and
 ocel_ocdfg_descr.
+
+## Monte Carlo simulation — 2026-10-25
+
+New bank `docs/monte-carlo-numpy-bank.json.gz` (240 seeded public
+simulations, 427 distinct outcomes) passes in
+`minera_monte_carlo_numpy_parity_tests` through the new
+`MonteCarloOptions::numpy_legacy_seed` (numpy legacy generator, reference draw
+order) and `numpy_choice_order`. Native `total_cases_time` and hidden-firing
+timing in map fitting were corrected. One outcome stays a pinned residual
+(resource wait, mc-081). Package and both modules promoted. Follow-up: expose
+the seeded mode in JSON/CLI/server. Next for this thread: log_to_features
+leftovers (temporal_lazy, LLE util).
 
 ## OCEL LLM abstractions — 2026-10-25
 

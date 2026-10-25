@@ -7,6 +7,7 @@
 #include <limits>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <queue>
 #include <random>
 #include <stdexcept>
@@ -16,6 +17,7 @@
 #include <vector>
 
 #include "minera/timestamp.hpp"
+#include "numpy_legacy_random.hpp"
 
 namespace minera {
 namespace {
@@ -617,6 +619,79 @@ PreparedOptions prepare_options(const PetriNet& net,
   return enabled[picked];
 }
 
+// numpy.random.choice over the enabled transitions with probabilities
+// weight / total (1 / n for a zero total): one uniform against the
+// cumulative sum normalized by its last entry.
+[[nodiscard]] std::size_t choose_transition_numpy(
+    std::vector<std::size_t> enabled, const std::vector<double>& weights,
+    const std::vector<std::size_t>& rank, NumpyLegacyRandom& rng) {
+  if (enabled.empty()) throw std::invalid_argument("no enabled transitions");
+  std::stable_sort(enabled.begin(), enabled.end(),
+                   [&](std::size_t left, std::size_t right) { return rank[left] < rank[right]; });
+  double total = 0.0;
+  for (const auto index : enabled) total += weights[index];
+  if (!std::isfinite(total)) {
+    throw std::invalid_argument(
+        "Monte Carlo enabled transition weight sum must be finite");
+  }
+  std::vector<double> cumulative;
+  cumulative.reserve(enabled.size());
+  double sum = 0.0;
+  for (const auto index : enabled) {
+    const double probability = total == 0.0
+        ? 1.0 / static_cast<double>(enabled.size()) : weights[index] / total;
+    if (!(probability >= 0.0)) {
+      throw std::invalid_argument(
+          "Monte Carlo enabled transition probabilities must be finite and non-negative");
+    }
+    sum += probability;
+    cumulative.push_back(sum);
+  }
+  if (std::fabs(sum - 1.0) > std::sqrt(std::numeric_limits<double>::epsilon()))
+    throw std::invalid_argument("Monte Carlo enabled transition probabilities do not sum to 1");
+  const double last = cumulative.back();
+  for (auto& value : cumulative) value /= last;
+  const double draw = rng.random_sample();
+  const auto picked = static_cast<std::size_t>(
+      std::upper_bound(cumulative.begin(), cumulative.end(), draw) - cumulative.begin());
+  return enabled[std::min(picked, enabled.size() - 1)];
+}
+
+// The reference service-time laws on numpy's legacy draws, redrawn while
+// negative.
+[[nodiscard]] double sample_duration_numpy(const MonteCarloDuration& duration,
+                                           NumpyLegacyRandom& rng) {
+  const auto draw = [&]() -> double {
+    switch (duration.distribution) {
+      case MonteCarloDurationDistribution::kDeterministic:
+        return duration.value_seconds;
+      case MonteCarloDurationDistribution::kConstant0:
+      case MonteCarloDurationDistribution::kImmediate:
+        return 0.0;
+      case MonteCarloDurationDistribution::kExponential:
+        return rng.standard_exponential() * duration.value_seconds + duration.secondary_seconds;
+      case MonteCarloDurationDistribution::kNormal:
+        if (duration.secondary_seconds == 0.0) return duration.value_seconds;
+        return duration.value_seconds + duration.secondary_seconds * rng.gauss();
+      case MonteCarloDurationDistribution::kUniform:
+        return rng.random_sample() * duration.secondary_seconds + duration.value_seconds;
+      case MonteCarloDurationDistribution::kLogNormal:
+        return std::exp(duration.value_seconds * rng.gauss()) * duration.tertiary_seconds +
+               duration.secondary_seconds;
+      case MonteCarloDurationDistribution::kGamma:
+        return rng.standard_gamma(duration.value_seconds) * duration.tertiary_seconds +
+               duration.secondary_seconds;
+      default:
+        throw std::invalid_argument("Monte Carlo duration distribution is invalid");
+    }
+  };
+  for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
+    const double value = draw();
+    if (!(value < 0.0)) return value;
+  }
+  throw std::runtime_error("Monte Carlo rejection sampling budget exceeded");
+}
+
 // Robert (2009), Proposition 2.3: https://arxiv.org/pdf/0907.4010.
 // For Z >= a >= 0, propose Z=a+E/alpha, E~Exp(1), where
 // alpha=(a+hypot(a,2))/2, accepting exp(-(Z-alpha)^2/2).
@@ -1046,6 +1121,18 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   std::vector<std::vector<double>> timestamps(net.place_count());
   std::vector<std::int64_t> occupied(net.place_count(), 0);
   std::mt19937_64 rng(options.seed);
+  std::optional<NumpyLegacyRandom> numpy_rng;
+  std::vector<std::size_t> choice_rank(net.transitions().size());
+  if (options.numpy_legacy_seed) {
+    numpy_rng.emplace(*options.numpy_legacy_seed);
+    std::iota(choice_rank.begin(), choice_rank.end(), net.transitions().size());
+    for (std::size_t position = 0; position < options.numpy_choice_order.size(); ++position) {
+      const auto index = options.numpy_choice_order[position];
+      if (index >= choice_rank.size())
+        throw std::invalid_argument("Monte Carlo numpy choice order names an unknown transition");
+      choice_rank[index] = std::min(choice_rank[index], position);
+    }
+  }
   auto advance = [&](CaseState& state) {
     if (options.stop_at_final &&
         is_final_marking(state.marking, prepared.final_marking,
@@ -1072,11 +1159,13 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
       return;
     }
 
-    const auto transition_index =
-        choose_transition(enabled, prepared.weights, rng);
+    const auto transition_index = numpy_rng
+        ? choose_transition_numpy(enabled, prepared.weights, choice_rank, *numpy_rng)
+        : choose_transition(enabled, prepared.weights, rng);
     const auto& transition = net.transitions()[transition_index];
-    const double duration =
-        sample_duration(prepared.durations[transition_index], rng);
+    const double duration = numpy_rng
+        ? sample_duration_numpy(prepared.durations[transition_index], *numpy_rng)
+        : sample_duration(prepared.durations[transition_index], rng);
     if (!std::isfinite(duration) || duration < 0.0) {
       throw std::runtime_error("Monte Carlo sampled an invalid duration");
     }
@@ -1208,7 +1297,9 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
         continue;
       }
       result.diagnostics.cases_ex_time.push_back(*last - *first);
-      first_visible = std::min(first_visible, *first);
+      // The reference measures from the first event of the first case, not
+      // the earliest event of any case.
+      if (&trace == &result.log.traces.front()) first_visible = *first;
       last_visible = std::max(last_visible, *last);
     }
     result.diagnostics.median_cases_ex_time =

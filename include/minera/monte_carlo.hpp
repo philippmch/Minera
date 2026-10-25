@@ -90,6 +90,15 @@ struct MonteCarloOptions {
   // transitions.  This bounds unsound nets and zero-duration loops.
   std::size_t max_steps = 1000;
   std::uint64_t seed = 1;
+  // When set, choices and service times draw from the numpy legacy global
+  // generator seeded with this value, in the reference's order: per firing
+  // one uniform through numpy's weighted choice over the enabled transitions,
+  // then the service time, redrawn while it is negative. seed is then unused.
+  std::optional<std::uint32_t> numpy_legacy_seed;
+  // Order of the enabled transitions handed to that weighted choice, as
+  // transition indices (the reference passes Python set order, which follows
+  // object identity). Transitions left out follow in index order.
+  std::vector<std::size_t> numpy_choice_order;
   // Timestamp of the first case arrival, in Unix epoch seconds.
   double start = 1000000.0;
   // A missing duration vector uses this deterministic service time.
