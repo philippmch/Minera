@@ -1685,6 +1685,31 @@ the WMI times are cut at the first '+' or '-' and parsed by time.strptime,
 whose regular expression native reproduces (so "2024012030405.123" is
 2024-01-20 03:04:05.123), and the first failure raises.
 
+## LLM connector parity bank
+
+`include/minera/llm_connector_reference.hpp` ports
+`algo.querying.llm.connectors` (anthropic, openai, google) as observed with
+`requests.post` stubbed: each connector builds one POST from the prompt and
+parameters and reads its answer out of the response.
+`scripts/capture-llm-bank.py` captures `docs/llm-connector-bank.txt.gz` (800
+seeded cases per connector: urls with and without a trailing '/', urls naming
+api.openai.com elsewhere, keys including None and '', thinking budgets,
+use_responses_api as bools, ints and None, overriding extra payloads, images
+with odd or missing extensions and missing files; responses mostly well
+formed, the rest other providers' shapes, API errors, empty lists and missing
+keys), replayed by `minera_llm_connector_parity_tests`. All 918 answers and
+every POST (url, headers in order, payload with keys in order, timeout)
+match, and the 1482 raising cases raise the same exception type (API errors
+with the same message). Rules found (header comment): the media type is
+"image/" plus the lowercased extension (so `.jpg` is `image/jpg`); a thinking
+budget raises max_tokens by itself; OpenAI picks the Responses API by
+default only when the url contains `api.openai.com`, defaults the model to
+gpt-5 with an image and gpt-4.1 without, and sends max_tokens to chat
+completions always with an image (16384 by default) but otherwise only when
+given; answers are content[-1], output[-1].content[0],
+choices[0].message.content and candidates[0].content.parts[0] by direct
+indexing.
+
 ## XES importer-variant evidence
 
 The native importer explicitly accepts `ITERPARSE`, `LINE_BY_LINE`,

@@ -146,6 +146,7 @@ struct ConnectorReferenceJson {
   std::vector<std::pair<std::string, ConnectorReferenceJson>> members;
   // The member named key, nullptr when absent (or when this is no object).
   [[nodiscard]] const ConnectorReferenceJson* find(const std::string& key) const;
+  bool operator==(const ConnectorReferenceJson&) const = default;
 };
 
 // requests.get(url, headers=headers).json()

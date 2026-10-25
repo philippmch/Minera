@@ -18837,8 +18837,29 @@
       "owner": "support:querying.llm.connectors",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_connector_reference.hpp",
+        "src/backend/llm_connector_reference.cpp",
+        "src/backend/tests/test_llm_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.connectors.anthropic",
+        "implementation": [
+          {
+            "path": "include/minera/llm_connector_reference.hpp",
+            "symbol": "reference_anthropic_query"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_connector_parity.cpp",
+            "executable": "minera_llm_connector_parity_tests",
+            "case": "anthropic_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.connectors.google",
@@ -18846,8 +18867,29 @@
       "owner": "support:querying.llm.connectors",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_connector_reference.hpp",
+        "src/backend/llm_connector_reference.cpp",
+        "src/backend/tests/test_llm_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.connectors.google",
+        "implementation": [
+          {
+            "path": "include/minera/llm_connector_reference.hpp",
+            "symbol": "reference_google_query"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_connector_parity.cpp",
+            "executable": "minera_llm_connector_parity_tests",
+            "case": "google_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.connectors.openai",
@@ -18855,8 +18897,29 @@
       "owner": "support:querying.llm.connectors",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_connector_reference.hpp",
+        "src/backend/llm_connector_reference.cpp",
+        "src/backend/tests/test_llm_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.connectors.openai",
+        "implementation": [
+          {
+            "path": "include/minera/llm_connector_reference.hpp",
+            "symbol": "reference_openai_query"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_connector_parity.cpp",
+            "executable": "minera_llm_connector_parity_tests",
+            "case": "openai_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.injection.db_knowledge.variants.pandas_duckdb",
