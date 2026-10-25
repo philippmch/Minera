@@ -168,6 +168,8 @@ add_library(minera_core
   src/backend/dfg_playout.cpp
   src/backend/dfg_alignment.cpp
   src/backend/dfg_filter.cpp
+  src/backend/dfg_filtering.cpp
+  src/backend/filtering_common.cpp
   src/backend/dfg_conversion.cpp
   src/backend/dfg_io.cpp
   src/backend/dfg_precision.cpp
@@ -2186,6 +2188,16 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_llm_ocel_abstractions_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_llm_ocel_abstractions_parity_tests COMMAND minera_llm_ocel_abstractions_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/llm_ocel_abstractions_bank.txt")
+
+  add_executable(minera_filtering_common_bank_parity_tests
+    src/backend/tests/test_filtering_common_bank_parity.cpp
+  )
+  target_link_libraries(minera_filtering_common_bank_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_filtering_common_bank_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_filtering_common_bank_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_filtering_common_bank_parity_tests COMMAND minera_filtering_common_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/filtering-common-bank.json.gz")
+  set_tests_properties(minera_filtering_common_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_random_tree_tests
     src/backend/tests/test_random_tree.cpp

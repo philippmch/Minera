@@ -13633,8 +13633,51 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/filtering-common-domain-parity.md",
+      "artifacts": [
+        "include/minera/filtering_common.hpp",
+        "src/backend/filtering_common.cpp",
+        "scripts/filtering_common_domain.py",
+        "scripts/capture-filtering-common-bank.py",
+        "src/backend/tests/test_filtering_common_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.common.attributes.attributes_common",
+        "implementation": [
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "get_sorted_attributes_list"
+          },
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "get_attributes_threshold"
+          },
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "get_kde_numeric_attribute"
+          },
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "get_kde_numeric_attribute_json"
+          },
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "get_kde_date_attribute"
+          },
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "get_kde_date_attribute_json"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_filtering_common_bank_parity.cpp",
+            "executable": "minera_filtering_common_bank_parity_tests",
+            "case": "attributes_common_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.common.end_activities.end_activities_common",
@@ -13676,8 +13719,39 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/filtering-common-domain-parity.md",
+      "artifacts": [
+        "include/minera/filtering_common.hpp",
+        "src/backend/filtering_common.cpp",
+        "scripts/filtering_common_domain.py",
+        "scripts/capture-filtering-common-bank.py",
+        "src/backend/tests/test_filtering_common_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.common.filtering_constants",
+        "implementation": [
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "kFilteringCaseConceptName"
+          },
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "kFilteringDecreasingFactor"
+          },
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "kFilteringDefaultNoiseThreshDf"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_filtering_common_bank_parity.cpp",
+            "executable": "minera_filtering_common_bank_parity_tests",
+            "case": "filtering_constants_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.common.start_activities.start_activities_common",
@@ -13719,8 +13793,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/filtering-common-domain-parity.md",
+      "artifacts": [
+        "include/minera/filtering_common.hpp",
+        "src/backend/filtering_common.cpp",
+        "scripts/filtering_common_domain.py",
+        "scripts/capture-filtering-common-bank.py",
+        "src/backend/tests/test_filtering_common_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.common.timestamp.timestamp_common",
+        "implementation": [
+          {
+            "path": "include/minera/filtering_common.hpp",
+            "symbol": "get_dt_from_string"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_filtering_common_bank_parity.cpp",
+            "executable": "minera_filtering_common_bank_parity_tests",
+            "case": "timestamp_common_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.common.traces.infix_to_regex",
@@ -13758,8 +13855,77 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/filtering-common-domain-parity.md",
+      "artifacts": [
+        "include/minera/dfg_filtering.hpp",
+        "src/backend/dfg_filtering.cpp",
+        "include/minera/filtering_common.hpp",
+        "src/backend/filtering_common.cpp",
+        "scripts/filtering_common_domain.py",
+        "scripts/capture-filtering-common-bank.py",
+        "src/backend/tests/test_filtering_common_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.dfg.dfg_filtering",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "kDfgFilteringDefaultNoiseThreshDf"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "filter_dfg_on_activities_percentage"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "filter_dfg_on_paths_percentage"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "filter_dfg_keep_connected"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "clean_dfg_based_on_noise_thresh"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "filter_dfg_to_activity"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "filter_dfg_from_activity"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "filter_dfg_contain_activity"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "build_adjacency_structures"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "bfs_reachable"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "remove_unreachable_nodes"
+          },
+          {
+            "path": "include/minera/dfg_filtering.hpp",
+            "symbol": "generate_nx_graph_from_dfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_filtering_common_bank_parity.cpp",
+            "executable": "minera_filtering_common_bank_parity_tests",
+            "case": "dfg_filtering_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.attr_value_repetition.filter",

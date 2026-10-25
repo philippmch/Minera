@@ -88,6 +88,21 @@ and TEMPORAL (weekly and daily). One native fix: absent-activity index
 features are -1. Package promoted (73/86); temporal_lazy and the LLE util
 stay partial.
 
+## Common and DFG filtering helpers — 2026-10-25
+
+New bank `docs/filtering-common-bank.json.gz` (4,000 cases, 33,747 public
+calls over `algo.filtering.common.{filtering_constants, timestamp_common,
+attributes_common}` and `algo.filtering.dfg.dfg_filtering`; about 2.5 minutes
+to capture) passes in `minera_filtering_common_bank_parity_tests`. New native
+API: `filtering_common.hpp` (constants, `get_dt_from_string`, attribute
+thresholds, numeric/date KDE replicating scipy's gaussian_kde and numpy's
+grids) and `dfg_filtering.hpp` (the reference-shaped DFG filters, next to the
+old `dfg_filter.hpp`). KDE densities use a conditioning-based tolerance
+because BLAS covariance sums are not portable; everything else is exact.
+Activity names `_S_START_`/`_S_END_` are outside the domain. Details in
+`docs/filtering-common-domain-parity.md`. All four modules promoted (281/387).
+Next in this thread: the pandas filter modules, then Polars.
+
 ## EventLog filtering modules — 2026-10-25
 
 New bank `docs/log-filter-domain-bank.json.gz` (6,000 XES cases, 240,450

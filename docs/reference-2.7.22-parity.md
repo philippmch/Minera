@@ -14933,3 +14933,17 @@ Reference behaviour found (black box):
 
 The bank also corrected native object degree centrality (now counted over
 interacting objects only and scaled as `degree * (1 / (n - 1))`).
+
+## Common and DFG filtering helpers bank (2026-10-25)
+
+`algo.filtering.common.filtering_constants`,
+`algo.filtering.common.timestamp.timestamp_common`,
+`algo.filtering.common.attributes.attributes_common` and
+`algo.filtering.dfg.dfg_filtering` are bound to a seeded public-call bank,
+`docs/filtering-common-bank.json.gz` (33,747 calls, hash seeds 0-3), replayed
+by `minera_filtering_common_bank_parity_tests`. KDE densities compare within a
+conditioning-based tolerance (non-portable BLAS covariance sums); all other
+results, errors and in-place mutations compare exactly. The domain, the
+comparison rules and the native behaviour are in
+[filtering-common-domain-parity.md](filtering-common-domain-parity.md). All
+four modules are complete.
