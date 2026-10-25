@@ -47,6 +47,18 @@ through the new include/minera/interleavings_merge.hpp
 model in the parity doc). The discovery-gaps thread (ILP, genetic, this util)
 is finished; nothing of it stays claimed. Modules: 307/387 complete.
 
+## In progress — remaining algorithm gaps (claimed 2026-10-25)
+
+Thread "Close remaining discovery parity gaps" now owns
+`algo.reduction.process_tree.*`, `algo.organizational_mining.util`,
+`algo.evaluation.precision.utils`,
+`algo.comparison.petrinet.element_usage_comparison`,
+`algo.clustering.trace_attribute_driven.*`,
+`algo.simulation.playout.{ocpn,oc_causal_net}`,
+`algo.conformance.alignments.{process_tree,decomposed}` and
+`algo.anonymization.{pripel,trace_variant_query}`. Other threads: please pick
+different packages.
+
 ## In progress — filtering gaps (claimed 2026-10-25)
 
 Thread "Close remaining filter and log parity gaps" owns the partial
