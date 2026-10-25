@@ -7895,8 +7895,65 @@
           "symbol": "EVENTS_TRANSFORMERS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CASES_TRANSFORMERS": {
+          "selector": "CASES_TRANSFORMERS",
+          "binding": {
+            "selector": "CASES_TRANSFORMERS",
+            "modules": [
+              "algo.transformation.to_embeddings.variants.cases_transformers"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CASES_TRANSFORMERS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/embedding_reference.hpp",
+              "symbol": "reference_case_embeddings"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_embedding_parity.cpp",
+              "executable": "minera_embedding_parity_tests",
+              "case": "cases_case"
+            }
+          ]
+        },
+        "EVENTS_TRANSFORMERS": {
+          "selector": "EVENTS_TRANSFORMERS",
+          "binding": {
+            "selector": "EVENTS_TRANSFORMERS",
+            "modules": [
+              "algo.transformation.to_embeddings.variants.events_transformers"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "EVENTS_TRANSFORMERS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/embedding_reference.hpp",
+              "symbol": "reference_event_embeddings"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_embedding_parity.cpp",
+              "executable": "minera_embedding_parity_tests",
+              "case": "events_case"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/embedding_reference.hpp",
+        "src/backend/embedding_reference.cpp",
+        "src/backend/tests/test_embedding_parity.cpp"
+      ]
     }
   ],
   "module_coverage": [

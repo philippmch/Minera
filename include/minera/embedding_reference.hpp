@@ -13,6 +13,9 @@
 // float32 norm then widened). Sums run left to right; the bank uses dyadic
 // vectors whose sums are exact, so BLAS's summation order cannot show.
 //
+// The package's apply dispatches to the variant (CASES_TRANSFORMERS by
+// default), keep_top_k_per_similarity likewise.
+//
 // variants.cases_transformers embeds one sentence per case: the attribute
 // values of its events in row order joined by spaces (TypeError for a value
 // that is no str), cases sorted by identifier. variants.events_transformers
