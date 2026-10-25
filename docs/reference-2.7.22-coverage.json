@@ -14766,8 +14766,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.activity_split.activity_split_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_activity_split_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "activity_split_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.attr_value_repetition.filter",
@@ -14852,8 +14875,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.consecutive_act_case_grouping.consecutive_act_case_grouping_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_consecutive_act_case_grouping_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "consecutive_act_case_grouping_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.end_activities.end_activities_filter",
@@ -14861,8 +14907,39 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.end_activities.end_activities_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_end_activities_apply"
+          },
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_filter_df_on_end_activities"
+          },
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_filter_df_on_end_activities_nocc"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "end_activities_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.ends_with.ends_with_filter",
@@ -14870,8 +14947,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.ends_with.ends_with_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_ends_with_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "ends_with_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.ltl.ltl_checker",
@@ -14897,8 +14997,35 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.pd_filtering_constants",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "kPandasMinNoOfActivitiesToRetainForDiagram"
+          },
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "kPandasMaxNoOfActivitiesToRetainForDiagram"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "pd_filtering_constants_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.prefixes.prefix_filter",
@@ -14906,8 +15033,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.prefixes.prefix_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_prefix_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "prefixes_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.rework.rework_filter",
@@ -14915,8 +15065,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.rework.rework_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_rework_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "rework_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.start_activities.start_activities_filter",
@@ -14924,8 +15097,39 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.start_activities.start_activities_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_start_activities_apply"
+          },
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_filter_df_on_start_activities"
+          },
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_filter_df_on_start_activities_nocc"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "start_activities_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.starts_with.starts_with_filter",
@@ -14933,8 +15137,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.starts_with.starts_with_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_starts_with_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "starts_with_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.suffixes.suffix_filter",
@@ -14942,8 +15169,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.suffixes.suffix_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_suffix_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "suffixes_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.timestamp_case_grouping.timestamp_case_grouping_filter",
@@ -14951,8 +15201,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.timestamp_case_grouping.timestamp_case_grouping_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_timestamp_case_grouping_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "timestamp_case_grouping_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.timestamp.timestamp_filter",
@@ -14969,8 +15242,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/pandas-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/pandas_sequence_filters.hpp",
+        "src/backend/pandas_sequence_filters.cpp",
+        "scripts/pandas_sequence_filter_domain.py",
+        "scripts/capture-pandas-sequence-filter-bank.py",
+        "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.pandas.traces.trace_filter",
+        "implementation": [
+          {
+            "path": "include/minera/pandas_sequence_filters.hpp",
+            "symbol": "pandas_trace_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp",
+            "executable": "minera_pandas_sequence_filter_bank_parity_tests",
+            "case": "traces_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.pandas.variants.variants_filter",

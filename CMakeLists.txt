@@ -170,6 +170,7 @@ add_library(minera_core
   src/backend/dfg_filter.cpp
   src/backend/dfg_filtering.cpp
   src/backend/filtering_common.cpp
+  src/backend/pandas_sequence_filters.cpp
   src/backend/dfg_conversion.cpp
   src/backend/dfg_io.cpp
   src/backend/dfg_precision.cpp
@@ -2207,6 +2208,16 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_monte_carlo_numpy_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_monte_carlo_numpy_parity_tests COMMAND minera_monte_carlo_numpy_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/monte_carlo_numpy_bank.txt")
+
+  add_executable(minera_pandas_sequence_filter_bank_parity_tests
+    src/backend/tests/test_pandas_sequence_filter_bank_parity.cpp
+  )
+  target_link_libraries(minera_pandas_sequence_filter_bank_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_pandas_sequence_filter_bank_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_pandas_sequence_filter_bank_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_pandas_sequence_filter_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_random_tree_tests
     src/backend/tests/test_random_tree.cpp

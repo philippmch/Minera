@@ -14992,3 +14992,17 @@ Contract: exact. One outcome (mc-081, a parallel net with capacity-one
 resources) has one firing whose native resource wait is later than the
 reference's under every choice order; the test pins it as the only residual.
 The seeded mode is a native option for now (not yet in JSON, CLI or server).
+
+## Pandas sequence filters bank (2026-10-25)
+
+The twelve pandas modules `pd_filtering_constants`, `start_activities`,
+`end_activities`, `traces`, `starts_with`, `ends_with`, `rework`, `prefixes`,
+`suffixes`, `consecutive_act_case_grouping`, `timestamp_case_grouping` and
+`activity_split` (all under `algo.filtering.pandas`) are bound to a seeded
+public-call bank, `docs/pandas-sequence-filter-bank.json.gz` (33,820 calls,
+hash seeds 0-3). It is replayed by
+`minera_pandas_sequence_filter_bank_parity_tests`. Tables compare exactly
+through the normalized event-table JSON, including dtypes and the index. The
+domain, the behaviour found and the limits are in
+[pandas-sequence-filter-domain-parity.md](pandas-sequence-filter-domain-parity.md).
+All twelve modules are complete.

@@ -114,6 +114,23 @@ Activity names `_S_START_`/`_S_END_` are outside the domain. Details in
 `docs/filtering-common-domain-parity.md`. All four modules promoted (290/387 after rebasing on the other threads).
 Next in this thread: the pandas filter modules, then Polars.
 
+## Pandas sequence filters — 2026-10-25
+
+New bank `docs/pandas-sequence-filter-bank.json.gz` (3,000 frames, 33,820
+public calls over pd_filtering_constants, start/end_activities, traces,
+starts_with, ends_with, rework, prefixes, suffixes,
+consecutive_act_case_grouping, timestamp_case_grouping and activity_split;
+about 4 minutes to capture) passes in
+`minera_pandas_sequence_filter_bank_parity_tests`. New native API:
+`pandas_sequence_filters.hpp` over `EventTable`, with typed Python arguments
+and Parameters-member keys. Notable reference quirks reproduced: the two-row
+`groupby([k1, k2])` array grouping when a key is not a column, and numpy's
+object argsort TypeError on str case ids mixed with nulls. Details and
+domain limits are in `docs/pandas-sequence-filter-domain-parity.md`. All
+twelve modules are promoted.
+Next in this thread: the pandas attributes, between, cases, ltl, paths,
+timestamp and variants filters, then Polars.
+
 ## EventLog filtering modules — 2026-10-25
 
 New bank `docs/log-filter-domain-bank.json.gz` (6,000 XES cases, 240,450
