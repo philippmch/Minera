@@ -257,6 +257,68 @@ void sap_o2c_case(const BankCase& item, Tally& tally, std::vector<std::string>& 
                 [](const ConnectorReferenceConnection& c, const std::string& p) { return reference_sap_o2c(c, p); });
 }
 
+ConnectorReferenceJson response_of(const Json& value) {
+  ConnectorReferenceJson out;
+  switch (value.kind) {
+    case Json::kNull: break;
+    case Json::kBool: out.kind = ConnectorReferenceJson::kBool; out.boolean = value.boolean; break;
+    case Json::kNumber:
+      if (value.number == static_cast<double>(static_cast<std::int64_t>(value.number))) {
+        out.kind = ConnectorReferenceJson::kInt;
+        out.integer = static_cast<std::int64_t>(value.number);
+      } else {
+        out.kind = ConnectorReferenceJson::kFloat;
+        out.real = value.number;
+      }
+      break;
+    case Json::kString: out.kind = ConnectorReferenceJson::kText; out.text = value.text; break;
+    case Json::kArray:
+      out.kind = ConnectorReferenceJson::kArray;
+      for (const auto& item : value.items) out.items.push_back(response_of(item));
+      break;
+    case Json::kObject:
+      out.kind = ConnectorReferenceJson::kObject;
+      for (const auto& [key, item] : value.fields) out.members.emplace_back(key, response_of(item));
+      break;
+  }
+  return out;
+}
+
+void github_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures) {
+  const auto& source = item.source;
+  const auto owner = source.get("owner")->text, repository = source.get("repository")->text;
+  const auto* token = source.get("token");
+  const auto prefix = "https://api.github.com/repos/" + owner + "/" + repository + "/issues?state=all&per_page=100&page=";
+  std::vector<std::pair<std::string, std::map<std::string, std::string>>> calls;
+  const ConnectorReferenceGet get = [&](const std::string& url, const std::map<std::string, std::string>& headers) {
+    calls.emplace_back(url, headers);
+    const Json* found = nullptr;
+    if (url.rfind(prefix, 0) == 0) found = source.get("pages")->get(url.substr(prefix.size()));
+    else found = source.get("timelines")->get(url);
+    return found ? response_of(*found) : ConnectorReferenceJson{ConnectorReferenceJson::kArray};
+  };
+  std::string problem;
+  const auto* raises = item.frame.get("raises");
+  try {
+    const auto mine = reference_github_repo(
+        owner, repository, token->kind == Json::kString ? std::optional(token->text) : std::nullopt, get);
+    if (raises) problem = "native returns where the reference raises " + raises->text;
+    else problem = difference(mine, frame_of(item.frame));
+  } catch (const ConnectorReferenceError& error) {
+    if (!raises) problem = std::string("native raises ") + error.what();
+  }
+  const auto& expected = source.get("calls")->items;
+  if (problem.empty() && calls.size() != expected.size()) problem = "GET count differs";
+  for (std::size_t k = 0; problem.empty() && k < calls.size(); ++k) {
+    std::map<std::string, std::string> headers;
+    for (const auto& [key, value] : expected[k].items[1].fields) headers[key] = value.text;
+    if (calls[k].first != expected[k].items[0].text || calls[k].second != headers)
+      problem = "GET " + std::to_string(k) + " differs: " + calls[k].first;
+  }
+  if (!problem.empty()) failures.push_back(item.name + ": " + problem);
+  else ++(raises ? tally.raising : tally.frames)[item.kind];
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -275,6 +337,7 @@ int main(int argc, char** argv) {
       else if (item.kind == "camunda_workflow") camunda_case(item, tally, failures);
       else if (item.kind == "sap_accounting") sap_accounting_case(item, tally, failures);
       else if (item.kind == "sap_o2c") sap_o2c_case(item, tally, failures);
+      else if (item.kind == "github_repo") github_case(item, tally, failures);
       else failures.push_back(item.name + ": unknown connector " + item.kind);
     } catch (const std::exception& error) {
       failures.push_back(item.name + ": " + error.what());

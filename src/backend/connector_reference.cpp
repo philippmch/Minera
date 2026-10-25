@@ -407,6 +407,149 @@ ConnectorReferenceFrame database_frame(const ConnectorReferenceConnection& conne
   return frame;
 }
 
+
+// The extraction stops at the first of these; the rows read so far are kept.
+struct GithubStop {};
+
+const ConnectorReferenceJson& member(const ConnectorReferenceJson& object, const std::string& key) {
+  const auto* found = object.find(key);
+  if (!found) throw GithubStop{};  // KeyError, or TypeError on a value that is no dict
+  return *found;
+}
+
+Value value_of(const ConnectorReferenceJson& json) {
+  switch (json.kind) {
+    case ConnectorReferenceJson::kNull: return Value::none();
+    case ConnectorReferenceJson::kBool: return Value::of_bool(json.boolean);
+    case ConnectorReferenceJson::kInt: return Value::of(json.integer);
+    case ConnectorReferenceJson::kFloat: return Value::of_real(json.real);
+    case ConnectorReferenceJson::kText: return Value::of(json.text);
+    default: throw GithubStop{};
+  }
+}
+
+std::int64_t days_from_civil(std::int64_t year, unsigned month, unsigned day) {
+  year -= month <= 2;
+  const std::int64_t era = (year >= 0 ? year : year - 399) / 400;
+  const auto yoe = static_cast<unsigned>(year - era * 400);
+  const unsigned doy = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1;
+  const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + static_cast<std::int64_t>(doe) - 719468;
+}
+
+// The ISO 8601 forms of a GitHub date, the offset dropped: microseconds of
+// the wall clock read as UTC.
+std::int64_t github_date(const ConnectorReferenceJson& json) {
+  if (json.kind != ConnectorReferenceJson::kText) throw GithubStop{};
+  const std::string& s = json.text;
+  std::size_t at = 0;
+  auto digits = [&](std::size_t count) {
+    if (at + count > s.size()) throw GithubStop{};
+    int out = 0;
+    for (std::size_t k = 0; k < count; ++k, ++at) {
+      if (s[at] < '0' || s[at] > '9') throw GithubStop{};
+      out = out * 10 + (s[at] - '0');
+    }
+    return out;
+  };
+  auto literal = [&](char c) {
+    if (at >= s.size() || s[at] != c) throw GithubStop{};
+    ++at;
+  };
+  const int year = digits(4);
+  literal('-');
+  const int month = digits(2);
+  literal('-');
+  const int day = digits(2);
+  int hour = 0, minute = 0, second = 0, micros = 0;
+  if (at < s.size()) {
+    if (s[at] != 'T' && s[at] != ' ') throw GithubStop{};
+    ++at;
+    hour = digits(2);
+    literal(':');
+    minute = digits(2);
+    if (at < s.size() && s[at] == ':') {
+      ++at;
+      second = digits(2);
+      if (at < s.size() && s[at] == '.') {
+        ++at;
+        const auto start = at;
+        while (at < s.size() && s[at] >= '0' && s[at] <= '9') ++at;
+        if (at == start) throw GithubStop{};
+        std::string fraction = s.substr(start, std::min<std::size_t>(at - start, 6));
+        fraction.resize(6, '0');
+        micros = std::stoi(fraction);
+      }
+    }
+    if (at < s.size()) {
+      if (s[at] == 'Z') {
+        ++at;
+      } else if (s[at] == '+' || s[at] == '-') {
+        ++at;
+        digits(2);
+        if (at < s.size() && s[at] == ':') ++at;
+        digits(2);
+      } else {
+        throw GithubStop{};
+      }
+    }
+    if (at != s.size()) throw GithubStop{};
+  }
+  static constexpr unsigned kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  const bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+  if (year < 1 || month < 1 || month > 12 || day < 1 ||
+      static_cast<unsigned>(day) > kDays[month - 1] + (month == 2 && leap) || hour > 23 || minute > 59 || second > 59)
+    throw GithubStop{};
+  return days_from_civil(year, static_cast<unsigned>(month), static_cast<unsigned>(day)) * kMicrosPerDay +
+         ((hour * 60LL + minute) * 60LL + second) * 1000000LL + micros;
+}
+
+struct GithubRow {
+  std::string case_id;
+  std::int64_t micros = 0;
+  Value activity, resource, association, title;
+  std::optional<Value> pull_request;
+};
+
+ConnectorReferenceFrame github_frame(const std::string& owner, const std::string& repository,
+                                     const std::vector<GithubRow>& rows) {
+  ConnectorReferenceFrame frame;
+  if (rows.empty()) return frame;
+  std::vector<std::size_t> by_time(rows.size());
+  std::iota(by_time.begin(), by_time.end(), std::size_t{0});
+  std::stable_sort(by_time.begin(), by_time.end(),
+                   [&](std::size_t a, std::size_t b) { return rows[a].micros < rows[b].micros; });
+  std::map<std::string, std::size_t> case_rank;
+  for (const auto k : by_time) case_rank.emplace(rows[k].case_id, case_rank.size());
+  std::vector<std::size_t> order = by_time;
+  std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+    return case_rank.at(rows[a].case_id) < case_rank.at(rows[b].case_id);
+  });
+  frame.index = order;
+  auto column = [&](const std::string& name, auto value) {
+    std::vector<Value> values;
+    for (const auto k : order) values.push_back(value(rows[k], k));
+    add_column(frame, name, values);
+  };
+  column("case:owner", [&](const GithubRow&, std::size_t) { return Value::of(owner); });
+  column("case:repo", [&](const GithubRow&, std::size_t) { return Value::of(owner + "/" + repository); });
+  column("case:concept:name", [](const GithubRow& r, std::size_t) { return Value::of(r.case_id); });
+  frame.columns.push_back("time:timestamp");
+  frame.dtypes.push_back("datetime64[us, UTC]");
+  for (std::size_t r = 0; r < order.size(); ++r) frame.rows[r].push_back(timestamp_text(rows[order[r]].micros));
+  column("concept:name", [](const GithubRow& r, std::size_t) { return r.activity; });
+  column("org:resource", [](const GithubRow& r, std::size_t) { return r.resource; });
+  column("case:author_association", [](const GithubRow& r, std::size_t) { return r.association; });
+  column("case:title", [](const GithubRow& r, std::size_t) { return r.title; });
+  if (std::any_of(rows.begin(), rows.end(), [](const GithubRow& r) { return r.pull_request.has_value(); }))
+    column("case:pull_request",
+           [](const GithubRow& r, std::size_t) { return r.pull_request ? *r.pull_request : Value::none(); });
+  column("@@index", [](const GithubRow&, std::size_t k) { return Value::of(static_cast<std::int64_t>(k)); });
+  column("@@case_index", [&](const GithubRow& r, std::size_t) {
+    return Value::of(static_cast<std::int64_t>(case_rank.at(r.case_id)));
+  });
+  return frame;
+}
 }  // namespace
 
 std::string reference_database_connector_query(const std::string& connector, const std::string& prefix) {
@@ -517,6 +660,59 @@ ConnectorReferenceFrame reference_firefox_history(const std::filesystem::path& d
   return browser_frame(visits, {"title", "visit_type", "visit_type_desc", "session_id", "from_visit", "visit_count_place",
                                 "typed", "frecency", "guid"});
 #endif
+}
+
+const ConnectorReferenceJson* ConnectorReferenceJson::find(const std::string& key) const {
+  if (kind != kObject) return nullptr;
+  for (const auto& [name, value] : members)
+    if (name == key) return &value;
+  return nullptr;
+}
+
+ConnectorReferenceFrame reference_github_repo(const std::string& owner, const std::string& repository,
+                                              const std::optional<std::string>& token,
+                                              const ConnectorReferenceGet& get) {
+  std::map<std::string, std::string> headers;
+  if (token) headers["Authorization"] = "Bearer " + *token;
+  std::vector<GithubRow> rows;
+  try {
+    for (std::size_t page = 1;; ++page) {
+      const auto issues = get("https://api.github.com/repos/" + owner + "/" + repository +
+                                  "/issues?state=all&per_page=100&page=" + std::to_string(page),
+                              headers);
+      if (issues.kind == ConnectorReferenceJson::kNull) break;
+      if (issues.kind != ConnectorReferenceJson::kArray) throw GithubStop{};
+      if (issues.items.empty()) break;
+      for (const auto& issue : issues.items) {
+        if (issue.kind != ConnectorReferenceJson::kObject) throw GithubStop{};
+        const auto* timeline_url = issue.find("timeline_url");
+        if (!timeline_url) continue;
+        GithubRow created;
+        if (timeline_url->kind != ConnectorReferenceJson::kText) throw GithubStop{};
+        created.case_id = timeline_url->text;
+        created.micros = github_date(member(issue, "created_at"));
+        created.activity = Value::of(std::string("created"));
+        created.resource = value_of(member(member(issue, "user"), "login"));
+        created.association = value_of(member(issue, "author_association"));
+        created.title = value_of(member(issue, "title"));
+        if (issue.find("pull_request")) created.pull_request = value_of(member(member(issue, "pull_request"), "url"));
+        rows.push_back(created);
+        const auto timeline = get(created.case_id, headers);
+        if (timeline.kind != ConnectorReferenceJson::kArray) throw GithubStop{};
+        for (auto event = timeline.items.rbegin(); event != timeline.items.rend(); ++event) {
+          if (event->kind != ConnectorReferenceJson::kObject) throw GithubStop{};
+          if (!event->find("created_at") || !event->find("event") || !event->find("actor")) continue;
+          GithubRow row = created;
+          row.micros = github_date(member(*event, "created_at"));
+          row.activity = value_of(member(*event, "event"));
+          row.resource = value_of(member(member(*event, "actor"), "login"));
+          rows.push_back(row);
+        }
+      }
+    }
+  } catch (const GithubStop&) {
+  }
+  return github_frame(owner, repository, rows);
 }
 
 }  // namespace minera

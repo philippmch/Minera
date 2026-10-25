@@ -8,20 +8,36 @@ and url ids, a Chrome visits table without visit_duration, and databases
 without the expected tables) go through
 pm4py.algo.connectors.variants.chrome_history / firefox_history.apply.
 
+Database connectors: camunda_workflow, sap_accounting and sap_o2c get a
+recording DB-API connection over seeded tables.
+
+GitHub: github_repo.apply runs with requests replaced by a stub serving
+seeded issue pages and timelines (ISO dates with and without seconds,
+fractions, Z and offsets, a few values that are not dates, null users,
+actors and logins, missing keys, pull requests, events without created_at,
+issues sharing a timeline url, one to three pages); every GET is recorded
+with its headers. Each response is a fresh copy, since the reference
+reverses the timeline lists it receives.
+
 The bank is a gzip text file of tagged lines read by
 minera_connector_parity_tests:
 
   C name
   K connector
-  S json   the SQLite database as iterdump statements (browser history), or
+  S json   the SQLite database as iterdump statements (browser history),
            {"prefix", "sql", "names", "rows", "closed"}: the SQL the
            reference issued, the columns and rows its cursor returned and
-           whether it closed the connection (database connectors)
+           whether it closed the connection (database connectors), or
+           {"owner", "repository", "token", "pages", "timelines", "calls"}:
+           the issue pages by number, the timelines by url and the GETs as
+           [url, headers] (github_repo)
   F json   {"columns", "dtypes", "index", "rows"} of the returned dataframe
            (values as str of a timestamp, repr of a float, True/False, null
            for a missing value), or {"raises": "ExceptionType: message"}
 """
 import argparse
+import contextlib
+import copy
 import gzip
 import json
 import os
@@ -30,11 +46,15 @@ import random
 import sqlite3
 import sys
 import tempfile
+import types
 import warnings
 
 warnings.filterwarnings('ignore')
 import pandas as pd
-from pm4py.algo.connectors.variants import camunda_workflow, chrome_history, firefox_history, sap_accounting, sap_o2c
+requests = types.ModuleType('requests')
+sys.modules['requests'] = requests
+from pm4py.algo.connectors.variants import (camunda_workflow, chrome_history, firefox_history, github_repo,
+                                            sap_accounting, sap_o2c)
 
 BANK_SEED = 20261030
 ROOT = Path(__file__).resolve().parent.parent
@@ -236,6 +256,105 @@ def database_cases(count):
     return cases
 
 
+def github_date():
+    if R.random() < 0.03:
+        return R.choice([None, 5, 'garbage', '2020-01-01T24:00:00Z', '2021-02-30T00:00:00Z', '2021-04-31', ''])
+    s = '20%02d-%02d-%02d' % (R.randint(15, 24), R.randint(1, 12), R.randint(1, 28))
+    k = R.random()
+    if k < 0.08:
+        return s
+    s += R.choice(['T', 'T', 'T', ' ']) + '%02d:%02d' % (R.randint(0, 23), R.randint(0, 59))
+    if k < 0.85:
+        s += ':%02d' % R.randint(0, 59)
+        if k > 0.7:
+            s += '.' + ''.join(R.choice('0123456789') for _ in range(R.randint(1, 9)))
+    return s + R.choice(['Z', 'Z', 'Z', 'Z', '', '+01:00', '-0530', '+00:00'])
+
+
+def github_user():
+    if R.random() < 0.06:
+        return R.choice([None, {'login': None}, {}, {'id': 3}])
+    return {'login': R.choice(['octo', 'mona', 'ü-dev', 'bot[bot]'])}
+
+
+def github_drop(d, rate):
+    for k in list(d):
+        if R.random() < rate:
+            del d[k]
+    return d
+
+
+def github_case(index):
+    owner, repository = R.choice(['o', 'Owner-1']), R.choice(['r', 're.po'])
+    base = f'https://api.github.com/repos/{owner}/{repository}/issues'
+    pages, number = {}, 1
+    count = R.choice([0, 1, 1, 1, 2, 2, 3])
+    for page in range(1, count + 1):
+        size = R.randint(1, 5)
+        issues = []
+        for _ in range(size):
+            shared = issues and R.random() < 0.05
+            issue = {'url': f'{base}/{number}', 'number': number,
+                     'title': R.choice(['Fix it', 'a, b', '', None, 'ü title']), 'user': github_user(),
+                     'created_at': github_date(), 'state': R.choice(['open', 'closed']),
+                     'author_association': R.choice(['NONE', 'OWNER', 'CONTRIBUTOR', None]),
+                     'timeline_url': issues[-1]['timeline_url'] if shared and 'timeline_url' in issues[-1]
+                     else f'{base}/{number}/timeline'}
+            if R.random() < 0.25:
+                issue['pull_request'] = R.choice([{'url': f'https://api.github.com/repos/{owner}/{repository}/pulls/{number}'}] * 8
+                                                 + [None, {}])
+            issues.append(github_drop(issue, 0.015))
+            number += 1
+        pages[page] = issues
+    timelines = {}
+    for issues in pages.values():
+        for issue in issues:
+            if 'timeline_url' not in issue or issue['timeline_url'] in timelines:
+                continue
+            events = []
+            for _ in range(R.randint(0, 5)):
+                event = {'event': R.choice(['commented', 'labeled', 'closed', 'reopened', 'referenced',
+                                            'cross-referenced', 'assigned', 'merged', None]),
+                         'created_at': github_date(), 'actor': github_user()}
+                if R.random() < 0.15:
+                    event = {'event': 'committed', 'author': {'date': github_date()}, 'sha': 'abc'}
+                if R.random() < 0.2:
+                    event['user'] = github_user()
+                events.append(github_drop(event, 0.02))
+            timelines[issue['timeline_url']] = events
+    token = R.choice([None, None, 'tok', ''])
+    calls = []
+
+    def get(url, *args, **kwargs):
+        calls.append([url, kwargs.get('headers')])
+        prefix = base + '?state=all&per_page=100&page='
+        if url.startswith(prefix):
+            return Response(copy.deepcopy(pages.get(int(url[len(prefix):]), [])))
+        return Response(copy.deepcopy(timelines.get(url, [])))
+
+    requests.get = get
+    parameters = {'owner': owner, 'repository': repository}
+    if token is not None:
+        parameters['auth_token'] = token
+    try:
+        with open(os.devnull, 'w') as sink, contextlib.redirect_stderr(sink):
+            result = ser(github_repo.apply(parameters))
+    except Exception as e:
+        result = {'raises': f'{type(e).__name__}: {e}'}
+    source = {'owner': owner, 'repository': repository, 'token': token, 'pages': {str(k): v for k, v in pages.items()},
+              'timelines': timelines, 'calls': calls}
+    return f'github{index}', 'github_repo', source, result
+
+
+class Response:
+    def __init__(self, data):
+        self.data = data
+        self.status_code = 200
+
+    def json(self):
+        return self.data
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--count', type=int, default=600)
@@ -245,6 +364,7 @@ def main():
     with tempfile.TemporaryDirectory() as directory:
         cases = browser_cases(args.count, directory)
     cases += database_cases(args.count // 2)
+    cases += [github_case(index) for index in range(args.count)]
     for name, kind, dump, result in cases:
         lines += [f'C {name}', f'K {kind}', 'S ' + json.dumps(dump, ensure_ascii=False),
                   'F ' + json.dumps(result, ensure_ascii=False, separators=(',', ':'))]

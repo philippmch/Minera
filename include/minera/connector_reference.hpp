@@ -31,11 +31,32 @@
 // given (the SAP ones with every "OWNED." replaced by the prefix parameter),
 // read the result as pandas.read_sql does, close the connection and return
 // pm4py.format_dataframe of that table with the default keys.
+//
+// variants.github_repo reads the issues of owner/repository page by page
+// (GET https://api.github.com/repos/{owner}/{repository}/issues?state=all&
+// per_page=100&page=N with {"Authorization": "Bearer " + token} as headers,
+// {} without a token) until a page is empty, and fetches each issue's
+// timeline_url (issues without that key are skipped). An issue gives a
+// "created" row (its created_at, user.login, author_association, title and,
+// when the key is present, pull_request.url as case:pull_request); the
+// timeline is walked from its last event to its first, and an event holding
+// created_at, event and actor gives a row of those, the others are skipped.
+// Every key named here is read directly, so a missing one, a null user,
+// actor or pull_request, or a created_at that is not a date stops the whole
+// extraction: the reference catches it, and the frame holds the rows read
+// until then. Dates are parsed by dateutil and the offset is dropped (the
+// wall clock is labelled UTC); the native side accepts the ISO 8601 forms
+// the API writes (YYYY-MM-DD, optionally followed by T or a space, HH:MM,
+// :SS, a fraction truncated to microseconds and Z or an offset), and treats
+// anything else as not a date. The frame is pm4py.format_dataframe of the
+// rows: cases ordered by their first event (by timestamp, then row), rows
+// by case, timestamp and row.
 
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -85,6 +106,27 @@ struct ConnectorReferenceConnection {
                                                                const std::string& prefix = {});
 [[nodiscard]] ConnectorReferenceFrame reference_sap_o2c(const ConnectorReferenceConnection& connection,
                                                         const std::string& prefix = {});
+
+// A decoded JSON response: members keep their order.
+struct ConnectorReferenceJson {
+  enum Kind { kNull, kBool, kInt, kFloat, kText, kArray, kObject } kind = kNull;
+  bool boolean = false;
+  std::int64_t integer = 0;
+  double real = 0.0;
+  std::string text;
+  std::vector<ConnectorReferenceJson> items;
+  std::vector<std::pair<std::string, ConnectorReferenceJson>> members;
+  // The member named key, nullptr when absent (or when this is no object).
+  [[nodiscard]] const ConnectorReferenceJson* find(const std::string& key) const;
+};
+
+// requests.get(url, headers=headers).json()
+using ConnectorReferenceGet =
+    std::function<ConnectorReferenceJson(const std::string& url, const std::map<std::string, std::string>& headers)>;
+
+[[nodiscard]] ConnectorReferenceFrame reference_github_repo(const std::string& owner, const std::string& repository,
+                                                            const std::optional<std::string>& token,
+                                                            const ConnectorReferenceGet& get);
 
 [[nodiscard]] ConnectorReferenceFrame reference_chrome_history(const std::filesystem::path& database);
 [[nodiscard]] ConnectorReferenceFrame reference_firefox_history(const std::filesystem::path& database);

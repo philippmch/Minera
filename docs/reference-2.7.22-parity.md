@@ -1652,6 +1652,22 @@ unit); and a canonical case or activity column whose values all parse as
 dates (SAP document numbers such as `0001`) is converted and then printed as
 pandas prints a timestamp (`0001-01-01 00:00:00+00:00`).
 
+GitHub: 600 seeded repositories served by a stub `requests` (zero to three
+issue pages, timelines of up to five events, ISO dates in eight shapes plus a
+few non-dates, null users, actors and logins, dropped keys, pull requests
+with null or empty values, `committed` events without `created_at`, issues
+sharing a timeline url, with and without a token, the empty token included).
+Every GET is recorded with its headers; all 600 frames (3010 rows) and GET
+sequences match exactly. Rules found by recording the reference's key reads
+(header comment): an issue without `timeline_url` is skipped, but every other
+key is read directly and any failure (a missing key, a null user, a date
+dateutil rejects) ends the whole extraction, keeping the rows read so far;
+an event is used only when it holds `created_at`, `event` and `actor`; the
+timeline is walked from its last event (the reference reverses the list it
+receives in place, so the stub serves fresh copies); the date offset is
+dropped and the wall clock labelled UTC. Native accepts the ISO 8601 forms
+the API writes instead of all of dateutil's grammar, a documented narrowing.
+
 ## XES importer-variant evidence
 
 The native importer explicitly accepts `ITERPARSE`, `LINE_BY_LINE`,
