@@ -125,7 +125,7 @@ are reconciled.
 | Comparison | Petri-net element-usage comparison | **Complete** — `compare_element_usage_token_replay` composes the public forward token replay (PLTR) exactly as the reference does and matches the 2,000-call public bank (see "Element-usage comparison bank"); the older `compare_petri_usage` options surface (CLI, server, frontend) keeps its own replay with the evidence below |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Complete** — module and dispatcher contracts cover all seven public functions, eight apply parameters, typed labels, signed controls, EventLog/EventTable adapters, diagnostics and RNG continuation; exact proofs and reviewed ordering distinctions are recorded in `docs/bose-parity-contract.md` |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete** (six search variants, log-level dispatcher and log enrichment) — all six variants are explicitly selectable and `align_petri_trace` reproduces the reference per-trace cost, best-worst cost, fitness, unreachable-marking and error behavior, including cost functions, arc-weight handling and the less-memory pruning, against three black-box banks (see "Conformance parity bank evidence"); less-memory Dijkstra with legacy unit costs remains the generic default of `check_alignment` |
-| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors; DFG classic is bound to the conformance parity banks (alignment, cost and visited states), while process-tree and decomposed results are captured there but not yet bound |
+| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors; DFG classic is bound to the conformance parity banks (alignment, cost and visited states), the four process-tree variants are bound to their reference ports (search-graph, dynamic-programming, MILP and approximated banks), while decomposed results are captured there but not yet bound |
 | Conformance: replay | forward token replay and backwards token replay | **Complete** (both variants, dispatcher, duration and root-cause support) — the dispatcher is bound by `minera_token_replay_dispatcher_parity_tests` (see "Token replay dispatcher bank"); root-cause diagnoses are bound by `minera_token_replay_root_cause_parity_tests` (see "Token replay root-cause bank"); forward PLTR maps and RETURN_NAMES rows are bound by `minera_token_replay_pltr_parity_tests` (see "Forward token replay PLTR and RETURN_NAMES bank"); forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, and root-cause support is bound separately; forward and backwards replay rows, including routing and flood cleaning under each public option, are bound to the conformance parity banks, forward `consider_activities_not_in_model_in_fitness` included |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
@@ -1420,8 +1420,8 @@ on root loops with a tau body and uses it as the fitness floor; the
 approximated variant splits traces over subtrees by its activity-set
 heuristic, while native splits optimally. Reference alignments of the DP,
 MILP and approximated variants omit silent and some model moves and are not
-bound by these tallies (the search-graph and MILP variants are matched by the
-reference ports below).
+bound by these tallies (all four variants are matched by the reference ports
+below).
 
 ### Search-graph variant, replay semantics and frequency annotation
 
@@ -1523,6 +1523,48 @@ fitness are bound within 1e-6; optimal ties may pick another alignment; and an
 infeasible program (the empty trace on a root loop with a tau do) makes the
 reference report whatever CBC left behind, where native throws. The older
 native `MILP` selector keeps its exact residual search for the CLI and server.
+
+### Approximated original variant
+
+`include/minera/process_tree_approximated_reference.hpp` ports
+`variants/approximated` (`original`, `utilities` and
+`calculate_a_sa_ea_sets`) as observed from the inputs and outputs of its
+helpers. `scripts/capture-process-tree-approximated-bank.py` captures 400
+seeded n-ary trees (22 with a single-child operator, which the reference
+rejects), each with an event log of 5 to 7 traces under one of five
+(max_trace_length, max_process_tree_height) settings, into
+`docs/process-tree-approximated-bank.txt.gz`: the binary tree, the sets and
+heights of its nodes, and for every aligned variant each program handed to
+PuLP with CBC's solution, each choice, each base alignment and each
+operator's returned alignment, in call order. The base alignments break
+ties by object addresses, so each case runs once, under hash seed
+`index % 4`. `minera_process_tree_approximated_parity_tests` checks:
+
+- the binary tree and all 4746 node sets and heights exactly;
+- all 3133 programs exactly (objective, constant and every row in order),
+  and the native optimum (an exact dynamic program over the same
+  structure) against the objective of CBC's solution; CBC treats the
+  objective as integral and stops short of the -1e-05 rewards for empty tau
+  executions in 2 programs, where native is better by those rewards only;
+- the 755 choices, and the 3888 operator returns composed from the
+  reference's own child alignments, exactly;
+- that each of the 5122 base alignments is optimal: the native Dijkstra
+  alignment on the same bordered net has the same deviation and tau-leaf
+  counts (4769 are identical);
+- replaying CBC's solutions and the base alignments, apply's alignment, cost
+  and fitness for all 2098 traces (158 None) exactly;
+- the fully native apply: a well-formed alignment of every trace with cost
+  and fitness following from it. 1733 of 1932 traces get the reference cost;
+  the others take another optimal split where CBC's choice among ties is
+  not reproduced, and 12 traces are None on one side only for the same
+  reason (with max_process_tree_height 0 a leaf longer than
+  max_trace_length gives None).
+
+The rules are in the header comment. Divergences: ties among optimal splits
+and among optimal base alignments, and CBC's integral cutoff above. The
+time limits (`max_align_time`, `max_align_time_trace`) are not ported. The
+older native `APPROXIMATED_ORIGINAL` selector keeps its exact residual
+alignments for the CLI and server.
 
 ## XES importer-variant evidence
 

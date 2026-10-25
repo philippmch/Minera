@@ -1090,8 +1090,124 @@
           "symbol": "MILP"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "APPROXIMATED_ORIGINAL": {
+          "selector": "APPROXIMATED_ORIGINAL",
+          "binding": {
+            "selector": "APPROXIMATED_ORIGINAL",
+            "modules": [
+              "algo.conformance.alignments.process_tree.variants.approximated.original"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "APPROXIMATED_ORIGINAL"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/process_tree_approximated_reference.hpp",
+              "symbol": "reference_approximated_alignments"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_process_tree_approximated_parity.cpp",
+              "executable": "minera_process_tree_approximated_parity_tests",
+              "case": "approximated_case"
+            }
+          ]
+        },
+        "SEARCH_GRAPH_PT": {
+          "selector": "SEARCH_GRAPH_PT",
+          "binding": {
+            "selector": "SEARCH_GRAPH_PT",
+            "modules": [
+              "algo.conformance.alignments.process_tree.variants.search_graph_pt"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "SEARCH_GRAPH_PT"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/process_tree_search_graph_reference.hpp",
+              "symbol": "reference_search_graph_alignments"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_process_tree_search_graph_parity.cpp",
+              "executable": "minera_process_tree_search_graph_parity_tests",
+              "case": "search_variant_case"
+            }
+          ]
+        },
+        "DYNAMIC_PROGRAMMING": {
+          "selector": "DYNAMIC_PROGRAMMING",
+          "binding": {
+            "selector": "DYNAMIC_PROGRAMMING",
+            "modules": [
+              "algo.conformance.alignments.process_tree.variants.dynamic_programming"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "DYNAMIC_PROGRAMMING"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/process_tree_reference_alignment.hpp",
+              "symbol": "reference_process_tree_dp_alignments"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_process_tree_reference_alignment_parity.cpp",
+              "executable": "minera_process_tree_reference_alignment_parity_tests",
+              "case": "check_dp"
+            }
+          ]
+        },
+        "MILP": {
+          "selector": "MILP",
+          "binding": {
+            "selector": "MILP",
+            "modules": [
+              "algo.conformance.alignments.process_tree.variants.milp"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "MILP"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/process_tree_milp_reference.hpp",
+              "symbol": "reference_milp_alignments"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_process_tree_milp_parity.cpp",
+              "executable": "minera_process_tree_milp_parity_tests",
+              "case": "milp_case"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/process_tree_approximated_reference.hpp",
+        "src/backend/process_tree_approximated_reference.cpp",
+        "src/backend/tests/test_process_tree_approximated_parity.cpp",
+        "include/minera/process_tree_search_graph_reference.hpp",
+        "src/backend/process_tree_search_graph_reference.cpp",
+        "src/backend/tests/test_process_tree_search_graph_parity.cpp",
+        "include/minera/process_tree_reference_alignment.hpp",
+        "src/backend/process_tree_reference_alignment.cpp",
+        "src/backend/tests/test_process_tree_reference_alignment_parity.cpp",
+        "include/minera/process_tree_milp_reference.hpp",
+        "src/backend/process_tree_milp_reference.cpp",
+        "src/backend/tests/test_process_tree_milp_parity.cpp"
+      ]
     },
     {
       "package": "algo.conformance.antialignments",
@@ -9081,8 +9197,30 @@
       "owner": "algo.conformance.alignments.process_tree",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_approximated_reference.hpp",
+        "src/backend/process_tree_approximated_reference.cpp",
+        "src/backend/tests/test_process_tree_approximated_parity.cpp",
+        "scripts/capture-process-tree-approximated-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.process_tree.variants.approximated.calculate_a_sa_ea_sets",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_approximated_reference.hpp",
+            "symbol": "reference_approximated_sets"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_approximated_parity.cpp",
+            "executable": "minera_process_tree_approximated_parity_tests",
+            "case": "sets_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.process_tree.variants.approximated.original",
@@ -9095,8 +9233,30 @@
           "selector": "APPROXIMATED_ORIGINAL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_approximated_reference.hpp",
+        "src/backend/process_tree_approximated_reference.cpp",
+        "src/backend/tests/test_process_tree_approximated_parity.cpp",
+        "scripts/capture-process-tree-approximated-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.process_tree.variants.approximated.original",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_approximated_reference.hpp",
+            "symbol": "reference_approximated_alignments"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_approximated_parity.cpp",
+            "executable": "minera_process_tree_approximated_parity_tests",
+            "case": "approximated_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.process_tree.variants.approximated.utilities",
@@ -9104,8 +9264,30 @@
       "owner": "algo.conformance.alignments.process_tree",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_approximated_reference.hpp",
+        "src/backend/process_tree_approximated_reference.cpp",
+        "src/backend/tests/test_process_tree_approximated_parity.cpp",
+        "scripts/capture-process-tree-approximated-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.process_tree.variants.approximated.utilities",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_approximated_reference.hpp",
+            "symbol": "reference_approximated_optimal_alignment"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_approximated_parity.cpp",
+            "executable": "minera_process_tree_approximated_parity_tests",
+            "case": "base_alignment_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.process_tree.variants.dynamic_programming",

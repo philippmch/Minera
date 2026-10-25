@@ -169,8 +169,7 @@ searches, about two minutes to capture) passes in
 `include/minera/process_tree_search_graph_reference.hpp`. Modules
 `...process_tree.variants.search_graph_pt`,
 `...util.search_graph_pt_replay_semantics` and
-`...util.search_graph_pt_frequency_annotation` promoted; the package stays partial until MILP and
-APPROXIMATED_ORIGINAL are done. `apply`'s candidate order follows object
+`...util.search_graph_pt_frequency_annotation` promoted; the package is now complete (see the approximated entry). `apply`'s candidate order follows object
 addresses with repeated labels, so the bank drives `align_variant` with a
 preorder leaf list there and uses `apply` only on trees with unique labels.
 The annotation rule was corrected: per alignment, ENABLED counts, or OPEN
@@ -187,6 +186,19 @@ fitness within 1e-6 (68 of 1,460 optima tie to another alignment). Module
 `...process_tree.variants.milp` promoted. Infeasible programs (empty trace,
 root loop with a tau do) throw natively where the reference reports CBC
 leftovers. Remaining in the package: APPROXIMATED_ORIGINAL and its utils.
+
+## Process-tree approximated variant — 2026-10-25
+
+Bank `docs/process-tree-approximated-bank.txt.gz` (400 trees, 2,098 traces,
+3,133 PuLP programs, 5,122 base alignments, about two minutes to capture)
+passes in `minera_process_tree_approximated_parity_tests` (about 6 s) through
+`include/minera/process_tree_approximated_reference.hpp`. Binary trees, sets,
+programs, choices and compositions are exact; replaying CBC's solutions and
+the base alignments reproduces apply exactly. The three approximated modules
+are promoted and `algo.conformance.alignments.process_tree` is complete with
+all four selector proofs. CBC's ties (splits) and object-address ties (base
+alignments) are not reproduced natively; the fully native run gives the
+reference cost for 1,733 of 1,932 traces.
 
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
