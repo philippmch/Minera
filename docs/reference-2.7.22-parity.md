@@ -15007,6 +15007,21 @@ domain, the behaviour found and the limits are in
 [pandas-sequence-filter-domain-parity.md](pandas-sequence-filter-domain-parity.md).
 All twelve modules are complete.
 
+## Polars sequence filters bank (2026-10-25)
+
+The twelve Polars modules `polars_filtering_constants`, `start_activities`,
+`end_activities`, `traces`, `starts_with`, `ends_with`, `rework`, `prefixes`,
+`suffixes`, `consecutive_act_case_grouping`, `timestamp_case_grouping` and
+`activity_split` (all under `algo.filtering.polars`) are bound to a seeded
+public-call bank, `docs/polars-sequence-filter-bank.json.gz` (38,601 calls,
+hash seeds 0-3, three runs each). It is replayed by
+`minera_polars_sequence_filter_bank_parity_tests`. Frames compare exactly
+through the normalized event-table JSON; calls whose reference row or entry
+order changes between runs compare sorted. The domain, the behaviour found
+and the limits are in
+[polars-sequence-filter-domain-parity.md](polars-sequence-filter-domain-parity.md).
+All twelve modules are complete.
+
 ## Genetic discovery bank (2026-10-25)
 
 `scripts/capture-genetic-discovery-bank.py` (seed 20261025, three hash seeds;

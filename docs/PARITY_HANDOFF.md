@@ -243,6 +243,23 @@ date payload. Details are in `docs/pandas-filter-domain-parity.md`. All seven
 modules are promoted.
 Next in this thread: the Polars filter modules.
 
+## Polars sequence filters — 2026-10-25
+
+New bank `docs/polars-sequence-filter-bank.json.gz` (3,000 frames, 38,601
+public calls over polars_filtering_constants, start/end_activities, traces,
+starts_with, ends_with, rework, prefixes, suffixes,
+consecutive_act_case_grouping, timestamp_case_grouping and activity_split;
+about 6 minutes to capture, three runs per hash seed) passes in
+`minera_polars_sequence_filter_bank_parity_tests`. New native API:
+`polars_sequence_filters.hpp`, reusing the pandas sequence argument types.
+Errors carry the full Polars plan text. Polars `group_by` outputs come in a
+random order, so such calls are stored as unordered and compared sorted.
+Inner joins keep source order unless the source is no taller than the joined
+case frame. Details in `docs/polars-sequence-filter-domain-parity.md`. All
+twelve modules are promoted.
+Next in this thread: the Polars attributes, between, cases, ltl, paths,
+timestamp and variants filters.
+
 ## EventLog filtering modules — 2026-10-25
 
 New bank `docs/log-filter-domain-bank.json.gz` (6,000 XES cases, 240,450

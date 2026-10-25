@@ -15759,8 +15759,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.activity_split.activity_split_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_activity_split_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "activity_split_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.attr_value_repetition.filter",
@@ -15850,8 +15873,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.consecutive_act_case_grouping.consecutive_act_case_grouping_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_consecutive_act_case_grouping_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "consecutive_act_case_grouping_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.end_activities.end_activities_filter",
@@ -15859,8 +15905,43 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.end_activities.end_activities_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_end_activities_apply"
+          },
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_filter_df_on_end_activities"
+          },
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_filter_df_on_end_activities_nocc"
+          },
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_get_end_activities"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "end_activities_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.ends_with.ends_with_filter",
@@ -15868,8 +15949,35 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.ends_with.ends_with_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_ends_with_filter_apply"
+          },
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_ends_with_filter_get_variants_df"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "ends_with_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.ltl.ltl_checker",
@@ -15895,8 +16003,35 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.polars_filtering_constants",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "kPolarsMinNoOfActivitiesToRetainForDiagram"
+          },
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "kPolarsMaxNoOfActivitiesToRetainForDiagram"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "polars_filtering_constants_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.prefixes.prefix_filter",
@@ -15904,8 +16039,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.prefixes.prefix_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_prefix_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "prefixes_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.rework.rework_filter",
@@ -15913,8 +16071,35 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.rework.rework_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_rework_filter_apply"
+          },
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_rework_filter_apply_activity_set"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "rework_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.start_activities.start_activities_filter",
@@ -15922,8 +16107,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.start_activities.start_activities_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_start_activities_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "start_activities_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.starts_with.starts_with_filter",
@@ -15931,8 +16139,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.starts_with.starts_with_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_starts_with_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "starts_with_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.suffixes.suffix_filter",
@@ -15940,8 +16171,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.suffixes.suffix_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_suffix_filter_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "suffixes_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.timestamp_case_grouping.timestamp_case_grouping_filter",
@@ -15949,8 +16203,31 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.timestamp_case_grouping.timestamp_case_grouping_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_timestamp_case_grouping_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "timestamp_case_grouping_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.timestamp.timestamp_filter",
@@ -15967,8 +16244,35 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/polars-sequence-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/polars_sequence_filters.hpp",
+        "src/backend/polars_sequence_filters.cpp",
+        "scripts/polars_sequence_filter_domain.py",
+        "scripts/capture-polars-sequence-filter-bank.py",
+        "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.polars.traces.trace_filter",
+        "implementation": [
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_trace_filter_apply"
+          },
+          {
+            "path": "include/minera/polars_sequence_filters.hpp",
+            "symbol": "polars_trace_filter_get_variants_df"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_polars_sequence_filter_bank_parity.cpp",
+            "executable": "minera_polars_sequence_filter_bank_parity_tests",
+            "case": "traces_module"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.polars.variants.variants_filter",
