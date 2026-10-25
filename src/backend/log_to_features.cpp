@@ -260,6 +260,7 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
                                                    bool numeric) {
   std::map<std::string, std::size_t> occurrences;
   std::map<std::string, std::set<std::string>> string_values;
+  std::set<std::string> has_string;
   const auto trace_count = log.trace_count();
   const auto keys = event_feature_keys(log);
   for (const auto& trace : log.traces) {
@@ -269,7 +270,11 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
         const auto attribute = event_feature_cell(event, key);
         if (!numeric && attribute && !trace_inference_hashable(*attribute))
           throw std::invalid_argument("log_to_features: unhashable inferred event attribute: " + key);
-        if (attribute && (numeric ? trace_inference_numeric(*attribute) : native_string_cell(*attribute))) {
+        if (!attribute) continue;
+        // A key mixing strings with numbers is one-hot encoded over every
+        // value, numbers included, and is never numeric.
+        if (native_string_cell(*attribute)) has_string.insert(key);
+        if (trace_inference_numeric(*attribute) || (!numeric && native_string_cell(*attribute))) {
           seen.insert(key);
           if (!numeric) string_values[key].insert(attribute->value);
         }
@@ -279,7 +284,9 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
   }
   std::vector<std::string> result;
   for (const auto& [key, count] : occurrences)
-    if (count == trace_count && (numeric || string_values[key].size() <= 12)) result.push_back(key);
+    if (count == trace_count && has_string.contains(key) != numeric &&
+        (numeric || string_values[key].size() <= 12))
+      result.push_back(key);
   return result;
 }
 
@@ -287,6 +294,7 @@ std::vector<std::string> inferred_trace_attributes(const EventLog& log,
                                                    bool numeric) {
   std::map<std::string, std::size_t> occurrences;
   std::map<std::string, std::set<std::string>> string_values;
+  std::set<std::string> has_string;
   const auto trace_count = log.trace_count();
   for (const auto& trace : log.traces) {
     std::set<std::string> keys;
@@ -299,7 +307,9 @@ std::vector<std::string> inferred_trace_attributes(const EventLog& log,
       const auto attribute = numeric_cell(trace, key);
       if (!numeric && attribute && !trace_inference_hashable(*attribute))
         throw std::invalid_argument("log_to_features: unhashable inferred trace attribute: " + key);
-      if (attribute && (numeric ? trace_inference_numeric(*attribute) : native_string_cell(*attribute))) {
+      if (!attribute) continue;
+      if (native_string_cell(*attribute)) has_string.insert(key);
+      if (trace_inference_numeric(*attribute) || (!numeric && native_string_cell(*attribute))) {
         ++occurrences[key];
         if (!numeric) string_values[key].insert(attribute->value);
       }
@@ -307,7 +317,9 @@ std::vector<std::string> inferred_trace_attributes(const EventLog& log,
   }
   std::vector<std::string> result;
   for (const auto& [key, count] : occurrences)
-    if (count == trace_count && (numeric || string_values[key].size() <= 12)) result.push_back(key);
+    if (count == trace_count && has_string.contains(key) != numeric &&
+        (numeric || string_values[key].size() <= 12))
+      result.push_back(key);
   return result;
 }
 

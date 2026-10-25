@@ -1,0 +1,822 @@
+#include "minera/llm_abstractions.hpp"
+
+#include <algorithm>
+#include <array>
+#include <charconv>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <map>
+#include <numeric>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include "minera/log_skeleton.hpp"
+#include "minera/log_to_features.hpp"
+#include "minera/timestamp.hpp"
+#include "root_cause_unicode.hpp"
+
+namespace minera {
+namespace {
+
+// ---------------------------------------------------------------------------
+// Python text conventions
+
+std::size_t code_points(std::string_view text) {
+  return static_cast<std::size_t>(
+      std::count_if(text.begin(), text.end(), [](unsigned char c) { return (c & 0xc0) != 0x80; }));
+}
+
+bool decode_code_point(std::string_view value, std::size_t start, char32_t& code, std::size_t& end) {
+  const auto first = static_cast<unsigned char>(value[start]);
+  unsigned count = 0;
+  code = first;
+  if (first < 0x80) {
+  } else if (first >= 0xc2 && first <= 0xdf) {
+    code = first & 0x1f;
+    count = 1;
+  } else if (first >= 0xe0 && first <= 0xef) {
+    code = first & 0x0f;
+    count = 2;
+  } else if (first >= 0xf0 && first <= 0xf4) {
+    code = first & 7;
+    count = 3;
+  } else {
+    return false;
+  }
+  if (count > value.size() - start - 1) return false;
+  for (unsigned i = 1; i <= count; ++i) {
+    const auto next = static_cast<unsigned char>(value[start + i]);
+    if ((next & 0xc0) != 0x80) return false;
+    code = (code << 6) | (next & 63);
+  }
+  if ((count == 1 && code < 0x80) || (count == 2 && code < 0x800) || (count == 3 && code < 0x10000) ||
+      code > 0x10ffff)
+    return false;
+  end = start + count + 1;
+  return true;
+}
+
+// repr() of a Python str.
+std::string py_repr(std::string_view value) {
+  const char delimiter =
+      value.find('\'') != std::string_view::npos && value.find('"') == std::string_view::npos ? '"' : '\'';
+  std::string out(1, delimiter);
+  constexpr char hex[] = "0123456789abcdef";
+  for (std::size_t i = 0; i < value.size();) {
+    char32_t code = 0;
+    std::size_t end = i;
+    if (!decode_code_point(value, i, code, end)) {
+      out += value[i++];
+      continue;
+    }
+    if (code == '\\' || code == static_cast<unsigned char>(delimiter)) {
+      out += '\\';
+      out += static_cast<char>(code);
+    } else if (code == '\n') {
+      out += "\\n";
+    } else if (code == '\r') {
+      out += "\\r";
+    } else if (code == '\t') {
+      out += "\\t";
+    } else if (!root_cause_unicode_printable(code)) {
+      const int digits = code <= 0xff ? 2 : code <= 0xffff ? 4 : 8;
+      out += digits == 2 ? "\\x" : digits == 4 ? "\\u" : "\\U";
+      for (int shift = (digits - 1) * 4; shift >= 0; shift -= 4) out += hex[(code >> shift) & 15];
+    } else {
+      out.append(value.substr(i, end - i));
+    }
+    i = end;
+  }
+  return out + delimiter;
+}
+
+// repr() of a Python float: the shortest round-trip digits, positional for
+// decimal exponents in [-4, 16), scientific otherwise.
+std::string py_float(double value) {
+  if (std::isnan(value)) return "nan";
+  if (std::isinf(value)) return value < 0 ? "-inf" : "inf";
+  std::array<char, 64> buffer{};
+  const auto result =
+      std::to_chars(buffer.data(), buffer.data() + buffer.size(), value, std::chars_format::scientific);
+  std::string text(buffer.data(), result.ptr);
+  std::string sign;
+  if (text.front() == '-') {
+    sign = "-";
+    text.erase(0, 1);
+  }
+  const auto e = text.find('e');
+  const int exponent = std::stoi(text.substr(e + 1));
+  std::string digits;
+  for (const char c : text.substr(0, e))
+    if (c != '.') digits += c;
+  if (exponent < -4 || exponent >= 16) {
+    std::string out = sign + digits.substr(0, 1);
+    if (digits.size() > 1) out += "." + digits.substr(1);
+    const int magnitude = std::abs(exponent);
+    return out + (exponent < 0 ? "e-" : "e+") + (magnitude < 10 ? "0" : "") + std::to_string(magnitude);
+  }
+  if (exponent < 0) return sign + "0." + std::string(static_cast<std::size_t>(-exponent - 1), '0') + digits;
+  const auto whole = static_cast<std::size_t>(exponent) + 1;
+  if (digits.size() <= whole) return sign + digits + std::string(whole - digits.size(), '0') + ".0";
+  return sign + digits.substr(0, whole) + "." + digits.substr(whole);
+}
+
+// Python "%.3f".
+std::string fixed3(double value) {
+  if (std::isnan(value)) return "nan";
+  if (std::isinf(value)) return value < 0 ? "-inf" : "inf";
+  std::array<char, 400> buffer{};
+  const auto result =
+      std::to_chars(buffer.data(), buffer.data() + buffer.size(), value, std::chars_format::fixed, 3);
+  return {buffer.data(), result.ptr};
+}
+
+// ---------------------------------------------------------------------------
+// NumPy reductions on float64 arrays
+
+double pairwise_sum(const double* values, std::size_t count) {
+  if (count < 8) {
+    double total = 0.0;
+    for (std::size_t i = 0; i < count; ++i) total += values[i];
+    return total;
+  }
+  if (count <= 128) {
+    std::array<double, 8> partial{};
+    for (std::size_t j = 0; j < 8; ++j) partial[j] = values[j];
+    std::size_t i = 8;
+    for (; i < count - count % 8; i += 8)
+      for (std::size_t j = 0; j < 8; ++j) partial[j] += values[i + j];
+    double total = ((partial[0] + partial[1]) + (partial[2] + partial[3])) +
+                   ((partial[4] + partial[5]) + (partial[6] + partial[7]));
+    for (; i < count; ++i) total += values[i];
+    return total;
+  }
+  std::size_t half = count / 2;
+  half -= half % 8;
+  return pairwise_sum(values, half) + pairwise_sum(values + half, count - half);
+}
+
+double numpy_mean(const std::vector<double>& values) {
+  return pairwise_sum(values.data(), values.size()) / static_cast<double>(values.size());
+}
+
+double numpy_std(const std::vector<double>& values, std::size_t ddof = 0) {
+  const double mean = numpy_mean(values);
+  std::vector<double> squares;
+  squares.reserve(values.size());
+  for (const double value : values) squares.push_back((value - mean) * (value - mean));
+  return std::sqrt(pairwise_sum(squares.data(), squares.size()) / static_cast<double>(values.size() - ddof));
+}
+
+// numpy.quantile(method="linear") of an already sorted array.
+double numpy_quantile(const std::vector<double>& sorted, double q) {
+  const double virtual_index = static_cast<double>(sorted.size() - 1) * q;
+  const double previous = std::floor(virtual_index);
+  const auto low = static_cast<std::size_t>(previous);
+  const auto high = std::min(low + 1, sorted.size() - 1);
+  const double gamma = virtual_index - previous;
+  const double a = sorted[low], b = sorted[high], difference = b - a;
+  return gamma >= 0.5 ? b - difference * (1.0 - gamma) : a + difference * gamma;
+}
+
+constexpr std::array<double, 5> kQuantiles{0.0, 0.25, 0.5, 0.75, 1.0};
+
+template <typename Format>
+std::string quantile_dict(std::vector<double> values, Format format) {
+  std::sort(values.begin(), values.end());
+  std::string text = "{";
+  for (std::size_t i = 0; i < kQuantiles.size(); ++i) {
+    if (i) text += ", ";
+    text += py_float(kQuantiles[i]) + ": " + format(numpy_quantile(values, kQuantiles[i]));
+  }
+  return text + "}";
+}
+
+// ---------------------------------------------------------------------------
+// Event table view: one row per event, event keys then case: prefixed keys.
+
+enum class CellKind { kMissing, kString, kInt, kFloat, kBool, kDate };
+
+struct Cell {
+  CellKind kind = CellKind::kMissing;
+  std::string text;      // string payload or integer digits
+  double number = 0.0;   // int, float or bool value
+  std::int64_t micros = 0;
+  bool aware = true;
+  std::int32_t offset_minutes = 0;
+};
+
+Cell date_cell(std::string_view text) {
+  Cell cell;
+  const auto parsed = parse_timestamp_exact(text);
+  if (!parsed) {
+    cell.kind = CellKind::kString;
+    cell.text = std::string(text);
+    return cell;
+  }
+  cell.kind = CellKind::kDate;
+  cell.micros = parsed->seconds * 1000000 + parsed->nanoseconds / 1000;
+  cell.aware = parsed->timezone_aware;
+  cell.offset_minutes = parsed->offset_minutes;
+  return cell;
+}
+
+Cell string_cell(std::string text) {
+  Cell cell;
+  cell.kind = CellKind::kString;
+  cell.text = std::move(text);
+  return cell;
+}
+
+Cell attribute_cell(const EventAttribute& attribute) {
+  if (attribute.is_null) return {};
+  Cell cell;
+  switch (attribute.kind) {
+    case AttributeKind::kInt: {
+      cell.kind = CellKind::kInt;
+      if (const auto* value = std::get_if<std::int64_t>(&attribute.typed_value)) {
+        cell.text = std::to_string(*value);
+        cell.number = static_cast<double>(*value);
+      } else if (const auto* unsigned_value = std::get_if<std::uint64_t>(&attribute.typed_value)) {
+        cell.text = std::to_string(*unsigned_value);
+        cell.number = static_cast<double>(*unsigned_value);
+      } else {
+        const long long value = std::strtoll(attribute.value.c_str(), nullptr, 10);
+        cell.text = std::to_string(value);
+        cell.number = static_cast<double>(value);
+      }
+      return cell;
+    }
+    case AttributeKind::kFloat:
+      cell.kind = CellKind::kFloat;
+      if (const auto* value = std::get_if<double>(&attribute.typed_value))
+        cell.number = *value;
+      else
+        cell.number = std::strtod(attribute.value.c_str(), nullptr);
+      return cell;
+    case AttributeKind::kBoolean:
+      cell.kind = CellKind::kBool;
+      if (const auto* value = std::get_if<bool>(&attribute.typed_value))
+        cell.number = *value ? 1.0 : 0.0;
+      else
+        cell.number = attribute.value == "true" || attribute.value == "True" || attribute.value == "1" ? 1.0 : 0.0;
+      return cell;
+    case AttributeKind::kDate:
+      return date_cell(attribute.value);
+    default:
+      return string_cell(attribute.value);
+  }
+}
+
+using Row = std::vector<std::pair<std::string, Cell>>;
+
+Cell first_class_cell(FirstClassAttributeState state, const std::string& text) {
+  return state == FirstClassAttributeState::kNull ? Cell{} : string_cell(text);
+}
+
+void put(Row& row, std::string key, Cell cell) {
+  for (auto& entry : row)
+    if (entry.first == key) return;
+  row.emplace_back(std::move(key), std::move(cell));
+}
+
+Row event_row(const Trace& trace, const Event& event) {
+  Row row;
+  if (event.has_activity()) put(row, "concept:name", first_class_cell(event.activity_state, event.activity));
+  if (event.has_resource()) put(row, "org:resource", first_class_cell(event.resource_state, event.resource));
+  if (event.has_timestamp())
+    put(row, "time:timestamp",
+        event.timestamp_state == FirstClassAttributeState::kNull ? Cell{} : date_cell(event.timestamp));
+  if (event.has_lifecycle())
+    put(row, "lifecycle:transition", first_class_cell(event.lifecycle_state, event.lifecycle));
+  for (const auto& attribute : event.attributes) put(row, attribute.key, attribute_cell(attribute));
+  if (trace.has_case_id())
+    put(row, "case:concept:name", first_class_cell(trace.case_id_state, trace.case_id));
+  for (const auto& attribute : trace.attributes)
+    if (attribute.key != "concept:name") put(row, "case:" + attribute.key, attribute_cell(attribute));
+  return row;
+}
+
+std::int64_t event_micros(const Event& event) {
+  if (!event.has_timestamp() || event.timestamp_state == FirstClassAttributeState::kNull)
+    throw std::invalid_argument("every event needs a timestamp");
+  const auto cell = date_cell(event.timestamp);
+  if (cell.kind != CellKind::kDate) throw std::invalid_argument("unparseable event timestamp");
+  return cell.micros;
+}
+
+// Civil date of a day count since 1970-01-01.
+void civil(std::int64_t days, int& year, int& month, int& day) {
+  days += 719468;
+  const std::int64_t era = (days >= 0 ? days : days - 146096) / 146097;
+  const auto doe = static_cast<unsigned>(days - era * 146097);
+  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const unsigned mp = (5 * doy + 2) / 153;
+  day = static_cast<int>(doy - (153 * mp + 2) / 5 + 1);
+  month = static_cast<int>(mp < 10 ? mp + 3 : mp - 9);
+  year = static_cast<int>(yoe + era * 400 + (month <= 2));
+}
+
+struct Fields {
+  int year, month, day, hour, minute, second, micro;
+};
+
+Fields fields(std::int64_t micros) {
+  std::int64_t seconds = micros / 1000000, micro = micros % 1000000;
+  if (micro < 0) {
+    micro += 1000000;
+    --seconds;
+  }
+  std::int64_t days = seconds / 86400, rest = seconds % 86400;
+  if (rest < 0) {
+    rest += 86400;
+    --days;
+  }
+  Fields out{};
+  civil(days, out.year, out.month, out.day);
+  out.hour = static_cast<int>(rest / 3600);
+  out.minute = static_cast<int>(rest / 60 % 60);
+  out.second = static_cast<int>(rest % 60);
+  out.micro = static_cast<int>(micro);
+  return out;
+}
+
+// repr() of a pandas Timestamp at microsecond resolution.
+std::string timestamp_repr(std::int64_t micros, bool aware) {
+  const auto f = fields(micros);
+  std::array<char, 64> text{};
+  std::snprintf(text.data(), text.size(), "%04d-%02d-%02d %02d:%02d:%02d", f.year, f.month, f.day, f.hour, f.minute,
+                f.second);
+  std::string out = "Timestamp('" + std::string(text.data());
+  if (f.micro) {
+    std::snprintf(text.data(), text.size(), ".%06d", f.micro);
+    out += text.data();
+  }
+  return out + (aware ? "+0000', tz='UTC')" : "')");
+}
+
+std::string timedelta_repr(std::int64_t seconds) {
+  std::int64_t days = seconds / 86400, rest = seconds % 86400;
+  if (rest < 0) {
+    rest += 86400;
+    --days;
+  }
+  std::string out = "datetime.timedelta(";
+  if (days) out += "days=" + std::to_string(days);
+  if (rest) out += std::string(days ? ", " : "") + "seconds=" + std::to_string(rest);
+  return out + ")";
+}
+
+// repr() of a Python datetime in its own UTC offset.
+std::string datetime_repr(const Cell& cell) {
+  const auto f = fields(cell.micros + static_cast<std::int64_t>(cell.offset_minutes) * 60000000);
+  std::string out = "datetime.datetime(" + std::to_string(f.year) + ", " + std::to_string(f.month) + ", " +
+                    std::to_string(f.day) + ", " + std::to_string(f.hour) + ", " + std::to_string(f.minute);
+  if (f.second || f.micro) out += ", " + std::to_string(f.second);
+  if (f.micro) out += ", " + std::to_string(f.micro);
+  if (cell.aware)
+    out += cell.offset_minutes == 0
+               ? ", tzinfo=datetime.timezone.utc"
+               : ", tzinfo=datetime.timezone(" + timedelta_repr(static_cast<std::int64_t>(cell.offset_minutes) * 60) +
+                     ")";
+  return out + ")";
+}
+
+std::string cell_repr(const Cell& cell) {
+  switch (cell.kind) {
+    case CellKind::kMissing:
+      return "None";
+    case CellKind::kString:
+      return py_repr(cell.text);
+    case CellKind::kInt:
+      return cell.text;
+    case CellKind::kFloat:
+      return py_float(cell.number);
+    case CellKind::kBool:
+      return cell.number != 0.0 ? "True" : "False";
+    case CellKind::kDate:
+      return datetime_repr(cell);
+  }
+  return "None";
+}
+
+// str() of a value in an object column.
+std::string cell_str(const Cell& cell) {
+  switch (cell.kind) {
+    case CellKind::kString:
+      return cell.text;
+    case CellKind::kDate: {
+      const auto f = fields(cell.micros + static_cast<std::int64_t>(cell.offset_minutes) * 60000000);
+      std::array<char, 64> text{};
+      std::snprintf(text.data(), text.size(), "%04d-%02d-%02d %02d:%02d:%02d", f.year, f.month, f.day, f.hour,
+                    f.minute, f.second);
+      std::string out = text.data();
+      if (f.micro) {
+        std::snprintf(text.data(), text.size(), ".%06d", f.micro);
+        out += text.data();
+      }
+      if (cell.aware) {
+        const int offset = std::abs(cell.offset_minutes);
+        std::snprintf(text.data(), text.size(), "%c%02d:%02d", cell.offset_minutes < 0 ? '-' : '+', offset / 60,
+                      offset % 60);
+        out += text.data();
+      }
+      return out;
+    }
+    default:
+      return cell_repr(cell);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Performance aggregations
+
+std::optional<double> aggregate(const std::string& name, std::vector<double> values, bool sample_stdev) {
+  if (name == "mean") return numpy_mean(values);
+  if (name == "sum") return pairwise_sum(values.data(), values.size());
+  if (name == "max") return *std::max_element(values.begin(), values.end());
+  if (name == "min") return *std::min_element(values.begin(), values.end());
+  if (name == "median") {
+    std::sort(values.begin(), values.end());
+    const auto middle = values.size() / 2;
+    return values.size() % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2.0;
+  }
+  if (name == "stdev") {
+    // DFG arcs use the sample deviation (NaN for one value); variants use the
+    // population deviation and have none for a single case.
+    if (sample_stdev) return values.size() < 2 ? NAN : numpy_std(values, 1);
+    if (values.size() < 2) return std::nullopt;
+    return numpy_std(values);
+  }
+  return std::nullopt;
+}
+
+bool known_aggregation(const std::string& name) {
+  return name == "mean" || name == "sum" || name == "max" || name == "min" || name == "median" || name == "stdev";
+}
+
+std::string frequency_text(std::size_t count, std::size_t total, bool relative) {
+  if (!relative) return std::to_string(count);
+  return std::to_string(static_cast<long long>(100.0 * static_cast<double>(count) / static_cast<double>(total))) +
+         "\\%";
+}
+
+std::string performance_text(const std::vector<double>& values, const LlmAbstractionOptions& options, bool dfg) {
+  const auto primary = aggregate(options.primary_performance_aggregation, values, dfg);
+  if (!primary) throw std::invalid_argument("primary performance aggregation has no value");
+  std::string text = "  performance = " + fixed3(*primary);
+  const auto& secondary = options.secondary_performance_aggregation;
+  if (!secondary.empty()) {
+    const auto value = aggregate(secondary, values, dfg);
+    if (value && !std::isnan(*value)) text += "  " + secondary + " = " + fixed3(*value);
+  }
+  return text;
+}
+
+double seconds_between(std::int64_t from, std::int64_t to) { return static_cast<double>(to - from) / 1e6; }
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+
+std::string llm_log_columns_description(const EventLog& log, std::size_t max_len) {
+  std::vector<std::string> order;
+  std::map<std::string, std::vector<Cell>> columns;
+  std::size_t rows = 0;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) {
+      for (auto& [key, cell] : event_row(trace, event)) {
+        auto& column = columns[key];
+        if (column.empty() && std::find(order.begin(), order.end(), key) == order.end()) order.push_back(key);
+        column.resize(rows);
+        column.push_back(std::move(cell));
+      }
+      ++rows;
+    }
+  for (auto& [key, column] : columns) column.resize(rows);
+
+  std::map<std::string, std::string> lines;
+  std::size_t measure = 0;
+  struct Piece {
+    std::size_t count;
+    std::string column;
+    std::size_t rank;
+    std::string text, head;
+  };
+  std::vector<Piece> pieces;
+  for (const auto& key : order) {
+    const auto& column = columns[key];
+    std::size_t missing = 0;
+    bool all_date = true, all_bool = true, all_int = true, all_number = true, all_string = true;
+    std::vector<const Cell*> present;
+    for (const auto& cell : column) {
+      if (cell.kind == CellKind::kMissing) {
+        ++missing;
+        continue;
+      }
+      present.push_back(&cell);
+      all_date &= cell.kind == CellKind::kDate;
+      all_bool &= cell.kind == CellKind::kBool;
+      all_int &= cell.kind == CellKind::kInt;
+      all_number &= cell.kind == CellKind::kInt || cell.kind == CellKind::kFloat;
+      all_string &= cell.kind == CellKind::kString;
+    }
+    const auto empty = std::to_string(missing);
+    if (all_date) {
+      bool aware = false;
+      std::vector<double> values;
+      for (const auto* cell : present) {
+        values.push_back(static_cast<double>(cell->micros));
+        aware |= cell->aware;
+      }
+      if (values.empty()) continue;
+      lines[key] = key + "  empty: " + empty + "  quantiles: " + quantile_dict(values, [&](double value) {
+                     return timestamp_repr(static_cast<std::int64_t>(value), aware);
+                   });
+      measure += code_points(lines[key]);
+    } else if (all_number && !(all_int && missing == 0)) {
+      std::vector<double> values;
+      for (const auto* cell : present) values.push_back(cell->number);
+      lines[key] = key + "  empty: " + empty + "  quantiles: " + quantile_dict(values, py_float);
+      measure += code_points(lines[key]);
+    } else if (!all_number && !all_string) {
+      // Boolean and mixed columns: value counts, by count and then value.
+      struct Count {
+        const Cell* cell;
+        std::size_t count;
+      };
+      std::vector<Count> counts;
+      for (const auto* cell : present) {
+        auto found = std::find_if(counts.begin(), counts.end(), [&](const Count& entry) {
+          return entry.cell->kind == cell->kind && entry.cell->text == cell->text &&
+                 entry.cell->number == cell->number && entry.cell->micros == cell->micros;
+        });
+        if (found == counts.end())
+          counts.push_back({cell, 1});
+        else
+          ++found->count;
+      }
+      if (counts.size() <= 1) continue;
+      const auto family = [](const Cell& cell) {
+        return cell.kind == CellKind::kString ? 0 : cell.kind == CellKind::kDate ? 2 : 1;
+      };
+      for (std::size_t i = 0; i < counts.size(); ++i)
+        for (std::size_t j = i + 1; j < counts.size(); ++j)
+          if (counts[i].count == counts[j].count && family(*counts[i].cell) != family(*counts[j].cell))
+            throw std::invalid_argument("column " + key + " ties values that cannot be ordered");
+      std::sort(counts.begin(), counts.end(), [&](const Count& left, const Count& right) {
+        if (left.count != right.count) return left.count > right.count;
+        const auto& a = *left.cell;
+        const auto& b = *right.cell;
+        if (family(a) == 0) return a.text > b.text;
+        if (family(a) == 2) return a.micros > b.micros;
+        return a.number > b.number;
+      });
+      for (std::size_t rank = 0; rank < counts.size(); ++rank)
+        pieces.push_back({counts[rank].count, key, rank,
+                          " (" + cell_str(*counts[rank].cell) + "; freq. " + std::to_string(counts[rank].count) + ")",
+                          key + "  empty: " + empty + " values:"});
+    }
+  }
+  std::stable_sort(pieces.begin(), pieces.end(), [](const Piece& left, const Piece& right) {
+    if (left.count != right.count) return left.count > right.count;
+    if (left.column != right.column) return left.column > right.column;
+    return left.rank < right.rank;
+  });
+  std::map<std::string, std::string> started;
+  for (const auto& piece : pieces) {
+    if (measure >= max_len) break;
+    auto found = started.find(piece.column);
+    if (found == started.end()) {
+      found = started.emplace(piece.column, piece.head).first;
+      // The reference budget charges eight more characters per started column.
+      measure += code_points(piece.head) + 8;
+    }
+    found->second += piece.text;
+    measure += code_points(piece.text);
+  }
+  lines.insert(started.begin(), started.end());
+  std::string text;
+  for (const auto& [key, line] : lines) {
+    if (!text.empty()) text += '\n';
+    text += line;
+  }
+  return text;
+}
+
+std::string llm_log_dfg_description(const EventLog& log, const LlmAbstractionOptions& options) {
+  if (!known_aggregation(options.primary_performance_aggregation))
+    throw std::invalid_argument("unknown primary performance aggregation");
+  std::map<std::pair<std::string, std::string>, std::vector<double>> arcs;
+  std::map<std::pair<std::string, std::string>, std::size_t> cases;
+  for (const auto& trace : log.traces) {
+    std::vector<std::pair<std::int64_t, const Event*>> events;
+    for (const auto& event : trace.events) events.emplace_back(event_micros(event), &event);
+    std::stable_sort(events.begin(), events.end(),
+                     [](const auto& left, const auto& right) { return left.first < right.first; });
+    std::map<std::pair<std::string, std::string>, bool> seen;
+    for (std::size_t i = 1; i < events.size(); ++i) {
+      const std::pair<std::string, std::string> arc{events[i - 1].second->activity, events[i].second->activity};
+      arcs[arc].push_back(seconds_between(events[i - 1].first, events[i].first));
+      if (!seen[arc]) {
+        seen[arc] = true;
+        ++cases[arc];
+      }
+    }
+  }
+  std::vector<std::pair<std::pair<std::string, std::string>, std::size_t>> order;
+  for (const auto& [arc, values] : arcs)
+    order.emplace_back(arc, options.relative_frequency ? cases[arc] : values.size());
+  std::sort(order.begin(), order.end(), [](const auto& left, const auto& right) {
+    return left.second != right.second ? left.second > right.second : left.first > right.first;
+  });
+  std::string text = options.response_header ? "If I have a process with flow:\n\n" : "\n\n";
+  for (const auto& [arc, count] : order) {
+    if (code_points(text) > options.max_len) break;
+    text += arc.first + " -> " + arc.second + " ( frequency = " +
+            frequency_text(count, log.traces.size(), options.relative_frequency);
+    if (options.include_performance) text += performance_text(arcs[arc], options, true);
+    text += " )\n";
+  }
+  return text + "\n\n";
+}
+
+std::string llm_log_variants_description(const EventLog& log, const LlmAbstractionOptions& options) {
+  std::map<std::vector<std::string>, std::vector<double>> variants;
+  for (const auto& trace : log.traces) {
+    std::vector<std::string> activities;
+    std::int64_t first = 0, last = 0;
+    for (std::size_t i = 0; i < trace.events.size(); ++i) {
+      activities.push_back(trace.events[i].activity);
+      const auto micros = event_micros(trace.events[i]);
+      first = i ? std::min(first, micros) : micros;
+      last = i ? std::max(last, micros) : micros;
+    }
+    variants[activities].push_back(seconds_between(first, last));
+  }
+  struct Entry {
+    const std::vector<std::string>* activities;
+    const std::vector<double>* durations;
+    double performance;
+  };
+  std::vector<Entry> order;
+  for (const auto& [activities, durations] : variants) {
+    const auto performance = aggregate(options.primary_performance_aggregation, durations, false);
+    if (!performance) throw std::invalid_argument("primary performance aggregation has no value");
+    order.push_back({&activities, &durations, *performance});
+  }
+  std::sort(order.begin(), order.end(), [](const Entry& left, const Entry& right) {
+    if (left.durations->size() != right.durations->size()) return left.durations->size() > right.durations->size();
+    if (left.performance != right.performance) return left.performance > right.performance;
+    return *left.activities > *right.activities;
+  });
+  std::string text = options.response_header ? "If I have a process with the following process variants:\n\n" : "\n\n";
+  for (const auto& entry : order) {
+    if (code_points(text) > options.max_len) break;
+    std::string joined;
+    for (const auto& activity : *entry.activities) joined += (joined.empty() ? "" : " -> ") + activity;
+    text += " " + joined + " ( frequency = " +
+            frequency_text(entry.durations->size(), log.traces.size(), options.relative_frequency);
+    if (options.include_performance) text += performance_text(*entry.durations, options, false);
+    text += " )\n";
+  }
+  return text + "\n\n";
+}
+
+std::string llm_log_features_description(const EventLog& log, const LlmAbstractionOptions& options) {
+  const auto features = trace_based_log_features(log);
+  struct Entry {
+    std::size_t count;
+    double variation;
+    std::string description, line;
+  };
+  std::vector<Entry> entries;
+  for (std::size_t column = 0; column < features.feature_names.size(); ++column) {
+    std::vector<double> values;
+    for (const auto& row : features.trace_rows) {
+      const auto* value = std::get_if<double>(&row.at(column));
+      if (value && *value != 0.0) values.push_back(*value);
+    }
+    if (values.empty()) continue;
+    const auto& name = features.feature_names[column];
+    std::string description;
+    const auto split = [](std::string_view text, char separator) {
+      std::vector<std::string> parts;
+      std::size_t start = 0;
+      for (std::size_t at; (at = text.find(separator, start)) != std::string_view::npos; start = at + 1)
+        parts.emplace_back(text.substr(start, at - start));
+      parts.emplace_back(text.substr(start));
+      return parts;
+    };
+    if (name.starts_with("succession:")) {
+      const auto parts = split(std::string_view(name).substr(11), '@');
+      const auto pair = split(parts.back(), '#');
+      description = "Succession '" + pair.front() + "' -> '" + pair.back() + "' for the Values of the Attribute '" +
+                    parts.front() + "'";
+    } else if (name.starts_with("trace:") || name.starts_with("event:")) {
+      const std::string scope = name.starts_with("trace:") ? "Case" : "Event";
+      const auto parts = split(std::string_view(name).substr(6), '@');
+      description = parts.size() == 1 ? "Values for " + scope + " Attribute '" + parts.front() + "'"
+                                      : "Value '" + parts.back() + "' for " + scope + " Attribute '" +
+                                            parts.front() + "'";
+    } else {
+      description = "None";
+    }
+    const double variation = numpy_std(values) / numpy_mean(values);
+    entries.push_back({values.size(), variation, description,
+                       description + ":    number of non-zero values: " + std::to_string(values.size()) +
+                           " ; quantiles of the non-zero: " + quantile_dict(values, py_float) + "\n"});
+  }
+  std::sort(entries.begin(), entries.end(), [](const Entry& left, const Entry& right) {
+    if (left.count != right.count) return left.count > right.count;
+    if (left.variation != right.variation) return left.variation > right.variation;
+    return left.description > right.description;
+  });
+  std::string text = options.include_header ? "\n Given the following features:\n\n" : "\n";
+  for (const auto& entry : entries) {
+    if (code_points(text) > options.max_len) break;
+    text += entry.line;
+  }
+  return text;
+}
+
+std::string llm_event_stream_description(const EventLog& log, const LlmAbstractionOptions& options) {
+  struct Item {
+    std::int64_t micros;
+    std::string line;
+  };
+  std::vector<Item> items;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) {
+      std::string line = "{";
+      for (const auto& [key, cell] : event_row(trace, event)) {
+        if (line.size() > 1) line += ", ";
+        line += py_repr(key) + ": " + cell_repr(cell);
+      }
+      items.push_back({event_micros(event), line + "}\n"});
+    }
+  // Latest first, ties in log order; each line is put in front of the others.
+  std::stable_sort(items.begin(), items.end(), [](const Item& left, const Item& right) { return left.micros > right.micros; });
+  const std::string head =
+      std::string("\n\n") + (options.response_header ? "If I have the following stream of events:\n\n" : "");
+  std::vector<const std::string*> kept;
+  std::size_t length = code_points(head);
+  for (const auto& item : items) {
+    if (length > options.max_len) break;
+    kept.push_back(&item.line);
+    length += code_points(item.line);
+  }
+  std::string text = head;
+  for (auto line = kept.rbegin(); line != kept.rend(); ++line) text += **line;
+  return text + "\n";
+}
+
+std::string llm_log_skeleton_description(const EventLog& log, const LlmAbstractionOptions& options) {
+  const auto model = discover_log_skeleton(log);
+  std::string text = options.include_header
+                         ? "\n\nThe Log Skeleton process model contains the following declarative constraints:\n- "
+                           "Equivalence (if the first activity occurs, then it has the same occurrences as the "
+                           "second one)\n- Always Before (if the first activity occur, then the second activity "
+                           "should have been executed previously)\n- Always After (if the first activity occur, then "
+                           "the second activity is executed in one of the following events)\n- Never Together (the "
+                           "two activities cannot co-exist inside the same case)\n- Activity Occurrences (bounds the "
+                           "number of occurrences for an activity in a case)\n- Directly-Follows Constraints (if the "
+                           "first activity occurs, then the second activity shall occur immediately after)\n    "
+                           "\n\nI have a Log Skeleton process model containing the following declarative "
+                           "constraints:\n\n"
+                         : "\n";
+  const auto pairs = [&](const char* label, const std::vector<LogSkeletonPair>& entries) {
+    text += std::string(label) + ": ";
+    for (const auto& entry : entries) text += " (" + py_repr(entry.source) + ", " + py_repr(entry.target) + ")";
+    text += "\n\n";
+  };
+  pairs("Equivalence", model.equivalence);
+  pairs("Always Before", model.always_before);
+  pairs("Always After", model.always_after);
+  pairs("Never Together", model.never_together);
+  std::vector<std::string> activities;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events)
+      if (std::find(activities.begin(), activities.end(), event.activity) == activities.end())
+        activities.push_back(event.activity);
+  text += "Activity Occurrences: ";
+  for (const auto& activity : activities) {
+    const auto found = model.activ_freq.find(activity);
+    if (found == model.activ_freq.end()) continue;
+    text += " " + activity + ":";
+    for (std::size_t i = 0; i < found->second.size(); ++i) text += (i ? ", " : " ") + std::to_string(found->second[i]);
+    text += ";";
+  }
+  text += "\n\n";
+  pairs("Directly-Follows Constraints", model.directly_follows);
+  return text;
+}
+
+}  // namespace minera

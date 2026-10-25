@@ -29,8 +29,20 @@ Other threads: please pick different packages.
 ## In progress — clustering and features (claimed 2026-10-25)
 
 Thread "Continue parity toward 2.7.22" owns
-`algo.transformation.log_to_features` leftovers (temporal_lazy, LLE util) and
+`algo.transformation.log_to_features` leftovers (temporal_lazy, LLE util),
+the OCEL LLM abstractions (ocel_fea_descr, ocel_ocdfg_descr) and
 `algo.simulation.montecarlo` next.
+
+## LLM log abstractions — 2026-10-25
+
+New bank `docs/llm-abstractions-bank.json.gz` (2,700 calls over columns, DFG,
+variants, features, stream and log-skeleton descriptions) passes byte for byte
+in `minera_llm_abstractions_parity_tests` through
+`include/minera/llm_abstractions.hpp`. The capture builds a fresh log per call
+because the public abstractions mutate their input. Native feature inference
+now one-hot encodes mixed string/number attributes. Six support modules
+promoted: 276/387. Left in `algo.querying.llm.abstractions`: ocel_fea_descr and
+ocel_ocdfg_descr.
 
 ## Profile clustering — 2026-10-25
 

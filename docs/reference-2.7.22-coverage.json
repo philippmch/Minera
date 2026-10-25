@@ -15598,8 +15598,32 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_abstractions.hpp",
+        "src/backend/llm_abstractions.cpp",
+        "src/backend/tests/test_llm_abstractions_parity.cpp",
+        "src/backend/tests/fixtures/llm_abstractions_bank.txt",
+        "scripts/capture-llm-abstractions-bank.py",
+        "scripts/generate-llm-abstractions-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.log_to_cols_descr",
+        "implementation": [
+          {
+            "path": "include/minera/llm_abstractions.hpp",
+            "symbol": "llm_log_columns_description"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_abstractions_parity.cpp",
+            "executable": "minera_llm_abstractions_parity_tests",
+            "case": "columns_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.log_to_dfg_descr",
@@ -15607,8 +15631,32 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_abstractions.hpp",
+        "src/backend/llm_abstractions.cpp",
+        "src/backend/tests/test_llm_abstractions_parity.cpp",
+        "src/backend/tests/fixtures/llm_abstractions_bank.txt",
+        "scripts/capture-llm-abstractions-bank.py",
+        "scripts/generate-llm-abstractions-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.log_to_dfg_descr",
+        "implementation": [
+          {
+            "path": "include/minera/llm_abstractions.hpp",
+            "symbol": "llm_log_dfg_description"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_abstractions_parity.cpp",
+            "executable": "minera_llm_abstractions_parity_tests",
+            "case": "dfg_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.log_to_fea_descr",
@@ -15616,8 +15664,32 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_abstractions.hpp",
+        "src/backend/llm_abstractions.cpp",
+        "src/backend/tests/test_llm_abstractions_parity.cpp",
+        "src/backend/tests/fixtures/llm_abstractions_bank.txt",
+        "scripts/capture-llm-abstractions-bank.py",
+        "scripts/generate-llm-abstractions-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.log_to_fea_descr",
+        "implementation": [
+          {
+            "path": "include/minera/llm_abstractions.hpp",
+            "symbol": "llm_log_features_description"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_abstractions_parity.cpp",
+            "executable": "minera_llm_abstractions_parity_tests",
+            "case": "features_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.log_to_variants_descr",
@@ -15625,8 +15697,32 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_abstractions.hpp",
+        "src/backend/llm_abstractions.cpp",
+        "src/backend/tests/test_llm_abstractions_parity.cpp",
+        "src/backend/tests/fixtures/llm_abstractions_bank.txt",
+        "scripts/capture-llm-abstractions-bank.py",
+        "scripts/generate-llm-abstractions-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.log_to_variants_descr",
+        "implementation": [
+          {
+            "path": "include/minera/llm_abstractions.hpp",
+            "symbol": "llm_log_variants_description"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_abstractions_parity.cpp",
+            "executable": "minera_llm_abstractions_parity_tests",
+            "case": "variants_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.logske_to_descr",
@@ -15634,8 +15730,32 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_abstractions.hpp",
+        "src/backend/llm_abstractions.cpp",
+        "src/backend/tests/test_llm_abstractions_parity.cpp",
+        "src/backend/tests/fixtures/llm_abstractions_bank.txt",
+        "scripts/capture-llm-abstractions-bank.py",
+        "scripts/generate-llm-abstractions-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.logske_to_descr",
+        "implementation": [
+          {
+            "path": "include/minera/llm_abstractions.hpp",
+            "symbol": "llm_log_skeleton_description"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_abstractions_parity.cpp",
+            "executable": "minera_llm_abstractions_parity_tests",
+            "case": "skeleton_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.net_to_descr",
@@ -15713,8 +15833,32 @@
       "owner": "support:querying.llm.abstractions",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_abstractions.hpp",
+        "src/backend/llm_abstractions.cpp",
+        "src/backend/tests/test_llm_abstractions_parity.cpp",
+        "src/backend/tests/fixtures/llm_abstractions_bank.txt",
+        "scripts/capture-llm-abstractions-bank.py",
+        "scripts/generate-llm-abstractions-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.abstractions.stream_to_descr",
+        "implementation": [
+          {
+            "path": "include/minera/llm_abstractions.hpp",
+            "symbol": "llm_event_stream_description"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_abstractions_parity.cpp",
+            "executable": "minera_llm_abstractions_parity_tests",
+            "case": "stream_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.tempprofile_to_descr",

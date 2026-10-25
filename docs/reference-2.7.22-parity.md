@@ -14763,3 +14763,68 @@ variation), replayed by `minera_log_filter_bank_parity_tests`. The tooling,
 the edge-case domain and every native rule the bank added are in
 [log-filter-domain-parity.md](log-filter-domain-parity.md). All seven modules
 are complete.
+
+## LLM log-abstraction bank (2026-10-25)
+
+`scripts/capture-llm-abstractions-bank.py` (seed 20261033, 150 seeded logs,
+four hash seeds) calls the public `algo.querying.llm.abstractions` modules
+`log_to_cols_descr`, `log_to_dfg_descr`, `log_to_variants_descr`,
+`log_to_fea_descr`, `stream_to_descr` and `logske_to_descr` (on the public
+`discover_log_skeleton`) under 18 parameter sets, 2,700 calls in all. Each call
+gets a freshly built log: the public columns, DFG and variants abstractions add
+`case:` attributes to the events of the log they receive, so a shared log
+would change later calls (Minera takes the log by const reference and has no
+such side effect). The fixture
+`src/backend/tests/fixtures/llm_abstractions_bank.txt` drives
+`minera_llm_abstractions_parity_tests` against the functions of
+`include/minera/llm_abstractions.hpp`; all 2,700 calls match byte for byte (68
+raise, as the reference does).
+
+Reference behaviour found (black box):
+
+- Columns: the event table (event attributes, then `case:` trace attributes,
+  one row per event) sorted by column name. Float columns (numbers with a gap
+  or any float) and datetime columns print `empty:` and the five linear
+  quantiles (Python float repr; pandas Timestamp repr at microseconds,
+  truncating the interpolated float). Integer columns without gaps and string
+  columns are omitted. Boolean and mixed columns with two or more distinct
+  values print `(value; freq. n)` pieces by count then value, descending; a
+  count tie between a string and a non-string value raises TypeError. Pieces
+  of all columns are taken by count, then column name, descending, while a
+  budget below `max_len`; the budget starts at the total length of the
+  quantile lines and charges each piece plus, for a column's first piece, its
+  `col  empty: n values:` head and eight more characters.
+- DFG: arcs over each case ordered by timestamp, by frequency (cases with the
+  arc under `relative_frequency`, shown as the truncated percent of cases)
+  then arc, descending. Performance uses durations in seconds; `stdev` is the
+  sample deviation, NaN prints `nan`, an unknown primary aggregation raises
+  KeyError and a NaN or unknown secondary one is left out.
+- Variants: activities in log order, case duration as last minus first
+  timestamp, sorted by count, primary performance and variant, descending;
+  `stdev` is the population deviation and has no value for a single case
+  (left out as secondary, TypeError as primary, as are unknown names).
+- Features: default TRACE_BASED log features; per feature the count of
+  non-zero traces and the quantiles of the non-zero values, sorted by count,
+  coefficient of variation (numpy population std over mean) and description,
+  descending. Descriptions split the feature name at `@` (first part the
+  attribute, last part the value) and successions at `#`.
+- Stream: events (`case:` attributes appended) by timestamp, latest first with
+  ties in log order, each line put in front of the earlier ones while the text
+  is at most `max_len`; values use Python repr.
+- Skeleton: the shared Log Skeleton header, relation pairs each preceded by a
+  space, activity occurrences in first-appearance order.
+
+Budgets (`max_len`) count code points and stop once the text so far exceeds
+the limit (columns: once the budget reaches it). Contract: relation pairs in
+the skeleton follow Python set order, which moves with the hash seed, so the
+test compares each relation line as a set of pairs; native prints sorted
+pairs. The reference types a mixed string/number attribute by the first member
+of a Python set of its values, so with some small integers it raises
+ValueError under some hash seeds; Minera one-hot encodes every value of such an
+attribute when it occurs in every trace (the bank's outcome under all four
+seeds). That rule is now in the native log-to-features inference, which also
+keeps the log-to-features bank green. Stream key order is `concept:name`,
+`org:resource`, `time:timestamp`, `lifecycle:transition`, the other event
+attributes in input order, then `case:concept:name` and the trace attributes:
+native events do not record the source order of their first-class fields.
+`abstract_log_skeleton` now uses the same spacing for several or no pairs.
