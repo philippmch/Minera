@@ -36,7 +36,7 @@ partition utils and tournament fitness exactly; individuals, crossover,
 mutate, repair and apply by invariants (model in the parity doc). Token
 replay ties need the reference place names, which the bank records.
 `mine_genetic` is unchanged (follow-up: route it through the reference blocks).
-Package promoted: 77/86 packages, 286/387 modules.
+Package promoted: 78/86 packages, 306/387 modules (after rebase).
 
 ## In progress — discovery gaps (claimed 2026-10-25)
 
