@@ -629,4 +629,49 @@ PetriUsageComparison compare_element_usage_two_logs(const PetriNet& net,
   return compare_petri_usage(net, log1, log2, options);
 }
 
+PetriUsageComparison compare_element_usage_token_replay(const PetriNet& net, const EventLog& log1,
+                                                       const EventLog& log2, TokenReplayOptions replay) {
+  replay.variant = TokenReplayVariant::kForward;
+  replay.enable_pltr_fitness = true;
+  const auto usage = [&](const EventLog& log) {
+    const auto result = replay_token_result(log, net, replay);
+    std::vector<std::uint64_t> places(net.place_count(), 0), transitions(net.transitions().size(), 0);
+    for (const auto& trace : result.traces)
+      for (const auto transition : trace.activated_transitions) ++transitions.at(transition);
+    if (result.pltr_fitness) {
+      for (std::size_t place = 0; place < result.pltr_fitness->places.size() && place < places.size(); ++place) {
+        const auto& fitness = result.pltr_fitness->places[place];
+        places[place] = std::stoull(fitness.consumed.decimal()) + std::stoull(fitness.remaining.decimal());
+      }
+    }
+    return std::pair{places, transitions};
+  };
+  const auto [places1, transitions1] = usage(log1);
+  const auto [places2, transitions2] = usage(log2);
+  PetriUsageComparison result;
+  for (std::size_t p = 0; p < net.place_count(); ++p) result.places.push_back(record(p, places1[p], places2[p]));
+  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+    const auto& transition = net.transitions()[t];
+    std::string label_prefix;
+    if (transition.activity && *transition.activity < net.activities().size())
+      label_prefix = net.activities()[*transition.activity] + " ";
+    result.transitions.push_back(record(t, transitions1[t], transitions2[t], std::move(label_prefix)));
+  }
+  std::size_t arc_id = 0;
+  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+    const auto& transition = net.transitions()[t];
+    const auto& stats = result.transitions[t];
+    const auto append_arc = [&](std::size_t place, PetriArcUsageKind kind) {
+      result.arcs.push_back({arc_id++, t, place, kind, kind != PetriArcUsageKind::kOutput, stats.log1_occurrences,
+                             stats.log2_occurrences, stats.total_occurrences, stats.direction, stats.label,
+                             stats.color});
+    };
+    for (const auto place : transition.inputs) append_arc(place, PetriArcUsageKind::kInput);
+    for (const auto place : transition.outputs) append_arc(place, PetriArcUsageKind::kOutput);
+    for (const auto place : transition.reset_inputs) append_arc(place, PetriArcUsageKind::kReset);
+    for (const auto place : transition.inhibitor_inputs) append_arc(place, PetriArcUsageKind::kInhibitor);
+  }
+  return result;
+}
+
 }  // namespace minera

@@ -69,6 +69,16 @@ passes in `minera_precision_utils_parity_tests` through the new
 include/minera/precision_utils.hpp (`precision_log_prefixes`,
 `precision_fake_log`, `precision_sync_search`; model in the parity doc).
 
+## Element-usage comparison — 2026-10-25
+
+New bank `docs/element-usage-bank.txt.gz` (2,000 calls on the 40 frozen
+conformance nets, about four minutes) passes in
+`minera_element_usage_comparison_parity_tests` through the new
+`compare_element_usage_token_replay`, which composes the native forward
+token replay with PLTR fitness the way the reference does. The CLI/server
+comparison still calls `compare_petri_usage`; moving it onto the new
+function is a possible follow-up.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

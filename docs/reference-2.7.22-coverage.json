@@ -8040,8 +8040,30 @@
       "owner": "support:comparison",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_usage_comparison.hpp",
+        "src/backend/petri_usage_comparison.cpp",
+        "src/backend/tests/test_element_usage_comparison_parity.cpp",
+        "scripts/capture-element-usage-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.comparison.petrinet.element_usage_comparison",
+        "implementation": [
+          {
+            "path": "include/minera/petri_usage_comparison.hpp",
+            "symbol": "compare_element_usage_token_replay"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_element_usage_comparison_parity.cpp",
+            "executable": "minera_element_usage_comparison_parity_tests",
+            "case": "check_comparison"
+          }
+        ]
+      }
     },
     {
       "module": "algo.concept_drift.variants.bose",

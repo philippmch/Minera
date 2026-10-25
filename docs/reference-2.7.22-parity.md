@@ -122,7 +122,7 @@ are reconciled.
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Complete** — native marking/extended-equation/workflow/soundness cores expose the classic continuous state-equation optimum (including fractional solutions) with realizability recovery only for integral vectors, deterministic structural pair diagnostics, explicit Woflan selection, short-circuit construction, reachability liveness projection, strong-connectivity diagnostics, single-place marking validation, early unsound-witness return, and strict CLI/server/frontend adapters; focused contracts independently prove every selector and graph, pair, and invariant support projection |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
-| Comparison | Petri-net element-usage comparison | **Partial (remaining replay proof)** — native place/transition/arc usage deltas, supplied-PNML CLI input, explicit markings including zero-valued key metadata, selectors, weighted/extended arcs, color helpers, and token-flood cleaning have registered coverage; partial hidden routes and replay limits have public evidence, while resource-unresolved models remain outside the comparison proof |
+| Comparison | Petri-net element-usage comparison | **Complete** — `compare_element_usage_token_replay` composes the public forward token replay (PLTR) exactly as the reference does and matches the 2,000-call public bank (see "Element-usage comparison bank"); the older `compare_petri_usage` options surface (CLI, server, frontend) keeps its own replay with the evidence below |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Complete** — module and dispatcher contracts cover all seven public functions, eight apply parameters, typed labels, signed controls, EventLog/EventTable adapters, diagnostics and RNG continuation; exact proofs and reviewed ordering distinctions are recorded in `docs/bose-parity-contract.md` |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete** (six search variants, log-level dispatcher and log enrichment) — all six variants are explicitly selectable and `align_petri_trace` reproduces the reference per-trace cost, best-worst cost, fitness, unreachable-marking and error behavior, including cost functions, arc-weight handling and the less-memory pruning, against three black-box banks (see "Conformance parity bank evidence"); less-memory Dijkstra with legacy unit costs remains the generic default of `check_alignment` |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors; DFG classic is bound to the conformance parity banks (alignment, cost and visited states), while process-tree and decomposed results are captured there but not yet bound |
@@ -15192,3 +15192,27 @@ Reference behaviour found (black box):
   recorded instead of expanded, and the search ends at the first queued cost
   above the cheapest recorded one. It returns the recorded markings, or None
   when there are none.
+
+## Element-usage comparison bank (2026-10-25)
+
+`scripts/capture-element-usage-bank.py` (seed 20261025) gives each of the 40
+frozen nets of `docs/reference-2.7.22-conformance-parity-nets.json.gz` 50
+seeded pairs of logs (model words, repeated traces, the unknown label `zz`,
+empty traces) and records `compare_element_usage_two_logs` on the
+PNML-imported net into `docs/element-usage-bank.txt.gz` under eight hash
+seeds; the 71 calls whose output varied were run under 64 more seeds and
+keep every distinct output (duplicate-label choices also follow object
+addresses: one output appeared once in 64 runs).
+`minera_element_usage_comparison_parity_tests` requires every place,
+transition and arc record (counts, total, label, direction, color) of
+`compare_element_usage_token_replay` to equal an observed output: 2,000
+calls, 0 failures.
+
+Reference behaviour found (black box): each log is replayed by the public
+forward token replay with PLTR fitness and default parameters. A
+transition's count is its number of appearances in the traces' activated
+transitions; a place's count is its consumed plus remaining tokens in the
+PLTR place fitness; every arc carries the record of its transition. The
+label is "(log1/log2/total)", prefixed by "label " for a visible
+transition; direction is (log2 - log1) / total (0 for no use) and colors
+come from the dynamic palette. Every element appears, used or not.

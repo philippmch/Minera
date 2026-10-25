@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "minera/conformance.hpp"
 #include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
 
@@ -111,5 +112,15 @@ struct PetriUsageComparisonOptions {
 [[nodiscard]] PetriUsageComparison compare_element_usage_two_logs(
     const PetriNet& net, const EventLog& log1, const EventLog& log2,
     const PetriUsageComparisonOptions& options = {});
+
+// compare_element_usage_two_logs of the reference as it composes the public
+// forward token replay: each log is replayed with PLTR fitness under
+// `replay` (markings, names and arc order as for replay_token_result). A
+// transition's usage is the number of times it appears in the traces'
+// activated transitions; a place's usage is its consumed plus remaining
+// tokens in the PLTR place fitness. Arcs carry their transition's record.
+[[nodiscard]] PetriUsageComparison compare_element_usage_token_replay(
+    const PetriNet& net, const EventLog& log1, const EventLog& log2,
+    TokenReplayOptions replay = {});
 
 }  // namespace minera
