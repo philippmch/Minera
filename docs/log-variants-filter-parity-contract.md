@@ -67,3 +67,10 @@ Evidence is retained under `build/filtering-variants-log-public-prepared-1` and 
 Final acceptance passes all 34 assertion-enabled native suites in `build/parity-closures/native-current/ctest-variants-final.log`, against the successful `configure-variants-third.log` and `build-variants-third.log`. The log companion matches all 380 retained outcomes; its original direct run also passed. All 50 actual production HTTP checks pass in `build/parity-closures/variants-production-http-1`, using server SHA256 `e6037fea1b18de19e983595c1d7bf22281288496d3161d35e87936ea9441df90`. The owned server exited and the existing application was not replaced. The frontend suite passes 186 files and 9,755 tests, the final focused suite passes 38 tests, and TypeScript/Vite pass.
 
 The acceptance archive retains the original aggregate builds, the initial 33/34 CTest failure in the separate Polars helper, direct-run receipts, and the frontend verification history alongside the authoritative successful receipts. The log source and generated expectations were not changed to repair that other helper. The catalogue row remains partial: finite observations do not establish arbitrary Python objects, every malformed parameter dictionary, pathological dictionary hash collisions, reference alias identity, or non-trace EventLog outputs from invalid dictionary values. No rendered-browser validation is claimed.
+
+## Disjoint bank closure (2026-10-25)
+
+The module is promoted on the seeded public-call bank in
+[log-filter-domain-parity.md](log-filter-domain-parity.md) (240,450 calls
+across the seven EventLog filtering modules, zero failures), which also lists
+the native rules that bank added.

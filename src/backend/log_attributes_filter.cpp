@@ -152,9 +152,18 @@ void case_projection(Trace&t){for(const auto&a:t.attributes)if(a.key=="concept:n
 EventLog regroup(const EventLog&source,const std::vector<Event>&events,const EventAttribute&case_key){EventLog result;copy_event_log_context(source,result);std::vector<EventAttribute>ids;for(auto e:events){auto key=required(e,case_key);hash_key(key);auto at=std::find_if(ids.begin(),ids.end(),[&](const auto&v){return dictionary_equal(v,key);});const auto index=static_cast<std::size_t>(at-ids.begin());if(at==ids.end()){Trace t;for(auto a:e.attributes)if(a.key.starts_with("case:")){a.key.erase(0,5);t.attributes.push_back(std::move(a));}if(std::none_of(t.attributes.begin(),t.attributes.end(),[](const auto&a){return a.key=="concept:name";})){auto canonical=key;canonical.key="concept:name";t.attributes.push_back(std::move(canonical));}case_projection(t);result.traces.push_back(std::move(t));ids.push_back(std::move(key));}e.attributes.erase(std::remove_if(e.attributes.begin(),e.attributes.end(),[](const auto&a){return a.key.starts_with("case:");}),e.attributes.end());result.traces[index].events.push_back(std::move(e));}return result;}
 EventAttribute event_case_key(const LogAttributesFilterOptions&o){return o.case_id_key.value_or(EventAttribute{"","case:concept:name"});}
 bool in_range(const EventAttribute&v,const EventAttribute&lo,const EventAttribute&hi){return compare(lo,v,"<=")&&compare(v,hi,"<=");}
+// Positive keeps lo <= v <= hi; negative keeps v < lo or v > hi (so NaN is never kept).
+bool numeric_kept(const EventAttribute&v,const EventAttribute&lo,const EventAttribute&hi,const EventAttribute&positive){if(truth(positive))return in_range(v,lo,hi);return compare(v,lo,"<")||compare(v,hi,">");}
 bool stream_matches(const Event&e,const LogAttributesFilterOptions&o){for(const auto pair:{std::pair{&o.stream_filter_key1,&o.stream_filter_value1},std::pair{&o.stream_filter_key2,&o.stream_filter_value2}})if(*pair.first&&!(*pair.first)->is_null){const auto v=event_value(e,**pair.first);if(!v||!equal(*v,*pair.second,false))return false;}return true;}
 struct Count{EventAttribute key;std::size_t value=0;};
 std::vector<Count> counts(const EventLog&source,const EventAttribute&key,bool once){std::vector<Count>result;for(const auto&t:source.traces){std::vector<EventAttribute>seen;for(const auto&e:t.events)if(auto v=event_value(e,key)){hash_key(*v);if(once&&std::any_of(seen.begin(),seen.end(),[&](const auto&w){return dictionary_equal(w,*v);}))continue;seen.push_back(*v);auto at=std::find_if(result.begin(),result.end(),[&](const auto&w){return dictionary_equal(w.key,*v);});if(at==result.end())result.push_back({*v,1});else++at->value;}}return result;}
+// Python's glue + case_id_key, which builds the stream case key.
+TokenInteger whole_number(const EventAttribute&v){if(type(v)=="bool")return TokenInteger(truth(v)?1:0);if(const auto* s=std::get_if<std::int64_t>(&v.typed_value))return TokenInteger(*s);if(const auto* u=std::get_if<std::uint64_t>(&v.typed_value))return TokenInteger(*u);return TokenInteger(v.value);}
+EventAttribute plus(const EventAttribute&a,const EventAttribute&b){
+ if(text(a)){if(text(b))return EventAttribute{"",a.value+b.value};fail("TypeError","can only concatenate str (not \""+type(b)+"\") to str");}
+ if(numeric(a)&&numeric(b)){if(type(a)=="float"||type(b)=="float")return real(native_attribute_number(a)+native_attribute_number(b));return EventAttribute{"",(whole_number(a)+whole_number(b)).decimal(),AttributeKind::kInt};}
+ fail("TypeError","unsupported operand type(s) for +: '"+type(a)+"' and '"+type(b)+"'");
+}
 EventAttribute multiplied(const EventAttribute&v,std::size_t n){if(is_native_na_attribute(v))return v;if(numeric(v)){if(type(v)=="float")return real(native_attribute_number(v)*static_cast<double>(n));TokenInteger integer;if(type(v)=="bool")integer=TokenInteger(truth(v)?1:0);else if(const auto* signed_value=std::get_if<std::int64_t>(&v.typed_value))integer=TokenInteger(*signed_value);else if(const auto* unsigned_value=std::get_if<std::uint64_t>(&v.typed_value))integer=TokenInteger(*unsigned_value);else integer=TokenInteger(v.value);return EventAttribute{"",(integer*TokenInteger(n)).decimal(),AttributeKind::kInt};}if(text(v)||v.kind==AttributeKind::kBytes||v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple)return v;fail("TypeError","unsupported operand type(s) for *: '"+type(v)+"' and 'int'");}
 EventAttribute sequence(std::vector<EventAttribute>values,AttributeContainerKind kind=AttributeContainerKind::kList){EventAttribute v;v.container=kind;v.children=std::move(values);return v;}
 void set_parameter(LogAttributesFilterParameters&params,std::string key,EventAttribute value){for(auto&p:params)if(!p.enum_key&&p.key==key){p.value=std::move(value);return;}params.push_back({std::move(key),std::move(value),false});}
@@ -190,34 +199,41 @@ EventLog filter_log_attributes_events(EventLog&source,const EventAttribute&value
 EventLog filter_log_attributes_events(const EventLog&source,const EventAttribute&values,const LogAttributesFilterOptions&o){auto copy=source;return filter_log_attributes_events(copy,values,o);}
 EventLog filter_log_attributes_numeric_events(EventLog&source,const EventAttribute&lower,const EventAttribute&upper,const LogAttributesFilterOptions&o){
  check_parameters(o);inject(source);std::vector<Event>events;
- for(const auto&t:source.traces)for(const auto&e:t.events)if(const auto v=event_value(e,selected_key(o))){const bool matched=in_range(*v,lower,upper);if(matched==truth(o.positive))events.push_back(e);}
+ for(const auto&t:source.traces)for(const auto&e:t.events)if(const auto v=event_value(e,selected_key(o))){if(numeric_kept(*v,lower,upper,o.positive))events.push_back(e);}
  return regroup(source,events,event_case_key(o));
 }
 EventLog filter_log_attributes_numeric_events(const EventLog&source,const EventAttribute&lower,const EventAttribute&upper,const LogAttributesFilterOptions&o){auto copy=source;return filter_log_attributes_numeric_events(copy,lower,upper,o);}
 EventLog filter_log_attributes_numeric(EventLog&source,const EventAttribute&lower,const EventAttribute&upper,const LogAttributesFilterOptions&o){
  check_parameters(o);inject(source);const auto trace_key=o.case_id_key.value_or(EventAttribute{"","concept:name"});
- if(!text(o.case_id_glue)||!text(trace_key))fail("TypeError","numeric case glue and key require ordinary strings");
- const EventAttribute stream_key{"",o.case_id_glue.value+trace_key.value};std::vector<EventAttribute>ids;
- for(const auto&t:source.traces)for(const auto&e:t.events)if(stream_matches(e,o))if(const auto v=event_value(e,selected_key(o))){const bool matched=in_range(*v,lower,upper);if(matched==truth(o.positive)){auto id=required(e,stream_key);hash_key(id);if(std::none_of(ids.begin(),ids.end(),[&](const auto&v){return dictionary_equal(v,id);}))ids.push_back(std::move(id));}}
+ std::optional<EventAttribute>stream_key;std::vector<EventAttribute>ids;
+ for(const auto&t:source.traces)for(const auto&e:t.events)if(stream_matches(e,o))if(const auto v=event_value(e,selected_key(o))){if(numeric_kept(*v,lower,upper,o.positive)){if(!stream_key)stream_key=plus(o.case_id_glue,trace_key);auto id=required(e,*stream_key);hash_key(id);if(std::none_of(ids.begin(),ids.end(),[&](const auto&v){return dictionary_equal(v,id);}))ids.push_back(std::move(id));}}
  EventLog out;copy_event_log_context(source,out);
- for(const auto&t:source.traces)if(!t.events.empty()){const auto id=trace_value(t,trace_key);if(!id)fail("KeyError",key_repr(trace_key));hash_key(*id);if(std::any_of(ids.begin(),ids.end(),[&](const auto&v){return dictionary_equal(v,*id);}))out.traces.push_back(t);}return out;
+ for(const auto&t:source.traces){const auto id=trace_value(t,trace_key);if(!id)fail("KeyError",key_repr(trace_key));hash_key(*id);if(std::any_of(ids.begin(),ids.end(),[&](const auto&v){return dictionary_equal(v,*id);}))out.traces.push_back(t);}return out;
 }
 EventLog filter_log_attributes_numeric(const EventLog&source,const EventAttribute&lower,const EventAttribute&upper,const LogAttributesFilterOptions&o){auto copy=source;return filter_log_attributes_numeric(copy,lower,upper,o);}
 EventLog filter_log_attributes_relative_occurrence(EventLog&source,const EventAttribute&minimum,const LogAttributesFilterOptions&o){
  check_parameters(o);const bool once=o.keep_once_per_case&&truth(*o.keep_once_per_case);
  const bool case_denominator=!o.keep_once_per_case||once;
  const auto values=counts(source,selected_key(o),once);std::size_t total=source.traces.size();if(!case_denominator){total=0;for(const auto&t:source.traces)total+=t.events.size();}
- const auto threshold=multiplied(minimum,total);std::vector<EventAttribute>admitted;
- for(const auto&v:values)if(compare(number(v.value),threshold,">="))admitted.push_back(v.key);
+ // The threshold is only computed when there is a counted value to compare.
+ std::vector<EventAttribute>admitted;
+ if(!values.empty()){const auto threshold=multiplied(minimum,total);
+ for(const auto&v:values)if(compare(number(v.value),threshold,">="))admitted.push_back(v.key);}
  return filter_log_attributes_events(source,sequence(std::move(admitted),AttributeContainerKind::kSet),o);
 }
 EventLog filter_log_attributes_relative_occurrence(const EventLog&source,const EventAttribute&minimum,const LogAttributesFilterOptions&o){auto copy=source;return filter_log_attributes_relative_occurrence(copy,minimum,o);}
 EventLog filter_log_attributes_max_activities(EventLog&source,const EventAttribute&maximum,LogAttributesFilterParameters&params){
- const auto initial=resolve_log_attributes_filter_parameters(params);set_parameter(params,"pm4py:param:attribute_key",initial.activity_key);
+ // The public function reads the activity key under its plain string name only
+ // (an ACTIVITY_KEY enum member is ignored) and never reads keep_once_per_case.
+ EventAttribute activity_key{"","concept:name"};
+ for(auto i=params.rbegin();i!=params.rend();++i)if(!i->enum_key&&i->key=="pm4py:param:activity_key"){activity_key=i->value;break;}
+ set_parameter(params,"pm4py:param:attribute_key",activity_key);
  const auto o=resolve_log_attributes_filter_parameters(params);
- auto values=counts(source,initial.activity_key,initial.keep_once_per_case&&truth(*initial.keep_once_per_case));
+ auto values=counts(source,activity_key,false);
  if(!compare(maximum,number(values.size()),"<"))return source;
  if(type(maximum)!="int"&&type(maximum)!="bool")fail("TypeError","slice indices must be integers or None or have an __index__ method");
+ // A log without activity values is returned whole, even for negative maxima.
+ if(values.empty())return source;
  std::stable_sort(values.begin(),values.end(),[](const auto&a,const auto&b){return a.value>b.value;});
  EventAttribute negative_size{"","-"+std::to_string(values.size()),AttributeKind::kInt};std::size_t size=values.size();
  if(native_scalar_key_compare(maximum,number(0))<0&&native_scalar_key_compare(maximum,negative_size)<=0)size=0;
@@ -235,13 +251,15 @@ EventLog filter_log_attributes_threshold(const EventLog&source,const LogAttribut
  if(!cache)fail("TypeError","'"+type(std::get<EventAttribute>(variants))+"' object is not subscriptable");
  const auto entry=std::find_if(cache->begin(),cache->end(),[&](const auto&v){return dictionary_equal(v.variant,variant_key);});if(entry==cache->end())fail("KeyError",key_repr(variant_key));
  if(entry->traces.empty())fail("IndexError","list index out of range");std::vector<EventAttribute>exempt;
- for(const auto&e:entry->traces.front().events)exempt.push_back(required(e,key));
+ // Events of the protected trace without the key are skipped, not an error.
+ for(const auto&e:entry->traces.front().events)if(auto value=event_value(e,key))exempt.push_back(std::move(*value));
  const auto allowed=sequence(std::move(exempt));EventLog out;copy_event_log_context(source,out);
  for(const auto&t:source.traces){Trace filtered=t;filtered.events.clear();filtered.properties.clear();for(const auto&e:t.events)if(const auto value=event_value(e,key)){
    std::optional<EventAttribute>count;
    if(const auto* map=std::get_if<LogAttributesCounts>(&attributes)){hash_key(*value);const auto at=std::find_if(map->begin(),map->end(),[&](const auto&pair){return dictionary_equal(pair.first,*value);});if(at!=map->end())count=at->second;}
    else {const auto&raw=std::get<EventAttribute>(attributes);if(type(raw)=="NoneType")fail("TypeError","argument of type 'NoneType' is not iterable");if(contains(raw,*value)){if(raw.container==AttributeContainerKind::kContainer){for(const auto&v:raw.children)if(text(*value)&&v.key==value->value)count=v;}else fail("TypeError","list indices must be integers or slices, not str");}}
-   if(count&&(compare(*count,threshold,">=")||contains(allowed,*value)))filtered.events.push_back(e);
+   // Protected values are kept before the threshold is compared.
+   if(count&&(contains(allowed,*value)||compare(*count,threshold,">=")))filtered.events.push_back(e);
   }if(!filtered.events.empty())out.traces.push_back(std::move(filtered));}return out;
 }
 } // namespace minera

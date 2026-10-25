@@ -55,6 +55,23 @@ and TEMPORAL (weekly and daily). One native fix: absent-activity index
 features are -1. Package promoted (73/86); temporal_lazy and the LLE util
 stay partial.
 
+## EventLog filtering modules — 2026-10-25
+
+New bank `docs/log-filter-domain-bank.json.gz` (6,000 XES cases, 240,450
+public calls over every function of the seven `algo.filtering.log` modules
+attributes/between/cases/ltl/paths/timestamp/variants, 40% with typed edge-case
+arguments; about 3 minutes to capture) passes in
+`minera_log_filter_bank_parity_tests`. Native changes: max-activities key and
+empty-log rules, negative numeric ranges, lazy stream case keys, operand order
+of case-size errors, per-position LTL timestamp bounds, protected-trace rules
+of the two threshold helpers, list/tuple repetition in the paths threshold
+(details in `docs/log-filter-domain-parity.md`). All seven modules promoted
+(277/387). The retained per-module suites (`test_log_*_filter.cpp`, not in
+CMake) still pass; compile them ad hoc with
+`g++ -std=c++20 -O0 -g0 -UNDEBUG -Iinclude -Isrc/backend TEST.cpp build/libminera_core.a`
+(about a minute each). Next in this thread: common/dfg filtering helpers, then
+pandas and Polars filter modules.
+
 ## Decision mining — 2026-10-25
 
 New bank `docs/decision-mining-bank.json.gz` (632 decision points, under a

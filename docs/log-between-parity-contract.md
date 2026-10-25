@@ -188,3 +188,10 @@ logs, the compiled helper/test objects, test executable and production server.
 Each embedded member retains its byte length and SHA-256. These are bounded
 acceptance results; the canonical module remains partial and rendered browser
 interaction remains unverified.
+
+## Disjoint bank closure (2026-10-25)
+
+The module is promoted on the seeded public-call bank in
+[log-filter-domain-parity.md](log-filter-domain-parity.md) (240,450 calls
+across the seven EventLog filtering modules, zero failures), which also lists
+the native rules that bank added.

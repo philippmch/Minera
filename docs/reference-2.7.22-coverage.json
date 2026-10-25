@@ -13752,8 +13752,60 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/log-attributes-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/log-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/log_attributes_filter.hpp",
+        "src/backend/log_attributes_filter.cpp",
+        "scripts/log_filter_domain.py",
+        "scripts/capture-log-filter-bank.py",
+        "src/backend/tests/test_log_filter_bank_parity.cpp",
+        "src/backend/tests/test_log_attributes_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.attributes.attributes_filter",
+        "implementation": [
+          {
+            "path": "include/minera/log_attributes_filter.hpp",
+            "symbol": "filter_log_attributes_traces"
+          },
+          {
+            "path": "include/minera/log_attributes_filter.hpp",
+            "symbol": "filter_log_attributes_events"
+          },
+          {
+            "path": "include/minera/log_attributes_filter.hpp",
+            "symbol": "filter_log_attributes_numeric"
+          },
+          {
+            "path": "include/minera/log_attributes_filter.hpp",
+            "symbol": "filter_log_attributes_numeric_events"
+          },
+          {
+            "path": "include/minera/log_attributes_filter.hpp",
+            "symbol": "filter_log_attributes_trace_values"
+          },
+          {
+            "path": "include/minera/log_attributes_filter.hpp",
+            "symbol": "filter_log_attributes_max_activities"
+          },
+          {
+            "path": "include/minera/log_attributes_filter.hpp",
+            "symbol": "filter_log_attributes_relative_occurrence"
+          },
+          {
+            "path": "include/minera/log_attributes_filter.hpp",
+            "symbol": "filter_log_attributes_threshold"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_filter_bank_parity.cpp",
+            "executable": "minera_log_filter_bank_parity_tests",
+            "case": "attributes"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.between.between_filter",
@@ -13761,8 +13813,32 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/log-between-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/log-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/log_between_filter.hpp",
+        "src/backend/log_between_filter.cpp",
+        "scripts/log_filter_domain.py",
+        "scripts/capture-log-filter-bank.py",
+        "src/backend/tests/test_log_filter_bank_parity.cpp",
+        "src/backend/tests/test_log_between_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.between.between_filter",
+        "implementation": [
+          {
+            "path": "include/minera/log_between_filter.hpp",
+            "symbol": "filter_log_between_result"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_filter_bank_parity.cpp",
+            "executable": "minera_log_filter_bank_parity_tests",
+            "case": "between"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.cases.case_filter",
@@ -13770,8 +13846,56 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/log-case-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/log-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/log_case_filter.hpp",
+        "src/backend/log_case_filter.cpp",
+        "scripts/log_filter_domain.py",
+        "scripts/capture-log-filter-bank.py",
+        "src/backend/tests/test_log_filter_bank_parity.cpp",
+        "src/backend/tests/test_log_case_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.cases.case_filter",
+        "implementation": [
+          {
+            "path": "include/minera/log_case_filter.hpp",
+            "symbol": "apply_log_case_filter"
+          },
+          {
+            "path": "include/minera/log_case_filter.hpp",
+            "symbol": "apply_log_case_auto_filter"
+          },
+          {
+            "path": "include/minera/log_case_filter.hpp",
+            "symbol": "filter_log_on_case_size"
+          },
+          {
+            "path": "include/minera/log_case_filter.hpp",
+            "symbol": "filter_log_on_ncases"
+          },
+          {
+            "path": "include/minera/log_case_filter.hpp",
+            "symbol": "filter_log_on_case_performance"
+          },
+          {
+            "path": "include/minera/log_case_filter.hpp",
+            "symbol": "filter_log_case_performance"
+          },
+          {
+            "path": "include/minera/log_case_filter.hpp",
+            "symbol": "log_case_satisfies_performance"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_filter_bank_parity.cpp",
+            "executable": "minera_log_filter_bank_parity_tests",
+            "case": "cases"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.end_activities.end_activities_filter",
@@ -13813,8 +13937,52 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/log-ltl-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/log-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/log_ltl_filter.hpp",
+        "src/backend/log_ltl_filter.cpp",
+        "scripts/log_filter_domain.py",
+        "scripts/capture-log-filter-bank.py",
+        "src/backend/tests/test_log_filter_bank_parity.cpp",
+        "src/backend/tests/test_log_ltl_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.ltl.ltl_checker",
+        "implementation": [
+          {
+            "path": "include/minera/log_ltl_filter.hpp",
+            "symbol": "filter_log_ltl_eventually_follows"
+          },
+          {
+            "path": "include/minera/log_ltl_filter.hpp",
+            "symbol": "filter_log_ltl_next"
+          },
+          {
+            "path": "include/minera/log_ltl_filter.hpp",
+            "symbol": "filter_log_ltl_four_eyes"
+          },
+          {
+            "path": "include/minera/log_ltl_filter.hpp",
+            "symbol": "filter_log_ltl_different_persons"
+          },
+          {
+            "path": "include/minera/log_ltl_filter.hpp",
+            "symbol": "log_ltl_timestamp_list_is_ge"
+          },
+          {
+            "path": "include/minera/log_ltl_filter.hpp",
+            "symbol": "log_ltl_timestamp_list_is_le"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_filter_bank_parity.cpp",
+            "executable": "minera_log_filter_bank_parity_tests",
+            "case": "ltl"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.paths.paths_filter",
@@ -13822,8 +13990,52 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/log-paths-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/log-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/log_paths_filter.hpp",
+        "src/backend/log_paths_filter.cpp",
+        "scripts/log_filter_domain.py",
+        "scripts/capture-log-filter-bank.py",
+        "src/backend/tests/test_log_filter_bank_parity.cpp",
+        "src/backend/tests/test_log_paths_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.paths.paths_filter",
+        "implementation": [
+          {
+            "path": "include/minera/log_paths_filter.hpp",
+            "symbol": "filter_log_paths"
+          },
+          {
+            "path": "include/minera/log_paths_filter.hpp",
+            "symbol": "filter_log_paths_performance"
+          },
+          {
+            "path": "include/minera/log_paths_filter.hpp",
+            "symbol": "get_log_paths_from_log"
+          },
+          {
+            "path": "include/minera/log_paths_filter.hpp",
+            "symbol": "get_sorted_log_paths_list"
+          },
+          {
+            "path": "include/minera/log_paths_filter.hpp",
+            "symbol": "get_log_paths_threshold"
+          },
+          {
+            "path": "include/minera/log_paths_filter.hpp",
+            "symbol": "filter_log_by_paths"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_filter_bank_parity.cpp",
+            "executable": "minera_log_filter_bank_parity_tests",
+            "case": "paths"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.prefixes.prefix_filter",
@@ -13955,8 +14167,64 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/log-timestamp-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/log-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/log_timestamp_filter.hpp",
+        "src/backend/log_timestamp_filter.cpp",
+        "scripts/log_filter_domain.py",
+        "scripts/capture-log-filter-bank.py",
+        "src/backend/tests/test_log_filter_bank_parity.cpp",
+        "src/backend/tests/test_log_timestamp_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.timestamp.timestamp_filter",
+        "implementation": [
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "apply_log_timestamp_filter"
+          },
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "apply_log_timestamp_auto_filter"
+          },
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "filter_log_timestamp_contained"
+          },
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "filter_log_timestamp_intersecting"
+          },
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "filter_log_timestamp_events"
+          },
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "filter_log_timestamp_starting"
+          },
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "filter_log_timestamp_completing"
+          },
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "filter_log_timestamp_trace_attribute"
+          },
+          {
+            "path": "include/minera/log_timestamp_filter.hpp",
+            "symbol": "filter_log_timestamp_attribute"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_filter_bank_parity.cpp",
+            "executable": "minera_log_filter_bank_parity_tests",
+            "case": "timestamp"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.traces.trace_filter",
@@ -13994,8 +14262,56 @@
       "owner": "support:filtering",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/log-variants-filter-parity-contract.md"
+      "status": "complete",
+      "evidence": "docs/log-filter-domain-parity.md",
+      "artifacts": [
+        "include/minera/log_variants_filter.hpp",
+        "src/backend/log_variants_filter.cpp",
+        "scripts/log_filter_domain.py",
+        "scripts/capture-log-filter-bank.py",
+        "src/backend/tests/test_log_filter_bank_parity.cpp",
+        "src/backend/tests/test_log_variants_filter.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.variants.variants_filter",
+        "implementation": [
+          {
+            "path": "include/minera/log_variants_filter.hpp",
+            "symbol": "filter_log_variants"
+          },
+          {
+            "path": "include/minera/log_variants_filter.hpp",
+            "symbol": "filter_log_variants_top_k"
+          },
+          {
+            "path": "include/minera/log_variants_filter.hpp",
+            "symbol": "filter_log_variants_min_coverage"
+          },
+          {
+            "path": "include/minera/log_variants_filter.hpp",
+            "symbol": "filter_log_variants_max_coverage"
+          },
+          {
+            "path": "include/minera/log_variants_filter.hpp",
+            "symbol": "filter_log_variants_cumulative"
+          },
+          {
+            "path": "include/minera/log_variants_filter.hpp",
+            "symbol": "filter_log_variants_dictionary_percentage"
+          },
+          {
+            "path": "include/minera/log_variants_filter.hpp",
+            "symbol": "find_log_variants_auto_threshold"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_filter_bank_parity.cpp",
+            "executable": "minera_log_filter_bank_parity_tests",
+            "case": "variants"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.ocel.activity_type_matching",

@@ -194,6 +194,12 @@ EventAttribute multiply(const EventAttribute& a,const EventAttribute& b) {
     std::string result;const auto count=native_attribute_number(a);
     for(std::size_t i=0;i<count;++i)result+=b.value;return EventAttribute{"",std::move(result)};
   }
+  if((type(a)=="int"||type(a)=="bool")&&(b.container==AttributeContainerKind::kList||b.container==AttributeContainerKind::kTuple)) {
+    // Sequence repetition, as Python's int * list / int * tuple.
+    EventAttribute result{"",""};result.container=b.container;const auto count=native_attribute_number(a);
+    for(std::size_t i=0;i<count;++i)for(const auto& child:b.children){auto copy=child;copy.key=std::to_string(result.children.size());result.children.push_back(std::move(copy));}
+    return result;
+  }
   fail("TypeError","unsupported operand type(s) for *: '"+type(a)+"' and '"+type(b)+"'");
 }
 double timestamp(const EventAttribute& value) {
@@ -273,15 +279,22 @@ EventLog filter_log_by_paths(const EventLog& source,const LogPathsDictionary& pa
   const auto variant=std::find_if(variants.begin(),variants.end(),[&](const auto& value){return equal(value.key,first_key);});
   if(variant==variants.end())fail("KeyError",key_repr(first_key));
   if(variant->traces.empty())fail("IndexError","list index out of range");
-  EventLog first_log;first_log.traces.push_back(variant->traces.front());const auto protected_paths=get_log_paths_from_log(first_log,attribute_key);
+  // The protected trace's paths require the key; source traces skip pairs without it.
+  const auto& protected_trace=variant->traces.front();LogPathsDictionary protected_paths;
+  for(std::size_t i=1;i<protected_trace.events.size();++i){
+    const auto key=path_name(required(protected_trace.events[i-1],attribute_key),required(protected_trace.events[i],attribute_key));
+    if(!lookup(protected_paths,key))protected_paths.emplace_back(key,whole(1));
+  }
   EventLog result;copy_event_log_context(source,result);
   for(const auto& trace:source.traces) {
     if(trace.events.empty())continue;
     Trace filtered;copy_trace_context(trace,filtered);filtered.properties.clear();filtered.events.push_back(trace.events.front());
     for(std::size_t i=1;i+1<trace.events.size();++i) {
-      const auto key=path_name(required(trace.events[i],attribute_key),required(trace.events[i+1],attribute_key));
+      const auto left=event_value(trace.events[i],attribute_key),right=event_value(trace.events[i+1],attribute_key);
+      if(!left||!right)continue;
+      const auto key=path_name(*left,*right);
       const auto* count=lookup(paths,key);
-      if(count&&(compare(*count,threshold,">=")||lookup(protected_paths,key))){filtered.events.push_back(trace.events[i]);filtered.events.push_back(trace.events[i+1]);}
+      if(count&&(lookup(protected_paths,key)||compare(*count,threshold,">="))){filtered.events.push_back(trace.events[i]);filtered.events.push_back(trace.events[i+1]);}
     }
     if(trace.events.size()>1)filtered.events.push_back(trace.events.back());result.traces.push_back(std::move(filtered));
   }

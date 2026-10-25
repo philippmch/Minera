@@ -236,8 +236,10 @@ EventAttribute log_ltl_timestamp_list_is_le(const EventAttribute& a,const EventA
 
 EventLog filter_log_ltl_eventually_follows(EventLog& source,const EventAttribute& values,const LogLtlFilterOptions& options) {
   check_parameters(options);
-  const auto pattern=iterable(values);
   EventLog result;copy_event_log_context(source,result);
+  // The pattern is iterated per trace, so a log without traces never reads it.
+  if(source.traces.empty())return result;
+  const auto pattern=iterable(values);
   for(const auto& trace:source.traces) {
     std::vector<std::size_t> positions;std::size_t begin=0;
     for(const auto& target:pattern) {
@@ -250,13 +252,15 @@ EventLog filter_log_ltl_eventually_follows(EventLog& source,const EventAttribute
     }
     bool matched=positions.size()==pattern.size();
     if(matched && truth(options.enable_timestamp) && options.timestamp_diff_boundaries && truth(*options.timestamp_diff_boundaries) && positions.size()>1) {
-      EventAttribute differences;differences.container=AttributeContainerKind::kList;
-      for(std::size_t i=1;i<positions.size();++i) {
+      // Each difference is computed and checked against its (minimum, maximum)
+      // pair in turn; the first failing bound stops before later timestamps are read.
+      for(std::size_t i=1;matched&&i<positions.size();++i) {
         const auto left=epoch_timestamp(required(trace.events[i-1],options.timestamp_key));
         const auto right=epoch_timestamp(required(trace.events[i],options.timestamp_key));
-        differences.children.push_back(real(right-left));
+        const auto difference=real(right-left);
+        const auto pair=indexed(*options.timestamp_diff_boundaries,i-1);
+        if(compare(difference,indexed(pair,0),"<")||compare(difference,indexed(pair,1),">"))matched=false;
       }
-      matched=timestamp_compare(differences,*options.timestamp_diff_boundaries,true)&&timestamp_compare(differences,*options.timestamp_diff_boundaries,false);
     }
     if(matched==truth(options.positive))result.traces.push_back(trace);
   }

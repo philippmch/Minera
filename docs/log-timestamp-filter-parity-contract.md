@@ -17,3 +17,10 @@ Audit timing correction: the continuation recipes compare freshly constructed co
 Acceptance passes all 29 assertion-enabled native suites in `build/parity-closures/native-current/ctest-timestamp-second.log`, against `build-timestamp-second.log`, and all 50 actual production HTTP checks in `build/parity-closures/timestamp-production-http-2`. The accepted production server SHA256 is `a90c0d6f519386992266bdabc8fddd70fdf27b85cad723ec4d70c49e95253b4f`. The owned server exited and the existing application was not replaced. The frontend suite passes 185 files and 9,737 tests in `timestamp-frontend-full-final2.log` with two workers; TypeScript and Vite also pass. These checks do not claim browser rendering.
 
 The initial native run retained a real intersecting-predicate lazy-endpoint bug, now corrected generally by reading both endpoints before overlap tests. Its original source, test, compiled hashes, direct failure, and initial 27/29 CTest receipt are preserved. The original production harness failed at its 44th request because it used a table attribute kind in raw log JSON; the corrected raw-schema harness passed all fifty requests without a product change. Initial frontend timeout receipts are also retained. This evidence does not establish arbitrary Python object identity, dictionary keys outside the native ordinary carrier, arbitrary parameter objects, or every datetime string parser diagnostic. The catalogue row remains partial; no browser-rendered validation is claimed.
+
+## Disjoint bank closure (2026-10-25)
+
+The module is promoted on the seeded public-call bank in
+[log-filter-domain-parity.md](log-filter-domain-parity.md) (240,450 calls
+across the seven EventLog filtering modules, zero failures), which also lists
+the native rules that bank added.

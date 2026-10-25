@@ -89,3 +89,10 @@ reference call and promotes no catalogue row. All 86 packages / 387 modules,
 ## Historical native/friendly acceptance
 
 Coordinated native acceptance passed all 41 suites, including all 280 retained LOG outcomes, complete source/control mutation assertions and exact integer cutoff/storage controls. Authoritative receipts are `build/parity-closures/native-current/configure-attributes-workflows-first.log`, `build-attributes-final.log` and `ctest-attributes-final.log`. Initial failed module/direct receipts and the three original source/compiled-binding snapshots remain preserved. The final owned production server passed all 95 cross-family HTTP requests in `build/parity-closures/attributes-production-http-4/validation.json`, using server SHA256 `1d6b11e78d1197130a162db0419df62ec62e906de4cbee1db60e26e74c54b1e3`. It exited after validation and did not replace the existing application. Frontend acceptance passed 190 files and 9,809 tests in `frontend-attributes-full-third-final.log`, plus 65 focused checks, TypeScript and Vite. The first three HTTP attempts remain preserved with their original executed scripts, records and failure contexts: the harness needed to decode valid byte-wrapped table counts, respect the threshold helper dropping returned trace properties, and reopen XES with the explicit exported activity role. Those three harness corrections used the same unchanged product server. The final checks archive binds the current header, implementation, driver, executable, map, object files and production server to these receipts. The canonical row remains partial; finite banks do not establish arbitrary Python objects, every malformed parameter/container shape, arbitrary alias graphs or pathological hash collisions. No rendered-browser validation is claimed.
+
+## Disjoint bank closure (2026-10-25)
+
+The module is promoted on the seeded public-call bank in
+[log-filter-domain-parity.md](log-filter-domain-parity.md) (240,450 calls
+across the seven EventLog filtering modules, zero failures), which also lists
+the native rules that bank added.

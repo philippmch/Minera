@@ -163,7 +163,11 @@ EventLog filter_log_on_case_size(const EventLog& source,const EventAttribute& mi
   EventLog result;
   for(const auto& trace:source.traces) {
     const auto count=integer(trace.events.size());
-    if(truth(compare(count,minimum,">=")) && (type(maximum)=="NoneType"||truth(compare(count,maximum,"<="))))result.traces.push_back(trace);
+    // Without a maximum the public test is len >= minimum, otherwise the
+    // chained minimum <= len <= maximum (which names the operands the other way round).
+    const bool kept=type(maximum)=="NoneType"?truth(compare(count,minimum,">=")):
+        truth(compare(minimum,count,"<="))&&truth(compare(count,maximum,"<="));
+    if(kept)result.traces.push_back(trace);
   }
   return result;
 }

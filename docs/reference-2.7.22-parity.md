@@ -14753,3 +14753,13 @@ fixpoint instead (each trace nearest to its own cluster mean), capped at 15
 logs. One bank log also changes outcome with the hash seed (feature column
 order changes the rounding). Custom `sklearn_clusterer` objects are outside
 the contract.
+
+## EventLog filtering bank (2026-10-25)
+
+The seven `algo.filtering.log` modules (attributes, between, cases, ltl,
+paths, timestamp, variants) are bound to a disjoint seeded public-call bank,
+`docs/log-filter-domain-bank.json.gz` (240,450 calls, hash seeds 0-3, no seed
+variation), replayed by `minera_log_filter_bank_parity_tests`. The tooling,
+the edge-case domain and every native rule the bank added are in
+[log-filter-domain-parity.md](log-filter-domain-parity.md). All seven modules
+are complete.

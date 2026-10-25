@@ -114,3 +114,10 @@ root and focused CMake context, contract and generator to final/historical
 acceptance logs and compiled executable/map/object identities. Embedded
 members retain individual byte lengths and SHA-256 hashes; the production
 server hash is checked against the actual HTTP receipt.
+
+## Disjoint bank closure (2026-10-25)
+
+The module is promoted on the seeded public-call bank in
+[log-filter-domain-parity.md](log-filter-domain-parity.md) (240,450 calls
+across the seven EventLog filtering modules, zero failures), which also lists
+the native rules that bank added.
