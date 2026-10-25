@@ -14,6 +14,12 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## In progress — discovery gaps (claimed 2026-10-25)
+
+Thread "Close remaining discovery parity gaps" owns `algo.discovery.ilp`,
+`algo.discovery.genetic` and the interleavings util
+`merge_dataframe_rel_cases`. Other threads: please pick different packages.
+
 ## Decision mining — 2026-10-25
 
 New bank `docs/decision-mining-bank.json.gz` (632 decision points, under a
