@@ -15164,3 +15164,31 @@ Reference behaviour found (black box):
   groups by (activity, resource) and counts the non-null groups (so a
   pair can map to 0); get_resources_from_log counts non-null resources by
   descending count, ties in first appearance.
+
+## Precision utils bank (2026-10-25)
+
+`scripts/capture-precision-utils-bank.py` (seed 20261025, three hash seeds,
+which agree) records 3,000 calls of `algo.evaluation.precision.utils` into
+`docs/precision-utils-bank.txt.gz`: 1,000 `get_log_prefixes` calls on
+EventLogs and DataFrames (string and integer case ids, shuffled rows,
+activities containing commas, a custom key), 1,000 `form_fake_log` calls
+(empty keys and parts) and 1,000 `__search` calls on synchronous products of
+prefix trace nets with inductive-miner nets and seeded move costs (570 reach
+no covering marking). `minera_precision_utils_parity_tests` compares them
+against include/minera/precision_utils.hpp: 0 failures.
+
+Reference behaviour found (black box):
+- get_log_prefixes reads the activity of every event first (KeyError on an
+  event without it), then maps each proper non-empty prefix, joined by ",",
+  to the set of following activities and counts it once per continuation;
+  both dicts follow first appearance. A None activity inside a joined
+  prefix raises TypeError. A DataFrame is read with cases in sorted case-id
+  order (numeric ids by value) and events in row order.
+- form_fake_log splits each key on "," into one event per part carrying only
+  the activity key; traces have no attributes.
+- __search is a cheapest-first search from the initial marking over
+  synchronous moves and invisible model moves (">>", None) only. A marking
+  is closed when it leaves the queue; one that covers the stop marking is
+  recorded instead of expanded, and the search ends at the first queued cost
+  above the cheapest recorded one. It returns the recorded markings, or None
+  when there are none.

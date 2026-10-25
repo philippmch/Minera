@@ -13439,8 +13439,30 @@
       "owner": "algo.evaluation.precision",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/precision_utils.hpp",
+        "src/backend/precision_utils.cpp",
+        "src/backend/tests/test_precision_utils_parity.cpp",
+        "scripts/capture-precision-utils-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.precision.utils",
+        "implementation": [
+          {
+            "path": "include/minera/precision_utils.hpp",
+            "symbol": "precision_sync_search"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_precision_utils_parity.cpp",
+            "executable": "minera_precision_utils_parity_tests",
+            "case": "check_search"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.precision.variants.align_etconformance",

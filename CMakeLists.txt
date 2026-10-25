@@ -299,6 +299,7 @@ add_library(minera_core
   src/backend/timestamp_interleavings.cpp
   src/backend/interleavings_merge.cpp
   src/backend/organizational_util.cpp
+  src/backend/precision_utils.cpp
   src/backend/transition_system.cpp
   src/backend/variant_statistics.cpp
   src/backend/trace_variant_query.cpp
@@ -2256,6 +2257,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_organizational_util_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_organizational_util_parity_tests COMMAND minera_organizational_util_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/organizational-util-bank.txt.gz")
+
+  add_executable(minera_precision_utils_parity_tests
+    src/backend/tests/test_precision_utils_parity.cpp
+  )
+  target_link_libraries(minera_precision_utils_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_precision_utils_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_precision_utils_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_precision_utils_parity_tests COMMAND minera_precision_utils_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/precision-utils-bank.txt.gz")
 
   add_executable(minera_random_tree_tests
     src/backend/tests/test_random_tree.cpp

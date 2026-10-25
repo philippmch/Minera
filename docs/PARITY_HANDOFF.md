@@ -62,6 +62,13 @@ New bank `docs/organizational-util-bank.txt.gz` (4,000 cases, about a
 minute) passes in `minera_organizational_util_parity_tests` through the new
 include/minera/organizational_util.hpp (model in the parity doc).
 
+## Precision utils — 2026-10-25
+
+New bank `docs/precision-utils-bank.txt.gz` (3,000 calls, about 30 seconds)
+passes in `minera_precision_utils_parity_tests` through the new
+include/minera/precision_utils.hpp (`precision_log_prefixes`,
+`precision_fake_log`, `precision_sync_search`; model in the parity doc).
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns
