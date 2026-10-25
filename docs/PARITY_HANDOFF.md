@@ -118,6 +118,20 @@ seconds) passes in `minera_llm_sql_utils_parity_tests` through the new
 include/minera/llm_sql_utils.hpp. Module `algo.querying.llm.utils.sql_utils`
 promoted.
 
+## Trace-variant query anonymization — 2026-10-25
+
+New bank `docs/trace-variant-query-bank.txt.gz` (5,720 calls: exp_mech,
+BA relations and violations, generate_pm4py_log, 2,400 SaCoFa queries, 20
+LAPLACE; under a minute to capture) passes in
+`minera_trace_variant_query_parity_tests` through the new
+include/minera/trace_variant_query_reference.hpp (model in the parity doc;
+Python `random` and legacy numpy draws emulated in
+src/backend/python_random.hpp and numpy_legacy_random.hpp). Package
+`algo.anonymization.trace_variant_query` and its five partial modules
+promoted. LAPLACE raises AttributeError in the pinned release for every
+input, so the reference function raises the same. The older
+`trace_variant_query.hpp` still backs the CLI/server.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

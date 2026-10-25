@@ -9,8 +9,8 @@ namespace minera {
 // The legacy global generator of numpy (numpy.random.seed with an integer and
 // the RandomState draws): MT19937 seeded by init_genrand, 53-bit doubles from
 // two 32-bit outputs, the polar normal with its cached second value, and the
-// legacy exponential and gamma samplers. These are the published numpy
-// algorithms; draws match numpy bit for bit.
+// legacy exponential, Laplace and gamma samplers. These are the published
+// numpy algorithms; draws match numpy bit for bit.
 class NumpyLegacyRandom {
  public:
   explicit NumpyLegacyRandom(std::uint32_t seed) : engine_(seed) {}
@@ -39,6 +39,14 @@ class NumpyLegacyRandom {
   }
 
   double standard_exponential() { return -std::log(1.0 - random_sample()); }
+
+  double laplace(double loc, double scale) {
+    for (;;) {
+      const double u = random_sample();
+      if (u >= 0.5) return loc - scale * std::log(2.0 - u - u);
+      if (u > 0.0) return loc + scale * std::log(u + u);
+    }
+  }
 
   double standard_gamma(double shape) {
     if (shape == 1.0) return standard_exponential();

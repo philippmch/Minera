@@ -364,8 +364,68 @@
           "symbol": "SACOFA"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "LAPLACE": {
+          "selector": "LAPLACE",
+          "binding": {
+            "selector": "LAPLACE",
+            "modules": [
+              "algo.anonymization.trace_variant_query.variants.laplace"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "LAPLACE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/trace_variant_query_reference.hpp",
+              "symbol": "reference_laplace_trace_variant_query"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_trace_variant_query_parity.cpp",
+              "executable": "minera_trace_variant_query_parity_tests",
+              "case": "check_laplace"
+            }
+          ]
+        },
+        "SACOFA": {
+          "selector": "SACOFA",
+          "binding": {
+            "selector": "SACOFA",
+            "modules": [
+              "algo.anonymization.trace_variant_query.variants.sacofa"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "SACOFA"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/trace_variant_query_reference.hpp",
+              "symbol": "reference_sacofa_trace_variant_query"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_trace_variant_query_parity.cpp",
+              "executable": "minera_trace_variant_query_parity_tests",
+              "case": "check_sacofa"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/trace_variant_query_reference.hpp",
+        "src/backend/trace_variant_query_reference.cpp",
+        "src/backend/python_random.hpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/tests/test_trace_variant_query_parity.cpp",
+        "scripts/capture-trace-variant-query-bank.py"
+      ]
     },
     {
       "package": "algo.clustering.profiles",
@@ -7878,8 +7938,32 @@
       "owner": "algo.anonymization.trace_variant_query",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_variant_query_reference.hpp",
+        "src/backend/trace_variant_query_reference.cpp",
+        "src/backend/python_random.hpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/tests/test_trace_variant_query_parity.cpp",
+        "scripts/capture-trace-variant-query-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.trace_variant_query.util.behavioralAppropriateness",
+        "implementation": [
+          {
+            "path": "include/minera/trace_variant_query_reference.hpp",
+            "symbol": "reference_ba_violations"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_variant_query_parity.cpp",
+            "executable": "minera_trace_variant_query_parity_tests",
+            "case": "check_relations"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.trace_variant_query.util.exp_mech",
@@ -7887,8 +7971,32 @@
       "owner": "algo.anonymization.trace_variant_query",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_variant_query_reference.hpp",
+        "src/backend/trace_variant_query_reference.cpp",
+        "src/backend/python_random.hpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/tests/test_trace_variant_query_parity.cpp",
+        "scripts/capture-trace-variant-query-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.trace_variant_query.util.exp_mech",
+        "implementation": [
+          {
+            "path": "include/minera/trace_variant_query_reference.hpp",
+            "symbol": "reference_exp_mech"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_variant_query_parity.cpp",
+            "executable": "minera_trace_variant_query_parity_tests",
+            "case": "check_exp_mech"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.trace_variant_query.util.util",
@@ -7896,8 +8004,32 @@
       "owner": "algo.anonymization.trace_variant_query",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_variant_query_reference.hpp",
+        "src/backend/trace_variant_query_reference.cpp",
+        "src/backend/python_random.hpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/tests/test_trace_variant_query_parity.cpp",
+        "scripts/capture-trace-variant-query-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.trace_variant_query.util.util",
+        "implementation": [
+          {
+            "path": "include/minera/trace_variant_query_reference.hpp",
+            "symbol": "reference_generate_variant_log"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_variant_query_parity.cpp",
+            "executable": "minera_trace_variant_query_parity_tests",
+            "case": "check_generate"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.trace_variant_query.variants.laplace",
@@ -7910,8 +8042,32 @@
           "selector": "LAPLACE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_variant_query_reference.hpp",
+        "src/backend/trace_variant_query_reference.cpp",
+        "src/backend/python_random.hpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/tests/test_trace_variant_query_parity.cpp",
+        "scripts/capture-trace-variant-query-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.trace_variant_query.variants.laplace",
+        "implementation": [
+          {
+            "path": "include/minera/trace_variant_query_reference.hpp",
+            "symbol": "reference_laplace_trace_variant_query"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_variant_query_parity.cpp",
+            "executable": "minera_trace_variant_query_parity_tests",
+            "case": "check_laplace"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.trace_variant_query.variants.sacofa",
@@ -7924,8 +8080,32 @@
           "selector": "SACOFA"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_variant_query_reference.hpp",
+        "src/backend/trace_variant_query_reference.cpp",
+        "src/backend/python_random.hpp",
+        "src/backend/numpy_legacy_random.hpp",
+        "src/backend/tests/test_trace_variant_query_parity.cpp",
+        "scripts/capture-trace-variant-query-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.trace_variant_query.variants.sacofa",
+        "implementation": [
+          {
+            "path": "include/minera/trace_variant_query_reference.hpp",
+            "symbol": "reference_sacofa_trace_variant_query"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_variant_query_parity.cpp",
+            "executable": "minera_trace_variant_query_parity_tests",
+            "case": "check_sacofa"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.profiles.variants.sklearn_profiles",
