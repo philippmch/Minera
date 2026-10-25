@@ -56,6 +56,12 @@ reference walk (`reference_reduce_process_tree`), including its structural
 deduplication that can return a subtree, and the reference fold keeps the
 last xor tau (the old native rule kept the first).
 
+## Organizational-mining util — 2026-10-25
+
+New bank `docs/organizational-util-bank.txt.gz` (4,000 cases, about a
+minute) passes in `minera_organizational_util_parity_tests` through the new
+include/minera/organizational_util.hpp (model in the parity doc).
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

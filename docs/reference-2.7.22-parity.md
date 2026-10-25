@@ -15140,3 +15140,27 @@ Reference behaviour found (black box):
   and or keep only their last tau, sequence and parallel drop taus unless
   nothing else is left, one-child nodes become their child, and a loop of
   only taus becomes tau. The input tree is not changed.
+
+## Organizational-mining util bank (2026-10-25)
+
+`scripts/capture-organizational-util-bank.py` (seed 20261025, three hash
+seeds, which agree) records 4,000 cases (2,014 EventLogs, 1,986 DataFrames)
+of the three public functions of `algo.organizational_mining.util` into
+`docs/organizational-util-bank.txt.gz`; inputs have missing and None/NaN
+activities, resources and groups, custom keys and shuffled rows.
+`minera_organizational_util_parity_tests` compares every result with dict
+order against include/minera/organizational_util.hpp: 0 failures.
+
+Reference behaviour found (black box):
+- EventLog: get_groups_from_log counts, per group and resource, the events
+  that carry the activity, resource and group keys (an event without the
+  activity is skipped); get_res_act_from_log counts the events carrying
+  both keys; get_resources_from_log counts every event and raises KeyError
+  on one without the resource key. A None value is a key of its own; dicts
+  follow first appearance.
+- DataFrame: null cells drop out of the grouping keys and groups come in
+  sorted key order. get_groups_from_log groups by (resource, group) and
+  counts the non-null activities, keyed by group; get_res_act_from_log
+  groups by (activity, resource) and counts the non-null groups (so a
+  pair can map to 0); get_resources_from_log counts non-null resources by
+  descending count, ties in first appearance.

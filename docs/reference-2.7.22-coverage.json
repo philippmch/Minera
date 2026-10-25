@@ -16155,8 +16155,30 @@
       "owner": "support:organizational_mining",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_util.hpp",
+        "src/backend/organizational_util.cpp",
+        "src/backend/tests/test_organizational_util_parity.cpp",
+        "scripts/capture-organizational-util-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.util",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_util.hpp",
+            "symbol": "organizational_res_act_from_log"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_util_parity.cpp",
+            "executable": "minera_organizational_util_parity_tests",
+            "case": "check_table"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.abstractions.case_to_descr",
