@@ -3102,8 +3102,43 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ilp_reference.hpp",
+        "src/backend/ilp_reference.cpp",
+        "src/backend/tests/test_ilp_discovery_parity.cpp",
+        "src/backend/tests/ilp_discovery_bank_cases.inc",
+        "scripts/capture-ilp-discovery-bank.py",
+        "scripts/generate-ilp-discovery-bank-tests.py"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.ilp.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/ilp_reference.hpp",
+              "symbol": "reference_ilp_net"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ilp_discovery_parity.cpp",
+              "executable": "minera_ilp_discovery_parity_tests",
+              "case": "check"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.inductive",
@@ -10584,8 +10619,29 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ilp_reference.hpp",
+        "src/backend/ilp_reference.cpp",
+        "src/backend/tests/test_ilp_discovery_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ilp.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/ilp_reference.hpp",
+            "symbol": "reference_ilp_net"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ilp_discovery_parity.cpp",
+            "executable": "minera_ilp_discovery_parity_tests",
+            "case": "check"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.inductive.base_case.abc",

@@ -14,6 +14,18 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## ILP discovery — 2026-10-25
+
+New bank `docs/ilp-discovery-bank.json.gz` (1,169 calls, about 12 minutes to
+capture) passes in `minera_ilp_discovery_parity_tests` through the new
+`reference_ilp_net` (one LP relaxation per causal pair rounded at 0.5, the
+alpha prefix filter, place naming, murata implicit places, simple silent
+reduction; model in the parity doc). 353 tie-free calls match exactly; for
+the 795 calls whose pair LPs have tied optima, reference and native places
+are checked to be optimal roundings. `mine_ilp` and its adapters are
+unchanged (follow-up: wire `reference_ilp_net` into JSON/CLI/server).
+Package promoted: 76/86 packages, 284/387 modules.
+
 ## In progress — discovery gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" owns `algo.discovery.ilp`,

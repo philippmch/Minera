@@ -134,7 +134,7 @@ are reconciled.
 | Discovery: Alpha | classic and Alpha+ | **Complete** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with full public/native process captures; identity-ordered boundary cleanup is enumerated exactly, the native default is a deterministic member of that support, and two new disjoint public banks plus the earlier merged fixture fall inside it, with every enumerated outcome observed (see "Alpha+ cleanup selection contract") |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete** (both variants and the dispatcher) — CLASSIC public EventLog/DFG object and Petri routes, typed returned fields, order, noise pruning and conversion have saved native/public proof; PLUSPLUS and the dispatcher are bound by `minera_heuristics_plusplus_parity_tests` (see "Heuristics Miner++ bank"): every public HeuristicsNet field and node connection of the EventLog and dispatcher DataFrame routes under six parameter sets, Petri results of both forms up to renaming of places and silent transitions, and the pandas route's pair-free errors |
-| Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
+| Discovery: optimization | ILP classic and Genetic classic | **Partial (ILP classic complete)** — `reference_ilp_net` reproduces the reference ILP nets (1,169-call bank, see "ILP discovery bank"); bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete** — all 18 Declare templates and all six log-skeleton constraint families retain their weighted threshold, vacuity, ordering, and diagnostic contracts; grouped logs, streams, eager/lazy tables, strict custom activity/case selectors, and log-skeleton variant lists are supported by distinct registered proofs |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, graph utilities, both causal variants, all three correlation variants, and all three minimum-self-distance adapters with witnesses have focused native contracts plus JSON/CLI/server/frontend integration; eventually-follows is covered as a native statistical extension outside the algorithm-dispatch catalog |
 | Discovery: footprints | log entire/trace-by-trace, eager dataframe, lazy dataframe, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete** — all eight selectors have distinct registered contracts and production dispatch; eager/lazy ordering differences, activity/case/time/index selectors, explicit Petri markings, and inclusive-choice bottom-up behavior are covered |
@@ -14828,3 +14828,68 @@ keeps the log-to-features bank green. Stream key order is `concept:name`,
 attributes in input order, then `case:concept:name` and the trace attributes:
 native events do not record the source order of their first-class fields.
 `abstract_log_skeleton` now uses the same spacing for several or no pairs.
+## ILP discovery bank (2026-10-25)
+
+`scripts/capture-ilp-discovery-bank.py` (seed 20261025, two hash seeds, no
+seed variation) records 1,169 public calls: `pm4py.discover_petri_net_ilp`
+on seeded EventLogs (random walks, short random logs, tiny logs, sequences of
+single/exclusive/concurrent blocks, empty logs and traces) and on DataFrames
+whose rows interleave the cases and run backwards in time, and
+`algo.discovery.ilp.algorithm.apply` (CLASSIC) with explicit
+`CAUSAL_RELATION` dicts (including missing artificial nodes and unknown
+activities) and custom artificial start/end names, for alpha in {1, 0.9,
+0.75, 0.7, 0.5, 0.3, 0.25, 0, 2, -1}. The fixture drives
+`minera_ilp_discovery_parity_tests` against `reference_ilp_net`
+(include/minera/ilp_reference.hpp): all 353 `exact` calls reproduce the
+reference net exactly (transition names and labels, place names, producers
+and consumers, source/sink markings), all 795 `tied` calls pass the
+optimal-rounding check below (360 of them are equal anyway), and the 21
+errors match by class and message.
+
+Reference behaviour found (black box):
+- Each trace gets the artificial start (`▶`) and end (`■`) activities. The
+  default causal pairs are the directly-follows pairs (a, b), a != b, of the
+  wrapped log with no (b, a), in first-occurrence order (traces in log
+  order; a DataFrame contributes its cases in first-row order and its rows in
+  row order, timestamps unsorted). An explicit `CAUSAL_RELATION` is used in
+  its key order. A causal graph without the start (checked first) or end node
+  raises NetworkXError "The node ▶ is not in the digraph."; a pair naming an
+  activity outside the log raises ValueError "'x' is not in list".
+- One LP relaxation per pair (scipy; cvxopt and PuLP are not used: removing
+  them changes nothing), over x_t, y_t in [0, 1] with the pair's producer x
+  and consumer y fixed to 1. Rows come from the sequence encoding: for every
+  retained prefix σ followed by a, σ·x − (σ+a)·y ≥ 0, and for every retained
+  complete trace, σ·x − σ·y = 0. The objective sums the marking σ·(x − y)
+  after every retained prefix of the distinct variants (duplicate traces do
+  not weigh it). Alpha filter: per prefix occurrence vector, a continuation
+  is kept when its trace count is at least (1 − alpha)·max over that
+  prefix's continuations; a dropped continuation cuts the rest of the trace
+  and its final row. Arcs are the variables above 0.5, so the net need not
+  fit the log.
+- Infeasible pairs and places equal to an earlier one are skipped; a new
+  place is named after the current place count, so the first is "2" (after
+  source and sink).
+- Then the public murata reduction: places outside the initial and final
+  markings, in name order, are removed when a place-flow LP (a_p ≥ 1,
+  a_q ≥ 0, a P-flow whose pre-weights stay within its initial marking) is
+  feasible. Then the public simple reduction: repeated passes over the silent
+  transitions, first merging a single input place that feeds only that
+  transition and has one producer into its output places, then a single
+  output place fed only by it with one consumer into its input places. Both
+  were pinned by calling the public functions on designed nets.
+
+Contract decisions:
+- 84% of the pair LPs in a first 200-log probe had tied optima, and the
+  reference keeps its solver's vertex, rounding exact 0.5 values either way.
+  The capture therefore classifies each call with the LP model above:
+  `exact` when every pair's rounding is the same at every optimal point,
+  else `tied`, and it fails unless every numbered reference place is the
+  rounding of an optimal point of some contained causal pair's LP (all 1,148
+  nets pass). Exact calls bind the whole pipeline (pairs, filter, LP,
+  rounding, naming, both reductions). Tied calls require every numbered
+  reference and native place to be such an optimal rounding
+  (`reference_ilp_rounding_is_optimal`); native picks its own optimal
+  vertex (dense simplex, Bland's rule, rows added lazily).
+- The older `mine_ilp` (native boundaries, noise filter, integer regions) and
+  its adapters stay as documented extensions; `reference_ilp_net` is not yet
+  wired into JSON/CLI/server. The package is complete.
