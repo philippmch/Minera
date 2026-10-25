@@ -29,8 +29,15 @@ Other threads: please pick different packages.
 ## In progress — clustering and features (claimed 2026-10-25)
 
 Thread "Continue parity toward 2.7.22" owns
-`algo.clustering.trace_attribute_driven` (the DMM_VEC rule) next, then
-`algo.transformation.log_to_features` leftovers (temporal_lazy, LLE util).
+`algo.transformation.log_to_features` leftovers (temporal_lazy, LLE util) and
+`algo.clustering.profiles` next.
+
+## Trace-attribute clustering DMM_VEC — 2026-10-25
+
+The open DMM_VEC rule is found: equal variant lists (ordered by descending
+frequency, then descending sequence) give a zero succession distance. The
+bank's 73-call exemption is gone and all 1,200 calls pass (3 near-tie vector
+trees remain tolerated). Package promoted: 74/86.
 
 ## Log to features — 2026-10-25
 

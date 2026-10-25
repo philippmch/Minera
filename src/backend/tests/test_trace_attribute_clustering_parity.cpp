@@ -100,7 +100,6 @@ TraceAttributeClusteringVariant variant_of(const std::string& name) {
 }
 
 std::size_t near_tie_trees = 0;
-std::size_t undefined_successions = 0;
 
 // True when two reference distances lie within 1e-12 of each other, so the
 // last-bit rounding of the vector distances can decide a merge.
@@ -116,32 +115,20 @@ bool has_near_tie(const std::vector<double>& distances) {
 // that a vector variant whose reference distances hold a near tie may merge
 // tied groups in another order (the reference vector distances carry
 // rounding noise in the last bits).
-std::string cluster_case(const BankCase& item, const std::string& variant) {
+template <typename Discover>
+std::string cluster_case(const BankCase& item, const std::string& variant, Discover discover) {
   TraceAttributeClusteringOptions options;
   options.trace_attribute = "dept";
   options.variant = variant_of(variant);
   std::string actual;
   std::vector<double> native_distances;
   try {
-    const auto result = discover_trace_attribute_clustering(bank_log(item), options);
+    const auto result = discover(bank_log(item), options);
     actual = tree_text(result.tree);
     for (const auto& leaf : result.leaf_names) actual += " " + leaf;
     native_distances = result.distances;
   } catch (const std::exception& error) {
     actual = std::string{"!native: "} + error.what();
-  }
-  // With DMM_VEC, a variant without successions makes the reference's
-  // succession cosine 0/0; its results there follow a rule this contract
-  // does not model, so such calls only need a native tree.
-  if (variant == "VARIANT_DMM_VEC") {
-    bool undefined = false;
-    for (const auto& trace : item.traces)
-      if (trace.value != "-" && trace.activities.size() < 2) undefined = true;
-    if (undefined && actual.rfind("!native", 0) != 0 &&
-        item.outcomes.at(variant).front()[0] != '!') {
-      ++undefined_successions;
-      return {};
-    }
   }
   if (const auto it = item.distances.find(variant); it != item.distances.end()) {
     if (native_distances.size() != it->second.size()) return "distance count differs";
@@ -160,6 +147,37 @@ std::string cluster_case(const BankCase& item, const std::string& variant) {
   }
   return "native " + actual + " | reference " + item.outcomes.at(variant).front();
 }
+// One entry per public selector, each replaying that selector's calls.
+std::string dmm_leven_case(const BankCase& item) {
+  return cluster_case(item, "VARIANT_DMM_LEVEN", [](const EventLog& log, const auto& options) {
+    return discover_trace_attribute_clustering(log, options);
+  });
+}
+
+std::string avg_leven_case(const BankCase& item) {
+  return cluster_case(item, "VARIANT_AVG_LEVEN", [](const EventLog& log, const auto& options) {
+    return discover_trace_attribute_clustering(log, options);
+  });
+}
+
+std::string dmm_vec_case(const BankCase& item) {
+  return cluster_case(item, "VARIANT_DMM_VEC", [](const EventLog& log, const auto& options) {
+    return discover_trace_attribute_clustering(log, options);
+  });
+}
+
+std::string avg_vec_case(const BankCase& item) {
+  return cluster_case(item, "VARIANT_AVG_VEC", [](const EventLog& log, const auto& options) {
+    return discover_trace_attribute_clustering(log, options);
+  });
+}
+
+std::string dfg_case(const BankCase& item) {
+  return cluster_case(item, "DFG", [](const EventLog& log, const auto& options) {
+    return discover_trace_attribute_clustering(log, options);
+  });
+}
+
 }  // namespace
 
 int main() {
@@ -168,7 +186,12 @@ int main() {
   for (const auto& item : cases()) {
     for (const auto& [variant, outcomes] : item.outcomes) {
       ++calls;
-      const auto failure = cluster_case(item, variant);
+      const auto failure = variant == "VARIANT_DMM_LEVEN" ? dmm_leven_case(item)
+                         : variant == "VARIANT_AVG_LEVEN" ? avg_leven_case(item)
+                         : variant == "VARIANT_DMM_VEC"   ? dmm_vec_case(item)
+                         : variant == "VARIANT_AVG_VEC"   ? avg_vec_case(item)
+                         : variant == "DFG"               ? dfg_case(item)
+                                                          : "unknown selector " + variant;
       if (failure.empty()) continue;
       ++failures;
       ++by_variant[variant];
@@ -176,12 +199,8 @@ int main() {
     }
   }
   std::cout << calls << " calls compared, " << near_tie_trees
-            << " vector trees differ at reference near ties, "
-            << undefined_successions << " DMM_VEC calls with undefined successions\n";
+            << " vector trees differ at reference near ties\n";
   for (const auto& [variant, count] : by_variant)
     std::cerr << variant << ": " << count << " mismatches\n";
-  return failures || calls < 1200 || near_tie_trees > 10 ||
-                 undefined_successions > 120
-             ? 1
-             : 0;
+  return failures || calls < 1200 || near_tie_trees > 10 ? 1 : 0;
 }

@@ -442,8 +442,143 @@
           "symbol": "DFG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/clustering.hpp",
+        "src/backend/clustering.cpp",
+        "src/backend/tests/test_trace_attribute_clustering_parity.cpp",
+        "src/backend/tests/trace_attribute_clustering_bank_cases.inc",
+        "scripts/capture-trace-attribute-clustering-bank.py",
+        "scripts/generate-trace-attribute-clustering-bank-tests.py"
+      ],
+      "proofs": {
+        "VARIANT_DMM_LEVEN": {
+          "selector": "VARIANT_DMM_LEVEN",
+          "binding": {
+            "selector": "VARIANT_DMM_LEVEN",
+            "modules": [
+              "algo.clustering.trace_attribute_driven.util.evaluation"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VARIANT_DMM_LEVEN"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/clustering.hpp",
+              "symbol": "discover_trace_attribute_clustering"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_trace_attribute_clustering_parity.cpp",
+              "executable": "minera_trace_attribute_clustering_parity_tests",
+              "case": "dmm_leven_case"
+            }
+          ]
+        },
+        "VARIANT_AVG_LEVEN": {
+          "selector": "VARIANT_AVG_LEVEN",
+          "binding": {
+            "selector": "VARIANT_AVG_LEVEN",
+            "modules": [
+              "algo.clustering.trace_attribute_driven.util.evaluation"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VARIANT_AVG_LEVEN"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/clustering.hpp",
+              "symbol": "discover_trace_attribute_clustering"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_trace_attribute_clustering_parity.cpp",
+              "executable": "minera_trace_attribute_clustering_parity_tests",
+              "case": "avg_leven_case"
+            }
+          ]
+        },
+        "VARIANT_DMM_VEC": {
+          "selector": "VARIANT_DMM_VEC",
+          "binding": {
+            "selector": "VARIANT_DMM_VEC",
+            "modules": [
+              "algo.clustering.trace_attribute_driven.util.evaluation"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VARIANT_DMM_VEC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/clustering.hpp",
+              "symbol": "discover_trace_attribute_clustering"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_trace_attribute_clustering_parity.cpp",
+              "executable": "minera_trace_attribute_clustering_parity_tests",
+              "case": "dmm_vec_case"
+            }
+          ]
+        },
+        "VARIANT_AVG_VEC": {
+          "selector": "VARIANT_AVG_VEC",
+          "binding": {
+            "selector": "VARIANT_AVG_VEC",
+            "modules": [
+              "algo.clustering.trace_attribute_driven.util.evaluation"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VARIANT_AVG_VEC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/clustering.hpp",
+              "symbol": "discover_trace_attribute_clustering"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_trace_attribute_clustering_parity.cpp",
+              "executable": "minera_trace_attribute_clustering_parity_tests",
+              "case": "avg_vec_case"
+            }
+          ]
+        },
+        "DFG": {
+          "selector": "DFG",
+          "binding": {
+            "selector": "DFG",
+            "modules": [
+              "algo.clustering.trace_attribute_driven.util.evaluation"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "DFG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/clustering.hpp",
+              "symbol": "discover_trace_attribute_clustering"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_trace_attribute_clustering_parity.cpp",
+              "executable": "minera_trace_attribute_clustering_parity_tests",
+              "case": "dfg_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.concept_drift",
@@ -7661,8 +7796,32 @@
           "selector": "VARIANT_DMM_VEC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/clustering.hpp",
+        "src/backend/clustering.cpp",
+        "src/backend/tests/test_trace_attribute_clustering_parity.cpp",
+        "src/backend/tests/trace_attribute_clustering_bank_cases.inc",
+        "scripts/capture-trace-attribute-clustering-bank.py",
+        "scripts/generate-trace-attribute-clustering-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.util.evaluation",
+        "implementation": [
+          {
+            "path": "include/minera/clustering.hpp",
+            "symbol": "discover_trace_attribute_clustering"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_clustering_parity.cpp",
+            "executable": "minera_trace_attribute_clustering_parity_tests",
+            "case": "dmm_vec_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.util.filter_subsets",

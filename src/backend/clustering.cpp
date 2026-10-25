@@ -224,9 +224,25 @@ double pair_distance(const Profile& a, const Profile& b,
     const auto act = dmm_distance(a, b, [&](const Variant& x, const Variant& y) {
       return vector_component(x, y, false);
     });
-    const auto suc = dmm_distance(a, b, [&](const Variant& x, const Variant& y) {
-      return vector_component(x, y, true);
-    });
+    // The reference reports a zero succession distance when both groups list
+    // the same variants, ordered by descending frequency and then descending
+    // sequence (frequencies themselves are not compared), even when every
+    // pair would otherwise compare two traces without successions.
+    const auto listed = [](const Profile& profile) {
+      std::vector<const Variant*> order;
+      for (const auto& variant : profile) order.push_back(&variant);
+      std::sort(order.begin(), order.end(), [](const Variant* x, const Variant* y) {
+        return x->count != y->count ? x->count > y->count : x->seq > y->seq;
+      });
+      std::vector<Sequence> sequences;
+      for (const auto* variant : order) sequences.push_back(variant->seq);
+      return sequences;
+    };
+    const auto suc = listed(a) == listed(b)
+        ? 0.0
+        : dmm_distance(a, b, [&](const Variant& x, const Variant& y) {
+            return vector_component(x, y, true);
+          });
     return std::clamp(act * alpha + suc * (1.0 - alpha), 0.0, 1.0);
   }
   if (dmm) {

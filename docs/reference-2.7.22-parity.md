@@ -6260,13 +6260,16 @@ Reference semantics found and now native:
 
 Contract: DMM and average Levenshtein match exactly (trees, leaves and
 distances). Average vector matches distances within 1e-12, and trees exactly
-except 5 calls where the reference distances hold near ties (equal within
-1e-12) and last-bit rounding decides the merge. DMM vector stays open: when a
-group has a variant without successions the reference's succession cosine is
-0/0, and its result follows a rule not yet identified (identical variant sets
-usually give 0, but not always). Those 73 calls only require a native tree;
-the other DMM vector calls match exactly. The package stays partial until
-that rule is found.
+except a few calls (3 in the bank, capped at 10) where the reference
+distances hold near ties (equal within 1e-12) and last-bit rounding decides
+the merge. DMM vector matches exactly too: the reference reports a zero
+succession distance whenever both groups list the same variants, ordered by
+descending frequency and then descending sequence (frequencies are not
+compared), and otherwise compares two traces without successions as distance
+1. Found by calling the public `suc_sim_percent` and `sublog2varlist` helpers
+on small logs (the helper prints "Please give different variant lists!" in
+that case). The package is complete on its five selectors; its internal
+helper modules stay partial.
 
 ## Feature transformation and clustering parity
 
