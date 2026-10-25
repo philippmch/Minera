@@ -42,6 +42,7 @@ ProcessTreeReplaySemantics::ProcessTreeReplaySemantics(const ProcessTree& tree) 
     Node entry;
     entry.op = node.op;
     entry.parent = parent;
+    if (node.op == Op::kActivity) entry.activity = node.activity;
     nodes_.push_back(entry);
     if (parent != kNone) nodes_[parent].children.push_back(index);
     for (const auto& child : node.children) self(self, child, index);
@@ -424,20 +425,291 @@ std::vector<std::optional<ProcessTreeFrequency>> reference_search_graph_frequenc
     const std::size_t structure = replay.structure(x);
     ProcessTreeFrequency frequency;
     for (const auto& chain : alignments) {
-      long long count = 0;
-      for (const auto& segment : chain) {
-        for (const auto& step : segment.path) {
+      long long enabled = 0, opened = 0;
+      // The root search state's path is not read.
+      for (std::size_t k = 1; k < chain.size(); ++k) {
+        for (const auto& step : chain[k].path) {
           if (step.node >= n) throw ProcessTreeSearchGraphReferenceError("node out of range");
           if (replay.structure(step.node) != structure) continue;
-          if (step.state == (step.node == 0 ? 'O' : 'E')) ++count;
+          if (step.state == 'E') ++enabled;
+          if (step.state == 'O') ++opened;
         }
       }
+      const long long count = enabled > 0 ? enabled : opened;
       frequency.num_events += count;
       if (count > 0) ++frequency.num_cases;
     }
     result[x] = frequency;
   }
   return result;
+}
+
+namespace {
+
+struct SearchState {
+  long long costs = 0;
+  std::size_t index = 0;
+  std::string state;
+  std::vector<std::size_t> leaves;
+  std::size_t parent = kNone;
+  std::vector<std::size_t> children;
+};
+
+class SearchGraph {
+ public:
+  SearchGraph(const ProcessTree& tree, const std::vector<std::string>& variant,
+              const std::vector<std::size_t>& order)
+      : tree_(tree), replay_(tree), variant_(variant), order_(order) {
+    if (order_.empty()) {
+      for (std::size_t x = 0; x < replay_.size(); ++x) {
+        if (replay_.children(x).empty()) order_.push_back(x);
+      }
+    }
+    for (std::size_t x : order_) {
+      if (x >= replay_.size() || !replay_.children(x).empty()) {
+        throw ProcessTreeSearchGraphReferenceError("candidate order lists a node that is not a leaf");
+      }
+    }
+  }
+
+  ProcessTreeSearchGraphAlignment run() {
+    const std::size_t result = search();
+    ProcessTreeSearchGraphAlignment out;
+    out.cost = states_[result].costs;
+    out.alignment = construct(result);
+    return out;
+  }
+
+ private:
+  bool less(std::size_t a, std::size_t b) const {
+    return states_[a].costs < states_[b].costs ||
+           (states_[a].costs == states_[b].costs && states_[a].index > states_[b].index);
+  }
+
+  // heapq._siftdown / _siftup / heappush / heappop.
+  void sift_down(std::size_t start, std::size_t pos) {
+    const std::size_t item = heap_[pos];
+    while (pos > start) {
+      const std::size_t up = (pos - 1) >> 1;
+      if (!less(item, heap_[up])) break;
+      heap_[pos] = heap_[up];
+      pos = up;
+    }
+    heap_[pos] = item;
+  }
+  void sift_up(std::size_t pos) {
+    const std::size_t end = heap_.size();
+    const std::size_t start = pos;
+    const std::size_t item = heap_[pos];
+    std::size_t child = 2 * pos + 1;
+    while (child < end) {
+      const std::size_t right = child + 1;
+      if (right < end && !less(heap_[child], heap_[right])) child = right;
+      heap_[pos] = heap_[child];
+      pos = child;
+      child = 2 * pos + 1;
+    }
+    heap_[pos] = item;
+    sift_down(start, pos);
+  }
+  void push(std::size_t x) {
+    heap_.push_back(x);
+    sift_down(0, heap_.size() - 1);
+  }
+  std::size_t pop() {
+    const std::size_t last = heap_.back();
+    heap_.pop_back();
+    if (heap_.empty()) return last;
+    const std::size_t top = heap_[0];
+    heap_[0] = last;
+    sift_up(0);
+    return top;
+  }
+
+  bool visible(std::size_t x) const { return replay_.op(x) == Op::kActivity; }
+  bool labelled(std::size_t x, const std::string& label) const {
+    return visible(x) && tree_.activities().at(replay_.activity(x)) == label;
+  }
+  std::vector<std::size_t> opened_leaves(const ProcessTreeReplayPath& path, bool tau) const {
+    std::vector<std::size_t> out;
+    for (const auto& step : path) {
+      if (step.state == 'O' && replay_.children(step.node).empty() && (tau || visible(step.node))) {
+        out.push_back(step.node);
+      }
+    }
+    return out;
+  }
+
+  // _need_log_move: whether the enabling path does more than enable the
+  // target through sequence/parallel/choice bookkeeping.
+  bool needs_log_move(const std::string& before, const ProcessTreeReplayPath& path, std::size_t target) const {
+    for (const auto& step : path) {
+      const char from = before[step.node];
+      const char to = step.state;
+      bool allowed = false;
+      if (step.node == target) {
+        allowed = from == 'F' && (to == 'E' || to == 'F');
+      } else {
+        switch (replay_.op(step.node)) {
+          case Op::kActivity:
+          case Op::kTau:
+            allowed = from == 'F' && (to == 'C' || to == 'F');
+            break;
+          case Op::kSequence:
+          case Op::kParallel:
+            allowed = from == 'F' || (from == 'E' && to == 'O') || (from == 'O' && to == 'C');
+            break;
+          case Op::kExclusive:
+            allowed = (from == 'E' && to == 'O') || (from == 'F' && to == 'F') || (from == 'O' && to == 'C');
+            break;
+          default:
+            allowed = from == 'F' && to == 'F';
+            break;
+        }
+      }
+      if (!allowed) return true;
+    }
+    return false;
+  }
+
+  void lower_costs(long long delta, const std::vector<std::size_t>& states) {
+    for (std::size_t x : states) {
+      states_[x].costs -= delta;
+      lower_costs(delta, states_[x].children);
+    }
+  }
+
+  bool merge(const SearchState& fresh, const std::vector<std::size_t>& collection) {
+    for (std::size_t x : collection) {
+      SearchState& old = states_[x];
+      if (old.index != fresh.index || old.state != fresh.state) continue;
+      if (fresh.costs < old.costs) {
+        const long long delta = old.costs - fresh.costs;
+        old.costs = fresh.costs;
+        old.parent = fresh.parent;
+        old.leaves = fresh.leaves;
+        lower_costs(delta, old.children);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  void add(SearchState fresh) {
+    if (merge(fresh, closed_) || merge(fresh, heap_)) return;
+    const std::size_t parent = fresh.parent;
+    states_.push_back(std::move(fresh));
+    states_[parent].children.push_back(states_.size() - 1);
+    push(states_.size() - 1);
+  }
+
+  std::size_t search() {
+    states_.push_back(SearchState{0, 0, replay_.initial_state(), {}, kNone, {}});
+    heap_.push_back(0);
+    while (!heap_.empty()) {
+      const std::size_t current = pop();
+      closed_.push_back(current);
+      if (states_[current].index == variant_.size()) {
+        const std::string& state = states_[current].state;
+        if (std::all_of(state.begin(), state.end(), [](char c) { return c == 'C'; })) return current;
+        ProcessTreeReplayResult closing = replay_.shortest_path_to_close(0, state);
+        if (!closing.path) throw ProcessTreeSearchGraphReferenceError("the tree cannot be closed");
+        states_[current].costs += static_cast<long long>(opened_leaves(*closing.path, false).size());
+        const auto all = opened_leaves(*closing.path, true);
+        states_[current].leaves.insert(states_[current].leaves.end(), all.begin(), all.end());
+        states_[current].state = std::move(closing.state);
+        push(current);
+        continue;
+      }
+      const std::string state = states_[current].state;
+      const long long costs = states_[current].costs;
+      const std::size_t index = states_[current].index;
+      bool need_log = false;
+      bool candidate = false;
+      for (std::size_t leaf : order_) {
+        if (!labelled(leaf, variant_[index])) continue;
+        candidate = true;
+        ProcessTreeReplayResult enabled = replay_.shortest_path_to_enable(leaf, state);
+        if (!enabled.path) {
+          need_log = true;
+          continue;
+        }
+        if (!need_log) need_log = needs_log_move(state, *enabled.path, leaf);
+        ProcessTreeReplayResult closed = replay_.shortest_path_to_close(leaf, enabled.state);
+        if (!closed.path) throw ProcessTreeSearchGraphReferenceError("an enabled leaf cannot be closed");
+        ProcessTreeReplayPath path = *enabled.path;
+        path.insert(path.end(), closed.path->begin(), closed.path->end());
+        const auto cost = static_cast<long long>(opened_leaves(path, false).size());
+        add(SearchState{costs + cost - 1, index + 1, std::move(closed.state), opened_leaves(path, true), current, {}});
+      }
+      if (need_log || !candidate) add(SearchState{costs + 1, index + 1, state, {}, current, {}});
+    }
+    throw ProcessTreeSearchGraphReferenceError("the search ran out of states");
+  }
+
+  std::vector<ProcessTreeSearchGraphMove> construct(std::size_t result) const {
+    std::vector<std::vector<ProcessTreeSearchGraphMove>> parts;
+    for (std::size_t x = result; states_[x].parent != kNone; x = states_[x].parent) {
+      const SearchState& s = states_[x];
+      const std::string& event = variant_.at(s.index - 1);
+      std::vector<ProcessTreeSearchGraphMove> moves;
+      if (s.leaves.empty()) {
+        moves.push_back({event, std::nullopt});
+      } else if (x == result) {
+        std::optional<std::size_t> sync;
+        for (std::size_t k = s.leaves.size(); k-- > 0;) {
+          if (labelled(s.leaves[k], event)) {
+            sync = k;
+            break;
+          }
+        }
+        for (std::size_t k = 0; k < s.leaves.size(); ++k) {
+          moves.push_back({sync == k ? std::optional<std::string>(event) : std::nullopt, s.leaves[k]});
+        }
+        if (!sync && s.costs - states_[s.parent].costs > static_cast<long long>(s.leaves.size())) {
+          moves.push_back({event, std::nullopt});
+        }
+      } else {
+        for (std::size_t k = 0; k + 1 < s.leaves.size(); ++k) moves.push_back({std::nullopt, s.leaves[k]});
+        moves.push_back({event, s.leaves.back()});
+      }
+      parts.push_back(std::move(moves));
+    }
+    std::vector<ProcessTreeSearchGraphMove> out;
+    for (auto part = parts.rbegin(); part != parts.rend(); ++part) out.insert(out.end(), part->begin(), part->end());
+    return out;
+  }
+
+  const ProcessTree& tree_;
+  ProcessTreeReplaySemantics replay_;
+  const std::vector<std::string>& variant_;
+  std::vector<std::size_t> order_;
+  std::vector<SearchState> states_;
+  std::vector<std::size_t> heap_;
+  std::vector<std::size_t> closed_;
+};
+
+}  // namespace
+
+ProcessTreeSearchGraphAlignment reference_search_graph_align_variant(const ProcessTree& tree,
+                                                                     const std::vector<std::string>& variant,
+                                                                     const std::vector<std::size_t>& candidate_order) {
+  return SearchGraph(tree, variant, candidate_order).run();
+}
+
+std::vector<ProcessTreeSearchGraphAlignment> reference_search_graph_alignments(
+    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces) {
+  const long long best_worst = reference_search_graph_align_variant(tree, {}).cost;
+  std::vector<ProcessTreeSearchGraphAlignment> out;
+  out.reserve(traces.size());
+  for (const auto& trace : traces) {
+    ProcessTreeSearchGraphAlignment aligned = reference_search_graph_align_variant(tree, trace);
+    const long long denominator = best_worst + static_cast<long long>(trace.size());
+    aligned.fitness =
+        denominator > 0 ? 1.0 - static_cast<double>(aligned.cost) / static_cast<double>(denominator) : 0.0;
+    out.push_back(std::move(aligned));
+  }
+  return out;
 }
 
 }  // namespace minera

@@ -7,11 +7,15 @@
 // - search_graph_pt_frequency_annotation: the per-node num_events/num_cases
 //   computed from the recorded search-state chains must equal what the
 //   reference wrote, except where the reference search handed a state a path
-//   that does not replay from its parent state (tallied separately).
+//   that does not replay from its parent state (tallied separately);
+// - search_graph_pt: align_variant with preorder candidates must give the
+//   reference's cost and alignment exactly, and so must the public apply
+//   (with its fitness) on trees without repeated labels.
 #include "minera/process_tree_search_graph_reference.hpp"
 
 #include "../gzip_codec.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -159,8 +163,8 @@ ProcessTree parse_tree(const std::string& text) {
 
 struct BankCase {
   std::string name, tree, initial;
-  Json records, annotation;
-  bool annotated = false;
+  Json records, annotation, variant, apply;
+  bool annotated = false, applied = false;
 };
 
 std::vector<BankCase> read_bank(const char* path) {
@@ -181,6 +185,11 @@ std::vector<BankCase> read_bank(const char* path) {
       cases.back().initial = line.substr(2);
     } else if (line[0] == 'R') {
       cases.back().records = JsonReader(line.c_str() + 2).value();
+    } else if (line[0] == 'V') {
+      cases.back().variant = JsonReader(line.c_str() + 2).value();
+    } else if (line[0] == 'P') {
+      cases.back().apply = JsonReader(line.c_str() + 2).value();
+      cases.back().applied = true;
     } else if (line[0] == 'A') {
       cases.back().annotation = JsonReader(line.c_str() + 2).value();
       cases.back().annotated = true;
@@ -205,7 +214,7 @@ std::string path_text(const std::optional<ProcessTreeReplayPath>& path) {
 }
 
 struct Tally {
-  std::size_t probes = 0, annotated = 0, inconsistent = 0, inconsistent_differ = 0;
+  std::size_t probes = 0, annotated = 0, inconsistent = 0, inconsistent_differ = 0, variants = 0, applied = 0;
   std::map<std::string, std::size_t> per_op;
 };
 
@@ -307,6 +316,62 @@ std::string frequency_annotation_case(const BankCase& item, Tally& tally) {
   return text;
 }
 
+std::vector<std::string> trace_of(const Json& events) {
+  std::vector<std::string> out;
+  for (const auto& event : events.items) out.push_back(event.text);
+  return out;
+}
+
+std::vector<ProcessTreeSearchGraphMove> moves_of(const Json& moves) {
+  std::vector<ProcessTreeSearchGraphMove> out;
+  for (const auto& move : moves.items) {
+    ProcessTreeSearchGraphMove entry;
+    if (move.items[0].text != ">>") entry.log = move.items[0].text;
+    if (move.items[1].kind == Json::kNumber) entry.model = static_cast<std::size_t>(move.items[1].number);
+    out.push_back(entry);
+  }
+  return out;
+}
+
+std::string moves_text(const std::vector<ProcessTreeSearchGraphMove>& moves) {
+  std::string out;
+  for (const auto& move : moves) {
+    out += " (" + move.log.value_or(">>") + "," + (move.model ? std::to_string(*move.model) : std::string(">>")) + ")";
+  }
+  return out;
+}
+
+std::string search_variant_case(const BankCase& item, Tally& tally) {
+  const ProcessTree tree = parse_tree(item.tree);
+  std::string failure;
+  for (const auto& record : item.variant.items) {
+    ++tally.variants;
+    const auto trace = trace_of(record.items[0]);
+    const auto expected = moves_of(record.items[2]);
+    const auto actual = reference_search_graph_align_variant(tree, trace);
+    if (actual.cost != static_cast<long long>(record.items[1].number) || actual.alignment != expected) {
+      failure += "\n  align_variant cost " + std::to_string(actual.cost) + moves_text(actual.alignment) +
+                 "\n     reference cost " + std::to_string(static_cast<long long>(record.items[1].number)) +
+                 moves_text(expected);
+    }
+  }
+  if (!item.applied) return failure;
+  std::vector<std::vector<std::string>> traces;
+  for (const auto& record : item.apply.items) traces.push_back(trace_of(record.items[0]));
+  const auto actual = reference_search_graph_alignments(tree, traces);
+  for (std::size_t k = 0; k < traces.size(); ++k) {
+    ++tally.applied;
+    const auto& record = item.apply.items[k];
+    if (actual[k].cost != static_cast<long long>(record.items[1].number) ||
+        actual[k].alignment != moves_of(record.items[2]) ||
+        std::abs(actual[k].fitness - record.items[3].number) > 1e-12) {
+      failure += "\n  apply trace " + std::to_string(k) + " differs: cost " + std::to_string(actual[k].cost) +
+                 " fitness " + std::to_string(actual[k].fitness) + moves_text(actual[k].alignment);
+    }
+  }
+  return failure;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) try {
@@ -319,7 +384,8 @@ int main(int argc, char** argv) try {
   for (const auto& item : read_bank(argv[1])) {
     std::string failure;
     try {
-      failure = replay_semantics_case(item, tally) + frequency_annotation_case(item, tally);
+      failure = replay_semantics_case(item, tally) + frequency_annotation_case(item, tally) +
+                search_variant_case(item, tally);
     } catch (const std::exception& error) {
       failure = std::string("\n  raised ") + error.what();
     }
@@ -329,7 +395,8 @@ int main(int argc, char** argv) try {
   std::string ops;
   for (const auto& [op, count] : tally.per_op) ops += (ops.empty() ? "" : ", ") + op + " " + std::to_string(count);
   std::cout << "search-graph replay: " << tally.probes << " probes (" << ops << "); frequency annotation: " << tally.annotated << " searches, " << tally.inconsistent
-            << " with non-replaying search paths (" << tally.inconsistent_differ << " differing); " << failures
+            << " with non-replaying search paths (" << tally.inconsistent_differ << " differing); search variant: "
+            << tally.variants << " align_variant traces, " << tally.applied << " apply traces; " << failures
             << " failing cases\n";
   return failures ? 1 : 0;
 } catch (const std::exception& error) {

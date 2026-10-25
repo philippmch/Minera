@@ -160,16 +160,21 @@ within 1e-12; act_sim_med (numpy unstable argsort median) must hit one of its
 tie choices; occu_suc may pick other successions within a frequency it takes
 only in part. fcluster(maxclust) is emulated for monotonic linkages only.
 
-## Search-graph replay helpers — 2026-10-25
+## Search-graph variant and replay helpers — 2026-10-25
 
-New bank `docs/process-tree-search-graph-bank.txt.gz` (60,000 replay calls
-and 400 annotated searches, under a minute to capture) passes in
+Bank `docs/process-tree-search-graph-bank.txt.gz` (60,000 replay calls,
+7,200 `align_variant` runs, 3,072 public `apply` traces and 400 annotated
+searches, about two minutes to capture) passes in
 `minera_process_tree_search_graph_parity_tests` through
 `include/minera/process_tree_search_graph_reference.hpp`. Modules
-`...process_tree.util.search_graph_pt_replay_semantics` and
-`...search_graph_pt_frequency_annotation` promoted. The SEARCH_GRAPH_PT search
-itself depends on object addresses (the same trace aligned in another batch
-can get another cost), so it stays on the cost contract.
+`...process_tree.variants.search_graph_pt`,
+`...util.search_graph_pt_replay_semantics` and
+`...util.search_graph_pt_frequency_annotation` promoted; the package stays partial until MILP and
+APPROXIMATED_ORIGINAL are done. `apply`'s candidate order follows object
+addresses with repeated labels, so the bank drives `align_variant` with a
+preorder leaf list there and uses `apply` only on trees with unique labels.
+The annotation rule was corrected: per alignment, ENABLED counts, or OPEN
+counts when there is no ENABLED assignment.
 
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 

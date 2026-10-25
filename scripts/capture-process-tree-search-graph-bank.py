@@ -1,6 +1,7 @@
-"""Capture the public bank for the process-tree SEARCH_GRAPH_PT helpers:
-algo.conformance.alignments.process_tree.util.search_graph_pt_replay_semantics
-and search_graph_pt_frequency_annotation.
+"""Capture the public bank for the process-tree SEARCH_GRAPH_PT variant and
+its helpers: algo.conformance.alignments.process_tree.variants.search_graph_pt
+and util.search_graph_pt_replay_semantics / search_graph_pt_frequency_
+annotation.
 
 Seeded process trees (sequence, choice, parallel and binary loop operators,
 labels a..e with repeats, some tau leaves) go through
@@ -9,6 +10,14 @@ walks over the replay semantics: from get_initial_state, each step calls one
 of the public functions on a random node and usually moves to the state it
 returns. Every replay case runs in fresh interpreters under four hash seeds,
 which must agree.
+
+Variant records align every tree against six traces (the empty one, model
+walks and walks with a deleted or inserted event) with
+search_graph_pt.align_variant, handing it the leaves as a preorder list of
+(id(leaf), leaf) instead of the frozenset apply builds: apply's candidate order
+follows object addresses, a list makes it fixed. Trees without repeated labels
+also go through the public apply, where the order cannot matter. Both run
+under the four hash seeds, which must agree.
 
 Frequency-annotation records run the public SEARCH_GRAPH_PT variant on a
 small log (seed 0 only: the search itself depends on object ids) and keep,
@@ -31,6 +40,10 @@ E/O/C/F per node in preorder, nodes are preorder indices):
   A json   [[[[state, [[node, state], ...]] per search state, root first]
            per alignment], [[num_events, num_cases] per node]] (null where
            apply leaves a node without the properties)
+  V json   [[trace, cost, [[log or ">>", node or ">>"], ...]], ...] from
+           align_variant with preorder candidates
+  P json   [[trace, cost, alignment, fitness], ...] from apply (trees without
+           repeated labels only)
 """
 import argparse
 import concurrent.futures
@@ -114,6 +127,7 @@ def generate(count, steps):
         node = tree(r)
         cases.append({'name': f'tree{index}', 'tree': text(node), 'seed': r.randrange(1 << 30),
                       'steps': steps, 'traces': traces(r, node) if index % 3 == 0 else None})
+        cases[-1]['variants'] = [[]] + traces(random.Random(cases[-1]['seed'] + 1), node)
     return cases
 
 
@@ -142,6 +156,18 @@ def encode(state, nodes):
     return ''.join(state[(id(n), n)].name[0] for n in nodes)
 def path_of(path, index):
     return None if path is None else [[index[id(n)], s.name[0]] for n, s in path]
+def moves(alignment, index):
+    return [[a, b if isinstance(b, str) else index[id(b)]] for a, b in alignment]
+def make_log(traces):
+    log, minute = EventLog(), 0
+    for k, trace in enumerate(traces):
+        t = Trace()
+        t.attributes['concept:name'] = f'c{k}'
+        for activity in trace:
+            t.append(Event({'concept:name': activity, 'time:timestamp': origin + datetime.timedelta(minutes=minute)}))
+            minute += 1
+        log.append(t)
+    return log
 out = []
 for case in json.load(sys.stdin):
     tree = parse(case['tree'])
@@ -174,15 +200,19 @@ for case in json.load(sys.stdin):
             if all(v == States.CLOSED for v in state.values()) and r.random() < 0.5:
                 state = rs.get_initial_state(tree)
         item['records'] = records
+        leaves = [(id(n), n) for n in nodes if not n.children]
+        item['variant'] = []
+        for trace in case['variants']:
+            aligned = sg.align_variant(tuple(trace), leaves, tree)
+            item['variant'].append([trace, aligned['cost'], moves(aligned['alignment'], index)])
+        labels = [n.label for n in nodes if not n.children and n.label is not None]
+        if len(labels) == len(set(labels)):
+            with contextlib.redirect_stderr(io.StringIO()):
+                aligned = sg.apply(make_log(case['variants']), tree, parameters={'show_progress_bar': False})
+            item['public'] = [[trace, a['cost'], moves(a['alignment'], index), a['fitness']]
+                              for trace, a in zip(case['variants'], aligned)]
     elif case['traces'] is not None:
-        log, minute = EventLog(), 0
-        for k, trace in enumerate(case['traces']):
-            t = Trace()
-            t.attributes['concept:name'] = f'c{k}'
-            for activity in trace:
-                t.append(Event({'concept:name': activity, 'time:timestamp': origin + datetime.timedelta(minutes=minute)}))
-                minute += 1
-            log.append(t)
+        log = make_log(case['traces'])
         with contextlib.redirect_stderr(io.StringIO()):
             aligned = sg.apply(log, tree, parameters={'show_progress_bar': False})
         paths = []
@@ -232,7 +262,12 @@ def main():
             continue
         summary['records'] = summary.get('records', 0) + len(seen[0]['records'])
         lines += [f'C {case["name"]}', f'T {case["tree"]}', f'I {seen[0]["initial"]}',
-                  'R ' + json.dumps(seen[0]['records'], separators=(',', ':'))]
+                  'R ' + json.dumps(seen[0]['records'], separators=(',', ':')),
+                  'V ' + json.dumps(seen[0]['variant'], separators=(',', ':'))]
+        summary['variant_traces'] = summary.get('variant_traces', 0) + len(seen[0]['variant'])
+        if 'public' in seen[0]:
+            summary['public_traces'] = summary.get('public_traces', 0) + len(seen[0]['public'])
+            lines.append('P ' + json.dumps(seen[0]['public'], separators=(',', ':')))
         if 'annotation' in annotations[index]:
             summary['annotated'] = summary.get('annotated', 0) + 1
             lines.append('A ' + json.dumps(annotations[index]['annotation'], separators=(',', ':')))

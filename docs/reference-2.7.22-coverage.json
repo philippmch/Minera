@@ -9168,8 +9168,30 @@
           "selector": "SEARCH_GRAPH_PT"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_search_graph_reference.hpp",
+        "src/backend/process_tree_search_graph_reference.cpp",
+        "src/backend/tests/test_process_tree_search_graph_parity.cpp",
+        "scripts/capture-process-tree-search-graph-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.process_tree.variants.search_graph_pt",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_search_graph_reference.hpp",
+            "symbol": "reference_search_graph_alignments"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_search_graph_parity.cpp",
+            "executable": "minera_process_tree_search_graph_parity_tests",
+            "case": "search_variant_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.antialignments.variants.discounted_a_star",

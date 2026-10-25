@@ -1420,23 +1420,27 @@ on root loops with a tau body and uses it as the fitness floor; the
 approximated variant splits traces over subtrees by its activity-set
 heuristic, while native splits optimally. Reference alignments of the DP,
 MILP and approximated variants omit silent and some model moves and are not
-bound; the search-graph tie choice and its occasional dropped log moves after
-a tau move are not bound either.
+bound here (the search-graph variant is matched exactly by the reference port
+below).
 
-### Search-graph replay semantics and frequency annotation
+### Search-graph variant, replay semantics and frequency annotation
 
 `include/minera/process_tree_search_graph_reference.hpp`
-(`ProcessTreeReplaySemantics`, `reference_search_graph_frequency_annotation`)
-ports `algo.conformance.alignments.process_tree.util.search_graph_pt_replay_semantics`
-and `search_graph_pt_frequency_annotation`. The bank
+(`reference_search_graph_align_variant`, `reference_search_graph_alignments`,
+`ProcessTreeReplaySemantics`, `reference_search_graph_frequency_annotation`)
+ports `algo.conformance.alignments.process_tree.variants.search_graph_pt` and
+its helpers `util.search_graph_pt_replay_semantics` and
+`util.search_graph_pt_frequency_annotation`. The bank
 `docs/process-tree-search-graph-bank.txt.gz`
 (`scripts/capture-process-tree-search-graph-bank.py`, 1,200 seeded trees,
 four hash seeds that must agree) records 60,000 calls from random walks over
 the replay states (every predicate, vertex move, `transform_tree` and
-shortest path) plus 400 SEARCH_GRAPH_PT searches with their search-state
+shortest path), 7,200 `align_variant` runs (six traces per tree, with the
+leaves handed over as a preorder list), 3,072 public `apply` traces on trees
+without repeated labels, and 400 public searches with their search-state
 chains and the annotation the reference wrote.
 `minera_process_tree_search_graph_parity_tests` matches every replay path and
-state and every annotation.
+state, every cost, alignment and fitness, and every annotation.
 
 Reference behaviour found by probing (the header lists the full rules):
 
@@ -1448,16 +1452,39 @@ Reference behaviour found by probing (the header lists the full rules):
   closing opens the fewest visible leaves (tau children win).
 - Enabling a closed node resets the nearest enclosing loop whose redo is not
   that closed node; when that loop is not open, opening it is the whole reset.
+- `apply` hands `align_variant` a frozenset of `(id(leaf), leaf)`, so with
+  repeated labels the order in which candidate leaves are tried, and with it
+  tie choices and sometimes the cost, follows object addresses. Given a fixed
+  order the search is deterministic, and the native search takes the leaves
+  in preorder; with one leaf per label the order cannot matter.
+- The search is a heapq best-first search over (cost, trace index, vertex
+  states), ties going to the higher index, that tries synchronous moves first:
+  a log move is only added when the event has no candidate leaf, a candidate
+  cannot be enabled, or an enabling path does more than enable the leaf
+  through sequence, parallel and choice bookkeeping. A cheaper duplicate
+  takes over an existing state's cost, parent and leaves but keeps its path,
+  and descendants' costs drop with it. This pruning is why the search is not
+  always cost-optimal (the 28 rows above).
+- Alignments are rebuilt from the states' opened leaves: each state's last
+  leaf is the synchronous one, while the final state syncs the last leaf
+  labelled like the trace's last event and only adds that event as a log move
+  when its cost grew by more than its leaf count, so a log move ahead of a
+  final tau-only closing is dropped. The empty trace gives an empty
+  alignment, its cost is the fitness floor, and fitness is
+  `1 - cost / (floor + len)` (0 when that is 0).
 - The annotation walks `get_bottomup_nodes`, which keeps one node per
   structural class (leaves breadth first, then parents whose children are
   all kept), so equal subtrees pool their counts onto one node and the others
-  get no properties. A node's `num_events` counts ENABLED assignments in the
-  chains' paths (OPEN for the root); `num_cases` counts alignments with at
-  least one. In 6 of the 400 searches the reference hands a search state a
-  path that does not replay from its parent state; the annotation still
-  matches there.
+  get no properties. Per alignment a node counts the ENABLED assignments of
+  its class in the chain's paths, or the OPEN ones when there are none (which
+  is how the root counts its openings); the root state's path is not read.
+  `num_cases` counts alignments with a positive count. In 5 of the 400
+  searches the reference hands a search state a path that does not replay
+  from its parent state; the annotation still matches there.
 
 The replay covers the four operators SEARCH_GRAPH_PT aligns (binary loops).
+The older native `align_process_tree` keeps its optimal search for the CLI
+and server; the contract tallies above still bind it.
 
 ## XES importer-variant evidence
 
