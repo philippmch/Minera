@@ -15710,3 +15710,53 @@ Reference behaviour found (black box):
   non-ASCII spaces and decimal digits, and raises ValueError (with the
   literal's repr, cut to 200 characters), the 4,300-digit ValueError,
   OverflowError beyond a C int, and chr's range ValueError.
+
+## Temporal lazy log features bank (2026-10-25)
+
+`scripts/capture-temporal-lazy-bank.py` (seed 20261101, polars 1.44.1, four
+hash seeds, two runs each) records 1,575 `_freq_to_polars_duration` calls on
+seeded and handmade strings (ASCII letters and digits, signs, separators,
+non-ASCII letters, digits and spaces; 1,095 raise) and 3,000
+`temporal_lazy.apply` calls on seeded LazyFrames into
+`docs/temporal-lazy-bank.txt.gz`. The frames have one to eight cases of one
+to five events, string or integer case ids and activities, null activities
+and resources, UTC or naive microsecond timestamps, an optional start
+column, custom column names, single-row, empty and column-missing frames, and
+grouper frequencies over every unit with multiples including 0.
+`minera_temporal_lazy_parity_tests` checks include/minera/temporal_lazy_reference.hpp:
+0 failures, error types and helper messages included.
+
+Reference behaviour found (black box):
+- The helper rejects None and "" with one ValueError message. It strips
+  Python whitespace, cuts at the first '-', and keeps the str.isdigit
+  characters as written and the str.isalpha characters upper-cased. The
+  letters must name S/SEC/SECOND, T/MIN, M, D, H, W, Q or Y/A, either as is
+  or after dropping trailing S's and then trailing E's. Otherwise it raises
+  ValueError ("cannot infer unit ..." when there are no letters, "... is not
+  supported ..." otherwise). The result is the digits (or 1) plus a Polars
+  unit. src/backend/python_str_classes.hpp is generated from Python 3.11 by
+  scripts/generate-python-str-classes.py.
+- Buckets use the Polars truncation of the start timestamp in wall time:
+  weeks are aligned to Monday 1970-01-05; days, hours, minutes and seconds
+  to the epoch; months, quarters and years to January 1970. A multiple of 0
+  keeps the timestamp. Only buckets with events appear, and the counts are
+  UInt32.
+- Errors come in this order: missing case or time column
+  (ColumnNotFoundError), the helper's ValueError, missing activity or
+  resource column, then non-ASCII duration digits (InvalidOperationError).
+- Case metrics are as in TEMPORAL. Ties in arrival and finish order go to
+  the smaller case id. Seconds are microseconds × 1e-6, except two cases that
+  use microseconds / 1e6: sojourn when the frame has a single case, and
+  service when the frame has a single row. Nulls are left out of the
+  distinct activity and resource counts, the rework count and the resource
+  ratios, and a bucket without resources has 0 cases per resource.
+- Polars' group mean is a Kahan sum divided by the count, and it sums the
+  bucket's cases in a thread-dependent order: 326 of the 3,000 frames gave
+  different last bits across runs. The test accepts a mean that equals the
+  Kahan mean of the native case values in some order, trying every order of
+  up to eight cases. 182 tables needed an order other than first appearance.
+
+Outside the bank's domain: null case ids or timestamps, millisecond or
+nanosecond and Date columns, time zones other than UTC, inputs that are not
+LazyFrames (TypeError), and metric destination names that collide with
+existing columns.

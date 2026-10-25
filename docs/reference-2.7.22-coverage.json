@@ -19867,8 +19867,30 @@
       "owner": "algo.transformation.log_to_features",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/temporal_lazy_reference.hpp",
+        "src/backend/temporal_lazy_reference.cpp",
+        "src/backend/python_str_classes.hpp",
+        "src/backend/tests/test_temporal_lazy_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_features.variants.temporal_lazy",
+        "implementation": [
+          {
+            "path": "include/minera/temporal_lazy_reference.hpp",
+            "symbol": "reference_temporal_lazy"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_temporal_lazy_parity.cpp",
+            "executable": "minera_temporal_lazy_parity_tests",
+            "case": "apply_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_features.variants.trace_based",
