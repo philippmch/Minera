@@ -11796,8 +11796,30 @@
       "owner": "algo.discovery.ocel.interleavings",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/interleavings_merge.hpp",
+        "src/backend/interleavings_merge.cpp",
+        "src/backend/tests/test_interleavings_merge_parity.cpp",
+        "scripts/capture-interleavings-merge-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.interleavings.utils.merge_dataframe_rel_cases",
+        "implementation": [
+          {
+            "path": "include/minera/interleavings_merge.hpp",
+            "symbol": "interleavings_merge_dataframes"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_interleavings_merge_parity.cpp",
+            "executable": "minera_interleavings_merge_parity_tests",
+            "case": "check_merge"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.interleavings.variants.timestamp_interleavings",

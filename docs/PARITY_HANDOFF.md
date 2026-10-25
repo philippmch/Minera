@@ -38,11 +38,14 @@ replay ties need the reference place names, which the bank records.
 `mine_genetic` is unchanged (follow-up: route it through the reference blocks).
 Package promoted: 78/86 packages, 306/387 modules (after rebase).
 
-## In progress — discovery gaps (claimed 2026-10-25)
+## Interleavings dataframe merge — 2026-10-25
 
-Thread "Close remaining discovery parity gaps" owns `algo.discovery.ilp`,
-`algo.discovery.genetic` and the interleavings util
-`merge_dataframe_rel_cases`. Other threads: please pick different packages.
+New bank `docs/interleavings-merge-bank.txt.gz` (6,000 calls, about 13
+minutes for three hash seeds) passes in `minera_interleavings_merge_parity_tests`
+through the new include/minera/interleavings_merge.hpp
+(`interleavings_directly_follows_dataframe`, `interleavings_merge_dataframes`;
+model in the parity doc). The discovery-gaps thread (ILP, genetic, this util)
+is finished; nothing of it stays claimed. Modules: 307/387 complete.
 
 ## In progress — filtering gaps (claimed 2026-10-25)
 

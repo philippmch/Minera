@@ -15057,3 +15057,51 @@ Reference behaviour found (black box):
 
 `mine_genetic` and its adapters are unchanged (follow-up: wire the reference
 building blocks into the bounded miner).
+
+## Interleavings dataframe merge bank (2026-10-25)
+
+`scripts/capture-interleavings-merge-bank.py` (seed 20261025, hash seeds 0, 1
+and 2, which agree) records 6,000 public calls of
+`algo.discovery.ocel.interleavings.utils.merge_dataframe_rel_cases` into
+`docs/interleavings-merge-bank.txt.gz`: 3,000 `directly_follows_dataframe`
+and 3,000 `merge_dataframes`, 372 of them raising. Inputs are seeded
+DataFrames with str or int case ids, null ids and activities, NaT, hour ties,
+UTC, Europe/Berlin and naive timestamps in us or ns, extra int, float, str
+and bool columns, an existing index column, custom and shuffled indexes,
+custom keys and the INDEX_KEY and suffix parameters, plus relation tables
+with unknown, null and duplicate pairs, an extra column or a missing key
+column. `minera_interleavings_merge_parity_tests` compares every result as
+its complete native table (columns, dtypes, index class and labels, every
+cell) against `interleavings_directly_follows_dataframe` and
+`interleavings_merge_dataframes` (include/minera/interleavings_merge.hpp),
+and errors by class and message: 0 failures.
+
+Reference behaviour found (black box):
+- directly_follows_dataframe adds one start (`▶`, at
+  `1677-09-21T00:12:43.145224193+00:00`) and one end (`■`, at
+  `2262-04-11T23:47:16.854775807+00:00`) row per non-null case, in sorted
+  case order. The index column numbers the start rows, then the events sorted
+  stably by (case, timestamp) with nulls last, then the end rows. The table
+  is sorted stably by (case, timestamp) again, and every row whose case has a
+  next row is kept with that row's columns suffixed `_2`. Null-case rows
+  never pair, and a NaT event sorts after the end row, so the end row pairs
+  with it.
+- Columns are case, timestamp, activity, the other input columns in input
+  order (an existing index column keeps its place and is overwritten), and
+  the index key, then the same columns with `_2`. A UTC timestamp column
+  becomes `datetime64[ns, UTC]`; any other zone gives `object` with each value
+  in its own offset. int64 columns become float64 and bool columns object
+  (the boundary rows are NaN), and the `_2` copies of case and index are
+  float64 unless the input is empty. The result keeps a RangeIndex only when
+  the final sort is the identity and the kept labels are 0..n-1.
+- Naive timestamps raise TypeError "'values' is not ordered, please explicitly
+  specify the categories order by passing in a categories argument." as soon
+  as one non-null timestamp and one non-null case exist.
+- merge_dataframes builds both directly-follows tables (left first), then
+  inner-merges the left one with the relations on case + LEFT_SUFFIX and the
+  result with the right one on case + RIGHT_SUFFIX (a missing key column
+  raises KeyError). Columns present in both directly-follows tables take the
+  suffixes, other relation columns sit between the two sides, and the index
+  is a fresh RangeIndex. The row order is pandas' inner-merge order, including
+  the regrouping when a merge yields exactly one pair per left row (see
+  "Case-relations merging evidence").
