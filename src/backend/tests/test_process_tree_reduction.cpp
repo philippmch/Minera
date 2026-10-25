@@ -91,7 +91,7 @@ int main() {
   const auto root_kept = minera::reduce_process_tree(root_optional, trace({"B"}));
   assert(same(root_kept.root(), root_optional.root()));
 
-  // Deduplicating XOR tau branches preserves the position of the first tau.
+  // Deduplicating XOR tau branches keeps the last tau, as the reference fold.
   const ProcessTree tau_middle(
       {"A", "B"}, xor_node({ProcessTreeNode::leaf(0), ProcessTreeNode::tau(),
                               ProcessTreeNode::leaf(1)}));
@@ -105,11 +105,11 @@ int main() {
   const ProcessTree repeated_tau(
       {"A", "B"}, xor_node({ProcessTreeNode::leaf(0), ProcessTreeNode::tau(),
                               ProcessTreeNode::leaf(1), ProcessTreeNode::tau()}));
-  const ProcessTreeNode first_tau_retained =
-      xor_node({ProcessTreeNode::leaf(0), ProcessTreeNode::tau(),
-                ProcessTreeNode::leaf(1)});
+  const ProcessTreeNode last_tau_retained =
+      xor_node({ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1),
+                ProcessTreeNode::tau()});
   assert(same(minera::reduce_process_tree(repeated_tau, trace({"A", "B"})).root(),
-              first_tau_retained));
+              last_tau_retained));
 
   // Folding keeps mixed binary loops intact, whichever child is tau.
   const ProcessTree tau_redo(

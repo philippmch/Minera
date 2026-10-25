@@ -16793,8 +16793,30 @@
       "owner": "support:reduction",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_reduction.hpp",
+        "src/backend/process_tree_reduction.cpp",
+        "src/backend/tests/test_tree_reduction_parity.cpp",
+        "scripts/capture-tree-reduction-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.reduction.process_tree.reducer",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_reduction.hpp",
+            "symbol": "reduce_process_tree"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_tree_reduction_parity.cpp",
+            "executable": "minera_tree_reduction_parity_tests",
+            "case": "check_reducer"
+          }
+        ]
+      }
     },
     {
       "module": "algo.reduction.process_tree.variants.tree_tr_based",
@@ -16802,8 +16824,30 @@
       "owner": "support:reduction",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_reduction.hpp",
+        "src/backend/process_tree_reduction.cpp",
+        "src/backend/tests/test_tree_reduction_parity.cpp",
+        "scripts/capture-tree-reduction-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.reduction.process_tree.variants.tree_tr_based",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_reduction.hpp",
+            "symbol": "reference_reduce_process_tree"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_tree_reduction_parity.cpp",
+            "executable": "minera_tree_reduction_parity_tests",
+            "case": "check_tree_tr_based"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.montecarlo.utils.replay",

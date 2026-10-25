@@ -47,6 +47,15 @@ through the new include/minera/interleavings_merge.hpp
 model in the parity doc). The discovery-gaps thread (ILP, genetic, this util)
 is finished; nothing of it stays claimed. Modules: 307/387 complete.
 
+## Process-tree reduction — 2026-10-25
+
+New bank `docs/tree-reduction-bank.txt.gz` (6,000 calls, eight hash seeds,
+about a minute) passes in `minera_tree_reduction_parity_tests`.
+`reduce_process_tree` (and its JSON/CLI/server adapters) now runs the
+reference walk (`reference_reduce_process_tree`), including its structural
+deduplication that can return a subtree, and the reference fold keeps the
+last xor tau (the old native rule kept the first).
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns
