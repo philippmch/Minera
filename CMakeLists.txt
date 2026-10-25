@@ -300,6 +300,7 @@ add_library(minera_core
   src/backend/interleavings_merge.cpp
   src/backend/organizational_util.cpp
   src/backend/precision_utils.cpp
+  src/backend/ocpn_reference_playout.cpp
   src/backend/transition_system.cpp
   src/backend/variant_statistics.cpp
   src/backend/trace_variant_query.cpp
@@ -2275,6 +2276,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_element_usage_comparison_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_element_usage_comparison_parity_tests COMMAND minera_element_usage_comparison_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/element-usage-bank.txt.gz")
+
+  add_executable(minera_ocpn_playout_parity_tests
+    src/backend/tests/test_ocpn_playout_parity.cpp
+  )
+  target_link_libraries(minera_ocpn_playout_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_ocpn_playout_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocpn_playout_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocpn_playout_parity_tests COMMAND minera_ocpn_playout_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocpn-playout-bank.txt.gz")
 
   add_executable(minera_random_tree_tests
     src/backend/tests/test_random_tree.cpp

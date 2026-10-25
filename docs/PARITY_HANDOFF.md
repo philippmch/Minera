@@ -79,6 +79,17 @@ token replay with PLTR fitness the way the reference does. The CLI/server
 comparison still calls `compare_petri_usage`; moving it onto the new
 function is a possible follow-up.
 
+## OCPN extensive playout — 2026-10-25
+
+New bank `docs/ocpn-playout-bank.txt.gz` (200 mined logs, 1,418 compared
+calls, about 25 minutes to capture, 4.5 minutes to run) passes in
+`minera_ocpn_playout_parity_tests` through the new
+include/minera/ocpn_reference_playout.hpp (one object per type, double arcs
+optional in a binding, every transition bounded; model in the parity doc).
+Package `algo.simulation.playout.ocpn` promoted. The older
+`ocpn_extensive_playout` (its own object choices, caps and timestamps) still
+backs the CLI/server.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

@@ -6247,8 +6247,41 @@
           "symbol": "EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "EXTENSIVE": {
+          "selector": "EXTENSIVE",
+          "binding": {
+            "selector": "EXTENSIVE",
+            "modules": [
+              "algo.simulation.playout.ocpn.variants.extensive"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "EXTENSIVE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/ocpn_reference_playout.hpp",
+              "symbol": "reference_ocpn_extensive_playout"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocpn_playout_parity.cpp",
+              "executable": "minera_ocpn_playout_parity_tests",
+              "case": "check_dispatcher"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/ocpn_reference_playout.hpp",
+        "src/backend/ocpn_reference_playout.cpp",
+        "src/backend/tests/test_ocpn_playout_parity.cpp",
+        "scripts/capture-ocpn-playout-bank.py"
+      ]
     },
     {
       "package": "algo.simulation.playout.petri_net",
@@ -17120,8 +17153,30 @@
           "selector": "EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocpn_reference_playout.hpp",
+        "src/backend/ocpn_reference_playout.cpp",
+        "src/backend/tests/test_ocpn_playout_parity.cpp",
+        "scripts/capture-ocpn-playout-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.ocpn.variants.extensive",
+        "implementation": [
+          {
+            "path": "include/minera/ocpn_reference_playout.hpp",
+            "symbol": "reference_ocpn_extensive_traces"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocpn_playout_parity.cpp",
+            "executable": "minera_ocpn_playout_parity_tests",
+            "case": "check_traces"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.ocpn.variants.utils",
@@ -17129,8 +17184,30 @@
       "owner": "algo.simulation.playout.ocpn",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocpn_reference_playout.hpp",
+        "src/backend/ocpn_reference_playout.cpp",
+        "src/backend/tests/test_ocpn_playout_parity.cpp",
+        "scripts/capture-ocpn-playout-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.ocpn.variants.utils",
+        "implementation": [
+          {
+            "path": "include/minera/ocpn_reference_playout.hpp",
+            "symbol": "reference_ocpn_traces_to_ocel"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocpn_playout_parity.cpp",
+            "executable": "minera_ocpn_playout_parity_tests",
+            "case": "check_playout"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.petri_net.variants.basic_playout",
