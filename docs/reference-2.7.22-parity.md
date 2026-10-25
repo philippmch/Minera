@@ -15760,3 +15760,43 @@ Outside the bank's domain: null case ids or timestamps, millisecond or
 nanosecond and Date columns, time zones other than UTC, inputs that are not
 LazyFrames (TypeError), and metric destination names that collide with
 existing columns.
+
+## Locally linear embedding bank (2026-10-25)
+
+`scripts/capture-lle-bank.py` (seed 20261102, numpy 2.4.6 with
+scipy-openblas 0.3.31, scikit-learn 1.9.0) records 1,500 `smooth` calls and
+500 `apply` calls into `docs/lle-bank.txt.gz`. The smooth calls use arrays of
+length 0 to 40 and box widths from -1 to 15; 53 raise. The apply calls use
+logs of 1 to 120 traces with tied and out-of-order whole-hour timestamps;
+28 raise. scikit-learn runs for real, and its LocallyLinearEmbedding and
+NearestNeighbors are only watched, so the bank also holds the feature
+matrix, the neighbour indices and the embedding.
+`minera_lle_parity_tests` checks include/minera/lle_reference.hpp with 0
+failures.
+
+Reference behaviour found (black box):
+- smooth is numpy's `convolve(y, ones(box)/box, 'same')`. A full overlap of
+  at most 11 terms sums rounded products left to right. Partial overlaps,
+  and full overlaps of 12 to 15 terms, use fused multiply-adds left to
+  right (the OpenBLAS dot below 16 terms). Errors: a negative box raises
+  "negative dimensions are not allowed", an empty y raises "a cannot be
+  empty" and box 0 raises "v cannot be empty", even when the kernel is the
+  longer array.
+- apply sorts the events of each trace by timestamp, then the traces by
+  their first timestamp, both stable. It embeds the TRACE_BASED features
+  (str_ev_attr and str_evsucc_attr set to the activity), using the native
+  log_to_features, which matches the reference's matrix exactly. The
+  embedding is scikit-learn's standard LLE: 5 neighbours, reg 1e-3, the
+  dense solver and one component. The smoothing box is floor(sqrt(n)) + 1.
+  Fewer than 6 traces raise scikit-learn's ValueError.
+
+Contract: dates, the feature matrix and the smoothing are exact. The
+features are binary, so distances tie in every log, and scikit-learn breaks
+those ties inside its tree search. The native search breaks them by row
+index. The test therefore checks that the native neighbours lie at the
+reference's distances, then replays the reference's neighbours. In the 307
+logs where the second eigenvalue is isolated, the native embedding equals
+the reference's up to sign within 1e-7. In the other 165 logs, the
+reference's vector is an eigenvector of the native matrix for the same
+eigenvalue. Dots of 16 or more terms (logs over 224 traces, or longer
+smoothing boxes) depend on the BLAS SIMD kernel and are outside the bank.

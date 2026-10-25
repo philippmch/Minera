@@ -226,6 +226,7 @@ add_library(minera_core
   src/backend/llm_connector_reference.cpp
   src/backend/embedding_reference.cpp
   src/backend/temporal_lazy_reference.cpp
+  src/backend/lle_reference.cpp
   src/backend/trace_attribute_reference.cpp
   src/backend/live_stream.cpp
   src/backend/streaming_session.cpp
@@ -2420,6 +2421,15 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_temporal_lazy_parity_tests
            COMMAND minera_temporal_lazy_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/temporal-lazy-bank.txt.gz")
+  add_executable(minera_lle_parity_tests
+    src/backend/tests/test_lle_parity.cpp
+  )
+  target_link_libraries(minera_lle_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_lle_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_lle_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_lle_parity_tests
+           COMMAND minera_lle_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/lle-bank.txt.gz")
 
   add_executable(minera_pandas_filter_bank_parity_tests
     src/backend/tests/test_pandas_filter_bank_parity.cpp

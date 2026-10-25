@@ -19782,8 +19782,29 @@
       "owner": "algo.transformation.log_to_features",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/lle_reference.hpp",
+        "src/backend/lle_reference.cpp",
+        "src/backend/tests/test_lle_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_features.util.locally_linear_embedding",
+        "implementation": [
+          {
+            "path": "include/minera/lle_reference.hpp",
+            "symbol": "reference_lle_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_lle_parity.cpp",
+            "executable": "minera_lle_parity_tests",
+            "case": "apply_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_features.variants.event_based",

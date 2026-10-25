@@ -256,13 +256,19 @@ Thread "Close remaining filter and log parity gaps" owns the partial
 `support:filtering` modules (`algo.filtering.{common,dfg,log,pandas,polars}.*`).
 Other threads: please pick different packages.
 
-## In progress — clustering and features (claimed 2026-10-25)
+## Clustering and features — complete (2026-10-25)
 
 Thread "Continue parity toward 2.7.22" did the OCEL LLM abstractions and
-`algo.simulation.montecarlo` (both done). The `algo.transformation.
-log_to_features` leftovers (temporal_lazy, LLE util) were reassigned on
-2026-10-25 to thread "Close remaining algorithm parity gaps", since the
-original thread had gone idle.
+`algo.simulation.montecarlo`. The `algo.transformation.log_to_features`
+leftovers were finished by thread "Close remaining algorithm parity gaps".
+`variants.temporal_lazy` is bound to `docs/temporal-lazy-bank.txt.gz`
+(`minera_temporal_lazy_parity_tests`, 4,575 cases, polars 1.44.1 installed
+into the cloud reference venv). The Polars group means are summed in a
+thread-dependent order, so the test accepts any order of the bank's case
+values. `util.locally_linear_embedding` is bound to `docs/lle-bank.txt.gz`
+(`minera_lle_parity_tests`, 2,000 cases). Smoothing and features are
+exact, and the embedding replays scikit-learn's tie-broken neighbours. The
+verifier now reports all 86 packages and all 387 modules complete.
 
 ## LLM log abstractions — 2026-10-25
 
