@@ -222,6 +222,7 @@ add_library(minera_core
   src/backend/process_tree_milp_reference.cpp
   src/backend/process_tree_approximated_reference.cpp
   src/backend/decomposed_reference.cpp
+  src/backend/connector_reference.cpp
   src/backend/trace_attribute_reference.cpp
   src/backend/live_stream.cpp
   src/backend/streaming_session.cpp
@@ -2375,6 +2376,18 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_decomposed_parity_tests
            COMMAND minera_decomposed_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/decomposed-bank.txt.gz")
+
+  if(SQLite3_FOUND)
+    add_executable(minera_connector_parity_tests
+      src/backend/tests/test_connector_parity.cpp
+    )
+    target_link_libraries(minera_connector_parity_tests PRIVATE minera::core SQLite::SQLite3)
+    target_compile_features(minera_connector_parity_tests PRIVATE cxx_std_20)
+    target_compile_options(minera_connector_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+    add_test(NAME minera_connector_parity_tests
+             COMMAND minera_connector_parity_tests
+             "${CMAKE_CURRENT_SOURCE_DIR}/docs/connector-bank.txt.gz")
+  endif()
 
   add_executable(minera_pandas_filter_bank_parity_tests
     src/backend/tests/test_pandas_filter_bank_parity.cpp

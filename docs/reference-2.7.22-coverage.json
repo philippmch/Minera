@@ -10099,8 +10099,29 @@
           "selector": "chrome_history"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.variants.chrome_history",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_chrome_history"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "chrome_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.variants.firefox_history",
@@ -10113,8 +10134,29 @@
           "selector": "firefox_history"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.variants.firefox_history",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_firefox_history"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "firefox_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.variants.github_repo",

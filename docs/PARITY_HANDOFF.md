@@ -212,6 +212,19 @@ where the reference loops forever (a link cycle in the first recomposition
 queue) raise natively. Module and package `algo.conformance.alignments.decomposed`
 promoted. The older `align_decomposed` used by the CLI and server is unchanged.
 
+## Connectors — in progress (claimed 2026-10-25)
+
+Thread "Close remaining algorithm parity gaps" owns `algo.connectors.*`,
+`algo.transformation.to_embeddings.*` and `algo.querying.llm.connectors.*`.
+Chrome and Firefox history are bound to `docs/connector-bank.txt.gz`
+(`minera_connector_parity_tests`, 1,200 seeded databases, exact frames and
+exception types) through `include/minera/connector_reference.hpp`. Camunda and
+SAP accounting behave as pandas.read_sql of their SQL followed by
+pm4py.format_dataframe with default keys (0 differences on 500 fuzzed
+databases), and the connection is closed afterwards; SAP order-to-cash uses
+Oracle SQL (DECODE, parenthesized unions), so its bank stubs the query
+result.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

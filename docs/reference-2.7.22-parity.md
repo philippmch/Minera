@@ -1609,6 +1609,31 @@ threshold are left at their defaults. The older native `RECOMPOS_MAXIMAL`
 selector (`align_decomposed`) keeps its own composition for the CLI and
 server.
 
+## Connector parity bank
+
+`include/minera/connector_reference.hpp` ports `algo.connectors` as observed
+from the outside with stubbed sources, returning the reference's dataframe
+(columns, pandas dtypes, row labels and every value as the reference prints
+it). `scripts/capture-connector-bank.py` captures
+`docs/connector-bank.txt.gz`, replayed by `minera_connector_parity_tests`.
+
+Browser history: 600 seeded Chrome History and 600 Firefox places.sqlite
+databases (iterdump statements in the bank) cover urls with and without
+schemes, several `//`, queries, commas, ports, user info, empty and NULL urls
+and titles, NULL and out-of-range visit times (both bounds of years 1..9999),
+transitions with qualifier bits, durations, dangling from_visit and url ids, a
+visits table without `visit_duration`, and databases without the expected
+tables. All 655 frames match exactly and the 545 raising cases raise the same
+Python exception type. Rules found (header comment): Chrome resolves
+`from_visit` through the urls table's ids rather than the visits'; the
+activity, domain and url_wo_parameters come from the text after the last
+non-overlapping `//` (so `file:///x` gives `/x` and an empty domain), with
+commas removed from the activity only; per row the visit time is converted
+before the url is split (and, for Chrome, before the transition is decoded),
+and rows with an empty activity are dropped only after those conversions;
+Firefox divides the microsecond integer by 10^6 (correctly rounded) and lets
+`datetime.fromtimestamp` round half-even to microseconds.
+
 ## XES importer-variant evidence
 
 The native importer explicitly accepts `ITERPARSE`, `LINE_BY_LINE`,
