@@ -132,6 +132,18 @@ promoted. LAPLACE raises AttributeError in the pinned release for every
 input, so the reference function raises the same. The older
 `trace_variant_query.hpp` still backs the CLI/server.
 
+## PRIPEL — 2026-10-25
+
+The pinned requirements do not install diffprivlib, so every module of
+`algo.anonymization.pripel` fails to import (ModuleNotFoundError "No module
+named 'diffprivlib'"), whatever the input. Judgment call: the new
+include/minera/pripel_reference.hpp functions raise the same, bound by
+`docs/pripel-reference-bank.txt` in `minera_pripel_reference_parity_tests`;
+package and its three partial modules promoted. Minera's working PRIPEL
+(minera/pripel.hpp) is unchanged. Revisit if the pin set ever gains
+diffprivlib (its mechanisms draw from secrets.SystemRandom, so only
+invariants would be checkable).
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

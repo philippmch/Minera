@@ -335,8 +335,41 @@
           "symbol": "PRIPEL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "PRIPEL": {
+          "selector": "PRIPEL",
+          "binding": {
+            "selector": "PRIPEL",
+            "modules": [
+              "algo.anonymization.pripel.variants.pripel"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PRIPEL"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/pripel_reference.hpp",
+              "symbol": "reference_pripel_apply"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_pripel_reference_parity.cpp",
+              "executable": "minera_pripel_reference_parity_tests",
+              "case": "check_pripel"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/pripel_reference.hpp",
+        "src/backend/pripel_reference.cpp",
+        "src/backend/tests/test_pripel_reference_parity.cpp",
+        "scripts/capture-pripel-reference-bank.py"
+      ]
     },
     {
       "package": "algo.anonymization.trace_variant_query",
@@ -7868,8 +7901,30 @@
       "owner": "algo.anonymization.pripel",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/pripel_reference.hpp",
+        "src/backend/pripel_reference.cpp",
+        "src/backend/tests/test_pripel_reference_parity.cpp",
+        "scripts/capture-pripel-reference-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.pripel.util.AttributeAnonymizer",
+        "implementation": [
+          {
+            "path": "include/minera/pripel_reference.hpp",
+            "symbol": "reference_pripel_attribute_anonymizer"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pripel_reference_parity.cpp",
+            "executable": "minera_pripel_reference_parity_tests",
+            "case": "check_attribute_anonymizer"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.pripel.util.trace_levenshtein",
@@ -7915,8 +7970,30 @@
       "owner": "algo.anonymization.pripel",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/pripel_reference.hpp",
+        "src/backend/pripel_reference.cpp",
+        "src/backend/tests/test_pripel_reference_parity.cpp",
+        "scripts/capture-pripel-reference-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.pripel.util.TraceMatcher",
+        "implementation": [
+          {
+            "path": "include/minera/pripel_reference.hpp",
+            "symbol": "reference_pripel_trace_matcher"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pripel_reference_parity.cpp",
+            "executable": "minera_pripel_reference_parity_tests",
+            "case": "check_trace_matcher"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.pripel.variants.pripel",
@@ -7929,8 +8006,30 @@
           "selector": "PRIPEL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/pripel_reference.hpp",
+        "src/backend/pripel_reference.cpp",
+        "src/backend/tests/test_pripel_reference_parity.cpp",
+        "scripts/capture-pripel-reference-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.anonymization.pripel.variants.pripel",
+        "implementation": [
+          {
+            "path": "include/minera/pripel_reference.hpp",
+            "symbol": "reference_pripel_apply"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_pripel_reference_parity.cpp",
+            "executable": "minera_pripel_reference_parity_tests",
+            "case": "check_pripel"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.trace_variant_query.util.behavioralAppropriateness",
