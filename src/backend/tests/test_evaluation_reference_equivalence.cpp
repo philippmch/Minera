@@ -8,6 +8,7 @@
 #include "../evaluation_internal.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -93,14 +94,9 @@ struct KnownDivergence {
   std::string_view metric;
   std::string_view reason;
 };
-constexpr KnownDivergence kKnownDivergences[] = {
-    // Forward token replay routes hidden transitions differently on this
-    // heuristics net; token fitness, generalization and the composite inherit
-    // it. Owned by conformance token replay (exact routing still pending).
-    {"seed1_heuristics_noisy", "fitness TOKEN_BASED", "token-replay hidden routing"},
-    {"seed1_heuristics_noisy", "generalization GENERALIZATION_TOKEN", "token-replay hidden routing"},
-    {"seed1_heuristics_noisy", "composite default", "token-replay hidden routing"},
-};
+// None at present. Forward replay breaks ties between equally short silent
+// paths by the PNML arc order, which closed the last entries.
+constexpr std::array<KnownDivergence, 0> kKnownDivergences{};
 
 const KnownDivergence* known_divergence(const ReferenceCase& reference, std::string_view metric) {
   for (const auto& entry : kKnownDivergences) {

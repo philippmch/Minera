@@ -14,6 +14,200 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Decision mining — 2026-10-25
+
+New bank `docs/decision-mining-bank.json.gz` (632 decision points, under a
+minute) passes in `minera_decision_mining_parity_tests` through the new
+`reference_decision_table` (token replay rows, attributes present in every
+trace, one-hot strings then numerics, first-appearance classes). The public
+tree raises and the data net has no guards in the pinned environment; native
+trees and guards stay extensions. Package promoted: 72/86 packages.
+Next: DMM_VEC rule, OC playouts, remaining partial packages.
+
+## Trace-attribute clustering — 2026-10-25
+
+New bank `docs/trace-attribute-clustering-bank.json.gz` (1,200 calls, about
+30 s, with the evaluation functions' condensed distances) passes in
+`minera_trace_attribute_clustering_parity_tests`. Native changes:
+nearest-neighbour-chain average linkage with scipy's tie and relabel rules,
+left-to-right leaves, single-group error, DFG selector raising (native DFG
+distance behind `dfg_extension`), norm-product cosine. Still open: DMM_VEC
+when a variant has no successions (73 calls tolerated; see the parity doc).
+Package stays partial. Next: that DMM_VEC rule, decision mining, OC playouts.
+
+## LLM knowledge injection — 2026-10-25
+
+New bank `docs/llm-injection-bank.json.gz` (245 calls, a few seconds) passes
+in `minera_llm_injection_parity_tests`. The reference texts are fixed
+templates over the parameter strings; new native header
+`include/minera/llm_injection.hpp` reproduces them (not yet wired into the
+JSON/CLI/server adapters, which still use the older prompt builder). The
+three injection packages promoted (71/86, 265/387). Next: process-tree
+alignments, OC playouts, decision mining.
+
+## Contextual label splitting — 2026-10-25
+
+New bank `docs/label-splitting-bank.json.gz` (1,600 calls, about 10 s) passes
+in `minera_label_splitting_parity_tests`. Native changes: the target column
+copies the activity column first, and greedy modularity uses the incremental
+CNM gain updates with the library's exact float arithmetic (details in the
+parity doc). Package promoted (68/86, 261/387). Next: process-tree
+alignments, OC playouts.
+
+## Case-relations merging — 2026-10-25
+
+New bank `docs/case-relations-bank.json.gz` (440 calls, 46 raising, about
+20 s) passes in `minera_case_relations_parity_tests` (cells, dtypes, index
+labels). Native changes: `str` stays `str` with missing values, absent
+columns of empty sides count as missing, `datetime64[s|ms]` units, and the
+pandas inner-merge row order when each incoming row yields one pair on
+average (rule in the parity doc, also fuzzed on 36,000 direct merges). The
+fixture header takes about 8 minutes to compile. Package promoted (67/86,
+260/387). Next: label splitting, process-tree alignments, OC playouts.
+
+## OCPN and SAW nets — 2026-10-25
+
+New bank `docs/ocel-nets-bank.json.gz` (1,080 calls, about 50 s) passes in
+`minera_ocel_nets_parity_tests`; nets compare up to isomorphism, with replay
+counters and per-arc weight distributions in the colours. Native changes: the
+reference tree-to-net construction (`process_tree_reference_net`, fuzzed
+against the public converter on 6,000 random trees), OCPN mining without
+fall-throughs or the strict sequence cut, relation-order event sequences for
+IMd, SAW and replay, flattening by canonical type under a type selector, the
+unrelated-object-type error, the IMd single-activity IndexError, and per-arc
+SAW weights in the merged net. Both packages promoted (66/86, 259/387).
+Next: process-tree alignments, decomposed RECOMPOS_MAXIMAL, OC playouts.
+
+## Link analysis and timestamp interleavings — 2026-10-25
+
+New bank `docs/ocel-links-bank.json.gz` (1,000 calls, about 10 s) passes in
+`minera_ocel_links_parity_tests`. Native interleavings changes: reference
+index numbering, nanosecond-extreme boundaries with exact elapsed seconds and
+the start-boundary overflow error, naive timestamps rejected, and rows ordered
+by the pairs' first indices. Link target order within a source is a hash-set
+order and is compared as a set. Both packages promoted (64/86, 256/387).
+Next: OCPN and SAW nets.
+
+## Object-centric OTG, ETOT and OCDFG — 2026-10-25
+
+New bank `docs/ocel-graphs-bank.json.gz` (2,550 calls, about a minute) passes
+in `minera_ocel_graphs_parity_tests` with no native change. Six packages
+promoted: OTG, ETOT and OCDFG discovery and graph-comparison conformance (62/86
+packages, 254/387 modules). Remaining object-centric packages: interleavings,
+link analysis, OCPN, SAW nets, and the two OC playouts.
+
+## Heuristics Miner++ and dispatcher — 2026-10-25
+
+New bank `docs/heuristics-plusplus-bank.json.gz` (2,580 calls, about 20 s)
+passes in `minera_heuristics_plusplus_parity_tests`; Petri results are bound up
+to renaming of places and silent transitions (the reference names them in hash
+order). Native fix: the pandas route's two pair-free TypeErrors now follow the
+general rule (see the parity doc section "Heuristics Miner++ bank"). Module
+`algo.discovery.heuristics.variants.plusplus` and package
+`algo.discovery.heuristics` promoted (56/86 packages, 248/387 modules). The
+older `docs/heuristic-plusplus-parity-contract.md` gates are superseded by this
+bank.
+
+## Token replay dispatcher — 2026-10-25
+
+New bank `docs/token-replay-dispatcher-bank.json.gz` (1,200 calls, about 20 s)
+passes in `minera_token_replay_dispatcher_parity_tests`. New native entry
+points `token_replay_dataframe_apply` (unvalidated public DataFrame apply,
+backwards KeyError rule) and `token_replay_diagnostics_dataframe` (the public
+zip of appearance-order case ids with a given output). Package
+`algo.conformance.tokenreplay` promoted (55/86).
+
+## Token replay root cause — 2026-10-25
+
+Installed scikit-learn 1.9.0 into the cloud reference venv (the classifier the
+existing root-cause fixtures name). New bank `docs/token-replay-root-cause-bank.json.gz`
+(240 cases, sixteen hash seeds, about 20 s) passes in
+`minera_token_replay_root_cause_parity_tests` after splitting the native
+transition and unknown-activity diagnoses into separate calls, as the public
+functions are. Module `root_cause_analysis` promoted (247/387).
+
+## Forward token replay PLTR and RETURN_NAMES — 2026-10-25
+
+New bank `docs/token-replay-pltr-bank.json.gz` (400 logs on the frozen
+conformance nets, four PLTR/RETURN_NAMES configurations, sixteen hash seeds;
+about a minute to capture) bound by `minera_token_replay_pltr_parity_tests`:
+1,600/1,600 calls pass with no native change needed. Module
+`algo.conformance.tokenreplay.variants.token_replay` promoted (246/387). The
+tokenreplay package then remained partial on `root_cause_analysis` (closed
+above) and its dispatcher.
+
+## Petri alignment log dispatcher — 2026-10-25
+
+New `align_petri_log` and bank `docs/petri-alignment-dispatcher-bank.json.gz`
+(`scripts/capture-petri-alignment-dispatcher-bank.py`, about 12 minutes on 4
+cores; fixture by `scripts/generate-petri-alignment-dispatcher-tests.py`):
+1,568/1,568 bound calls pass in `minera_petri_alignment_dispatcher_parity_tests`.
+Package `algo.conformance.alignments.petri_net` promoted (54/86 packages). The
+log path raises on nets with an unreachable final marking (easy-soundness
+check) and orders DataFrame cases by case id; see the parity doc section.
+
+## Alignment log enrichment — 2026-10-25
+
+New `include/minera/alignment_log_enrichment.hpp` ports the public
+petri_net `utils.log_enrichment`; bank `docs/alignment-log-enrichment-bank.json.gz`
+(`scripts/capture-alignment-log-enrichment-bank.py`, fixture by
+`scripts/generate-alignment-log-enrichment-tests.py`) passes 3,000/3,000 in
+`minera_alignment_log_enrichment_parity_tests`. Module promoted (245/387). All
+seven petri_net alignment modules are now complete (the package followed, see
+above).
+
+## DFG alignment dispatcher — 2026-10-25
+
+New bank `docs/dfg-alignment-dispatcher-bank.json.gz` (1,500 cases, EventLog
+and DataFrame, sixteen processes each) bound by
+`minera_dfg_alignment_dispatcher_parity_tests`. Both sides break ties by two
+random routing UUIDs per search; the new `DfgAlignmentOptions::routing_names`
+fixes them, and the test enumerates all 56 relative orders: scores and errors
+exact, every public alignment/counter attainable. Package
+`algo.conformance.alignments.dfg` promoted (53/86 packages). Regenerate with
+`scripts/capture-dfg-alignment-dispatcher-bank.py` and
+`scripts/generate-dfg-alignment-dispatcher-tests.py` (the fixture is JSON
+parsed at run time; a brace-initialized fixture of that size did not compile
+within 30 minutes).
+
+## Log repetition XES lists — 2026-10-25
+
+Cloud container, pinned runtime. The public default importer stores a
+`<list>` as `{'value': None, 'children': ...}` (None without child elements,
+pairs after an early `<values>`, later `<values>` ignored) and never stores
+`<container>`; native kept plain list/dict structure. The importer now sets
+`EventAttribute::xes_public_shape` for the iterparse variations (native
+structure and export unchanged) and the log repetition filter compares the
+public value. New bank `docs/attribute-repetition-domain-log-lists-bank.json.gz`
+(`capture-repetition-domain-bank.py --engine log --log-lists --bank-seed
+20261025`): 18,557/18,557 pass, 1,010 fail with the shapes ignored; the
+20261024 log bank still passes. `algo.filtering.log.attr_value_repetition.filter`
+promoted (244/387 modules). One XES round-trip test assertion was updated:
+an exported `<container>` re-imports as a `<list>`, so its shape becomes a
+wrapper. Rules: *XES lists and containers* in
+`docs/attribute-repetition-domain-parity.md`.
+
+## Token replay silent-path tie order — 2026-10-25
+
+Cloud container, pinned runtime; no retained `build/` bank used. The last
+evaluator gap (`seed1_heuristics_noisy`) was a tie between equally short
+silent paths: the reference follows the PNML arc order of a place's outgoing
+arcs, native followed transition index order. PNML document entry points of
+the evaluators now pass `pnml_place_outgoing_transition_order(document)` as
+`place_outgoing_transition_order`. The evaluation suite has no listed
+divergences left (token fitness 162/162, generalization 162/162, composite
+160/160). New disjoint bank `docs/token-replay-arc-order-bank.json.gz`
+(1,000 shuffled documents, hash seeds 0-3 x three allocation paddings) is
+bound by `minera_token_replay_arc_order_parity_tests`: 3,695/3,695 stable
+rows exact, 843 of them differ under the old order, 55 identity-dependent
+rows excluded. Regenerate with `scripts/capture-token-replay-arc-order-bank.py`
+and `scripts/generate-token-replay-arc-order-tests.py`. Promoted: token
+fitness and token generalization modules, packages `algo.evaluation`,
+`algo.evaluation.replay_fitness`, `algo.evaluation.generalization`
+(52/86 packages, 243/387 modules). Open for token replay itself: in-memory
+nets carry no arc order, and identity-dependent ties have no document rule.
+See *Token replay silent-path tie order* in the parity doc.
+
 ## Model quality metrics equivalence — 2026-10-24
 
 Fresh black-box capture from the cloud container (pip-installed pinned
@@ -28,11 +222,10 @@ is proven by validity and optimality across the reference's tie choices
 (152/156 attainable, 4 too large to enumerate with Minera's alignment checked
 optimal). Evaluator alignment fitness now defaults to state-equation A*.
 Align-ETC and automaton precision use the reference's name-ordered silent
-search (see the parity doc). Token fitness, generalization and composite
-agree except one asserted token-replay hidden-routing gap on
-`seed1_heuristics_noisy` (owned by token replay). Mined corpus nets depend on
-the capture process's hash seed, so a fresh capture can move that gap to
-another heuristics net. Details: *Evaluation black-box equivalence* in
+search (see the parity doc). Token fitness, generalization and composite now agree too (see the
+tie-order checkpoint above). Mined corpus nets depend on the capture
+process's hash seed, so a fresh capture can expose new routing ties on other
+heuristics nets. Details: *Evaluation black-box equivalence* in
 `docs/reference-2.7.22-parity.md`.
 
 ## Current continuation: full732 Polars timestamp API/UI acceptance — 2026-10-24
@@ -3358,10 +3551,9 @@ stays partial. See `docs/attribute-repetition-domain-parity.md`.
 - Keep arbitrary relation dataframe cells, dtype/storage domains, non-string
   grouping IDs and actual performance benchmarking explicit. The new timing
   companion supports string identities; do not silently coerce other domains.
-- Close the log repetition row: give XES `<list>`/`<container>` values a
-  native representation distinct from plain dicts (importer-wide change),
-  then extend the log domain bank to them. Custom-equality objects and
-  nonstring dict keys remain outside the carrier.
+- The log repetition row is closed (see the XES list checkpoint). Other
+  public algorithms that read XES list/container values through the default
+  importer can reuse `EventAttribute::xes_public_shape` the same way.
 - All other partial rows, connectors/platforms, solvers, rendered UI and
   performance requirements remain in scope until their own evidence closes.
 

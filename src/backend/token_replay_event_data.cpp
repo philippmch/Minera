@@ -426,21 +426,28 @@ std::vector<TokenReplayTraceDiagnostics> replay_dataframe_traces(
   columns.case_id_key = options.case_id_attribute;
   columns.timestamp_key = options.timestamp_attribute;
   check_dataframe_columns(table, columns);
-  return replay_token_traces(EventDataView(table), net, options);
+  return token_replay_dataframe_apply(table, net, std::move(options));
 }
 
-EventTable replay_dataframe_diagnostics(
+std::vector<TokenReplayTraceDiagnostics> token_replay_dataframe_apply(
     const EventTable& table, const PetriNet& net, TokenReplayOptions options) {
-  DataFrameColumnOptions columns;
-  columns.activity_key = options.activity_attribute;
-  columns.case_id_key = options.case_id_attribute;
-  columns.timestamp_key = options.timestamp_attribute;
-  check_dataframe_columns(table, columns);
-  enforce_cap(table.size(), options);
-  // The public dataframe-return mode converts to exact source-order cases
-  // before replay; the list-return mode's inferred group index is not used.
-  auto log = project_stream(event_table_to_event_stream(table), options);
-  const auto diagnostics = replay_token_traces(log, net, options);
+  auto traces = replay_token_traces(EventDataView(table), net, options);
+  // The public backwards variation maps a DataFrame's results back through
+  // an index of its cases but walks it once per event, so after replaying
+  // every variant it raises KeyError whenever the frame holds more events
+  // than cases.
+  if (options.variant == TokenReplayVariant::kBackwards && table.size() > traces.size())
+    throw std::out_of_range("token replay: backwards dataframe replay indexes cases by event (KeyError " +
+                            std::to_string(traces.size()) + ")");
+  return traces;
+}
+
+namespace {
+
+// Labels row i with the i-th source-order case, as the public diagnostics
+// dataframe zips the log's cases with the replay output it is given.
+EventTable diagnostics_table(const EventLog& log,
+                             const std::vector<TokenReplayTraceDiagnostics>& diagnostics) {
   EventTable result;
   result.index = EventTableIndex{"RangeIndex", "int64", {std::nullopt}, {}};
   if (diagnostics.empty()) return result;
@@ -483,7 +490,7 @@ EventTable replay_dataframe_diagnostics(
     cell.typed_value = value;
     return cell;
   };
-  for (std::size_t i = 0; i < diagnostics.size(); ++i) {
+  for (std::size_t i = 0; i < std::min(diagnostics.size(), log.traces.size()); ++i) {
     auto key = *log.traces[i].case_id_attribute;
     key.key = "case_id";
     key.first_class_role = FirstClassAttributeRole::kNone;
@@ -516,6 +523,29 @@ EventTable replay_dataframe_diagnostics(
     result.index->labels.push_back({integer_cell("", i)});
   }
   return result;
+}
+
+}  // namespace
+
+EventTable replay_dataframe_diagnostics(
+    const EventTable& table, const PetriNet& net, TokenReplayOptions options) {
+  DataFrameColumnOptions columns;
+  columns.activity_key = options.activity_attribute;
+  columns.case_id_key = options.case_id_attribute;
+  columns.timestamp_key = options.timestamp_attribute;
+  check_dataframe_columns(table, columns);
+  enforce_cap(table.size(), options);
+  // The public dataframe-return mode converts to exact source-order cases
+  // before replay; the list-return mode's inferred group index is not used.
+  auto log = project_stream(event_table_to_event_stream(table), options);
+  return diagnostics_table(log, replay_token_traces(log, net, options));
+}
+
+EventTable token_replay_diagnostics_dataframe(
+    const EventTable& table, const std::vector<TokenReplayTraceDiagnostics>& diagnostics,
+    TokenReplayOptions options) {
+  enforce_cap(table.size(), options);
+  return diagnostics_table(project_stream(event_table_to_event_stream(table), options), diagnostics);
 }
 
 EventLog normalize_token_replay_event_log(const EventDataView& data,

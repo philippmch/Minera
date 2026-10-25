@@ -545,6 +545,18 @@ std::optional<EventAttribute> parse_attribute_node(
     if (const auto* date = std::get_if<NativeDate>(&result.typed_value))
       result.value = date->value;
   }
+  // The public iterparse importers never store a <container>, store a <list>
+  // without child elements as None, and wrap any other <list> like a scalar
+  // with children (see XesPublicShape).
+  const bool public_shapes = variant == XesImportVariant::kIterparse ||
+                             variant == XesImportVariant::kIterparseMemoryCompressed;
+  if (public_shapes && container) result.xes_public_shape = XesPublicShape::kAbsent;
+  if (public_shapes && list) result.xes_public_shape = XesPublicShape::kNone;
+  const auto public_children_empty = [&] {
+    return std::all_of(result.children.begin(), result.children.end(), [](const auto& child) {
+      return child.xes_public_shape == XesPublicShape::kAbsent;
+    });
+  };
   if (start.self_closing) return result;
   if (kind && (variant == XesImportVariant::kChunkRegex ||
                variant == XesImportVariant::kRustXes)) {
@@ -565,6 +577,7 @@ std::optional<EventAttribute> parse_attribute_node(
       continue;
     }
     if (token.kind != detail::XmlPullParser::Kind::StartElement) continue;
+    if (public_shapes && list) result.xes_public_shape = XesPublicShape::kWrapper;
     if (kind && local_name(token.name) == "values" &&
         (variant == XesImportVariant::kIterparse ||
          variant == XesImportVariant::kIterparseMemoryCompressed ||
@@ -597,6 +610,11 @@ std::optional<EventAttribute> parse_attribute_node(
       // the parser variations, even when their scalar contents are identical.
       if (list && local_name(token.name) == "values") {
         if (variant == XesImportVariant::kIterparse20) {
+          skip_element(parser, token);
+          continue;
+        }
+        // Public iterparse keeps <values> only while no child is stored yet.
+        if (public_shapes && !public_children_empty()) {
           skip_element(parser, token);
           continue;
         }

@@ -1,6 +1,7 @@
 #include "minera/timestamp_interleavings.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <iomanip>
 #include <limits>
@@ -18,15 +19,19 @@ namespace {
 
 constexpr std::string_view kStartActivity = "▶";
 constexpr std::string_view kEndActivity = "■";
-constexpr std::string_view kStartTimestamp = "0001-01-01T00:00:00Z";
-constexpr std::string_view kEndTimestamp = "9999-12-31T23:59:59Z";
-constexpr double kBoundaryMagnitude = 1.0e15;
+// The artificial boundaries sit at the extreme representable nanosecond
+// timestamps, so elapsed times against them are finite and exact.
+constexpr std::string_view kStartTimestamp = "1677-09-21T00:12:43.145224193Z";
+constexpr std::string_view kEndTimestamp = "2262-04-11T23:47:16.854775807Z";
+using Nanoseconds = __int128;
+constexpr Nanoseconds kStartTime = static_cast<Nanoseconds>(INT64_MIN);
+constexpr Nanoseconds kEndTime = static_cast<Nanoseconds>(INT64_MAX);
 
 struct BoundaryEvent {
   const Event* event = nullptr;
   std::string activity;
   std::string timestamp;
-  double time = 0.0;
+  Nanoseconds time = 0;
   std::size_t index = 0;
   bool artificial = false;
 };
@@ -41,16 +46,18 @@ const std::string* timestamp_text(const Event& event,
 
 struct ParsedEvent {
   const Event* event = nullptr;
-  double time = 0.0;
+  Nanoseconds time = 0;
   std::size_t sequence = 0;
 };
 
+// Each case becomes start boundary, events by (timestamp, input order), end
+// boundary. Indices number the whole log: the start boundaries of the cases
+// in case-id order, then every case's events in that order, then the end
+// boundaries.
 std::map<std::string, Timeline> build_timelines(const EventLog& log,
                                                  std::string_view key) {
   std::map<std::string, std::vector<ParsedEvent>> grouped;
   std::size_t sequence = 0;
-  std::size_t maximum_index = 0;
-  bool has_event = false;
   for (const auto& trace : log.traces) {
     auto& events = grouped[trace.case_id];
     for (const auto& event : trace.events) {
@@ -60,24 +67,31 @@ std::map<std::string, Timeline> build_timelines(const EventLog& log,
             "timestamp interleavings: missing timestamp '" + std::string(key) +
             "'");
       }
-      const auto parsed = parse_timestamp(*raw_timestamp);
-      if (!parsed || !std::isfinite(*parsed)) {
+      const auto parsed = parse_timestamp_exact(*raw_timestamp);
+      if (!parsed) {
         throw std::invalid_argument(
             "timestamp interleavings: invalid timestamp '" +
             *raw_timestamp + "'");
       }
-      events.push_back({&event, *parsed, sequence++});
-      maximum_index = std::max(maximum_index, event.input_order);
-      has_event = true;
+      // Timezone-naive columns cannot be ordered against the boundaries.
+      if (!parsed->timezone_aware) {
+        throw std::invalid_argument(
+            "timestamp interleavings: timezone-naive timestamp '" +
+            *raw_timestamp + "'");
+      }
+      events.push_back({&event,
+                        static_cast<Nanoseconds>(parsed->seconds) * 1'000'000'000 +
+                            parsed->nanoseconds,
+                        sequence++});
     }
   }
+  std::erase_if(grouped, [](const auto& entry) { return entry.second.empty(); });
 
   std::map<std::string, Timeline> timelines;
-  if (has_event && maximum_index == std::numeric_limits<std::size_t>::max()) {
-    throw std::invalid_argument(
-        "timestamp interleavings: event index is too large");
-  }
-  std::size_t next_synthetic_index = has_event ? maximum_index + 1 : 0;
+  std::size_t total = 0;
+  for (const auto& [_, events] : grouped) total += events.size();
+  const std::size_t cases = grouped.size();
+  std::size_t rank = 0, position = cases;
   for (auto& [case_id, events] : grouped) {
     std::stable_sort(events.begin(), events.end(),
                      [](const ParsedEvent& left, const ParsedEvent& right) {
@@ -88,20 +102,18 @@ std::map<std::string, Timeline> build_timelines(const EventLog& log,
                      });
     Timeline timeline;
     timeline.reserve(events.size() + 2);
-    const std::size_t start_index = next_synthetic_index++;
-    const std::size_t end_index = next_synthetic_index++;
     timeline.push_back({nullptr, std::string(kStartActivity),
-                        std::string(kStartTimestamp), -kBoundaryMagnitude,
-                        start_index, true});
+                        std::string(kStartTimestamp), kStartTime, rank, true});
     for (const auto& parsed : events) {
       timeline.push_back({parsed.event, parsed.event->activity,
                           *timestamp_text(*parsed.event, key), parsed.time,
-                          parsed.event->input_order, false});
+                          position++, false});
     }
     timeline.push_back({nullptr, std::string(kEndActivity),
-                        std::string(kEndTimestamp), kBoundaryMagnitude,
-                        end_index, true});
+                        std::string(kEndTimestamp), kEndTime,
+                        cases + total + rank, true});
     timelines.emplace(case_id, std::move(timeline));
+    ++rank;
   }
   return timelines;
 }
@@ -154,22 +166,29 @@ TimestampInterleavingsResult discover_timestamp_interleavings(
 
   TimestampInterleavingsResult result;
   result.options = options;
+  // Rows are ordered by the indices of the two pairs' first events.
+  std::vector<std::pair<std::size_t, std::size_t>> order;
   const auto append = [&](const BoundaryEvent& source,
                           const BoundaryEvent& target, std::size_t left_index,
                           std::size_t right_index,
-                          TimestampInterleavingDirection direction) {
+                          TimestampInterleavingDirection direction,
+                          std::size_t left_pair, std::size_t right_pair) {
     if (result.interleavings.size() >= options.max_interleavings) {
       throw std::invalid_argument(
           "timestamp interleavings: max_interleavings exceeded");
     }
-    const double difference = target.time - source.time;
-    if (!std::isfinite(difference)) {
-      throw std::invalid_argument(
-          "timestamp interleavings: timestamp difference is not finite");
-    }
+    // Elapsed times are nanosecond counts; one from the start boundary to a
+    // real event does not fit and fails the whole discovery.
+    const Nanoseconds elapsed = target.time - source.time;
+    if (elapsed > kEndTime || elapsed < kStartTime)
+      throw std::overflow_error(
+          "timestamp interleavings: elapsed time overflows nanoseconds");
+    const auto difference = static_cast<double>(
+        static_cast<long double>(elapsed) / 1'000'000'000.0L);
     result.interleavings.push_back(
         {source.activity, target.activity, source.timestamp, target.timestamp,
          left_index, right_index, direction, difference});
+    order.emplace_back(left_pair, right_pair);
   };
 
   for (const auto& relation : relations) {
@@ -191,26 +210,28 @@ TimestampInterleavingsResult discover_timestamp_interleavings(
         if (lhs[i].time < rhs[j].time && rhs[j].time < lhs[i + 1].time &&
             lhs[i + 1].time < rhs[j + 1].time) {
           append(lhs[i], rhs[j], lhs[i].index, rhs[j].index,
-                 TimestampInterleavingDirection::kLeftToRight);
+                 TimestampInterleavingDirection::kLeftToRight, lhs[i].index,
+                 rhs[j].index);
         }
         if (rhs[j].time < lhs[i].time && lhs[i].time < rhs[j + 1].time &&
             rhs[j + 1].time < lhs[i + 1].time) {
           append(rhs[j + 1], lhs[i + 1], lhs[i + 1].index, rhs[j + 1].index,
-                 TimestampInterleavingDirection::kRightToLeft);
+                 TimestampInterleavingDirection::kRightToLeft, lhs[i].index,
+                 rhs[j].index);
         }
       }
     }
   }
 
-  std::stable_sort(
-      result.interleavings.begin(), result.interleavings.end(),
-      [](const TimestampInterleaving& left_row,
-         const TimestampInterleaving& right_row) {
-        return std::tie(left_row.left_index, left_row.right_index,
-                        left_row.direction) <
-               std::tie(right_row.left_index, right_row.right_index,
-                        right_row.direction);
-      });
+  std::vector<std::size_t> rows(result.interleavings.size());
+  for (std::size_t i = 0; i < rows.size(); ++i) rows[i] = i;
+  std::stable_sort(rows.begin(), rows.end(), [&](std::size_t lhs, std::size_t rhs) {
+    return order[lhs] < order[rhs];
+  });
+  std::vector<TimestampInterleaving> sorted;
+  sorted.reserve(rows.size());
+  for (const auto row : rows) sorted.push_back(std::move(result.interleavings[row]));
+  result.interleavings = std::move(sorted);
   return result;
 }
 

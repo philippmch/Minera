@@ -761,14 +761,16 @@ DtypeInfo parse_dtype(const std::string& name) {
           comma == std::string::npos
               ? std::string{}
               : trim(specification.substr(comma + 1));
-      const bool valid_unit = unit == "us" || unit == "ns";
+      const bool valid_unit =
+          unit == "s" || unit == "ms" || unit == "us" || unit == "ns";
       const bool valid_timezone =
           comma == std::string::npos ||
           (!timezone.empty() && specification.find(',', comma + 1) ==
                                      std::string::npos);
       if (valid_unit && valid_timezone) {
         result.family = DtypeFamily::kDatetime;
-        result.width = unit == "ns" ? 64 : 32;
+        // Width ranks the resolution so promotion keeps the finer unit.
+        result.width = unit == "ns" ? 64 : unit == "us" ? 32 : unit == "ms" ? 16 : 8;
         result.datetime_timezone = timezone;
       }
     }
@@ -1051,7 +1053,9 @@ std::string promote_dtype_pair(
     if (left.family == DtypeFamily::kDatetime &&
         right.family == DtypeFamily::kDatetime) {
       if (left.datetime_timezone != right.datetime_timezone) return "object";
-      const auto resolution = left.width == 64 || right.width == 64 ? "ns" : "us";
+      const auto width = std::max(left.width, right.width);
+      const auto resolution =
+          width == 64 ? "ns" : width == 32 ? "us" : width == 16 ? "ms" : "s";
       if (left.datetime_timezone.empty())
         return std::string("datetime64[") + resolution + "]";
       return std::string("datetime64[") + resolution + ", " +
@@ -1166,9 +1170,8 @@ std::string promote_dtype_sources(
     if (parsed.family == DtypeFamily::kSigned ||
         parsed.family == DtypeFamily::kUnsigned)
       return "float64";
-    if (parsed.family == DtypeFamily::kBoolean ||
-        parsed.family == DtypeFamily::kString)
-      return "object";
+    // The default "str" dtype is NaN-capable, so only bool falls back.
+    if (parsed.family == DtypeFamily::kBoolean) return "object";
   }
   return result;
 }
@@ -1272,6 +1275,94 @@ std::optional<EventAttribute> coerce_cell_to_dtype(
     return result;
   }
   return result;
+}
+
+// Pairs (incoming row, relation row) in the order pandas' inner merge emits
+// them. Rows normally follow the incoming table with relation rows ascending.
+// When the pair count equals the incoming row count, pandas instead takes
+// the key-grouped pairs at each incoming row's position in a stable sort by
+// key code. Codes follow first appearance in the incoming keys, or, for
+// numeric keys, in the relation keys and then the incoming keys; null keys
+// form the last group. Numeric keys skip the regrouping when the incoming
+// keys are unique and both key columns are monotonic increasing.
+std::vector<std::pair<std::size_t, std::size_t>> inner_merge_pairs(
+    const EventTable& incoming, std::size_t incoming_key,
+    const EventTable& relations, std::size_t relation_key) {
+  std::vector<std::pair<std::size_t, std::size_t>> pairs;
+  for (std::size_t row = 0; row < incoming.rows.size(); ++row)
+    for (std::size_t relation = 0; relation < relations.rows.size(); ++relation)
+      if (cell_equal(incoming.rows[row][incoming_key],
+                     relations.rows[relation][relation_key]))
+        pairs.push_back({row, relation});
+  if (pairs.size() != incoming.rows.size() || pairs.empty()) return pairs;
+
+  const auto numeric_family = [](const EventTable& table, std::size_t key) {
+    if (table.dtypes.size() == table.columns.size()) {
+      const auto family = parse_dtype(table.dtypes[key]).family;
+      return family == DtypeFamily::kSigned || family == DtypeFamily::kUnsigned ||
+             family == DtypeFamily::kFloat || family == DtypeFamily::kBoolean;
+    }
+    for (const auto& row : table.rows)
+      if (!null_cell(row[key]) && !numeric_value(*row[key])) return false;
+    return true;
+  };
+  const bool numeric = numeric_family(incoming, incoming_key) &&
+                       numeric_family(relations, relation_key);
+  const auto monotonic = [](const EventTable& table, std::size_t key) {
+    std::optional<NumericValue> previous;
+    for (const auto& row : table.rows) {
+      if (null_cell(row[key])) return false;
+      const auto current = numeric_value(*row[key]);
+      if (!current) return false;
+      if (previous && compare_numeric(*previous, *current) > 0) return false;
+      previous = current;
+    }
+    return true;
+  };
+
+  std::vector<const std::optional<EventAttribute>*> codes;
+  const auto code_of = [&](const std::optional<EventAttribute>& cell) {
+    if (null_cell(cell)) return codes.size();
+    for (std::size_t code = 0; code < codes.size(); ++code)
+      if (cell_equal(*codes[code], cell)) return code;
+    return codes.size();
+  };
+  const auto register_keys = [&](const EventTable& table, std::size_t key) {
+    for (const auto& row : table.rows)
+      if (!null_cell(row[key]) && code_of(row[key]) == codes.size())
+        codes.push_back(&row[key]);
+  };
+  if (numeric) register_keys(relations, relation_key);
+  register_keys(incoming, incoming_key);
+  std::vector<std::size_t> incoming_codes;
+  bool unique = true;
+  for (const auto& row : incoming.rows) {
+    const auto code = code_of(row[incoming_key]);
+    unique = unique && std::find(incoming_codes.begin(), incoming_codes.end(),
+                                 code) == incoming_codes.end();
+    incoming_codes.push_back(code);
+  }
+  if (numeric && unique && monotonic(incoming, incoming_key) &&
+      monotonic(relations, relation_key))
+    return pairs;
+
+  std::vector<std::size_t> sorter(incoming.rows.size());
+  for (std::size_t row = 0; row < sorter.size(); ++row) sorter[row] = row;
+  std::stable_sort(sorter.begin(), sorter.end(),
+                   [&](std::size_t left, std::size_t right) {
+                     return incoming_codes[left] < incoming_codes[right];
+                   });
+  std::vector<std::vector<std::pair<std::size_t, std::size_t>>> by_row(
+      incoming.rows.size());
+  for (const auto& pair : pairs) by_row[pair.first].push_back(pair);
+  std::vector<std::pair<std::size_t, std::size_t>> grouped;
+  grouped.reserve(pairs.size());
+  for (const auto row : sorter)
+    grouped.insert(grouped.end(), by_row[row].begin(), by_row[row].end());
+  std::vector<std::pair<std::size_t, std::size_t>> ordered(pairs.size());
+  for (std::size_t position = 0; position < sorter.size(); ++position)
+    ordered[sorter[position]] = grouped[position];
+  return ordered;
 }
 
 }  // namespace
@@ -1620,11 +1711,11 @@ EventTable merge_case_relations(const EventTable& base,
     make_base_row(base.rows[position], position, sequence++);
 
   std::size_t incoming_index_sequence = 0;
-  for (const auto& source : incoming.rows) {
-    for (const auto& relation : relations.rows) {
-      if (!cell_equal(source[incoming_case_index],
-                      relation[relation_right_index]))
-        continue;
+  for (const auto& [source_position, relation_position] : inner_merge_pairs(
+           incoming, incoming_case_index, relations, relation_right_index)) {
+    {
+      const auto& source = incoming.rows[source_position];
+      const auto& relation = relations.rows[relation_position];
       EventTable::Row row(result.columns.size());
       for (const auto& plan : incoming_plans)
         write_cell(row, plan.output_name, source[plan.source_index]);
@@ -1696,10 +1787,12 @@ EventTable merge_case_relations(const EventTable& base,
                            source_category(*joined_table, joined_source)});
 
       bool missing = false;
-      if (!base.rows.empty()) {
-        if (!base_source) {
-          missing = true;
-        } else {
+      // Pandas concatenation pads an absent column with nulls even when the
+      // frame lacking it is empty.
+      if (!base_source) {
+        missing = true;
+      } else if (!base.rows.empty()) {
+        {
           for (const auto& row : base.rows)
             if (null_cell(row[*base_source])) {
               missing = true;
@@ -1707,10 +1800,10 @@ EventTable merge_case_relations(const EventTable& base,
             }
         }
       }
-      if (joined_row_count != 0) {
-        if (!joined_source) {
-          missing = true;
-        } else {
+      if (!joined_source) {
+        missing = true;
+      } else if (joined_row_count != 0) {
+        {
           for (const auto& output : output_rows) {
             if (!output.index_label_from_expansion) continue;
             if (null_cell(output.row[column])) {

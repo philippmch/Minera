@@ -517,6 +517,12 @@ void typed_nested_attributes_and_first_class_states_round_trip() {
   auto expected_globals = log.metadata.globals;
   expected_globals[0].attributes[0].container = minera::AttributeContainerKind::kList;
   expected_globals[0].attributes[0].children[1].container = minera::AttributeContainerKind::kList;
+  // The exported <container> comes back as a <list>, which public iterparse
+  // stores as a wrapper instead of dropping it.
+  assert(expected_globals[0].attributes[0].children[1].xes_public_shape ==
+         minera::XesPublicShape::kAbsent);
+  expected_globals[0].attributes[0].children[1].xes_public_shape =
+      minera::XesPublicShape::kWrapper;
   assert(round.metadata.globals == expected_globals);
   assert(round.traces[0].case_id_state ==
          minera::FirstClassAttributeState::kMissing);

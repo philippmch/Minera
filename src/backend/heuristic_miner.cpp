@@ -2343,10 +2343,23 @@ HeuristicsNet discover_plus_plus_pandas(
     return false;
   };
   const bool string_cases = pandas_string_column(data, *case_column);
-  if (timezone_aware(completed) &&
-      std::all_of(data.rows.begin(), data.rows.end(), [&](const auto& row) {
-        return pandas_missing_cell(row[*case_column]) ||
-               (string_cases && pandas_string_has_surrogate(row[*case_column]->value));
+  // The pairing of consecutive events of a case yields no rows when no case
+  // holds two events; timezone-aware columns then fail on the empty object
+  // array. Missing (or unencodable) case ids form no case here.
+  const auto holds_pair = [&](const auto& counted) {
+    std::map<std::optional<std::string>, std::size_t> sizes;
+    for (const auto& row : data.rows) {
+      if (!counted(row)) continue;
+      const auto& cell = row[*case_column];
+      const auto key = pandas_missing_cell(cell) ? std::nullopt
+                                                 : std::optional<std::string>(cell->value);
+      if (++sizes[key] == 2) return true;
+    }
+    return false;
+  };
+  if (timezone_aware(completed) && !holds_pair([&](const auto& row) {
+        return !pandas_missing_cell(row[*case_column]) &&
+               !(string_cases && pandas_string_has_surrogate(row[*case_column]->value));
       }))
     throw HeuristicPandasError(
         "builtins.TypeError", "cannot subtract DatetimeArray from ndarray[object]");
@@ -2390,7 +2403,13 @@ HeuristicsNet discover_plus_plus_pandas(
       data.rows.begin(), data.rows.end(), [&](const auto& row) {
         return !pandas_missing_cell(row[*activity_column]);
       });
-  if (started != difference && (!any_timestamp(started) || !any_activity)) {
+  // Rows without an activity are dropped before pairing; when no case
+  // (missing ids grouped together) keeps two events, the empty pair table
+  // fails the duration comparison.
+  const bool any_pair = holds_pair([&](const auto& row) {
+    return !pandas_missing_cell(row[*activity_column]);
+  });
+  if (started != difference && (!any_timestamp(started) || !any_activity || !any_pair)) {
     const auto suffix = duration_units == 1'000'000'000 ? "ns"
                         : duration_units == 1'000'000 ? "us"
                         : duration_units == 1'000 ? "ms" : "s";

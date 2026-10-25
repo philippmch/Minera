@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "minera/conformance.hpp"
 #include "minera/event_log.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/petri_net.hpp"
@@ -71,5 +72,36 @@ struct DecisionTablesResult {
 
 [[nodiscard]] std::string serialize_decision_tables_json(
     const DecisionTablesResult& result);
+
+// Column storage of the reference-shaped table: one-hot string columns are
+// bool, numeric columns int64 when every row carries an integer, else float64.
+enum class ReferenceDecisionColumnType { kBool, kInt64, kFloat64 };
+
+// The public reference encoding of one decision point (the X, y and classes
+// of algo.decision_mining.apply). Token replay supplies each trace's fired
+// transitions; every fired transition whose label (null for silent ones)
+// occurs among the labels of the place's outgoing transitions yields one row
+// carrying the attributes of the last visible event replayed before it, and
+// firings before the first event yield none. Traces are visited per activity
+// variant in first-appearance order, then in log order. Only event attributes
+// present in every trace are encoded (string attributes one-hot per observed
+// value, then numeric ones; booleans, dates, concept:name, time:timestamp and
+// lifecycle:transition are skipped), each group in lexical key order.
+struct ReferenceDecisionTable {
+  std::vector<std::string> columns;
+  std::vector<ReferenceDecisionColumnType> column_types;
+  // One-hot cells are 0 or 1; numeric cells are null when the event lacks
+  // the attribute.
+  std::vector<std::vector<std::optional<double>>> rows;
+  std::vector<std::size_t> targets;  // indices into classes
+  // Fired labels in first-appearance order; null for silent transitions.
+  std::vector<std::optional<std::string>> classes;
+};
+
+// Throws std::invalid_argument when the point yields no rows or no string
+// column, where the reference raises ValueError.
+[[nodiscard]] ReferenceDecisionTable reference_decision_table(
+    const EventLog& log, const PetriNet& net, std::size_t place,
+    const TokenReplayOptions& replay = {});
 
 }  // namespace minera

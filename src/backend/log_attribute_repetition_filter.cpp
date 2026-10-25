@@ -18,7 +18,7 @@ std::optional<EventAttribute> selected(const Event& event,
   // Native dictionaries retain their last present value. First-class state
   // markers can explicitly represent an absent or present-null cell.
   for (auto it = event.attributes.rbegin(); it != event.attributes.rend(); ++it) {
-    if (it->key != key) continue;
+    if (it->key != key || it->xes_public_shape == XesPublicShape::kAbsent) continue;
     if (it->first_class_role != FirstClassAttributeRole::kNone &&
         it->first_class_state == FirstClassAttributeState::kMissing)
       return std::nullopt;
@@ -65,32 +65,54 @@ bool set_kind(const EventAttribute& value) {
 }
 
 bool wrapped(const EventAttribute& value) {
+  if (value.xes_public_shape == XesPublicShape::kWrapper ||
+      value.xes_public_shape == XesPublicShape::kNone) return true;
   return value.container == AttributeContainerKind::kScalar &&
          (value.scalar_wrapper || value.scalar_children_list || !value.children.empty());
 }
 
+bool absent(const EventAttribute& value) {
+  return value.xes_public_shape == XesPublicShape::kAbsent;
+}
+
 // The public value of an imported scalar with nested elements is the mapping
 // {'value': scalar, 'children': mapping-or-pair-list}; nested wrappers recurse.
+// An imported XES <list> is the same wrapper around None (pairs for a
+// <values> list), or None without child elements; <container> elements are
+// not stored.
 EventAttribute public_view(const EventAttribute& value) {
+  if (value.xes_public_shape == XesPublicShape::kNone) {
+    EventAttribute none{value.key, ""};
+    none.is_null = true;
+    return none;
+  }
   if (!wrapped(value)) {
     if (value.children.empty()) return value;
     auto copy = value;
-    for (auto& child : copy.children) child = public_view(child);
+    copy.children.clear();
+    for (const auto& child : value.children)
+      if (!absent(child)) copy.children.push_back(public_view(child));
     return copy;
   }
+  const bool xes_list = value.xes_public_shape == XesPublicShape::kWrapper;
   EventAttribute scalar = value;
+  if (xes_list) {
+    scalar = EventAttribute{"value", ""};
+    scalar.is_null = true;
+  }
   scalar.key = "value";
   scalar.children.clear();
   scalar.scalar_wrapper = false;
   scalar.scalar_children_list = false;
   EventAttribute children{"children", ""};
-  if (value.scalar_children_list) {
+  if (xes_list ? value.container == AttributeContainerKind::kList : value.scalar_children_list) {
     children.container = AttributeContainerKind::kList;
-    for (std::size_t i = 0; i < value.children.size(); ++i) {
-      EventAttribute pair{std::to_string(i), ""};
+    for (const auto& child : value.children) {
+      if (absent(child)) continue;
+      EventAttribute pair{std::to_string(children.children.size()), ""};
       pair.container = AttributeContainerKind::kTuple;
-      pair.children.push_back(EventAttribute{"0", value.children[i].key});
-      auto item = public_view(value.children[i]);
+      pair.children.push_back(EventAttribute{"0", child.key});
+      auto item = public_view(child);
       item.key = "1";
       pair.children.push_back(std::move(item));
       children.children.push_back(std::move(pair));
@@ -99,6 +121,7 @@ EventAttribute public_view(const EventAttribute& value) {
     children.container = AttributeContainerKind::kContainer;
     // Later duplicate keys replace earlier values, as in a dictionary.
     for (const auto& child : value.children) {
+      if (absent(child)) continue;
       const auto existing = std::find_if(children.children.begin(), children.children.end(),
                                          [&](const auto& item) { return item.key == child.key; });
       if (existing != children.children.end()) *existing = public_view(child);

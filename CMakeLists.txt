@@ -181,6 +181,7 @@ add_library(minera_core
   src/backend/event_data.cpp
   src/backend/edit_distance_alignment.cpp
   src/backend/petri_trace_alignment.cpp
+  src/backend/alignment_log_enrichment.cpp
   src/backend/evaluation.cpp
   src/backend/event_ordering.cpp
   src/backend/eventually_follows.cpp
@@ -206,6 +207,7 @@ add_library(minera_core
   src/backend/interval_tree.cpp
   src/backend/overlap.cpp
   src/backend/label_splitting.cpp
+  src/backend/llm_injection.cpp
   src/backend/live_stream.cpp
   src/backend/streaming_session.cpp
   src/backend/link_analysis.cpp
@@ -269,6 +271,7 @@ add_library(minera_core
   src/backend/pripel.cpp
   src/backend/process_tree_alignment.cpp
   src/backend/random_tree.cpp
+  src/backend/reference_tree_net.cpp
   src/backend/saw_nets.cpp
   src/backend/process_tree_playout.cpp
   src/backend/process_tree_reduction.cpp
@@ -1900,6 +1903,105 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_evaluation_reference_equivalence_tests
            COMMAND minera_evaluation_reference_equivalence_tests)
 
+  add_executable(minera_token_replay_arc_order_parity_tests
+    src/backend/tests/test_token_replay_arc_order_parity.cpp
+  )
+  target_link_libraries(minera_token_replay_arc_order_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_token_replay_arc_order_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_token_replay_arc_order_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_token_replay_arc_order_parity_tests
+           COMMAND minera_token_replay_arc_order_parity_tests)
+
+  add_executable(minera_dfg_alignment_dispatcher_parity_tests
+    src/backend/tests/test_dfg_alignment_dispatcher_parity.cpp
+  )
+  target_link_libraries(minera_dfg_alignment_dispatcher_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_alignment_dispatcher_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_alignment_dispatcher_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dfg_alignment_dispatcher_parity_tests
+           COMMAND minera_dfg_alignment_dispatcher_parity_tests)
+
+  add_executable(minera_alignment_log_enrichment_parity_tests
+    src/backend/tests/test_alignment_log_enrichment_parity.cpp
+  )
+  target_link_libraries(minera_alignment_log_enrichment_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_alignment_log_enrichment_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_alignment_log_enrichment_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_alignment_log_enrichment_parity_tests
+           COMMAND minera_alignment_log_enrichment_parity_tests)
+
+  add_executable(minera_petri_alignment_dispatcher_parity_tests
+    src/backend/tests/test_petri_alignment_dispatcher_parity.cpp
+  )
+  target_link_libraries(minera_petri_alignment_dispatcher_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_petri_alignment_dispatcher_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_petri_alignment_dispatcher_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_petri_alignment_dispatcher_parity_tests
+           COMMAND minera_petri_alignment_dispatcher_parity_tests)
+
+  add_executable(minera_token_replay_pltr_parity_tests
+    src/backend/tests/test_token_replay_pltr_parity.cpp
+  )
+  target_link_libraries(minera_token_replay_pltr_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_token_replay_pltr_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_token_replay_pltr_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_token_replay_pltr_parity_tests
+           COMMAND minera_token_replay_pltr_parity_tests)
+
+  add_executable(minera_token_replay_root_cause_parity_tests
+    src/backend/tests/test_token_replay_root_cause_parity.cpp
+  )
+  target_link_libraries(minera_token_replay_root_cause_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_token_replay_root_cause_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_token_replay_root_cause_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_token_replay_root_cause_parity_tests
+           COMMAND minera_token_replay_root_cause_parity_tests)
+
+  add_executable(minera_token_replay_dispatcher_parity_tests
+    src/backend/tests/test_token_replay_dispatcher_parity.cpp
+  )
+  target_link_libraries(minera_token_replay_dispatcher_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_token_replay_dispatcher_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_token_replay_dispatcher_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_token_replay_dispatcher_parity_tests
+           COMMAND minera_token_replay_dispatcher_parity_tests)
+
+  add_executable(minera_heuristics_plusplus_parity_tests
+    src/backend/tests/test_heuristics_plusplus_parity.cpp
+  )
+  target_link_libraries(minera_heuristics_plusplus_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_heuristics_plusplus_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_heuristics_plusplus_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_heuristics_plusplus_parity_tests
+           COMMAND minera_heuristics_plusplus_parity_tests)
+
+  add_executable(minera_ocel_graphs_parity_tests
+    src/backend/tests/test_ocel_graphs_parity.cpp
+  )
+  target_link_libraries(minera_ocel_graphs_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_graphs_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_graphs_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_graphs_parity_tests
+           COMMAND minera_ocel_graphs_parity_tests)
+
+  add_executable(minera_ocel_nets_parity_tests
+    src/backend/tests/test_ocel_nets_parity.cpp
+  )
+  target_link_libraries(minera_ocel_nets_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_nets_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_nets_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_nets_parity_tests
+           COMMAND minera_ocel_nets_parity_tests)
+
+  add_executable(minera_ocel_links_parity_tests
+    src/backend/tests/test_ocel_links_parity.cpp
+  )
+  target_link_libraries(minera_ocel_links_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_links_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_links_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_links_parity_tests
+           COMMAND minera_ocel_links_parity_tests)
+
   add_executable(minera_extended_cardoso_module_tests
     src/backend/tests/test_extended_cardoso_module.cpp
   )
@@ -1984,6 +2086,50 @@ if(MINERA_BUILD_TESTS)
     target_compile_options(minera_case_relations_tests PRIVATE /bigobj)
   endif()
   add_test(NAME minera_case_relations_tests COMMAND minera_case_relations_tests)
+
+  add_executable(minera_case_relations_parity_tests
+    src/backend/tests/test_case_relations_parity.cpp
+  )
+  target_link_libraries(minera_case_relations_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_case_relations_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_case_relations_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  if(MSVC)
+    target_compile_options(minera_case_relations_parity_tests PRIVATE /bigobj)
+  endif()
+  add_test(NAME minera_case_relations_parity_tests COMMAND minera_case_relations_parity_tests)
+
+  add_executable(minera_label_splitting_parity_tests
+    src/backend/tests/test_label_splitting_parity.cpp
+  )
+  target_link_libraries(minera_label_splitting_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_label_splitting_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_label_splitting_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_label_splitting_parity_tests COMMAND minera_label_splitting_parity_tests)
+
+  add_executable(minera_llm_injection_parity_tests
+    src/backend/tests/test_llm_injection_parity.cpp
+  )
+  target_link_libraries(minera_llm_injection_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_llm_injection_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_llm_injection_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_llm_injection_parity_tests COMMAND minera_llm_injection_parity_tests)
+
+  add_executable(minera_trace_attribute_clustering_parity_tests
+    src/backend/tests/test_trace_attribute_clustering_parity.cpp
+  )
+  target_link_libraries(minera_trace_attribute_clustering_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_trace_attribute_clustering_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_trace_attribute_clustering_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_trace_attribute_clustering_parity_tests COMMAND minera_trace_attribute_clustering_parity_tests)
+
+  add_executable(minera_decision_mining_parity_tests
+    src/backend/tests/test_decision_mining_parity.cpp
+  )
+  target_link_libraries(minera_decision_mining_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_decision_mining_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_decision_mining_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_decision_mining_parity_tests COMMAND minera_decision_mining_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/decision_mining_bank.txt")
 
   add_executable(minera_random_tree_tests
     src/backend/tests/test_random_tree.cpp

@@ -14,6 +14,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/saw_nets.hpp"
+#include "../reference_tree_net.hpp"
 
 namespace {
 
@@ -66,8 +67,10 @@ void ocpn_miner_policy_contract() {
     const auto log = policy_ocel_from_traces(fixtures[fixture]);
     const auto default_model = minera::discover_ocpn(log);
     minera::OcpnDiscoveryOptions explicit_defaults;
-    explicit_defaults.disable_strict_sequence_cut = false;
-    explicit_defaults.disable_fallthroughs = false;
+    // The public discovery mines without the strict sequence cut or
+    // fall-throughs.
+    explicit_defaults.disable_strict_sequence_cut = true;
+    explicit_defaults.disable_fallthroughs = true;
     assert(minera::serialize_ocpn_json(default_model) ==
            minera::serialize_ocpn_json(
                minera::discover_ocpn(log, explicit_defaults)));
@@ -97,7 +100,7 @@ void ocpn_miner_policy_contract() {
                               : minera::InductiveMinerVariant::kDfg;
           miner.disable_strict_sequence_cut = disable_strict;
           miner.disable_fallthroughs = disable_fallthroughs;
-          const auto expected = policy_net_signature(minera::to_petri_net(
+          const auto expected = policy_net_signature(minera::process_tree_reference_net(
               minera::discover_process_tree(variants, miner)));
           assert(model.petri_nets.size() == 2);
           for (const auto& [type, net] : model.petri_nets) {
@@ -1037,14 +1040,17 @@ int main() {
       minera::discover_saw_nets(selected_log, saw_selected_options);
   assert(selected_saw.ot_saw_nets.contains("order-main") &&
          selected_saw.ot_saw_nets.contains("item-main"));
-  assert(selected_saw.ot_saw_nets.at("order-main").net.activities() ==
-         std::vector<std::string>({"Assemble", "Deliver"}));
+  // A selected type label names the net, but the flattening matches the
+  // canonical type, so no object feeds it: the net is a single silent step.
+  const auto& selected_order_net = selected_saw.ot_saw_nets.at("order-main").net;
+  assert(selected_order_net.transitions().size() == 1 &&
+         !selected_order_net.transitions().front().activity);
   assert(selected_saw.multi_place_object_types.size() > 0);
   for (const auto& [place, type] : selected_saw.multi_place_object_types) {
     (void)place;
     assert(type == "order-main" || type == "item-main");
   }
-  assert(!selected_saw.ot_saw_nets.at("order-main").transition_weights.empty());
+  assert(selected_saw.ot_saw_nets.at("order-main").transition_weights.empty());
   bool saw_missing_selector_rejected = false;
   try {
     auto invalid = saw_selected_options;

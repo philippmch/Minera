@@ -9,6 +9,7 @@
 #include <locale>
 #include <numeric>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -646,6 +647,33 @@ bool stack_ends_with(const std::vector<std::string>& stack,
 }
 
 }  // namespace
+
+std::optional<std::vector<std::vector<std::size_t>>>
+pnml_place_outgoing_transition_order(const PnmlDocument& document) {
+  if (!document.arc_occurrences) return std::nullopt;
+  const auto& net = document.net;
+  std::vector<std::vector<std::size_t>> order(net.place_count());
+  for (const auto& arc : *document.arc_occurrences) {
+    if (!arc.input) continue;
+    if (arc.place >= order.size() || arc.transition >= net.transitions().size())
+      return std::nullopt;
+    order[arc.place].push_back(arc.transition);
+  }
+  // Every adjacent transition must be listed, and nothing else.
+  for (std::size_t place = 0; place < order.size(); ++place) {
+    std::set<std::size_t> listed(order[place].begin(), order[place].end());
+    std::set<std::size_t> adjacent;
+    for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+      const auto& transition = net.transitions()[t];
+      for (const auto* inputs : {&transition.inputs, &transition.reset_inputs,
+                                 &transition.inhibitor_inputs})
+        if (std::find(inputs->begin(), inputs->end(), place) != inputs->end())
+          adjacent.insert(t);
+    }
+    if (listed != adjacent) return std::nullopt;
+  }
+  return order;
+}
 
 PnmlDocument parse_pnml_document(std::string_view xml,
                                  const PnmlImportOptions& options) {

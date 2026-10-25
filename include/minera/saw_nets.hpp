@@ -22,6 +22,12 @@ struct SawNet {
   // matching the stochastic-arc convention while keeping the workflow net
   // representation compact.
   std::map<std::size_t, SawWeightDistribution> transition_weights;
+  // The merged net keeps each arc's distribution from the object type the arc
+  // came from, keyed "<transition>:input|output:<position>" like the merged
+  // arc decorations; a merged visible transition sums those in
+  // transition_weights. Empty for per-type nets, whose arcs all carry their
+  // transition's distribution.
+  std::map<std::string, SawWeightDistribution> arc_weights;
 };
 
 struct SawNetDiscoveryResult {

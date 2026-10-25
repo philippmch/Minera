@@ -93,7 +93,9 @@ double cosine_distance(const Counts& a, const Counts& b,
   if (aa == 0.0 && bb == 0.0)
     return empty_pair_is_distance ? 1.0 : 0.0;
   if (aa == 0.0 || bb == 0.0) return 1.0;
-  const double sim = ab / std::sqrt(aa * bb);
+  // The reference divides by the product of the two norms; the rounding of
+  // sqrt(aa) * sqrt(bb) decides near-tie merges.
+  const double sim = ab / (std::sqrt(aa) * std::sqrt(bb));
   return std::clamp(1.0 - sim, 0.0, 1.0);
 }
 
@@ -277,6 +279,8 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
   if (!std::isfinite(o.alpha) || o.alpha < 0 || o.alpha > 1) throw std::invalid_argument("clustering: alpha must be in [0,1]");
   if (!std::isfinite(o.percent) || o.percent <= 0 || o.percent > 1) throw std::invalid_argument("clustering: percent must be in (0,1]");
   if (o.max_groups == 0 || o.max_groups > kHardGroups || o.max_output_nodes == 0 || o.max_output_nodes > kHardNodes) throw std::invalid_argument("clustering: safety bound exceeded");
+  if (o.variant == TraceAttributeClusteringVariant::kDfg && !o.dfg_extension)
+    throw std::invalid_argument("clustering: the reference DFG variant is not callable");
   TraceAttributeClusteringResult r; r.diagnostics.trace_count = log.traces.size();
   // Attribute values are discovered in input order.  Keep a separate lookup
   // map so grouping remains linear without imposing lexical output order.
@@ -313,47 +317,82 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
     r.diagnostics.message = log.traces.empty() ? "empty event log" : "no matching trace attribute groups";
     return r;
   }
-  std::vector<Cluster> cs; cs.reserve(groups.size());
-  for (std::size_t i = 0; i < names.size(); ++i) {
-    Cluster c;
-    c.members = {i};
-    c.name = names[i];
-    c.node = {names[i], {}, 0.0, groups[i].traces.size(), true};
-    cs.push_back(std::move(c));
-  }
-  // Keep average-linkage distances between active clusters. Updating the
-  // merged row by the Lance-Williams weighted average avoids rescanning every
-  // pair of original leaves on every merge.
-  std::vector<std::vector<double>> d(
-      names.size(), std::vector<double>(names.size(), 0.0));
-  for (std::size_t i = 0; i < names.size(); ++i)
-    for (std::size_t j = i + 1; j < names.size(); ++j)
+  // The reference linkage needs at least two observations.
+  if (groups.size() == 1)
+    throw std::invalid_argument("clustering: at least two trace attribute groups are required");
+  const std::size_t n = names.size();
+  std::vector<std::vector<double>> d(n, std::vector<double>(n, 0.0));
+  for (std::size_t i = 0; i < n; ++i)
+    for (std::size_t j = i + 1; j < n; ++j)
       d[i][j] = d[j][i] =
           pair_distance(profiles[i], profiles[j], o.variant, o.alpha);
-  std::size_t node_count = cs.size();
-  while (cs.size() > 1) {
-    std::size_t bi=0,bj=1; double bd=std::numeric_limits<double>::infinity();
-    for (std::size_t i=0;i<cs.size();++i) for (std::size_t j=i+1;j<cs.size();++j) {
-      const double x = d[i][j];
-      if (x < bd) {
-        bd=x;bi=i;bj=j;
+  for (std::size_t i = 0; i < n; ++i)
+    for (std::size_t j = i + 1; j < n; ++j) r.distances.push_back(d[i][j]);
+  // Average linkage by the nearest-neighbour chain, as the reference's
+  // hierarchical clustering library does: the chain starts at the first
+  // active cluster, a neighbour must be strictly closer to replace the
+  // current one, and a merged cluster takes the larger slot. The merges are
+  // then stably sorted by distance and relabelled.
+  struct Merge { std::size_t left, right; double distance; };
+  std::vector<Merge> merges;
+  std::vector<std::size_t> size(n);
+  for (std::size_t i = 0; i < n; ++i) size[i] = 1;
+  std::vector<std::size_t> chain;
+  for (std::size_t k = 0; k + 1 < n; ++k) {
+    if (chain.empty())
+      for (std::size_t i = 0; i < n; ++i)
+        if (size[i]) { chain.push_back(i); break; }
+    std::size_t x = 0, y = 0;
+    double current = 0.0;
+    while (true) {
+      x = chain.back();
+      bool have = chain.size() >= 2;
+      y = have ? chain[chain.size() - 2] : 0;
+      current = have ? d[x][y] : std::numeric_limits<double>::infinity();
+      for (std::size_t i = 0; i < n; ++i) {
+        if (!size[i] || i == x) continue;
+        if (d[x][i] < current) { current = d[x][i]; y = i; }
       }
+      if (chain.size() >= 2 && y == chain[chain.size() - 2]) break;
+      chain.push_back(y);
     }
-    const std::size_t old_size = cs.size();
-    const double left_weight = static_cast<double>(cs[bi].members.size());
-    const double right_weight = static_cast<double>(cs[bj].members.size());
-    const double merged_weight = left_weight + right_weight;
-    std::vector<double> merged_distances(old_size, 0.0);
-    for (std::size_t k = 0; k < old_size; ++k) {
-      if (k == bi || k == bj) continue;
-      merged_distances[k] =
-          (left_weight * d[bi][k] + right_weight * d[bj][k]) /
-          merged_weight;
+    chain.resize(chain.size() - 2);
+    if (x > y) std::swap(x, y);
+    const double nx = static_cast<double>(size[x]);
+    const double ny = static_cast<double>(size[y]);
+    merges.push_back({x, y, current});
+    size[y] += size[x];
+    size[x] = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+      if (!size[i] || i == y) continue;
+      d[i][y] = d[y][i] = (nx * d[i][x] + ny * d[i][y]) / (nx + ny);
     }
+  }
+  std::stable_sort(merges.begin(), merges.end(), [](const Merge& a, const Merge& b) {
+    return a.distance < b.distance;
+  });
+  std::vector<std::size_t> parent(2 * n - 1);
+  for (std::size_t i = 0; i < parent.size(); ++i) parent[i] = i;
+  const std::function<std::size_t(std::size_t)> find = [&](std::size_t v) {
+    while (parent[v] != v) v = parent[v] = parent[parent[v]];
+    return v;
+  };
+  std::vector<Cluster> cs(2 * n - 1);
+  for (std::size_t i = 0; i < n; ++i) {
+    cs[i].members = {i};
+    cs[i].name = names[i];
+    cs[i].node = {names[i], {}, 0.0, groups[i].traces.size(), true};
+  }
+  std::size_t node_count = n;
+  for (std::size_t k = 0; k < merges.size(); ++k) {
+    auto a = find(merges[k].left), b = find(merges[k].right);
+    if (a > b) std::swap(a, b);
+    const auto label = n + k;
+    parent[a] = parent[b] = label;
     Cluster merged;
-    merged.members = cs[bi].members;
-    merged.members.insert(merged.members.end(), cs[bj].members.begin(),
-                          cs[bj].members.end());
+    merged.members = cs[a].members;
+    merged.members.insert(merged.members.end(), cs[b].members.begin(),
+                          cs[b].members.end());
     std::sort(merged.members.begin(), merged.members.end());
     std::vector<std::string> member_names;
     member_names.reserve(merged.members.size());
@@ -367,37 +406,25 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
           return joined;
         });
     merged.node.name = merged.name;
-    merged.node.distance = bd;
-    merged.node.size = cs[bi].node.size + cs[bj].node.size;
-    merged.node.children = {std::move(cs[bi].node), std::move(cs[bj].node)};
+    merged.node.distance = merges[k].distance;
+    merged.node.size = cs[a].node.size + cs[b].node.size;
+    merged.node.children = {std::move(cs[a].node), std::move(cs[b].node)};
     merged.node.leaf = false;
-    std::vector<std::size_t> survivors;
-    survivors.reserve(old_size - 2);
-    for (std::size_t k = 0; k < old_size; ++k)
-      if (k != bi && k != bj) survivors.push_back(k);
-    // Remove the larger index first so the surviving order remains stable.
-    cs.erase(cs.begin() + static_cast<std::ptrdiff_t>(bj));
-    cs.erase(cs.begin() + static_cast<std::ptrdiff_t>(bi));
-    d.erase(d.begin() + static_cast<std::ptrdiff_t>(bj));
-    d.erase(d.begin() + static_cast<std::ptrdiff_t>(bi));
-    for (auto& row : d) {
-      row.erase(row.begin() + static_cast<std::ptrdiff_t>(bj));
-      row.erase(row.begin() + static_cast<std::ptrdiff_t>(bi));
-    }
-    cs.push_back(std::move(merged));
-    const std::size_t merged_index = cs.size() - 1;
-    for (auto& row : d) row.push_back(0.0);
-    d.emplace_back(cs.size(), 0.0);
-    for (std::size_t k = 0; k < survivors.size(); ++k) {
-      const double value = merged_distances[survivors[k]];
-      d[k][merged_index] = d[merged_index][k] = value;
-    }
+    cs[label] = std::move(merged);
     if (++node_count > o.max_output_nodes) {
       r.diagnostics.output_truncated = true;
       throw std::invalid_argument("clustering: output node bound exceeded");
     }
   }
-  r.tree = std::move(cs.front().node);
+  r.tree = std::move(cs.back().node);
+  // Leaves are listed left to right through the final tree.
+  r.leaf_names.clear();
+  const std::function<void(const TraceAttributeClusteringNode&)> collect =
+      [&](const TraceAttributeClusteringNode& node) {
+        if (node.children.empty()) r.leaf_names.push_back(node.name);
+        for (const auto& child : node.children) collect(child);
+      };
+  collect(r.tree);
   if (!r.tree.leaf) r.tree.name = "root";
   r.diagnostics.node_count = node_count;
   r.diagnostics.computed = true;

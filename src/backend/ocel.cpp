@@ -4,6 +4,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
 #include "ocpn_projection.hpp"
+#include "reference_tree_net.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -1972,6 +1973,22 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
   if (options.annotated) {
     result.annotations = discover_ocdfg_classic(projected, false);
   }
+  if (options.require_related_object_types) {
+    std::set<std::string> related;
+    for (const auto& relation : projected.relations) {
+      const auto type_it = object_type.find(relation.object_id);
+      if (type_it != object_type.end() && event_by_id.contains(relation.event_id))
+        related.insert(type_it->second);
+    }
+    for (const auto& type : result.object_types)
+      if (!related.contains(type))
+        throw std::invalid_argument("OCPN object type '" + type + "' has no object related to an event");
+  }
+  // Each type's log is flattened from the objects whose original type equals
+  // the type label: with an object-type selector the selected labels name
+  // the types, but the flattening still matches the canonical types.
+  std::map<std::string, std::string> flattening_type;
+  for (const auto& object : log.objects) flattening_type[object.id] = object.type;
   for (const auto& type : result.object_types) {
     OcpnTokenReplayDiagnostics* token_replay_diagnostics = nullptr;
     if (options.diagnostics_with_token_based_replay) {
@@ -1980,17 +1997,20 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       token_replay_diagnostics = &diagnostics;
     }
     EventLog flattened;
+    // Each object's events by time, and in relation order (the first relation
+    // of an event to the object places it) for the replay diagnostics.
     EventLog replay_flattened;
     std::map<std::string, std::set<std::string>> object_event_ids;
     std::map<std::string, std::vector<std::string>> replay_event_ids;
     for (const auto& relation : projected.relations) {
-      const auto type_it = object_type.find(relation.object_id);
-      if (type_it == object_type.end() || type_it->second != type) continue;
+      const auto type_it = flattening_type.find(relation.object_id);
+      if (type_it == flattening_type.end() || type_it->second != type ||
+          !object_type.contains(relation.object_id))
+        continue;
       if (event_by_id.count(relation.event_id)) {
         object_event_ids[relation.object_id].insert(relation.event_id);
         auto& ordered = replay_event_ids[relation.object_id];
-        if (std::find(ordered.begin(), ordered.end(), relation.event_id) ==
-            ordered.end())
+        if (std::find(ordered.begin(), ordered.end(), relation.event_id) == ordered.end())
           ordered.push_back(relation.event_id);
       }
     }
@@ -2007,18 +2027,16 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       order_events_by_time(trace.events);
       if (!trace.events.empty()) flattened.traces.push_back(std::move(trace));
     }
+
     for (const auto& [object_id, event_ids] : replay_event_ids) {
       Trace trace;
       trace.case_id = object_id;
       for (const auto& event_id : event_ids) {
-        const auto event_it = event_by_id.find(event_id);
-        if (event_it == event_by_id.end()) continue;
-        const auto* event = event_it->second;
-        trace.events.push_back(Event{object_id, event->activity,
-                                     event->timestamp, {}, event_order[event_id],
-                                     {}, {}});
+        const auto* event = event_by_id.at(event_id);
+        trace.events.push_back(Event{object_id, event->activity, event->timestamp, {},
+                                     event_order[event_id], {}, {}});
       }
-      if (!trace.events.empty()) replay_flattened.traces.push_back(std::move(trace));
+      replay_flattened.traces.push_back(std::move(trace));
     }
 
     InductiveMinerOptions miner_options;
@@ -2029,11 +2047,12 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
     miner_options.variant = options.variant == OcpnInductiveVariant::kDfg
                                 ? InductiveMinerVariant::kDfg
                                 : InductiveMinerVariant::kLog;
-    const auto& discovery_log = options.diagnostics_with_token_based_replay
-                                    ? replay_flattened
-                                    : flattened;
-    const auto tree = discover_process_tree(discovery_log, miner_options);
-    result.petri_nets[type] = to_petri_net(tree);
+    // The classic miner reads each object's events by time; the DFG variant
+    // (and SAW-net discovery) reads them in relation order.
+    const bool relation_order =
+        options.mine_in_relation_order || options.variant == OcpnInductiveVariant::kDfg;
+    const auto tree = discover_process_tree(relation_order ? replay_flattened : flattened, miner_options);
+    result.petri_nets[type] = process_tree_reference_net(tree);
 
     if (token_replay_diagnostics != nullptr) {
       const auto replay = replay_token_diagnostics(

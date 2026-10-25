@@ -23,6 +23,33 @@
       },
       "unrepresentable_skipped": 0
     },
+    "log_lists": {
+      "bank_seed": 20261025,
+      "calls": 18557,
+      "distinct_outcomes": 36,
+      "failures": 0,
+      "failures_without_list_shapes": 1010,
+      "file": "docs/attribute-repetition-domain-log-lists-bank.json.gz",
+      "generator_flags": [
+        "--log-lists"
+      ],
+      "gzip_sha256": "47c9091a5a0ebda91274f5a3e362a233ca282ce9a45d09f12ccd965454336cd8",
+      "json_sha256": "c6e1c282a58e3afdb387faa58a1ed808cc07fb346ae02b41c865d5657ec8d62a",
+      "runtime": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.5",
+        "polars": "1.44.1",
+        "python": "3.11.17"
+      },
+      "stats": {
+        "calls": 18557,
+        "error": 2294,
+        "pass": 18557,
+        "result": 16263,
+        "stable": 18557
+      },
+      "unrepresentable_skipped": 0
+    },
     "pandas": {
       "calls": 28318,
       "distinct_outcomes": 4439,

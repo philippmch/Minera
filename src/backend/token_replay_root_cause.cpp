@@ -214,10 +214,16 @@ std::vector<TokenReplayUnknownRootCauseDiagnostics> token_replay_unknown_root_ca
   return result;
 }
 
-TokenReplayRootCauseDiagnostics compute_token_replay_root_cause_diagnostics(
-    const EventLog& log, const PetriNet& net,
-    const std::vector<TokenReplayTraceDiagnostics>& traces,
-    const TokenReplayOptions& options) {
+namespace {
+
+struct ReplayCohorts {
+  std::vector<TokenReplayTransitionRootCauseCohort> transitions;
+  std::vector<TokenReplayUnknownRootCauseCohort> unknown;
+};
+
+ReplayCohorts replay_cohorts(const EventLog& log, const PetriNet& net,
+                             const std::vector<TokenReplayTraceDiagnostics>& traces,
+                             const TokenReplayOptions& options) {
   std::map<std::size_t, TokenReplayTransitionRootCauseCohort> transitions;
   std::vector<TokenReplayUnknownRootCauseCohort> unknown;
   ActivityKeyIndex unknown_index;
@@ -257,12 +263,39 @@ TokenReplayRootCauseDiagnostics compute_token_replay_root_cause_diagnostics(
       unknown[group].problem_contexts.push_back({trace.trace_index, context});
     }
   }
-  std::vector<TokenReplayTransitionRootCauseCohort> transition_cohorts;
-  for (auto& [key, cohort] : transitions) transition_cohorts.push_back(std::move(cohort));
+  ReplayCohorts result;
+  for (auto& [key, cohort] : transitions) result.transitions.push_back(std::move(cohort));
+  result.unknown = std::move(unknown);
+  return result;
+}
+
+}  // namespace
+
+std::vector<TokenReplayTransitionRootCauseDiagnostics> compute_token_replay_transition_root_cause_diagnostics(
+    const EventLog& log, const PetriNet& net,
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    const TokenReplayOptions& options) {
+  return token_replay_transition_root_cause_diagnostics(
+      log, replay_cohorts(log, net, traces, options).transitions, options.root_cause);
+}
+
+std::vector<TokenReplayUnknownRootCauseDiagnostics> compute_token_replay_unknown_root_cause_diagnostics(
+    const EventLog& log, const PetriNet& net,
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    const TokenReplayOptions& options) {
+  return token_replay_unknown_root_cause_diagnostics(
+      log, replay_cohorts(log, net, traces, options).unknown, options);
+}
+
+TokenReplayRootCauseDiagnostics compute_token_replay_root_cause_diagnostics(
+    const EventLog& log, const PetriNet& net,
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    const TokenReplayOptions& options) {
+  auto cohorts = replay_cohorts(log, net, traces, options);
   TokenReplayRootCauseDiagnostics result;
   result.options = options.root_cause;
-  result.transitions = token_replay_transition_root_cause_diagnostics(log, transition_cohorts, options.root_cause);
-  result.unknown_activities = token_replay_unknown_root_cause_diagnostics(log, unknown, options);
+  result.transitions = token_replay_transition_root_cause_diagnostics(log, cohorts.transitions, options.root_cause);
+  result.unknown_activities = token_replay_unknown_root_cause_diagnostics(log, cohorts.unknown, options);
   return result;
 }
 }  // namespace minera

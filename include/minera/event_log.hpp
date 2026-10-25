@@ -27,6 +27,14 @@ enum class AttributeContainerKind { kScalar, kList, kContainer, kTuple, kSet, kF
 
 enum class FirstClassAttributeState { kMissing, kPresent, kNull };
 
+// Public value of an imported XES <list>/<container> element where the public
+// iterparse importers do not store it as the plain list or dict that the
+// native container suggests. kWrapper: {'value': None, 'children': ...} with
+// a mapping (kContainer) or ordered (key, value) pairs (kList) of the
+// children; kNone: None (a list without child elements); kAbsent: the
+// element is not stored at all (any <container>). kNative: no override.
+enum class XesPublicShape : std::uint8_t { kNative, kWrapper, kNone, kAbsent };
+
 // Flat adapters attach this role to the value cell that represents a
 // first-class event field.  It is transport metadata on the cell itself, so
 // adapters do not have to inject collision-prone synthetic columns or mutate
@@ -211,12 +219,15 @@ struct EventAttribute {
   bool scalar_wrapper = false;
   // Ordered key/value child pairs, including duplicate keys; implies wrapping.
   bool scalar_children_list = false;
+  // Set by the XES importer only; native containers keep their structure.
+  XesPublicShape xes_public_shape = XesPublicShape::kNative;
 
   bool operator==(const EventAttribute& other) const {
     if (key != other.key || value != other.value || kind != other.kind ||
         is_null != other.is_null || container != other.container ||
         children != other.children || scalar_wrapper != other.scalar_wrapper ||
         scalar_children_list != other.scalar_children_list ||
+        xes_public_shape != other.xes_public_shape ||
         first_class_role != other.first_class_role ||
         first_class_state != other.first_class_state ||
         first_class_source_key != other.first_class_source_key)

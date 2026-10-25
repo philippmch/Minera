@@ -313,9 +313,17 @@ struct OcpnDiscoveryOptions {
   // corresponding records and stringify them deterministically.
   std::string activity_attribute;
   std::string object_type_attribute;
-  // Inductive-miner policy forwarded to each object-type projection.
-  bool disable_strict_sequence_cut = false;
-  bool disable_fallthroughs = false;
+  // Inductive-miner policy forwarded to each object-type projection. The
+  // public discovery mines without fall-throughs or the strict sequence cut.
+  bool disable_strict_sequence_cut = true;
+  bool disable_fallthroughs = true;
+  // The public discovery fails when an object type has no object related to
+  // any event (the reference raises KeyError); SAW-net discovery keeps such
+  // types with a net mined from their empty flattened log.
+  bool require_related_object_types = true;
+  // Mine each object's events in relation order instead of by time (SAW-net
+  // discovery does; the DFG variant always does).
+  bool mine_in_relation_order = false;
 };
 
 struct OcpnTokenReplayPlaceDiagnostics {

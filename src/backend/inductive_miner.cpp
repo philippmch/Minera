@@ -1696,6 +1696,12 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
   // the graph abstraction's unknown empty-trace behavior explicit.
   if (dfg.size() == 1) {
     if (!dfg.has_edge(dfg.to_global.front(), dfg.to_global.front())) {
+      // The reference labels the leaf with the graph's first start activity
+      // and fails (IndexError) when the projection left it none.
+      const bool starts = (!dfg.is_start.empty() && dfg.is_start.front()) ||
+                          (!dfg.start_count.empty() && dfg.start_count.front() > 0);
+      if (!starts)
+        throw std::out_of_range("inductive miner: single-activity graph has no start activity");
       return ProcessTreeNode::leaf(dfg.to_global.front());
     }
     return FlowerFallThrough::build(dfg.to_global, labels);

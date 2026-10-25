@@ -24,6 +24,10 @@ struct TraceAttributeClusteringOptions {
   double percent = 1.0;
   std::size_t max_groups = 10000;
   std::size_t max_output_nodes = 20000;
+  // The reference DFG selector names a module rather than a callable and
+  // raises TypeError for every input, so kDfg raises unless this Minera
+  // extension enables the native DFG distance.
+  bool dfg_extension = false;
 };
 
 struct TraceAttributeClusteringNode {
@@ -46,6 +50,8 @@ struct TraceAttributeClusteringDiagnostics {
 struct TraceAttributeClusteringResult {
   TraceAttributeClusteringNode tree;
   std::vector<std::string> leaf_names;
+  // Condensed pairwise group distances in group order (0-1, 0-2, ..., 1-2, ...).
+  std::vector<double> distances;
   TraceAttributeClusteringDiagnostics diagnostics;
 };
 

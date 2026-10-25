@@ -532,8 +532,44 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_alignment.hpp",
+        "src/backend/dfg_alignment.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp",
+        "src/backend/tests/test_dfg_alignment_dispatcher_parity.cpp",
+        "src/backend/tests/dfg_alignment_dispatcher_cases.inc",
+        "scripts/capture-dfg-alignment-dispatcher-bank.py",
+        "scripts/generate-dfg-alignment-dispatcher-tests.py"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.conformance.alignments.dfg.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_alignment.hpp",
+              "symbol": "align_log_on_dfg"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_alignment_dispatcher_parity.cpp",
+              "executable": "minera_dfg_alignment_dispatcher_parity_tests",
+              "case": "difference"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.conformance.alignments.edit_distance",
@@ -632,8 +668,118 @@
           "symbol": "VERSION_DISCOUNTED_A_STAR"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_trace_alignment.hpp",
+        "src/backend/petri_trace_alignment.cpp",
+        "src/backend/tests/test_petri_alignment_dispatcher_parity.cpp",
+        "src/backend/tests/petri_alignment_dispatcher_cases.inc",
+        "scripts/capture-petri-alignment-dispatcher-bank.py",
+        "scripts/generate-petri-alignment-dispatcher-tests.py"
+      ],
+      "proofs": {
+        "VERSION_STATE_EQUATION_A_STAR": {
+          "selector": "VERSION_STATE_EQUATION_A_STAR",
+          "binding": {
+            "selector": "VERSION_STATE_EQUATION_A_STAR",
+            "modules": [
+              "algo.conformance.alignments.petri_net.variants.state_equation_a_star"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VERSION_STATE_EQUATION_A_STAR"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/petri_trace_alignment.hpp",
+              "symbol": "align_petri_log"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_petri_alignment_dispatcher_parity.cpp",
+              "executable": "minera_petri_alignment_dispatcher_parity_tests",
+              "case": "difference"
+            }
+          ]
+        },
+        "VERSION_DIJKSTRA_NO_HEURISTICS": {
+          "selector": "VERSION_DIJKSTRA_NO_HEURISTICS",
+          "binding": {
+            "selector": "VERSION_DIJKSTRA_NO_HEURISTICS",
+            "modules": [
+              "algo.conformance.alignments.petri_net.variants.dijkstra_no_heuristics"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VERSION_DIJKSTRA_NO_HEURISTICS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/petri_trace_alignment.hpp",
+              "symbol": "align_petri_log"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_petri_alignment_dispatcher_parity.cpp",
+              "executable": "minera_petri_alignment_dispatcher_parity_tests",
+              "case": "difference"
+            }
+          ]
+        },
+        "VERSION_DIJKSTRA_LESS_MEMORY": {
+          "selector": "VERSION_DIJKSTRA_LESS_MEMORY",
+          "binding": {
+            "selector": "VERSION_DIJKSTRA_LESS_MEMORY",
+            "modules": [
+              "algo.conformance.alignments.petri_net.variants.dijkstra_less_memory"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VERSION_DIJKSTRA_LESS_MEMORY"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/petri_trace_alignment.hpp",
+              "symbol": "align_petri_log"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_petri_alignment_dispatcher_parity.cpp",
+              "executable": "minera_petri_alignment_dispatcher_parity_tests",
+              "case": "difference"
+            }
+          ]
+        },
+        "VERSION_DISCOUNTED_A_STAR": {
+          "selector": "VERSION_DISCOUNTED_A_STAR",
+          "binding": {
+            "selector": "VERSION_DISCOUNTED_A_STAR",
+            "modules": [
+              "algo.conformance.alignments.petri_net.variants.discounted_a_star"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "VERSION_DISCOUNTED_A_STAR"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/petri_trace_alignment.hpp",
+              "symbol": "align_petri_log"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_petri_alignment_dispatcher_parity.cpp",
+              "executable": "minera_petri_alignment_dispatcher_parity_tests",
+              "case": "difference"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.conformance.alignments.process_tree",
@@ -1047,8 +1193,43 @@
           "symbol": "GRAPH_COMPARISON"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "GRAPH_COMPARISON": {
+          "selector": "GRAPH_COMPARISON",
+          "binding": {
+            "selector": "GRAPH_COMPARISON",
+            "modules": [
+              "algo.conformance.ocel.etot.variants.graph_comparison"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "GRAPH_COMPARISON"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/ocel.cpp",
+              "symbol": "compare_etot"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+              "executable": "minera_ocel_graphs_parity_tests",
+              "case": "conform_etot_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.conformance.ocel.ocdfg",
@@ -1066,8 +1247,43 @@
           "symbol": "GRAPH_COMPARISON"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "GRAPH_COMPARISON": {
+          "selector": "GRAPH_COMPARISON",
+          "binding": {
+            "selector": "GRAPH_COMPARISON",
+            "modules": [
+              "algo.conformance.ocel.ocdfg.variants.graph_comparison"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "GRAPH_COMPARISON"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/ocel.cpp",
+              "symbol": "compare_ocdfg"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+              "executable": "minera_ocel_graphs_parity_tests",
+              "case": "conform_ocdfg_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.conformance.ocel.otg",
@@ -1085,8 +1301,43 @@
           "symbol": "GRAPH_COMPARISON"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "GRAPH_COMPARISON": {
+          "selector": "GRAPH_COMPARISON",
+          "binding": {
+            "selector": "GRAPH_COMPARISON",
+            "modules": [
+              "algo.conformance.ocel.otg.variants.graph_comparison"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "GRAPH_COMPARISON"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/ocel.cpp",
+              "symbol": "compare_otg"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+              "executable": "minera_ocel_graphs_parity_tests",
+              "case": "conform_otg_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.conformance.temporal_profile",
@@ -1176,28 +1427,69 @@
           "symbol": "BACKWARDS"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
       "artifacts": [
         "include/minera/conformance.hpp",
-        "src/backend/conformance.cpp",
-        "include/minera/request_params.hpp",
-        "src/backend/request_params.cpp",
-        "src/backend/json_export.cpp",
-        "src/backend/tools/minera_export.cpp",
-        "src/backend/tools/minera_server.cpp",
-        "src/backend/tests/test_token_replay_diagnostics.cpp",
-        "src/backend/tests/test_token_replay_transport.cpp",
         "src/backend/token_replay_event_data.cpp",
-        "src/backend/tests/test_token_replay_event_data.cpp",
-        "src/frontend/src/api.ts",
-        "src/frontend/src/types.ts",
-        "src/frontend/src/components/Filters.tsx",
-        "src/frontend/src/components/Conformance.tsx",
-        "src/frontend/tests/api.test.ts",
-        "src/frontend/tests/components/Filters.test.ts",
-        "src/frontend/tests/components/TokenReplayDiagnostics.test.ts"
-      ]
+        "src/backend/conformance.cpp",
+        "src/backend/tests/test_token_replay_dispatcher_parity.cpp",
+        "src/backend/tests/token_replay_dispatcher_cases.inc",
+        "scripts/capture-token-replay-dispatcher-bank.py",
+        "scripts/generate-token-replay-dispatcher-tests.py"
+      ],
+      "proofs": {
+        "TOKEN_REPLAY": {
+          "selector": "TOKEN_REPLAY",
+          "binding": {
+            "selector": "TOKEN_REPLAY",
+            "modules": [
+              "algo.conformance.tokenreplay.variants.token_replay"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "TOKEN_REPLAY"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/conformance.hpp",
+              "symbol": "token_replay_dataframe_apply"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_token_replay_dispatcher_parity.cpp",
+              "executable": "minera_token_replay_dispatcher_parity_tests",
+              "case": "difference"
+            }
+          ]
+        },
+        "BACKWARDS": {
+          "selector": "BACKWARDS",
+          "binding": {
+            "selector": "BACKWARDS",
+            "modules": [
+              "algo.conformance.tokenreplay.variants.backwards"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "BACKWARDS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/conformance.hpp",
+              "symbol": "token_replay_dataframe_apply"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_token_replay_dispatcher_parity.cpp",
+              "executable": "minera_token_replay_dispatcher_parity_tests",
+              "case": "difference"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.connectors",
@@ -1314,8 +1606,43 @@
           "symbol": null
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/decision_table.hpp",
+        "src/backend/decision_table.cpp",
+        "src/backend/tests/test_decision_mining_parity.cpp",
+        "src/backend/tests/fixtures/decision_mining_bank.txt",
+        "scripts/capture-decision-mining-bank.py",
+        "scripts/generate-decision-mining-bank-tests.py"
+      ],
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.decision_mining.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/decision_table.hpp",
+              "symbol": "reference_decision_table"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_decision_mining_parity.cpp",
+              "executable": "minera_decision_mining_parity_tests",
+              "case": "table_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.alpha",
@@ -2521,8 +2848,73 @@
           "symbol": "PLUSPLUS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/heuristic_miner.hpp",
+        "src/backend/heuristic_miner.cpp",
+        "src/backend/petri_net.cpp",
+        "src/backend/tests/test_heuristics_plusplus_parity.cpp",
+        "src/backend/tests/heuristics_plusplus_cases.inc",
+        "scripts/capture-heuristics-plusplus-bank.py",
+        "scripts/generate-heuristics-plusplus-tests.py",
+        "src/backend/petri_net_reduction.cpp",
+        "src/backend/tests/test_heuristic_variants.cpp",
+        "src/backend/tests/test_petri_net_conversion.cpp",
+        "src/backend/tests/test_petri_net_reduction.cpp"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.heuristics.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/heuristic_miner.cpp",
+              "symbol": "discover_heuristics_net"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_heuristic_variants.cpp",
+              "executable": "minera_heuristic_variants_tests",
+              "case": "classic_dfg_order_preserves_inferred_boundary_lists"
+            }
+          ]
+        },
+        "PLUSPLUS": {
+          "selector": "PLUSPLUS",
+          "binding": {
+            "selector": "PLUSPLUS",
+            "modules": [
+              "algo.discovery.heuristics.variants.plusplus"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PLUSPLUS"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/heuristic_miner.cpp",
+              "symbol": "discover_plus_plus_pandas"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_heuristics_plusplus_parity.cpp",
+              "executable": "minera_heuristics_plusplus_parity_tests",
+              "case": "difference"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.ilp",
@@ -2874,8 +3266,43 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.ocel.etot.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/ocel.cpp",
+              "symbol": "discover_etot_classic"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+              "executable": "minera_ocel_graphs_parity_tests",
+              "case": "discover_etot_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.ocel.interleavings",
@@ -2893,8 +3320,44 @@
           "symbol": "TIMESTAMP_INTERLEAVINGS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/timestamp_interleavings.hpp",
+        "src/backend/timestamp_interleavings.cpp",
+        "src/backend/tests/test_timestamp_interleavings.cpp",
+        "src/backend/tests/test_ocel_links_parity.cpp",
+        "src/backend/tests/ocel_links_cases.inc",
+        "scripts/capture-ocel-links-bank.py",
+        "scripts/generate-ocel-links-tests.py"
+      ],
+      "proofs": {
+        "TIMESTAMP_INTERLEAVINGS": {
+          "selector": "TIMESTAMP_INTERLEAVINGS",
+          "binding": {
+            "selector": "TIMESTAMP_INTERLEAVINGS",
+            "modules": [
+              "algo.discovery.ocel.interleavings.variants.timestamp_interleavings"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "TIMESTAMP_INTERLEAVINGS"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/timestamp_interleavings.cpp",
+              "symbol": "discover_timestamp_interleavings"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_links_parity.cpp",
+              "executable": "minera_ocel_links_parity_tests",
+              "case": "interleavings_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.ocel.link_analysis",
@@ -2912,8 +3375,43 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/link_analysis.hpp",
+        "src/backend/link_analysis.cpp",
+        "src/backend/tests/test_ocel_links_parity.cpp",
+        "src/backend/tests/ocel_links_cases.inc",
+        "scripts/capture-ocel-links-bank.py",
+        "scripts/generate-ocel-links-tests.py"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.ocel.link_analysis.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/link_analysis.cpp",
+              "symbol": "discover_link_analysis"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_links_parity.cpp",
+              "executable": "minera_ocel_links_parity_tests",
+              "case": "link_analysis_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.ocel.ocdfg",
@@ -2931,8 +3429,43 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.ocel.ocdfg.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/ocel.cpp",
+              "symbol": "discover_ocdfg_classic"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+              "executable": "minera_ocel_graphs_parity_tests",
+              "case": "discover_ocdfg_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.ocel.ocpn",
@@ -2960,8 +3493,70 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/reference_tree_net.hpp",
+        "src/backend/reference_tree_net.cpp",
+        "src/backend/tests/test_ocel_nets_parity.cpp",
+        "src/backend/tests/ocel_nets_cases.inc",
+        "scripts/capture-ocel-nets-bank.py",
+        "scripts/generate-ocel-nets-tests.py"
+      ],
+      "proofs": {
+        "WO_ANNOTATION": {
+          "selector": "WO_ANNOTATION",
+          "binding": {
+            "selector": "WO_ANNOTATION",
+            "modules": [
+              "algo.discovery.ocel.ocpn.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "WO_ANNOTATION"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/ocel.cpp",
+              "symbol": "discover_ocpn"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_nets_parity.cpp",
+              "executable": "minera_ocel_nets_parity_tests",
+              "case": "ocpn_case"
+            }
+          ]
+        },
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.ocel.ocpn.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/ocel.cpp",
+              "symbol": "discover_ocpn"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_nets_parity.cpp",
+              "executable": "minera_ocel_nets_parity_tests",
+              "case": "ocpn_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.ocel.otg",
@@ -2979,8 +3574,43 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.ocel.otg.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/ocel.cpp",
+              "symbol": "discover_otg_classic"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+              "executable": "minera_ocel_graphs_parity_tests",
+              "case": "discover_otg_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.ocel.saw_nets",
@@ -2998,8 +3628,47 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/saw_nets.hpp",
+        "src/backend/saw_nets.cpp",
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/reference_tree_net.hpp",
+        "src/backend/reference_tree_net.cpp",
+        "src/backend/tests/test_ocel_nets_parity.cpp",
+        "src/backend/tests/ocel_nets_cases.inc",
+        "scripts/capture-ocel-nets-bank.py",
+        "scripts/generate-ocel-nets-tests.py"
+      ],
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.discovery.ocel.saw_nets.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "src/backend/saw_nets.cpp",
+              "symbol": "discover_saw_nets"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_ocel_nets_parity.cpp",
+              "executable": "minera_ocel_nets_parity_tests",
+              "case": "saw_nets_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.discovery.performance_spectrum",
@@ -3551,8 +4220,50 @@
           "symbol": null
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "include/minera/pnml.hpp",
+        "src/backend/pnml.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py",
+        "src/backend/tests/test_token_replay_arc_order_parity.cpp",
+        "src/backend/tests/token_replay_arc_order_cases.inc",
+        "scripts/capture-token-replay-arc-order-bank.py",
+        "scripts/generate-token-replay-arc-order-tests.py"
+      ],
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.evaluation.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "evaluate_composite"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "composite_default_equivalence"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.evaluation.earth_mover_distance",
@@ -3630,8 +4341,50 @@
           "symbol": "GENERALIZATION_TOKEN"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "include/minera/pnml.hpp",
+        "src/backend/pnml.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py",
+        "src/backend/tests/test_token_replay_arc_order_parity.cpp",
+        "src/backend/tests/token_replay_arc_order_cases.inc",
+        "scripts/capture-token-replay-arc-order-bank.py",
+        "scripts/generate-token-replay-arc-order-tests.py"
+      ],
+      "proofs": {
+        "GENERALIZATION_TOKEN": {
+          "selector": "GENERALIZATION_TOKEN",
+          "binding": {
+            "selector": "GENERALIZATION_TOKEN",
+            "modules": [
+              "algo.evaluation.generalization.variants.token_based"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "GENERALIZATION_TOKEN"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "GeneralizationVariant::GENERALIZATION_TOKEN"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "generalization_token_equivalence"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.evaluation.precision",
@@ -3837,8 +4590,75 @@
           "symbol": "TOKEN_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "include/minera/pnml.hpp",
+        "src/backend/pnml.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py",
+        "src/backend/tests/test_token_replay_arc_order_parity.cpp",
+        "src/backend/tests/token_replay_arc_order_cases.inc",
+        "scripts/capture-token-replay-arc-order-bank.py",
+        "scripts/generate-token-replay-arc-order-tests.py"
+      ],
+      "proofs": {
+        "ALIGNMENT_BASED": {
+          "selector": "ALIGNMENT_BASED",
+          "binding": {
+            "selector": "ALIGNMENT_BASED",
+            "modules": [
+              "algo.evaluation.replay_fitness.variants.alignment_based"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "ALIGNMENT_BASED"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "ReplayFitnessVariant::ALIGNMENT_BASED"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "replay_fitness_alignment_based_equivalence"
+            }
+          ]
+        },
+        "TOKEN_BASED": {
+          "selector": "TOKEN_BASED",
+          "binding": {
+            "selector": "TOKEN_BASED",
+            "modules": [
+              "algo.evaluation.replay_fitness.variants.token_replay"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "TOKEN_BASED"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/evaluation.hpp",
+              "symbol": "ReplayFitnessVariant::TOKEN_BASED"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+              "executable": "minera_evaluation_reference_equivalence_tests",
+              "case": "replay_fitness_token_based_equivalence"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.evaluation.simplicity",
@@ -3981,8 +4801,44 @@
           "symbol": "CONTEXTUAL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/label_splitting.hpp",
+        "src/backend/label_splitting.cpp",
+        "src/backend/tests/test_label_splitting.cpp",
+        "src/backend/tests/test_label_splitting_parity.cpp",
+        "src/backend/tests/label_splitting_bank_cases.inc",
+        "scripts/capture-label-splitting-bank.py",
+        "scripts/generate-label-splitting-bank-tests.py"
+      ],
+      "proofs": {
+        "CONTEXTUAL": {
+          "selector": "CONTEXTUAL",
+          "binding": {
+            "selector": "CONTEXTUAL",
+            "modules": [
+              "algo.label_splitting.variants.contextual"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CONTEXTUAL"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/label_splitting.hpp",
+              "symbol": "split_activity_labels"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_label_splitting_parity.cpp",
+              "executable": "minera_label_splitting_parity_tests",
+              "case": "split_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.merging.case_relations",
@@ -4000,8 +4856,44 @@
           "symbol": "PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "PANDAS": {
+          "selector": "PANDAS",
+          "binding": {
+            "selector": "PANDAS",
+            "modules": [
+              "algo.merging.case_relations.variants.pandas"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PANDAS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/case_relations.hpp",
+              "symbol": "merge_case_relations"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_case_relations_parity.cpp",
+              "executable": "minera_case_relations_parity_tests",
+              "case": "merge_case"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/case_relations.hpp",
+        "src/backend/case_relations.cpp",
+        "src/backend/tests/test_case_relations.cpp",
+        "src/backend/tests/test_case_relations_parity.cpp",
+        "src/backend/tests/case_relations_bank_cases.hpp",
+        "scripts/capture-case-relations-bank.py",
+        "scripts/generate-case-relations-bank-tests.py"
+      ]
     },
     {
       "package": "algo.organizational_mining.local_diagnostics",
@@ -4654,8 +5546,43 @@
           "symbol": null
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_injection.hpp",
+        "src/backend/llm_injection.cpp",
+        "src/backend/tests/test_llm_injection_parity.cpp",
+        "src/backend/tests/llm_injection_bank_cases.inc",
+        "scripts/capture-llm-injection-bank.py",
+        "scripts/generate-llm-injection-bank-tests.py"
+      ],
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.querying.llm.injection.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/llm_injection.hpp",
+              "symbol": "llm_domain_knowledge"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_llm_injection_parity.cpp",
+              "executable": "minera_llm_injection_parity_tests",
+              "case": "injection_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.querying.llm.injection.db_knowledge",
@@ -4683,8 +5610,68 @@
           "symbol": "sqlite3_traditional"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_injection.hpp",
+        "src/backend/llm_injection.cpp",
+        "src/backend/tests/test_llm_injection_parity.cpp",
+        "src/backend/tests/llm_injection_bank_cases.inc",
+        "scripts/capture-llm-injection-bank.py",
+        "scripts/generate-llm-injection-bank-tests.py"
+      ],
+      "proofs": {
+        "pandas_duckdb": {
+          "selector": "pandas_duckdb",
+          "binding": {
+            "selector": "pandas_duckdb",
+            "modules": [
+              "algo.querying.llm.injection.db_knowledge.variants.pandas_duckdb"
+            ],
+            "kind": "variant-import",
+            "class": null,
+            "symbol": "pandas_duckdb"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/llm_injection.hpp",
+              "symbol": "kPandasDuckdb"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_llm_injection_parity.cpp",
+              "executable": "minera_llm_injection_parity_tests",
+              "case": "duckdb_case"
+            }
+          ]
+        },
+        "sqlite3_traditional": {
+          "selector": "sqlite3_traditional",
+          "binding": {
+            "selector": "sqlite3_traditional",
+            "modules": [
+              "algo.querying.llm.injection.db_knowledge.variants.sqlite3_traditional"
+            ],
+            "kind": "variant-import",
+            "class": null,
+            "symbol": "sqlite3_traditional"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/llm_injection.hpp",
+              "symbol": "kSqlite3Traditional"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_llm_injection_parity.cpp",
+              "executable": "minera_llm_injection_parity_tests",
+              "case": "sqlite_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.querying.llm.injection.pm_knowledge",
@@ -4712,8 +5699,68 @@
           "symbol": "ocel20"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_injection.hpp",
+        "src/backend/llm_injection.cpp",
+        "src/backend/tests/test_llm_injection_parity.cpp",
+        "src/backend/tests/llm_injection_bank_cases.inc",
+        "scripts/capture-llm-injection-bank.py",
+        "scripts/generate-llm-injection-bank-tests.py"
+      ],
+      "proofs": {
+        "traditional": {
+          "selector": "traditional",
+          "binding": {
+            "selector": "traditional",
+            "modules": [
+              "algo.querying.llm.injection.pm_knowledge.variants.traditional"
+            ],
+            "kind": "variant-import",
+            "class": null,
+            "symbol": "traditional"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/llm_injection.hpp",
+              "symbol": "kTraditional"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_llm_injection_parity.cpp",
+              "executable": "minera_llm_injection_parity_tests",
+              "case": "traditional_case"
+            }
+          ]
+        },
+        "ocel20": {
+          "selector": "ocel20",
+          "binding": {
+            "selector": "ocel20",
+            "modules": [
+              "algo.querying.llm.injection.pm_knowledge.variants.ocel20"
+            ],
+            "kind": "variant-import",
+            "class": null,
+            "symbol": "ocel20"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/llm_injection.hpp",
+              "symbol": "kOcel20"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_llm_injection_parity.cpp",
+              "executable": "minera_llm_injection_parity_tests",
+              "case": "ocel20_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.simulation.montecarlo",
@@ -6752,8 +7799,32 @@
       "owner": "algo.conformance.alignments.petri_net",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/alignment_log_enrichment.hpp",
+        "src/backend/alignment_log_enrichment.cpp",
+        "src/backend/tests/test_alignment_log_enrichment_parity.cpp",
+        "src/backend/tests/alignment_log_enrichment_cases.inc",
+        "scripts/capture-alignment-log-enrichment-bank.py",
+        "scripts/generate-alignment-log-enrichment-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.petri_net.utils.log_enrichment",
+        "implementation": [
+          {
+            "path": "include/minera/alignment_log_enrichment.hpp",
+            "symbol": "enrich_log_with_alignments_in_place"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_alignment_log_enrichment_parity.cpp",
+            "executable": "minera_alignment_log_enrichment_parity_tests",
+            "case": "difference"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.petri_net.variants.dijkstra_less_memory",
@@ -7371,8 +8442,32 @@
           "selector": "GRAPH_COMPARISON"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.ocel.etot.variants.graph_comparison",
+        "implementation": [
+          {
+            "path": "src/backend/ocel.cpp",
+            "symbol": "compare_etot"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+            "executable": "minera_ocel_graphs_parity_tests",
+            "case": "conform_etot_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.ocel.ocdfg.variants.graph_comparison",
@@ -7385,8 +8480,32 @@
           "selector": "GRAPH_COMPARISON"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.ocel.ocdfg.variants.graph_comparison",
+        "implementation": [
+          {
+            "path": "src/backend/ocel.cpp",
+            "symbol": "compare_ocdfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+            "executable": "minera_ocel_graphs_parity_tests",
+            "case": "conform_ocdfg_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.ocel.otg.variants.graph_comparison",
@@ -7399,8 +8518,32 @@
           "selector": "GRAPH_COMPARISON"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.ocel.otg.variants.graph_comparison",
+        "implementation": [
+          {
+            "path": "src/backend/ocel.cpp",
+            "symbol": "compare_otg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+            "executable": "minera_ocel_graphs_parity_tests",
+            "case": "conform_otg_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.temporal_profile.variants.dataframe",
@@ -7498,17 +8641,35 @@
       "owner": "algo.conformance.tokenreplay",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
       "artifacts": [
+        "include/minera/conformance.hpp",
         "include/minera/root_cause.hpp",
-        "src/backend/root_cause.cpp",
-        "src/backend/root_cause_trace_key.cpp",
         "src/backend/token_replay_root_cause.cpp",
-        "src/backend/tests/test_root_cause.cpp",
+        "src/backend/root_cause.cpp",
         "src/backend/tests/test_token_replay_root_cause.cpp",
-        "src/backend/tests/test_token_replay_transport.cpp"
-      ]
+        "src/backend/tests/test_token_replay_root_cause_parity.cpp",
+        "src/backend/tests/token_replay_root_cause_cases.inc",
+        "scripts/capture-root-cause-bank.py",
+        "scripts/generate-root-cause-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.tokenreplay.diagnostics.root_cause_analysis",
+        "implementation": [
+          {
+            "path": "include/minera/conformance.hpp",
+            "symbol": "compute_token_replay_transition_root_cause_diagnostics"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_token_replay_root_cause_parity.cpp",
+            "executable": "minera_token_replay_root_cause_parity_tests",
+            "case": "difference"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.tokenreplay.variants.backwards",
@@ -7556,8 +8717,33 @@
           "selector": "TOKEN_REPLAY"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/conformance.hpp",
+        "src/backend/conformance.cpp",
+        "src/backend/tests/test_conformance_parity_contracts.cpp",
+        "src/backend/tests/test_token_replay_pltr_parity.cpp",
+        "src/backend/tests/token_replay_pltr_cases.inc",
+        "scripts/capture-token-replay-pltr-bank.py",
+        "scripts/generate-token-replay-pltr-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.tokenreplay.variants.token_replay",
+        "implementation": [
+          {
+            "path": "include/minera/conformance.hpp",
+            "symbol": "replay_token_result"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_token_replay_pltr_parity.cpp",
+            "executable": "minera_token_replay_pltr_parity_tests",
+            "case": "difference"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.util.mail",
@@ -9056,8 +10242,33 @@
           "selector": "PLUSPLUS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/heuristic_miner.hpp",
+        "src/backend/heuristic_miner.cpp",
+        "src/backend/petri_net.cpp",
+        "src/backend/tests/test_heuristics_plusplus_parity.cpp",
+        "src/backend/tests/heuristics_plusplus_cases.inc",
+        "scripts/capture-heuristics-plusplus-bank.py",
+        "scripts/generate-heuristics-plusplus-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.heuristics.variants.plusplus",
+        "implementation": [
+          {
+            "path": "src/backend/heuristic_miner.cpp",
+            "symbol": "discover_plus_plus_pandas"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_heuristics_plusplus_parity.cpp",
+            "executable": "minera_heuristics_plusplus_parity_tests",
+            "case": "difference"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ilp.variants.classic",
@@ -10079,8 +11290,32 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.etot.variants.classic",
+        "implementation": [
+          {
+            "path": "src/backend/ocel.cpp",
+            "symbol": "discover_etot_classic"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+            "executable": "minera_ocel_graphs_parity_tests",
+            "case": "discover_etot_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.interleavings.utils.merge_dataframe_rel_cases",
@@ -10102,8 +11337,33 @@
           "selector": "TIMESTAMP_INTERLEAVINGS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/timestamp_interleavings.hpp",
+        "src/backend/timestamp_interleavings.cpp",
+        "src/backend/tests/test_timestamp_interleavings.cpp",
+        "src/backend/tests/test_ocel_links_parity.cpp",
+        "src/backend/tests/ocel_links_cases.inc",
+        "scripts/capture-ocel-links-bank.py",
+        "scripts/generate-ocel-links-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.interleavings.variants.timestamp_interleavings",
+        "implementation": [
+          {
+            "path": "src/backend/timestamp_interleavings.cpp",
+            "symbol": "discover_timestamp_interleavings"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_links_parity.cpp",
+            "executable": "minera_ocel_links_parity_tests",
+            "case": "interleavings_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.link_analysis.variants.classic",
@@ -10116,8 +11376,32 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/link_analysis.hpp",
+        "src/backend/link_analysis.cpp",
+        "src/backend/tests/test_ocel_links_parity.cpp",
+        "src/backend/tests/ocel_links_cases.inc",
+        "scripts/capture-ocel-links-bank.py",
+        "scripts/generate-ocel-links-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.link_analysis.variants.classic",
+        "implementation": [
+          {
+            "path": "src/backend/link_analysis.cpp",
+            "symbol": "discover_link_analysis"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_links_parity.cpp",
+            "executable": "minera_ocel_links_parity_tests",
+            "case": "link_analysis_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.ocdfg.variants.classic",
@@ -10130,8 +11414,32 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.ocdfg.variants.classic",
+        "implementation": [
+          {
+            "path": "src/backend/ocel.cpp",
+            "symbol": "discover_ocdfg_classic"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+            "executable": "minera_ocel_graphs_parity_tests",
+            "case": "discover_ocdfg_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.ocpn.variants.classic",
@@ -10148,8 +11456,34 @@
           "selector": "WO_ANNOTATION"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/reference_tree_net.hpp",
+        "src/backend/reference_tree_net.cpp",
+        "src/backend/tests/test_ocel_nets_parity.cpp",
+        "src/backend/tests/ocel_nets_cases.inc",
+        "scripts/capture-ocel-nets-bank.py",
+        "scripts/generate-ocel-nets-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.ocpn.variants.classic",
+        "implementation": [
+          {
+            "path": "src/backend/ocel.cpp",
+            "symbol": "discover_ocpn"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_nets_parity.cpp",
+            "executable": "minera_ocel_nets_parity_tests",
+            "case": "ocpn_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.ocpn.variants.wo_annotation",
@@ -10157,8 +11491,34 @@
       "owner": "algo.discovery.ocel.ocpn",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/reference_tree_net.hpp",
+        "src/backend/reference_tree_net.cpp",
+        "src/backend/tests/test_ocel_nets_parity.cpp",
+        "src/backend/tests/ocel_nets_cases.inc",
+        "scripts/capture-ocel-nets-bank.py",
+        "scripts/generate-ocel-nets-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.ocpn.variants.wo_annotation",
+        "implementation": [
+          {
+            "path": "include/minera/ocel.hpp",
+            "symbol": "OcpnDiscoveryOptions"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_nets_parity.cpp",
+            "executable": "minera_ocel_nets_parity_tests",
+            "case": "wo_annotation_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.otg.variants.classic",
@@ -10171,8 +11531,32 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel_graphs_parity.cpp",
+        "src/backend/tests/ocel_graphs_cases.inc",
+        "scripts/capture-ocel-graphs-bank.py",
+        "scripts/generate-ocel-graphs-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.otg.variants.classic",
+        "implementation": [
+          {
+            "path": "src/backend/ocel.cpp",
+            "symbol": "discover_otg_classic"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_graphs_parity.cpp",
+            "executable": "minera_ocel_graphs_parity_tests",
+            "case": "discover_otg_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.ocel.saw_nets.variants.classic",
@@ -10185,8 +11569,36 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/saw_nets.hpp",
+        "src/backend/saw_nets.cpp",
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/reference_tree_net.hpp",
+        "src/backend/reference_tree_net.cpp",
+        "src/backend/tests/test_ocel_nets_parity.cpp",
+        "src/backend/tests/ocel_nets_cases.inc",
+        "scripts/capture-ocel-nets-bank.py",
+        "scripts/generate-ocel-nets-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.discovery.ocel.saw_nets.variants.classic",
+        "implementation": [
+          {
+            "path": "src/backend/saw_nets.cpp",
+            "symbol": "discover_saw_nets"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_nets_parity.cpp",
+            "executable": "minera_ocel_nets_parity_tests",
+            "case": "saw_nets_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.performance_spectrum.variants.dataframe",
@@ -11492,8 +12904,39 @@
           "selector": "GENERALIZATION_TOKEN"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "include/minera/pnml.hpp",
+        "src/backend/pnml.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py",
+        "src/backend/tests/test_token_replay_arc_order_parity.cpp",
+        "src/backend/tests/token_replay_arc_order_cases.inc",
+        "scripts/capture-token-replay-arc-order-bank.py",
+        "scripts/generate-token-replay-arc-order-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.generalization.variants.token_based",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "GeneralizationVariant::GENERALIZATION_TOKEN"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+            "executable": "minera_evaluation_reference_equivalence_tests",
+            "case": "generalization_token_equivalence"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.precision.utils",
@@ -11671,8 +13114,39 @@
           "selector": "TOKEN_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/evaluation.hpp",
+        "src/backend/evaluation.cpp",
+        "include/minera/pnml.hpp",
+        "src/backend/pnml.cpp",
+        "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+        "src/backend/tests/evaluation_reference_cases.inc",
+        "src/backend/evaluation_internal.hpp",
+        "scripts/capture-evaluation-reference.py",
+        "scripts/generate-evaluation-reference-tests.py",
+        "src/backend/tests/test_token_replay_arc_order_parity.cpp",
+        "src/backend/tests/token_replay_arc_order_cases.inc",
+        "scripts/capture-token-replay-arc-order-bank.py",
+        "scripts/generate-token-replay-arc-order-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.evaluation.replay_fitness.variants.token_replay",
+        "implementation": [
+          {
+            "path": "include/minera/evaluation.hpp",
+            "symbol": "ReplayFitnessVariant::TOKEN_BASED"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_evaluation_reference_equivalence.cpp",
+            "executable": "minera_evaluation_reference_equivalence_tests",
+            "case": "replay_fitness_token_based_equivalence"
+          }
+        ]
+      }
     },
     {
       "module": "algo.evaluation.simplicity.variants.arc_degree",
@@ -11934,8 +13408,40 @@
       "owner": "support:filtering",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_attribute_repetition_filter.hpp",
+        "src/backend/log_attribute_repetition_filter.cpp",
+        "include/minera/event_log.hpp",
+        "src/backend/xes_event_log_importer.cpp",
+        "scripts/repetition_domain.py",
+        "scripts/capture-repetition-domain-bank.py",
+        "scripts/check-repetition-domain-bank.py",
+        "src/backend/tools/minera_repetition_batch.cpp",
+        "src/backend/tests/test_attribute_repetition_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.filtering.log.attr_value_repetition.filter",
+        "implementation": [
+          {
+            "path": "include/minera/log_attribute_repetition_filter.hpp",
+            "symbol": "filter_log_attribute_value_repetition"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "log_scalar_wrappers_compare_as_value_children_mappings"
+          },
+          {
+            "path": "src/backend/tests/test_attribute_repetition_parity_contracts.cpp",
+            "executable": "minera_attribute_repetition_parity_contracts_tests",
+            "case": "log_xes_lists_compare_as_public_list_values"
+          }
+        ]
+      }
     },
     {
       "module": "algo.filtering.log.attributes.attributes_filter",
@@ -12834,8 +14340,30 @@
           "selector": "CONTEXTUAL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/label_splitting.hpp",
+        "src/backend/label_splitting.cpp",
+        "src/backend/tests/test_label_splitting.cpp",
+        "src/backend/tests/test_label_splitting_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.label_splitting.variants.contextual",
+        "implementation": [
+          {
+            "path": "include/minera/label_splitting.hpp",
+            "symbol": "split_activity_labels"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_label_splitting_parity.cpp",
+            "executable": "minera_label_splitting_parity_tests",
+            "case": "split_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.merging.case_relations.variants.pandas",
@@ -12848,8 +14376,30 @@
           "selector": "PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/case_relations.hpp",
+        "src/backend/case_relations.cpp",
+        "src/backend/tests/test_case_relations.cpp",
+        "src/backend/tests/test_case_relations_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.merging.case_relations.variants.pandas",
+        "implementation": [
+          {
+            "path": "include/minera/case_relations.hpp",
+            "symbol": "merge_case_relations"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_case_relations_parity.cpp",
+            "executable": "minera_case_relations_parity_tests",
+            "case": "merge_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.network_analysis.variants.dataframe",
@@ -13634,8 +15184,29 @@
           "selector": "pandas_duckdb"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_injection.hpp",
+        "src/backend/llm_injection.cpp",
+        "src/backend/tests/test_llm_injection_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.injection.db_knowledge.variants.pandas_duckdb",
+        "implementation": [
+          {
+            "path": "include/minera/llm_injection.hpp",
+            "symbol": "kPandasDuckdb"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_injection_parity.cpp",
+            "executable": "minera_llm_injection_parity_tests",
+            "case": "duckdb_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.injection.db_knowledge.variants.sqlite3_traditional",
@@ -13648,8 +15219,29 @@
           "selector": "sqlite3_traditional"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_injection.hpp",
+        "src/backend/llm_injection.cpp",
+        "src/backend/tests/test_llm_injection_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.injection.db_knowledge.variants.sqlite3_traditional",
+        "implementation": [
+          {
+            "path": "include/minera/llm_injection.hpp",
+            "symbol": "kSqlite3Traditional"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_injection_parity.cpp",
+            "executable": "minera_llm_injection_parity_tests",
+            "case": "sqlite_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.injection.pm_knowledge.variants.ocel20",
@@ -13662,8 +15254,29 @@
           "selector": "ocel20"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_injection.hpp",
+        "src/backend/llm_injection.cpp",
+        "src/backend/tests/test_llm_injection_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.injection.pm_knowledge.variants.ocel20",
+        "implementation": [
+          {
+            "path": "include/minera/llm_injection.hpp",
+            "symbol": "kOcel20"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_injection_parity.cpp",
+            "executable": "minera_llm_injection_parity_tests",
+            "case": "ocel20_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.injection.pm_knowledge.variants.traditional",
@@ -13676,8 +15289,29 @@
           "selector": "traditional"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_injection.hpp",
+        "src/backend/llm_injection.cpp",
+        "src/backend/tests/test_llm_injection_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.injection.pm_knowledge.variants.traditional",
+        "implementation": [
+          {
+            "path": "include/minera/llm_injection.hpp",
+            "symbol": "kTraditional"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_injection_parity.cpp",
+            "executable": "minera_llm_injection_parity_tests",
+            "case": "traditional_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.querying.llm.utils.sql_utils",

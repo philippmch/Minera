@@ -3,6 +3,10 @@
 The target is the complete public surface of
 `algo.discovery.heuristics.variants.plusplus` in PM4Py 2.7.22, pinned to commit
 `0715c31f3f1d85924107d6aa5329806db69df899`. The module remains **partial**.
+
+> Superseded on 2026-10-25: the module is complete, bound by the Heuristics Miner++
+> bank in `docs/reference-2.7.22-parity.md` ("Heuristics Miner++ bank").
+
 The gates below include returned-object values, public routes and parameters,
 input preservation, and Petri conversion. A matching graph projection alone
 does not complete this contract.

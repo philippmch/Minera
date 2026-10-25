@@ -49,7 +49,7 @@ def error_outcome(error):
     return {"error": type(error).__name__, "message": str(error)}
 
 
-def run_cell(engine, count, bank_seed):
+def run_cell(engine, count, bank_seed, lists=False):
     warnings.filterwarnings("ignore")
     d = domain()
     rows = []
@@ -88,7 +88,7 @@ def run_cell(engine, count, bank_seed):
                 rows.append(outcome)
     else:
         from pm4py.algo.filtering.log.attr_value_repetition import filter as public
-        for spec in d.generate_log_cases(count, bank_seed):
+        for spec in d.generate_log_cases(count, bank_seed, lists):
             xes, calls = d.build_log_case(spec)
             for target, params in calls:
                 log = d.import_log(xes)
@@ -103,7 +103,7 @@ def run_cell(engine, count, bank_seed):
     return rows
 
 
-def case_inputs(engine, count, bank_seed):
+def case_inputs(engine, count, bank_seed, lists=False):
     """Native transport for every call, in call order."""
     d = domain()
     out = []
@@ -120,7 +120,7 @@ def case_inputs(engine, count, bank_seed):
             for target, params in calls:
                 out.append(d.native_call(c, spec, source, target, params))
     else:
-        for c, spec in enumerate(d.generate_log_cases(count, bank_seed)):
+        for c, spec in enumerate(d.generate_log_cases(count, bank_seed, lists)):
             source, calls = d.build_log_case(spec)
             for target, params in calls:
                 out.append(d.native_call(c, spec, source, target, params))
@@ -134,15 +134,17 @@ def main():
     parser.add_argument("--cases", type=int, default=400)
     parser.add_argument("--seeds", type=int, default=4)
     parser.add_argument("--bank-seed", type=int, default=BANK_SEED)
+    parser.add_argument("--log-lists", action="store_true",
+                        help="log engine: also generate XES <list>/<container> attributes")
     parser.add_argument("--cell", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.cell:
-        json.dump(run_cell(args.engine, args.cases, args.bank_seed), sys.stdout)
+        json.dump(run_cell(args.engine, args.cases, args.bank_seed, args.log_lists), sys.stdout)
         return
     import pm4py
     assert pm4py.__version__ == "2.7.22"
     import numpy, pandas, polars
-    calls = case_inputs(args.engine, args.cases, args.bank_seed)
+    calls = case_inputs(args.engine, args.cases, args.bank_seed, args.log_lists)
     outcomes, index = [], {}
 
     def intern(value):
@@ -155,7 +157,8 @@ def main():
     for seed in range(args.seeds):
         env = dict(os.environ, PYTHONHASHSEED=str(seed))
         run = subprocess.run([sys.executable, "-B", "-X", "utf8", __file__, "--cell", "--engine", args.engine,
-                              "--cases", str(args.cases), "--bank-seed", str(args.bank_seed)],
+                              "--cases", str(args.cases), "--bank-seed", str(args.bank_seed)]
+                             + (["--log-lists"] if args.log_lists else []),
                              env=env, capture_output=True, text=True, encoding="utf-8")
         if run.returncode:
             sys.stderr.write(run.stderr)
@@ -168,6 +171,7 @@ def main():
     body = dict(engine=args.engine, reference=pm4py.__version__, python=sys.version.split()[0],
                 versions=dict(pandas=pandas.__version__, polars=polars.__version__, numpy=numpy.__version__),
                 bank_seed=args.bank_seed, cases=args.cases, hash_seeds=list(range(args.seeds)),
+                log_lists=args.log_lists,
                 outcomes=outcomes, calls=calls)
     data = json.dumps(body, sort_keys=True).encode("utf-8")
     with open(args.output, "wb") as raw, gzip.GzipFile(filename="", fileobj=raw, mode="wb", mtime=0) as out:

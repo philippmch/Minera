@@ -217,7 +217,9 @@ int main() {
   assert(custom_result.log.traces[0].events[1].attribute("split") != nullptr);
   assert(*custom_result.log.traces[0].events[1].attribute("split") == "A_1");
   assert(*custom_result.log.traces[1].events[1].attribute("split") == "A_0");
-  assert(custom_result.log.traces[0].events[2].attribute("split") == nullptr);
+  // Like the reference's target column, unrelabeled events copy their label.
+  assert(*custom_result.log.traces[0].events[2].attribute("split") ==
+         *custom_result.log.traces[0].events[2].attribute("kind"));
 
   // The configured edge minimum is strict: a similarity equal to the
   // threshold is excluded, while a lower threshold joins the two segments.

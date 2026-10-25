@@ -377,6 +377,19 @@ token_replay_transition_root_cause_diagnostics(
 token_replay_unknown_root_cause_diagnostics(
     const EventLog& log, const std::vector<TokenReplayUnknownRootCauseCohort>& cohorts,
     const TokenReplayOptions& options = {});
+// The public diagnose_from_trans_fitness and diagnose_from_notexisting_activities
+// are separate calls, so either can raise while the other succeeds; these
+// compute one side each from replay diagnostics.
+[[nodiscard]] std::vector<TokenReplayTransitionRootCauseDiagnostics>
+compute_token_replay_transition_root_cause_diagnostics(
+    const EventLog& log, const PetriNet& net,
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    const TokenReplayOptions& options = {});
+[[nodiscard]] std::vector<TokenReplayUnknownRootCauseDiagnostics>
+compute_token_replay_unknown_root_cause_diagnostics(
+    const EventLog& log, const PetriNet& net,
+    const std::vector<TokenReplayTraceDiagnostics>& traces,
+    const TokenReplayOptions& options = {});
 [[nodiscard]] TokenReplayRootCauseDiagnostics compute_token_replay_root_cause_diagnostics(
     const EventLog& log, const PetriNet& net,
     const std::vector<TokenReplayTraceDiagnostics>& traces,
@@ -470,6 +483,13 @@ struct TokenReplayDiagnostics {
 replay_token_activation_sequences(const EventLog& event_log, const PetriNet& net,
                                   TokenReplayOptions options = {});
 
+// The public tokenreplay.algorithm.apply on a DataFrame: no column-type
+// validation (an empty frame returns no rows), cases in case-id order, and
+// the backwards variation's KeyError when the frame holds more events than
+// cases.
+[[nodiscard]] std::vector<TokenReplayTraceDiagnostics> token_replay_dataframe_apply(
+    const EventTable& table, const PetriNet& net, TokenReplayOptions options = {});
+
 // Validated dataframe entry point: checks declared schema and required
 // case/activity/timestamp columns before applying dataframe replay semantics.
 [[nodiscard]] std::vector<TokenReplayTraceDiagnostics> replay_dataframe_traces(
@@ -479,6 +499,14 @@ replay_token_activation_sequences(const EventLog& event_log, const PetriNet& net
 // contains typed case identifiers and scalar fitness/token counters.
 [[nodiscard]] EventTable replay_dataframe_diagnostics(
     const EventTable& table, const PetriNet& net, TokenReplayOptions options = {});
+// The public get_diagnostics_dataframe(df, output): row i of a supplied replay
+// output is labeled with the i-th case in source order, so list-mode output
+// of a DataFrame (cases in case-id order) is labeled by appearance order, as
+// the reference does; extra rows or cases on either side are dropped. Like
+// the public function, it does not validate column types.
+[[nodiscard]] EventTable token_replay_diagnostics_dataframe(
+    const EventTable& table, const std::vector<TokenReplayTraceDiagnostics>& diagnostics,
+    TokenReplayOptions options = {});
 
 // Flat replay projection does not require timestamps or reorder case events.
 [[nodiscard]] EventLog normalize_token_replay_event_log(

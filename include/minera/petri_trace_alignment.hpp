@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
 
 namespace minera {
@@ -67,5 +68,24 @@ struct PetriTraceAlignmentOptions {
 [[nodiscard]] std::vector<PetriTraceAlignment> align_petri_trace_all(
     const std::vector<std::string>& trace, const PetriNet& net,
     const PetriTraceAlignmentOptions& options = {});
+
+// Log-level dispatcher (the public algorithm.apply on an EventLog): one entry
+// per trace in log order. Traces with equal activity sequences are aligned
+// once and share the result. A net whose final marking is unreachable raises
+// std::invalid_argument up front (the public easy-soundness check), although a
+// single trace would get None there.
+// trace.trace_costs is per event and cannot apply to a whole log, so it must be
+// empty. A DataFrame aligns as the log of its cases in ascending case-id order.
+struct PetriLogAlignmentOptions {
+  PetriTraceAlignmentOptions trace;
+  // "concept:name" (or "activity") reads Event::activity; other keys read the
+  // named event attribute, and an event without it raises std::invalid_argument.
+  std::string activity_key = "concept:name";
+  // ENABLE_BEST_WORST_COST: false drops bwc and fitness from every entry.
+  bool enable_best_worst_cost = true;
+};
+
+[[nodiscard]] std::vector<PetriTraceAlignment> align_petri_log(
+    const EventLog& log, const PetriNet& net, const PetriLogAlignmentOptions& options = {});
 
 }  // namespace minera

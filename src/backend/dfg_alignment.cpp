@@ -13,6 +13,7 @@
 #include <set>
 #include <stdexcept>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 
 namespace minera {
@@ -306,9 +307,18 @@ DfgAlignmentResult align_impl(const std::vector<std::string>& trace,
     while (m.id.count(name) || std::find(trace.begin(), trace.end(), name) != trace.end());
     return name;
   };
-  const std::string source_name = fresh_routing_name();
-  std::string sink_name;
-  do { sink_name = fresh_routing_name(); } while (sink_name == source_name);
+  std::string source_name, sink_name;
+  if (o.routing_names) {
+    std::tie(source_name, sink_name) = *o.routing_names;
+    const auto taken = [&](const std::string& name) {
+      return m.id.count(name) || std::find(trace.begin(), trace.end(), name) != trace.end();
+    };
+    if (source_name == sink_name || taken(source_name) || taken(sink_name))
+      throw std::invalid_argument("DFG alignment routing names must be distinct and unused");
+  } else {
+    source_name = fresh_routing_name();
+    do { sink_name = fresh_routing_name(); } while (sink_name == source_name);
+  }
   const auto routing_name = [&](std::size_t node) -> std::string_view {
     if (node == m.start) return source_name;
     if (node == m.end) return sink_name;

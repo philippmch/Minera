@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <initializer_list>
 #include <map>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "minera/dfg_variants.hpp"
@@ -43,6 +45,13 @@ struct DfgAlignmentOptions {
   bool model_move_cost_supplied = false;
   bool log_move_cost_supplied = false;
   bool internal_log_move_cost_supplied = false;
+  // Source and sink routing names. Each public search draws two fresh UUIDs,
+  // whose lexical order against the activity names breaks queue ties, so the
+  // returned alignment and state counters can vary between calls. Supplying
+  // the names fixes that choice (every search then uses this pair); empty
+  // keeps the random draw. Names must differ from each other, from every
+  // model activity and from the trace's activities.
+  std::optional<std::pair<std::string, std::string>> routing_names;
 };
 
 struct DfgAlignmentResult {

@@ -124,26 +124,26 @@ are reconciled.
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial (remaining replay proof)** — native place/transition/arc usage deltas, supplied-PNML CLI input, explicit markings including zero-valued key metadata, selectors, weighted/extended arcs, color helpers, and token-flood cleaning have registered coverage; partial hidden routes and replay limits have public evidence, while resource-unresolved models remain outside the comparison proof |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Complete** — module and dispatcher contracts cover all seven public functions, eight apply parameters, typed labels, signed controls, EventLog/EventTable adapters, diagnostics and RNG continuation; exact proofs and reviewed ordering distinctions are recorded in `docs/bose-parity-contract.md` |
-| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete for the six search variants (log enrichment pending)** — all six variants are explicitly selectable and `align_petri_trace` reproduces the reference per-trace cost, best-worst cost, fitness, unreachable-marking and error behavior, including cost functions, arc-weight handling and the less-memory pruning, against three black-box banks (see "Conformance parity bank evidence"); less-memory Dijkstra with legacy unit costs remains the generic default of `check_alignment` |
+| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete** (six search variants, log-level dispatcher and log enrichment) — all six variants are explicitly selectable and `align_petri_trace` reproduces the reference per-trace cost, best-worst cost, fitness, unreachable-marking and error behavior, including cost functions, arc-weight handling and the less-memory pruning, against three black-box banks (see "Conformance parity bank evidence"); less-memory Dijkstra with legacy unit costs remains the generic default of `check_alignment` |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors; DFG classic is bound to the conformance parity banks (alignment, cost and visited states), while process-tree and decomposed results are captured there but not yet bound |
-| Conformance: replay | forward token replay and backwards token replay | **Partial (duration support complete; replay proof pending)** — forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, while root-cause support remains pending; forward and backwards replay rows, including routing and flood cleaning under each public option, are bound to the conformance parity banks except forward `consider_activities_not_in_model_in_fitness`, an open cross-trace divergence |
+| Conformance: replay | forward token replay and backwards token replay | **Complete** (both variants, dispatcher, duration and root-cause support) — the dispatcher is bound by `minera_token_replay_dispatcher_parity_tests` (see "Token replay dispatcher bank"); root-cause diagnoses are bound by `minera_token_replay_root_cause_parity_tests` (see "Token replay root-cause bank"); forward PLTR maps and RETURN_NAMES rows are bound by `minera_token_replay_pltr_parity_tests` (see "Forward token replay PLTR and RETURN_NAMES bank"); forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, and root-cause support is bound separately; forward and backwards replay rows, including routing and flood cleaning under each public option, are bound to the conformance parity banks, forward `consider_activities_not_in_model_in_fitness` included |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both `VERSION_DISCOUNTED_A_STAR` algorithms preserve the asymmetric discounted recurrence, complete model-transition runs, raw ordinary-distance borders, deterministic longer-run ties, exact marking-limit boundaries, objectives, precision/distance diagnostics, arbitrary markings, strict activity selectors, and JSON/CLI/server/frontend adapters, with distinct registered proofs |
-| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection; broader OCEL schema coverage remains |
+| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Complete** — all three graph comparisons are bound by `minera_ocel_graphs_parity_tests` (see "Object-centric graph bank") with the OCEL and with a discovered graph as the real side, under default and custom weights and thresholds; deterministic diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, strict direct-OCDFG activity/object-type selectors, and cross-family envelope rejection are available |
 | Discovery: Alpha | classic and Alpha+ | **Complete** — grouped/stream/eager/lazy inputs, sparse weighted graphs, explicit and inferred endpoints, typed selectors, table ordering/null contracts, and native/request/CLI/frontend event caps are implemented; Alpha+ exposes raw live/detached markings and reserved-label collision cleanup through native/JSON/CLI/HTTP adapters, with full public/native process captures; identity-ordered boundary cleanup is enumerated exactly, the native default is a deterministic member of that support, and two new disjoint public banks plus the earlier merged fixture fall inside it, with every enumerated outcome observed (see "Alpha+ cleanup selection contract") |
 | Discovery: Inductive | IM, IMf, IMd | **Partial (feature surfaces complete; differential proof pending)** — `log`, explicit `imf`, and graph-recursive `dfg` selectors have distinct native semantics; EventLog, stream, eager/lazy table, weighted-variant, and direct-DFG inputs are available; specialized fall-throughs, strict-sequence and fall-through toggles, field selectors, regrouping, timestamp ordering, recursive JSON, request/CLI/server/frontend plumbing, and model-specific downstream replay are covered by focused tests |
-| Discovery: Heuristics | classic and Heuristics Miner++ | **CLASSIC complete; dispatcher and PLUSPLUS partial** — CLASSIC public EventLog/DFG object and Petri routes, typed returned fields, order, noise pruning and conversion have saved native/public proof; separate dispatcher and PLUSPLUS obligations remain |
+| Discovery: Heuristics | classic and Heuristics Miner++ | **Complete** (both variants and the dispatcher) — CLASSIC public EventLog/DFG object and Petri routes, typed returned fields, order, noise pruning and conversion have saved native/public proof; PLUSPLUS and the dispatcher are bound by `minera_heuristics_plusplus_parity_tests` (see "Heuristics Miner++ bank"): every public HeuristicsNet field and node connection of the EventLog and dispatcher DataFrame routes under six parameter sets, Petri results of both forms up to renaming of places and silent transitions, and the pandas route's pair-free errors |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete** — all 18 Declare templates and all six log-skeleton constraint families retain their weighted threshold, vacuity, ordering, and diagnostic contracts; grouped logs, streams, eager/lazy tables, strict custom activity/case selectors, and log-skeleton variant lists are supported by distinct registered proofs |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, graph utilities, both causal variants, all three correlation variants, and all three minimum-self-distance adapters with witnesses have focused native contracts plus JSON/CLI/server/frontend integration; eventually-follows is covered as a native statistical extension outside the algorithm-dispatch catalog |
 | Discovery: footprints | log entire/trace-by-trace, eager dataframe, lazy dataframe, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete** — all eight selectors have distinct registered contracts and production dispatch; eager/lazy ordering differences, activity/case/time/index selectors, explicit Petri markings, and inclusive-choice bottom-up behavior are covered |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete** — view-based transition systems cover sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, occurrence data, flat and trace inputs, and explicit activity/case selectors; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and the additional DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings, backed by exact selector and module contracts |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum log/dataframe/lazyframe connected and disconnected projections; batches | **Complete** — strict native temporal discovery and permissive bundled analysis, all six canonical spectrum projections with adapter-specific sampling and timestamp behavior, all three batch adapters and five classifications, and every activity/resource/time/case/event selector have registered native plus production integration contracts |
-| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
-| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Partial (simplicity, token, alignment and automaton precision, alignment fitness, distance and DFG precision complete)** — a 163-case black-box equivalence suite against the pinned public evaluators proves all three simplicity variants, token and Align-ETConformance precision, the precision dispatcher, alignment fitness and the fitness dispatcher exactly, and automaton precision by validity and optimality across the reference's tie choices; token fitness, generalization, and the composite agree everywhere except one listed token-replay hidden-routing gap on one heuristics net (see *Evaluation black-box equivalence*) |
-| Label splitting | contextual | **Partial (implemented core; proof pending)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
-| Merging | case relations | **Partial (implemented core; proof pending)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
+| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Complete** — ETOT, OCDFG (with and without edge performance, custom selectors) and OTG are bound by `minera_ocel_graphs_parity_tests` (see "Object-centric graph bank"), link analysis and timestamp interleavings by `minera_ocel_links_parity_tests` (see "Link analysis and timestamp interleavings bank"), OCPN (both selectors and the internal wo_annotation module) and SAW nets by `minera_ocel_nets_parity_tests` (see "Object-centric Petri net and SAW net bank"); classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
+| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Complete (all evaluation packages; the `algo.evaluation.precision.utils` support module stays partial)** — a 163-case black-box equivalence suite against the pinned public evaluators proves all three simplicity variants, token and Align-ETConformance precision, the precision dispatcher, token and alignment fitness, the fitness dispatcher, token generalization and the composite exactly, and automaton precision by validity and optimality across the reference's tie choices (see *Evaluation black-box equivalence* and *Token replay silent-path tie order*) |
+| Label splitting | contextual | **Complete** — the CONTEXTUAL variation matches a 1,600-call public bank (default, short/long/empty contexts, edge minimums, target subsets, custom target column and suffix), and keeps JSON/CLI/local-server/frontend adapters |
+| Merging | case relations | **Complete** — the PANDAS variation matches a 440-call public bank (values, dtypes, index labels and raising calls) under default and custom keys, and keeps native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Complete** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) have native/JSON/CLI/server/frontend adapters; focused contracts prove LOG/PANDAS adapters, custom selectors, diagnostics, common role records, and all eight SNA selectors |
 | Reduction | process-tree transition-reduction based; ordinary Petri-net silent-transition reduction | **Partial (implemented core; proof pending)** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, and custom activity keys are exposed through JSON/CLI/server/frontend adapters. Ordinary PNML reduction exposes the complete structural fixed-point rule family through native, standalone CLI, multipart local-server, and typed frontend APIs, including deterministic single-entry/single-exit/series transition and place fusion, positively marked invariant-place elimination, duplicate silent-transition fusion, inert self-loop elimination, extended-arc preservation, redundant reset cleanup, and opt-in parallel-place fusion and abstraction; result diagnostics include remapped markings, place aliases, and reduced PNML. Marking-aware PNML import/export preserves arbitrary nonnegative initial/final vectors through reduction, while legacy conformance import remains strict to single-token workflow nets. |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial overall; tree generation plus Petri, process-tree, DFG, and Declare playout complete** — Petri basic/stochastic/extensive, Declare classic, both DFG variants, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation, including deterministic multi-model batches), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; completed catalog packages are backed by manifest-enforced native/request/JSON/CLI/server/frontend/test artifacts; Declare now uses nonnegative bounded native options, a shared strict server/request parser, and a dedicated frontend serializer instead of incorrectly emitting process-tree field names; DFG performance playout counts completed versus truncated/deadlocked traces and treats an invisible end-boundary transition after the visible-event cap as successful termination; bounded OCPN playout plus native causal-net obligation search support independent/shared/synchronized projections, marker groups, cardinality, key constraints, independent activity/binding/transition branching caps, reachability, binding sequences, and per-trace object suffixing through native, CLI, multipart local-server, and frontend adapters; broader simulation/model-family coverage remains |
@@ -736,10 +736,9 @@ discovery expose the same selector contract: OCDFG applies projected labels to
 activity, start/end, flow, and performance metrics, while SAW applies them to
 per-type nets, merged-net decorations, and transition-weight projections.
 Their existing performance toggle and no-selector overloads remain compatible.
-SAW discovery applies a fixed no-specialized-fall-through and normal-sequence
-policy to each flattened object-type projection before replaying transition
-multiplicities; the policy and sparse projected-activity regression are covered
-by the native SAW test suite.
+OCPN and SAW discovery mine each flattened object-type projection without
+fall-throughs or the strict sequence cut; see "Object-centric Petri net and SAW
+net bank" for the reference construction, event orders and selector semantics.
 
 Link-analysis evidence: the classic relation join is available as
 `discover_link_analysis` over event logs and supports first-class or generic
@@ -932,8 +931,8 @@ weights and their runtime remain an optional application integration concern.
 Timestamp-interleavings evidence: the native discovery joins related left/right
 event logs through `CaseRelation` rows, adds deterministic extreme trace
 boundaries, and emits only strict four-timestamp LR/RL crossings with source /
-target activities, original event indices, timestamps, and finite elapsed
-seconds. Missing or invalid timestamps, malformed relations, and result-bound
+target activities, reference-numbered event indices, timestamps, and exact
+elapsed seconds (see "Link analysis and timestamp interleavings bank"). Missing or invalid timestamps, malformed relations, and result-bound
 overruns are rejected during discovery. The standalone
 `minera_export --timestamp-interleavings` path, multipart local
 `POST /api/timestamp-interleavings`, strict request parser, frontend upload
@@ -985,7 +984,7 @@ export CLI, the cached local server route, and typed frontend controls.
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules with bounded depth/split/leaf/candidate/gain controls, selected context attributes, and configurable event activity fields, deterministic encoded numeric/one-hot tables with bounded pre-choice lookback, and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; clean variants use exact replay while deviating variants now use optimal-alignment model choices with replay/alignment/failure diagnostics; richer classifier backends and columnar training integrations remain |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
 | ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Partial** — deterministic seeded train/test trace splits, fixed and all-prefix projections, until-activity targets, activity-targeted sublogs, automatic event/case feature selection, and typed process-cube tables now have native, standalone CLI, cached-log server, and typed frontend adapters; model training and columnar dataframe integrations remain |
-| LLM/querying | abstractions, provider calls, clustering/hypotheses, natural-language log query/filter, database knowledge injection | **Partial (implemented core; proof pending)** — bounded provider-neutral prompt construction covers all three catalogued injection packages (generic descriptions, process-mining knowledge, and database-schema knowledge) through native, JSON, strict request, standalone CLI, local-server, and typed frontend APIs without performing network calls; provider execution, clustering/hypotheses, and natural-language log querying remain separate integration work |
+| LLM/querying | abstractions, provider calls, clustering/hypotheses, natural-language log query/filter, database knowledge injection | **Partial (the three injection packages complete)** — `include/minera/llm_injection.hpp` reproduces the reference injection texts exactly (245-call bank, see "LLM knowledge-injection bank"); separately, bounded provider-neutral prompt construction covers all three catalogued injection packages (generic descriptions, process-mining knowledge, and database-schema knowledge) through native, JSON, strict request, standalone CLI, local-server, and typed frontend APIs without performing network calls; provider execution, clustering/hypotheses, and natural-language log querying remain separate integration work |
 | Connectors | Mail/calendar, Windows events, browsers, repository issue history, workflow history, enterprise order-to-cash/accounting | **Partial (implemented core; proof pending)** — every connector family has a native, bounded normalization contract with JSON, CLI, local-server, and typed frontend adapters; mailbox class/direction mapping and calendar lifecycle/reminder synthesis consume explicit CSV exports without desktop automation, while browser and Windows connectors likewise require explicit files; remote repository ingestion confines timeline requests to the configured repository and keeps bearer credentials out of query strings; optional live platform/database drivers remain deployment adapters |
 
 Overlap evidence: `OverlapOptions` validates finite non-negative epsilon,
@@ -1126,8 +1125,10 @@ invalid options.
 Attribute-value repetition domain banks (2026-10-24): the pandas and Polars
 companions are complete over disjoint seeded banks covering NumPy
 weak-scalar/array comparisons, categoricals, zoned datetimes, the Polars
-literal model, optimizer bound folding and diagnostics; the log module stays
-partial for the XES list/plain-dict carrier ambiguity. See
+literal model, optimizer bound folding and diagnostics. The log module is
+complete too (2026-10-25): the XES importer records the public shape of
+`<list>`/`<container>` elements (wrapper around None, None, or not stored),
+and a fifth disjoint bank of 18,557 calls with such elements passes. See
 [attribute-repetition-domain-parity.md](attribute-repetition-domain-parity.md).
 
 Attribute-value repetition evidence: a whole-trace filter counts matching
@@ -2512,6 +2513,29 @@ cycle-safe return edges, rank-direction controls, and caps of 120 nodes and
 regressions, so changing projections cannot start a force simulation or depend
 on browser timing.
 
+## LLM knowledge-injection bank (2026-10-25)
+
+`scripts/capture-llm-injection-bank.py` calls the public injection,
+database-knowledge and process-knowledge dispatchers for every combination
+of event-data source (dataframe, SQLite connection, OCEL, EventLog, an
+unsupported value), seven parameter sets (each key alone, the table name, and
+all keys with quotes, non-ASCII text and an empty value) and every explicit
+variant: 245 calls, no errors, no hash-seed variation, 33 distinct texts.
+The results are pure templates over the parameter strings:
+- Automatic database knowledge uses DuckDB text for a dataframe, SQLite text
+  for a connection and `"\n\n"` otherwise; automatic process knowledge uses
+  the traditional text for a dataframe or connection, the OCEL 2.0 text for an
+  OCEL and `"\n\n"` otherwise. An explicit variant ignores the source.
+- The injection dispatcher returns `"\n\n"` + database knowledge + process
+  knowledge. Parameter values are inserted verbatim.
+
+`llm_database_knowledge`, `llm_process_knowledge` and `llm_domain_knowledge`
+in `include/minera/llm_injection.hpp` reproduce every text;
+`minera_llm_injection_parity_tests` replays the fixture
+`src/backend/tests/llm_injection_bank_cases.inc` (written by
+`scripts/generate-llm-injection-bank-tests.py`). The older provider-neutral
+prompt builder in `knowledge_injection.hpp` and its adapters are unchanged.
+
 ## Case-relations merging evidence
 
 The case-relations variation preserves the base log, inserts only incoming
@@ -2649,6 +2673,39 @@ Validation is recorded in
 `docs/case-relations-mixed-validation.json`. These adapter checks do not prove
 exhaustive XES dtype inference, arbitrary CSV type inference, or complete
 case-relation parity.
+
+### Case-relations bank (2026-10-25)
+
+`scripts/capture-case-relations-bank.py` (seed 20261027) runs 220 seeded
+cases through the public `algo.merging.case_relations.algorithm.apply` under
+the default parameters and under a custom case-id key, suffixes and
+timestamp key, in fresh interpreters under four hash seeds. The first 150
+cases vary string or integer ids, UTC timestamps with ties and nulls, absent
+timestamp columns, optional numeric/string columns, shared and colliding
+columns, duplicate and unknown relations, and empty tables. The last 70 pin
+the inner-merge row order for incoming rows that match several relations
+while others match none, with string, integer and float ids, sorted inputs
+and null ids. The 440 calls (46 raising) show no hash-seed variation and are
+stored in `docs/case-relations-bank.json.gz`;
+`scripts/generate-case-relations-bank-tests.py` writes
+`src/backend/tests/case_relations_bank_cases.hpp`, and
+`minera_case_relations_parity_tests` checks every cell, column dtype and
+index label, and that raising calls raise.
+
+The bank fixed three native rules under pandas 3.0.5:
+- The default `str` dtype stays `str` when the concatenation adds missing
+  values; only `bool` falls back to `object`.
+- A column absent from an empty side still counts as missing for dtype
+  promotion (an empty base without `case_LEFT` turns an int64 key into
+  float64). `datetime64[s|ms|us|ns, tz]` promote to the finer unit.
+- When the inner merge yields exactly one pair per incoming row, pandas emits
+  the key-grouped pairs at each incoming row's position in a stable sort by
+  key code. Codes follow first appearance in the incoming keys, or, for
+  numeric keys, in the relation keys and then the incoming keys; null keys
+  are the last group. Numeric keys keep the plain incoming order when the
+  incoming keys are unique and both key columns are monotonic increasing.
+  This rule also matched 36,000 direct pandas merges with integer, float,
+  NaN, string, None and object keys.
 
 ## Dataframe formatting evidence
 
@@ -3495,10 +3552,10 @@ Results: arc-degree, extended Cardoso, and extended cyclomatic simplicity (163,
 163, and 148 cases), token precision, Align-ETConformance precision, and the
 precision dispatcher (160 cases each), alignment replay fitness and the fitness
 dispatcher (163 cases each) agree exactly. Token replay fitness,
-generalization, and the composite agree on every case except one listed
-divergence, which the suite asserts so the list cannot go stale: forward token
-replay routes hidden transitions differently on one heuristics net
-(`seed1_heuristics_noisy`, owned by token replay).
+generalization, and the composite agree on every compared case as well (162,
+162, and 160). The last divergence, a hidden-routing difference on
+`seed1_heuristics_noisy`, came from the tie order between equally short
+silent paths; see *Token replay silent-path tie order* below.
 
 Automaton-after-align precision scores one optimal alignment per trace variant,
 and the reference picks among equally cheap alignments by its search order
@@ -3530,6 +3587,47 @@ appends the transitions enabled afterwards and moves each of them to the newest
 marking, and a transition is handled once per marking. A silent transition used
 on one branch can therefore be unavailable on another, and the visible labels
 behind it are not reported; a plain net without IDs uses index order.
+
+### Token replay silent-path tie order
+
+Forward token replay reaches a needed place, or the final marking, through
+the shortest silent paths from the marked places, found breadth-first. When
+two silent transitions leave a place towards equally short paths, the
+reference keeps the one whose arc it visits first, and for a model imported
+from PNML that is the order in which the document lists the place's outgoing
+arcs. Native replay used transition index order, which is the document's
+transition element order. On `seed1_heuristics_noisy` the two orders disagree
+at the place after `a` (`hid_8` against `hid_9`).
+
+PNML document entry points of the evaluators (replay fitness, precision,
+generalization, composite) now pass the document's arc order to replay as
+`place_outgoing_transition_order`, derived by
+`pnml_place_outgoing_transition_order`; a caller-supplied order still wins,
+and a plain `PetriNet` without arc metadata keeps index order.
+
+Evidence: `scripts/capture-token-replay-arc-order-bank.py` builds 1,000 PNML
+documents (bank seed 20261025) whose place, transition and arc element order
+and silent-transition names are shuffled independently: 500 tie nets (one
+marked place with two to five parallel silent transitions to the place a
+visible `X` needs, each also marking a witness place, half with a second tie
+layer) and 500 small random nets with ranked places, so silent routing cannot
+cycle, and random traces including unknown labels. Every trace is replayed by
+the public release in a fresh interpreter under hash seeds 0-3 and three
+allocation paddings (objects created before each import, which moves the
+model's object addresses). 3,695 of 3,750 rows are equal under all twelve runs;
+the other 55 are excluded as identity-dependent (for example `random_0629`,
+where the public choice changed with the padding and even between repeated
+imports in one process, so it follows object identity, not any document
+order). `minera_token_replay_arc_order_parity_tests` matches all 3,695 rows
+exactly (activated transitions, missing, consumed, remaining and produced
+tokens, fitness flag); under native transition order 843 of them differ, so
+the bank discriminates between the two orders. Element names and transition
+order alone explain far fewer tie choices than arc order (in a 60-net pilot,
+60/60 for arc order against 23 for name order and 20 for transition order).
+
+Still open for `algo.conformance.tokenreplay`: nets built in memory rather
+than imported have no recorded arc order (the reference follows arc creation
+order there), and the identity-dependent rows have no document-level rule.
 
 ## PNML document export evidence
 
@@ -4301,6 +4399,30 @@ coverage includes token-boundary distance, weighted competing gains,
 zero-edge graphs, zero-gain paths, deterministic ties, cross-activity global
 normalization without cross-label edges, custom-column preservation, and
 threshold boundaries.
+
+### Label-splitting bank (2026-10-25)
+
+`scripts/capture-label-splitting-bank.py` (seed 20261028) runs 200 seeded
+logs (one to eight traces over three to six activities, some multi-character
+names, repeated variants) through the public
+`algo.label_splitting.algorithm.apply` under eight parameter sets, in fresh
+interpreters under four hash seeds: 1,600 calls, no variation, no errors, and
+the returned rows always in input order. `minera_label_splitting_parity_tests`
+replays the fixture `src/backend/tests/label_splitting_bank_cases.inc`
+(written by `scripts/generate-label-splitting-bank-tests.py`) and compares
+every label.
+
+Two native fixes came from the bank:
+- A separate target column starts as a copy of the activity column, so
+  events that are not relabeled carry their original label there (it
+  replaces any existing value).
+- The greedy modularity merge follows the Clauset-Newman-Moore incremental
+  updates bit for bit: m is half the sum of weighted degrees in adjacency
+  order, gains start at `2*q0*w - 2*a_u*a_v` with `q0 = 1/(2m)` and
+  `a = k*q0`, and merges add or subtract `2*a_x*a_w` instead of recomputing
+  gains from scratch. Recomputed gains differ in the last bits and pick a
+  different merge on near-ties. The update rule matched the public graph
+  library's merge-gain sequence exactly on 300 random weighted graphs.
 
 ## Live-stream transport evidence
 
@@ -5449,6 +5571,83 @@ approximation thresholds and loop fallback diagnostics, timeout/state
 completion flags, empty-denominator fitness, n-ary normalization, and MILP's
 binary-loop rejection.
 
+### DFG alignment dispatcher bank (2026-10-25)
+
+`scripts/capture-dfg-alignment-dispatcher-bank.py` aligns 1,500 seeded random
+DFGs (bank seed 20261025; start/end maps with zero frequencies, disconnected
+graphs, two to six activities) and logs (unknown labels, empty traces, repeated
+variants) through the public `algo.conformance.alignments.dfg.algorithm`, on
+an EventLog and on the equivalent DataFrame, with default costs or random
+sync/model/log/internal cost functions (some missing an activity). Every call
+runs in sixteen fresh processes. The public search draws two fresh UUIDs per
+search as routing names and breaks queue ties by their lexical order, so the
+alignment and the visited/closed counters of a row can change between calls
+(the early sink transition, also a UUID, is canonicalized to `@@dfg_sink`);
+native reproduces that draw. `DfgAlignmentOptions::routing_names` fixes the
+pair, and `minera_dfg_alignment_dispatcher_parity_tests` runs native under
+every relative order of the two names against the activity names and each
+other (56 orders). Contract: cost, internal cost, fitness, best-worst cost and
+raising are exact under every order (812 raising calls: no accepting path,
+missing cost entries, zero best-worst denominators); every alignment and
+counter the reference returned is among those native produces. 2,998 of
+3,000 calls (6,639 rows, 187 with ties observed across processes) satisfy it;
+two calls whose outcome shape varied are skipped. A DataFrame has no empty
+cases and aligns as the log of its nonempty traces. With this bank the
+`algo.conformance.alignments.dfg` package is complete.
+
+### Petri alignment log dispatcher bank (2026-10-25)
+
+`align_petri_log` (`include/minera/petri_trace_alignment.hpp`) is the public
+`algo.conformance.alignments.petri_net.algorithm.apply` on a whole log.
+`docs/petri-alignment-dispatcher-bank.json.gz` gives the 40 frozen conformance
+nets four seeded logs each (plain, frozen model/sync cost functions, activity
+key `act`, ENABLE_BEST_WORST_COST off) and aligns them as an EventLog and as a
+DataFrame under the four enum variants and the default, in four processes
+(PYTHONHASHSEED 0 to 3, 20 s per call). `minera_petri_alignment_dispatcher_parity_tests`
+passes all 1,568 bound calls (80 raising, 7,534 trace rows); 32 calls that
+timed out bind nothing. Per trace it binds cost, bwc and fitness to a value
+some run returned (discounted A* may instead beat every run, as per trace);
+the per-trace alignments stay bound by the per-trace banks. Observed rules:
+
+- One entry per trace in log order; a DataFrame aligns its cases in
+  ascending case-id string order (`c10` before `c2`) and has no empty cases.
+  Removing that order fails 582 frame calls.
+- The default variant is state-equation A*.
+- The log path raises for a net whose final marking is unreachable (an
+  easy-soundness check), for every variant, where a single trace would get
+  None. Native raises std::invalid_argument up front.
+- ENABLE_BEST_WORST_COST false drops bwc and fitness; FITNESS_ROUND_DIGITS
+  has no visible effect on the returned fitness.
+- Contract choice: per-event trace costs have no log-level meaning, so
+  `align_petri_log` rejects them; the native activity key reads the named
+  event attribute and rejects an event without it.
+
+### Alignment log enrichment bank (2026-10-25)
+
+`enrich_log_with_alignments` / `enrich_log_with_alignments_in_place`
+(`include/minera/alignment_log_enrichment.hpp`) reproduce the public
+`algo.conformance.alignments.petri_net.utils.log_enrichment.apply`.
+`docs/alignment-log-enrichment-bank.json.gz` (1,500 seeded logs, bank seed
+20261025; four in five with synthesized alignments in the
+`ret_tuple_as_trans_desc` shape, one in five with real alignments of an
+inductive-miner model) is bound by `minera_alignment_log_enrichment_parity_tests`:
+3,000/3,000 calls (with and without ENABLE_DEEPCOPY, 460 raising) match the
+outcome, the returned log and the input log after the call. Observed rules:
+
+- Entry i belongs to trace i. A synchronous move (both sides not `>>`) writes
+  its model transition name under TARGET_ATTRIBUTE (default
+  `@@transition_id`) on the event at the current log-side position; every
+  log-side move advances the position, model moves do not.
+- A None entry raises TypeError before anything else of that entry. The trace
+  and event are looked up only for a synchronous move: an entry beyond the
+  log, or log moves past the trace's end, raise nothing; a synchronous move
+  there raises IndexError. Fewer entries than traces leave the rest unchanged.
+- Without ENABLE_DEEPCOPY (the default) the input is mutated, including the
+  enrichment made before an error; with it the input is untouched.
+
+Contract choice: native rejects `time:timestamp` as the target, because a
+native timestamp cannot hold a transition name; the bank does not use it.
+
 ## DFG classic and edit-distance alignment parity evidence
 
 DFG alignment implements the pinned `CLASSIC` variant over a complete
@@ -6031,6 +6230,43 @@ witnesses. Result serialization validates binding variants and rejects witness
 payloads that conflict with their request flags or contain empty activities or
 object identities. Causal marker groups retain conjunctive and alternative
 bindings, cardinalities, support counts, and object-exclusion keys.
+
+## Trace-attribute clustering bank (2026-10-25)
+
+`scripts/capture-trace-attribute-clustering-bank.py` (seed 20261029) runs 240
+seeded logs (two to fourteen traces, a string or integer trace attribute with
+one to six values, some traces without it) through the public
+`algo.clustering.trace_attribute_driven.algorithm.apply` under all five
+variants, in fresh interpreters under four hash seeds: 1,200 calls, no
+variation. Each value call also records the condensed group distances of the
+public evaluation function behind its variant. `minera_trace_attribute_clustering_parity_tests`
+replays `src/backend/tests/trace_attribute_clustering_bank_cases.inc`
+(written by `scripts/generate-trace-attribute-clustering-bank-tests.py`).
+
+Reference semantics found and now native:
+- Average linkage runs by the nearest-neighbour chain: the chain starts at the
+  first active cluster, a neighbour replaces the current one only when
+  strictly closer, a merged cluster takes the larger slot, and merges are then
+  stably sorted by distance and relabelled (children ordered by label). This
+  decides every tie, including all-zero distance matrices.
+- Leaves are listed left to right through the final tree.
+- A single attribute group raises (ValueError); native raises
+  `std::invalid_argument`.
+- The DFG selector names a module rather than a callable and raises TypeError
+  for every input. Native `kDfg` now raises too; the native DFG distance stays
+  available as the `dfg_extension` option.
+- Vector distances divide by the product of the two norms,
+  `1 - ab / (sqrt(aa) * sqrt(bb))`, clamped at zero.
+
+Contract: DMM and average Levenshtein match exactly (trees, leaves and
+distances). Average vector matches distances within 1e-12, and trees exactly
+except 5 calls where the reference distances hold near ties (equal within
+1e-12) and last-bit rounding decides the merge. DMM vector stays open: when a
+group has a variant without successions the reference's succession cosine is
+0/0, and its result follows a rule not yet identified (identical variant sets
+usually give 0, but not always). Those 73 calls only require a native tree;
+the other DMM vector calls match exactly. The package stays partial until
+that rule is found.
 
 ## Feature transformation and clustering parity
 
@@ -9070,6 +9306,296 @@ parity. The catalogue is unchanged: 46/86 packages, 199/387 modules and 228 inco
 units. No module/package promotion or full parity is claimed.
 
 Evidence: [weighted-token-replay-validation.json](weighted-token-replay-validation.json).
+
+## Forward token replay PLTR and RETURN_NAMES bank (2026-10-25)
+
+`replay_token_result` is bound to `docs/token-replay-pltr-bank.json.gz`
+(`scripts/capture-token-replay-pltr-bank.py`, fixture by
+`scripts/generate-token-replay-pltr-tests.py`): the 40 frozen conformance nets,
+ten seeded logs each (repeated variants, unknown labels, empty traces and
+exact value-equal trace copies; every event carries an `eid`), replayed by the
+public `token_replay.apply` with ENABLE_PLTR_FITNESS on source traces and on
+grouped variants (DISABLE_VARIANTS False), with RETURN_NAMES, and with both,
+in sixteen processes. `minera_token_replay_pltr_parity_tests` passes all 1,600
+calls (64 with seed-dependent output, where native must equal one observed
+output). Bound per call: every row (fitness, counters, activated, problem and
+enabled transitions, reached marking, RETURN_NAMES labels and keys), every
+place's underfed/overfed trace sets and m/r/c/p, every visible transition's
+underfed/fit event contexts, and every unknown activity's contexts. Native is
+driven from the PNML document (names, exact markings and arc order).
+
+Observed shapes worth knowing:
+
+- PLTR rows report the reached marking as `place:count` strings and the
+  enabled transitions as a set; RETURN_NAMES rows use names and add
+  `activated_transitions_labels` and `enabled_transitions_in_marking_labels`.
+- Value-equal traces collapse to one key. Grouped replay keys activity-only
+  variant traces without attributes.
+- The unknown-activity map holds one event context per trace, not a list; an
+  unknown activity at the start of a trace has an empty dict as its context.
+- On duplicate-label nets the choice among equally labeled transitions can
+  follow the hash seed (8 of 24 seeds pick the other transition on
+  `duplicate-027-0`); sixteen seeds cover every choice native makes.
+
+`algo.conformance.tokenreplay.variants.token_replay` is promoted (246/387
+modules). The package stays partial on `root_cause_analysis`.
+
+## Token replay dispatcher bank (2026-10-25)
+
+`docs/token-replay-dispatcher-bank.json.gz` (`scripts/capture-token-replay-dispatcher-bank.py`,
+fixture by `scripts/generate-token-replay-dispatcher-tests.py`) replays 200
+seeded logs on the frozen conformance nets through the public
+`tokenreplay.algorithm.apply` under the default, TOKEN_REPLAY and BACKWARDS,
+on the EventLog and on the equivalent DataFrame (cases interleaved, case ids
+unsorted), plus `get_diagnostics_dataframe` for the DataFrame form, under
+sixteen hash seeds. `minera_token_replay_dispatcher_parity_tests` passes all
+1,200 calls (329 raising). Observed rules, now native:
+
+- The default variant is TOKEN_REPLAY. On a DataFrame the rows come in
+  ascending case-id string order, with no column-type validation; an empty
+  frame returns no rows and an empty diagnostics frame.
+  `token_replay_dataframe_apply` is this entry point (the validated
+  `replay_dataframe_traces` keeps its checks and adds the rule below).
+- `get_diagnostics_dataframe(df, output)` labels row i of the output it is
+  given with the i-th case in appearance order, so for DataFrame output the
+  case ids and values are mispaired whenever case-id order differs from
+  appearance order. `token_replay_diagnostics_dataframe` reproduces this;
+  `replay_dataframe_diagnostics` (replay and table in one call, both in source
+  order) is unchanged.
+- BACKWARDS rows have no `reached_marking` and add `replay_interrupted` and
+  `activated_transitions_labels`. On a DataFrame it raises KeyError whenever
+  the frame holds more events than cases (after any ZeroDivisionError from the
+  replay itself, which takes precedence); on an EventLog an empty trace or a
+  trace of only unknown activities raises ZeroDivisionError.
+
+Package `algo.conformance.tokenreplay` is promoted (55/86 packages).
+
+## Token replay root-cause bank (2026-10-25)
+
+`docs/token-replay-root-cause-bank.json.gz` (`scripts/capture-root-cause-bank.py`,
+fixture by `scripts/generate-root-cause-tests.py`) feeds the frozen conformance
+nets 240 seeded logs whose events carry `org:resource`, an integer `amount` and
+a float `cost`, replays them forward with PLTR and passes the maps to the
+public `diagnose_from_trans_fitness` and `diagnose_from_notexisting_activities`
+with random string/numeric selections (`concept:name` included) and
+ENABLE_MULTIPLIER. Classifier dependency scikit-learn 1.9.0, as in
+`docs/token-replay-root-cause-fixtures.json`; it is not among the pinned core
+dependencies and was added to the cloud reference environment for this
+capture. Each case runs under sixteen hash seeds (five of 480 calls vary,
+through duplicate-label replay ties).
+
+`minera_token_replay_root_cause_parity_tests` passes all 240 cases (560
+models): feature names, data matrix, target and classes exactly, raising calls
+raise, and the fitted tree's root class counts and root Gini gain match with a
+depth of at most seven. The reference tree picks among equally good features
+without a seed, so the rest of its structure is not bound.
+
+Found and fixed: the two public functions are separate calls, so one can
+raise (an unknown activity's empty-dict start context has no numeric
+attribute; no selected attribute with a two-sided cohort) while the other
+succeeds. Native gains `compute_token_replay_transition_root_cause_diagnostics`
+and `compute_token_replay_unknown_root_cause_diagnostics`; the combined
+`compute_token_replay_root_cause_diagnostics` is unchanged.
+
+`algo.conformance.tokenreplay.diagnostics.root_cause_analysis` is promoted
+(247/387 modules).
+
+## Object-centric Petri net and SAW net bank (2026-10-25)
+
+`docs/ocel-nets-bank.json.gz` (`scripts/capture-ocel-nets-bank.py`, about
+50 s) holds 120 seeded OCELs (two to four object types, objects without
+events, shared and repeated objects, timestamp ties, event tables not in time
+order, events without objects in a quarter of the logs), captured under four
+hash seeds. Each OCEL goes through the public OCPN dispatcher (defaults, the
+`imd` inductive variant, double-arc threshold 0.5, token-based-replay
+diagnostics, custom activity/object-type selector columns, the WO_ANNOTATION
+selector), the internal `ocpn.variants.wo_annotation` module and the public
+SAW-net dispatcher (defaults and custom selectors). OCPN results are recorded
+by their OCDFG fields, double-arc map, per-type nets with markings and replay
+counters; SAW results by the per-type and merged nets with every arc's weight
+distribution.
+
+`minera_ocel_nets_parity_tests` compares all 1,080 calls, 72 of them raising,
+and every call passes. The OCDFG fields and double-arc map compare exactly.
+Nets compare up to isomorphism (transition names are random UUIDs, and the
+merged SAW net repeats place names), with markings, replay counters and arc
+weights bound in the node and arc colours. A native result must match one of
+the outcomes the reference showed under the four seeds.
+
+Reference behavior found and now implemented natively:
+
+- **Tree to net:** `process_tree_reference_net` builds the reference's
+  workflow net from each per-type tree. Sequences chain children through fresh
+  places, choices share entry and exit places, parallel blocks add a silent
+  split and join with a place pair per child, and loops add a silent entry, the
+  redo children into a fresh place with a silent step back, and a silent exit.
+  A silent step from the source or into the sink is added for a choice,
+  parallel or loop root, and for a sequence root whose first child starts with
+  a loop (or begins with a choice or parallel block and ends with a loop) or
+  whose last child ends with a loop. A silent transition is then folded into
+  its neighbour through any place with one input and one output arc. The
+  construction matches the public converter on 6,000 random trees.
+- **Miner policy:** the OCPN dispatcher and SAW discovery mine without
+  fall-throughs and without the strict sequence cut.
+- **Event order:** the classic miner reads each object's events by time. The
+  `imd` variant, SAW discovery and both replays (OCPN diagnostics, SAW weights)
+  read them in relation order (an event's first relation to the object places
+  it).
+- **Selectors:** a custom object-type selector names the types, but each
+  type's log is still flattened from the objects whose canonical type equals
+  the label. With labels that never match, every net is a single silent step
+  and SAW weights are empty.
+- **Errors:** OCPN raises (`KeyError`; natively `std::invalid_argument`) when
+  an object type has no object related to an event; SAW keeps such types. IMd
+  raises (`IndexError`; natively `std::out_of_range`) when a single-activity
+  sub-graph without a self-loop has no start activity.
+- **Merged SAW net:** per-type places and silent transitions stay separate,
+  visible transitions merge by label, and every arc keeps the weight
+  distribution of the type it came from (`SawNet::arc_weights`).
+
+Contract decision: the internal wo_annotation module and the WO_ANNOTATION
+selector both return the full classic payload, annotations included, so both
+bind to the classic native discovery.
+
+## Link analysis and timestamp interleavings bank (2026-10-25)
+
+`docs/ocel-links-bank.json.gz` (`scripts/capture-ocel-links-bank.py`, about
+10 s) holds two groups, captured under four hash seeds.
+
+- **Link analysis:** 100 seeded event tables (case, activity, minute
+  timestamps, half of them not in time order, `doc`/`ref` link columns from a
+  small pool) go through the public `link_analysis.algorithm.apply`. Each table
+  runs with the default columns and with `doc`→`ref` under all eight
+  LOOK_FORWARD/KEEP_FIRST_OCCURRENCE/PROPAGATE combinations. Results are
+  recorded by their `@@index_out`/`@@index_in` pairs.
+- **Interleavings:** 100 seeded related left/right logs with case relations,
+  some naming unknown cases, go through the public `interleavings.algorithm.apply`.
+  Results are recorded by every row's `@@` columns; ten logs use naive
+  timestamps.
+
+`minera_ocel_links_parity_tests` compares all 1,000 calls, 54 of them raising,
+and every call passes.
+
+Reference behavior found and now implemented natively in
+`discover_timestamp_interleavings`:
+
+- **Indices:** each log is numbered as the start boundaries of its cases in
+  case-id order, then every case's events ordered by (timestamp, input
+  position), then the end boundaries. Native previously used input positions.
+- **Boundaries:** the start and end boundaries sit at the extreme nanosecond
+  timestamps `1677-09-21T00:12:43.145224193Z` and
+  `2262-04-11T23:47:16.854775807Z`, and elapsed seconds are exact nanosecond
+  counts divided by 1e9. An elapsed time that does not fit in nanoseconds,
+  which happens whenever a row runs from the start boundary to a real event,
+  makes the whole call raise (`OverflowError`; natively `std::overflow_error`).
+- **Naive timestamps:** timezone-naive timestamps raise (`TypeError` in the
+  reference; natively `std::invalid_argument`).
+- **Row order:** rows are ordered by the indices of the two pairs' first
+  events. Native previously ordered them by the reported indices.
+
+Contract decisions:
+
+- Link rows are grouped by ascending source index. Within a source, the
+  reference lists targets in the iteration order of a hash set, which depends
+  on the set's insertion and resize history, so targets are compared as a
+  set.
+- Beyond sixteen rows, the reference's sort of the sorting column is not
+  stable: its tie order comes from the sort implementation and the machine.
+  Larger bank tables therefore have distinct timestamps; up to sixteen rows,
+  ties are bound and follow input order.
+- The error class name is not bound, only that the call raised. Reference
+  timestamps (`YYYY-MM-DD HH:MM:SS+00:00`) are compared as the same UTC
+  instant in native ISO form.
+
+`algo.discovery.ocel.link_analysis` and `algo.discovery.ocel.interleavings`
+are promoted to complete.
+
+## Object-centric graph bank (2026-10-25)
+
+`docs/ocel-graphs-bank.json.gz` (`scripts/capture-ocel-graphs-bank.py`, about
+a minute) holds 150 seeded OCELs: two to four object types, objects without
+events, shared and repeated objects, timestamp ties, 15% of event tables not
+in time order, and events without objects in a quarter of the logs. Each has a
+sibling OCEL (sometimes with one type fewer or a changed activity) as the
+normative side. Calls, under four hash seeds:
+
+- the public discovery dispatchers `algo.discovery.ocel.otg`, `etot` and
+  `ocdfg` (`algorithm.apply`), OCDFG also without edge performance and with
+  custom activity/object-type selector columns (`param:event:activity`,
+  `param:object:type`);
+- the public conformance dispatchers `algo.conformance.ocel.otg`, `etot` and
+  `ocdfg` against the graph discovered from the sibling, with the OCEL and with
+  its own discovered graph as the real side, under default and custom
+  parameters.
+
+`minera_ocel_graphs_parity_tests` compares all 2,550 calls, 264 of them
+raising, and every call passes with no native change. Sets and dicts compare
+as sets; lists (OCDFG total-object pairs and performance samples) compare in
+order.
+
+Contract decisions and reference behavior found:
+
+- OTG discovery raises when an event has no related object (a KeyError on the
+  event id), and so does OTG conformance whenever either side needs that
+  discovery. Native raises as well; the error class is not bound, only that
+  the call raised.
+- The OTG conformance `THETA` parameter is a per-relation map (a scalar raises
+  AttributeError in the reference); relations it omits keep the default. The
+  bank binds the map form through `theta_by_relation`.
+- Without edge performance, the public OCDFG still holds `edges_performance`,
+  with two empty maps; native marks this with `performance_computed = false`.
+
+`algo.discovery.ocel.{otg,etot,ocdfg}` and `algo.conformance.ocel.{otg,etot,ocdfg}`
+(packages and their modules) are promoted to complete.
+
+## Heuristics Miner++ bank (2026-10-25)
+
+`docs/heuristics-plusplus-bank.json.gz` (`scripts/capture-heuristics-plusplus-bank.py`,
+about 20 s) simulates 160 seeded interval logs from random process trees
+(sequence, choice, parallel blocks with overlapping intervals, loops) with
+integer-second start/complete timestamps, occasional swapped or dropped
+events, and 15% of logs without `start_timestamp`. Each log goes through:
+
+- the public `plusplus.apply_heu` on the EventLog and the public dispatcher
+  `algorithm.apply_heu` (PLUSPLUS) on the equivalent DataFrame, under six
+  parameter sets (defaults, dependency 0.9, dependency 0 with AND 0.3, AND 0.9,
+  minimum activity and DFG counts 2, performance decoration);
+- the public dispatcher `algorithm.apply` (PLUSPLUS, Petri result) on both
+  forms under two of them.
+
+Twenty DataFrame controls (empty, pair-free, missing case id and missing
+activity rows, overlap only, under aware and naive dtypes) go through the
+public `plusplus.apply_heu_pandas`. Captures run under four hash seeds.
+
+`minera_heuristics_plusplus_parity_tests` compares all 2,580 calls: 1,920
+HeuristicsNet results (activities, boundary and occurrence maps, DFG,
+dependency and performance matrices, performance DFG, sojourn times,
+concurrency, node type, auxiliary-map presence, and per node its occurrences,
+input/output connections with dependency, DFG and representation values, AND
+measures and length-two loops), 640 Petri results and the 20 controls. Every
+call passes.
+
+Contract decisions:
+
+- The dispatcher's DataFrame `apply_heu` returns exactly what the EventLog
+  route returns (all 960 pairs agree), so native binds it to the generic table
+  entry point; the dispatcher's DataFrame `apply` takes the pandas route, bound
+  to `discover_plus_plus_pandas`.
+- The reference names places and silent transitions in hash order (58 Petri
+  calls vary across seeds only by those names), so Petri nets are bound up to
+  an isomorphism that preserves transition labels, arcs, weights and both
+  markings. Names are not bound.
+- Floating values are compared to twelve significant digits.
+
+Native change: the pandas route now raises its two pair-free errors by rule.
+With timezone-aware columns, `TypeError: cannot subtract DatetimeArray from
+ndarray[object]` is raised when no case with a present id holds two rows (it
+was previously raised only when every case id was missing). With either
+dtype, after the `@@diff` column is written, `TypeError: Invalid comparison
+between dtype=timedelta64[unit] and int` is raised when no case (missing ids
+grouped together) keeps two rows with a present activity. The module
+`algo.discovery.heuristics.variants.plusplus` and the package
+`algo.discovery.heuristics` are promoted to complete.
 
 ## Exact ordinary arc magnitudes beyond uint64
 
@@ -14123,3 +14649,44 @@ Evidence: docs/feature-first-exact-source-acquisition-validation.json. No strict
 - The native application assets are active on8562; recovered query runtime PID29740/8192 and recovered provider PID11724/8189 remain unchanged from the bound recovery epoch. One live capability POST verifies the independent route without invoking either runtime.
 - Browser history is carried without a new attempt or rendered check; user settings are not disputed.
 - Availability checkpoint99 changes only the selected query family delivery status. All strict statuses/selectors/backlog and the complete scope remain:46/86 packages,199/387 modules,228 incomplete units; full parity remains false.
+
+## Decision-mining bank (2026-10-25)
+
+`scripts/capture-decision-mining-bank.py` (seed 20261030, 150 seeded logs,
+four hash seeds, no seed variation) mines each log with the public inductive
+miner and records, per decision point of
+`algo.decision_mining.algorithm.get_decision_points`, the public `apply`
+table (columns, dtypes, cells, targets, classes) or its error, the
+`get_decision_tree` outcome, and the guards of
+`create_data_petri_nets_with_decisions`. The fixture
+`src/backend/tests/fixtures/decision_mining_bank.txt` drives
+`minera_decision_mining_parity_tests`: all 632 points, 134 tables and 498
+ValueErrors, match `reference_decision_table` (include/minera/decision_table.hpp)
+exactly, and the decision-point sets and labels match.
+
+Reference behaviour found (black box):
+- Rows come from token replay. Each fired transition whose label (None when
+  silent) occurs among the labels of the place's outgoing transitions gives a
+  row, even when that transition does not consume from the place, carrying the
+  attributes of the last visible event replayed before it. Firings before the
+  first event give none. Traces are visited by activity variant in
+  first-appearance order, then in log order.
+- Only event attributes present in every trace are encoded: string attributes
+  one-hot per value seen in the rows (values sorted), then numeric ones
+  (int64 when every row has an integer, else float64). Booleans, concept:name,
+  time:timestamp and lifecycle:transition are skipped; org:resource is a
+  string attribute. No rows or no string column raises ValueError.
+- Classes are the fired labels in first-appearance order; silent labels read
+  "None" when all labels are silent and "nan" beside visible ones (pandas str
+  inference). Targets index the classes.
+- Column order across different attributes follows Python set order and
+  moves with the hash seed; the bank only uses one string and one numeric
+  attribute, so it never sees that. Minera uses lexical key order per group.
+
+Contract decisions:
+- `get_decision_tree` raises ValueError for every point in the pinned
+  environment (sklearn rejects the object target) and
+  `create_data_petri_nets_with_decisions` returns no guards; the bank pins
+  both. Minera's native trees, guards and `mine_decision_tables` stay as
+  documented extensions rather than reproducing a broken path.
+- The package is complete on the reference table and decision points.

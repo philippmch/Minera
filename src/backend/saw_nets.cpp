@@ -52,27 +52,23 @@ FlattenedTypeLog flatten_type(const Ocel& log, const std::string& type) {
     event_order[log.events[index].id] = index;
   }
 
-  std::map<std::string, std::set<std::string>> object_event_ids;
+  // Each object's events are replayed in relation order (the first relation
+  // of an event to the object places it), not by time: the reference
+  // replays the flattened relations as they are listed.
+  std::map<std::string, std::vector<std::string>> object_event_ids;
   for (const auto& relation : log.relations) {
     const auto object_it = object_types.find(relation.object_id);
     if (object_it == object_types.end() || object_it->second != type ||
         !events.contains(relation.event_id)) {
       continue;
     }
-    object_event_ids[relation.object_id].insert(relation.event_id);
+    auto& ordered = object_event_ids[relation.object_id];
+    if (std::find(ordered.begin(), ordered.end(), relation.event_id) == ordered.end())
+      ordered.push_back(relation.event_id);
   }
 
   FlattenedTypeLog result;
-  for (const auto& [object_id, event_ids] : object_event_ids) {
-    std::vector<std::string> ordered_ids(event_ids.begin(), event_ids.end());
-    std::stable_sort(ordered_ids.begin(), ordered_ids.end(),
-                     [&](const std::string& left, const std::string& right) {
-                       const auto left_time = parse_timestamp(events.at(left)->timestamp);
-                       const auto right_time = parse_timestamp(events.at(right)->timestamp);
-                       if (left_time && right_time && *left_time != *right_time)
-                         return *left_time < *right_time;
-                       return event_order.at(left) < event_order.at(right);
-                     });
+  for (const auto& [object_id, ordered_ids] : object_event_ids) {
     Trace trace;
     trace.case_id = object_id;
     for (const auto& event_id : ordered_ids) {
@@ -176,6 +172,9 @@ SawNet merge_saw_nets(const std::map<std::string, SawNet>& object_nets,
       if (transition.activity) {
         activity = activity_index.at(saw.net.activities()[*transition.activity]);
       }
+      const auto found_weights = saw.transition_weights.find(index);
+      const SawWeightDistribution* weights =
+          found_weights == saw.transition_weights.end() ? nullptr : &found_weights->second;
       std::size_t merged = result.net.transitions().size();
       if (activity) {
         const auto label = result.net.activities()[*activity];
@@ -190,9 +189,11 @@ SawNet merge_saw_nets(const std::map<std::string, SawNet>& object_nets,
                                            std::move(outputs));
         for (std::size_t arc = 0; arc < transition.inputs.size(); ++arc) {
           arc_types[std::to_string(merged) + ":input:" + std::to_string(arc)] = type;
+          if (weights) result.arc_weights[std::to_string(merged) + ":input:" + std::to_string(arc)] = *weights;
         }
         for (std::size_t arc = 0; arc < transition.outputs.size(); ++arc) {
           arc_types[std::to_string(merged) + ":output:" + std::to_string(arc)] = type;
+          if (weights) result.arc_weights[std::to_string(merged) + ":output:" + std::to_string(arc)] = *weights;
         }
         if (activity) {
           visible_transitions.emplace(result.net.activities()[*activity], merged);
@@ -215,17 +216,18 @@ SawNet merge_saw_nets(const std::map<std::string, SawNet>& object_nets,
         result.net.append_transition_arcs(
             merged, std::move(additional_inputs), std::move(additional_outputs));
         for (std::size_t arc = 0; arc < transition.inputs.size(); ++arc) {
-          arc_types[std::to_string(merged) + ":input:" +
-                    std::to_string(input_offset + arc)] = type;
+          const auto key = std::to_string(merged) + ":input:" + std::to_string(input_offset + arc);
+          arc_types[key] = type;
+          if (weights) result.arc_weights[key] = *weights;
         }
         for (std::size_t arc = 0; arc < transition.outputs.size(); ++arc) {
-          arc_types[std::to_string(merged) + ":output:" +
-                    std::to_string(output_offset + arc)] = type;
+          const auto key = std::to_string(merged) + ":output:" + std::to_string(output_offset + arc);
+          arc_types[key] = type;
+          if (weights) result.arc_weights[key] = *weights;
         }
       }
-      const auto weights = saw.transition_weights.find(index);
-      if (weights != saw.transition_weights.end()) {
-        for (const auto& [multiplicity, frequency] : weights->second)
+      if (weights) {
+        for (const auto& [multiplicity, frequency] : *weights)
           result.transition_weights[merged][multiplicity] += frequency;
       }
     }
@@ -289,12 +291,21 @@ SawNetDiscoveryResult discover_saw_nets(const Ocel& log) {
 
 SawNetDiscoveryResult discover_saw_nets(
     const Ocel& log, const SawNetDiscoveryOptions& options) {
-  const Ocel projected = project_ocel_labels(
+  // Selected activity labels name the transitions, but each type's log is
+  // flattened from the objects whose canonical type equals the type label.
+  Ocel projected = project_ocel_labels(
       log, options.activity_attribute, options.object_type_attribute, "SAW");
+  for (std::size_t index = 0; index < projected.objects.size() && index < log.objects.size(); ++index)
+    projected.objects[index].type = log.objects[index].type;
   OcpnDiscoveryOptions discovery_options;
   discovery_options.disable_fallthroughs = true;
   discovery_options.disable_strict_sequence_cut = true;
-  const auto ocpn = discover_ocpn(projected, discovery_options);
+  discovery_options.require_related_object_types = false;
+  discovery_options.mine_in_relation_order = true;
+  discovery_options.annotated = false;
+  discovery_options.activity_attribute = options.activity_attribute;
+  discovery_options.object_type_attribute = options.object_type_attribute;
+  const auto ocpn = discover_ocpn(log, discovery_options);
   SawNetDiscoveryResult result;
   for (const auto& type : ocpn.object_types) {
     const auto net_it = ocpn.petri_nets.find(type);

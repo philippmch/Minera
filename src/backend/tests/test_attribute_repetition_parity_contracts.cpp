@@ -207,6 +207,55 @@ void log_scalar_wrappers_compare_as_value_children_mappings() {
   assert(retained(R"({"type":"string","value":"v"})").empty());
 }
 
+void log_xes_lists_compare_as_public_list_values() {
+  std::istringstream xes(R"(<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1.0">
+ <trace><string key="concept:name" value="mapping"/>
+  <event><list key="k"><string key="a" value="1"/><container key="c"/><string key="a" value="2"/></list></event>
+ </trace>
+ <trace><string key="concept:name" value="pairs"/>
+  <event><list key="k"><values><string key="a" value="1"/></values><string key="b" value="2"/></list></event>
+ </trace>
+ <trace><string key="concept:name" value="late"/>
+  <event><list key="k"><string key="b" value="2"/><values><string key="a" value="1"/></values></list></event>
+ </trace>
+ <trace><string key="concept:name" value="empty"/>
+  <event><list key="k"/></event><event><list key="k"></list></event>
+ </trace>
+ <trace><string key="concept:name" value="container"/>
+  <event><container key="k"><string key="a" value="2"/></container></event>
+ </trace>
+</log>
+)");
+  const auto log = import_xes_event_log(xes);
+  LogAttributeRepetitionOptions options;
+  options.attribute_key = std::string("k");
+  options.minimum = TokenInteger(1);
+  const auto retained = [&](const std::string& json) {
+    std::vector<std::string> out;
+    for (const auto& trace : filter_log_attribute_value_repetition(log, target(json), options).traces) out.push_back(trace.case_id);
+    return out;
+  };
+  const std::string none = R"({"type":"null"})";
+  const auto pair = [](const std::string& key, const std::string& value) {
+    return R"({"type":"tuple","value":[{"type":"string","value":")" + key + R"("},{"type":"string","value":")" + value + R"("}]})";
+  };
+  // A <list> is {'value': None, 'children': ...}; containers are never stored,
+  // and a <values> block after a stored child is ignored.
+  assert(retained(R"({"type":"map","value":{"value":)" + none + R"(,"children":{"type":"map","value":{"a":{"type":"string","value":"2"}}}}})") ==
+         std::vector<std::string>{"mapping"});
+  assert(retained(R"({"type":"map","value":{"value":)" + none + R"(,"children":{"type":"list","value":[)" + pair("a", "1") + "," + pair("b", "2") + "]}}}") ==
+         std::vector<std::string>{"pairs"});
+  assert(retained(R"({"type":"map","value":{"value":)" + none + R"(,"children":{"type":"map","value":{"b":{"type":"string","value":"2"}}}}})") ==
+         std::vector<std::string>{"late"});
+  // A <list> without child elements is None.
+  options.minimum = TokenInteger(2);
+  assert(retained(none) == std::vector<std::string>{"empty"});
+  options.minimum = TokenInteger(1);
+  // A plain mapping equal to the container's children matches nothing.
+  assert(retained(R"({"type":"map","value":{"a":{"type":"string","value":"2"}}})").empty());
+}
+
 }  // namespace
 
 int main() {
@@ -220,5 +269,6 @@ int main() {
   polars_integers_beyond_int128_fail_when_the_literal_is_built();
   polars_single_row_nan_case_joins_nothing();
   log_scalar_wrappers_compare_as_value_children_mappings();
+  log_xes_lists_compare_as_public_list_values();
   return 0;
 }

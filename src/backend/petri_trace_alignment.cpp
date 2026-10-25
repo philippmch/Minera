@@ -7,6 +7,7 @@
 #include <queue>
 #include <optional>
 #include <functional>
+#include <map>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
@@ -486,6 +487,45 @@ std::vector<PetriTraceAlignment> align_petri_trace_all(
     const std::vector<std::string>& trace, const PetriNet& net,
     const PetriTraceAlignmentOptions& options) {
   return run(trace, net, options);
+}
+
+std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const PetriNet& net,
+                                                 const PetriLogAlignmentOptions& options) {
+  if (!options.trace.trace_costs.empty())
+    throw std::invalid_argument("per-event trace costs cannot apply to a whole log");
+  // The public log dispatcher first checks easy soundness and raises for a
+  // net whose final marking is unreachable, where a single trace would get
+  // None.
+  if (!final_marking_reachable(net, options.trace.initial_marking, options.trace.final_marking))
+    throw std::invalid_argument("trying to apply alignments on a Petri net that is not easy sound");
+  const bool standard = options.activity_key == "concept:name" || options.activity_key == "activity";
+  std::map<std::vector<std::string>, PetriTraceAlignment> variants;
+  std::vector<PetriTraceAlignment> out;
+  out.reserve(log.traces.size());
+  for (const auto& trace : log.traces) {
+    std::vector<std::string> activities;
+    activities.reserve(trace.events.size());
+    for (const auto& event : trace.events) {
+      if (standard) {
+        activities.push_back(event.activity);
+        continue;
+      }
+      const auto* value = event.attribute(options.activity_key);
+      if (!value) throw std::invalid_argument("event without activity key '" + options.activity_key + "'");
+      activities.push_back(*value);
+    }
+    auto found = variants.find(activities);
+    if (found == variants.end()) {
+      auto aligned = align_petri_trace(activities, net, options.trace);
+      if (!options.enable_best_worst_cost) {
+        aligned.bwc.reset();
+        aligned.fitness.reset();
+      }
+      found = variants.emplace(std::move(activities), std::move(aligned)).first;
+    }
+    out.push_back(found->second);
+  }
+  return out;
 }
 
 }  // namespace minera

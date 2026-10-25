@@ -694,15 +694,57 @@ def log_element(rng, key, depth=0):
     return head + "/>"
 
 
-def generate_log_cases(count, bank_seed):
+def log_list_element(rng, key, depth=0, in_pairs=False):
+    """An XES <list> or <container> in one of the shapes the public importer
+    distinguishes. Inside <values> pairs nothing may gain child elements,
+    which the public importer rejects."""
+    def child(pairs):
+        roll = rng.random()
+        name = rng.choice(("a", "b", "a", "n"))
+        if roll < 0.15:
+            return f"<container key={xml_attr(name)}>{log_element(rng, 'x', 2)}</container>"
+        if roll < 0.3 and depth < 2:
+            return log_list_element(rng, name, depth + 1, pairs)
+        return log_element(rng, name, 2 if pairs else depth + 1)
+    head = f"<list key={xml_attr(key)}"
+    form = rng.choice(("empty", "open", "mapping", "mapping", "pairs", "pairs", "container", "values-late"))
+    if in_pairs and form not in ("empty", "open", "container"):
+        form = "empty"
+    if form == "empty":
+        return head + "/>"
+    if form == "open":
+        return head + "></list>"
+    if form == "container":
+        return f"<container key={xml_attr(key)}>{''.join(child(False) for _ in range(rng.randint(0, 2)))}</container>"
+    if form == "mapping":
+        return f"{head}>{''.join(child(False) for _ in range(rng.randint(1, 3)))}</list>"
+    if form == "pairs":
+        inner = "".join(child(True) for _ in range(rng.randint(0, 3)))
+        after = "".join(log_element(rng, rng.choice(("a", "b")), 2) for _ in range(rng.randint(0, 1)))
+        return f"{head}><values>{inner}</values>{after}</list>"
+    # <values> after a stored child is ignored by the public importer.
+    first = log_element(rng, "a", 2)
+    late = "".join(log_element(rng, "b", 2) for _ in range(rng.randint(0, 2)))
+    return f"{head}>{first}<values>{late}</values></list>"
+
+
+def generate_log_cases(count, bank_seed, lists=False):
     rng = random.Random(bank_seed)
-    return [{"traces": rng.randint(0, 5), "key": rng.choice(LOG_KEYS), "seed": rng.randrange(1 << 30)}
-            for _ in range(count)]
+    cases = [{"traces": rng.randint(0, 5), "key": rng.choice(LOG_KEYS), "seed": rng.randrange(1 << 30)}
+             for _ in range(count)]
+    if lists:
+        for case in cases:
+            case["lists"] = True
+    return cases
 
 
 def build_log_xes(spec):
     rng = random.Random(spec["seed"])
-    pool = [log_element(rng, spec["key"]) for _ in range(rng.randint(1, 4))]
+    element = log_element
+    if spec.get("lists"):
+        element = lambda rng, key: (log_list_element(rng, key) if rng.random() < 0.6
+                                    else log_element(rng, key))
+    pool = [element(rng, spec["key"]) for _ in range(rng.randint(1, 4))]
     lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<log xes.version="1.0">']
     for t in range(spec["traces"]):
         lines.append(f' <trace><string key="concept:name" value="rd-t{t}"/>')
@@ -711,7 +753,7 @@ def build_log_xes(spec):
             if spec["key"] != "concept:name":
                 parts.append(f'<string key="concept:name" value={xml_attr(rng.choice(LABELS[:3]))}/>')
             if rng.random() < 0.85:
-                parts.append(rng.choice(pool) if rng.random() < 0.8 else log_element(rng, spec["key"]))
+                parts.append(rng.choice(pool) if rng.random() < 0.8 else element(rng, spec["key"]))
             lines.append("  <event>" + "".join(parts) + "</event>")
         lines.append(" </trace>")
     lines.append("</log>")

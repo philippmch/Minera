@@ -152,6 +152,14 @@ void write_pnml(std::ostream& out, const PnmlDocument& document,
 [[nodiscard]] PnmlDocument parse_pnml_document(
     std::string_view xml, const PnmlImportOptions& options = {});
 
+// Outgoing transitions of each place in imported arc order (one entry per
+// place-to-transition arc, any arc type). Public replay walks a place's
+// outgoing arcs in the order the PNML lists them, which decides ties between
+// equally short silent paths. Empty when the document has no arc metadata or
+// the metadata does not cover exactly the net's input arcs.
+[[nodiscard]] std::optional<std::vector<std::vector<std::size_t>>>
+pnml_place_outgoing_transition_order(const PnmlDocument& document);
+
 // Reads and parses a PNML file.
 [[nodiscard]] PetriNet import_pnml(const std::filesystem::path& path);
 [[nodiscard]] PnmlDocument import_pnml_document(

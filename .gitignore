@@ -47,3 +47,4 @@ Thumbs.db
 # Frontend
 src/frontend/node_modules/
 src/frontend/dist/
+__pycache__/

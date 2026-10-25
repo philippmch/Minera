@@ -110,13 +110,38 @@ evidence.
   Arbitrary Python objects with custom equality, Polars List/Struct/Decimal/
   Duration/Time columns and pandas period/interval/sparse dtypes are not
   representable and are rejected by the carrier or the companion.
-* The log row stays partial. A public XES `<list>` without `<values>` is
-  `{'value': None, 'children': {...}}`, but natively it is the same
-  `kContainer` that ordinary Python logs use for a plain dict, so the two
-  public meanings share one native representation and native compares it as
-  a plain mapping. The bank does not generate `<list>`/`<container>`
-  elements for that reason. Custom-equality objects and nonstring dictionary
-  keys also remain outside the log carrier.
+* Custom-equality objects and nonstring dictionary keys remain outside the
+  log carrier. XES `<list>`/`<container>` shapes (below) are recorded for the
+  default importer variations (iterparse and its memory-compressed form);
+  logs read with the other variations keep native list/dict structure.
+
+## XES lists and containers (2026-10-25)
+
+The public default importer does not store XES `<list>` and `<container>`
+elements as the plain list or dict that the native container suggests,
+which the log row previously could not tell apart. Observed rules:
+
+* A `<list>` with any child element is `{'value': None, 'children': ...}`
+  (its own `value` attribute is ignored); without child elements it is None.
+* Its children are a mapping (later duplicate keys win) unless a `<values>`
+  element arrives while no child is stored yet: then they are ordered
+  `(key, value)` pairs, and later siblings are appended as pairs. A
+  `<values>` after a stored child, or a second one, is ignored.
+* `<container>` elements are never stored, at the top level or nested; they
+  still make an enclosing `<list>` a wrapper.
+* Nested lists recurse. An element with children inside pairs makes the
+  public import fail (`TypeError: list indices must be integers or slices,
+  not str`); generators avoid that shape.
+
+The importer now records this as `EventAttribute::xes_public_shape`
+(`kWrapper`, `kNone`, `kAbsent`) without changing the native structure, so
+XES export round trips are unaffected; the log repetition filter compares the
+public value. A fifth bank, `docs/attribute-repetition-domain-log-lists-bank.json.gz`
+(`--log-lists`, bank seed 20261025, hash seeds 0-4, 6,000 cases) mixes these
+elements into the log generator: 18,557 calls (16,263 results, 2,294
+errors), all stable and all passing. With the shapes ignored, 1,010 of them
+fail. The 20261024 log bank still passes in full. With this bank the log row
+is promoted.
 
 ## Registered proofs
 
@@ -124,4 +149,5 @@ evidence.
 (`src/backend/tests/test_attribute_repetition_parity_contracts.cpp`) pins each
 rule above with a focused case. With these banks, `algo.filtering.pandas.
 attr_value_repetition.filter` and `algo.filtering.polars.attr_value_repetition.
-filter` are promoted; the log module remains partial.
+filter` are promoted; `algo.filtering.log.attr_value_repetition.filter` follows
+with the XES list bank (`log_xes_lists_compare_as_public_list_values`).

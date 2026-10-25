@@ -97,6 +97,9 @@ struct ReplayFitnessOptions {
   std::vector<bool> final_marking_keys;
   std::vector<std::string> place_names;
   std::vector<std::string> transition_names;
+  // Token replay's per-place silent-path tie order (see TokenReplayOptions).
+  // PNML document entry points default it to the imported arc order.
+  std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
 };
 
 struct PrecisionResult {
@@ -129,6 +132,9 @@ struct PrecisionOptions {
   std::vector<bool> final_marking_keys;
   std::vector<std::string> place_names;
   std::vector<std::string> transition_names;
+  // Token replay's per-place silent-path tie order (see TokenReplayOptions).
+  // PNML document entry points default it to the imported arc order.
+  std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
 };
 
 struct GeneralizationOptions {
@@ -143,6 +149,9 @@ struct GeneralizationOptions {
   std::vector<bool> final_marking_keys;
   std::vector<std::string> place_names;
   std::vector<std::string> transition_names;
+  // Token replay's per-place silent-path tie order (see TokenReplayOptions).
+  // PNML document entry points default it to the imported arc order.
+  std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
 };
 
 struct GeneralizationResult {
@@ -203,6 +212,9 @@ struct CompositeEvaluationOptions {
   std::vector<bool> final_marking_keys;
   std::vector<std::string> place_names;
   std::vector<std::string> transition_names;
+  // Token replay's per-place silent-path tie order (see TokenReplayOptions).
+  // PNML document entry points default it to the imported arc order.
+  std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
 };
 
 struct CompositeEvaluationResult {

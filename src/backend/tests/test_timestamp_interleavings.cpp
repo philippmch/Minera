@@ -42,29 +42,58 @@ void finds_strict_lr_and_rl_crossings() {
   const auto result = minera::discover_timestamp_interleavings(
       left, right, {minera::CaseRelation{"L", "R"}});
   // The artificial boundaries make the opposite crossings at the
-  // beginning/end of the related traces observable as well.
+  // beginning/end of the related traces observable as well. Indices number
+  // each log as start boundaries, events, end boundaries (A = 1, X = 1), and
+  // rows follow the indices of the two pairs' first events.
   assert(result.interleavings.size() == 5);
   assert(result.interleavings[0].direction ==
-         minera::TimestampInterleavingDirection::kLeftToRight);
-  assert(result.interleavings[0].source_activity == "A" &&
-         result.interleavings[0].target_activity == "X");
-  assert(result.interleavings[0].left_index == 0 &&
-         result.interleavings[0].right_index == 0 &&
-         result.interleavings[0].timestamp_diff_seconds == 1.0);
-  assert(result.interleavings[1].direction ==
          minera::TimestampInterleavingDirection::kRightToLeft);
-  assert(result.interleavings[1].source_activity == "X" &&
-         result.interleavings[1].target_activity == "B");
+  assert(result.interleavings[0].source_activity == "X" &&
+         result.interleavings[0].target_activity == "B");
+  assert(result.interleavings[0].left_index == 2 &&
+         result.interleavings[0].right_index == 1 &&
+         result.interleavings[0].timestamp_diff_seconds == 2.0);
+  assert(result.interleavings[1].direction ==
+         minera::TimestampInterleavingDirection::kLeftToRight);
+  assert(result.interleavings[1].source_activity == "A" &&
+         result.interleavings[1].target_activity == "X");
   assert(result.interleavings[1].left_index == 1 &&
-         result.interleavings[1].right_index == 0 &&
-         result.interleavings[1].timestamp_diff_seconds == 2.0);
-  assert(result.interleavings[3].source_activity == "Y" &&
-         result.interleavings[3].target_activity == "C");
-  assert(result.interleavings[3].left_index == 2 &&
-         result.interleavings[3].right_index == 1 &&
-         result.interleavings[3].timestamp_diff_seconds == 2.0);
+         result.interleavings[1].right_index == 1 &&
+         result.interleavings[1].timestamp_diff_seconds == 1.0);
+  assert(result.interleavings[2].source_activity == "Y" &&
+         result.interleavings[2].target_activity == "C");
+  assert(result.interleavings[2].left_index == 3 &&
+         result.interleavings[2].right_index == 2 &&
+         result.interleavings[2].timestamp_diff_seconds == 2.0);
   assert(result.interleavings[4].source_activity == "Z" &&
          result.interleavings[4].target_activity == "■");
+  assert(result.interleavings[4].target_timestamp == "2262-04-11T23:47:16.854775807Z");
+}
+
+void naive_timestamps_and_start_overflow_raise() {
+  bool threw = false;
+  try {
+    (void)minera::discover_timestamp_interleavings(
+        log_with("L", {event("L", "A", "2024-01-01T00:00:01", 0)}),
+        log_with("R", {event("R", "X", "2024-01-01T00:00:02Z", 0)}),
+        {minera::CaseRelation{"L", "R"}});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  // The start boundary precedes X, which precedes A: elapsed time from the
+  // start boundary to X does not fit in nanoseconds.
+  threw = false;
+  try {
+    (void)minera::discover_timestamp_interleavings(
+        log_with("L", {event("L", "A", "2024-01-01T00:00:03Z", 0)}),
+        log_with("R", {event("R", "X", "2024-01-01T00:00:02Z", 0),
+                       event("R", "Y", "2024-01-01T00:00:04Z", 1)}),
+        {minera::CaseRelation{"L", "R"}});
+  } catch (const std::overflow_error&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void equality_and_unrelated_relations_are_excluded() {
@@ -165,6 +194,7 @@ void malformed_result_is_rejected() {
 
 int main() {
   finds_strict_lr_and_rl_crossings();
+  naive_timestamps_and_start_overflow_raise();
   equality_and_unrelated_relations_are_excluded();
   custom_timestamp_and_bound_are_strict();
   invalid_timestamps_and_json_contract();

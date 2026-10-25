@@ -15,6 +15,7 @@ EventLog sample() {
 
 int main() {
   auto l = sample(); TraceAttributeClusteringOptions o; o.trace_attribute="segment";
+  o.dfg_extension = true;
   const auto memberships = trace_attribute_clustering_groups(l, "segment");
   assert(memberships.size() == 2 && memberships[0].name == "z" && memberships[1].name == "y");
   assert(memberships[0].trace_indices == std::vector<std::size_t>({0, 2}));
@@ -45,8 +46,11 @@ int main() {
   Trace case_prefixed{"d", {Event{"d","A","","",0,{},""}}, {{"case:segment","x"}}};
   EventLog prefixed; prefixed.traces.push_back(case_prefixed);
   auto prefixed_options=o; prefixed_options.trace_attribute="segment";
+  // A single group raises, like the reference linkage.
+  threw=false; try { (void)discover_trace_attribute_clustering(prefixed,prefixed_options); } catch(const std::invalid_argument&) {threw=true;} assert(threw);
+  prefixed.traces.push_back(Trace{"e", {Event{"e","B","","",0,{},""}}, {{"case:segment","w"}}});
   auto prefixed_result=discover_trace_attribute_clustering(prefixed,prefixed_options);
-  assert(prefixed_result.diagnostics.group_count==1 && prefixed_result.leaf_names[0]=="x");
+  assert(prefixed_result.diagnostics.group_count==2 && prefixed_result.leaf_names.size()==2);
   auto case_options=o; case_options.trace_attribute="case:concept:name";
   auto case_result=discover_trace_attribute_clustering(l,case_options);
   assert(case_result.diagnostics.group_count==3);

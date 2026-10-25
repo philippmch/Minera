@@ -405,6 +405,7 @@ void copy_token_markings(const Source& source, Target& target) {
   target.final_marking_keys = source.final_marking_keys;
   target.place_names = source.place_names;
   target.transition_names = source.transition_names;
+  target.place_outgoing_transition_order = source.place_outgoing_transition_order;
 }
 
 template <class Options>
@@ -423,6 +424,8 @@ bool inherit_document_token_markings(const PnmlDocument& document, Options& opti
                options.exact_final_marking, options.final_marking_keys)) return false;
   if (options.place_names.empty()) options.place_names = document.place_ids;
   if (options.transition_names.empty()) options.transition_names = document.transition_ids;
+  if (!options.place_outgoing_transition_order)
+    options.place_outgoing_transition_order = pnml_place_outgoing_transition_order(document);
   return true;
 }
 
@@ -760,6 +763,7 @@ ReplayFitnessResult evaluate_replay_fitness(
     replay_options.place_names = options.place_names;
     replay_options.transition_names = options.transition_names;
     replay_options.cleaning_token_flood = options.cleaning_token_flood;
+    replay_options.place_outgoing_transition_order = options.place_outgoing_transition_order;
     std::vector<TokenReplayTraceDiagnostics> rows;
     try {
       rows = options.token_replay_variant == TokenReplayVariant::kForward
@@ -916,6 +920,8 @@ ReplayFitnessResult evaluate_replay_fitness(
   }
   if (supplied.place_names.empty()) supplied.place_names = document.place_ids;
   if (supplied.transition_names.empty()) supplied.transition_names = document.transition_ids;
+  if (!supplied.place_outgoing_transition_order)
+    supplied.place_outgoing_transition_order = pnml_place_outgoing_transition_order(document);
   return evaluate_replay_fitness(log, document.net, variant, supplied);
 }
 ReplayFitnessResult evaluate_replay_fitness(

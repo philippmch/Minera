@@ -6,7 +6,10 @@
 #include <map>
 #include <set>
 #include <stdexcept>
+#include <string>
+#include <tuple>
 #include <utility>
+#include <vector>
 
 namespace minera {
 namespace {
@@ -82,7 +85,6 @@ struct SegmentCollection {
 
 struct Community {
   std::vector<std::size_t> nodes;
-  std::size_t representative = 0;
   // The graph implementation returns communities sorted by node count while
   // preserving the graph's insertion order for equal-sized communities.
   // Keep that order explicit so the later event-frequency ordering can use
@@ -94,103 +96,107 @@ std::vector<Community> cluster_segments(const std::vector<SegmentRef>& nodes,
                                          double min_edge_weight) {
   const std::size_t n = nodes.size();
   std::vector<double> degree(n, 0.0);
-  std::map<std::pair<std::size_t, std::size_t>, double> edges;
-  double total_weight = 0.0;
+  std::vector<std::vector<std::pair<std::size_t, double>>> adjacency(n);
   for (std::size_t i = 0; i < n; ++i) {
     for (std::size_t j = i + 1; j < n; ++j) {
       if (nodes[i].activity != nodes[j].activity) continue;
       const double weight = context_similarity(nodes[i].encoded_context,
                                                nodes[j].encoded_context);
       if (!(weight > min_edge_weight)) continue;
-      edges[{i, j}] = weight;
-      degree[i] += weight;
-      degree[j] += weight;
-      total_weight += weight;
+      adjacency[i].push_back({j, weight});
+      adjacency[j].push_back({i, weight});
     }
   }
+  // Degrees and the total weight are summed in graph adjacency order, as the
+  // reference graph library does; the greedy merge order depends on the
+  // exact floating-point values.
+  for (std::size_t i = 0; i < n; ++i)
+    for (const auto& [neighbour, weight] : adjacency[i]) degree[i] += weight;
+  double degree_sum = 0.0;
+  for (const auto value : degree) degree_sum += value;
+  const double total_weight = degree_sum / 2.0;
   std::vector<Community> communities;
   communities.reserve(n);
   for (std::size_t i = 0; i < n; ++i)
-    communities.push_back({{i}, i, i});
+    communities.push_back({{i}, i});
   if (total_weight <= 0.0) return communities;
 
-  while (communities.size() > 1) {
+  // Clauset-Newman-Moore greedy modularity with incrementally updated
+  // gains: dq[u][v] starts at 2*q0*w - 2*a_u*a_v (q0 = 1/(2m), a = k*q0).
+  // Merging u into v sets dq[v][w] to dq[u][w] + dq[v][w] for common
+  // neighbours and subtracts 2*a_x*a_w for a neighbour of only one side x.
+  const double q0 = 1.0 / (2.0 * total_weight);
+  std::vector<double> a(n);
+  for (std::size_t i = 0; i < n; ++i) a[i] = degree[i] * q0;
+  std::vector<std::map<std::size_t, double>> dq(n);
+  for (std::size_t i = 0; i < n; ++i)
+    for (const auto& [neighbour, weight] : adjacency[i])
+      dq[i][neighbour] = 2 * q0 * weight - 2 * a[i] * a[neighbour];
+  std::vector<bool> alive(n, true);
+  std::vector<NodeKey> labels;
+  labels.reserve(n);
+  for (const auto& node : nodes) labels.push_back({node.activity, node.context});
+
+  while (true) {
+    // The reference heap pops the largest gain and breaks ties by the
+    // smallest ordered pair of node identifiers, (activity, context).
+    bool found = false;
     double best_gain = 0.0;
-    std::size_t best_left = n;
-    std::size_t best_right = n;
-    std::pair<NodeKey, NodeKey> best_key;
-    bool have_best_key = false;
-    for (std::size_t a = 0; a < communities.size(); ++a) {
-      double total_a = 0.0;
-      for (const auto node : communities[a].nodes) total_a += degree[node];
-      for (std::size_t b = a + 1; b < communities.size(); ++b) {
-        double total_b = 0.0;
-        for (const auto node : communities[b].nodes) total_b += degree[node];
-        double between = 0.0;
-        bool adjacent = false;
-        for (const auto left : communities[a].nodes) {
-          for (const auto right : communities[b].nodes) {
-            const auto edge = std::minmax(left, right);
-            if (const auto it = edges.find(edge); it != edges.end()) {
-              between += it->second;
-              adjacent = true;
-            }
-          }
-        }
-        // The graph queue contains only pairs joined by at least one graph
-        // edge. In particular, isolated vertices must not be merged through
-        // a synthetic zero-gain pair.
-        if (!adjacent) continue;
-        // m is the total undirected edge weight. For two communities A and
-        // B, the weighted modularity delta is e(A,B)/m minus the expected
-        // term k(A)k(B)/(2m^2); between already sums every cross-edge once.
-        const double gain = between / total_weight -
-                            (total_a * total_b) /
-                                (2.0 * total_weight * total_weight);
-        const auto& left_node = nodes[communities[a].representative];
-        const auto& right_node = nodes[communities[b].representative];
-        const NodeKey left_id{left_node.activity, left_node.context};
-        const NodeKey right_id{right_node.activity, right_node.context};
-        // The heap used by the reference greedy modularity implementation
-        // breaks equal gains by the lexicographically smallest ordered pair
-        // of graph node identifiers, (activity, context).
-        const auto candidate_key =
-            left_id < right_id
-                ? std::pair<NodeKey, NodeKey>{left_id, right_id}
-                : std::pair<NodeKey, NodeKey>{right_id, left_id};
-        if (gain > best_gain ||
+    std::size_t best_u = n, best_v = n;
+    for (std::size_t u = 0; u < n; ++u) {
+      if (!alive[u]) continue;
+      for (const auto& [v, gain] : dq[u]) {
+        if (!found || gain > best_gain ||
             (gain == best_gain &&
-             (!have_best_key || candidate_key < best_key))) {
+             std::tie(labels[u], labels[v]) <
+                 std::tie(labels[best_u], labels[best_v]))) {
+          found = true;
           best_gain = gain;
-          best_key = candidate_key;
-          // The heap removes the lower identifier into the higher one. This
-          // matters because the surviving representative controls all later
-          // tie breaks.
-          if (left_id < right_id) {
-            best_left = b;
-            best_right = a;
-          } else {
-            best_left = a;
-            best_right = b;
-          }
-          have_best_key = true;
+          best_u = u;
+          best_v = v;
         }
       }
     }
-    // The network routine accepts zero-gain merges and stops only after the
-    // best available gain becomes negative. A graph with no edges has already
-    // taken the singleton fast path above.
-    if (best_left == n || best_gain < 0.0) break;
-    auto& destination = communities[best_left].nodes;
-    destination.insert(destination.end(), communities[best_right].nodes.begin(),
-                       communities[best_right].nodes.end());
-    std::sort(destination.begin(), destination.end());
-    communities.erase(communities.begin() +
-                       static_cast<std::ptrdiff_t>(best_right));
+    // Zero-gain merges are accepted; a negative best gain stops.
+    if (!found || best_gain < 0.0) break;
+    const auto u = best_u;
+    const auto v = best_v;
+    std::set<std::size_t> neighbours;
+    for (const auto& entry : dq[u]) neighbours.insert(entry.first);
+    for (const auto& entry : dq[v]) neighbours.insert(entry.first);
+    neighbours.erase(u);
+    neighbours.erase(v);
+    for (const auto w : neighbours) {
+      const auto from_u = dq[u].find(w);
+      const auto from_v = dq[v].find(w);
+      double updated;
+      if (from_u != dq[u].end() && from_v != dq[v].end())
+        updated = from_v->second + from_u->second;
+      else if (from_u != dq[u].end())
+        updated = from_u->second - 2 * a[v] * a[w];
+      else
+        updated = from_v->second - 2 * a[u] * a[w];
+      dq[v][w] = updated;
+      dq[w][v] = updated;
+      dq[w].erase(u);
+    }
+    dq[v].erase(u);
+    dq[u].clear();
+    alive[u] = false;
+    a[v] = a[v] + a[u];
+    // Communities are indexed by their surviving node.
+    auto& members = communities[v].nodes;
+    members.insert(members.end(), communities[u].nodes.begin(),
+                   communities[u].nodes.end());
+    std::sort(members.begin(), members.end());
+    communities[u].nodes.clear();
   }
+  std::erase_if(communities, [](const Community& community) {
+    return community.nodes.empty();
+  });
   // The Python graph routine returns largest communities first and preserves
   // insertion order for equal cardinalities. The vector remains in insertion
-  // order because merges erase only the consumed representative.
+  // order because merges empty only the consumed community.
   std::stable_sort(communities.begin(), communities.end(),
                    [](const Community& left, const Community& right) {
                      return left.nodes.size() > right.nodes.size();
@@ -291,6 +297,16 @@ LabelSplittingResult split_activity_labels(const EventLog& log,
     for (auto& [label, piece] : pieces)
       communities_by_activity[label].push_back(std::move(piece));
   }
+  // A separate target column starts as a copy of the activity column, so
+  // events that are not relabeled keep their original label there.
+  const auto canonical = [](const std::string& key) {
+    return key == "concept:name" ? std::string{"activity"} : key;
+  };
+  if (canonical(options.target_key) != canonical(options.activity_key))
+    for (auto& trace : result.log.traces)
+      for (auto& event : trace.events)
+        set_activity_value(event, options.target_key,
+                           activity_value(event, options.activity_key));
   for (const auto& label : activity_order) {
     auto community_it = communities_by_activity.find(label);
     if (community_it == communities_by_activity.end()) continue;
