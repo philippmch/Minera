@@ -8250,8 +8250,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.dfg.dfg_dist",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_dfg_dist_calc"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "dfg_dist_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.leven_dist.leven_dist_calc",
@@ -8259,8 +8281,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.leven_dist.leven_dist_calc",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_leven_dist"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "leven_dist_calc_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.linkage_method.linkage_avg",
@@ -8268,8 +8312,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.linkage_method.linkage_avg",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_linkage_avg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "linkage_avg_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.merge_log.merge_log",
@@ -8277,8 +8343,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.merge_log.merge_log",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_clusteredlog"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "merge_log_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.util.evaluation",
@@ -8340,8 +8428,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.util.filter_subsets",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_sublog_percent"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "filter_subsets_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.variants.act_dist_calc",
@@ -8349,8 +8459,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.variants.act_dist_calc",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_act_sim"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "act_dist_calc_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.variants.logslice_dist",
@@ -8358,8 +8490,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.variants.logslice_dist",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_slice_dist_act"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "logslice_dist_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.variants.sim_calc",
@@ -8367,8 +8521,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.variants.sim_calc",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_dist_calc"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "sim_calc_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.variants.suc_dist_calc",
@@ -8376,8 +8552,30 @@
       "owner": "algo.clustering.trace_attribute_driven",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trace_attribute_reference.hpp",
+        "src/backend/trace_attribute_reference.cpp",
+        "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+        "scripts/capture-trace-attribute-helpers-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.trace_attribute_driven.variants.suc_dist_calc",
+        "implementation": [
+          {
+            "path": "include/minera/trace_attribute_reference.hpp",
+            "symbol": "reference_ta_suc_sim"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_trace_attribute_helpers_parity.cpp",
+            "executable": "minera_trace_attribute_helpers_parity_tests",
+            "case": "suc_dist_calc_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.comparison.petrinet.element_usage_comparison",

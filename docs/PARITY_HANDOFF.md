@@ -144,6 +144,22 @@ package and its three partial modules promoted. Minera's working PRIPEL
 diffprivlib (its mechanisms draw from secrets.SystemRandom, so only
 invariants would be checkable).
 
+## Trace-attribute clustering helpers — 2026-10-25
+
+The nine helper modules of `algo.clustering.trace_attribute_driven`
+(filter_subsets, act/suc_dist_calc, sim_calc, logslice_dist, leven_dist_calc,
+dfg_dist, linkage_avg, merge_log) are ported black-box in
+include/minera/trace_attribute_reference.hpp and bound by
+`docs/trace-attribute-helpers-bank.txt.gz` (6,608 seeded calls over 47
+functions, 0 failures) in `minera_trace_attribute_helpers_parity_tests`.
+Reference quirks kept: act_sim/suc_sim weigh by sublog2df's variant-sorted
+counts (IndexError past them), act_dist and merge_log always raise TypeError,
+linkage_* need a square matrix and IndexError below two logs, clusteredlog
+returns one (possibly empty) group per label 1..maxclust. Contracts: floats
+within 1e-12; act_sim_med (numpy unstable argsort median) must hit one of its
+tie choices; occu_suc may pick other successions within a frequency it takes
+only in part. fcluster(maxclust) is emulated for monotonic linkages only.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

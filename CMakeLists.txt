@@ -218,6 +218,7 @@ add_library(minera_core
   src/backend/llm_sql_utils.cpp
   src/backend/trace_variant_query_reference.cpp
   src/backend/pripel_reference.cpp
+  src/backend/trace_attribute_reference.cpp
   src/backend/live_stream.cpp
   src/backend/streaming_session.cpp
   src/backend/link_analysis.cpp
@@ -2367,6 +2368,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_pripel_reference_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_pripel_reference_parity_tests COMMAND minera_pripel_reference_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pripel-reference-bank.txt")
+
+  add_executable(minera_trace_attribute_helpers_parity_tests
+    src/backend/tests/test_trace_attribute_helpers_parity.cpp
+  )
+  target_link_libraries(minera_trace_attribute_helpers_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_trace_attribute_helpers_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_trace_attribute_helpers_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_trace_attribute_helpers_parity_tests COMMAND minera_trace_attribute_helpers_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/trace-attribute-helpers-bank.txt.gz")
 
   add_executable(minera_random_tree_tests
     src/backend/tests/test_random_tree.cpp
