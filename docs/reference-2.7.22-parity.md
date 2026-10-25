@@ -125,7 +125,7 @@ are reconciled.
 | Comparison | Petri-net element-usage comparison | **Complete** — `compare_element_usage_token_replay` composes the public forward token replay (PLTR) exactly as the reference does and matches the 2,000-call public bank (see "Element-usage comparison bank"); the older `compare_petri_usage` options surface (CLI, server, frontend) keeps its own replay with the evidence below |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Complete** — module and dispatcher contracts cover all seven public functions, eight apply parameters, typed labels, signed controls, EventLog/EventTable adapters, diagnostics and RNG continuation; exact proofs and reviewed ordering distinctions are recorded in `docs/bose-parity-contract.md` |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete** (six search variants, log-level dispatcher and log enrichment) — all six variants are explicitly selectable and `align_petri_trace` reproduces the reference per-trace cost, best-worst cost, fitness, unreachable-marking and error behavior, including cost functions, arc-weight handling and the less-memory pruning, against three black-box banks (see "Conformance parity bank evidence"); less-memory Dijkstra with legacy unit costs remains the generic default of `check_alignment` |
-| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial (implemented core; proof pending)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors; DFG classic is bound to the conformance parity banks (alignment, cost and visited states), the four process-tree variants are bound to their reference ports (search-graph, dynamic-programming, MILP and approximated banks), while decomposed results are captured there but not yet bound |
+| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters; strict activity selectors apply to every family and DFG/edit projections additionally expose timestamp selectors; DFG classic is bound to the conformance parity banks (alignment, cost and visited states), the four process-tree variants are bound to their reference ports (search-graph, dynamic-programming, MILP and approximated banks), and decomposed `RECOMPOS_MAXIMAL` is bound to its reference port (`docs/decomposed-bank.txt.gz`) |
 | Conformance: replay | forward token replay and backwards token replay | **Complete** (both variants, dispatcher, duration and root-cause support) — the dispatcher is bound by `minera_token_replay_dispatcher_parity_tests` (see "Token replay dispatcher bank"); root-cause diagnoses are bound by `minera_token_replay_root_cause_parity_tests` (see "Token replay root-cause bank"); forward PLTR maps and RETURN_NAMES rows are bound by `minera_token_replay_pltr_parity_tests` (see "Forward token replay PLTR and RETURN_NAMES bank"); forward replay remains the default; grouped/stream/eager/lazy replay preserves null activities, typed case identity, selector precedence, adapter-specific case ordering, and event caps; both variations expose per-case counters, ordered silent/visible firings, event-level problems, unknown-event positions, reached markings, and enabled-transition IDs; duration cohorts have independent support proofs and native/JSON/CLI/server/frontend adapters, and root-cause support is bound separately; forward and backwards replay rows, including routing and flood cleaning under each public option, are bound to the conformance parity banks, forward `consider_activities_not_in_model_in_fitness` included |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete** — all three footprint selectors have distinct production components and registered contracts, including strict/non-strict relations, extensive diagnostics, tree-node decoration, and evaluation utilities; classic log-skeleton and Declare conformance add trace/log/flat adapters, strict activity and case selectors, exact empty/subset family-selection behavior, typed per-case diagnostics, and distinct registered proofs |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete** — log and dataframe contracts preserve one result bucket per case, apply strict configurable selectors and business-hour elapsed time, handle zero-variance profiles deterministically, and expose grouped diagnostics through native JSON plus the cached local conformance endpoint and typed frontend adapter |
@@ -1565,6 +1565,49 @@ and among optimal base alignments, and CBC's integral cutoff above. The
 time limits (`max_align_time`, `max_align_time_trace`) are not ported. The
 older native `APPROXIMATED_ORIGINAL` selector keeps its exact residual
 alignments for the CLI and server.
+
+### Decomposed RECOMPOS_MAXIMAL
+
+`include/minera/decomposed_reference.hpp` ports
+`algo.conformance.alignments.decomposed.variants.recompos_maximal` and the
+maximal decomposition it uses (`objects.petri_net.utils.decomposition`) as
+observed from the inputs and outputs of their helpers.
+`scripts/capture-decomposed-bank.py` converts 400 seeded process trees to
+accepting Petri nets with the reference converter and captures, for an event
+log of 4 to 6 traces each, into `docs/decomposed-bank.txt.gz`: the net in the
+reference's place and transition iteration order, the components `decompose`
+returns, the empty-trace alignment behind the best-worst cost, and per
+aligned variant every `align` call with its result, every
+`merge_sublist_nets` call with its result and the component list handed to
+`recompose_alignment`. Component alignments break ties by object addresses,
+so each case runs once, under hash seed `index % 4`, with a 3 second limit.
+`minera_decomposed_parity_tests` checks:
+
+- all 765 components of the 400 nets exactly, in order, and all 190 merges;
+- the best-worst cost (visible model moves of the empty trace's alignment of
+  the whole net, at the same optimal cost);
+- that each of the 2144 component alignments is optimal: the native Dijkstra
+  alignment has the same cost (1047 are identical);
+- replaying the reference's component alignments, apply makes the same
+  align, merge and recompose calls in the same order (variants in order of
+  first occurrence, alignments cached by component object and projected
+  trace, merges by the merged transition sets) and gives the cost,
+  alignment, fitness and bwc of all 1402 traces exactly;
+- that apply raises for the 82 logs where the reference never returns: its
+  first recomposition queue has no visited check, so it runs forever once a
+  link cycle between component alignments is reachable from a component with
+  an initial marking, and the native port detects exactly those cycles;
+- the fully native apply: costs follow from the alignments, and 1310 of 1393
+  traces get the reference cost (another optimal component alignment changes
+  which border activities disagree and so the merges and the recomposition).
+
+The rules are in the header comment, including two reference quirks: of the
+visible transitions sharing a label, only the last in iteration order joins
+its places, and a disagreement on an activity merges every component holding
+that activity, aligned or not. The time limits and the border-agreement
+threshold are left at their defaults. The older native `RECOMPOS_MAXIMAL`
+selector (`align_decomposed`) keeps its own composition for the CLI and
+server.
 
 ## XES importer-variant evidence
 

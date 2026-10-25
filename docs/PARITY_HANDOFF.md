@@ -200,6 +200,18 @@ all four selector proofs. CBC's ties (splits) and object-address ties (base
 alignments) are not reproduced natively; the fully native run gives the
 reference cost for 1,733 of 1,932 traces.
 
+## Decomposed RECOMPOS_MAXIMAL — 2026-10-25
+
+Bank `docs/decomposed-bank.txt.gz` (400 tree nets, 765 components, 2,144
+component alignments, 1,402 traces, about a minute to capture) passes in
+`minera_decomposed_parity_tests` (about 6 s) through
+`include/minera/decomposed_reference.hpp`. Decomposition and merges are
+exact; replaying the reference's component alignments reproduces every
+align/merge/recompose call and every apply result exactly, and the 82 logs
+where the reference loops forever (a link cycle in the first recomposition
+queue) raise natively. Module and package `algo.conformance.alignments.decomposed`
+promoted. The older `align_decomposed` used by the CLI and server is unchanged.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

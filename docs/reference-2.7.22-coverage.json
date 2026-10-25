@@ -776,8 +776,40 @@
           "symbol": "RECOMPOS_MAXIMAL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "RECOMPOS_MAXIMAL": {
+          "selector": "RECOMPOS_MAXIMAL",
+          "binding": {
+            "selector": "RECOMPOS_MAXIMAL",
+            "modules": [
+              "algo.conformance.alignments.decomposed.variants.recompos_maximal"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "RECOMPOS_MAXIMAL"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/decomposed_reference.hpp",
+              "symbol": "reference_decomposed_alignments"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_decomposed_parity.cpp",
+              "executable": "minera_decomposed_parity_tests",
+              "case": "replay_case"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/decomposed_reference.hpp",
+        "src/backend/decomposed_reference.cpp",
+        "src/backend/tests/test_decomposed_parity.cpp"
+      ]
     },
     {
       "package": "algo.conformance.alignments.dfg",
@@ -8803,8 +8835,29 @@
           "selector": "RECOMPOS_MAXIMAL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/decomposed_reference.hpp",
+        "src/backend/decomposed_reference.cpp",
+        "src/backend/tests/test_decomposed_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.decomposed.variants.recompos_maximal",
+        "implementation": [
+          {
+            "path": "include/minera/decomposed_reference.hpp",
+            "symbol": "reference_decomposed_alignments"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_decomposed_parity.cpp",
+            "executable": "minera_decomposed_parity_tests",
+            "case": "replay_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.dfg.variants.classic",
