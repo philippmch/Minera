@@ -140,6 +140,25 @@ struct LogToFeaturesResult {
   return log_to_features(log, options);
 }
 
+// Per-variant entry points: the options' variant is replaced by the named one.
+[[nodiscard]] inline LogToFeaturesResult event_based_log_features(
+    const EventLog& log, LogToFeaturesOptions options = {}) {
+  options.variant = LogToFeaturesVariant::EVENT_BASED;
+  return log_to_features(log, options);
+}
+
+[[nodiscard]] inline LogToFeaturesResult trace_based_log_features(
+    const EventLog& log, LogToFeaturesOptions options = {}) {
+  options.variant = LogToFeaturesVariant::TRACE_BASED;
+  return log_to_features(log, options);
+}
+
+[[nodiscard]] inline LogToFeaturesResult temporal_log_features(
+    const EventLog& log, LogToFeaturesOptions options = {}) {
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  return log_to_features(log, options);
+}
+
 using FeatureExtractionVariant = LogToFeaturesVariant;
 using FeatureExtractionOptions = LogToFeaturesOptions;
 using FeatureExtractionResult = LogToFeaturesResult;

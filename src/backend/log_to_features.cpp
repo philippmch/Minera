@@ -1275,7 +1275,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       auto set_core = [&](const std::string& n, double v) { if (auto i = index.find(n); i != index.end()) row[i->second] = v; };
       auto set = [&](const std::string& n, double v) { if (auto i = extra_index.find(n); i != extra_index.end()) row[i->second] = v; };
       for (std::size_t i = core_feature_count; i < names.size(); ++i)
-        set(names[i], options.default_not_present);
+        set(names[i], names[i].starts_with("firstIndexAct@@") || names[i].starts_with("lastIndexAct@@")
+                          ? -1.0 : options.default_not_present);
       std::map<std::string, int> count; std::map<std::string, std::size_t> first, last;
       std::set<std::string> seen;
       for (std::size_t i = 0; i < t.events.size(); ++i) {

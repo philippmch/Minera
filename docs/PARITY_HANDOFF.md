@@ -26,6 +26,20 @@ Thread "Close remaining filter and log parity gaps" owns the partial
 `support:filtering` modules (`algo.filtering.{common,dfg,log,pandas,polars}.*`).
 Other threads: please pick different packages.
 
+## In progress — clustering and features (claimed 2026-10-25)
+
+Thread "Continue parity toward 2.7.22" owns
+`algo.clustering.trace_attribute_driven` (the DMM_VEC rule) next, then
+`algo.transformation.log_to_features` leftovers (temporal_lazy, LLE util).
+
+## Log to features — 2026-10-25
+
+New bank `docs/log-to-features-bank.json.gz` (960 calls, a few seconds)
+passes in `minera_log_to_features_parity_tests` for EVENT_BASED, TRACE_BASED
+and TEMPORAL (weekly and daily). One native fix: absent-activity index
+features are -1. Package promoted (73/86); temporal_lazy and the LLE util
+stay partial.
+
 ## Decision mining — 2026-10-25
 
 New bank `docs/decision-mining-bank.json.gz` (632 decision points, under a

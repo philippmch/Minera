@@ -14690,3 +14690,32 @@ Contract decisions:
   both. Minera's native trees, guards and `mine_decision_tables` stay as
   documented extensions rather than reproducing a broken path.
 - The package is complete on the reference table and decision points.
+
+## Log-to-features bank (2026-10-25)
+
+`scripts/capture-log-to-features-bank.py` (seed 20261031, 120 seeded logs,
+four hash seeds) records the public
+`algo.transformation.log_to_features.algorithm.apply` for EVENT_BASED and
+TRACE_BASED under default parameters, explicit event/case attribute lists,
+`enable_all_extra_features`, and an explicit succession attribute, and for
+TEMPORAL (the same events as a dataframe, timestamps stretched 300 times)
+with weekly and daily `grouper_freq`. The fixture
+`src/backend/tests/fixtures/log_to_features_bank.txt` drives
+`minera_log_to_features_parity_tests`: all 960 calls (40 raising) match the
+per-variant entry points `event_based_log_features`,
+`trace_based_log_features` and `temporal_log_features`.
+
+Reference behaviour found (black box):
+- TRACE_BASED column order follows Python set order and moves with the hash
+  seed (240 calls); every observation is the same table up to column order,
+  so the test compares columns by name. EVENT_BASED pads shorter traces with
+  zero rows up to the longest trace; Minera returns the unpadded rows and the
+  test pads them.
+- `firstIndexAct@@a` and `lastIndexAct@@a` are -1 for an activity absent from
+  the trace (other extra features default to 0). Minera used 0 and now uses -1.
+- An explicit numeric event attribute missing from every event of some trace
+  raises (`Exception`, "at least a trace without any event with event
+  attribute").
+
+The package is complete on its three selectors. Still partial: the internal
+`variants.temporal_lazy` module and `util.locally_linear_embedding`.

@@ -6364,8 +6364,93 @@
           "symbol": "TEMPORAL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_to_features.hpp",
+        "src/backend/log_to_features.cpp",
+        "src/backend/tests/test_log_to_features_parity.cpp",
+        "src/backend/tests/fixtures/log_to_features_bank.txt",
+        "scripts/capture-log-to-features-bank.py",
+        "scripts/generate-log-to-features-bank-tests.py"
+      ],
+      "proofs": {
+        "EVENT_BASED": {
+          "selector": "EVENT_BASED",
+          "binding": {
+            "selector": "EVENT_BASED",
+            "modules": [
+              "algo.transformation.log_to_features.variants.event_based"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "EVENT_BASED"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/log_to_features.hpp",
+              "symbol": "event_based_log_features"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_log_to_features_parity.cpp",
+              "executable": "minera_log_to_features_parity_tests",
+              "case": "event_based_case"
+            }
+          ]
+        },
+        "TRACE_BASED": {
+          "selector": "TRACE_BASED",
+          "binding": {
+            "selector": "TRACE_BASED",
+            "modules": [
+              "algo.transformation.log_to_features.variants.trace_based"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "TRACE_BASED"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/log_to_features.hpp",
+              "symbol": "trace_based_log_features"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_log_to_features_parity.cpp",
+              "executable": "minera_log_to_features_parity_tests",
+              "case": "trace_based_case"
+            }
+          ]
+        },
+        "TEMPORAL": {
+          "selector": "TEMPORAL",
+          "binding": {
+            "selector": "TEMPORAL",
+            "modules": [
+              "algo.transformation.log_to_features.variants.temporal"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "TEMPORAL"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/log_to_features.hpp",
+              "symbol": "temporal_log_features"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_log_to_features_parity.cpp",
+              "executable": "minera_log_to_features_parity_tests",
+              "case": "temporal_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.transformation.log_to_interval_tree",
@@ -15805,8 +15890,32 @@
           "selector": "EVENT_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_to_features.hpp",
+        "src/backend/log_to_features.cpp",
+        "src/backend/tests/test_log_to_features_parity.cpp",
+        "src/backend/tests/fixtures/log_to_features_bank.txt",
+        "scripts/capture-log-to-features-bank.py",
+        "scripts/generate-log-to-features-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_features.variants.event_based",
+        "implementation": [
+          {
+            "path": "include/minera/log_to_features.hpp",
+            "symbol": "event_based_log_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_to_features_parity.cpp",
+            "executable": "minera_log_to_features_parity_tests",
+            "case": "event_based_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_features.variants.temporal",
@@ -15819,8 +15928,32 @@
           "selector": "TEMPORAL"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_to_features.hpp",
+        "src/backend/log_to_features.cpp",
+        "src/backend/tests/test_log_to_features_parity.cpp",
+        "src/backend/tests/fixtures/log_to_features_bank.txt",
+        "scripts/capture-log-to-features-bank.py",
+        "scripts/generate-log-to-features-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_features.variants.temporal",
+        "implementation": [
+          {
+            "path": "include/minera/log_to_features.hpp",
+            "symbol": "temporal_log_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_to_features_parity.cpp",
+            "executable": "minera_log_to_features_parity_tests",
+            "case": "temporal_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_features.variants.temporal_lazy",
@@ -15842,8 +15975,32 @@
           "selector": "TRACE_BASED"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_to_features.hpp",
+        "src/backend/log_to_features.cpp",
+        "src/backend/tests/test_log_to_features_parity.cpp",
+        "src/backend/tests/fixtures/log_to_features_bank.txt",
+        "scripts/capture-log-to-features-bank.py",
+        "scripts/generate-log-to-features-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_features.variants.trace_based",
+        "implementation": [
+          {
+            "path": "include/minera/log_to_features.hpp",
+            "symbol": "trace_based_log_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_to_features_parity.cpp",
+            "executable": "minera_log_to_features_parity_tests",
+            "case": "trace_based_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_interval_tree.variants.open_paths",
