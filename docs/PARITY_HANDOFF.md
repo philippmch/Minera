@@ -212,7 +212,7 @@ where the reference loops forever (a link cycle in the first recomposition
 queue) raise natively. Module and package `algo.conformance.alignments.decomposed`
 promoted. The older `align_decomposed` used by the CLI and server is unchanged.
 
-## Connectors — in progress (claimed 2026-10-25)
+## Connectors — algo.connectors complete; LLM and embeddings in progress (claimed 2026-10-25)
 
 Thread "Close remaining algorithm parity gaps" owns `algo.connectors.*`,
 `algo.transformation.to_embeddings.*` and `algo.querying.llm.connectors.*`.
@@ -225,6 +225,12 @@ read_sql of a fixed SQL text plus format_dataframe; the bank found three
 native `format_dataframe` gaps (compact dates, conversion before dropping
 incomplete rows, date-like canonical identifiers), fixed in
 `src/backend/dataframe_format.cpp`.
+
+All of `algo.connectors` is now complete: GitHub (600 stubbed repositories,
+every GET and frame exact), Outlook calendar and mail, Windows events and
+util.mail (win32com stubbed, 1,800 cases plus 60 connect call sequences).
+The package selectors are proven. Native GitHub date parsing accepts the
+ISO 8601 forms the API writes rather than dateutil's whole grammar.
 
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 

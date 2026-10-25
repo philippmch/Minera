@@ -1668,6 +1668,23 @@ receives in place, so the stub serves fresh copies); the date offset is
 dropped and the wall clock labelled UTC. Native accepts the ISO 8601 forms
 the API writes instead of all of dateutil's grammar, a documented narrowing.
 
+Outlook and Windows events: win32com and pythoncom are stubbed with objects
+that raise AttributeError for a missing attribute (KeyError for a missing WMI
+property), and 600 seeded cases per connector cover missing, None and
+wrongly typed attributes, naive and aware datetimes, int, float, bool and
+text minutes, meeting states, reminders on and off, senders and recipients
+without Name, mail classes 43, 46 and others, and WMI times with and without
+fraction and offset, overlong fractions and impossible dates. All 1214 frames
+match exactly and the 586 raising cases raise the same exception type; 60
+util.mail.connect cases match their COM call sequence. Rules found (header
+comment): the calendar keeps an item only when its four main times and
+Duration convert, and drops a cancelled or reminder row alone when its
+attribute is missing (a float reminder minutes value drops it too); the
+mail extractor walks sent items before the inbox and compares str(Class);
+the WMI times are cut at the first '+' or '-' and parsed by time.strptime,
+whose regular expression native reproduces (so "2024012030405.123" is
+2024-01-20 03:04:05.123), and the first failure raises.
+
 ## XES importer-variant evidence
 
 The native importer explicitly accepts `ITERPARSE`, `LINE_BY_LINE`,

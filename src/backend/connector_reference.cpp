@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <numeric>
+#include <regex>
 
 #include "database_history_queries.hpp"
 #include "minera/dataframe_format.hpp"
@@ -504,6 +505,23 @@ std::int64_t github_date(const ConnectorReferenceJson& json) {
          ((hour * 60LL + minute) * 60LL + second) * 1000000LL + micros;
 }
 
+// pm4py.format_dataframe's order: cases by their first row (timestamp, then
+// row number), rows by case, timestamp and row number. Returns the row order
+// and each row's case rank.
+std::pair<std::vector<std::size_t>, std::vector<std::size_t>> format_order(const std::vector<std::string>& cases,
+                                                                           const std::vector<std::int64_t>& micros) {
+  std::vector<std::size_t> order(cases.size());
+  std::iota(order.begin(), order.end(), std::size_t{0});
+  std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return micros[a] < micros[b]; });
+  std::map<std::string, std::size_t> rank;
+  for (const auto k : order) rank.emplace(cases[k], rank.size());
+  std::stable_sort(order.begin(), order.end(),
+                   [&](std::size_t a, std::size_t b) { return rank.at(cases[a]) < rank.at(cases[b]); });
+  std::vector<std::size_t> ranks(cases.size());
+  for (std::size_t k = 0; k < cases.size(); ++k) ranks[k] = rank.at(cases[k]);
+  return {order, ranks};
+}
+
 struct GithubRow {
   std::string case_id;
   std::int64_t micros = 0;
@@ -515,16 +533,13 @@ ConnectorReferenceFrame github_frame(const std::string& owner, const std::string
                                      const std::vector<GithubRow>& rows) {
   ConnectorReferenceFrame frame;
   if (rows.empty()) return frame;
-  std::vector<std::size_t> by_time(rows.size());
-  std::iota(by_time.begin(), by_time.end(), std::size_t{0});
-  std::stable_sort(by_time.begin(), by_time.end(),
-                   [&](std::size_t a, std::size_t b) { return rows[a].micros < rows[b].micros; });
-  std::map<std::string, std::size_t> case_rank;
-  for (const auto k : by_time) case_rank.emplace(rows[k].case_id, case_rank.size());
-  std::vector<std::size_t> order = by_time;
-  std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-    return case_rank.at(rows[a].case_id) < case_rank.at(rows[b].case_id);
-  });
+  std::vector<std::string> cases;
+  std::vector<std::int64_t> times;
+  for (const auto& row : rows) {
+    cases.push_back(row.case_id);
+    times.push_back(row.micros);
+  }
+  const auto [order, case_rank] = format_order(cases, times);
   frame.index = order;
   auto column = [&](const std::string& name, auto value) {
     std::vector<Value> values;
@@ -545,11 +560,144 @@ ConnectorReferenceFrame github_frame(const std::string& owner, const std::string
     column("case:pull_request",
            [](const GithubRow& r, std::size_t) { return r.pull_request ? *r.pull_request : Value::none(); });
   column("@@index", [](const GithubRow&, std::size_t k) { return Value::of(static_cast<std::int64_t>(k)); });
-  column("@@case_index", [&](const GithubRow& r, std::size_t) {
-    return Value::of(static_cast<std::int64_t>(case_rank.at(r.case_id)));
-  });
+  column("@@case_index",
+         [&](const GithubRow&, std::size_t k) { return Value::of(static_cast<std::int64_t>(case_rank[k])); });
   return frame;
 }
+// The COM connectors drop an item (or a row) at the first of these.
+struct ComSkip {};
+
+const ConnectorReferenceCom& attribute(const ConnectorReferenceCom& object, const std::string& name) {
+  const auto* found = object.find(name);
+  if (!found) throw ComSkip{};
+  return *found;
+}
+
+// str() of a COM value.
+std::string python_str(const ConnectorReferenceCom& value) {
+  switch (value.kind) {
+    case ConnectorReferenceCom::kNone: return "None";
+    case ConnectorReferenceCom::kBool: return value.boolean ? "True" : "False";
+    case ConnectorReferenceCom::kInt: return std::to_string(value.integer);
+    case ConnectorReferenceCom::kFloat: return filtering_float_repr(value.real);
+    case ConnectorReferenceCom::kText: return value.text;
+    case ConnectorReferenceCom::kTime: {
+      auto out = timestamp_text(value.micros);
+      out.resize(out.size() - 6);
+      if (value.offset_minutes) {
+        const int offset = *value.offset_minutes, magnitude = offset < 0 ? -offset : offset;
+        char buffer[16];
+        std::snprintf(buffer, sizeof buffer, "%c%02d:%02d", offset < 0 ? '-' : '+', magnitude / 60, magnitude % 60);
+        out += buffer;
+      }
+      return out;
+    }
+    default: throw ComSkip{};
+  }
+}
+
+// A datetime as UTC microseconds: an aware one converted, a naive one as is.
+std::int64_t com_time(const ConnectorReferenceCom& value) {
+  if (value.kind != ConnectorReferenceCom::kTime) throw ComSkip{};
+  return value.micros - (value.offset_minutes ? *value.offset_minutes * 60000000LL : 0);
+}
+
+// datetime plus timedelta(minutes=m), OverflowError outside years 1..9999.
+std::int64_t plus_minutes(std::int64_t micros, const ConnectorReferenceCom& minutes, bool int_only) {
+  double delta = 0.0;
+  if (minutes.kind == ConnectorReferenceCom::kInt && (minutes.integer > 1000000000000LL || minutes.integer < -1000000000000LL))
+    throw ComSkip{};  // OverflowError
+  if (minutes.kind == ConnectorReferenceCom::kInt) delta = static_cast<double>(minutes.integer) * 60e6;
+  else if (minutes.kind == ConnectorReferenceCom::kBool) delta = minutes.boolean ? 60e6 : 0.0;
+  else if (minutes.kind == ConnectorReferenceCom::kFloat && !int_only) delta = round_half_even(minutes.real * 60e6);
+  else throw ComSkip{};
+  const double out = static_cast<double>(micros) + delta;
+  if (!(out >= static_cast<double>(kMinMicros) && out < static_cast<double>(kMaxMicros))) throw ComSkip{};
+  if (minutes.kind == ConnectorReferenceCom::kInt) return micros + minutes.integer * 60000000LL;
+  return micros + static_cast<std::int64_t>(delta);
+}
+
+bool truthy(const ConnectorReferenceCom& value) {
+  switch (value.kind) {
+    case ConnectorReferenceCom::kNone: return false;
+    case ConnectorReferenceCom::kBool: return value.boolean;
+    case ConnectorReferenceCom::kInt: return value.integer != 0;
+    case ConnectorReferenceCom::kFloat: return value.real != 0.0;
+    case ConnectorReferenceCom::kText: return !value.text.empty();
+    case ConnectorReferenceCom::kList: return !value.items.empty();
+    default: return true;
+  }
+}
+
+bool equals_five(const ConnectorReferenceCom& value) {
+  return (value.kind == ConnectorReferenceCom::kInt && value.integer == 5) ||
+         (value.kind == ConnectorReferenceCom::kFloat && value.real == 5.0);
+}
+
+// One output row of a COM connector: its case, timestamp and text columns.
+struct ComRow {
+  std::string case_id;
+  std::int64_t micros = 0;
+  std::vector<std::string> texts;
+};
+
+ConnectorReferenceFrame com_frame(const std::vector<ComRow>& rows, const std::vector<std::string>& columns,
+                                  std::size_t timestamp_at) {
+  if (rows.empty()) throw ConnectorReferenceError("KeyError", "'time:timestamp'");
+  std::vector<std::string> cases;
+  std::vector<std::int64_t> times;
+  for (const auto& row : rows) {
+    cases.push_back(row.case_id);
+    times.push_back(row.micros);
+  }
+  const auto [order, ranks] = format_order(cases, times);
+  ConnectorReferenceFrame frame;
+  frame.index = order;
+  frame.rows.resize(order.size());
+  for (std::size_t c = 0, text = 0; c <= columns.size(); ++c) {
+    if (c == timestamp_at) {
+      frame.columns.push_back("time:timestamp");
+      frame.dtypes.push_back("datetime64[us, UTC]");
+      for (std::size_t r = 0; r < order.size(); ++r) frame.rows[r].push_back(timestamp_text(rows[order[r]].micros));
+    }
+    if (c == columns.size()) break;
+    std::vector<Value> values;
+    for (const auto k : order) values.push_back(Value::of(rows[k].texts[text]));
+    add_column(frame, columns[c], values);
+    ++text;
+  }
+  std::vector<Value> index, case_index;
+  for (const auto k : order) {
+    index.push_back(Value::of(static_cast<std::int64_t>(k)));
+    case_index.push_back(Value::of(static_cast<std::int64_t>(ranks[k])));
+  }
+  add_column(frame, "@@index", index);
+  add_column(frame, "@@case_index", case_index);
+  return frame;
+}
+
+// time.strptime(text, "%Y%m%d%H%M%S.%f") as naive microseconds.
+std::int64_t wmi_time(const std::string& text) {
+  static const std::regex pattern(
+      R"((\d\d\d\d)(1[0-2]|0[1-9]|[1-9])(3[01]|[12]\d|0[1-9]|[1-9]| [1-9])(2[0-3]|[0-1]\d|\d)([0-5]\d|\d)(6[0-1]|[0-5]\d|\d)\.(\d{1,6}))");
+  std::smatch match;
+  if (!std::regex_search(text, match, pattern, std::regex_constants::match_continuous))
+    throw ConnectorReferenceError("ValueError", "time data '" + text + "' does not match format '%Y%m%d%H%M%S.%f'");
+  if (static_cast<std::size_t>(match.length(0)) != text.size())
+    throw ConnectorReferenceError("ValueError", "unconverted data remains: " + text.substr(match.length(0)));
+  auto number = [&](int group) { return std::stoi(match.str(group)); };
+  const int year = number(1), month = number(2), day = number(3), second = number(6);
+  static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  const bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+  if (year < 1 || day > kDays[month - 1] + (month == 2 && leap))
+    throw ConnectorReferenceError("ValueError", "day is out of range for month");
+  if (second > 59) throw ConnectorReferenceError("ValueError", "second must be in 0..59");
+  auto fraction = match.str(7);
+  fraction.resize(6, '0');
+  return days_from_civil(year, static_cast<unsigned>(month), static_cast<unsigned>(day)) * kMicrosPerDay +
+         ((number(4) * 60LL + number(5)) * 60LL + second) * 1000000LL + std::stoll(fraction);
+}
+
 }  // namespace
 
 std::string reference_database_connector_query(const std::string& connector, const std::string& prefix) {
@@ -713,6 +861,186 @@ ConnectorReferenceFrame reference_github_repo(const std::string& owner, const st
   } catch (const GithubStop&) {
   }
   return github_frame(owner, repository, rows);
+}
+
+const ConnectorReferenceCom* ConnectorReferenceCom::find(const std::string& name) const {
+  if (kind != kObject) return nullptr;
+  for (const auto& [key, value] : members)
+    if (key == name) return &value;
+  return nullptr;
+}
+
+ConnectorReferenceFrame reference_outlook_calendar(const std::vector<ConnectorReferenceCom>& calendar,
+                                                  bool include_reminders) {
+  std::vector<ComRow> rows;
+  for (const auto& item : calendar) {
+    try {
+      const auto id = python_str(attribute(item, "ConversationID"));
+      const auto subject = python_str(attribute(item, "Subject"));
+      const auto created = com_time(attribute(item, "CreationTime"));
+      const auto changed = com_time(attribute(item, "LastModificationTime"));
+      const auto start = com_time(attribute(item, "Start"));
+      const auto end = plus_minutes(start, attribute(item, "Duration"), false);
+      auto add = [&](std::int64_t micros, const char* activity) { rows.push_back({id, micros, {id, subject, activity}}); };
+      add(created, "Meeting Created");
+      add(changed, "Last Change of Meeting");
+      add(start, "Meeting Started");
+      add(end, "Meeting Completed");
+      try {
+        if (equals_five(attribute(item, "MeetingStatus"))) add(changed, "Meeting Cancelled");
+      } catch (const ComSkip&) {
+      }
+      try {
+        if (include_reminders && truthy(attribute(item, "ReminderSet"))) {
+          const auto& minutes = attribute(item, "ReminderMinutesBeforeStart");
+          ConnectorReferenceCom negated = minutes;
+          if (minutes.kind == ConnectorReferenceCom::kInt) negated.integer = -minutes.integer;
+          else if (minutes.kind == ConnectorReferenceCom::kBool) negated = {ConnectorReferenceCom::kInt, false, -minutes.boolean};
+          add(plus_minutes(start, negated, true), "Meeting Reminder Fired");
+        }
+      } catch (const ComSkip&) {
+      }
+    } catch (const ComSkip&) {
+    }
+  }
+  return com_frame(rows, {"case:concept:name", "case:subject", "concept:name"}, 2);
+}
+
+ConnectorReferenceFrame reference_outlook_mail(const std::vector<ConnectorReferenceCom>& sent,
+                                               const std::vector<ConnectorReferenceCom>& inbox) {
+  std::vector<ComRow> rows;
+  for (const auto& [items, direction] : {std::pair{&sent, "Sent "}, std::pair{&inbox, "Received "}}) {
+    for (const auto& item : *items) {
+      try {
+        const auto kind = python_str(attribute(item, "Class"));
+        if (kind != "43" && kind != "46") continue;
+        const auto subject = python_str(attribute(item, "Subject"));
+        const auto created = com_time(attribute(item, "CreationTime"));
+        std::string sender = "EMPTY", recipients = "EMPTY";
+        try {
+          sender = python_str(attribute(attribute(item, "Sender"), "Name"));
+        } catch (const ComSkip&) {
+        }
+        try {
+          const auto& list = attribute(item, "Recipients");
+          if (list.kind == ConnectorReferenceCom::kText && list.text.empty()) {
+            recipients.clear();
+          } else {
+            if (list.kind != ConnectorReferenceCom::kList) throw ComSkip{};
+            std::string joined;
+            for (std::size_t k = 0; k < list.items.size(); ++k)
+              joined += (k ? " AND " : "") + python_str(attribute(list.items[k], "Name"));
+            recipients = joined;
+          }
+        } catch (const ComSkip&) {
+        }
+        const auto id = python_str(attribute(item, "ConversationID"));
+        const auto topic = python_str(attribute(item, "ConversationTopic"));
+        const std::string activity = direction + std::string(kind == "43" ? "Mail" : "Delivery Report");
+        rows.push_back({id, created, {id, activity, sender, recipients, topic, subject}});
+      } catch (const ComSkip&) {
+      }
+    }
+  }
+  return com_frame(rows, {"case:concept:name", "concept:name", "org:resource", "recipients", "topic", "subject"}, 2);
+}
+
+std::vector<std::string> reference_mail_connect_calls(const std::optional<std::string>& email_user, int mailbox_id) {
+  std::vector<std::string> calls = {"CoInitialize()", "Dispatch('Outlook.Application')", "GetNamespace('MAPI')"};
+  const auto id = std::to_string(mailbox_id);
+  if (!email_user) {
+    calls.push_back("GetDefaultFolder(" + id + ")");
+    return calls;
+  }
+  // repr() of the user name.
+  const bool double_quotes = email_user->find('\'') != std::string::npos && email_user->find('"') == std::string::npos;
+  const char quote = double_quotes ? '"' : '\'';
+  std::string text(1, quote);
+  for (const char c : *email_user) {
+    if (c == quote || c == '\\') text += '\\';
+    text += c;
+  }
+  text += quote;
+  const auto recipient = "CreateRecipient(" + text + ")";
+  calls.push_back(recipient);
+  calls.push_back("Resolve()");
+  calls.push_back("GetSharedDefaultFolder(" + recipient + ", " + id + ")");
+  return calls;
+}
+
+ConnectorReferenceFrame reference_windows_events(const std::vector<ConnectorReferenceCom>& rows) {
+  static const char* const kProperties[] = {"Category",   "CategoryString", "ComputerName", "EventCode", "EventIdentifier",
+                                            "EventType",  "LogFile",        "Message",      "RecordNumber", "SourceName",
+                                            "TimeGenerated", "TimeWritten", "Type",         "User"};
+  struct Event {
+    std::vector<std::string> texts;
+    std::int64_t generated = 0, written = 0;
+  };
+  std::vector<Event> events;
+  for (const auto& row : rows) {
+    Event event;
+    for (const char* name : kProperties) {
+      const auto* value = row.find(name);
+      if (!value) throw ConnectorReferenceError("KeyError", std::string("'") + name + "'");
+      std::string text;
+      try {
+        text = python_str(*value);
+      } catch (const ComSkip&) {
+        throw ConnectorReferenceError("TypeError", std::string("property ") + name + " has no str()");
+      }
+      const std::string name_text = name;
+      if (name_text == "TimeGenerated" || name_text == "TimeWritten") {
+        const auto cut = text.substr(0, text.find_first_of("+-"));
+        (name_text == "TimeGenerated" ? event.generated : event.written) = wmi_time(cut);
+      }
+      event.texts.push_back(std::move(text));
+    }
+    events.push_back(std::move(event));
+  }
+  if (events.empty()) throw ConnectorReferenceError("KeyError", "'computerName'");
+  std::vector<std::string> cases;
+  std::vector<std::int64_t> times;
+  for (const auto& event : events) {
+    cases.push_back(event.texts[2]);
+    times.push_back(event.generated);
+  }
+  const auto [order, ranks] = format_order(cases, times);
+  ConnectorReferenceFrame frame;
+  frame.index = order;
+  auto naive = [](std::int64_t micros) {
+    auto text = timestamp_text(micros);
+    text.resize(text.size() - 6);
+    return text;
+  };
+  auto text_column = [&](const std::string& name, auto value) {
+    std::vector<Value> values;
+    for (const auto k : order) values.push_back(Value::of(value(events[k])));
+    add_column(frame, name, values);
+  };
+  auto time_column = [&](const std::string& name, auto value) {
+    frame.columns.push_back(name);
+    frame.dtypes.push_back("datetime64[us]");
+    for (std::size_t r = 0; r < order.size(); ++r) frame.rows[r].push_back(naive(value(events[order[r]])));
+  };
+  static const char* const kColumns[] = {"category",  "categoryString", "computerName", "eventCode",    "eventIdentifier",
+                                         "eventType", "logFile",        "message",      "recordNumber", "sourceName"};
+  for (std::size_t c = 0; c < 10; ++c) text_column(kColumns[c], [c](const Event& e) { return e.texts[c]; });
+  time_column("timeGenerated", [](const Event& e) { return e.generated; });
+  time_column("timeWritten", [](const Event& e) { return e.written; });
+  text_column("type", [](const Event& e) { return e.texts[12]; });
+  text_column("user", [](const Event& e) { return e.texts[13]; });
+  text_column("case:concept:name", [](const Event& e) { return e.texts[2]; });
+  time_column("time:timestamp", [](const Event& e) { return e.generated; });
+  text_column("concept:name", [](const Event& e) { return e.texts[9] + " " + e.texts[4]; });
+  text_column("org:resource", [](const Event& e) { return e.texts[13]; });
+  std::vector<Value> index, case_index;
+  for (const auto k : order) {
+    index.push_back(Value::of(static_cast<std::int64_t>(k)));
+    case_index.push_back(Value::of(static_cast<std::int64_t>(ranks[k])));
+  }
+  add_column(frame, "@@index", index);
+  add_column(frame, "@@case_index", case_index);
+  return frame;
 }
 
 }  // namespace minera

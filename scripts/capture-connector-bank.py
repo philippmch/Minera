@@ -19,6 +19,14 @@ issues sharing a timeline url, one to three pages); every GET is recorded
 with its headers. Each response is a fresh copy, since the reference
 reverses the timeline lists it receives.
 
+Outlook and Windows events: win32com and pythoncom are stubbed; Outlook
+folders hold seeded items (attributes missing, None or of the wrong type,
+naive and aware datetimes, int and float minutes, meeting states, reminders,
+senders and recipients without Name, mail classes 43 and 46 and others) and
+the WMI query returns rows of seeded Win32_NTLogEvent properties (times with
+and without fraction and offset, overlong fractions, out-of-range dates,
+missing properties).
+
 The bank is a gzip text file of tagged lines read by
 minera_connector_parity_tests:
 
@@ -30,14 +38,20 @@ minera_connector_parity_tests:
            whether it closed the connection (database connectors), or
            {"owner", "repository", "token", "pages", "timelines", "calls"}:
            the issue pages by number, the timelines by url and the GETs as
-           [url, headers] (github_repo)
+           [url, headers] (github_repo), {"items"} (outlook_calendar),
+           {"sent", "inbox"} (outlook_mail_extractor) or {"rows"}
+           (windows_events), {"user", "mailbox"} (util.mail connect):
+           COM values as JSON scalars, {"float": x},
+           {"dt": isoformat}, {"obj": {attribute: value}} and lists
   F json   {"columns", "dtypes", "index", "rows"} of the returned dataframe
+           ({"calls"}: the COM calls of util.mail.connect, as text)
            (values as str of a timestamp, repr of a float, True/False, null
            for a missing value), or {"raises": "ExceptionType: message"}
 """
 import argparse
 import contextlib
 import copy
+import datetime
 import gzip
 import json
 import os
@@ -53,8 +67,15 @@ warnings.filterwarnings('ignore')
 import pandas as pd
 requests = types.ModuleType('requests')
 sys.modules['requests'] = requests
+win32com = types.ModuleType('win32com')
+win32com.client = types.ModuleType('win32com.client')
+pythoncom = types.ModuleType('pythoncom')
+pythoncom.CoInitialize = lambda: None
+sys.modules.update({'win32com': win32com, 'win32com.client': win32com.client, 'pythoncom': pythoncom})
+from pm4py.algo.connectors.util import mail
 from pm4py.algo.connectors.variants import (camunda_workflow, chrome_history, firefox_history, github_repo,
-                                            sap_accounting, sap_o2c)
+                                            outlook_calendar, outlook_mail_extractor, sap_accounting, sap_o2c,
+                                            windows_events)
 
 BANK_SEED = 20261030
 ROOT = Path(__file__).resolve().parent.parent
@@ -346,6 +367,210 @@ def github_case(index):
     return f'github{index}', 'github_repo', source, result
 
 
+class ComObject:
+    """A COM object: reading a missing attribute raises AttributeError."""
+
+    def __init__(self, attributes):
+        self.attributes = attributes
+
+    def __getattr__(self, name):
+        try:
+            return self.__dict__['attributes'][name]
+        except KeyError:
+            raise AttributeError(name) from None
+
+
+class WmiValue:
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return str(self.value)
+
+
+class WmiRow:
+    def __init__(self, properties):
+        self.properties = properties
+
+    def Properties_(self, name):
+        return WmiValue(self.properties[name])
+
+
+COM = {}
+
+
+def com_dispatch(name):
+    if name == 'Outlook.Application':
+        namespace = types.SimpleNamespace(GetDefaultFolder=lambda n: types.SimpleNamespace(Items=COM.get(n, [])))
+        return types.SimpleNamespace(GetNamespace=lambda kind: namespace)
+    service = types.SimpleNamespace(ExecQuery=lambda query: COM.get('wmi', []))
+    return types.SimpleNamespace(ConnectServer=lambda *args: service)
+
+
+win32com.client.Dispatch = com_dispatch
+
+
+def com_json(value):
+    if isinstance(value, datetime.datetime):
+        return {'dt': value.isoformat()}
+    if isinstance(value, ComObject):
+        return {'obj': {k: com_json(v) for k, v in value.attributes.items()}}
+    if isinstance(value, list):
+        return [com_json(v) for v in value]
+    if isinstance(value, float):
+        return {'float': value}
+    return value
+
+
+def com_time():
+    value = datetime.datetime(2024, R.randint(1, 3), R.randint(1, 28), R.randint(0, 23), R.randint(0, 59),
+                              R.randint(0, 59), R.choice([0, 0, 0, R.randint(0, 999999)]))
+    if R.random() < 0.3:
+        value = value.replace(tzinfo=datetime.timezone(datetime.timedelta(minutes=R.choice([-300, 0, 120, 330]))))
+    return value
+
+
+def com_item(generators, missing, none):
+    attributes = {}
+    for name, generate in generators.items():
+        r = R.random()
+        if r < missing:
+            continue
+        attributes[name] = None if r < missing + none else generate()
+    return attributes
+
+
+CALENDAR = {'ConversationID': lambda: R.choice(['c1', 'c2', 'c3', '']), 'Subject': lambda: R.choice(['s', 'Team, sync', 'ü', '']),
+            'CreationTime': com_time, 'LastModificationTime': com_time, 'Start': com_time,
+            'Duration': lambda: R.choice([0, 30, 60, R.randint(0, 500), 1.5, '30', -10, True]),
+            'MeetingStatus': lambda: R.choice([0, 1, 3, 5, 5, 7, '5', 5.0, None]), 'ReminderSet': lambda: R.choice([True, False, 1, 0]),
+            'ReminderMinutesBeforeStart': lambda: R.choice([0, 15, 30, 2.5, '15', 2.0, True, -5])}
+
+
+def com_person():
+    r = R.random()
+    if r < 0.05:
+        return None
+    if r < 0.1:
+        return ComObject({})
+    return ComObject({'Name': R.choice(['Ann', 'Bob', 'Lee, Kim', None, ''])})
+
+
+def com_recipients():
+    r = R.random()
+    if r < 0.05:
+        return None
+    if r < 0.07:
+        return ''
+    return [com_person() for _ in range(R.randint(0, 3))]
+
+
+MAIL = {'Class': lambda: R.choice([43, 43, 43, 43, 46, 0, '43', '46', 43.0, True]),
+        'Subject': lambda: R.choice(['s', 'RE: s', 'ü', '', None]), 'CreationTime': com_time, 'Sender': com_person,
+        'Recipients': com_recipients, 'ConversationID': lambda: R.choice(['c1', 'c2', 'c3', '', None]),
+        'ConversationTopic': lambda: R.choice(['t', 'topic, x', '', None])}
+
+
+def wmi_time():
+    r = R.random()
+    base = '2024%02d%02d%02d%02d%02d' % (R.randint(1, 12), R.randint(1, 28), R.randint(0, 23), R.randint(0, 59), R.randint(0, 59))
+    if r < 0.03:
+        return R.choice([None, '', 'garbage', '20241302030405.000000+000', '2024', '20240231030405.1', '20240102030460.1',
+                         '2024012030405.123', '20240102030405.1_x+000'])
+    fraction = R.choice(['.000000', '.123456', '.5', '.1234567', ''] if r < 0.12 else ['.000000', '.%06d' % R.randint(0, 999999)])
+    offset = R.choice(['+000', '-060', '+060', '-300', '', '+06'] if r < 0.3 else ['+000', '-060', '+120'])
+    return base + fraction + offset
+
+
+WMI = ['Category', 'CategoryString', 'ComputerName', 'EventCode', 'EventIdentifier', 'EventType', 'LogFile', 'Message',
+       'RecordNumber', 'SourceName', 'TimeGenerated', 'TimeWritten', 'Type', 'User']
+
+
+def wmi_value(name):
+    if name in ('TimeGenerated', 'TimeWritten'):
+        return wmi_time()
+    if name in ('Category', 'EventCode', 'EventIdentifier', 'EventType', 'RecordNumber'):
+        return R.choice([0, 1, 7, R.randint(0, 70000), None])
+    if name == 'ComputerName':
+        return R.choice(['pc', 'PC-2', '', None])
+    if name == 'SourceName':
+        return R.choice(['src', 'Service Control Manager', '', None])
+    if name == 'User':
+        return R.choice([None, None, 'NT AUTHORITY\\SYSTEM', 'bob', ''])
+    if name == 'Message':
+        return R.choice(['m', 'a, b\nc', '', None])
+    return R.choice(['x', '', None, 'Information', 'Error'])
+
+
+def com_apply(module, parameters=None):
+    try:
+        with open(os.devnull, 'w') as sink, contextlib.redirect_stderr(sink), contextlib.redirect_stdout(sink):
+            return ser(module.apply(parameters))
+    except Exception as e:
+        return {'raises': f'{type(e).__name__}: {e}'}
+
+
+def com_cases(count):
+    cases = []
+    for index in range(count):
+        items = [com_item(CALENDAR, 0.03, 0.03) for _ in range(R.randint(0, 4))]
+        reminders = R.choice([None, None, True, False])
+        COM.clear()
+        COM[9] = [ComObject(a) for a in items]
+        parameters = {} if reminders is None else {'include_reminders': reminders}
+        cases.append((f'calendar{index}', 'outlook_calendar',
+                      {'items': [com_json(ComObject(a)) for a in items], 'include_reminders': reminders},
+                      com_apply(outlook_calendar, parameters)))
+    for index in range(count):
+        inbox = [com_item(MAIL, 0.03, 0.02) for _ in range(R.randint(0, 4))]
+        sent = [com_item(MAIL, 0.03, 0.02) for _ in range(R.randint(0, 3))]
+        COM.clear()
+        COM[6], COM[5] = [ComObject(a) for a in inbox], [ComObject(a) for a in sent]
+        cases.append((f'mail{index}', 'outlook_mail_extractor',
+                      {'sent': [com_json(ComObject(a)) for a in sent], 'inbox': [com_json(ComObject(a)) for a in inbox]},
+                      com_apply(outlook_mail_extractor)))
+    for index in range(count):
+        rows = []
+        for _ in range(R.randint(0, 5)):
+            rows.append({name: wmi_value(name) for name in WMI if R.random() >= 0.005})
+        COM.clear()
+        COM['wmi'] = [WmiRow(p) for p in rows]
+        cases.append((f'wmi{index}', 'windows_events', {'rows': [com_json(ComObject(p)) for p in rows]},
+                      com_apply(windows_events)))
+    for index in range(count // 10):
+        user, mailbox = R.choice([None, None, '', 'me@example.org', 'Ann Lee']), R.choice([5, 6, 9, 3, 0])
+        cases.append((f'connect{index}', 'mail_connect', {'user': user, 'mailbox': mailbox},
+                      {'calls': mail_connect_calls(user, mailbox)}))
+    return cases
+
+
+class Recorder:
+    """Records the COM calls made through it, as text."""
+
+    def __init__(self, calls, name):
+        self.calls, self.name = calls, name
+
+    def __getattr__(self, attribute):
+        return Recorder(self.calls, attribute)
+
+    def __call__(self, *args):
+        text = self.name + '(' + ', '.join(a.name if isinstance(a, Recorder) else repr(a) for a in args) + ')'
+        self.calls.append(text)
+        return Recorder(self.calls, text)
+
+
+def mail_connect_calls(user, mailbox):
+    calls = []
+    dispatch, initialize = win32com.client.Dispatch, pythoncom.CoInitialize
+    win32com.client.Dispatch = Recorder(calls, 'Dispatch')
+    pythoncom.CoInitialize = Recorder(calls, 'CoInitialize')
+    try:
+        mail.connect(user, mailbox)
+    finally:
+        win32com.client.Dispatch, pythoncom.CoInitialize = dispatch, initialize
+    return calls
+
+
 class Response:
     def __init__(self, data):
         self.data = data
@@ -365,6 +590,7 @@ def main():
         cases = browser_cases(args.count, directory)
     cases += database_cases(args.count // 2)
     cases += [github_case(index) for index in range(args.count)]
+    cases += com_cases(args.count)
     for name, kind, dump, result in cases:
         lines += [f'C {name}', f'K {kind}', 'S ' + json.dumps(dump, ensure_ascii=False),
                   'F ' + json.dumps(result, ensure_ascii=False, separators=(',', ':'))]

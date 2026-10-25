@@ -1998,8 +1998,240 @@
           "symbol": "AVAILABLE_CONNECTORS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "chrome_history": {
+          "selector": "chrome_history",
+          "binding": {
+            "selector": "chrome_history",
+            "modules": [
+              "algo.connectors.variants.chrome_history"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_chrome_history"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "chrome_case"
+            }
+          ]
+        },
+        "firefox_history": {
+          "selector": "firefox_history",
+          "binding": {
+            "selector": "firefox_history",
+            "modules": [
+              "algo.connectors.variants.firefox_history"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_firefox_history"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "firefox_case"
+            }
+          ]
+        },
+        "github_repo": {
+          "selector": "github_repo",
+          "binding": {
+            "selector": "github_repo",
+            "modules": [
+              "algo.connectors.variants.github_repo"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_github_repo"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "github_case"
+            }
+          ]
+        },
+        "outlook_calendar": {
+          "selector": "outlook_calendar",
+          "binding": {
+            "selector": "outlook_calendar",
+            "modules": [
+              "algo.connectors.variants.outlook_calendar"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_outlook_calendar"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "outlook_calendar_case"
+            }
+          ]
+        },
+        "outlook_mail_extractor": {
+          "selector": "outlook_mail_extractor",
+          "binding": {
+            "selector": "outlook_mail_extractor",
+            "modules": [
+              "algo.connectors.variants.outlook_mail_extractor"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_outlook_mail"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "outlook_mail_case"
+            }
+          ]
+        },
+        "windows_events": {
+          "selector": "windows_events",
+          "binding": {
+            "selector": "windows_events",
+            "modules": [
+              "algo.connectors.variants.windows_events"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_windows_events"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "windows_events_case"
+            }
+          ]
+        },
+        "camunda_workflow": {
+          "selector": "camunda_workflow",
+          "binding": {
+            "selector": "camunda_workflow",
+            "modules": [
+              "algo.connectors.variants.camunda_workflow"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_camunda_workflow"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "camunda_case"
+            }
+          ]
+        },
+        "sap_accounting": {
+          "selector": "sap_accounting",
+          "binding": {
+            "selector": "sap_accounting",
+            "modules": [
+              "algo.connectors.variants.sap_accounting"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_sap_accounting"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "sap_accounting_case"
+            }
+          ]
+        },
+        "sap_o2c": {
+          "selector": "sap_o2c",
+          "binding": {
+            "selector": "sap_o2c",
+            "modules": [
+              "algo.connectors.variants.sap_o2c"
+            ],
+            "kind": "available",
+            "class": null,
+            "symbol": "AVAILABLE_CONNECTORS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/connector_reference.hpp",
+              "symbol": "reference_sap_o2c"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_connector_parity.cpp",
+              "executable": "minera_connector_parity_tests",
+              "case": "sap_o2c_case"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp"
+      ]
     },
     {
       "package": "algo.decision_mining",
@@ -10071,8 +10303,29 @@
       "owner": "algo.connectors",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.util.mail",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_mail_connect_calls"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "mail_connect_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.variants.camunda_workflow",
@@ -10227,8 +10480,29 @@
           "selector": "outlook_calendar"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.variants.outlook_calendar",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_outlook_calendar"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "outlook_calendar_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.variants.outlook_mail_extractor",
@@ -10241,8 +10515,29 @@
           "selector": "outlook_mail_extractor"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.variants.outlook_mail_extractor",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_outlook_mail"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "outlook_mail_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.connectors.variants.sap_accounting",
@@ -10329,8 +10624,29 @@
           "selector": "windows_events"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/connector_reference.hpp",
+        "src/backend/connector_reference.cpp",
+        "src/backend/tests/test_connector_parity.cpp"
+      ],
+      "proofs": {
+        "module": "algo.connectors.variants.windows_events",
+        "implementation": [
+          {
+            "path": "include/minera/connector_reference.hpp",
+            "symbol": "reference_windows_events"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_connector_parity.cpp",
+            "executable": "minera_connector_parity_tests",
+            "case": "windows_events_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.alpha.data_structures.alpha_classic_abstraction",

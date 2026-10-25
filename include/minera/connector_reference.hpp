@@ -51,6 +51,34 @@
 // anything else as not a date. The frame is pm4py.format_dataframe of the
 // rows: cases ordered by their first event (by timestamp, then row), rows
 // by case, timestamp and row.
+//
+// The Windows connectors read COM objects (win32com stubbed). Their values
+// are ConnectorReferenceCom: a missing attribute is an absent member, and
+// str() of a value is Python's (None, True, 5, repr of a float, the text).
+//
+// variants.outlook_calendar walks the default calendar folder (9): per item
+// ConversationID and Subject (str), CreationTime, LastModificationTime and
+// Start (datetimes; an aware one is converted to UTC, a naive one read as
+// UTC) and Duration (minutes, int or float) give "Meeting Created", "Last
+// Change of Meeting", "Meeting Started" and "Meeting Completed" (Start plus
+// Duration); a MeetingStatus equal to 5 adds "Meeting Cancelled" at the last
+// modification; a truthy ReminderSet with an int ReminderMinutesBeforeStart
+// adds "Meeting Reminder Fired" that many minutes before Start (unless
+// include_reminders is false, when ReminderSet is not read). A failure
+// before the four rows drops the item; a missing MeetingStatus, ReminderSet
+// or minutes (or a minutes value that is no int) drops only its row.
+// variants.outlook_mail_extractor walks the sent folder (5) and then the
+// inbox (6): an item whose str(Class) is "43" (mail) or "46" (delivery
+// report) gives one row "Sent ..."/"Received ..." from Subject, CreationTime,
+// Sender.Name ("EMPTY" when that fails), the recipients' names joined by
+// " AND " ("EMPTY" when that fails), ConversationID and ConversationTopic;
+// any other failure drops the item. variants.windows_events reads every
+// Win32_NTLogEvent row's properties as str() in a fixed order, parsing
+// TimeGenerated and TimeWritten as they are read (cut at the first '+' or
+// '-', then time.strptime with "%Y%m%d%H%M%S.%f"); a missing property or a
+// time that does not parse raises. The three frames are ordered as
+// format_dataframe orders them, and an empty one raises KeyError as the
+// reference does.
 
 #include <cstddef>
 #include <cstdint>
@@ -127,6 +155,37 @@ using ConnectorReferenceGet =
 [[nodiscard]] ConnectorReferenceFrame reference_github_repo(const std::string& owner, const std::string& repository,
                                                             const std::optional<std::string>& token,
                                                             const ConnectorReferenceGet& get);
+
+// A value read from a COM object.
+struct ConnectorReferenceCom {
+  enum Kind { kNone, kBool, kInt, kFloat, kText, kTime, kObject, kList } kind = kNone;
+  bool boolean = false;
+  std::int64_t integer = 0;
+  double real = 0.0;
+  std::string text;
+  // kTime: the wall clock in microseconds since 1970-01-01, and the UTC
+  // offset in minutes of an aware datetime.
+  std::int64_t micros = 0;
+  std::optional<int> offset_minutes;
+  std::vector<std::pair<std::string, ConnectorReferenceCom>> members;  // kObject attributes
+  std::vector<ConnectorReferenceCom> items;                            // kList
+  [[nodiscard]] const ConnectorReferenceCom* find(const std::string& name) const;
+};
+
+[[nodiscard]] ConnectorReferenceFrame reference_outlook_calendar(const std::vector<ConnectorReferenceCom>& calendar,
+                                                                 bool include_reminders = true);
+[[nodiscard]] ConnectorReferenceFrame reference_outlook_mail(const std::vector<ConnectorReferenceCom>& sent,
+                                                             const std::vector<ConnectorReferenceCom>& inbox);
+// util.mail.connect(email_user, mailbox_id), the folder every Outlook
+// connector reads (the calendar's email_user and calendar_id parameters, 9 by
+// default; the mail extractor always the own inbox, 6, and sent items, 5):
+// the COM calls it makes, as text. Without a user the own default folder is
+// opened; with one (the empty string included) the user is resolved as a
+// recipient and their shared default folder is opened.
+[[nodiscard]] std::vector<std::string> reference_mail_connect_calls(const std::optional<std::string>& email_user,
+                                                                    int mailbox_id);
+// Each row is a kObject of Win32_NTLogEvent properties.
+[[nodiscard]] ConnectorReferenceFrame reference_windows_events(const std::vector<ConnectorReferenceCom>& rows);
 
 [[nodiscard]] ConnectorReferenceFrame reference_chrome_history(const std::filesystem::path& database);
 [[nodiscard]] ConnectorReferenceFrame reference_firefox_history(const std::filesystem::path& database);

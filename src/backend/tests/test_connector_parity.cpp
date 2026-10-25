@@ -319,6 +319,103 @@ void github_case(const BankCase& item, Tally& tally, std::vector<std::string>& f
   else ++(raises ? tally.raising : tally.frames)[item.kind];
 }
 
+// A COM value from the bank's tagged JSON.
+ConnectorReferenceCom com_of(const Json& value) {
+  ConnectorReferenceCom out;
+  switch (value.kind) {
+    case Json::kNull: break;
+    case Json::kBool: out.kind = ConnectorReferenceCom::kBool; out.boolean = value.boolean; break;
+    case Json::kNumber: out.kind = ConnectorReferenceCom::kInt; out.integer = static_cast<std::int64_t>(value.number); break;
+    case Json::kString: out.kind = ConnectorReferenceCom::kText; out.text = value.text; break;
+    case Json::kArray:
+      out.kind = ConnectorReferenceCom::kList;
+      for (const auto& item : value.items) out.items.push_back(com_of(item));
+      break;
+    case Json::kObject:
+      if (const auto* real = value.get("float")) {
+        out.kind = ConnectorReferenceCom::kFloat;
+        out.real = real->number;
+      } else if (const auto* time = value.get("dt")) {
+        // datetime.isoformat(): YYYY-MM-DDTHH:MM:SS[.ffffff][+HH:MM]
+        const auto& t = time->text;
+        auto number = [&](std::size_t at, std::size_t count) { return std::stoll(t.substr(at, count)); };
+        std::int64_t y = number(0, 4), m = number(5, 2), d = number(8, 2);
+        y -= m <= 2;
+        const std::int64_t era = (y >= 0 ? y : y - 399) / 400, yoe = y - era * 400;
+        const std::int64_t doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
+        const std::int64_t days = era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
+        out.kind = ConnectorReferenceCom::kTime;
+        out.micros = days * 86400000000LL + ((number(11, 2) * 60 + number(14, 2)) * 60 + number(17, 2)) * 1000000LL;
+        std::size_t at = 19;
+        if (at < t.size() && t[at] == '.') {
+          out.micros += number(20, 6);
+          at = 26;
+        }
+        if (at < t.size()) {
+          const int minutes = static_cast<int>(number(at + 1, 2) * 60 + number(at + 4, 2));
+          out.offset_minutes = t[at] == '-' ? -minutes : minutes;
+        }
+      } else {
+        out.kind = ConnectorReferenceCom::kObject;
+        for (const auto& [key, item] : value.get("obj")->fields) out.members.emplace_back(key, com_of(item));
+      }
+      break;
+  }
+  return out;
+}
+
+std::vector<ConnectorReferenceCom> com_list(const Json& value) {
+  std::vector<ConnectorReferenceCom> out;
+  for (const auto& item : value.items) out.push_back(com_of(item));
+  return out;
+}
+
+template <typename Connector>
+void com_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures, Connector connector) {
+  std::string problem;
+  const auto* raises = item.frame.get("raises");
+  try {
+    const auto mine = connector(item.source);
+    if (raises) problem = "native returns where the reference raises " + raises->text;
+    else problem = difference(mine, frame_of(item.frame));
+  } catch (const ConnectorReferenceError& error) {
+    if (!raises) problem = std::string("native raises ") + error.what();
+    else if (raises->text.rfind(error.type() + ":", 0) != 0) problem = std::string("native raises ") + error.what() + " vs " + raises->text;
+  }
+  if (!problem.empty()) failures.push_back(item.name + ": " + problem);
+  else ++(raises ? tally.raising : tally.frames)[item.kind];
+}
+
+void outlook_calendar_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures) {
+  com_case(item, tally, failures,
+           [](const Json& source) {
+             const auto* reminders = source.get("include_reminders");
+             return reference_outlook_calendar(com_list(*source.get("items")),
+                                               reminders->kind != Json::kBool || reminders->boolean);
+           });
+}
+
+void outlook_mail_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures) {
+  com_case(item, tally, failures, [](const Json& source) {
+    return reference_outlook_mail(com_list(*source.get("sent")), com_list(*source.get("inbox")));
+  });
+}
+
+void windows_events_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures) {
+  com_case(item, tally, failures,
+           [](const Json& source) { return reference_windows_events(com_list(*source.get("rows"))); });
+}
+
+void mail_connect_case(const BankCase& item, Tally& tally, std::vector<std::string>& failures) {
+  const auto* user = item.source.get("user");
+  const auto mine = reference_mail_connect_calls(user->kind == Json::kString ? std::optional(user->text) : std::nullopt,
+                                                 static_cast<int>(item.source.get("mailbox")->number));
+  std::vector<std::string> expected;
+  for (const auto& call : item.frame.get("calls")->items) expected.push_back(call.text);
+  if (mine != expected) failures.push_back(item.name + ": COM calls differ");
+  else ++tally.frames[item.kind];
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -338,6 +435,10 @@ int main(int argc, char** argv) {
       else if (item.kind == "sap_accounting") sap_accounting_case(item, tally, failures);
       else if (item.kind == "sap_o2c") sap_o2c_case(item, tally, failures);
       else if (item.kind == "github_repo") github_case(item, tally, failures);
+      else if (item.kind == "outlook_calendar") outlook_calendar_case(item, tally, failures);
+      else if (item.kind == "outlook_mail_extractor") outlook_mail_case(item, tally, failures);
+      else if (item.kind == "windows_events") windows_events_case(item, tally, failures);
+      else if (item.kind == "mail_connect") mail_connect_case(item, tally, failures);
       else failures.push_back(item.name + ": unknown connector " + item.kind);
     } catch (const std::exception& error) {
       failures.push_back(item.name + ": " + error.what());
