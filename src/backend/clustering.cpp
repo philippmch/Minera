@@ -1,4 +1,5 @@
 #include "minera/clustering.hpp"
+#include "minera/log_to_features.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -7,6 +8,7 @@
 #include <limits>
 #include <map>
 #include <numeric>
+#include <random>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -966,4 +968,215 @@ std::string profile_clustering_json(const ProfileClusteringResult& result) {
       << ",\"message\":" << json_quote(result.diagnostics.message) << "}}";
   return out.str();
 }
-} // namespace minera
+
+namespace {
+
+// numpy's legacy random_sample: 53 bits from two 32-bit Mersenne Twister draws.
+double legacy_random_sample(std::mt19937& engine) {
+  const double a = static_cast<double>(engine() >> 5);
+  const double b = static_cast<double>(engine() >> 6);
+  return (a * 67108864.0 + b) / 9007199254740992.0;
+}
+
+double dot(const std::vector<double>& a, const std::vector<double>& b) {
+  double sum = 0.0;
+  for (std::size_t k = 0; k < a.size(); ++k) sum += a[k] * b[k];
+  return sum;
+}
+
+}  // namespace
+
+ReferenceKMeansResult reference_kmeans_labels(
+    std::vector<std::vector<double>> rows, const ReferenceProfileClusteringOptions& options) {
+  ReferenceKMeansResult result;
+  // Decisions closer than this to a tie depend on the reference's BLAS
+  // rounding rather than on the data.
+  const auto near = [](double a, double b) {
+    return std::fabs(a - b) <= 1e-9 * (1.0 + std::max(std::fabs(a), std::fabs(b)));
+  };
+  const std::size_t n = rows.size(), k = options.cluster_count;
+  if (k == 0) throw std::invalid_argument("k-means: cluster_count must be positive");
+  if (n < k) throw std::invalid_argument("k-means: fewer samples than clusters");
+  const std::size_t d = rows.front().size();
+
+  // Centre the features, then derive the tolerance from their variances.
+  std::vector<double> mean(d, 0.0);
+  for (const auto& row : rows)
+    for (std::size_t j = 0; j < d; ++j) mean[j] += row[j];
+  for (auto& value : mean) value /= static_cast<double>(n);
+  for (auto& row : rows)
+    for (std::size_t j = 0; j < d; ++j) row[j] -= mean[j];
+  double variance_sum = 0.0;
+  for (std::size_t j = 0; j < d; ++j) {
+    double centre = 0.0, squares = 0.0;
+    for (const auto& row : rows) centre += row[j];
+    centre /= static_cast<double>(n);
+    for (const auto& row : rows) squares += (row[j] - centre) * (row[j] - centre);
+    variance_sum += squares / static_cast<double>(n);
+  }
+  const double tolerance = d ? variance_sum / static_cast<double>(d) * options.tolerance : 0.0;
+
+  std::vector<double> norms(n);
+  for (std::size_t i = 0; i < n; ++i) norms[i] = dot(rows[i], rows[i]);
+  const auto squared_distances = [&](std::size_t centre) {
+    std::vector<double> out(n);
+    for (std::size_t i = 0; i < n; ++i)
+      out[i] = std::max(-2.0 * dot(rows[centre], rows[i]) + norms[centre] + norms[i], 0.0);
+    return out;
+  };
+
+  // k-means++ seeding.
+  std::mt19937 engine(options.seed);
+  std::vector<double> cdf(n);
+  double running = 0.0;
+  for (std::size_t i = 0; i < n; ++i) cdf[i] = running += 1.0 / static_cast<double>(n);
+  for (auto& value : cdf) value /= cdf.back();
+  const double first = legacy_random_sample(engine);
+  if (near(first * static_cast<double>(n), std::round(first * static_cast<double>(n))))
+    result.tie_dependent = true;
+  const auto first_centre = static_cast<std::size_t>(
+      std::upper_bound(cdf.begin(), cdf.end(), first) - cdf.begin());
+  std::vector<std::vector<double>> centres{rows.at(std::min(first_centre, n - 1))};
+  auto closest = squared_distances(std::min(first_centre, n - 1));
+  double potential = std::accumulate(closest.begin(), closest.end(), 0.0);
+  const auto trials = 2 + static_cast<std::size_t>(std::log(static_cast<double>(k)));
+  for (std::size_t c = 1; c < k; ++c) {
+    std::vector<double> draws(trials);
+    for (auto& draw : draws) draw = legacy_random_sample(engine) * potential;
+    std::vector<double> cumulative(n);
+    running = 0.0;
+    for (std::size_t i = 0; i < n; ++i) cumulative[i] = running += closest[i];
+    std::optional<double> best_potential;
+    std::size_t best_centre = 0;
+    std::vector<double> best_closest;
+    for (const double draw : draws) {
+      const auto position = static_cast<std::size_t>(
+          std::lower_bound(cumulative.begin(), cumulative.end(), draw) - cumulative.begin());
+      if ((position < n && near(cumulative[position], draw)) ||
+          (position > 0 && near(cumulative[position - 1], draw)))
+        result.tie_dependent = true;
+      const auto candidate = std::min<std::size_t>(position, n - 1);
+      auto distances = squared_distances(candidate);
+      for (std::size_t i = 0; i < n; ++i) distances[i] = std::min(closest[i], distances[i]);
+      const double candidate_potential = std::accumulate(distances.begin(), distances.end(), 0.0);
+      if (best_potential && rows[candidate] != rows[best_centre] &&
+          near(candidate_potential, *best_potential))
+        result.tie_dependent = true;
+      if (!best_potential || candidate_potential < *best_potential) {
+        best_potential = candidate_potential;
+        best_centre = candidate;
+        best_closest = std::move(distances);
+      }
+    }
+    potential = *best_potential;
+    closest = std::move(best_closest);
+    centres.push_back(rows[best_centre]);
+  }
+
+  // Lloyd iterations.
+  const auto assign = [&](const std::vector<std::vector<double>>& current) {
+    std::vector<double> centre_norms(k);
+    for (std::size_t c = 0; c < k; ++c) centre_norms[c] = dot(current[c], current[c]);
+    std::vector<std::size_t> labels(n);
+    for (std::size_t i = 0; i < n; ++i) {
+      std::vector<double> distances(k);
+      for (std::size_t c = 0; c < k; ++c)
+        distances[c] = centre_norms[c] - 2.0 * dot(current[c], rows[i]);
+      double best = distances[0];
+      for (std::size_t c = 1; c < k; ++c) {
+        const double distance = distances[c];
+        if (distance < best) {
+          best = distance;
+          labels[i] = c;
+        }
+      }
+      for (std::size_t c = 0; c < k; ++c)
+        if (c != labels[i] && near(distances[c], best)) result.tie_dependent = true;
+    }
+    return labels;
+  };
+  std::vector<std::size_t> labels, previous(n, k);
+  bool strict = false;
+  for (std::size_t iteration = 0; iteration < options.max_iterations; ++iteration) {
+    labels = assign(centres);
+    std::vector<std::vector<double>> sums(k, std::vector<double>(d, 0.0));
+    std::vector<std::size_t> weights(k, 0);
+    for (std::size_t i = 0; i < n; ++i) {
+      ++weights[labels[i]];
+      for (std::size_t j = 0; j < d; ++j) sums[labels[i]][j] += rows[i][j];
+    }
+    // Empty clusters take the points farthest from their centres.
+    std::vector<std::size_t> empty;
+    for (std::size_t c = 0; c < k; ++c)
+      if (weights[c] == 0) empty.push_back(c);
+    if (!empty.empty()) {
+      std::vector<double> far(n);
+      for (std::size_t i = 0; i < n; ++i) {
+        double sum = 0.0;
+        for (std::size_t j = 0; j < d; ++j)
+          sum += (rows[i][j] - centres[labels[i]][j]) * (rows[i][j] - centres[labels[i]][j]);
+        far[i] = sum;
+      }
+      std::vector<std::size_t> order(n);
+      std::iota(order.begin(), order.end(), 0);
+      std::stable_sort(order.begin(), order.end(),
+                       [&](std::size_t a, std::size_t b) { return far[a] > far[b]; });
+      for (std::size_t e = 0; e < empty.size() && e < n; ++e) {
+        const auto point = order[e];
+        --weights[labels[point]];
+        ++weights[empty[e]];
+        for (std::size_t j = 0; j < d; ++j) {
+          sums[labels[point]][j] -= rows[point][j];
+          sums[empty[e]][j] = rows[point][j];
+        }
+      }
+    }
+    double shift = 0.0;
+    for (std::size_t c = 0; c < k; ++c) {
+      double squares = 0.0;
+      for (std::size_t j = 0; j < d; ++j) {
+        if (weights[c]) sums[c][j] /= static_cast<double>(weights[c]);
+        squares += (sums[c][j] - centres[c][j]) * (sums[c][j] - centres[c][j]);
+      }
+      const double norm = std::sqrt(squares);
+      shift += norm * norm;
+    }
+    centres = std::move(sums);
+    if (labels == previous) {
+      strict = true;
+      break;
+    }
+    if (near(shift, tolerance)) result.tie_dependent = true;
+    if (shift <= tolerance) break;
+    previous = labels;
+  }
+  if (!strict) labels = assign(centres);
+  result.labels = std::move(labels);
+  return result;
+}
+
+ReferenceProfileClusteringResult reference_profile_clustering(
+    const EventLog& log, const ReferenceProfileClusteringOptions& options) {
+  if (log.traces.size() < options.cluster_count)
+    throw std::invalid_argument("profile clustering: fewer traces than clusters");
+  const auto features = trace_based_log_features(log);
+  std::vector<std::vector<double>> rows;
+  for (const auto& trace : features.trace_rows) {
+    std::vector<double> row;
+    for (const auto& cell : trace)
+      row.push_back(std::holds_alternative<double>(cell) ? std::get<double>(cell) : 0.0);
+    rows.push_back(std::move(row));
+  }
+  const auto kmeans = reference_kmeans_labels(std::move(rows), options);
+  ReferenceProfileClusteringResult result;
+  result.tie_dependent = kmeans.tie_dependent;
+  result.clusters.resize(options.cluster_count);
+  for (std::size_t i = 0; i < kmeans.labels.size(); ++i)
+    result.clusters[kmeans.labels[i]].push_back(i);
+  result.clusters.erase(std::remove_if(result.clusters.begin(), result.clusters.end(),
+                                       [](const auto& members) { return members.empty(); }),
+                        result.clusters.end());
+  return result;
+}
+
+}  // namespace minera

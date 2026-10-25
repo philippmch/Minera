@@ -383,8 +383,43 @@
           "symbol": "SKLEARN_PROFILES"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/clustering.hpp",
+        "src/backend/clustering.cpp",
+        "src/backend/tests/test_profile_clustering_parity.cpp",
+        "src/backend/tests/fixtures/profile_clustering_bank.txt",
+        "scripts/capture-profile-clustering-bank.py",
+        "scripts/generate-profile-clustering-bank-tests.py"
+      ],
+      "proofs": {
+        "SKLEARN_PROFILES": {
+          "selector": "SKLEARN_PROFILES",
+          "binding": {
+            "selector": "SKLEARN_PROFILES",
+            "modules": [
+              "algo.clustering.profiles.variants.sklearn_profiles"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "SKLEARN_PROFILES"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/clustering.hpp",
+              "symbol": "reference_profile_clustering"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_profile_clustering_parity.cpp",
+              "executable": "minera_profile_clustering_parity_tests",
+              "case": "profiles_case"
+            }
+          ]
+        }
+      }
     },
     {
       "package": "algo.clustering.trace_attribute_driven",
@@ -7730,8 +7765,32 @@
           "selector": "SKLEARN_PROFILES"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/clustering.hpp",
+        "src/backend/clustering.cpp",
+        "src/backend/tests/test_profile_clustering_parity.cpp",
+        "src/backend/tests/fixtures/profile_clustering_bank.txt",
+        "scripts/capture-profile-clustering-bank.py",
+        "scripts/generate-profile-clustering-bank-tests.py"
+      ],
+      "proofs": {
+        "module": "algo.clustering.profiles.variants.sklearn_profiles",
+        "implementation": [
+          {
+            "path": "include/minera/clustering.hpp",
+            "symbol": "reference_profile_clustering"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_profile_clustering_parity.cpp",
+            "executable": "minera_profile_clustering_parity_tests",
+            "case": "profiles_case"
+          }
+        ]
+      }
     },
     {
       "module": "algo.clustering.trace_attribute_driven.dfg.dfg_dist",

@@ -14722,3 +14722,34 @@ Reference behaviour found (black box):
 
 The package is complete on its three selectors. Still partial: the internal
 `variants.temporal_lazy` module and `util.locally_linear_embedding`.
+
+## Profile-clustering bank (2026-10-25)
+
+`scripts/capture-profile-clustering-bank.py` (seed 20261032, 300 seeded logs,
+four hash seeds) records the sublogs of the public
+`algo.clustering.profiles.algorithm.apply` (SKLEARN_PROFILES, default
+clusterer) as trace positions, or the error. The fixture
+`src/backend/tests/fixtures/profile_clustering_bank.txt` drives
+`minera_profile_clustering_parity_tests` against the new
+`reference_profile_clustering` (include/minera/clustering.hpp).
+
+Reference behaviour found (black box, by comparing the public call with
+scikit-learn 1.9.0 calls on the same features): the default clusterer is
+k-means with two clusters, `random_state=0` and one k-means++ initialisation,
+over the TRACE_BASED log-to-features rows with default parameters. Sublogs
+come in ascending label order; a one-trace log raises ValueError. Minera
+reproduces mean centring, k-means++ seeding (2 + floor(ln k) local trials)
+from a Mersenne Twister seeded like numpy's legacy RandomState, and Lloyd
+iterations that stop on repeated labels or a squared centre shift at most
+1e-4 times the mean feature variance.
+
+Contract: 280 logs match exactly and 13 raise as the reference does. In the
+other 7, a nearest-centre decision sits on an exact distance tie (duplicate
+or symmetric traces are common with one-hot features); the reference then
+decides by the rounding of its OpenBLAS kernel (SkylakeX here), which no
+portable summation order reproduces and which varies across machines. Native
+flags such runs (`tie_dependent`), and the test then requires a k-means
+fixpoint instead (each trace nearest to its own cluster mean), capped at 15
+logs. One bank log also changes outcome with the hash seed (feature column
+order changes the rounding). Custom `sklearn_clusterer` objects are outside
+the contract.

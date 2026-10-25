@@ -30,7 +30,15 @@ Other threads: please pick different packages.
 
 Thread "Continue parity toward 2.7.22" owns
 `algo.transformation.log_to_features` leftovers (temporal_lazy, LLE util) and
-`algo.clustering.profiles` next.
+`algo.simulation.montecarlo` next.
+
+## Profile clustering — 2026-10-25
+
+New bank `docs/profile-clustering-bank.json.gz` (300 logs) passes in
+`minera_profile_clustering_parity_tests` through `reference_profile_clustering`
+(k-means k=2, seed 0, on default trace features, numpy-compatible MT19937
+k-means++). 7 logs hinge on exact distance ties broken by OpenBLAS rounding;
+those need only a k-means fixpoint. Package promoted: 75/86.
 
 ## Trace-attribute clustering DMM_VEC — 2026-10-25
 

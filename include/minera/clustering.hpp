@@ -130,4 +130,41 @@ struct ProfileClusteringResult {
 [[nodiscard]] std::string profile_clustering_json(
     const ProfileClusteringResult& result);
 
+// The public SKLEARN_PROFILES default: the trace rows of
+// trace_based_log_features (default parameters) clustered by k-means on
+// mean-centred features, with k-means++ seeding (2 + floor(ln k) local trials)
+// drawn from a Mersenne Twister seeded like numpy's legacy RandomState(seed),
+// one initialisation, and Lloyd iterations that stop when labels repeat or the
+// squared centre shift falls to tolerance times the mean feature variance.
+struct ReferenceProfileClusteringOptions {
+  std::size_t cluster_count = 2;
+  std::uint32_t seed = 0;
+  std::size_t max_iterations = 300;
+  double tolerance = 1e-4;
+};
+
+struct ReferenceKMeansResult {
+  std::vector<std::size_t> labels;
+  // Some decision (a nearest centre, a seeding draw or candidate, the stop
+  // test) fell within rounding distance of a tie. The reference then decides
+  // by its BLAS kernel's rounding, which varies across machines.
+  bool tie_dependent = false;
+};
+
+struct ReferenceProfileClusteringResult {
+  // Trace indices per k-means label in ascending label order, empty labels
+  // omitted.
+  std::vector<std::vector<std::size_t>> clusters;
+  bool tie_dependent = false;
+};
+
+// Throws std::invalid_argument when the log has fewer traces than clusters,
+// where the reference raises ValueError.
+[[nodiscard]] ReferenceProfileClusteringResult reference_profile_clustering(
+    const EventLog& log, const ReferenceProfileClusteringOptions& options = {});
+
+// The k-means labels behind reference_profile_clustering for explicit rows.
+[[nodiscard]] ReferenceKMeansResult reference_kmeans_labels(
+    std::vector<std::vector<double>> rows, const ReferenceProfileClusteringOptions& options = {});
+
 }  // namespace minera

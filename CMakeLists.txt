@@ -2140,6 +2140,15 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_log_to_features_parity_tests COMMAND minera_log_to_features_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/log_to_features_bank.txt")
 
+  add_executable(minera_profile_clustering_parity_tests
+    src/backend/tests/test_profile_clustering_parity.cpp
+  )
+  target_link_libraries(minera_profile_clustering_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_profile_clustering_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_profile_clustering_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_profile_clustering_parity_tests COMMAND minera_profile_clustering_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/profile_clustering_bank.txt")
+
   add_executable(minera_random_tree_tests
     src/backend/tests/test_random_tree.cpp
   )
