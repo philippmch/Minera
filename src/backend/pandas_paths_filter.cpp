@@ -1,4 +1,5 @@
 #include "minera/pandas_paths_filter.hpp"
+#include "pandas_parameter_carrier.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -61,7 +62,7 @@ std::string type_name(const EventAttribute& v){
  // Native date precision does not encode a Python scalar class. The captured
  // path/query date operands are pandas Timestamp scalars at both us and ns
  // resolution; retain their class name independently of their precision.
- if(date_value(v))return "Timestamp";
+ if(date_value(v))return std::holds_alternative<NativeDate>(v.typed_value)?"Timestamp":"datetime.datetime";
  if(v.kind==AttributeKind::kBytes)return "bytes";
  if(v.kind==AttributeKind::kBoolean||std::holds_alternative<bool>(v.typed_value))return "bool";
  if(v.kind==AttributeKind::kInt||std::holds_alternative<std::int64_t>(v.typed_value)||std::holds_alternative<std::uint64_t>(v.typed_value))return "int";
@@ -199,16 +200,32 @@ std::vector<std::optional<std::string>> query_paths(const EventAttribute& paths,
  for(const auto& v:values)result.push_back(encoded_pair(subscript(v,0),subscript(v,1)));
  return result;
 }
-void validate_bounds(const EventAttribute& bound,bool lower,std::size_t count){
+// One comparison of the occurrence durations with a bound. A list needs one
+// item per occurrence and compares item by item. A tuple broadcasts against
+// the durations, and the result is then assigned to the occurrences.
+std::vector<bool> duration_mask(const std::vector<std::pair<std::size_t,double>>& occurrences,const EventAttribute& bound,bool lower){
+ const auto n=occurrences.size();const std::string op=lower?"'>='":"'<='";
  if(text_value(bound))error("TypeError","Invalid comparison between dtype=float64 and str");
- if(bound.container==AttributeContainerKind::kList){
-  if(bound.children.size()!=count)error("ValueError","('Lengths must match to compare', ("+std::to_string(count)+",), ("+std::to_string(bound.children.size())+",))");
-  error("ValueError","path filter vector bounds are outside the captured native domain");
+ if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",op+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
+ const auto compare=[&](double value,const EventAttribute& item)->bool{
+  if(item.is_null)return false;
+  if(item.container!=AttributeContainerKind::kScalar||!numeric(item)||is_native_na_attribute(item))error("TypeError",op+" not supported between instances of 'float' and '"+type_name(item)+"'");
+  const auto number=native_attribute_number(item);return lower?value>=number:value<=number;
+ };
+ std::vector<bool> result(n);
+ if(bound.container==AttributeContainerKind::kList||bound.container==AttributeContainerKind::kTuple){
+  const auto k=bound.children.size();
+  if(bound.container==AttributeContainerKind::kList&&k!=n)error("ValueError","('Lengths must match to compare', ("+std::to_string(n)+",), ("+std::to_string(k)+",))");
+  if(bound.container==AttributeContainerKind::kTuple){
+   if(k!=n&&k!=1&&n!=1)error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(n)+",) ("+std::to_string(k)+",) ");
+   if(n==1&&k!=1)error("ValueError","Length of values ("+std::to_string(k)+") does not match length of index (1)");
+  }
+  for(std::size_t i=0;i<n;++i)result[i]=compare(occurrences[i].second,bound.children[k==n?i:0]);
+  return result;
  }
- if(date_value(bound))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
- if(!bound.is_null&&!numeric(bound))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'float' and '"+type_name(bound)+"'");
+ for(std::size_t i=0;i<n;++i)result[i]=compare(occurrences[i].second,bound);
+ return result;
 }
-bool bound_accepts(double value,const EventAttribute& bound,bool lower){if(bound.is_null)return false;const auto n=native_attribute_number(bound);return lower?value>=n:value<=n;}
 double elapsed(const EventAttribute& a,const EventAttribute& b){
  if(missing(a)||missing(b))return std::numeric_limits<double>::quiet_NaN();
  if(!date_value(a)||!date_value(b)){
@@ -241,8 +258,11 @@ EventTable apply_paths(const EventTable& source,const EventAttribute& query,cons
  }
  if(performance){
   if(!sorted.dtypes.empty()&&!sorted.dtypes[time].starts_with("datetime64"))error("AttributeError","Can only use .dt accessor with datetimelike values");
-  validate_bounds(o.min_performance,true,occurrences.size());validate_bounds(o.max_performance,false,occurrences.size());
-  for(const auto& [i,duration]:occurrences)if(bound_accepts(duration,o.min_performance,true)&&bound_accepts(duration,o.max_performance,false))selected.insert(group_key(cell(sorted,i,cases)));
+  // Occurrences without a duration (NaT) are dropped before the bounds apply.
+  std::erase_if(occurrences,[](const auto& o){return std::isnan(o.second);});
+  const auto lower=duration_mask(occurrences,o.min_performance,true);
+  const auto upper=duration_mask(occurrences,o.max_performance,false);
+  for(std::size_t k=0;k<occurrences.size();++k)if(lower[k]&&upper[k])selected.insert(group_key(cell(sorted,occurrences[k].first,cases)));
  }
  const bool positive=truth(o.positive);std::vector<std::size_t> keep;
  for(std::size_t i=0;i<sorted.size();++i){const auto& value=cell(sorted,i,cases);const bool found=!missing(value)&&selected.contains(group_key(value));if(found==positive)keep.push_back(i);}
@@ -266,9 +286,9 @@ PandasPathsFilterOptions resolve_paths_options(const std::vector<PandasPathsFilt
 PandasPathsFilterOptions resolve_paths_options(const EventAttribute& params){
  std::vector<PandasPathsFilterParameter> values;
  if(params.container==AttributeContainerKind::kContainer){for(const auto& p:params.children)values.push_back({p,false});return resolve_paths_options(values);}
- if(params.is_null||(params.container==AttributeContainerKind::kList&&params.children.empty())||(text_value(params)&&params.value.empty()))return {};
- if(text_value(params))error("TypeError","string indices must be integers, not 'str'");
- error("TypeError","'"+type_name(params)+"' object is not iterable");
+ if(params.is_null||(params.container==AttributeContainerKind::kList&&params.children.empty()))return {};
+ detail::check_parameter_carrier(params,[](const std::string& type,const std::string& message){error(type,message);});
+ return {};
 }
 } // namespace
 EventTable filter_pandas_paths(const EventTable& s,const EventAttribute& paths,const PandasPathsFilterOptions& o){return apply_paths(s,paths,o,false);}

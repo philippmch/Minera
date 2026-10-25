@@ -222,6 +222,20 @@ twelve modules are promoted.
 Next in this thread: the pandas attributes, between, cases, ltl, paths,
 timestamp and variants filters, then Polars.
 
+## Pandas attributes/between/cases/ltl/paths/timestamp/variants — 2026-10-25
+
+New bank `docs/pandas-filter-bank.json.gz` (3,000 frames, 87,971 public calls
+over all 28 functions of the seven modules; about 20 minutes to capture)
+passes in `minera_pandas_filter_bank_parity_tests`. The pilots with seeds 7
+and 9 pass too. The native APIs are the existing per-module headers. New
+shared helpers: `pandas_parameter_carrier.hpp` (the `parameters` carrier),
+`numpy_object_sort.hpp` and `python_list_sort.hpp` (the comparison orders of
+numpy's object argsort and CPython's sort, which decide the operands a
+TypeError names). Bank arguments use Python datetimes, which carry no native
+date payload. Details are in `docs/pandas-filter-domain-parity.md`. All seven
+modules are promoted.
+Next in this thread: the Polars filter modules.
+
 ## EventLog filtering modules — 2026-10-25
 
 New bank `docs/log-filter-domain-bank.json.gz` (6,000 XES cases, 240,450

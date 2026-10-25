@@ -1,4 +1,5 @@
 #include "minera/pandas_ltl_filter.hpp"
+#include "pandas_parameter_carrier.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -61,7 +62,7 @@ std::string type_name(const EventAttribute& v){
  if(v.is_null)return date_value(v)?"NaTType":"NoneType";
  switch(v.container){case AttributeContainerKind::kList:return "list";case AttributeContainerKind::kTuple:return "tuple";case AttributeContainerKind::kContainer:return "dict";case AttributeContainerKind::kSet:return "set";case AttributeContainerKind::kFrozenSet:return "frozenset";default:break;}
  if(is_native_na_attribute(v))return "NAType";
- if(date_value(v))return "Timestamp";
+ if(date_value(v))return std::holds_alternative<NativeDate>(v.typed_value)?"Timestamp":"datetime.datetime";
  if(v.kind==AttributeKind::kBytes)return "bytes";
  if(v.kind==AttributeKind::kBoolean||std::holds_alternative<bool>(v.typed_value))return "bool";
  if(v.kind==AttributeKind::kInt||std::holds_alternative<std::int64_t>(v.typed_value)||std::holds_alternative<std::uint64_t>(v.typed_value))return "int";
@@ -161,20 +162,25 @@ EventAttribute element(const EventAttribute& value,std::size_t position){
 }
 bool equal_value(const EventAttribute& a,const EventAttribute& b){return identity(a)==identity(b);}
 bool matches(const EventAttribute& value,const EventAttribute& target){return !missing(value)&&!missing(target)&&equal_value(value,target);}
-void check_target(const EventAttribute& target,std::size_t rows){
+void check_target(const EventAttribute& target,std::size_t rows,const std::string& dtype){
  if(target.container==AttributeContainerKind::kList&&target.children.size()!=rows)
   error("ValueError","('Lengths must match to compare', ("+std::to_string(rows)+",), ("+std::to_string(target.children.size())+",))");
+ // A str column compares a tuple as an array.
+ if(target.container==AttributeContainerKind::kTuple&&dtype=="str"){
+  if(target.children.size()!=rows)error("ValueError","Lengths of operands do not match: "+std::to_string(rows)+" != "+std::to_string(target.children.size()));
+  if(rows)error("ValueError","ltl filter vector targets are outside the captured native domain");
+ }
 }
 std::vector<std::size_t> selected_columns(const EventTable& source,const std::vector<EventAttribute>& requested){
- std::vector<std::size_t> result;std::vector<std::string> absent;std::vector<std::string> names;
+ std::vector<std::size_t> result;std::vector<std::string> absent;std::vector<std::string> names;std::size_t missing_count=0;
  for(const auto& key:requested){
   names.push_back(key.is_null?"nan":repr(key));
   const auto found=text_value(key)?std::find(source.columns.begin(),source.columns.end(),key.value):source.columns.end();
-  if(found==source.columns.end())absent.push_back(names.back());else result.push_back(static_cast<std::size_t>(found-source.columns.begin()));
+  if(found==source.columns.end()){++missing_count;if(std::find(absent.begin(),absent.end(),names.back())==absent.end())absent.push_back(names.back());}else result.push_back(static_cast<std::size_t>(found-source.columns.begin()));
  }
  const auto list=[](const std::vector<std::string>& values){std::string output="[";for(std::size_t i=0;i<values.size();++i){if(i)output+=", ";output+=values[i];}return output+"]";};
  if(!absent.empty()){
-  const auto message=absent.size()==requested.size()?"None of [Index("+list(names)+", dtype='str')] are in the [columns]":list(absent)+" not in index";
+  const auto message=missing_count==requested.size()?"None of [Index("+list(names)+", dtype='str')] are in the [columns]":list(absent)+" not in index";
   error("KeyError",string_key_repr(message));
  }
  return result;
@@ -195,10 +201,10 @@ PandasLtlFilterOptions resolve_ltl_options(const std::vector<PandasLtlFilterPara
  return result;
 }
 PandasLtlFilterOptions resolve_ltl_options(const EventAttribute& parameters){
- if(parameters.is_null||(parameters.container==AttributeContainerKind::kList&&parameters.children.empty())||(text_value(parameters)&&parameters.value.empty()))return {};
+ if(parameters.is_null||(parameters.container==AttributeContainerKind::kList&&parameters.children.empty()))return {};
  if(parameters.container==AttributeContainerKind::kContainer){std::vector<PandasLtlFilterParameter> result;for(const auto& child:parameters.children)result.push_back({child,false});return resolve_ltl_options(result);}
- if(text_value(parameters))error("TypeError","string indices must be integers, not 'str'");
- error("TypeError","'"+type_name(parameters)+"' object is not iterable");
+ detail::check_parameter_carrier(parameters,[](const std::string& type,const std::string& message){error(type,message);});
+ return {};
 }
 double duration(const EventAttribute& a,const EventAttribute& b){
  const auto x=instant(a),y=instant(b);
@@ -212,7 +218,7 @@ bool temporal_bound(double value,const EventAttribute& bound,bool lower){
  const auto number=native_attribute_number(bound);
  return lower?value>=number:value<=number;
 }
-EventTable apply_rule(const EventTable& source,const std::vector<EventAttribute>& anchors,const PandasLtlFilterOptions& options,Rule rule){
+EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> anchors,const PandasLtlFilterOptions& options,Rule rule,const EventAttribute* pattern=nullptr){
  EventAttribute empty;empty.container=AttributeContainerKind::kList;
  const auto& boundaries=options.timestamp_diff_boundaries?*options.timestamp_diff_boundaries:empty;
  bool timed=false;std::size_t boundary_count=0;
@@ -222,9 +228,15 @@ EventTable apply_rule(const EventTable& source,const std::vector<EventAttribute>
  if(resources)roles.push_back(options.resource_key);
  if(timed)roles.push_back(options.timestamp_key);
  const auto columns=selected_columns(source,roles);
+ // The eventually-follows pattern is iterated after the column selection.
+ if(pattern)anchors=iterable(*pattern);
+ // A key naming the same column as another role duplicates it in the
+ // reference's selections.
+ if(columns[0]==columns[1]||(resources&&columns[1]==columns[2]))error("ValueError","cannot reindex on an axis with duplicate labels");
+ if(resources&&columns[0]==columns[2])error("ValueError","Cannot set a DataFrame with multiple columns to the single column @@conceptname");
  std::vector<std::size_t> valid;
  for(std::size_t i=0;i<source.size();++i){bool good=true;for(const auto c:columns)if(missing(cell(source,i,c))){good=false;break;}if(good)valid.push_back(i);}
- for(const auto& target:anchors)check_target(target,valid.size());
+ for(const auto& target:anchors)check_target(target,source.size(),source.dtypes.empty()?"object":source.dtypes[columns[1]]);
  if(rule==Rule::kEventually&&anchors.size()<2)error("IndexError","list index out of range");
  if(timed){
   const auto dtype=source.dtypes.empty()?"object":source.dtypes[columns.back()];
@@ -232,6 +244,13 @@ EventTable apply_rule(const EventTable& source,const std::vector<EventAttribute>
    bool strings=false;for(const auto row:valid)strings|=text_value(cell(source,row,columns.back()));
    if(strings)error("TypeError","unsupported operand type(s) for -: 'str' and 'str'");
    error("AttributeError","Can only use .dt accessor with datetimelike values");
+  }
+  // Each step's bounds are compared eagerly, whether or not rows remain.
+  if(rule==Rule::kEventually&&boundary_count){
+   for(std::size_t i=0;i+1<anchors.size();++i){
+    const auto bound=element(boundaries,i);
+    temporal_bound(0.0,element(bound,0),true);temporal_bound(0.0,element(bound,1),false);
+   }
   }
  }
  std::unordered_map<std::string,std::vector<std::size_t>> groups;
@@ -272,8 +291,9 @@ EventTable apply_rule(const EventTable& source,const std::vector<EventAttribute>
     const auto member=identity(cell(source,rows.front(),columns[0]));
     selected.erase(member);eligible.erase(member);
     if(!a.empty()&&!b.empty()){
+     // The reference pairs every A event with the case's last B event only.
      eligible.insert(member);bool overlap=false;
-     for(const auto* x:a)for(const auto* y:b)if(equal_value(*x,*y))overlap=true;
+     for(const auto* x:a)if(equal_value(*x,*b.back()))overlap=true;
      if(!overlap)selected.insert(member);
     }
    }
@@ -300,7 +320,7 @@ EventTable apply_rule(const EventTable& source,const std::vector<EventAttribute>
  return subset(source,keep);
 }
 } // namespace
-EventTable filter_pandas_ltl_eventually_follows(const EventTable& source,const EventAttribute& pattern,const PandasLtlFilterOptions& options){return apply_rule(source,iterable(pattern),options,Rule::kEventually);}
+EventTable filter_pandas_ltl_eventually_follows(const EventTable& source,const EventAttribute& pattern,const PandasLtlFilterOptions& options){return apply_rule(source,{},options,Rule::kEventually,&pattern);}
 EventTable filter_pandas_ltl_next(const EventTable& source,const EventAttribute& a,const EventAttribute& b,const EventAttribute& c,const PandasLtlFilterOptions& options){return apply_rule(source,{a,b,c},options,Rule::kNext);}
 EventTable filter_pandas_ltl_four_eyes(const EventTable& source,const EventAttribute& a,const EventAttribute& b,const PandasLtlFilterOptions& options){return apply_rule(source,{a,b},options,Rule::kFourEyes);}
 EventTable filter_pandas_ltl_different_persons(const EventTable& source,const EventAttribute& a,const PandasLtlFilterOptions& options){return apply_rule(source,{a},options,Rule::kDifferent);}

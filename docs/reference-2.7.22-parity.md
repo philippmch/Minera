@@ -15335,3 +15335,14 @@ its cost with it), 18 equal-cost alignments with a different loop
 decomposition, and 5 traces whose reference cost differs from the
 cache-free optimum of the model. They all involve loops over segments of
 four or more events with repeated labels.
+
+## Pandas filters bank (2026-10-25)
+
+The seven pandas modules `attributes`, `between`, `cases`, `ltl`, `paths`,
+`timestamp` and `variants` (all under `algo.filtering.pandas`) are bound to a
+seeded public-call bank, `docs/pandas-filter-bank.json.gz` (87,971 calls, hash
+seeds 0-3). It is replayed by `minera_pandas_filter_bank_parity_tests`. Tables
+compare exactly through the normalized event-table JSON. The domain, the
+behaviour found and the limits are in
+[pandas-filter-domain-parity.md](pandas-filter-domain-parity.md). All seven
+modules are complete.

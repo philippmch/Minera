@@ -1,5 +1,7 @@
 #include "minera/pandas_timestamp_filter.hpp"
+#include "pandas_parameter_carrier.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -148,9 +150,43 @@ std::optional<std::size_t> column(const EventTable& source,const EventAttribute&
  const auto p=std::find(source.columns.begin(),source.columns.end(),key.value);
  return p==source.columns.end()?std::nullopt:std::optional<std::size_t>(p-source.columns.begin());
 }
+// df[[...]]: every listed label must be a column.
+void check_list_columns(const EventTable& source,const EventAttribute& key){
+ std::vector<std::string> names,absent;bool strings=true,integers=true;
+ for(const auto& item:key.children){
+  names.push_back(repr(item));strings&=text_value(item);integers&=type_name(item)=="int";
+  if(!column(source,item)&&std::find(absent.begin(),absent.end(),names.back())==absent.end())absent.push_back(names.back());
+ }
+ const auto list=[](const std::vector<std::string>& values){std::string output="[";for(std::size_t i=0;i<values.size();++i){if(i)output+=", ";output+=values[i];}return output+"]";};
+ if(absent.empty())return;
+ if(absent.size()==names.size()){
+  const std::string dtype=names.empty()?"object":strings?"str":integers?"int64":"object";
+  error("KeyError",string_key_repr("None of [Index("+list(names)+", dtype='"+dtype+"')] are in the [columns]"));
+ }
+ error("KeyError",string_key_repr(list(absent)+" not in index"));
+}
+// repr() of a Python datetime argument (its text is ISO with an optional
+// fraction and UTC offset).
+std::string key_repr(const EventAttribute& key){
+ if(!date_value(key)||key.is_null||std::holds_alternative<NativeDate>(key.typed_value))return repr(key);
+ const auto& text=key.value;
+ const auto number=[&](std::size_t at,std::size_t width){return std::stoi(text.substr(at,width));};
+ std::string result="datetime.datetime("+std::to_string(number(0,4))+", "+std::to_string(number(5,2))+", "+std::to_string(number(8,2))+", "+std::to_string(number(11,2))+", "+std::to_string(number(14,2));
+ const int second=number(17,2);std::size_t position=19;int micro=0;
+ if(position<text.size()&&text[position]=='.'){std::string digits;++position;while(position<text.size()&&std::isdigit(static_cast<unsigned char>(text[position])))digits+=text[position++];digits.resize(6,'0');micro=std::stoi(digits.substr(0,6));}
+ if(second||micro)result+=", "+std::to_string(second);
+ if(micro)result+=", "+std::to_string(micro);
+ if(position<text.size()){
+  const int sign=text[position]=='-'?-1:1;const int minutes=sign*(number(position+1,2)*60+number(position+4,2));
+  if(minutes==0)result+=", tzinfo=datetime.timezone.utc";
+  else {const int seconds=minutes*60;result+=", tzinfo=datetime.timezone(datetime.timedelta("+std::string(seconds<0?"days=-1, seconds="+std::to_string(86400+seconds):"seconds="+std::to_string(seconds))+"))";}
+ }
+ return result+")";
+}
 std::size_t direct_column(const EventTable& source,const EventAttribute& key){
- if(const auto p=column(source,key))return *p;
- error("KeyError",repr(key));
+ if(const auto found=column(source,key))return *found;
+ if(key.container==AttributeContainerKind::kList)check_list_columns(source,key);
+ error("KeyError",key_repr(key));
 }
 const EventAttribute& cell(const EventTable& source,std::size_t row,std::size_t col){
  static const EventAttribute none{"","",AttributeKind::kString,true};
@@ -184,6 +220,8 @@ void check_time(const EventTable& source,std::size_t time,Mode mode,const EventA
 }
 EventTable masked_frame(const EventTable& source){
  EventTable result=source;
+ // Masking no row keeps every dtype.
+ if(source.size()==0)return result;
  for(std::size_t c=0;c<source.columns.size();++c){
   const auto dtype=source.dtypes.empty()?"object":source.dtypes[c];
   const bool nullable=dtype=="boolean"||dtype=="string"||dtype=="Int64"||dtype=="UInt64"||dtype=="Float64";
@@ -250,16 +288,12 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
   const auto time=direct_column(source,options.timestamp_key);check_time(source,time,mode,nullptr);
   std::vector<std::size_t> candidates;
   for(std::size_t i=0;i<source.size();++i){if(!selected||!equal_value(cell(source,i,*selected),vector?wanted->children[i]:*wanted))continue;
-   const auto& value=cell(source,i,time);check_time(source,time,mode,&value);if(inside(instant(value),lower,upper))candidates.push_back(i);
+   // keep_nan_values also accepts the cases of matching rows without a time.
+   const auto& value=cell(source,i,time);check_time(source,time,mode,&value);if(inside(instant(value),lower,upper)||(keep_missing&&missing(value)))candidates.push_back(i);
   }
   if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("AttributeError","'DataFrame' object has no attribute 'unique'");
   const auto cases=direct_column(source,options.case_id_key);std::unordered_set<std::string> accepted;
   for(auto i:candidates)accepted.insert(identity(cell(source,i,cases)));
-  if(keep_missing){
-   std::unordered_map<std::string,bool> timed;
-   for(std::size_t i=0;i<source.size();++i){const auto key=identity(cell(source,i,cases));timed[key]=timed[key]||!missing(cell(source,i,time));}
-   for(const auto& [key,present]:timed)if(!present)accepted.insert(key);
-  }
   std::vector<bool> keep(source.size());for(std::size_t i=0;i<source.size();++i)keep[i]=accepted.contains(identity(cell(source,i,cases)));
   return subset(source,keep);
  }
@@ -294,10 +328,10 @@ PandasTimestampFilterOptions resolve_timestamp_options(const std::vector<PandasT
  return options;
 }
 PandasTimestampFilterOptions resolve_timestamp_options(const EventAttribute& parameters){
- if(parameters.is_null||(parameters.container==AttributeContainerKind::kList&&parameters.children.empty())||(text_value(parameters)&&parameters.value.empty()))return {};
+ if(parameters.is_null||(parameters.container==AttributeContainerKind::kList&&parameters.children.empty()))return {};
  if(parameters.container==AttributeContainerKind::kContainer){std::vector<PandasTimestampFilterParameter> values;for(const auto& p:parameters.children)values.push_back({p,false});return resolve_timestamp_options(values);}
- if(text_value(parameters))error("TypeError","string indices must be integers, not 'str'");
- error("TypeError","'"+type_name(parameters)+"' object is not iterable");
+ detail::check_parameter_carrier(parameters,[](const std::string& type,const std::string& message){error(type,message);});
+ return {};
 }
 } // namespace
 #define MINERA_TIMESTAMP_FUNCTION(name,mode) \

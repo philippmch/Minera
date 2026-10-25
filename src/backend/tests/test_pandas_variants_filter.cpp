@@ -4741,8 +4741,8 @@ if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e747320657272
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_89(std::size_t& returned,std::size_t& errors){ // PVF-B1-filter_variants_top_k-shape-missing-time
 (void)returned;(void)errors;const auto input=snapshot_10();const auto before=serialize_embedding_workbench_table_json(input);
-const auto result=filter_pandas_variants_top_k(input,integer_value(bytes(""),std::int64_t{2LL}),container_value(bytes(""),AttributeContainerKind::kContainer,{}));const auto expected=snapshot_70();
-full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c207461626c65206d69736d617463683a205056462d42312d66696c7465725f76617269616e74735f746f705f6b2d73686170652d6d697373696e672d74696d65"));++returned;
+bool threw=false;try{(void)filter_pandas_variants_top_k(input,integer_value(bytes(""),std::int64_t{2LL}),container_value(bytes(""),AttributeContainerKind::kContainer,{}));}catch(const PandasVariantsFilterError& e){threw=e.type==bytes("4b65794572726f72") && e.message==bytes("2774696d653a74696d657374616d7027");if(!threw)std::cerr<<e.type<<": "<<e.message<<"\n";}
+if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e7473206572726f72206d69736d617463683a205056462d42312d66696c7465725f76617269616e74735f746f705f6b2d73686170652d6d697373696e672d74696d65"));++errors;
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_90(std::size_t& returned,std::size_t& errors){ // PVF-B1-filter_variants_top_k-shape-duplicate-index
 (void)returned;(void)errors;const auto input=snapshot_12();const auto before=serialize_embedding_workbench_table_json(input);
@@ -4851,7 +4851,7 @@ if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e747320657272
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_111(std::size_t& returned,std::size_t& errors){ // PVF-B1-filter_variants_top_k-shape-activity-nan
 (void)returned;(void)errors;const auto input=snapshot_47();const auto before=serialize_embedding_workbench_table_json(input);
-bool threw=false;try{(void)filter_pandas_variants_top_k(input,integer_value(bytes(""),std::int64_t{2LL}),container_value(bytes(""),AttributeContainerKind::kContainer,{}));}catch(const PandasVariantsFilterError& e){threw=e.type==bytes("547970654572726f72") && e.message==bytes("273c27206e6f7420737570706f72746564206265747765656e20696e7374616e636573206f6620277374722720616e642027666c6f617427");if(!threw)std::cerr<<e.type<<": "<<e.message<<"\n";}
+bool threw=false;try{(void)filter_pandas_variants_top_k(input,integer_value(bytes(""),std::int64_t{2LL}),container_value(bytes(""),AttributeContainerKind::kContainer,{}));}catch(const PandasVariantsFilterError& e){threw=e.type==bytes("547970654572726f72") && e.message==bytes("273c27206e6f7420737570706f72746564206265747765656e20696e7374616e636573206f662027666c6f61742720616e64202773747227");if(!threw)std::cerr<<e.type<<": "<<e.message<<"\n";}
 if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e7473206572726f72206d69736d617463683a205056462d42312d66696c7465725f76617269616e74735f746f705f6b2d73686170652d61637469766974792d6e616e"));++errors;
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_112(std::size_t& returned,std::size_t& errors){ // PVF-B1-filter_variants_top_k-shape-activity-numeric
@@ -5136,8 +5136,8 @@ if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e747320657272
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_168(std::size_t& returned,std::size_t& errors){ // PVF-B1-filter_variants_by_coverage_percentage-shape-missing-time
 (void)returned;(void)errors;const auto input=snapshot_10();const auto before=serialize_embedding_workbench_table_json(input);
-const auto result=filter_pandas_variants_min_coverage(input,float_value(bytes(""),0x1.999999999999ap-3),container_value(bytes(""),AttributeContainerKind::kContainer,{}));const auto expected=snapshot_70();
-full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c207461626c65206d69736d617463683a205056462d42312d66696c7465725f76617269616e74735f62795f636f7665726167655f70657263656e746167652d73686170652d6d697373696e672d74696d65"));++returned;
+bool threw=false;try{(void)filter_pandas_variants_min_coverage(input,float_value(bytes(""),0x1.999999999999ap-3),container_value(bytes(""),AttributeContainerKind::kContainer,{}));}catch(const PandasVariantsFilterError& e){threw=e.type==bytes("4b65794572726f72") && e.message==bytes("2774696d653a74696d657374616d7027");if(!threw)std::cerr<<e.type<<": "<<e.message<<"\n";}
+if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e7473206572726f72206d69736d617463683a205056462d42312d66696c7465725f76617269616e74735f62795f636f7665726167655f70657263656e746167652d73686170652d6d697373696e672d74696d65"));++errors;
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_169(std::size_t& returned,std::size_t& errors){ // PVF-B1-filter_variants_by_coverage_percentage-shape-duplicate-index
 (void)returned;(void)errors;const auto input=snapshot_12();const auto before=serialize_embedding_workbench_table_json(input);
@@ -5531,8 +5531,8 @@ if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e747320657272
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_247(std::size_t& returned,std::size_t& errors){ // PVF-B1-filter_variants_by_maximum_coverage_percentage-shape-missing-time
 (void)returned;(void)errors;const auto input=snapshot_10();const auto before=serialize_embedding_workbench_table_json(input);
-const auto result=filter_pandas_variants_max_coverage(input,float_value(bytes(""),0x1.999999999999ap-3),container_value(bytes(""),AttributeContainerKind::kContainer,{}));const auto expected=snapshot_104();
-full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c207461626c65206d69736d617463683a205056462d42312d66696c7465725f76617269616e74735f62795f6d6178696d756d5f636f7665726167655f70657263656e746167652d73686170652d6d697373696e672d74696d65"));++returned;
+bool threw=false;try{(void)filter_pandas_variants_max_coverage(input,float_value(bytes(""),0x1.999999999999ap-3),container_value(bytes(""),AttributeContainerKind::kContainer,{}));}catch(const PandasVariantsFilterError& e){threw=e.type==bytes("4b65794572726f72") && e.message==bytes("2774696d653a74696d657374616d7027");if(!threw)std::cerr<<e.type<<": "<<e.message<<"\n";}
+if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e7473206572726f72206d69736d617463683a205056462d42312d66696c7465725f76617269616e74735f62795f6d6178696d756d5f636f7665726167655f70657263656e746167652d73686170652d6d697373696e672d74696d65"));++errors;
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_248(std::size_t& returned,std::size_t& errors){ // PVF-B1-filter_variants_by_maximum_coverage_percentage-shape-duplicate-index
 (void)returned;(void)errors;const auto input=snapshot_12();const auto before=serialize_embedding_workbench_table_json(input);
@@ -6506,8 +6506,8 @@ full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_442(std::size_t& returned,std::size_t& errors){ // PVF-B2-filter_variants_top_k-timestamp-missing
 (void)returned;(void)errors;const auto input=snapshot_0();const auto before=serialize_embedding_workbench_table_json(input);
-const auto result=filter_pandas_variants_top_k(input,integer_value(bytes(""),std::int64_t{2LL}),container_value(bytes(""),AttributeContainerKind::kContainer,{EventAttribute{bytes("706d3470793a706172616d3a74696d657374616d705f6b6579"),bytes("6d697373696e672074696d657374616d702073656c6563746f72")}}));const auto expected=snapshot_65();
-full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c207461626c65206d69736d617463683a205056462d42322d66696c7465725f76617269616e74735f746f705f6b2d74696d657374616d702d6d697373696e67"));++returned;
+bool threw=false;try{(void)filter_pandas_variants_top_k(input,integer_value(bytes(""),std::int64_t{2LL}),container_value(bytes(""),AttributeContainerKind::kContainer,{EventAttribute{bytes("706d3470793a706172616d3a74696d657374616d705f6b6579"),bytes("6d697373696e672074696d657374616d702073656c6563746f72")}}));}catch(const PandasVariantsFilterError& e){threw=e.type==bytes("4b65794572726f72") && e.message==bytes("276d697373696e672074696d657374616d702073656c6563746f7227");if(!threw)std::cerr<<e.type<<": "<<e.message<<"\n";}
+if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e7473206572726f72206d69736d617463683a205056462d42322d66696c7465725f76617269616e74735f746f705f6b2d74696d657374616d702d6d697373696e67"));++errors;
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_443(std::size_t& returned,std::size_t& errors){ // PVF-B2-filter_variants_top_k-timestamp-literal-present
 (void)returned;(void)errors;const auto input=snapshot_140();const auto before=serialize_embedding_workbench_table_json(input);
@@ -6521,8 +6521,8 @@ full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_445(std::size_t& returned,std::size_t& errors){ // PVF-B2-filter_variants_by_coverage_percentage-timestamp-missing
 (void)returned;(void)errors;const auto input=snapshot_0();const auto before=serialize_embedding_workbench_table_json(input);
-const auto result=filter_pandas_variants_min_coverage(input,float_value(bytes(""),0x1.999999999999ap-3),container_value(bytes(""),AttributeContainerKind::kContainer,{EventAttribute{bytes("706d3470793a706172616d3a74696d657374616d705f6b6579"),bytes("6d697373696e672074696d657374616d702073656c6563746f72")}}));const auto expected=snapshot_65();
-full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c207461626c65206d69736d617463683a205056462d42322d66696c7465725f76617269616e74735f62795f636f7665726167655f70657263656e746167652d74696d657374616d702d6d697373696e67"));++returned;
+bool threw=false;try{(void)filter_pandas_variants_min_coverage(input,float_value(bytes(""),0x1.999999999999ap-3),container_value(bytes(""),AttributeContainerKind::kContainer,{EventAttribute{bytes("706d3470793a706172616d3a74696d657374616d705f6b6579"),bytes("6d697373696e672074696d657374616d702073656c6563746f72")}}));}catch(const PandasVariantsFilterError& e){threw=e.type==bytes("4b65794572726f72") && e.message==bytes("276d697373696e672074696d657374616d702073656c6563746f7227");if(!threw)std::cerr<<e.type<<": "<<e.message<<"\n";}
+if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e7473206572726f72206d69736d617463683a205056462d42322d66696c7465725f76617269616e74735f62795f636f7665726167655f70657263656e746167652d74696d657374616d702d6d697373696e67"));++errors;
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_446(std::size_t& returned,std::size_t& errors){ // PVF-B2-filter_variants_by_coverage_percentage-timestamp-literal-present
 (void)returned;(void)errors;const auto input=snapshot_140();const auto before=serialize_embedding_workbench_table_json(input);
@@ -6536,8 +6536,8 @@ full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_448(std::size_t& returned,std::size_t& errors){ // PVF-B2-filter_variants_by_maximum_coverage_percentage-timestamp-missing
 (void)returned;(void)errors;const auto input=snapshot_0();const auto before=serialize_embedding_workbench_table_json(input);
-const auto result=filter_pandas_variants_max_coverage(input,float_value(bytes(""),0x1.999999999999ap-3),container_value(bytes(""),AttributeContainerKind::kContainer,{EventAttribute{bytes("706d3470793a706172616d3a74696d657374616d705f6b6579"),bytes("6d697373696e672074696d657374616d702073656c6563746f72")}}));const auto expected=snapshot_94();
-full_table_equal(result,expected,bytes("50616e6461732076617269616e74732066756c6c207461626c65206d69736d617463683a205056462d42322d66696c7465725f76617269616e74735f62795f6d6178696d756d5f636f7665726167655f70657263656e746167652d74696d657374616d702d6d697373696e67"));++returned;
+bool threw=false;try{(void)filter_pandas_variants_max_coverage(input,float_value(bytes(""),0x1.999999999999ap-3),container_value(bytes(""),AttributeContainerKind::kContainer,{EventAttribute{bytes("706d3470793a706172616d3a74696d657374616d705f6b6579"),bytes("6d697373696e672074696d657374616d702073656c6563746f72")}}));}catch(const PandasVariantsFilterError& e){threw=e.type==bytes("4b65794572726f72") && e.message==bytes("276d697373696e672074696d657374616d702073656c6563746f7227");if(!threw)std::cerr<<e.type<<": "<<e.message<<"\n";}
+if(!threw)throw std::runtime_error(bytes("50616e6461732076617269616e7473206572726f72206d69736d617463683a205056462d42322d66696c7465725f76617269616e74735f62795f6d6178696d756d5f636f7665726167655f70657263656e746167652d74696d657374616d702d6d697373696e67"));++errors;
 assert(serialize_embedding_workbench_table_json(input)==before);}
 MINERA_NOINLINE void retained_case_449(std::size_t& returned,std::size_t& errors){ // PVF-B2-filter_variants_by_maximum_coverage_percentage-timestamp-literal-present
 (void)returned;(void)errors;const auto input=snapshot_140();const auto before=serialize_embedding_workbench_table_json(input);
@@ -7241,6 +7241,6 @@ retained_case_487(returned,errors);
 retained_case_488(returned,errors);
 retained_case_489(returned,errors);
 retained_case_490(returned,errors);
-assert(returned==357&&errors==134);std::cout<<returned<<"/357 full pandas variants filter results and "<<errors<<"/134 native diagnostics passed\n";}
+assert(returned==351&&errors==140);std::cout<<returned<<"/351 full pandas variants filter results and "<<errors<<"/140 native diagnostics passed\n";}
 } // namespace
 int main(){try{retained_pandas_variants_filter_cases();}catch(const std::exception& e){std::cerr<<e.what()<<"\n";return 1;}}

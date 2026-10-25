@@ -1,4 +1,5 @@
 #include "minera/pandas_variants_filter.hpp"
+#include "pandas_parameter_carrier.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -8,6 +9,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "minera/timestamp.hpp"
+#include "numpy_object_sort.hpp"
+#include "python_list_sort.hpp"
 #include "minera/token_integer.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
@@ -61,7 +64,7 @@ std::string type_name(const EventAttribute& v){
  if(v.is_null)return date_value(v)?"NaTType":"NoneType";
  switch(v.container){case AttributeContainerKind::kList:return "list";case AttributeContainerKind::kTuple:return "tuple";case AttributeContainerKind::kContainer:return "dict";case AttributeContainerKind::kSet:return "set";case AttributeContainerKind::kFrozenSet:return "frozenset";default:break;}
  if(is_native_na_attribute(v))return "NAType";
- if(date_value(v))return "Timestamp";
+ if(date_value(v))return std::holds_alternative<NativeDate>(v.typed_value)?"Timestamp":"datetime.datetime";
  if(v.kind==AttributeKind::kBytes)return "bytes";
  if(v.kind==AttributeKind::kBoolean||std::holds_alternative<bool>(v.typed_value))return "bool";
  if(v.kind==AttributeKind::kInt||std::holds_alternative<std::int64_t>(v.typed_value)||std::holds_alternative<std::uint64_t>(v.typed_value))return "int";
@@ -168,10 +171,7 @@ int order(const EventAttribute& left,const EventAttribute& right){
   if(a==NativeScalarOrderKind::kNumeric&&(missing(left)||missing(right)))return 0;
   return native_scalar_key_compare(left,right);
  }
- // The captured Python tuple sort reports a null on the left of this error.
- const auto first=left.is_null?type_name(left):right.is_null?type_name(right):type_name(left);
- const auto second=left.is_null?type_name(right):right.is_null?type_name(left):type_name(right);
- error("TypeError","'<' not supported between instances of '"+first+"' and '"+second+"'");
+ error("TypeError","'<' not supported between instances of '"+type_name(left)+"' and '"+type_name(right)+"'");
 }
 struct Group {std::string key;EventAttribute id;std::size_t first=0;std::vector<std::size_t> rows;};
 std::vector<Group> groups(const EventTable& source,std::size_t cases){
@@ -228,7 +228,8 @@ std::vector<EventAttribute> admitted_values(const EventAttribute& admitted){
 EventTable membership(const EventTable& source,const PandasVariantsFilterOptions& options,const EventAttribute* criterion,const std::vector<EventAttribute>* supplied=nullptr){
  const auto cache=membership_cache(source,options);
  std::vector<bool> keep(source.size());
- if(cache.empty())return subset(source,keep);
+ // Without a non-null case nothing is selected; a negative filter keeps all.
+ if(cache.empty()){std::fill(keep.begin(),keep.end(),!truth(options.positive));return subset(source,keep);}
  const auto admitted=supplied?*supplied:admitted_values(*criterion);
  std::unordered_set<std::string> variants;for(const auto& value:admitted)variants.insert(identity(value));
  std::unordered_set<std::string> selected;for(const auto& row:cache)if(variants.contains(identity(row.variant)))selected.insert(identity(row.id));
@@ -243,6 +244,7 @@ struct Statistics {std::vector<VariantCount> variants;std::size_t cases=0;};
 Statistics statistics(const EventTable& source,const PandasVariantsFilterOptions& options){
  if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("ValueError","No group keys passed!");
  const auto cases=direct_column(source,options.case_id_key);
+ (void)direct_column(source,options.timestamp_key);
  if(options.activity_key.container==AttributeContainerKind::kList&&options.activity_key.children.empty())error("TypeError","unhashable type: 'numpy.ndarray'");
  const auto activity=direct_column(source,options.activity_key);
  bool strings=false,numbers=false,reals=false;
@@ -250,7 +252,16 @@ Statistics statistics(const EventTable& source,const PandasVariantsFilterOptions
   if(value.is_null&&!date_value(value))error("TypeError","'<' not supported between instances of 'NoneType' and 'NoneType'");
   strings=strings||text_value(value);numbers=numbers||numeric(value);reals=reals||value.kind==AttributeKind::kFloat;
  }
- if(strings&&numbers)error("TypeError",std::string("'<' not supported between instances of 'str' and '")+(reals?"float":"int")+"'");
+ // The case ids go through numpy's object sort, which raises Python's "<"
+ // TypeError at its first str/number comparison.
+ if(strings&&numbers)detail::numpy_object_stable_argsort(source.size(),[&](std::size_t a,std::size_t b){
+  const auto& x=cell(source,a,cases);const auto& y=cell(source,b,cases);
+  if(text_value(x)!=text_value(y))error("TypeError","'<' not supported between instances of '"+type_name(x)+"' and '"+type_name(y)+"'");
+  if(text_value(x))return x.value<y.value?-1:y.value<x.value?1:0;
+  const auto u=native_attribute_number(x),v=native_attribute_number(y);
+  return u<v?-1:v<u?1:0;
+ });
+ (void)reals;
  auto grouped=groups(source,cases);std::stable_sort(grouped.begin(),grouped.end(),[](const Group& a,const Group& b){return order(a.id,b.id)<0;});
  Statistics result;result.cases=grouped.size();std::unordered_map<std::string,std::size_t> positions;
  for(const auto& group:grouped){
@@ -291,8 +302,10 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& criterion
  source.validate();if(mode==Mode::kMembership)return membership(source,options,&criterion);
  auto stats=statistics(source,options);std::vector<EventAttribute> admitted;
  if(mode==Mode::kTopK){
+  // Sorted by (count, variant) with reverse=True, as Python orders it, before
+  // k is read.
+  detail::python_list_sort(stats.variants,[](const VariantCount& a,const VariantCount& b){return a.count!=b.count?a.count<b.count:order(a.variant,b.variant)<0;},true);
   const auto selected=top_count(criterion,stats.variants.size());
-  std::stable_sort(stats.variants.begin(),stats.variants.end(),[](const VariantCount& a,const VariantCount& b){return a.count!=b.count?a.count>b.count:order(b.variant,a.variant)<0;});
   for(std::size_t i=0;i<selected;++i)admitted.push_back(stats.variants[i].variant);
  }else{
   if(!stats.variants.empty()){
@@ -317,6 +330,7 @@ PandasVariantsFilterOptions resolve_variants_options(const std::vector<PandasVar
  for(const auto& p:parameters){const auto& value=p.value;
   if(value.key=="pm4py:param:case_id_key")options.case_id_key=value;
   else if(value.key=="pm4py:param:activity_key")options.activity_key=value;
+  else if(value.key=="pm4py:param:timestamp_key"&&!p.enum_key)options.timestamp_key=value;
   else if(value.key=="positive")options.positive=value;
   else if(value.key=="decreasingFactor")options.decreasing_factor=value;
   else if(value.key=="variants_df"){if(p.table)options.variants_df=*p.table;else options.variants_df=value;}
@@ -324,10 +338,10 @@ PandasVariantsFilterOptions resolve_variants_options(const std::vector<PandasVar
  return options;
 }
 PandasVariantsFilterOptions resolve_variants_options(const EventAttribute& parameters){
- if(parameters.is_null||(parameters.container==AttributeContainerKind::kList&&parameters.children.empty())||(text_value(parameters)&&parameters.value.empty()))return {};
+ if(parameters.is_null||(parameters.container==AttributeContainerKind::kList&&parameters.children.empty()))return {};
  if(parameters.container==AttributeContainerKind::kContainer){std::vector<PandasVariantsFilterParameter> values;for(const auto& value:parameters.children)values.push_back({value,false,std::nullopt});return resolve_variants_options(values);}
- if(text_value(parameters))error("TypeError","string indices must be integers, not 'str'");
- error("TypeError","'"+type_name(parameters)+"' object is not iterable");
+ detail::check_parameter_carrier(parameters,[](const std::string& type,const std::string& message){error(type,message);});
+ return {};
 }
 } // namespace
 #define MINERA_VARIANTS_FUNCTION(name,mode) \

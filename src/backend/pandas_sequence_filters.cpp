@@ -7,6 +7,7 @@
 #include <variant>
 
 #include "minera/filtering_common.hpp"
+#include "numpy_object_sort.hpp"
 
 namespace minera {
 
@@ -834,7 +835,7 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
 namespace {
 
 // The reference sorts the case column as an object array (numpy's stable
-// argsort; this is its comparison order for up to 16 values). A str id
+// argsort, see numpy_object_sort.hpp). A str id
 // compared with a null (NaN) one raises the TypeError of Python's "<", named
 // by the operand order of the first such comparison.
 void require_sortable_case_ids(const EventTable& df, std::size_t column) {
@@ -842,7 +843,6 @@ void require_sortable_case_ids(const EventTable& df, std::size_t column) {
   bool any_text = false;
   for (const auto& row : df.rows) (null_cell(row[column]) ? any_null : any_text) = true;
   if (!any_null || !any_text) return;
-  const auto n = static_cast<std::ptrdiff_t>(df.size());
   auto cmp = [&](std::size_t a, std::size_t b) {
     const auto& x = df.rows[a][column];
     const auto& y = df.rows[b][column];
@@ -854,24 +854,7 @@ void require_sortable_case_ids(const EventTable& df, std::size_t column) {
     if (null_cell(x)) return 0;
     return x->value < y->value ? -1 : y->value < x->value ? 1 : 0;
   };
-  std::vector<std::size_t> order(df.size());
-  for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
-  std::ptrdiff_t pi = 1;
-  if (cmp(order[0], order[1]) <= 0) {
-    while (pi < n - 1 && cmp(order[pi], order[pi + 1]) <= 0) ++pi;
-  } else {
-    while (pi < n - 1 && cmp(order[pi + 1], order[pi]) < 0) ++pi;
-    std::reverse(order.begin(), order.begin() + pi + 1);
-  }
-  for (++pi; pi < n; ++pi) {
-    const auto vi = order[pi];
-    auto pj = pi;
-    while (pj > 0 && cmp(vi, order[pj - 1]) < 0) {
-      order[pj] = order[pj - 1];
-      --pj;
-    }
-    order[pj] = vi;
-  }
+  detail::numpy_object_stable_argsort(df.size(), cmp);
 }
 
 }  // namespace

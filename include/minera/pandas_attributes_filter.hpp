@@ -18,7 +18,9 @@ struct PandasAttributesFilterOptions {
   EventAttribute activity_key{"", "concept:name"};
   EventAttribute positive{"", "true", AttributeKind::kBoolean};
   EventAttribute keep_nan_values{"", "false", AttributeKind::kBoolean};
-  EventAttribute keep_once_per_case{"", "true", AttributeKind::kBoolean};
+  // Unset differs from true in the relative occurrence filter: values are
+  // counted per event but divided by the number of cases.
+  std::optional<EventAttribute> keep_once_per_case;
   std::optional<EventAttribute> stream_filter_key1;
   std::optional<EventAttribute> stream_filter_value1;
   std::optional<EventAttribute> stream_filter_key2;

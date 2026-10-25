@@ -11,6 +11,9 @@ namespace minera {
 struct PandasVariantsFilterOptions {
   EventAttribute case_id_key{"", "case:concept:name"};
   EventAttribute activity_key{"", "concept:name"};
+  // Read only from the plain "pm4py:param:timestamp_key" key (the Parameters
+  // enum has no member for it); the count-based filters require the column.
+  EventAttribute timestamp_key{"", "time:timestamp"};
   EventAttribute positive{"", "true", AttributeKind::kBoolean};
   std::optional<EventAttribute> decreasing_factor;
   std::optional<std::variant<EventAttribute, EventTable>> variants_df;

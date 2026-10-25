@@ -1,4 +1,5 @@
 #include "minera/pandas_case_filter.hpp"
+#include "pandas_parameter_carrier.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -184,8 +185,36 @@ void validate_bound(const EventAttribute& bound,bool lower,bool duration,std::si
   if(bound.children.size()!=count)error("ValueError","('Lengths must match to compare', ("+std::to_string(count)+",), ("+std::to_string(bound.children.size())+",))");
   error("ValueError","case filter vector bounds are outside the captured native domain");
  }
- if(date_value(bound))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
+ if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
  if(!bound.is_null&&!numeric(bound))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of '"+(duration?"float":"int")+"' and '"+type_name(bound)+"'");
+}
+// One Series comparison of case durations with a bound: a str fails for any
+// length, a list must have one item per case and compares item by item, a
+// tuple broadcasts like a numpy operand, and other objects fail on the first
+// case.
+std::vector<bool> duration_mask(const std::vector<double>& durations,const std::vector<std::size_t>& cases,const EventAttribute& bound,bool lower){
+ const auto n=cases.size();const std::string op=lower?"'>='":"'<='";
+ if(text_value(bound))error("TypeError","Invalid comparison between dtype=float64 and str");
+ if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",op+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
+ const auto compare=[&](double value,const EventAttribute& item)->bool{
+  if(item.is_null)return false;
+  if(item.container!=AttributeContainerKind::kScalar||!numeric(item)||is_native_na_attribute(item))error("TypeError",op+" not supported between instances of 'float' and '"+type_name(item)+"'");
+  const auto number=native_attribute_number(item);return lower?value>=number:value<=number;
+ };
+ std::vector<bool> result(n);
+ if(bound.container==AttributeContainerKind::kList||bound.container==AttributeContainerKind::kTuple){
+  const auto k=bound.children.size();
+  if(bound.container==AttributeContainerKind::kList&&k!=n)error("ValueError","('Lengths must match to compare', ("+std::to_string(n)+",), ("+std::to_string(k)+",))");
+  if(bound.container==AttributeContainerKind::kTuple&&k!=n&&k!=1){
+   // One case broadcasts to the tuple, whose result is assigned to that case.
+   if(n==1)error("ValueError","Length of values ("+std::to_string(k)+") does not match length of index (1)");
+   error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(n)+",) ("+std::to_string(k)+",) ");
+  }
+  for(std::size_t i=0;i<n;++i)result[i]=compare(durations[cases[i]],bound.children[k==n?i:0]);
+  return result;
+ }
+ for(std::size_t i=0;i<n;++i)result[i]=compare(durations[cases[i]],bound);
+ return result;
 }
 bool accepts(double value,const EventAttribute& bound,bool lower){
  if(bound.is_null)return false;
@@ -233,14 +262,27 @@ PandasCaseFilterOptions::PandasCaseFilterOptions(){
 }
 EventTable filter_pandas_case_size(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const PandasCaseFilterOptions& o){
  s.validate();const auto c=size_column(s,o.case_id_key);const auto grouped=groups(s,c);
+ if(s.size()&&grouped.values.empty())error("IndexError","cannot do a non-empty take from an empty axes.");
  validate_bound(minimum,true,false,s.size());
  std::vector<bool> lower(s.size());std::vector<double> selected_counts;
  for(std::size_t i=0;i<s.size();++i){const auto count=grouped.rows[i]?static_cast<double>(grouped.values[*grouped.rows[i]].count):std::numeric_limits<double>::quiet_NaN();lower[i]=accepts(count,minimum,true);if(lower[i])selected_counts.push_back(count);}
  auto result=subset(s,lower);
  if(maximum.is_null)return result;
  validate_bound(maximum,false,false,selected_counts.size());
- std::vector<bool> upper;for(const auto count:selected_counts)upper.push_back(accepts(count,maximum,false));
- return subset(result,upper);
+ // The upper mask is computed on every row and aligned to the kept rows by
+ // label: a duplicated label takes every row carrying it, then the mask is
+ // applied by position.
+ std::vector<bool> upper(s.size());
+ for(std::size_t i=0;i<s.size();++i){const auto count=grouped.rows[i]?static_cast<double>(grouped.values[*grouped.rows[i]].count):std::numeric_limits<double>::quiet_NaN();upper[i]=accepts(count,maximum,false);}
+ const auto labels=[](const EventTable& t){std::vector<EventTableIndexLabel> r;for(std::size_t i=0;i<t.size();++i){if(t.index)r.push_back(t.index->labels[i]);else {EventAttribute label{"",std::to_string(i),AttributeKind::kInt};label.typed_value=static_cast<std::uint64_t>(i);r.push_back({std::move(label)});}}return r;};
+ const auto all=labels(s),kept=labels(result);
+ std::vector<bool> aligned;
+ if(all==kept)aligned=upper;
+ else for(const auto& label:kept)for(std::size_t i=0;i<all.size();++i)if(all[i]==label)aligned.push_back(upper[i]);
+ if(std::all_of(aligned.begin(),aligned.end(),[](bool v){return v;}))return result;
+ std::vector<bool> keep(result.size());
+ for(std::size_t i=0;i<aligned.size();++i)if(aligned[i]){if(i>=result.size())error("IndexError","indices are out-of-bounds");keep[i]=true;}
+ return subset(result,keep);
 }
 EventTable filter_pandas_ncases(const EventTable& s,const EventAttribute& maximum,const PandasCaseFilterOptions& o){
  s.validate();const auto c=ncases_column(s,o.case_id_key);const auto grouped=groups(s,c);
@@ -263,14 +305,24 @@ EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribu
  const auto slots=business?business_slots(o.business_hour_slots):std::vector<BusinessHourSlot>{};
  std::vector<double> durations;for(const auto& g:grouped.values)durations.push_back(duration(g,business,slots));
  if(!business&&!s.dtypes.empty()&&!s.dtypes[t].starts_with("datetime64"))error("AttributeError","Can only use .dt accessor with datetimelike values");
- validate_bound(minimum,true,true,grouped.values.size());validate_bound(maximum,false,true,grouped.values.size());
- std::vector<bool> accepted;for(const auto elapsed:durations)accepted.push_back(accepts(elapsed,minimum,true)&&accepts(elapsed,maximum,false));
+ // Durations are a Series over the cases in sorted case order. The maximum
+ // is applied first, then the minimum to the cases that remain.
+ std::vector<std::size_t> order(grouped.values.size());std::iota(order.begin(),order.end(),0);
+ {std::vector<const EventAttribute*> ids(grouped.values.size());for(std::size_t i=0;i<s.size();++i)if(grouped.rows[i]&&!ids[*grouped.rows[i]])ids[*grouped.rows[i]]=&*s.rows[i][c];
+  std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){return native_scalar_key_compare(*ids[a],*ids[b])<0;});}
+ std::vector<bool> accepted(grouped.values.size());
+ std::vector<std::size_t> remaining;
+ const auto upper=duration_mask(durations,order,maximum,false);
+ for(std::size_t i=0;i<order.size();++i)if(upper[i])remaining.push_back(order[i]);
+ const auto lower=duration_mask(durations,remaining,minimum,true);
+ for(std::size_t i=0;i<remaining.size();++i)if(lower[i])accepted[remaining[i]]=true;
  std::vector<bool> keep(s.size());for(std::size_t i=0;i<s.size();++i)keep[i]=grouped.rows[i]&&accepted[*grouped.rows[i]];
  return subset(s,keep);
 }
 EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const EventAttribute& parameters){
  PandasCaseFilterOptions options;
- if(text_value(parameters)&&!parameters.value.empty())error("TypeError","string indices must be integers, not 'str'");
+ if(!parameters.is_null&&parameters.container!=AttributeContainerKind::kContainer)
+  detail::check_parameter_carrier(parameters,[](const std::string& type,const std::string& message){error(type,message);});
  if(parameters.container==AttributeContainerKind::kContainer)for(const auto& p:parameters.children){
   if(p.key=="pm4py:param:case_id_key")options.case_id_key=p;
   else if(p.key=="pm4py:param:timestamp_key")options.timestamp_key=p;

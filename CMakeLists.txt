@@ -2307,6 +2307,16 @@ if(MINERA_BUILD_TESTS)
            COMMAND minera_process_tree_reference_alignment_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/process-tree-dp-alignment-bank.txt.gz")
 
+  add_executable(minera_pandas_filter_bank_parity_tests
+    src/backend/tests/test_pandas_filter_bank_parity.cpp
+  )
+  target_link_libraries(minera_pandas_filter_bank_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_pandas_filter_bank_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_pandas_filter_bank_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_pandas_filter_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+
   add_executable(minera_random_tree_tests
     src/backend/tests/test_random_tree.cpp
   )

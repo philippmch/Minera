@@ -1,4 +1,6 @@
 #include "minera/pandas_between_filter.hpp"
+#include "numpy_object_sort.hpp"
+#include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -86,6 +88,12 @@ std::string type_name(const EventAttribute& value) {
     return date->resolution == NativeDateResolution::kNanosecond ? "Timestamp" : "datetime";
   if (value.kind == AttributeKind::kDate) return "datetime";
   return "str";
+}
+
+// The type's tp_name, as Python's operator errors report it.
+std::string qualified_type_name(const EventAttribute& value) {
+  const auto name = type_name(value);
+  return name == "datetime" ? "datetime.datetime" : name;
 }
 
 bool date_value(const EventAttribute& value) {
@@ -319,7 +327,7 @@ bool same_case(const EventAttribute& a, const EventAttribute& b, const CaseValue
 int case_compare(const EventAttribute& a, const EventAttribute& b,
                  bool numeric_array = false, bool numpy_dates = false) {
   const auto unsupported = [&]() -> int {
-    error("TypeError", "'<' not supported between instances of '" + type_name(a) + "' and '" + type_name(b) + "'");
+    error("TypeError", "'<' not supported between instances of '" + qualified_type_name(a) + "' and '" + qualified_type_name(b) + "'");
   };
   if (is_native_na_attribute(a) || is_native_na_attribute(b))
     error("TypeError", "boolean value of NA is ambiguous");
@@ -415,7 +423,7 @@ bool contains(const EventAttribute& query, const EventAttribute& value) {
     }
     error("TypeError", "a bytes-like object is required, not '" + type_name(value) + "'");
   }
-  error("TypeError", "argument of type '" + type_name(query) + "' is not iterable");
+  error("TypeError", "argument of type '" + qualified_type_name(query) + "' is not iterable");
 }
 
 bool arithmetic_index(const std::vector<EventTableIndexLabel>& labels) {
@@ -437,7 +445,7 @@ bool arithmetic_index(const std::vector<EventTableIndexLabel>& labels) {
 
 std::string separator(const EventAttribute& value) {
   if (string_value(value)) return value.value;
-  error("TypeError", "can only concatenate str (not \"" + type_name(value) + "\") to str");
+  error("TypeError", "can only concatenate str (not \"" + qualified_type_name(value) + "\") to str");
 }
 }  // namespace
 
@@ -448,8 +456,13 @@ EventTable filter_pandas_between(const EventTable& source, const EventAttribute&
   const auto cases = case_values(source, key);
   std::vector<std::size_t> sorted(source.rows.size()), buffer(source.rows.size());
   std::iota(sorted.begin(), sorted.end(), 0);
-  merge_cases(sorted, buffer, cases, 0, sorted.size());
   const auto activity = column(source, options.activity_key, false);
+  // A short object column fails at the first comparison numpy's sort makes.
+  if (sorted.size() <= 16)
+    detail::numpy_object_stable_argsort(sorted.size(), [&](std::size_t a, std::size_t b) {
+      return case_compare(cases.values[a], cases.values[b], cases.numeric_array, cases.numpy_dates);
+    });
+  merge_cases(sorted, buffer, cases, 0, sorted.size());
   std::vector<std::optional<std::string>> marks(source.rows.size());
   for (std::size_t first = 0; first < sorted.size();) {
     std::size_t last = first + 1;
@@ -460,9 +473,11 @@ EventTable filter_pandas_between(const EventTable& source, const EventAttribute&
     std::size_t subcase = 0;
     for (std::size_t row = begin; row < end; ++row) {
       const auto value = cell(source, row, *activity);
+      // Every event is tested against act2 before act1.
+      const bool closing = contains(act2, value);
       if (!opening) {
         if (contains(act1, value)) opening = row;
-      } else if (contains(act2, value)) {
+      } else if (closing) {
         const auto& case_value = cases.values[sorted[first]];
         const auto label = (cases.numpy_dates ? date_string(case_value, true)
                            : cases.float32_array ? float32_string(case_value)
@@ -514,10 +529,7 @@ EventTable filter_pandas_between(const EventTable& source, const EventAttribute&
     }
     return filter_pandas_between(source, act1, act2, options);
   }
-  if (string_value(parameters)) {
-    if (parameters.value.empty()) return filter_pandas_between(source, act1, act2, options);
-    error("TypeError", "string indices must be integers, not 'str'");
-  }
-  error("TypeError", "'" + type_name(parameters) + "' object is not iterable");
+  detail::check_parameter_carrier(parameters, [](const std::string& type, const std::string& message) { error(type, message); });
+  return filter_pandas_between(source, act1, act2, options);
 }
 }  // namespace minera
