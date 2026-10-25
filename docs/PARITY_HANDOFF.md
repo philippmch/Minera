@@ -41,7 +41,7 @@ in `minera_llm_abstractions_parity_tests` through
 `include/minera/llm_abstractions.hpp`. The capture builds a fresh log per call
 because the public abstractions mutate their input. Native feature inference
 now one-hot encodes mixed string/number attributes. Six support modules
-promoted: 276/387. Left in `algo.querying.llm.abstractions`: ocel_fea_descr and
+promoted: 283/387 with the filtering bank. Left in `algo.querying.llm.abstractions`: ocel_fea_descr and
 ocel_ocdfg_descr.
 
 ## Profile clustering — 2026-10-25
