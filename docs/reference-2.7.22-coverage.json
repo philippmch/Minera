@@ -17183,8 +17183,32 @@
       "owner": "support:querying.llm.utils",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/llm_sql_utils.hpp",
+        "src/backend/llm_sql_utils.cpp",
+        "src/backend/python_unicode_alnum.hpp",
+        "src/backend/tests/test_llm_sql_utils_parity.cpp",
+        "scripts/capture-llm-sql-utils-bank.py",
+        "scripts/generate-python-unicode-alnum.py"
+      ],
+      "proofs": {
+        "module": "algo.querying.llm.utils.sql_utils",
+        "implementation": [
+          {
+            "path": "include/minera/llm_sql_utils.hpp",
+            "symbol": "restore_non_alphanumeric"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_llm_sql_utils_parity.cpp",
+            "executable": "minera_llm_sql_utils_parity_tests",
+            "case": "check_restore"
+          }
+        ]
+      }
     },
     {
       "module": "algo.reduction.process_tree.reducer",

@@ -111,6 +111,13 @@ traces, seconds to capture and run) passes in
 on SEARCH_GRAPH_PT, MILP and APPROXIMATED_ORIGINAL. The older
 `align_process_tree` still backs the CLI/server.
 
+## LLM SQL utils — 2026-10-25
+
+New bank `docs/llm-sql-utils-bank.txt.gz` (6,000 mask/restore calls,
+seconds) passes in `minera_llm_sql_utils_parity_tests` through the new
+include/minera/llm_sql_utils.hpp. Module `algo.querying.llm.utils.sql_utils`
+promoted.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

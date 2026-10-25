@@ -15346,3 +15346,26 @@ compare exactly through the normalized event-table JSON. The domain, the
 behaviour found and the limits are in
 [pandas-filter-domain-parity.md](pandas-filter-domain-parity.md). All seven
 modules are complete.
+
+## LLM SQL utils bank (2026-10-25)
+
+`scripts/capture-llm-sql-utils-bank.py` (seed 20261025, two hash seeds)
+records 3,000 public `mask_non_alphanumeric` calls on seeded texts (ASCII,
+control characters, letters and digits of other scripts, symbols, emoji,
+non-ASCII spaces) and 3,000 `restore_non_alphanumeric` calls on masked,
+mutated and handmade texts (1,049 raise) into `docs/llm-sql-utils-bank.txt.gz`.
+`minera_llm_sql_utils_parity_tests` compares include/minera/llm_sql_utils.hpp:
+6,000 calls, 0 failures, error classes and messages included.
+
+Reference behaviour found (black box):
+- Masking keeps every character for which `str.isalnum()` holds (Unicode
+  letters and numbers; src/backend/python_unicode_alnum.hpp is generated
+  from Python 3.11 by scripts/generate-python-unicode-alnum.py) and
+  ` !"'()*+,-.<=>_`; any other character c becomes
+  `ordabcchrordabc<ord(c)>ordabcchr`.
+- Restoring splits at every `ordabcchr` and replaces each piece starting with
+  `ordabc` by `chr(int(rest))`, keeping the other pieces; `int()` accepts
+  surrounding whitespace, a sign, single underscores between digits and
+  non-ASCII spaces and decimal digits, and raises ValueError (with the
+  literal's repr, cut to 200 characters), the 4,300-digit ValueError,
+  OverflowError beyond a C int, and chr's range ValueError.
