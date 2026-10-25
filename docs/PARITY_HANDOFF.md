@@ -100,7 +100,7 @@ grids) and `dfg_filtering.hpp` (the reference-shaped DFG filters, next to the
 old `dfg_filter.hpp`). KDE densities use a conditioning-based tolerance
 because BLAS covariance sums are not portable; everything else is exact.
 Activity names `_S_START_`/`_S_END_` are outside the domain. Details in
-`docs/filtering-common-domain-parity.md`. All four modules promoted (281/387).
+`docs/filtering-common-domain-parity.md`. All four modules promoted (290/387 after rebasing on the other threads).
 Next in this thread: the pandas filter modules, then Polars.
 
 ## EventLog filtering modules — 2026-10-25
