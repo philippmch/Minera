@@ -8597,8 +8597,30 @@
           "selector": "DYNAMIC_PROGRAMMING"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_reference_alignment.hpp",
+        "src/backend/process_tree_reference_alignment.cpp",
+        "src/backend/tests/test_process_tree_reference_alignment_parity.cpp",
+        "scripts/capture-process-tree-dp-alignment-bank.py"
+      ],
+      "proofs": {
+        "module": "algo.conformance.alignments.process_tree.variants.dynamic_programming",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_reference_alignment.hpp",
+            "symbol": "reference_process_tree_dp_alignments"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_reference_alignment_parity.cpp",
+            "executable": "minera_process_tree_reference_alignment_parity_tests",
+            "case": "check_dp"
+          }
+        ]
+      }
     },
     {
       "module": "algo.conformance.alignments.process_tree.variants.milp",

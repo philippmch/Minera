@@ -100,6 +100,17 @@ rules in the parity doc). Package `algo.simulation.playout.oc_causal_net`
 promoted. The older native causal-net playout (its own caps and branching)
 still backs the CLI/server.
 
+## Process-tree DP alignments — 2026-10-25
+
+New bank `docs/process-tree-dp-alignment-bank.txt.gz` (3,000 trees, 24,000
+traces, seconds to capture and run) passes in
+`minera_process_tree_reference_alignment_parity_tests` through the new
+`reference_process_tree_dp_alignments` (alignments included; model and the
+85 pinned reference cache artefacts in the parity doc). Module
+`...process_tree.variants.dynamic_programming` promoted; the package waits
+on SEARCH_GRAPH_PT, MILP and APPROXIMATED_ORIGINAL. The older
+`align_process_tree` still backs the CLI/server.
+
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 
 Thread "Close remaining discovery parity gaps" now owns

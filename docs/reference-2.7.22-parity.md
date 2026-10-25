@@ -15290,3 +15290,48 @@ Reference behaviour found (black box):
   second apart from 10,000,001 seconds after the epoch, with one relation per
   consumed obligation (an object consumed from two activities is related
   twice), renamed `<id>_<sequence>` when unique.
+
+## Process-tree DP alignment bank (2026-10-25)
+
+`scripts/capture-process-tree-dp-alignment-bank.py` (seed 20261025, four
+hash seeds, no variation) records the public
+`algo.conformance.alignments.process_tree` DYNAMIC_PROGRAMMING apply on 3,000
+seeded trees (sequence, choice, parallel, loop; up to four levels; labels
+a..e with repeats; tau leaves) with eight traces each (tree walks with and
+without noise, random words) into `docs/process-tree-dp-alignment-bank.txt.gz`:
+cost, alignment and fitness per trace. `minera_process_tree_reference_alignment_parity_tests`
+compares include/minera/process_tree_reference_alignment.hpp
+(`reference_process_tree_dp_alignments`): 23,915 of 24,000 traces match
+exactly; the rest are pinned (below).
+
+Reference behaviour found (black box, by fuzzing a Python model against the
+reference until it agreed):
+- n-ary sequence, choice and parallel operators are nested to the right
+  first (`->(a, b, c)` is `->(a, ->(b, c))`); inclusive choice and
+  interleaving raise NotImplementedError.
+- Unit log and model move costs. A leaf syncs the first occurrence of its
+  label with log moves around it, or logs every event and adds a model move;
+  tau logs every event. A choice takes its first cheapest child.
+- A binary sequence keeps the cheapest split and, among equal totals, the one
+  with the cheaper left part (the first such split).
+- A binary parallel aligns each child on the trace projected to the child's
+  labels (an event may go to both children), adds a log move per event in
+  neither, and lists exactly one move per event: the next move of the event's
+  first child. All other moves, model moves included, are dropped from the
+  alignment but not from the cost.
+- A loop on an empty segment costs nothing. Otherwise it is a dynamic
+  program over positions with states after a body (D) and after a redo (R):
+  D[j] is the body on [0, j) or R[i] plus the body on [i, j); R[j] is a redo
+  on [0, j) or D[i] plus a redo on [i, j) for i >= 1; the result is the first
+  cheapest, by i, of the body on the whole segment, R[i] plus the body on
+  [i, n), and D[i] plus a second body on [i, n) (so two bodies may end a
+  loop without a redo between them).
+- fitness = 1 - cost / (length + empty-trace cost), and 0 when both are 0.
+
+Pinned divergences (reference cache artefacts the cache-free model does not
+reproduce): 62 reference alignments whose log moves do not spell the trace
+(an alignment of a neighbouring segment of the same length is reused, and
+its cost with it), 18 equal-cost alignments with a different loop
+decomposition, and 5 traces whose reference cost differs from the
+cache-free optimum of the model. They all involve loops over segments of
+four or more events with repeated labels.
