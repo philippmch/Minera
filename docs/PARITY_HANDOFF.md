@@ -212,7 +212,7 @@ where the reference loops forever (a link cycle in the first recomposition
 queue) raise natively. Module and package `algo.conformance.alignments.decomposed`
 promoted. The older `align_decomposed` used by the CLI and server is unchanged.
 
-## Connectors — algo.connectors and LLM connectors complete; embeddings in progress (claimed 2026-10-25)
+## Connectors, LLM connectors and embeddings — complete (2026-10-25)
 
 Thread "Close remaining algorithm parity gaps" owns `algo.connectors.*`,
 `algo.transformation.to_embeddings.*` and `algo.querying.llm.connectors.*`.
@@ -234,6 +234,9 @@ ISO 8601 forms the API writes rather than dateutil's whole grammar.
 
 The three LLM connectors are complete against `docs/llm-connector-bank.txt.gz`
 (`minera_llm_connector_parity_tests`, 2,400 stubbed POSTs and answers).
+`algo.transformation.to_embeddings` is complete against
+`docs/embedding-bank.txt.gz` (`minera_embedding_parity_tests`, 3,000 calls
+with a stub model of dyadic float32 vectors). Claim released.
 
 ## In progress — remaining algorithm gaps (claimed 2026-10-25)
 

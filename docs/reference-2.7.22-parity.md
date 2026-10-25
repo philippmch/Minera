@@ -1710,6 +1710,27 @@ given; answers are content[-1], output[-1].content[0],
 choices[0].message.content and candidates[0].content.parts[0] by direct
 indexing.
 
+## Embedding parity bank
+
+`include/minera/embedding_reference.hpp` ports
+`algo.transformation.to_embeddings` with the sentence-transformers model as a
+hook. `scripts/capture-embedding-bank.py` stubs the model with dyadic float32
+vectors (md5 bytes, so every float32 sum is exact and BLAS's summation order
+cannot show) and captures `docs/embedding-bank.txt.gz`: 3000 seeded calls of
+embed_sentence, similarity (sentence and list targets, float32 arrays and
+lists), the case and event transformers and both keep_top_k_per_similarity
+functions (k of 0, 1, 2, 3, 10 and -1, own or given identifiers and
+embeddings, keep_cases on and off) over small logs with repeated sentences,
+duplicate event identifiers, empty logs and missing columns, every encode
+call recorded. `minera_embedding_parity_tests` replays the encoder: all 2879
+results and every encode call (model and sentences) match exactly, and the
+121 raising cases raise the same exception type. Rules found (header
+comment): single sentences are encoded as a one-element batch; the cosine
+is float32 only when both vectors are float32 arrays; keep_top_k embeds the
+target with the default model whatever the parameters say and ranks by
+(similarity, identifier) descending, so ties go to the larger identifier;
+keep_cases keeps the whole cases of the top events.
+
 ## XES importer-variant evidence
 
 The native importer explicitly accepts `ITERPARSE`, `LINE_BY_LINE`,
