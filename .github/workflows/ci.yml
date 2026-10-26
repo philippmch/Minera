@@ -35,6 +35,13 @@ jobs:
       # The hosted runner has 16 GB of memory; four parallel compiles of the
       # largest sources can exhaust it and lose the runner, so the build runs
       # two at a time with extra swap as headroom.
+      # The build directory needs well over the runner's free disk once the
+      # swap file and ccache are counted, so drop preinstalled toolchains
+      # this job never uses.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
       - name: Add swap
         run: |
           sudo fallocate -l 8G /extra-swap
