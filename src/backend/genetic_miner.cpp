@@ -12,13 +12,13 @@
 #include <utility>
 #include <vector>
 
-#include "minera/conformance.hpp"
+#include "minera/genetic_reference.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
 
-constexpr std::size_t kHardActivities = 32;
+constexpr std::size_t kHardActivities = 256;
 constexpr std::size_t kHardPopulation = 10000;
 constexpr std::size_t kHardGenerations = 10000;
 constexpr std::size_t kHardStates = 1000000;
@@ -395,244 +395,6 @@ Individual initial_individual(const std::vector<std::vector<std::uint64_t>>& cau
   return individual;
 }
 
-PetriNet to_petri_net(const Individual& individual,
-                      const std::vector<std::string>& names) {
-  const std::size_t n = names.size();
-  PetriNet net;
-  net.set_activities(names);
-  const std::size_t source = net.add_place();
-  const std::size_t sink = net.add_place();
-  net.set_source(source);
-  net.set_sink(sink);
-
-  // A sophisticated place is identified by its complete predecessor and
-  // successor partitions. Both sides must point back to the same partition,
-  // otherwise the relation is represented by the fallback routing below.
-  using PlaceKey = std::pair<Partition, Partition>;
-  std::vector<PlaceKey> sophisticated;
-  std::vector<Partition> all_inputs, all_outputs;
-  for (const auto& partitions : individual.input)
-    all_inputs.insert(all_inputs.end(), partitions.begin(), partitions.end());
-  for (const auto& partitions : individual.output)
-    all_outputs.insert(all_outputs.end(), partitions.begin(), partitions.end());
-  normalize_partitions(all_inputs);
-  normalize_partitions(all_outputs);
-  for (const auto& predecessors : all_inputs) {
-    for (const auto& successors : all_outputs) {
-      const bool outputs_match = std::all_of(
-          predecessors.begin(), predecessors.end(), [&](const auto predecessor) {
-            return contains_partition(individual.output[predecessor], successors);
-          });
-      if (!outputs_match) continue;
-      const bool inputs_match = std::all_of(
-          successors.begin(), successors.end(), [&](const auto successor) {
-            return contains_partition(individual.input[successor], predecessors);
-          });
-      if (inputs_match) sophisticated.emplace_back(predecessors, successors);
-    }
-  }
-  std::sort(sophisticated.begin(), sophisticated.end());
-  sophisticated.erase(std::unique(sophisticated.begin(), sophisticated.end()),
-                      sophisticated.end());
-
-  // Start with the non-sophisticated places implied by every matrix edge.
-  // Remove an edge whenever a larger sophisticated place already covers it.
-  std::vector<PlaceKey> fallback;
-  for (std::size_t activity = 0; activity < n; ++activity) {
-    for (const auto& predecessors : individual.input[activity])
-      fallback.emplace_back(predecessors, Partition{activity});
-    for (const auto& successors : individual.output[activity])
-      fallback.emplace_back(Partition{activity}, successors);
-  }
-  std::sort(fallback.begin(), fallback.end());
-  fallback.erase(std::unique(fallback.begin(), fallback.end()), fallback.end());
-  fallback.erase(
-      std::remove_if(fallback.begin(), fallback.end(), [&](const PlaceKey& edge) {
-        return std::any_of(sophisticated.begin(), sophisticated.end(),
-                           [&](const PlaceKey& place) {
-                             return partition_subset(edge.first, place.first) &&
-                                    partition_subset(edge.second, place.second);
-                           });
-      }),
-      fallback.end());
-
-  // If a sophisticated place shares an input or output activity with a
-  // fallback edge, it can no longer be represented independently. Promote it
-  // to the fallback set and repeat until the two representations are disjoint.
-  std::vector<PlaceKey> pending = sophisticated;
-  sophisticated.clear();
-  while (!pending.empty()) {
-    const PlaceKey candidate = std::move(pending.back());
-    pending.pop_back();
-    const bool conflicts = std::any_of(
-        fallback.begin(), fallback.end(), [&](const PlaceKey& edge) {
-          return partition_intersects(candidate.first, edge.first) ||
-                 partition_intersects(candidate.second, edge.second);
-        });
-    if (conflicts) {
-      fallback.push_back(candidate);
-      for (const auto& next : sophisticated) {
-        if (partition_intersects(next.first, candidate.first) ||
-            partition_intersects(next.second, candidate.second))
-          pending.push_back(next);
-      }
-      sophisticated.erase(
-          std::remove_if(sophisticated.begin(), sophisticated.end(),
-                         [&](const PlaceKey& next) {
-                           return next == candidate ||
-                                  (partition_intersects(next.first, candidate.first) ||
-                                   partition_intersects(next.second, candidate.second));
-                         }),
-          sophisticated.end());
-    } else {
-      sophisticated.push_back(candidate);
-    }
-  }
-  std::sort(fallback.begin(), fallback.end());
-  fallback.erase(std::unique(fallback.begin(), fallback.end()), fallback.end());
-  std::sort(sophisticated.begin(), sophisticated.end());
-  sophisticated.erase(std::unique(sophisticated.begin(), sophisticated.end()),
-                      sophisticated.end());
-
-  std::map<PlaceKey, std::size_t> places;
-  for (const auto& key : sophisticated)
-    places.emplace(key, net.add_place());
-
-  // Keep visible transition indices stable; silent fallback transitions are
-  // appended after the complete visible model has been wired.
-  std::vector<std::size_t> visible(n);
-  for (std::size_t activity = 0; activity < n; ++activity)
-    visible[activity] = net.add_transition(activity, {}, {});
-
-  const auto source_sink_sets = [&](bool outgoing) {
-    std::vector<std::vector<std::size_t>> graphs;
-    for (std::size_t activity = 0; activity < n; ++activity) {
-      auto graph_it = std::find_if(
-          graphs.begin(), graphs.end(), [&](const auto& graph) {
-            return std::find(graph.begin(), graph.end(), activity) != graph.end();
-          });
-      if (graph_it == graphs.end()) {
-        graphs.push_back({activity});
-        graph_it = std::prev(graphs.end());
-      }
-      const auto successors = flatten(outgoing ? individual.output[activity]
-                                               : individual.input[activity]);
-      graph_it->insert(graph_it->end(), successors.begin(), successors.end());
-      for (const auto successor : successors) {
-        for (std::size_t other = 0; other < graphs.size(); ++other) {
-          if (&graphs[other] == &*graph_it || graphs[other].empty() ||
-              graphs[other].front() != successor)
-            continue;
-          graph_it->insert(graph_it->end(), graphs[other].begin(),
-                           graphs[other].end());
-          graphs.erase(graphs.begin() + static_cast<std::ptrdiff_t>(other));
-          graph_it = std::find_if(
-              graphs.begin(), graphs.end(), [&](const auto& graph) {
-                return std::find(graph.begin(), graph.end(), activity) !=
-                       graph.end();
-              });
-          break;
-        }
-      }
-    }
-    std::vector<std::size_t> boundary;
-    for (const auto& graph : graphs)
-      if (!graph.empty()) boundary.push_back(graph.front());
-    return boundary;
-  };
-  const auto starts = source_sink_sets(true);
-  const auto ends = source_sink_sets(false);
-  const bool single_cycle_boundary =
-      n > 1 && starts.size() == 1 && ends.size() == 1 &&
-      starts.front() == ends.front();
-  std::vector<std::size_t> cycle_entry_inputs;
-  std::vector<std::size_t> cycle_exit_outputs;
-  if (single_cycle_boundary) {
-    // A strongly connected candidate needs entry/exit alternatives: the first
-    // activity may start from the source or continue a cycle, while the last
-    // activity may either continue the cycle or complete at the sink.
-  } else {
-    for (const auto activity : starts)
-      if (activity < visible.size()) net.add_arc(visible[activity], source);
-    for (const auto activity : ends)
-      if (activity < visible.size()) net.add_output_arc(visible[activity], sink);
-  }
-
-  for (const auto& [key, place] : places) {
-    for (const auto activity : key.first)
-      if (activity < visible.size()) {
-        if (single_cycle_boundary && activity == n - 1)
-          cycle_exit_outputs.push_back(place);
-        else
-          net.add_output_arc(visible[activity], place);
-      }
-    for (const auto activity : key.second)
-      if (activity < visible.size()) {
-        if (single_cycle_boundary && activity == 0)
-          cycle_entry_inputs.push_back(place);
-        else
-          net.add_arc(visible[activity], place);
-      }
-  }
-
-  // A non-sophisticated edge is a visible-to-silent-to-visible route. This
-  // preserves each input/output partition without collapsing XOR choices.
-  std::map<std::pair<std::size_t, std::size_t>, std::size_t> silent;
-  const auto silent_transition = [&](std::size_t from, std::size_t to) {
-    const auto key = std::pair{from, to};
-    const auto existing = silent.find(key);
-    if (existing != silent.end()) return existing->second;
-    const auto created = net.add_transition(std::nullopt, {}, {});
-    silent.emplace(key, created);
-    return created;
-  };
-  std::set<std::size_t> fallback_inputs, fallback_outputs;
-  for (const auto& edge : fallback) {
-    fallback_inputs.insert(edge.first.begin(), edge.first.end());
-    fallback_outputs.insert(edge.second.begin(), edge.second.end());
-  }
-  for (const auto from : fallback_inputs) {
-    if (from >= individual.output.size()) continue;
-    for (const auto& successors : individual.output[from]) {
-      const auto place = net.add_place();
-      if (single_cycle_boundary && from == n - 1)
-        cycle_exit_outputs.push_back(place);
-      else
-        net.add_output_arc(visible[from], place);
-      for (const auto to : successors)
-        net.add_arc(silent_transition(from, to), place);
-    }
-  }
-  for (const auto to : fallback_outputs) {
-    if (to >= individual.input.size()) continue;
-    for (const auto& predecessors : individual.input[to]) {
-      const auto place = net.add_place();
-      if (single_cycle_boundary && to == 0)
-        cycle_entry_inputs.push_back(place);
-      else
-        net.add_arc(visible[to], place);
-      for (const auto from : predecessors)
-        net.add_output_arc(silent_transition(from, to), place);
-    }
-  }
-  if (single_cycle_boundary) {
-    const auto entry_hub = net.add_place();
-    net.add_arc(visible.front(), entry_hub);
-    net.add_transition(std::nullopt, {source}, {entry_hub});
-    if (!cycle_entry_inputs.empty())
-      net.add_transition(std::nullopt, std::move(cycle_entry_inputs),
-                         {entry_hub});
-
-    const auto exit_hub = net.add_place();
-    net.add_output_arc(visible.back(), exit_hub);
-    if (!cycle_exit_outputs.empty())
-      net.add_transition(std::nullopt, {exit_hub},
-                         std::move(cycle_exit_outputs));
-    net.add_transition(std::nullopt, {exit_hub}, {sink});
-  }
-  return net;
-}
-
 GeneticCausalMatrix to_causal_matrix(
     const Individual& individual,
     const std::vector<std::string>& names) {
@@ -643,16 +405,27 @@ GeneticCausalMatrix to_causal_matrix(
   return matrix;
 }
 
-double fitness(const EventLog& log, const PetriNet& net) {
-  const auto conformance = check_conformance(log, net);
-  if (conformance.trace_count == 0) return 0.0;
-  double average = 0.0;
-  for (const auto& variant : conformance.variants)
-    average += variant.fitness * static_cast<double>(variant.count);
-  average /= static_cast<double>(conformance.trace_count);
-  const double fitting = static_cast<double>(conformance.fitting_traces) /
-                         static_cast<double>(conformance.trace_count);
-  return std::clamp(0.4 * average + 0.6 * fitting, 0.0, 1.0);
+// The reference blocks (genetic_reference.hpp) name transitions and
+// partition members by activity label.
+ReferenceGeneticMatrix to_reference_matrix(const Individual& individual,
+                                           const std::vector<std::string>& names) {
+  ReferenceGeneticMatrix matrix;
+  matrix.transitions = names;
+  const auto named = [&](const std::vector<Partition>& partitions) {
+    ReferenceGeneticPartitions result;
+    for (const auto& partition : partitions) {
+      ReferenceGeneticPartition members;
+      for (const auto index : partition) members.push_back(names[index]);
+      std::sort(members.begin(), members.end());
+      result.push_back(std::move(members));
+    }
+    return result;
+  };
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    matrix.inputs[names[i]] = named(individual.input[i]);
+    matrix.outputs[names[i]] = named(individual.output[i]);
+  }
+  return matrix;
 }
 
 Individual crossover(Individual first, const Individual& second,
@@ -764,8 +537,8 @@ GeneticMinerResult mine_genetic(const EventLog& event_log,
         result.diagnostics.exhausted = true;
         break;
       }
-      candidate.fitness = fitness(log.conformance_log,
-                                  to_petri_net(candidate.individual, log.names));
+      candidate.fitness = reference_genetic_fitness(
+          to_reference_matrix(candidate.individual, log.names), log.conformance_log);
       ++result.diagnostics.candidates_evaluated;
     }
     std::sort(candidates.begin(), candidates.end(), [](const Scored& a, const Scored& b) {
@@ -825,9 +598,10 @@ GeneticMinerResult mine_genetic(const EventLog& event_log,
   }
 
   result.matrix = to_causal_matrix(best, log.names);
-  const auto conversion = convert_genetic_matrix_to_petri_net(result.matrix);
-  result.net = conversion.net;
-  result.markings = conversion.markings;
+  auto converted = reference_genetic_petri_net(
+      reference_genetic_net(to_reference_matrix(best, log.names)));
+  result.net = std::move(converted.net);
+  result.markings = std::move(converted.markings);
   result.diagnostics.best_fitness = best_fitness;
   result.diagnostics.computed = true;
   result.diagnostics.message = result.diagnostics.exhausted

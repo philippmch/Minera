@@ -13,6 +13,9 @@ namespace minera {
 
 // Deterministic, bounded controls for the classic causal-matrix genetic
 // discovery algorithm.  `seed` is an explicit reproducibility extension.
+// Fitness (0.4 * average trace fitness + 0.6 * fitting share) and the final
+// matrix-to-net conversion use the reference blocks in genetic_reference.hpp;
+// the evolutionary operators are seeded native ones.
 struct GeneticMinerOptions {
   std::string activity_key;
   // Optional event timestamp and case-id selectors. Standard keys (timestamp,
@@ -27,7 +30,9 @@ struct GeneticMinerOptions {
   double crossover_rate = 0.80;
   double mutation_rate = 0.10;
   std::size_t elitism_min_sample = 3;
-  std::size_t max_activities = 12;
+  // Distinct activities allowed (at most 256); each candidate's fitness is a
+  // token replay, so cost grows with the alphabet.
+  std::size_t max_activities = 64;
   std::size_t max_states = 10000;
 };
 

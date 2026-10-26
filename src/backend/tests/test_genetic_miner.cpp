@@ -171,11 +171,12 @@ int main() {
   const auto custom = minera::mine_genetic(custom_fields_log(), custom_options);
   assert(custom.diagnostics.computed);
   assert(custom.diagnostics.activity_count == 2);
-  assert(custom.diagnostics.best_fitness > 0.99);
-  assert(custom.net.transitions().size() > custom.net.activities().size());
-  assert(std::any_of(custom.net.transitions().begin(),
-                     custom.net.transitions().end(),
-                     [](const auto& transition) { return transition.silent(); }));
+  // The merged case is A,B,A,B; the reference fitness of the best of four
+  // individuals after one generation stays well below one.
+  assert(custom.diagnostics.best_fitness > 0.0 && custom.diagnostics.best_fitness < 1.0);
+  assert(custom.diagnostics.best_fitness ==
+         minera::mine_genetic(custom_fields_log(), custom_options).diagnostics.best_fitness);
+  assert(custom.net.transitions().size() == custom.net.activities().size());
   assert(custom.markings.initial[custom.net.source()] == 1);
   assert(custom.markings.final[custom.net.sink()] == 1);
   auto standard_case = custom_options;
