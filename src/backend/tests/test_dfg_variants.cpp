@@ -133,9 +133,8 @@ void performance_aggregations_start_fallback_and_validation() {
   };
   for (const auto& [aggregation, value] : expected) {
     options.performance_aggregation = aggregation;
-    const auto& selected =
-        performance(discover_performance_dfg(source, options), "A", "B")
-            .value;
+    const auto dfg = discover_performance_dfg(source, options);
+    const auto& selected = performance(dfg, "A", "B").value;
     assert(std::holds_alternative<double>(selected));
     assert(std::abs(std::get<double>(selected) - value) < 1e-9);
   }

@@ -8,6 +8,15 @@ project(
 )
 
 option(MINERA_BUILD_TESTS "Build Minera tests" ON)
+set(MINERA_TEST_OPTIMIZATION "-O0" CACHE STRING
+    "Optimization flag for test translation units (GCC/Clang); empty keeps the build type's")
+
+# Reuse earlier compilations when ccache is installed; a rebuild after a small
+# change then only recompiles what changed.
+find_program(MINERA_CCACHE ccache)
+if(MINERA_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${MINERA_CCACHE}")
+endif()
 
 # A mining core lives or dies by codegen: an unoptimized build is 5-10x slower
 # on real event logs. Default to Release when the user picks nothing (the
@@ -545,6 +554,15 @@ if(MINERA_BUILD_TESTS)
   # test translation units only.
   set(MINERA_TEST_OPTIONS $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>
                           $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>)
+  # The test sources embed megabytes of generated fixture code. Optimizing it
+  # costs most of the build (one file takes over 30 minutes and 4 GB at -O3,
+  # about a minute at -O0) and buys nothing: the code under test lives in
+  # minera_core, which keeps the build type's optimization.
+  if(MINERA_TEST_OPTIMIZATION)
+    list(APPEND MINERA_TEST_OPTIONS
+         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:${MINERA_TEST_OPTIMIZATION}>
+         $<$<CXX_COMPILER_ID:MSVC>:/Od>)
+  endif()
 
   add_executable(minera_root_cause_tests src/backend/tests/test_root_cause.cpp)
   target_link_libraries(minera_root_cause_tests PRIVATE minera::core)

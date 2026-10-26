@@ -344,6 +344,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Test sources compile at `-O0` by default (`MINERA_TEST_OPTIMIZATION`); they
+embed large generated fixtures, and the code under test in `minera_core` keeps
+the build type's optimization. Configure with `-DMINERA_BUILD_TESTS=OFF` to
+build only the library and tools. When `ccache` is installed it is used
+automatically. A clean build with tests takes about 35 minutes on 4 cores;
+`-DMINERA_TEST_OPTIMIZATION=` restores optimized tests, but then single
+fixture-heavy files take over 30 minutes and 4 GB of memory each.
+
 Implementation sources live under `src/backend/`, while the React/Vite
 application is under `src/frontend/`. Native tools and tests follow their
 owners in `src/backend/tools/` and `src/backend/tests/`; frontend tests live
