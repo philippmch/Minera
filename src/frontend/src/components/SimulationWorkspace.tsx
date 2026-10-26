@@ -41,7 +41,7 @@ export function SimulationWorkspace({ models, live, dataset, onOpenLog, onOpenUn
     <div className="panel-head"><h2>Monte Carlo Petri-net simulation</h2><span className="panel-meta">One run · complete diagnostics and generated log</span><span className="panel-meta">{dataset}</span></div>
     <p>Simulate the active workflow, then inspect visible case durations, scheduler times, resource intervals and every generated event. XES and diagnostics come from the same native run.</p>
     {!live && <p>Open a CSV or XES source to run a simulation.</p>}
-    <button className="btn-ghost" disabled={!live || pending} onClick={() => void refresh()}>Refresh simulation source</button>
+    <button className="btn-ghost" disabled={!live || pending} onClick={() => void refresh()}>Reload source</button>
     {schema && <p>Source {schema.source_id} · {schema.case_count} cases · {schema.event_count} events</p>}
     <fieldset disabled={disabled}><div className="align-settings-grid">
       <label>Simulation workflow model<select value={miner} onChange={event => { setMiner(event.target.value); option("process_tree_variant", undefined); }}>{models.map(model => <option key={model}>{model}</option>)}</select></label>

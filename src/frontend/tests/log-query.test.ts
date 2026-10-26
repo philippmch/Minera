@@ -70,7 +70,7 @@ describe("log query and filter delivery",()=>{
   it("lets an active source retry schema loading and disables saved-export query execution",()=>{
     const data={dataset:"fixture.csv",trace_count:2,event_count:3,activities:[],edges:[],variants:[]} as MineraExport;
     const markup=renderToStaticMarkup(createElement(QueryWorkspace,{data,available:true,mining:false,onOpenFiltered:vi.fn()}));
-    expect(markup).toContain('class="btn-ghost">Refresh source and runtime</button>');
+    expect(markup).toContain('class="btn-ghost">Reload source and runtime</button>');
     expect(markup).toContain("Generate SQL");expect(markup).toContain("Generate and run");
     expect(renderToStaticMarkup(createElement(QueryWorkspace,{data,available:false,mining:false,onOpenFiltered:vi.fn()}))).toContain("Saved exports do not provide an active query source");
   });

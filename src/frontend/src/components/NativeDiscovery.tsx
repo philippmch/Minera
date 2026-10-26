@@ -22,7 +22,7 @@ export function NativeDiscovery({family,data,available,mining,onUseModel}:{famil
     <section className="panel native-discovery"><div className="panel-head"><h2>{name} · Classic discovery</h2><span className="panel-meta">{data.dataset}</span></div>
       <p className="query-intro">{family==="ilp"?"Discover a workflow net with bounded integer region search.":"Evolve a causal matrix and inspect its converted workflow net."} Adjust parameters, then mine the active source.</p>
       {!available&&<p className="model-empty">Open a CSV or XES log to run this miner. Saved analysis JSON does not provide an active discovery source.</p>}
-      <div className="query-setup"><button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Refresh discovery source</button>{schema&&<p>Source: {schema.case_count} cases · {schema.event_count} events</p>}</div>
+      <div className="query-setup"><button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Reload source</button>{schema&&<p>Source: {schema.case_count} cases · {schema.event_count} events</p>}</div>
       <fieldset className="query-fields" disabled={disabled}><div className="query-options">
         <label className="filters-field"><span>Activity field (empty uses imported activity)</span><input value={family==="ilp"?ilp.activity:genetic.activity} onChange={e=>family==="ilp"?i("activity",e.target.value):g("activity",e.target.value)} /></label>
         {family==="ilp"?<>

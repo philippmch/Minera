@@ -104,7 +104,7 @@ export function OrganizationalWorkspace({data, available, mining}: {data: Minera
       <div className="panel-head"><h2>Organizational analysis workbench</h2><span className="panel-meta">{data.dataset}</span></div>
       <p>Discover roles, profile resources, inspect group diagnostics and analyze an attribute network. Each analysis keeps its completed native result and submitted settings independently.</p>
       <p>{currentSource ? `Source ${currentSource.source_id} · ${currentSource.case_count} cases · ${currentSource.event_count} events` : mining ? "The log is being mined. Organizational analysis resumes when the new source is ready." : available ? "Resolve the current cached log before running analysis." : "Start the native backend and mine a log to use organizational analysis."}</p>
-      <button className="btn-ghost" disabled={!available || mining || resolving} onClick={() => void resolveSource()}>Refresh organizational source</button>
+      <button className="btn-ghost" disabled={!available || mining || resolving} onClick={() => void resolveSource()}>Reload source</button>
       {resolving && <p role="status">Resolving organizational source…</p>}
       {sourceError && <p className="error-banner" role="alert">{sourceError}</p>}
     </section>

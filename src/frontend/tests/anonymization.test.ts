@@ -56,7 +56,7 @@ describe("anonymization delivery",()=>{
   it("exposes both variant methods, PRIPEL, entropy/preview choices and saved-source guidance",()=>{
     const data={dataset:"fixture.csv",trace_count:2,event_count:3,activities:[],edges:[],variants:[]} as MineraExport;
     const html=renderToStaticMarkup(createElement(AnonymizationWorkspace,{data,available:false,mining:false,onOpenReleased:vi.fn()}));
-    for(const label of ["LAPLACE","SACOFA","Run PRIPEL","Seeded preview","OS entropy","Attributes to remove","Refresh anonymization source","A saved analysis does not provide an active source log"])expect(html).toContain(label);
+    for(const label of ["LAPLACE","SACOFA","Run PRIPEL","Seeded preview","OS entropy","Attributes to remove","Reload source","A saved analysis does not provide an active source log"])expect(html).toContain(label);
     expect(html).toContain("<fieldset class=\"query-fields\" disabled");
   });
 });

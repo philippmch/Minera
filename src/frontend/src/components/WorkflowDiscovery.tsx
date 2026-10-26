@@ -27,7 +27,7 @@ export function WorkflowDiscovery({ family, variant, data, available, mining, on
   <section className="panel workflow-discovery" aria-label="Configured workflow discovery"><div className="panel-head"><h2>{{alpha:'Alpha',heuristic:'Heuristic',inductive:'Inductive',powl:'POWL'}[family]} discovery</h2><span className="panel-meta">{data.dataset}</span></div>
    <p>Select the native variant and mine the current source. The resulting graph and downloads come from that discovery run.</p>
    {!available&&<p>Open a CSV or XES source to discover another variant. The saved model below retains its recorded identity.</p>}
-   <button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Refresh workflow discovery source</button>{schema&&<p>Source {schema.source_id} · {schema.case_count} cases · {schema.event_count} events</p>}
+   <button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Reload source</button>{schema&&<p>Source {schema.source_id} · {schema.case_count} cases · {schema.event_count} events</p>}
    <fieldset disabled={!schema||mining||pending}><div className="align-settings-grid">
     <label>Workflow discovery variant<select value={form.variant} onChange={event=>change('variant',event.target.value as WorkflowVariant)}>{WORKFLOW_VARIANTS[family].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
     <label>Discovery activity field<input value={form.activity} placeholder="native selector" onChange={event=>change('activity',event.target.value)}/></label>

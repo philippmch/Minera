@@ -515,7 +515,7 @@ function PetriUsageComparisonPanel() {
     <div className="panel-head"><h2>Petri element usage comparison</h2><span className="panel-meta">Compare replay counts with a reference log</span></div>
     <div className="align-settings-grid">
       <label>Reference log<input type="file" accept=".csv,.xes,.xes.gz,.gz" onChange={e => { setReference(e.target.files?.[0] ?? null); setResult(null); setError(null); }} /></label>
-      <label>Miner<select value={miner} onChange={e => { setMiner(e.target.value); setResult(null); setError(null); }}><option value="inductive">Inductive</option><option value="alpha">Alpha</option><option value="heuristic">Heuristic</option><option value="powl">POWL</option></select></label>
+      <label>Discovery algorithm<select value={miner} onChange={e => { setMiner(e.target.value); setResult(null); setError(null); }}><option value="inductive">Inductive</option><option value="alpha">Alpha</option><option value="heuristic">Heuristic</option><option value="powl">POWL</option></select></label>
       <label>Activity attribute<input value={activityAttribute} placeholder="optional: business_activity" onChange={e => { setActivityAttribute(e.target.value); setResult(null); setError(null); }} /></label>
       <label>Initial marking<input value={initialMarking} placeholder="optional: 1,0,…" onChange={e => { setInitialMarking(e.target.value); setResult(null); setError(null); }} /></label>
       <label>Final marking<input value={finalMarking} placeholder="optional: 0,…,1" onChange={e => { setFinalMarking(e.target.value); setResult(null); setError(null); }} /></label>
@@ -615,7 +615,7 @@ function PetriPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array
     <div className="panel-head"><h2>Petri-net playout</h2><span className="panel-meta">Basic sampling or extensive enumeration from a cached model</span></div>
     {miners.length === 0 ? <p className="conf-inline-note">No Petri net is present in this analysis.</p> : <>
       <div className="align-settings-grid">
-        <label>Miner<select value={miner} onChange={e => setMiner(e.target.value)}>{miners.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>
+        <label>Discovery algorithm<select value={miner} onChange={e => setMiner(e.target.value)}>{miners.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>
         <label>Mode<select value={mode} onChange={e => { setMode(e.target.value as "basic" | "extensive"); setVisited(null); setError(null); }}><option value="basic">Basic sampling</option><option value="extensive">Extensive enumeration</option></select></label>
         <label>Traces<input type="number" min={1} value={options.traces ?? ""} onChange={e => number("traces", e.target.value)} /></label>
         {mode === "basic" ? <>
@@ -659,7 +659,7 @@ function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; min
     <div className="panel-head"><h2>Stochastic Petri-net playout</h2><span className="panel-meta">Weighted random XES from a cached Petri net</span></div>
     {miners.length === 0 ? <p className="conf-inline-note">No Petri net is present in this analysis.</p> : <>
       <div className="align-settings-grid">
-        <label>Miner<select value={miner} onChange={e => setMiner(e.target.value)}>{miners.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>
+        <label>Discovery algorithm<select value={miner} onChange={e => setMiner(e.target.value)}>{miners.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>
         <label>Traces<input type="number" min={1} value={options.traces ?? ""} onChange={e => number("traces", e.target.value)} /></label>
         <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
         <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>

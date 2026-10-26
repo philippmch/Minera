@@ -51,7 +51,7 @@ export function AnonymizationWorkspace({data,available,mining,onOpenReleased}:{d
   return <section className="panel anonymization-workspace"><div className="panel-head"><h2>Anonymize the log</h2><span className="panel-meta">{data.dataset}</span></div>
     <p className="query-intro">Release activity sequences with LAPLACE or SACOFA, then optionally add anonymized event attributes with PRIPEL using a released query log.</p>
     {!available&&<p className="model-empty">Open a CSV or XES log to anonymize it. A saved analysis does not provide an active source log.</p>}
-    <div className="query-setup"><button className="btn-ghost" disabled={!available||mining||!!pending} onClick={()=>void refresh()}>Refresh anonymization source</button>{schema&&<p>Source: {schema.case_count} cases · {schema.event_count} events</p>}</div>
+    <div className="query-setup"><button className="btn-ghost" disabled={!available||mining||!!pending} onClick={()=>void refresh()}>Reload source</button>{schema&&<p>Source: {schema.case_count} cases · {schema.event_count} events</p>}</div>
     <fieldset className="query-fields" disabled={disabled}><legend>1. Release activity variants</legend><div className="query-options">
       <label className="filters-field"><span>Variant method</span><select value={variants.variant} onChange={e=>v("variant",e.target.value)}><option value="sacofa">SACOFA</option><option value="laplace">LAPLACE</option></select></label>
       <label className="filters-field"><span>Variant epsilon</span><input type="number" min="0" step="any" value={variants.epsilon} onChange={e=>v("epsilon",e.target.value)} /></label>

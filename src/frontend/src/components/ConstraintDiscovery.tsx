@@ -24,7 +24,7 @@ export function ConstraintDiscovery({family,data,available,mining,onOpenLog}:{fa
     <section className="panel" aria-label="Configured constraint discovery"><div className="panel-head"><h2>{name} discovery and conformance</h2><span className="panel-meta">{data.dataset}</span></div>
       <p>Discover constraints from the current source, then check every case against that exact model. Completed results retain their submitted controls.</p>
       {!available&&<p>Open a CSV or XES source to discover constraints. The model below belongs to the saved analysis.</p>}
-      <button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Refresh constraint source</button>
+      <button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Reload source</button>
       {source&&<p>Source {source.source_id} · {source.case_count} cases · {source.event_count} events</p>}
       <fieldset disabled={!source||mining||pending}><div className="align-settings-grid">
         <label>Constraint discovery activity field<input value={form.activity} placeholder="concept:name" onChange={event=>change('activity',event.target.value)}/></label>
