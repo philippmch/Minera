@@ -1,6 +1,9 @@
 # Full parity continuation — 2026-10-21–24
 
-Resume from a fresh clone of the repository, branch `main`. The reference
+Resume from a fresh clone of the repository, branch `main`. The
+`docs/**/*.jsonl.gz` evidence logs named below were removed from the history
+on 2026-10-26 (nothing read them); the capture scripts in `scripts/` can
+regenerate a bank when one is needed. The reference
 venv and checkout can be rebuilt in a cloud container (see the README).
 
 ## Objective and authorization
