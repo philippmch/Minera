@@ -23,7 +23,7 @@ jobs:
   native:
     name: Native build and ctest
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,6 +32,15 @@ jobs:
           sparse-checkout-cone-mode: false
       - name: Install toolchain
         run: sudo apt-get update && sudo apt-get install -y ninja-build ccache
+      # The hosted runner has 16 GB of memory; four parallel compiles of the
+      # largest sources can exhaust it and lose the runner, so the build runs
+      # two at a time with extra swap as headroom.
+      - name: Add swap
+        run: |
+          sudo fallocate -l 8G /extra-swap
+          sudo chmod 600 /extra-swap
+          sudo mkswap /extra-swap
+          sudo swapon /extra-swap
       - uses: actions/cache@v4
         with:
           path: .ccache
@@ -45,9 +54,9 @@ jobs:
         env:
           CCACHE_DIR: ${{ github.workspace }}/.ccache
           CCACHE_MAXSIZE: 4G
-        run: cmake --build build -j4
+        run: cmake --build build -j2
       - name: ctest
-        run: ctest --test-dir build -j4 --output-on-failure --timeout 1800
+        run: ctest --test-dir build -j3 --output-on-failure --timeout 1800
 
   python:
     name: Python script tests
