@@ -55,7 +55,8 @@ inline void workflows(const std::function<DiscoveryWorkbenchResponse(const Parts
   table_success(run(attributes_request(engine,source,"threshold",{field("counts_json",pairs),field("most_common_json",common)})),source,source,engine);
   table_success(run(attributes_request(engine,source,"threshold",{field("counts_value_json",R"({"type":"null"})")})),source,subset(source,{}),engine);
   table_success(run(attributes_request(engine,source,"top_activities")),source,subset(source,engine=="pandas"?std::vector<std::size_t>{0,1,2,3}:std::vector<std::size_t>{}),engine);
-  table_success(run(attributes_request(engine,source,"relative")),source,subset(source,engine=="pandas"?std::vector<std::size_t>{1,3}:std::vector<std::size_t>{0,1,2,3}),engine);
+  // The pinned reference keeps every row here for both engines.
+  table_success(run(attributes_request(engine,source,"relative")),source,source,engine);
   table_success(run(attributes_request(engine,source,"relative",{field("keep_once_per_case","false")})),source,subset(source,{}),engine);
   table_success(run(attributes_request(engine,source,"relative",{field("keep_once_per_case","true")})),source,subset(source,{1,3}),engine);
   auto custom=source;const std::string key(" literal\n\0Ω ",13);custom.columns[0]="";custom.columns[1]=key;for(auto& row:custom.rows){row[0]->key="";row[1]->key=key;}

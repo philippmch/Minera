@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# docs/ holds about 11 GB of *.jsonl.gz evidence logs that no build or test
+# reads. Every job uses a blobless partial clone with a sparse checkout that
+# leaves them out, so a checkout downloads well under 1 GB.
+env:
+  SPARSE_CHECKOUT: |
+    /*
+    !/docs/**/*.jsonl.gz
+    !/docs/*.jsonl.gz
+
+jobs:
+  native:
+    name: Native build and ctest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: ${{ env.SPARSE_CHECKOUT }}
+          sparse-checkout-cone-mode: false
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build ccache
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-
+      - name: Configure
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          CCACHE_MAXSIZE: 4G
+        run: cmake --build build -j4
+      - name: ctest
+        run: ctest --test-dir build -j4 --output-on-failure --timeout 1800
+
+  python:
+    name: Python script tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: ${{ env.SPARSE_CHECKOUT }}
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r scripts/requirements-query.txt
+      - run: python -m unittest discover -s scripts/tests
+
+  frontend:
+    name: Frontend typecheck and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: ${{ env.SPARSE_CHECKOUT }}
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run --testTimeout 20000
+
+  parity:
+    name: Reference parity verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: ${{ env.SPARSE_CHECKOUT }}
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Fetch the pinned 2.7.22 reference release
+        run: |
+          git init "$RUNNER_TEMP/reference"
+          cd "$RUNNER_TEMP/reference"
+          git fetch --depth 1 https://github.com/process-intelligence-solutions/pm4py.git 0715c31f3f1d85924107d6aa5329806db69df899
+          git checkout --quiet FETCH_HEAD
+          git tag 2.7.22 FETCH_HEAD
+      - run: node scripts/test-reference-parity-verifier.mjs "$RUNNER_TEMP/reference"
+      - run: node scripts/test-reference-parity-source-parser.mjs
+      - run: node scripts/verify-reference-parity.mjs "$RUNNER_TEMP/reference" --require-complete

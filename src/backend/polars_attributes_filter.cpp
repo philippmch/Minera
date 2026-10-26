@@ -4,6 +4,8 @@
 #include "polars_list_literal.hpp"
 #include "pandas_parameter_carrier.hpp"
 
+#include <sstream>
+#include <chrono>
 #include <algorithm>
 #include <bit>
 #include <charconv>
@@ -322,7 +324,23 @@ std::string datetime_literal(const EventAttribute& v) {
   if(text.size()==25&&text.ends_with("+00:00")){text[10]=' ';return text.substr(0,19)+" UTC";}
   throw std::invalid_argument("Native Polars numeric bound datetime outside observed domain");
 }
-bool numeric_dtype(const std::string& dtype) { return dtype=="Int64"||dtype=="Float64"; }
+bool integer_dtype(const std::string& dtype) { return dtype=="Int64"||dtype=="UInt64"; }
+bool numeric_dtype(const std::string& dtype) { return integer_dtype(dtype)||dtype=="Float64"; }
+// Columns Polars compares with a numeric literal through a physical integer:
+// Boolean as 0/1 (cast to Int32), Date as days and microsecond Datetime as
+// microseconds since the epoch, Null as null.
+bool microsecond_datetime(const std::string& dtype) { return dtype.starts_with("Datetime(time_unit='us'"); }
+bool physical_dtype(const std::string& dtype) {
+  return dtype=="Boolean"||dtype=="Date"||dtype=="Null"||microsecond_datetime(dtype);
+}
+bool plain_number(const EventAttribute& v) { return (integer(v)&&!boolean(v)&&!date(v))||real(v); }
+// Days since 1970-01-01 of a Polars Date cell ("YYYY-MM-DD...").
+std::int64_t epoch_days(const EventAttribute& v) {
+  const auto text=date_text(v);
+  int y=0;unsigned m=0,d=0;char a=0,b=0;std::istringstream in(text.substr(0,10));
+  if(!(in>>y>>a>>m>>b>>d)||a!='-'||b!='-')throw std::invalid_argument("Native Polars Date cell is not a date");
+  return std::chrono::sys_days{std::chrono::year{y}/std::chrono::month{m}/std::chrono::day{d}}.time_since_epoch().count();
+}
 bool null_leaf(const Leaf& l) { return null(l.value); }
 // The (lhs, rhs) operands Polars prints once the literal is coerced to the
 // column; a None literal folds the comparison to a null column.
@@ -337,10 +355,17 @@ std::pair<std::string,std::string> operands(const Leaf& l,bool cast_list=false) 
     if(real(v))return {column,"dyn float: "+polars_dyn_float(number(v))};
     return {column,quote(v.value)};
   }
-  if(!numeric_dtype(l.dtype))throw std::invalid_argument("Native Polars numeric filter supports String, Int64 and Float64 columns");
+  if(physical_dtype(l.dtype)&&plain_number(v)) {
+    if(real(v))return {column,"dyn float: "+polars_dyn_float(number(v))};
+    if(l.dtype=="Boolean")return {column+".cast(Int32)",exact(v).decimal()};
+    return {column,"dyn int: "+exact(v).decimal()};
+  }
+  if(!numeric_dtype(l.dtype))throw std::invalid_argument("Native Polars numeric filter supports String, Int64, UInt64 and Float64 columns, and numeric bounds on Boolean, Date, microsecond Datetime and Null columns");
   if(collection(v))return {column,expression_literal(v)};
   if(text(v))return {column,quote(v.value)};
-  if(l.dtype=="Int64") {
+  if(l.dtype=="UInt64"&&integer(v)&&!date(v)&&exact(v)<TokenInteger(0))
+    return {column+".cast(Int64)",exact(v).decimal()};  // a negative literal widens the column
+  if(integer_dtype(l.dtype)) {
     if(real(v))return {column+".cast(Float64)",polars_plan_float(number(v))};
     if(date(v))return {column,std::to_string(date_micros(v))};
     return {column,exact(v).decimal()};
@@ -401,7 +426,7 @@ std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
     if((integer(v)&&!boolean(v))||real(v))return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with "+std::string(real(v)?"f64":"i32")};
     return {};
   }
-  if(text(v))return std::pair<std::string,std::string>{"ComputeError",std::string("cannot compare string with numeric type (")+(l.dtype=="Float64"?"f64":"i64")+")"};
+  if(text(v))return std::pair<std::string,std::string>{"ComputeError",std::string("cannot compare string with numeric type (")+(l.dtype=="Float64"?"f64":l.dtype=="UInt64"?"u64":"i64")+")"};
   if(collection(v))return std::pair<std::string,std::string>{"SchemaError","could not evaluate "+(l.op=="=="?std::string():"'"+l.op+"' ")+"comparison between series '"+l.column+"' of dtype: "+l.dtype+" and series 'literal' of dtype: List("+detail::polars_list_literal(v).inner+")"};
   return {};
 }
@@ -416,7 +441,11 @@ int leaf_truth(const Leaf& l,const EventAttribute& v) {
   const auto& b=l.value;int c=0;
   if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
     const auto rhs=boolean(b)?std::string(truth(b)?"true":"false"):b.value;c=v.value.compare(rhs);c=c<0?-1:c>0?1:0;
-  } else if(l.dtype=="Int64"&&!real(b)) {
+  } else if(physical_dtype(l.dtype)) {
+    const std::int64_t x=l.dtype=="Boolean"?(truth(v)?1:0):l.dtype=="Date"?epoch_days(v):date_micros(v);
+    if(real(b))c=total_compare(static_cast<double>(x),number(b));
+    else{const TokenInteger left(x),right=exact(b);c=left<right?-1:right<left?1:0;}
+  } else if(integer_dtype(l.dtype)&&!real(b)) {
     const TokenInteger x=exact(v),y=date(b)?TokenInteger(date_micros(b)):exact(b);c=x<y?-1:y<x?1:0;
   } else c=total_compare(number(v),date(b)?static_cast<double>(date_micros(b)):number(b));
   const auto& op=l.op;
@@ -429,7 +458,8 @@ std::optional<std::variant<std::string,TokenInteger,double>> range_value(const L
   if(null(v)||collection(v))return {};
   if(l.dtype=="String"){if(text(v))return v.value;if(boolean(v))return std::string(truth(v)?"true":"false");return {};}
   if(text(v))return {};
-  if(l.dtype=="Int64"&&!real(v))return date(v)?TokenInteger(date_micros(v)):exact(v);
+  if(integer_dtype(l.dtype)&&!real(v))return date(v)?TokenInteger(date_micros(v)):exact(v);
+  if(physical_dtype(l.dtype)&&!real(v))return exact(v);
   return date(v)?static_cast<double>(date_micros(v)):number(v);
 }
 bool empty_range(const Expr& node) {
@@ -755,6 +785,8 @@ LazyPolarsAttributesFilterResult invoke_polars_attributes_filter(const LazyEvent
     // Statistics is an actual apply-time scan, followed by a restartable lazy
     // predicate over the original source. Diagnostics keep the source kind.
     const auto materialized=source.materialize();const auto selected=stats(materialized,call,false);
+    // pl.col(attribute) is built while apply runs, so a bad selector fails there.
+    if(call.operation==Op::kRelative&&!selected.unchanged)col_selector(selected.attribute);
     return deferred(source,[call,selected](const auto& table){return stats_output(table,call,selected,false);});
   }
   return deferred(source,[call](const auto& table){const auto query=predicate(table,call,false);return filtered(table,query);},case_projection(meta,call));
