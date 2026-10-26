@@ -20,7 +20,7 @@ export function PandasVariantsOriginalCallWorkspace({initialForm}:{initialForm?:
     try{const result=await requestPandasVariantsOriginal(identity.source,identity.form,identity.variants,controller.signal);if(gate.current.accepts(ticket,current.current,controller.signal))setRun(result);}
     catch(cause){if(gate.current.accepts(ticket,current.current,controller.signal))setError(cause instanceof Error?cause.message:String(cause));}
     finally{if(request.current===controller){request.current=null;setPending(false);}}};
-  return <div className="reference-pandas-variants-original-workspace"><section className="panel query-workspace" aria-labelledby="pandas-variants-original-heading"><div className="panel-head"><h2 id="pandas-variants-original-heading">Original pandas activity-variant calls</h2></div>
+  return <div className="reference-pandas-variants-original-workspace"><section className="panel query-workspace" aria-labelledby="pandas-variants-original-heading"><div className="panel-head"><h2 id="pandas-variants-original-heading">Pandas activity-variant calls</h2></div>
     <p className="query-intro">Use complete typed arguments, ordered parameter entries and an optional native case-to-variant table.</p>
     <fieldset className="query-fields"><legend>Complete native tables</legend>
       <label className="filters-field"><span>Original pandas variants source table</span><input type="file" accept=".json" onChange={event=>{const file=referenceLogFilterPickedFile(event.target);edit(()=>setSource(file));}}/><small>{source?`${source.name} (${source.size} bytes)`:"Choose a genuine native EventTable JSON File with full rows, stored types, index and metadata."}</small></label>

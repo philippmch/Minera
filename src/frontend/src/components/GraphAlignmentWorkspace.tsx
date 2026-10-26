@@ -67,7 +67,7 @@ export function GraphAlignmentWorkspace({file: original = null, source = null}: 
     <SavedDfgProjectionWorkspace active={operation === "project_saved_dfg"} completed={states.DFG_CLASSIC.completed} original={original} />
     <div hidden={operation !== "new_alignment"}>
     <section className="panel" aria-label="Independent graph alignment">
-      <div className="panel-head"><h2>Align original traces against a DFG or PNML model</h2><span className="panel-meta">Independent inputs</span></div>
+      <div className="panel-head"><h2>Align traces against a DFG or PNML model</h2><span className="panel-meta">Independent inputs</span></div>
       <p>Choose Classic DFG alignment or maximal decomposed Petri alignment. Upload the original input and its normative model, then inspect every returned move, search diagnostic and model snapshot.</p>
       <label className="filters-field"><span>Graph alignment mode</span><select value={mode} onChange={event => changeMode(event.target.value as GraphAlignmentMode)}>{GRAPH_ALIGNMENT_MODES.map(value => <option key={value} value={value}>{modeLabel(value)}</option>)}</select></label>
       <fieldset className="query-fields" disabled={pending}>

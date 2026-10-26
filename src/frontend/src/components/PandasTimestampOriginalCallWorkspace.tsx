@@ -21,7 +21,7 @@ export function PandasTimestampOriginalCallWorkspace({initialForm}:{initialForm?
     try{const result=await requestPandasTimestampOriginal(identity.source,identity.form,controller.signal);if(gate.current.accepts(ticket,current.current,controller.signal))setRun(result);}
     catch(cause){if(gate.current.accepts(ticket,current.current,controller.signal))setError(cause instanceof Error?cause.message:String(cause));}
     finally{if(request.current===controller){request.current=null;setPending(false);}}};
-  return <div className="reference-pandas-timestamp-original-workspace"><section className="panel query-workspace" aria-labelledby="pandas-timestamp-original-heading"><div className="panel-head"><h2 id="pandas-timestamp-original-heading">Original pandas timestamp calls</h2></div>
+  return <div className="reference-pandas-timestamp-original-workspace"><section className="panel query-workspace" aria-labelledby="pandas-timestamp-original-heading"><div className="panel-head"><h2 id="pandas-timestamp-original-heading">Pandas timestamp calls</h2></div>
     <p className="query-intro">Run a time-window filter with complete typed bounds and ordered parameters, then inspect every native artifact.</p>
     <fieldset className="query-fields"><legend>Complete native table</legend>
       <label className="filters-field"><span>Original pandas timestamp source table</span><input type="file" accept=".json" onChange={event=>{const file=referenceLogFilterPickedFile(event.target);edit(()=>setSource(file));}}/><small>{source?`${source.name} (${source.size} bytes)`:"Choose a genuine native EventTable JSON File with full rows, stored types, index and metadata."}</small></label>

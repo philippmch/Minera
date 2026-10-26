@@ -39,7 +39,7 @@ export function MonteCarloWorkspace({file: original = null, source = null, onOpe
   const importField = (key: string, value: string) => editForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));
   return <>
     <section className="panel" aria-label="Independent original-model Monte Carlo workbench">
-      <div className="panel-head"><h2>Simulate an original Petri net</h2><span className="panel-meta">Monte Carlo · fitting · generated event logs</span></div>
+      <div className="panel-head"><h2>Simulate a Petri net</h2><span className="panel-meta">Monte Carlo · fitting · generated event logs</span></div>
       <p>Upload an original PNML model and optionally fit its transition weights and durations from an original event source. Each run retains its own inputs, options, generated events and resource intervals.</p>
       <label className="filters-field"><span>Monte Carlo operation</span><select value={operation} onChange={event => changeOperation(event.target.value as MonteCarloOperation)}>{MONTE_CARLO_OPERATIONS.map(value => <option key={value} value={value}>{labels[value]}</option>)}</select></label>
       <fieldset className="query-fields" disabled={pending}>

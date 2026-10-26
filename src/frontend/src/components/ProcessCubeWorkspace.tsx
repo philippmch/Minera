@@ -69,7 +69,7 @@ export function ProcessCubeWorkspace({ initialFile = null, busy = false }: { ini
       {error && <div className="error-banner" role="alert">{error}</div>}
     </section>
     {run && <section className="panel process-cube-inspection">
-      <div className="panel-head"><h2>Native process cube</h2><span className="panel-meta">{run.result.aggregation} · {run.source.name}</span></div>
+      <div className="panel-head"><h2>Process cube</h2><span className="panel-meta">{run.result.aggregation} · {run.source.name}</span></div>
       <p>X: {run.result.x_dimension} · Y: {run.result.y_dimension} · {run.result.x_bins.length} × {run.result.y_bins.length} bins · {run.input.case_ids.length} input rows</p>
       <p>Cell values and memberships come from this run. Null means no numeric result and is distinct from zero. Repeated case IDs can contribute several rows but appear once in each cell. The heatmap pages through ten bins per axis; all exports are complete.</p>
       <div className="query-actions"><button className="btn-ghost" onClick={() => downloadJson(run.raw, "minera-cube-data.json")}>Download native cube data</button><button className="btn-ghost" onClick={() => downloadJson(run.report_json, "minera-cube-report.json")}>Download process cube report</button>{file && <button className="btn-ghost" onClick={() => downloadQueryBlob(file, file.name)}>Download original cube table</button>}</div>

@@ -32,7 +32,7 @@ export function TreeReductionWorkspace({active}: {active: boolean}) {
   };
   return <div hidden={!active}>
     <section className="panel" aria-label="Independent original process-tree reduction">
-      <div className="panel-head"><h2>Reduce an original process tree</h2><span className="panel-meta">TREE_TR_BASED · original tree and trace</span></div>
+      <div className="panel-head"><h2>Reduce a process tree</h2><span className="panel-meta">TREE_TR_BASED · original tree and trace</span></div>
       <p>Supply the original process tree and a separate trace. The complete activity registry, ordered children, inactive stored indexes, Trace attributes and first-class states remain inspectable alongside the reduced tree.</p>
       <fieldset className="query-fields">
         <div className="query-options">

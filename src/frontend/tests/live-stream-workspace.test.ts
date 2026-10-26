@@ -104,7 +104,7 @@ describe("persistent native stream sessions",()=>{
   });
   it("renders persistent lifecycle controls, complete exports and reconnect semantics",()=>{
     const html=renderToStaticMarkup(createElement(LiveStreamingInspection,{run:run(),pending:false,onAction:()=>{},onDisconnect:()=>{},onError:()=>{}}));
-    for(const text of ["Persistent native stream","Drain queued events","Finish stream","Detach monitor","Reset monitor","Download live session report","Download complete live CSV","server restart"])expect(html).toContain(text);
+    for(const text of ["Persistent stream","Drain queued events","Finish stream","Detach monitor","Reset monitor","Download live session report","Download complete live CSV","server restart"])expect(html).toContain(text);
     const final=renderToStaticMarkup(createElement(LiveStreamingInspection,{run:run(tbrRaw),pending:false,onAction:()=>{},onDisconnect:()=>{},onError:()=>{}}));expect(final).toContain("Finalize all open cases");
   });
 });

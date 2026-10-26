@@ -51,7 +51,7 @@ export function ProcessTreeAlignmentWorkspace({file: original = null, source = n
   const download = (text: string, name: string) => downloadQueryBlob(new Blob([workflowInputNativeBytes(text)], {type: "application/json"}), name);
   return <>
     <section className="panel" aria-label="Independent process-tree alignment">
-      <div className="panel-head"><h2>Align original traces against a process-tree model</h2><span className="panel-meta">Independent inputs and model</span></div>
+      <div className="panel-head"><h2>Align traces against a process tree</h2><span className="panel-meta">Independent inputs and model</span></div>
       <p>Upload an original input and a normative PTML or complete native process tree. Choose an alignment variant, then inspect every returned move, native diagnostic and original model field.</p>
       <fieldset className="query-fields" disabled={pending}>
         <div className="query-options">

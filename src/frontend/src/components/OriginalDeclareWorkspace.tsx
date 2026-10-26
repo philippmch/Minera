@@ -32,7 +32,7 @@ export function OriginalDeclareWorkspace({file: original = null, source = null, 
   const selectNamed = (path: string) => {setEditorPath(path); const [group, key] = path.split(".") as [OriginalDeclareOptionGroup, string], option = group === "conformance" ? "conformanceJson" : group === "diagnostics" ? "diagnosticsJson" : "playoutJson"; try {setEditorValue(originalDeclareOptionValue(form[option], group, key));} catch {setEditorValue(controls.find(control => control.path === path)?.defaultJson ?? "null");}};
   const importField = (key: string, value: string) => editForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));
   return <>
-    <section className="panel" aria-label="Original Declare model workbench"><div className="panel-head"><h2>Check or play out an original Declare model</h2><span className="panel-meta">Original rules · conformance · optional diagnostics · playout</span></div>
+    <section className="panel" aria-label="Original Declare model workbench"><div className="panel-head"><h2>Check or play out a Declare model</h2><span className="panel-meta">Original rules · conformance · optional diagnostics · playout</span></div>
       <p>Supply the normative model directly, then check an activity word, raw Trace or original event source. Every operation keeps its own inputs and returned native values.</p>
       <label className="filters-field"><span>Original Declare operation</span><select value={operation} onChange={event => changeOperation(event.target.value as OriginalDeclareOperation)}>{ORIGINAL_DECLARE_OPERATIONS.map(value => <option key={value} value={value}>{ORIGINAL_DECLARE_LABELS[value]}</option>)}</select></label>
       <fieldset disabled={pending}>

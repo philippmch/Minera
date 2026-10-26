@@ -42,7 +42,7 @@ export function ModelConversionWorkspace() {
   const download = (text: string, name: string, type = "application/json") => downloadQueryBlob(new Blob([workflowInputNativeBytes(text)], {type}), name);
   return <>
     <section className="panel" aria-label="Independent original model conversion and reduction">
-      <div className="panel-head"><h2>Convert or reduce an original model</h2><span className="panel-meta">Process trees · POWL · Petri nets</span></div>
+      <div className="panel-head"><h2>Convert or reduce a model</h2><span className="panel-meta">Process trees · POWL · Petri nets</span></div>
       <p>Upload an independent original model. Each operation keeps the original model, the complete native result and every available export from the same run.</p>
       <label className="filters-field"><span>Model operation</span><select value={treeReduction ? "reduce_tree" : operation} onChange={event => {cancel(); setTreeReduction(event.target.value === "reduce_tree"); if (event.target.value !== "reduce_tree") chooseOperation(event.target.value as ModelConversionOperation);}}>{MODEL_CONVERSION_OPERATIONS.map(value => <option key={value} value={value}>{labels[value]}</option>)}<option value="reduce_tree">Reduce an original process tree with a trace</option></select></label>
       <fieldset className="query-fields" disabled={pending} hidden={treeReduction}>

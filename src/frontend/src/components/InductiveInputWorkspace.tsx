@@ -47,7 +47,7 @@ export function InductiveInputWorkspace({file: original = null, source = null}: 
   const download = (text: string, name: string) => downloadQueryBlob(new Blob([workflowInputNativeBytes(text)], {type: "application/json"}), name);
   return <>
     <section className="panel" aria-label="Independent Inductive input discovery">
-      <div className="panel-head"><h2>Discover an Inductive workflow from original inputs</h2><span className="panel-meta">Independent IM, IMf and IMd discovery</span></div>
+      <div className="panel-head"><h2>Discover an Inductive workflow</h2><span className="panel-meta">Independent IM, IMf and IMd discovery</span></div>
       <p>Upload an original log, a typed event table, compact weighted variants or a native DFG. Choose the input adapter and discovery options, then inspect the complete native tree and every model export.</p>
       <fieldset className="query-fields" disabled={pending}>
         <div className="query-options">

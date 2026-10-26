@@ -54,7 +54,7 @@ export function PetriAntiMultiWorkspace({file: original = null, source = null}: 
   const download = (text: string, name: string) => downloadQueryBlob(new Blob([workflowInputNativeBytes(text)], {type: "application/json"}), name);
   return <>
     <section className="panel" aria-label="Independent Petri anti and multi alignment">
-      <div className="panel-head"><h2>Compare original traces with an independent PNML model</h2><span className="panel-meta">Anti-alignment and multi-alignment</span></div>
+      <div className="panel-head"><h2>Compare traces with a PNML model</h2><span className="panel-meta">Anti-alignment and multi-alignment</span></div>
       <p>Upload an original input and normative PNML model. Each algorithm returns one aggregate visible model sequence and its complete transition path, including silent transitions.</p>
       <label className="filters-field"><span>Independent Petri objective</span><select value={algorithm} onChange={event => changeAlgorithm(event.target.value as PetriAntiMultiAlgorithm)}>{PETRI_ANTI_MULTI_ALGORITHMS.map(value => <option key={value} value={value}>{algorithmLabel(value)}</option>)}</select></label>
       <fieldset className="query-fields" disabled={pending}>

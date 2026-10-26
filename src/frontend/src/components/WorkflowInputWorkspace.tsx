@@ -64,7 +64,7 @@ export function WorkflowInputWorkspace({file: original = null, source = null}: {
   const download = (text: string, name: string) => downloadQueryBlob(new Blob([workflowInputNativeBytes(text)], {type: "application/json"}), name);
   return <>
     <section className="panel" aria-label="Independent workflow input discovery" onChangeCapture={cancel}>
-      <div className="panel-head"><h2>Discover a workflow from original inputs</h2><span className="panel-meta">Independent Alpha and Heuristic discovery</span></div>
+      <div className="panel-head"><h2>Discover a workflow</h2><span className="panel-meta">Independent Alpha and Heuristic discovery</span></div>
       <p>Upload an original log, a typed event table or a structured DFG. Choose the native input path, then inspect its complete model, table state and exports.</p>
       <fieldset className="query-fields" disabled={pending}>
         <div className="query-options">

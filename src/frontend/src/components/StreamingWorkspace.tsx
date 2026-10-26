@@ -146,7 +146,7 @@ export function StreamingWorkspace({ file = null, sourceFormat, busy = false, da
     </section>
     {mode==="live"&&liveRun&&<LiveStreamingInspection run={liveRun} pending={pending||busy} onAction={liveAction} onDisconnect={()=>{cancel();setLiveRun(null);setError(null);}} onError={setError}/>}
     {mode==="fresh"&&run && selected && <section className="panel streaming-inspection">
-      <div className="panel-head"><h2>Native streaming data</h2><span className="panel-meta">{run.method} · {selection} · {selected.count} rows</span></div>
+      <div className="panel-head"><h2>Streaming data</h2><span className="panel-meta">{run.method} · {selection} · {selected.count} rows</span></div>
       <p>Parsed events: {run.result.input.parsed_events} · Processed events: {run.result.family === "STREAMING_DFG" ? run.result.events : run.result.total_events_processed} · Order: {run.result.input.event_order}</p>
       <div className="query-actions">
         <button className="btn-ghost" onClick={() => downloadQueryBlob(new Blob([run.raw], { type: "application/json" }), "minera-streaming-data.json")}>Download native streaming data</button>

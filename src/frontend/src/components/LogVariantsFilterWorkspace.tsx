@@ -21,7 +21,7 @@ export function LogVariantsFilterWorkspace({initialForm}:{initialForm?:LogVarian
     catch(cause){if(gate.current.accepts(ticket,current.current,controller.signal))setError(cause instanceof Error?cause.message:String(cause));}
     finally{if(request.current===controller){request.current=null;setPending(false);}}};
   return <div className="reference-log-variants-workspace"><section className="panel query-workspace" aria-labelledby="log-variants-heading">
-    <div className="panel-head"><h2 id="log-variants-heading">Original activity-variant calls</h2></div>
+    <div className="panel-head"><h2 id="log-variants-heading">Activity-variant calls</h2></div>
     <p className="query-intro">Match complete case variants, compare coverage, or find a threshold using exact typed operands and supplied traces.</p>
     <fieldset className="query-fields"><legend>Source log</legend>
       <label className="filters-field"><span>Variants native event log file</span><input type="file" accept=".json" onChange={event=>{const file=referenceLogFilterPickedFile(event.target);edit(()=>setSource(file));}}/><small>{source?`${source.name} (${source.size} bytes)`:"Choose complete native EventLog JSON. Every operation, including the threshold helper, requires this source."}</small></label>

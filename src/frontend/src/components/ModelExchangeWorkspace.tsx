@@ -101,7 +101,7 @@ export function ModelExchangeWorkspace({ available = false, busy = false, onUseM
       {error && <div className="error-banner" role="alert">{error}</div>}
     </section>
     {run && <section className="panel model-exchange-inspection">
-      <div className="panel-head"><h2>Native model data</h2><span className="panel-meta">{run.result.format.toUpperCase()} · {run.source.name}</span></div>
+      <div className="panel-head"><h2>Model data</h2><span className="panel-meta">{run.result.format.toUpperCase()} · {run.source.name}</span></div>
       <p>{run.result.net ? run.result.net.place_count + " places · " + run.result.net.transition_count + " transitions · " + run.result.arcs.length + " arc occurrences" : "DFG source data"} · Requested output: {run.result.output_format}</p>
       {run.result.conversion_error && <div className="error-banner" role="alert">Native conversion: {run.result.conversion_error}. Imported data remains available.</div>}
       <div className="query-actions">

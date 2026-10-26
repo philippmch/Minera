@@ -21,7 +21,7 @@ export function PolarsTimestampOriginalCallWorkspace({initialForm}:{initialForm?
     try{const result=await requestPolarsTimestampOriginal(identity.source,identity.form,controller.signal);if(gate.current.accepts(ticket,current.current,controller.signal))setRun(result);}
     catch(cause){if(gate.current.accepts(ticket,current.current,controller.signal))setError(cause instanceof Error?cause.message:String(cause));}
     finally{if(request.current===controller){request.current=null;setPending(false);}}};
-  return <div className="reference-polars-timestamp-original-workspace"><section className="panel query-workspace" aria-labelledby="polars-timestamp-original-heading"><div className="panel-head"><h2 id="polars-timestamp-original-heading">Original Polars timestamp calls</h2></div>
+  return <div className="reference-polars-timestamp-original-workspace"><section className="panel query-workspace" aria-labelledby="polars-timestamp-original-heading"><div className="panel-head"><h2 id="polars-timestamp-original-heading">Polars timestamp calls</h2></div>
     <p className="query-intro">Run a time-window filter with complete typed bounds and ordered parameters, then inspect every native artifact.</p>
     <fieldset className="query-fields"><legend>Complete native table</legend>
       <label className="filters-field"><span>Original Polars timestamp source table</span><input type="file" accept=".json" onChange={event=>{const file=referenceLogFilterPickedFile(event.target);edit(()=>setSource(file));}}/><small>{source?`${source.name} (${source.size} bytes)`:"Choose a genuine native EventTable JSON File with full rows, stored types, index and metadata."}</small></label>

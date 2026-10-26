@@ -18,7 +18,7 @@ export function LogTimestampOriginalCallWorkspace({initialForm}:{initialForm?:Lo
     try{const result=await requestLogTimestamp(identity.source,identity.form,controller.signal);if(gate.current.accepts(ticket,current.current,controller.signal))setRun(result);}
     catch(cause){if(gate.current.accepts(ticket,current.current,controller.signal))setError(cause instanceof Error?cause.message:String(cause));}
     finally{if(request.current===controller){request.current=null;setPending(false);}}};
-  return <div className="reference-log-timestamp-workspace"><section className="panel query-workspace" aria-labelledby="log-timestamp-heading"><div className="panel-head"><h2 id="log-timestamp-heading">Original timestamp calls</h2></div>
+  return <div className="reference-log-timestamp-workspace"><section className="panel query-workspace" aria-labelledby="log-timestamp-heading"><div className="panel-head"><h2 id="log-timestamp-heading">Timestamp calls</h2></div>
     <p className="query-intro">Filter complete logs by time, or test a selected trace and inspect its Boolean result.</p>
     <fieldset className="query-fields"><legend>Source log</legend>
       <label className="filters-field"><span>Timestamp native event log file</span><input type="file" accept=".json" onChange={event=>{const file=referenceLogFilterPickedFile(event.target);edit(()=>setSource(file));}}/><small>{source?`${source.name} (${source.size} bytes)`:"Choose complete native EventLog JSON with stored timestamps and context."}</small></label>

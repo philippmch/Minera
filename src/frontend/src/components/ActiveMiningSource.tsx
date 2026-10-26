@@ -30,7 +30,7 @@ export function ActiveMiningSource({source = null, initialFile = null, data = nu
   const downloadCached = async () => {if (!source || !available) return; request.current?.abort(); const controller = new AbortController(); request.current = controller; setPending(true); setError(null); try {const original = await requestActiveMiningSourceFile(source, controller.signal); if (request.current === controller && !controller.signal.aborted) downloadQueryBlob(original, original.name);} catch (cause) {if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause));} finally {if (request.current === controller) {request.current = null; setPending(false);}}};
   return <>
     <section className="panel" aria-label="Original active mining source controls">
-      <div className="panel-head"><h2>Open and inspect a native source</h2><span className="panel-meta">Original event data</span></div>
+      <div className="panel-head"><h2>Open and inspect a source</h2><span className="panel-meta">Original event data</span></div>
       <p>Upload CSV, TSV, XES, gzip XES or a full native EventTable JSON. The original file remains unchanged. Native input views and the actual prepared source for each analysis are inspected separately.</p>
       <fieldset className="query-fields" disabled={mining || pending}><div className="query-options">
         <label className="filters-field"><span>Original mining source</span><input type="file" accept=".csv,.tsv,.xes,.xes.gz,.gz,.json,text/csv,application/xml,application/gzip,application/json" onChange={event => void chooseFile(event.target.files?.[0] ?? null)} /><span>{file?.name ?? "Choose an original source"}</span></label>

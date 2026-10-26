@@ -34,7 +34,7 @@ export function PlayoutWorkspace({file: original = null, source = null, onOpenLo
   const useModelText = () => chooseModel(new File([workflowInputNativeBytes(selected.modelText)], `original-${kind}.${modelExtension}`, {type: modelExtension === "json" ? "application/json" : "text/plain"}));
   return <>
     <section className="panel" aria-label="Independent original-model playout workbench">
-      <div className="panel-head"><h2>Generate from an original process model</h2><span className="panel-meta">Petri nets · declared DFGs · process trees</span></div>
+      <div className="panel-head"><h2>Generate from a process model</h2><span className="panel-meta">Petri nets · declared DFGs · process trees</span></div>
       <p>Upload an original model to sample its behavior or enumerate its language. Choose the actual native log, visited-element or full-result call. Each run keeps its own model, options, source and returned values.</p>
       <label className="filters-field"><span>Original-model playout operation</span><select value={operation} onChange={event => changeOperation(event.target.value as PlayoutOperation)}>{PLAYOUT_OPERATIONS.map(value => <option key={value} value={value}>{PLAYOUT_OPERATION_LABELS[value]}</option>)}</select></label>
       <fieldset className="query-fields" disabled={pending}>

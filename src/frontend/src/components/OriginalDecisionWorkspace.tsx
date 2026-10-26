@@ -31,7 +31,7 @@ export function OriginalDecisionWorkspace({file: original = null, source = null}
   const importField = (key: string, value: string) => editForm(current => ({...current, importFields: {...current.importFields, [key]: value}}));
   return <>
     <section className="panel" aria-label="Independent original-PNML decision workbench">
-      <div className="panel-head"><h2>Learn decisions from an original Petri net</h2><span className="panel-meta">Decision trees · encoded tables · learned guards</span></div>
+      <div className="panel-head"><h2>Learn decisions from a Petri net</h2><span className="panel-meta">Decision trees · encoded tables · learned guards</span></div>
       <p>Choose an original PNML model and original event source to learn branch decisions, inspect encoded feature rows or produce a data Petri net. Each operation retains its own inputs and native results.</p>
       <label className="filters-field"><span>Original-model decision operation</span><select value={operation} onChange={event => changeOperation(event.target.value as OriginalDecisionOperation)}>{ORIGINAL_DECISION_OPERATIONS.map(value => <option key={value} value={value}>{ORIGINAL_DECISION_LABELS[value]}</option>)}</select></label>
       <fieldset className="query-fields" disabled={pending}>
