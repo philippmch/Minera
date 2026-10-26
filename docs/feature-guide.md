@@ -196,7 +196,7 @@ and tracks every family as complete, partial, or missing.
   axes, the observations show how flow times evolve over the log's lifetime,
   where cases batch up, and which ones overtake others — detail a mean waiting
   time averages away. CLI `--spectrum "a,b,c"` embeds it in the JSON export;
-  the frontend computes and draws it live on the **Events over Time** tab,
+  the frontend computes and draws it live on the **Timeline** view,
   with lines graded by flow-time tercile.
 - **Temporal-profile discovery and conformance**: every ordered activity pair
   in a trace contributes its elapsed-time observation, producing count, mean,
@@ -381,19 +381,31 @@ The launch screen takes a CSV event log (`case_id`, `activity`, `timestamp`
 columns; a bundled order-to-cash sample is one click away) or an `.xes` file.
 The frontend uploads it to `POST /api/mine`, where the native core picks the
 importer by extension/content, then imports and mines it in memory — the log
-never leaves your machine. An opened log shows the raw
-events first; discovery lives in tabs:
+never leaves your machine.
 
-- **Event Log** — the imported cases with their event sequences, timestamps,
+**Navigation.** The left sidebar shows the open log, its views and every
+standalone tool. The views are grouped as Overview (Event log, Timeline),
+Discover (Process map, Process models, Timing, Behavior), Check (Conformance),
+Analyze (Resources, Clustering, Search and embeddings), Prepare (Query and
+filter, Transform, Anonymize) and Assist (Ask a model). Standalone tools take
+their own files and work without an open log; the landing page lists them by
+task, and the sidebar lists them under **Tools**. Workbenches that mirror the
+reference API call by call, with every option as JSON, are kept apart under
+**Reference API**. ⌘K (Ctrl+K) searches all views and tools. The tool list is
+defined once in `src/frontend/src/tools.ts`.
+
+An opened log shows the raw events first; the views are:
+
+- **Event log** — the imported cases with their event sequences, timestamps,
   and case attributes, filterable by case id, with a **Download log as XES**
   button that exports the log exactly as mined (filters included),
-- **Events over Time** — a dotted chart (one row per case ordered by start
+- **Timeline** — a dotted chart (one row per case ordered by start
   instant, one dot per event colored by activity) exposing arrival patterns,
   batching, and drift at a glance, and the **performance spectrum**: choose
   a sequence of activities and every uninterrupted run a case makes through
   them draws one line between the steps' time axes, colored by flow-time
   tercile — so slow stretches and overtaking stand out,
-- **Directly-Follows Graph** — an interactive process map (pan, zoom, and a
+- **Process map** — an interactive process map (pan, zoom, and a
   minimum-frequency path filter) with a **frequency / performance** toggle that
   relabels edges with mean waiting times (and shows median/mean case throughput)
   when the log is timed, a variant explorer that highlights paths on the map,
@@ -402,7 +414,7 @@ events first; discovery lives in tabs:
   **eventually-follows matrix** — a heatmap of how often each activity is
   eventually followed by each other, exposing long-range order the map's
   local edges don't show,
-- **Mine a Process Model** — pick a discovery algorithm (the Inductive Miner's
+- **Process models** — pick a discovery algorithm (the Inductive Miner's
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
   graph) and explore the resulting model; the tree and dependency-graph
   views flip to the model's **workflow net** — the exact net conformance
@@ -439,7 +451,7 @@ events first; discovery lives in tabs:
   item limits are configurable. Upload a CSV or XES log to use this tab; opening
   a saved JSON export does not create the native log session it needs.
 
-A **Filter log** bar above the tabs re-mines the original upload focused on the
+A **Filters & miner settings** bar under the page header re-mines the original upload focused on the
 most frequent variants (top-N, a minimum frequency, or a cumulative coverage
 share), a time window (keeping
 the events inside it, or the cases contained in / touching it), rework (only
@@ -948,7 +960,7 @@ UTF-8 regex body and `source_id`, optional `name`/`activity_attribute`, and
 
 ### ILP and genetic discovery
 
-In **Mine a Process Model**, select **ILP Miner** or **Genetic Miner**, then
+In **Process models**, select **ILP Miner** or **Genetic Miner**, then
 **Classic**. Both run the native miner on the active CSV/XES source and render
 its actual Petri net with local activity labels and initial/final markings.
 ILP exposes activity/boundary labels, alpha, noise filtering, causal relations
@@ -1387,7 +1399,7 @@ search-exhaustiveness, platform and performance gates open.
 
 ### OCEL file exchange
 
-**Import OCEL JSON, XML, CSV or SQLite** is available from the landing page.
+**OCEL import and export** is available as a tool from the landing page and the sidebar.
 **Import OCEL data** is also available from classic and object-centric views;
 returning from import preserves the current workspace. With an OCEL source open,
 choose **Import & export OCEL** for original-source export.
@@ -1444,8 +1456,7 @@ not promote any algorithm-family parity status.
 
 ### Related logs and events
 
-Choose **Relate logs and events** on the landing page, **Relate logs** in the
-top bar, or **Relate logs & events** in the classic transformation workspace.
+Open the **Relate logs** tool, or **Relate logs & events** in the Transform view.
 
 - **Link events in the active log** selects outgoing/incoming values, sorting,
   the generated event-index field, look-forward behavior, first occurrence and
@@ -1512,7 +1523,7 @@ workflow annotations preserve every existing catalogue parity status.
 
 ### Replay event streams
 
-Choose **Replay event streams** on the landing page, **Event streams** in an
+Open the **Event streams** tool, or **Event streams** in an
 open workspace, or **Replay event streams** under **Transform**. Upload a CSV
 event sequence and select streaming DFG discovery, footprint prefix checks,
 temporal prefix checks, or forward/backwards token replay with a PNML model.
@@ -1565,7 +1576,7 @@ Full reference parity remains active.
 
 ### Inspect and convert model files
 
-Choose **Inspect and convert model files** on the landing page, **Model files**
+Open the **Model files** tool, **Model files**
 in an open workspace, or **Inspect & convert model files** under **Transform**.
 PNML, BPMN, PTML and classic DFG uploads work independently of an event log.
 Select inspection or a requested PNML/BPMN/PTML/DFG export.
@@ -1613,8 +1624,7 @@ minera_export --pnml-to-ptml model.pnml -o converted.ptml
 
 ## Process cubes
 
-Choose **Explore process cubes** on the landing page, **Process cubes** in a
-classic or OCEL workspace's top bar, or **Process cubes** under **Transform**.
+Open the **Process cubes** tool, or **Process cubes** under **Transform**.
 Upload a JSON table with `case_ids` and `columns`; optional
 `categorical_columns` contains additional string columns. Each column has one
 finite numeric or string value per input row:
@@ -1793,7 +1803,7 @@ retain the source bindings and corrected attempts.
 
 ### Source acquisition
 
-Open **Acquire source data** from the landing page, classic or object-centric
+Open the **Acquire source data** tool, classic or object-centric
 navigation, or the transformation hub. All nine existing native connectors are
 available: Chrome/Firefox history databases, GitHub issues/timelines, Windows
 event XML, workflow activity CSV, SAP order-to-cash/accounting CSV, and Outlook
@@ -2083,8 +2093,7 @@ navigating away or reloading. Full reference behavioral parity remains open.
 
 ### Generate process trees and logs
 
-Choose Generate process trees and logs on the start page, or Generate trees in
-an event-log/OCEL toolbar. BASIC offers recursive depth, leaf probability and
+Open the **Generate process trees** tool. BASIC offers recursive depth, leaf probability and
 custom activity labels. PT-and-log offers model population and triangular
 activity counts, plus sequence/choice/parallel/loop/inclusive/silent/duplicate
 probabilities. Blank values use native defaults and full 64-bit seeds remain
@@ -2340,8 +2349,7 @@ Original table metadata and every remaining feature/strict parity gate stay open
 
 ### Replay original logs against independent PNML models
 
-Open **Replay a log against a PNML model** from the landing page, or **Token replay**
-from either toolbar. Upload CSV, TSV, XES or gzip XES and a PNML model. This workflow
+Open the **Token replay** tool. Upload CSV, TSV, XES or gzip XES and a PNML model. This workflow
 runs independently of the cached discovered model. Import controls cover custom
 columns, delimiters and all six existing XES importer selectors.
 
@@ -2365,8 +2373,7 @@ This is a feature checkpoint; strict full-reference replay parity remains open.
 
 ### Align independent logs against PNML models
 
-Open **Align a log against a PNML model** from landing, or **Petri alignment** from
-either toolbar. Upload CSV, TSV, XES or gzip XES and the original PNML model.
+Open the **Petri net alignment** tool. Upload CSV, TSV, XES or gzip XES and the original PNML model.
 Choose any of the six native alignment variants and grouped log, event stream,
 dataframe or lazyframe inputs. CSV flat shapes retain parser rows; case selection
 can regroup them. Grouped logs preserve their trace boundaries.
@@ -2426,8 +2433,7 @@ See [validation and boundaries](feature-first-organizational-validation.json).
 
 ### Discovery from original workflow inputs
 
-Use **Discover a workflow from original inputs** on the landing page or
-**Workflow inputs** in either toolbar. Select Alpha Classic/Alpha+ or Heuristic
+Open the **Workflow discovery** tool. Select Alpha Classic/Alpha+ or Heuristic
 Classic/Heuristics++, then an original CSV/TSV/XES/gzip-XES, a typed EventTable
 JSON file, or a structured direct graph. Log, stream, dataframe and lazyframe
 shapes retain their native behavior. Direct graphs use Classic discovery.
@@ -2451,8 +2457,7 @@ and strict reference parity remain pending; see
 
 ### Align original inputs against independent graph models
 
-Use **Align original traces against a DFG or PNML model** on the landing page or
-**Graph alignment** in either toolbar. Choose DFG Classic with DFG JSON/text,
+Open the **DFG and graph alignment** tool. Choose DFG Classic with DFG JSON/text,
 or decomposed RECOMPOS_MAXIMAL with a PNML model. Check an original CSV/TSV/XES/
 gzip-XES log, a typed EventTable JSON file, one original trace, or literal trace
 words. These requests preserve the current cached mining session.
@@ -2477,8 +2482,7 @@ attempt is claimed. See [validation and boundaries](feature-first-graph-alignmen
 
 ### Discover Inductive trees from original inputs
 
-Use **Discover an Inductive workflow from original inputs** on the landing page or the Inductive entry in either
-toolbar. Choose IM, IMF or IMD and an original CSV/TSV/XES/gzip-XES, complete
+Open the **Inductive discovery** tool. Choose IM, IMF or IMD and an original CSV/TSV/XES/gzip-XES, complete
 typed EventTable JSON, compact weighted variants or a declared DFG constructor.
 Log, stream, dataframe and lazyframe retain their native input behavior. These
 requests preserve the current cached mining session.
@@ -2504,8 +2508,7 @@ attempt is claimed. See [validation and boundaries](feature-first-inductive-inpu
 
 ### Align against original process-tree models
 
-Use **Align original traces against a process-tree model** on the landing page or the Tree alignment entry in
-either toolbar. Choose SEARCH_GRAPH_PT, DYNAMIC_PROGRAMMING, MILP or
+Open the **Process tree alignment** tool. Choose SEARCH_GRAPH_PT, DYNAMIC_PROGRAMMING, MILP or
 APPROXIMATED_ORIGINAL, an original PTML/full ProcessTree JSON model and original
 CSV/TSV/XES/gzip-XES, complete typed EventTable JSON or exact trace words.
 Check the grouped log or a selected original trace; explicit words become a
@@ -2535,8 +2538,7 @@ See [validation and boundaries](feature-first-process-tree-alignment-validation.
 
 ### Compare traces with original PNML models
 
-Use **Compare original traces with an independent PNML model** on the landing page or **Anti/multi alignment** in either
-toolbar. Choose the existing native discounted anti-alignment or multi-alignment
+Open the **Anti- and multi-alignment** tool. Choose the existing native discounted anti-alignment or multi-alignment
 search, an original PNML model and original CSV/TSV/XES/gzip-XES, complete typed
 EventTable JSON or exact trace words. Check the grouped log or a selected trace;
 explicit words become a native EventLog with PRESENT cells, including empty
@@ -2565,8 +2567,7 @@ See [validation and boundaries](feature-first-petri-anti-multi-validation.json).
 
 ### Convert or reduce original process models
 
-Use **Convert or reduce an original process model** on the landing page or **Convert models** in either
-classic/OCEL toolbar. Supply an original PTML/full process-tree constructor,
+Open the **Convert and reduce models** tool. Supply an original PTML/full process-tree constructor,
 PNML model or native POWL text. Choose Tree to POWL, Net to POWL, POWL to Tree,
 Net to Tree, POWL to Net or PNML reduction. These requests preserve the cached
 mining session and use the existing public native overloads directly.
@@ -2597,7 +2598,7 @@ The workspace now accepts full native typed tables as active inputs in log, stre
 
 ### Simulate an original PNML model with Monte Carlo
 
-Open **Original-model Monte Carlo** from the landing page or workspace toolbar.
+Open the **Monte Carlo simulation** tool.
 Upload a PNML model to simulate it directly, optionally supply an original
 CSV/TSV/XES/gzip XES or typed table for log-informed simulation, fit options only,
 or fit and then simulate. These requests own their inputs and preserve the cached
@@ -2622,7 +2623,7 @@ see `docs/feature-first-monte-carlo-workbench-validation.json`.
 
 ### Play out original Petri nets, DFGs and process trees
 
-Open **Original-model playout** from the landing page or workspace toolbar.
+Open the **Model playout** tool.
 Upload PNML for basic, stochastic or extensive Petri playout, a declared DFG JSON
 or classic `.dfg` file, or an original PTML/full constructor tree. The workbench
 exposes 13 separate native operations and all 69 fields across their five option
