@@ -1,6 +1,7 @@
 # Full parity continuation — 2026-10-21–24
 
-Resume in `C:/Users/pmoch/Documents/Minera`, branch `main`.
+Resume from a fresh clone of the repository, branch `main`. The reference
+venv and checkout can be rebuilt in a cloud container (see the README).
 
 ## Objective and authorization
 
@@ -3966,6 +3967,11 @@ stays partial. See `docs/attribute-repetition-domain-parity.md`.
   performance requirements remain in scope until their own evidence closes.
 
 ## Build coordination and safe staging
+
+The paths below describe the original Windows workstation and are kept as
+history. Current work runs in Linux cloud containers: the reference venv uses
+Python 3.11 with pm4py 2.7.22 and its pinned dependencies, and the build uses
+CMake with Ninja.
 
 Python: `C:/Users/pmoch/AppData/Local/Programs/Python/Python311/python.exe`
 with `-B -X utf8`; Node: `C:/Program Files/nodejs/node.exe`;

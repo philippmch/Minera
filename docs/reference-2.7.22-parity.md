@@ -13,8 +13,8 @@ dispatch structure, but code is not copied into Minera.
 Run the reproducible catalogue audit against a checkout containing the pinned
 Git object database:
 
-```powershell
-node scripts/audit-reference-catalog.mjs C:\path\to\reference-2.7.22
+```sh
+node scripts/audit-reference-catalog.mjs /path/to/reference-2.7.22
 ```
 
 The audit resolves `HEAD`, verifies the `2.7.22` tag and pinned commit, and
@@ -28,8 +28,8 @@ The checked-in package/selector mapping is
 `docs/reference-2.7.22-coverage.json`. Verify that it still covers the exact
 pinned catalogue with:
 
-```powershell
-node scripts/verify-reference-parity.mjs C:\path\to\reference-2.7.22
+```sh
+node scripts/verify-reference-parity.mjs /path/to/reference-2.7.22
 ```
 
 The verifier covers every tracked non-`__init__` Python module under `algo`,
@@ -47,23 +47,14 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 49
-complete and 37 partial dispatcher rows, plus 241 complete and 146 partial
-non-dispatcher module rows. The completed module group covers the implemented
-simulation, core transformation, Petri-analysis, organizational, statistical
-DFG, causal and correlation discovery, 26-module Inductive discovery, 31-module
-POWL discovery, 13-module footprints discovery/conformance, and the 19-module
-temporal/behavioral adapter stack, plus discounted anti-/multi-alignment and
-classic Declare/log-skeleton discovery and conformance, with distinct
-registered tests, plus the replay-duration diagnostic support module and the
-backwards token-replay variation and CLASSIC heuristic discovery, and the
-model-quality simplicity, precision, and alignment-fitness evaluators; 183
-coverage units still require exact proof.
+adapter, integration, or missing are complete. The current manifest records all 86
+dispatcher rows and all 387 non-dispatcher module rows as complete, each with
+distinct registered tests, so the strict gate below passes.
 A release may
 additionally run the strict gate:
 
-```powershell
-node scripts/verify-reference-parity.mjs C:\path\to\reference-2.7.22 --require-complete
+```sh
+node scripts/verify-reference-parity.mjs /path/to/reference-2.7.22 --require-complete
 ```
 
 `--require-complete` is an evidence-completeness gate. It fails until every
