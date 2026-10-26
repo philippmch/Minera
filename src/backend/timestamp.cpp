@@ -1,4 +1,5 @@
 #include "minera/timestamp.hpp"
+#include "zone_database.hpp"
 
 #include <cctype>
 #include <chrono>
@@ -362,12 +363,11 @@ std::optional<ParsedExactTimestamp> localize_timestamp_wall_time(
     result.seconds -= std::int64_t{result.offset_minutes} * 60;
     return result;
   }
-  const std::chrono::time_zone* resolved = nullptr;
-  try { resolved = std::chrono::locate_zone(zone); }
+  ::minera::zone_database::LocalInfo info;
+  try { info = ::minera::zone_database::info_at_local(zone, wall.seconds); }
   catch (const std::runtime_error&) { throw std::invalid_argument("unknown timezone: " + std::string(zone)); }
-  const auto info = resolved->get_info(std::chrono::local_seconds{std::chrono::seconds{wall.seconds}});
-  if (info.result != std::chrono::local_info::unique) return std::nullopt;
-  const auto offset = std::chrono::duration_cast<std::chrono::seconds>(info.first.offset).count();
+  if (info.result != ::minera::zone_database::LocalResult::kUnique) return std::nullopt;
+  const auto offset = info.first_offset_seconds;
   result.offset_minutes = static_cast<std::int32_t>(offset / 60);
   result.seconds -= offset;
   return result;

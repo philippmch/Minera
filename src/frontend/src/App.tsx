@@ -1,7 +1,8 @@
 import {OriginalLogQueryWorkspace} from "./components/OriginalLogQueryWorkspace";
 import {OriginalLabelSplittingWorkspace} from "./components/OriginalLabelSplittingWorkspace";
 import {OriginalFeaturesWorkspace} from "./components/OriginalFeaturesWorkspace";
-import {OwnedExactFilterResult,exactFilterRun,clearExactFilterControls,hasFullHeuristic,clearLegacyHeuristicOptions,type ExactFilterRun} from "./exact-filter-controls";
+import {OwnedExactFilterResult,exactFilterRun,type ExactFilterRun} from "./exact-filter-controls";
+import {sourceImportOptions} from "./source-import-options";
 import {ExactFilterInspection} from "./components/OriginalLtlFilter";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -510,7 +511,9 @@ export default function App() {
   // keeping the active tab. Always mines from source.file so nothing compounds.
   const applyFilters = (filters: FilterOptions & MinerOptions) => {
     if (!source) return;
-    const original = source, {ticket, controller} = beginSourceLoad(), options: MineOptions = {...(hasFullHeuristic(filters)?clearLegacyHeuristicOptions(clearExactFilterControls(original.options)):clearExactFilterControls(original.options)), ...filters, miningRequestId: ticket.request_id};
+    // Only the import settings carry over; filters and miner settings come
+    // entirely from this request, so Reset ({}) really clears them.
+    const original = source, {ticket, controller} = beginSourceLoad(), options: MineOptions = {...sourceImportOptions(original.options), ...filters, miningRequestId: ticket.request_id};
     sourceRequest.current!.posted = true;
     mineActiveDataset(original.file, options, controller.signal)
       .then((result) => {
@@ -897,6 +900,7 @@ export default function App() {
             heuristicPetriLayout={heuristicPetriLayout}
             powlPetriLayout={powlPetriLayout}
             canExportPnml={sourceAvailable}
+            playoutSourceId={sourceAvailable && source ? source.source_id : undefined}
             mining={mining}
             onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey});setTab("conformance");}}
           />
@@ -932,6 +936,7 @@ export default function App() {
             onRequestPetriAnalysis={requestPetriAnalysis}
             onRequestEmd={requestEmd}
             onRequestConceptDrift={requestConceptDriftCached}
+            playoutSourceId={sourceAvailable && source ? source.source_id : undefined}
           />
         </main>
       )}

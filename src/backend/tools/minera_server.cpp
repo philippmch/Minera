@@ -669,11 +669,10 @@ void reject_unknown_monte_carlo_params(const httplib::Request& request,
       "monte_carlo_token_replay_variant",
       "monte_carlo_numpy_legacy_seed", "monte_carlo_numpy_choice_order",
       "monte_carlo_provided_stochastic_map",
-      "process_tree_variant"};
+      "process_tree_variant", "source_id"};
   for (const auto& [key, value] : request.params) {
     (void)value;
-    if (!allowed.contains(key) &&
-        !(allow_workspace && (key == "source_id" || key == "include_workspace")))
+    if (!allowed.contains(key) && !(allow_workspace && key == "include_workspace"))
       throw std::invalid_argument("unknown Monte Carlo parameter: " + key);
   }
 }
@@ -686,7 +685,7 @@ void reject_unknown_stochastic_params(const httplib::Request& request) {
       "stochastic_return_visited_elements",
       "stochastic_start", "stochastic_case_interval",
       "stochastic_event_interval", "stochastic_initial_marking",
-      "stochastic_final_marking", "process_tree_variant"};
+      "stochastic_final_marking", "process_tree_variant", "source_id"};
   for (const auto& [key, value] : request.params) {
     (void)value;
     if (!allowed.contains(key))
@@ -8958,6 +8957,18 @@ void handle_playout(const httplib::Request& request,
     response.status = 409;  // nothing mined yet this run
     response.set_content(error_json("no mined log; mine a log first"),
                          "application/json");
+    return;
+  }
+
+  // The page names the mined source it shows; refuse to play out a session
+  // that has since been replaced (another tab re-mined a different log).
+  if (request.has_param("source_id") &&
+      request.get_param_value("source_id") != std::to_string(session->query_source_id)) {
+    response.status = 409;
+    response.set_content(
+        error_json("the mined log changed since this analysis was shown; "
+                   "re-open its event log to play out its models"),
+        "application/json");
     return;
   }
 

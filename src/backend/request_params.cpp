@@ -2280,41 +2280,60 @@ MineParams parse_mine_params(const FieldLookup& field,
         field(min_field), min_field);
     params.filter.attribute_occurrence_threshold = std::move(threshold);
   }
-  if (const auto value = field("keep_activities"); !value.empty()) {
-    params.filter.keep_activities = split_csv(value);
+  // Label lists also accept a JSON string array under `<name>_json`, so a
+  // label may contain commas or edge spaces. The comma-joined form stays for
+  // command-line callers and splits on every comma, trimming spaces.
+  const auto label_list = [&](std::string_view name)
+      -> std::optional<std::vector<std::string>> {
+    const auto json_name = std::string(name) + "_json";
+    if (supplied(json_name)) {
+      if (supplied(name))
+        throw std::invalid_argument(json_name + ": conflicts by presence with " + std::string(name));
+      try {
+        return parse_exact_ltl_values_json(field(json_name));
+      } catch (const std::exception& error) {
+        throw std::invalid_argument(json_name + ": expected a JSON array of strings (" + error.what() + ")");
+      }
+    }
+    const auto value = field(name);
+    if (value.empty()) return std::nullopt;
+    return split_csv(value);
+  };
+  if (auto values = label_list("keep_activities")) {
+    params.filter.keep_activities = std::move(*values);
   }
-  if (const auto value = field("remove_activities"); !value.empty()) {
-    params.filter.remove_activities = split_csv(value);
+  if (auto values = label_list("remove_activities")) {
+    params.filter.remove_activities = std::move(*values);
   }
-  if (const auto value = field("keep_resources"); !value.empty()) {
-    params.filter.keep_resources = split_csv(value);
+  if (auto values = label_list("keep_resources")) {
+    params.filter.keep_resources = std::move(*values);
   }
-  if (const auto value = field("remove_resources"); !value.empty()) {
-    params.filter.remove_resources = split_csv(value);
+  if (auto values = label_list("remove_resources")) {
+    params.filter.remove_resources = std::move(*values);
   }
-  if (const auto value = field("keep_lifecycles"); !value.empty()) {
-    params.filter.keep_lifecycles = split_csv(value);
+  if (auto values = label_list("keep_lifecycles")) {
+    params.filter.keep_lifecycles = std::move(*values);
   }
-  if (const auto value = field("remove_lifecycles"); !value.empty()) {
-    params.filter.remove_lifecycles = split_csv(value);
+  if (auto values = label_list("remove_lifecycles")) {
+    params.filter.remove_lifecycles = std::move(*values);
   }
   if (const auto value = field("attribute_key"); !value.empty()) {
     params.filter.attribute_key = value;
   }
-  if (const auto value = field("keep_attribute_values"); !value.empty()) {
-    params.filter.keep_attribute_values = split_csv(value);
+  if (auto values = label_list("keep_attribute_values")) {
+    params.filter.keep_attribute_values = std::move(*values);
   }
-  if (const auto value = field("remove_attribute_values"); !value.empty()) {
-    params.filter.remove_attribute_values = split_csv(value);
+  if (auto values = label_list("remove_attribute_values")) {
+    params.filter.remove_attribute_values = std::move(*values);
   }
   if (const auto value = field("case_attribute_key"); !value.empty()) {
     params.filter.case_attribute_key = value;
   }
-  if (const auto value = field("keep_case_attribute_values"); !value.empty()) {
-    params.filter.keep_case_attribute_values = split_csv(value);
+  if (auto values = label_list("keep_case_attribute_values")) {
+    params.filter.keep_case_attribute_values = std::move(*values);
   }
-  if (const auto value = field("remove_case_attribute_values"); !value.empty()) {
-    params.filter.remove_case_attribute_values = split_csv(value);
+  if (auto values = label_list("remove_case_attribute_values")) {
+    params.filter.remove_case_attribute_values = std::move(*values);
   }
   if (const auto value = field("attribute_mode"); !value.empty()) {
     const auto mode = parse_attribute_filter_mode(value);
@@ -2595,26 +2614,30 @@ MineParams parse_mine_params(const FieldLookup& field,
     }
   }
   const bool start_activities_supplied =
-      supplied("start_activities") || supplied("start_activities_positive");
+      supplied("start_activities") || supplied("start_activities_json") ||
+      supplied("start_activities_positive");
   if (start_activities_supplied) {
-    if (!supplied("start_activities") || field("start_activities").empty()) {
+    auto start_values = label_list("start_activities");
+    if (!start_values) {
       throw std::invalid_argument(
           "start_activities: required when endpoint polarity is supplied");
     }
-    params.filter.start_activities = split_csv(field("start_activities"));
+    params.filter.start_activities = std::move(*start_values);
     if (supplied("start_activities_positive")) {
       params.filter.start_activities_positive = parse_boolean(
           field("start_activities_positive"), "start_activities_positive");
     }
   }
   const bool end_activities_supplied =
-      supplied("end_activities") || supplied("end_activities_positive");
+      supplied("end_activities") || supplied("end_activities_json") ||
+      supplied("end_activities_positive");
   if (end_activities_supplied) {
-    if (!supplied("end_activities") || field("end_activities").empty()) {
+    auto end_values = label_list("end_activities");
+    if (!end_values) {
       throw std::invalid_argument(
           "end_activities: required when endpoint polarity is supplied");
     }
-    params.filter.end_activities = split_csv(field("end_activities"));
+    params.filter.end_activities = std::move(*end_values);
     if (supplied("end_activities_positive")) {
       params.filter.end_activities_positive = parse_boolean(
           field("end_activities_positive"), "end_activities_positive");

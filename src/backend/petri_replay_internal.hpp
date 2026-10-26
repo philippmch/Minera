@@ -19,8 +19,37 @@ namespace minera { struct TokenReplayOptions; }
 
 namespace minera::detail {
 
+// Precision needs every visible activity a marking eventually enables through
+// silent transitions. That search is bounded (silent cycles can make it
+// unbounded); when the bound is hit the enabled set is incomplete, so the
+// search throws this instead of returning a partial answer.
+struct SilentSearchBudgetExhausted : std::runtime_error {
+  SilentSearchBudgetExhausted()
+      : std::runtime_error(
+            "precision is not computable: the silent-transition search for "
+            "eventually enabled activities exceeded its budget") {}
+};
+
+// Expansion budget of that search: markings expanded per queried marking.
+inline constexpr std::size_t kEnabledSearchBudget = std::size_t{1} << 16;
+
+// Lowers the budget on the current thread while alive (tests force exhaustion
+// on small nets with it). Zero restores the default.
+std::size_t enabled_search_budget() noexcept;
+class ScopedEnabledSearchBudget {
+ public:
+  explicit ScopedEnabledSearchBudget(std::size_t budget) noexcept;
+  ~ScopedEnabledSearchBudget();
+  ScopedEnabledSearchBudget(const ScopedEnabledSearchBudget&) = delete;
+  ScopedEnabledSearchBudget& operator=(const ScopedEnabledSearchBudget&) = delete;
+
+ private:
+  std::size_t previous_;
+};
+
 // Visible activities reachable from the exact initial marking through hidden
-// transitions. This query does not calculate trace fitness.
+// transitions. This query does not calculate trace fitness. Throws
+// SilentSearchBudgetExhausted when the search cannot finish.
 std::vector<std::size_t> initial_enabled_token_activities(
     const PetriNet& net, const TokenReplayOptions& options);
 

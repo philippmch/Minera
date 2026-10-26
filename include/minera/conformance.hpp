@@ -189,6 +189,10 @@ struct TokenReplayUnknownRootCauseCohort {
 struct ConformanceResult {
   double fitness = 1.0;         // log-level token fitness; early stop can be negative
   double precision = 1.0;       // escaping-edges precision in [0, 1]
+  // False when some prefix's eventually-enabled activities could not be
+  // determined within the silent-search budget; precision is then NaN and
+  // serialized as null rather than as a misleadingly low number.
+  bool precision_computed = true;
   double generalization = 1.0;  // token-replay generalization in [0, 1]
   double simplicity = 1.0;      // inverse arc-degree simplicity in (0, 1]
 
@@ -714,6 +718,7 @@ struct AlignmentResult {
   // than from forced token replay — so on a deviating log the markings are
   // the trustworthy ones an optimal explanation actually reaches.
   double precision = 1.0;
+  bool precision_computed = true;  // see ConformanceResult::precision_computed
   std::uint64_t fitting_traces = 0;  // traces with a perfect (cost-0) alignment
   std::uint64_t trace_count = 0;
   double total_cost = 0.0;           // summed optimal cost over all traces

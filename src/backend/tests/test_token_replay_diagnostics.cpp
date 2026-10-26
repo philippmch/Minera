@@ -480,8 +480,11 @@ void precision_uses_selected_hidden_routing_policy() {
   const auto direct = check_conformance(log, net, options);
   // Prefix replay changes with the routing policy, while the enabled model
   // alternatives always include visible steps behind silent transitions.
+  // Without hidden routing, `a` misses a token, so that prefix is discarded
+  // (ETConformance never scores invalid prefixes) and only the empty prefix
+  // counts: {a, c} enabled, c escaping.
   assert(std::abs(routed.precision - 2.0 / 3.0) < 1e-12);
-  assert(std::abs(direct.precision - 2.0 / 5.0) < 1e-12);
+  assert(std::abs(direct.precision - 1.0 / 2.0) < 1e-12);
 }
 
 void unknown_positions_and_custom_activity_selector() {

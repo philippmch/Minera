@@ -661,7 +661,8 @@ export type MineOptions = CsvOptions & FilterOptions & MinerOptions & MiningInpu
  * The form fields a mine request sends for the given options, as name/value
  * pairs. Pure so the option-to-field mapping is unit-testable; absent or
  * default-signalling options produce no field, leaving the backend defaults
- * in charge. Activity lists are comma-joined to match the backend's parser.
+ * in charge. Label lists travel as JSON arrays (`<field>_json`) so labels
+ * containing commas survive; the backend's comma form is for the CLI.
  */
 export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.miningInputFormat === "table") {
@@ -753,24 +754,24 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.variantPercentage !== undefined)
     add("variant_percentage", String(options.variantPercentage));
   if (options.keepActivities?.length)
-    add("keep_activities", options.keepActivities.join(","));
+    add("keep_activities_json", JSON.stringify(options.keepActivities));
   if (options.removeActivities?.length)
-    add("remove_activities", options.removeActivities.join(","));
+    add("remove_activities_json", JSON.stringify(options.removeActivities));
   if (options.keepResources?.length)
-    add("keep_resources", options.keepResources.join(","));
+    add("keep_resources_json", JSON.stringify(options.keepResources));
   if (options.removeResources?.length)
-    add("remove_resources", options.removeResources.join(","));
+    add("remove_resources_json", JSON.stringify(options.removeResources));
   if (options.keepLifecycles?.length)
-    add("keep_lifecycles", options.keepLifecycles.join(","));
+    add("keep_lifecycles_json", JSON.stringify(options.keepLifecycles));
   if (options.removeLifecycles?.length)
-    add("remove_lifecycles", options.removeLifecycles.join(","));
+    add("remove_lifecycles_json", JSON.stringify(options.removeLifecycles));
   if (options.startActivities?.length) {
-    add("start_activities", options.startActivities.join(","));
+    add("start_activities_json", JSON.stringify(options.startActivities));
     if (options.startActivitiesPositive !== undefined)
       add("start_activities_positive", String(options.startActivitiesPositive));
   }
   if (options.endActivities?.length) {
-    add("end_activities", options.endActivities.join(","));
+    add("end_activities_json", JSON.stringify(options.endActivities));
     if (options.endActivitiesPositive !== undefined)
       add("end_activities_positive", String(options.endActivitiesPositive));
   }
@@ -909,20 +910,20 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.attributeKey) {
     add("attribute_key", options.attributeKey);
     if (options.keepAttributeValues?.length)
-      add("keep_attribute_values", options.keepAttributeValues.join(","));
+      add("keep_attribute_values_json", JSON.stringify(options.keepAttributeValues));
     if (options.removeAttributeValues?.length)
-      add("remove_attribute_values", options.removeAttributeValues.join(","));
+      add("remove_attribute_values_json", JSON.stringify(options.removeAttributeValues));
     if (options.attributeMode)
       add("attribute_mode", options.attributeMode);
   }
   if (options.caseAttributeKey) {
     add("case_attribute_key", options.caseAttributeKey);
     if (options.keepCaseAttributeValues?.length)
-      add("keep_case_attribute_values", options.keepCaseAttributeValues.join(","));
+      add("keep_case_attribute_values_json", JSON.stringify(options.keepCaseAttributeValues));
     if (options.removeCaseAttributeValues?.length)
       add(
-        "remove_case_attribute_values",
-        options.removeCaseAttributeValues.join(","),
+        "remove_case_attribute_values_json",
+        JSON.stringify(options.removeCaseAttributeValues),
       );
   }
   const numericAttributeConfigured =
@@ -4655,14 +4656,24 @@ export function stochasticPlayoutQuery(options: StochasticPlayoutOptions = {}): 
 }
 
 /** Fetches the structured visitation sequence emitted by stochastic Petri playout. */
+/**
+ * Binds a playout request to the mined source the page is showing. The server
+ * plays out its current session only while that session is still this source,
+ * so a re-mine elsewhere (another tab) cannot answer for the wrong dataset.
+ */
+export function playoutUrl(url: string, sourceId?: string): string {
+  if (sourceId === undefined) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}source_id=${encodeURIComponent(sourceId)}`;
+}
+
 export async function fetchStochasticPlayoutVisited(
-  options: StochasticPlayoutOptions = {},
+  options: StochasticPlayoutOptions = {}, sourceId?: string,
 ): Promise<StochasticPlayoutVisitedResult> {
   const query = stochasticPlayoutQuery({
     ...options,
     return_visited_elements: true,
   });
-  const response = await fetch(`/api/playout?miner=stochastic${query ? `&${query}` : ""}`);
+  const response = await fetch(playoutUrl(`/api/playout?miner=stochastic${query ? `&${query}` : ""}`, sourceId));
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     if (payload && typeof payload === "object" && "error" in payload)
@@ -4982,10 +4993,11 @@ async function fetchPlayoutText(path: string, init?: RequestInit): Promise<strin
 
 /** Fetches Monte Carlo XES from the playout endpoint with an explicit mode. */
 export async function fetchMonteCarloPlayout(
-  miner = "inductive", options: MonteCarloOptions = {},
+  miner = "inductive", options: MonteCarloOptions = {}, sourceId?: string,
 ): Promise<string> {
   const params = new URLSearchParams(monteCarloQuery(options));
   params.set("miner", miner);
+  if (sourceId !== undefined) params.set("source_id", sourceId);
   params.set("mode", "monte_carlo");
   return fetchPlayoutText("/api/playout", {
     method: "POST",
@@ -5001,20 +5013,22 @@ export async function fetchMonteCarloPlayout(
  * function so ambiguous controls cannot be silently reinterpreted.
  */
 export function fetchPlayout(
-  miner: "monte_carlo", options?: MonteCarloOptions,
+  miner: "monte_carlo", options?: MonteCarloOptions, sourceId?: string,
 ): Promise<string>;
 export function fetchPlayout(
   miner: string,
   options?: BasicPlayoutOptions | ProcessTreePlayoutOptions |
     DeclarePlayoutOptions | StochasticPlayoutOptions | DfgPlayoutOptions,
+  sourceId?: string,
 ): Promise<string>;
 export async function fetchPlayout(
   miner: string,
   options: BasicPlayoutOptions | ProcessTreePlayoutOptions |
     DeclarePlayoutOptions | StochasticPlayoutOptions | DfgPlayoutOptions | MonteCarloOptions = {},
+  sourceId?: string,
 ): Promise<string> {
   if (miner === "monte_carlo") {
-    return fetchMonteCarloPlayout("inductive", options as MonteCarloOptions);
+    return fetchMonteCarloPlayout("inductive", options as MonteCarloOptions, sourceId);
   }
   const monteCarloOnly = [
     "simulations", "case_arrival_ratio", "case_arrival_seconds",
@@ -5043,7 +5057,7 @@ export async function fetchPlayout(
         : basicPlayoutQuery(options as BasicPlayoutOptions);
   }
   return fetchPlayoutText(
-    `/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`,
+    playoutUrl(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`, sourceId),
   );
 }
 
@@ -5051,11 +5065,12 @@ export async function fetchPlayout(
 export async function fetchBasicPlayoutVisited(
   miner = "inductive",
   options: BasicPlayoutOptions = {},
+  sourceId?: string,
 ): Promise<BasicPlayoutVisitedResult> {
   const query = basicPlayoutQuery({ ...options, return_visited_elements: true });
   let response: Response;
   try {
-    response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+    response = await fetch(playoutUrl(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`, sourceId));
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -5078,6 +5093,7 @@ export async function fetchBasicPlayoutVisited(
 export async function fetchExtensivePlayoutVisited(
   miner = "inductive",
   options: BasicPlayoutOptions = {},
+  sourceId?: string,
 ): Promise<ExtensivePlayoutVisitedResult> {
   const query = basicPlayoutQuery({
     ...options,
@@ -5086,7 +5102,7 @@ export async function fetchExtensivePlayoutVisited(
   });
   let response: Response;
   try {
-    response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+    response = await fetch(playoutUrl(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`, sourceId));
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
@@ -5293,7 +5309,7 @@ export async function fetchStochasticMap(
 
 /** Fetches the deterministic activity-word set from extensive process-tree playout. */
 export async function fetchProcessTreePlayoutSet(
-  options: ProcessTreePlayoutOptions = {},
+  options: ProcessTreePlayoutOptions = {}, sourceId?: string,
 ): Promise<ProcessTreePlayoutSetResult> {
   const query = processTreePlayoutQuery({
     ...options,
@@ -5302,7 +5318,7 @@ export async function fetchProcessTreePlayoutSet(
   });
   let response: Response;
   try {
-    response = await fetch(`/api/playout?miner=process_tree${query ? `&${query}` : ""}`);
+    response = await fetch(playoutUrl(`/api/playout?miner=process_tree${query ? `&${query}` : ""}`, sourceId));
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
@@ -5319,12 +5335,12 @@ export async function fetchProcessTreePlayoutSet(
 
 /** Fetches DFG playout, decoding the structured classic variant response. */
 export async function fetchDfgPlayout(
-  options: DfgPlayoutOptions = {},
+  options: DfgPlayoutOptions = {}, sourceId?: string,
 ): Promise<string | DfgPlayoutVariantsResult> {
   const query = dfgPlayoutQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/playout?miner=dfg${query ? `&${query}` : ""}`);
+    response = await fetch(playoutUrl(`/api/playout?miner=dfg${query ? `&${query}` : ""}`, sourceId));
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",

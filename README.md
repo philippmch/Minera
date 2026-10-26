@@ -33,6 +33,12 @@ the per-package history.
 You need CMake 3.20 or newer, a C++20 compiler (GCC 12+, Clang 15+ or MSVC
 2022) and, for the frontend, Node 22.
 
+Named time zones use the standard library's C++20 time-zone database where it
+exists (libstdc++ 14+, MSVC). Apple's libc++ does not ship one, so on macOS
+CMake detects that and builds the vendored `third_party/date` library, which
+reads the system zoneinfo instead. Configure with `-DMINERA_PORTABLE_TZDB=ON`
+to use that backend on any POSIX system, or `OFF` to require the standard one.
+
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j4

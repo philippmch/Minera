@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type ViewBox } from "../layout";
+import { panViewBox, zoomViewBoxAt } from "../graph-viewport";
 import { type TreeLayout } from "../tree-layout";
 
 const OPERATOR_NAME: Record<string, string> = {
@@ -34,17 +35,9 @@ export function ProcessTree({ layout, title, actions }: ProcessTreeProps) {
       event.preventDefault();
       const factor = Math.exp(event.deltaY * 0.0016);
       const rect = svg.getBoundingClientRect();
-      const px = (event.clientX - rect.left) / rect.width;
-      const py = (event.clientY - rect.top) / rect.height;
       setView((view) => {
         const newW = Math.min(Math.max(view.w * factor, 160), layout.fit.w * 4);
-        const newH = view.h * (newW / view.w);
-        return {
-          x: view.x + (view.w - newW) * px,
-          y: view.y + (view.h - newH) * py,
-          w: newW,
-          h: newH,
-        };
+        return zoomViewBoxAt(view, rect, event.clientX, event.clientY, newW);
       });
     };
     svg.addEventListener("wheel", onWheel, { passive: false });
@@ -90,12 +83,7 @@ export function ProcessTree({ layout, title, actions }: ProcessTreeProps) {
             const pan = panRef.current;
             if (!pan) return;
             const rect = event.currentTarget.getBoundingClientRect();
-            const scale = view.w / rect.width;
-            setView({
-              ...view,
-              x: view.x - (event.clientX - pan.x) * scale,
-              y: view.y - (event.clientY - pan.y) * scale,
-            });
+            setView(panViewBox(view, rect, event.clientX - pan.x, event.clientY - pan.y));
             panRef.current = { x: event.clientX, y: event.clientY };
           }}
           onPointerUp={() => {

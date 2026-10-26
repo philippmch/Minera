@@ -155,14 +155,18 @@ void build(const ProcessTreeNode& node,
         net.add_transition(std::nullopt, {in}, {out});
         return;
       }
-      // Keep a private loop-entry place so the silent redo edge remains
-      // distinguishable from a sink escape after ordinary reduction.
+      // Both loop borders are private places behind silent transitions. A
+      // shared exit would let a sibling or a preceding fragment that also
+      // produces `out` start a redo path, so XOR(LOOP(A, B), C) would admit
+      // C, B, A.
       const std::size_t loop_entry = net.add_place();
+      const std::size_t loop_exit = net.add_place();
       net.add_transition(std::nullopt, {in}, {loop_entry});
-      build(node.children[0], loop_entry, out, net);
+      build(node.children[0], loop_entry, loop_exit, net);
       for (std::size_t i = 1; i < node.children.size(); ++i) {
-        build(node.children[i], out, loop_entry, net);
+        build(node.children[i], loop_exit, loop_entry, net);
       }
+      net.add_transition(std::nullopt, {loop_exit}, {out});
       return;
     }
   }

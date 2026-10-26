@@ -229,6 +229,48 @@ void binary_loop_preserves_language() {
                           {"A", "B", "A", "B", "A"}}));
 }
 
+// Standard conversion must accept exactly the tree language: a loop's redo
+// path may only be entered from that loop's own body. Transition-bordered
+// conversion isolates every fragment, so it serves as the language oracle.
+void standard_loop_borders_stay_private() {
+  using Op = minera::ProcessTreeOperator;
+  const auto a = minera::ProcessTreeNode::leaf(0);
+  const auto b = minera::ProcessTreeNode::leaf(1);
+  const auto c = minera::ProcessTreeNode::leaf(2);
+  const auto d = minera::ProcessTreeNode::leaf(3);
+  const auto loop_ab = node(Op::kLoop, {a, b});
+  const minera::ProcessTree choice({"A", "B", "C", "D"},
+                                   node(Op::kExclusive, {loop_ab, c}));
+  const auto standard = enumerate(minera::to_petri_net(choice), 5).traces;
+  assert(!standard.contains(Trace{"C", "B", "A"}));
+  assert(!standard.contains(Trace{"A", "B", "C"}));
+  assert(standard.contains(Trace{"C"}) && standard.contains(Trace{"A"}) &&
+         standard.contains(Trace{"A", "B", "A"}));
+
+  const std::vector<minera::ProcessTreeNode> contexts = {
+      node(Op::kExclusive, {loop_ab, c}),
+      node(Op::kExclusive, {c, loop_ab}),
+      node(Op::kSequence, {c, loop_ab}),
+      node(Op::kSequence, {loop_ab, c}),
+      node(Op::kSequence, {c, loop_ab, d}),
+      node(Op::kExclusive, {loop_ab, minera::ProcessTreeNode::tau()}),
+      node(Op::kSequence,
+           {node(Op::kExclusive, {loop_ab, minera::ProcessTreeNode::tau()}), c}),
+      node(Op::kParallel, {loop_ab, c}),
+      node(Op::kLoop, {loop_ab, c}),
+      node(Op::kLoop, {c, loop_ab}),
+      node(Op::kExclusive, {node(Op::kLoop, {a, b}), node(Op::kLoop, {c, d})}),
+      node(Op::kSequence, {node(Op::kLoop, {a, b}), node(Op::kLoop, {c, d})}),
+      node(Op::kExclusive,
+           {node(Op::kSequence, {c, loop_ab}), node(Op::kSequence, {loop_ab, d})}),
+  };
+  for (const auto& root : contexts) {
+    const minera::ProcessTree tree({"A", "B", "C", "D"}, root);
+    assert(enumerate(minera::to_petri_net(tree), 5, 96).traces ==
+           enumerate(minera::to_petri_net_transition_bordered(tree), 5, 96).traces);
+  }
+}
+
 void unsupported_and_malformed_trees_are_rejected() {
   const auto inclusive = node(
       minera::ProcessTreeOperator::kInclusiveChoice,
@@ -1406,6 +1448,7 @@ int main() {
   leaf_and_tau_keep_labels_and_language();
   composite_fragments_have_silent_borders();
   binary_loop_preserves_language();
+  standard_loop_borders_stay_private();
   unsupported_and_malformed_trees_are_rejected();
   explicit_standard_variant_matches_default();
   variant_names_and_json_are_stable();

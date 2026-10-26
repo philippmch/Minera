@@ -890,8 +890,11 @@ class Replayer {
     std::queue<Marking> frontier;
     frontier.push(marking);
     std::size_t expanded = 0;
-    while (!frontier.empty() && !remaining.empty() &&
-           expanded++ < kSilentSearchCap) {
+    const std::size_t budget = detail::enabled_search_budget();
+    while (!frontier.empty() && !remaining.empty()) {
+      // Candidates are still open and markings are still unexplored: a
+      // partial set would understate escaping edges, so refuse to answer.
+      if (expanded++ >= budget) throw detail::SilentSearchBudgetExhausted();
       const Marking current = std::move(frontier.front());
       frontier.pop();
       for (const std::size_t s : silent_transitions_) {
@@ -1925,9 +1928,20 @@ double compute_precision(const std::vector<Variant>& variants,
   using MarkingHash = TokenMarkingHash;
   // Prefix automaton as a trie: each node is a distinct prefix and records how
   // many traces pass through it and which activities they go on to take.
-  // Activities absent from the model all collapse onto one edge key, matching
-  // how replay treats them (the marking does not move).
+  // Activities absent from the model get one edge key per distinct label, so
+  // prefixes X and Y stay apart as in the reference's prefix strings; replay
+  // still treats every absent label alike (the marking does not move).
   constexpr std::size_t kAbsent = std::numeric_limits<std::size_t>::max();
+  std::map<std::pair<bool, std::string>, std::size_t> absent_edges;
+  const auto absent_edge = [&](const Variant& variant, std::size_t depth) {
+    const bool null_label =
+        std::find(variant.null_activity_indices.begin(),
+                  variant.null_activity_indices.end(),
+                  depth) != variant.null_activity_indices.end();
+    const auto [it, inserted] = absent_edges.try_emplace(
+        {null_label, variant.names[depth]}, kAbsent - absent_edges.size());
+    return it->second;
+  };
   struct Node {
     std::unordered_map<std::size_t, std::size_t> children;  // edge -> node
     std::uint64_t freq = 0;
@@ -1941,7 +1955,7 @@ double compute_precision(const std::vector<Variant>& variants,
     for (std::size_t depth = 0; depth < variant.ids.size(); ++depth) {
       const auto& id = variant.ids[depth];
       if (id) nodes[current].observed.insert(*id);
-      const auto edge = id ? *id : kAbsent;
+      const auto edge = id ? *id : absent_edge(variant, depth);
       const auto existing = nodes[current].children.find(edge);
       std::size_t child = 0;
       if (existing == nodes[current].children.end()) {
@@ -2017,10 +2031,7 @@ double compute_precision(const std::vector<Variant>& variants,
       for (const auto& [edge, child] : node.children) {
         Marking next = frame.marking;
         const bool fitting = replayer.advance(
-            next, edge == kAbsent
-                      ? std::nullopt
-                      : std::optional<std::size_t>(edge),
-            walk_through_hidden_transitions);
+            next, nodes[child].prefix.back(), walk_through_hidden_transitions);
         stack.push_back({child, std::move(next), fitting});
       }
     }
@@ -3645,6 +3656,23 @@ FootprintResult check_footprints(const EventLog& event_log,
   return check_footprints(event_log, to_petri_net(tree));
 }
 
+namespace {
+thread_local std::size_t g_enabled_search_budget = 0;
+}  // namespace
+
+std::size_t detail::enabled_search_budget() noexcept {
+  return g_enabled_search_budget == 0 ? kEnabledSearchBudget : g_enabled_search_budget;
+}
+
+detail::ScopedEnabledSearchBudget::ScopedEnabledSearchBudget(std::size_t budget) noexcept
+    : previous_(g_enabled_search_budget) {
+  g_enabled_search_budget = budget;
+}
+
+detail::ScopedEnabledSearchBudget::~ScopedEnabledSearchBudget() {
+  g_enabled_search_budget = previous_;
+}
+
 std::vector<std::size_t> detail::initial_enabled_token_activities(
     const PetriNet& net, const TokenReplayOptions& options) {
   const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
@@ -3711,9 +3739,16 @@ ConformanceResult check_conformance(const EventLog& event_log,
     result.fitness = 0.5 * (1.0 - consume_term) + 0.5 * (1.0 - produce_term);
   }
 
-  result.precision = compute_precision(
-      variants, replayer, options.variant, options.stop_immediately_unfit,
-      options.walk_through_hidden_transitions);
+  // ETConformance precision always discards a prefix at its first missing
+  // token, whatever the fitness replay was asked to do with unfit traces.
+  try {
+    result.precision = compute_precision(
+        variants, replayer, options.variant, /*stop_immediately_unfit=*/true,
+        options.walk_through_hidden_transitions);
+  } catch (const detail::SilentSearchBudgetExhausted&) {
+    result.precision = std::numeric_limits<double>::quiet_NaN();
+    result.precision_computed = false;
+  }
   result.generalization = compute_generalization(executions);
   result.transition_frequencies = executions;
   result.simplicity = compute_simplicity(net);
@@ -4450,7 +4485,12 @@ AlignmentResult check_alignment(const EventLog& event_log,
                      ? 1.0
                      : std::clamp(1.0 - result.total_cost / total_worst, 0.0, 1.0);
   const Replayer replayer(net, options.initial_marking, options.final_marking);
-  result.precision = compute_alignment_precision(variants, variant_markings, replayer);
+  try {
+    result.precision = compute_alignment_precision(variants, variant_markings, replayer);
+  } catch (const detail::SilentSearchBudgetExhausted&) {
+    result.precision = std::numeric_limits<double>::quiet_NaN();
+    result.precision_computed = false;
+  }
   std::stable_sort(result.variants.begin(), result.variants.end(),
                    [](const VariantAlignment& a, const VariantAlignment& b) {
                      if (a.fitness != b.fitness) return a.fitness < b.fitness;

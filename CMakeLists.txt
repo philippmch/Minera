@@ -318,6 +318,7 @@ add_library(minera_core
   src/backend/role_discovery.cpp
   src/backend/secure_random.cpp
   src/backend/timestamp.cpp
+  src/backend/zone_database.cpp
   src/backend/temporal_profile.cpp
   src/backend/timestamp_interleavings.cpp
   src/backend/interleavings_merge.cpp
@@ -339,6 +340,57 @@ add_library(minera_core
 )
 
 add_library(minera::core ALIAS minera_core)
+
+# Named time zones need the C++20 time-zone database. libstdc++ and MSVC ship
+# it; Apple's libc++ does not, so there the vendored date/tz library reads the
+# operating system's zoneinfo instead. AUTO probes the standard library; ON
+# forces the portable backend (useful to test it on any platform).
+set(MINERA_PORTABLE_TZDB "AUTO" CACHE STRING
+    "Time-zone database backend: AUTO, ON (vendored date/tz) or OFF (std::chrono)")
+set_property(CACHE MINERA_PORTABLE_TZDB PROPERTY STRINGS AUTO ON OFF)
+if(MINERA_PORTABLE_TZDB STREQUAL "AUTO")
+  include(CheckCXXSourceCompiles)
+  set(_minera_tz_required_flags "${CMAKE_REQUIRED_FLAGS}")
+  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} ${CMAKE_CXX20_STANDARD_COMPILE_OPTION}")
+  check_cxx_source_compiles([[
+    #include <chrono>
+    int main() {
+      const auto* zone = std::chrono::locate_zone("Europe/Berlin");
+      const auto local = zone->get_info(std::chrono::local_seconds{});
+      const auto sys = zone->get_info(std::chrono::sys_seconds{});
+      return local.result == std::chrono::local_info::unique && sys.offset.count() ? 0 : 1;
+    }
+  ]] MINERA_HAS_STD_TZDB)
+  set(CMAKE_REQUIRED_FLAGS "${_minera_tz_required_flags}")
+  if(MINERA_HAS_STD_TZDB)
+    set(_minera_use_portable_tzdb OFF)
+  else()
+    set(_minera_use_portable_tzdb ON)
+  endif()
+else()
+  set(_minera_use_portable_tzdb ${MINERA_PORTABLE_TZDB})
+endif()
+if(_minera_use_portable_tzdb)
+  if(WIN32)
+    message(FATAL_ERROR "The portable time-zone database reads the OS zoneinfo and "
+                        "needs a POSIX system; use a standard library with C++20 time zones")
+  endif()
+  add_library(minera_tzdb STATIC third_party/date/src/tz.cpp)
+  target_include_directories(minera_tzdb PRIVATE third_party/date/include)
+  target_compile_features(minera_tzdb PRIVATE cxx_std_20)
+  target_compile_definitions(minera_tzdb PRIVATE USE_OS_TZDB=1 HAS_REMOTE_API=0)
+  set_target_properties(minera_tzdb PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(minera_core PRIVATE minera_tzdb)
+  # Only the seam sees date/tz, so the rest of the core keeps its flags.
+  set_source_files_properties(src/backend/zone_database.cpp PROPERTIES
+    INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/date/include"
+    COMPILE_DEFINITIONS "MINERA_PORTABLE_TZDB=1;USE_OS_TZDB=1;HAS_REMOTE_API=0")
+  message(STATUS "Minera time zones: vendored date/tz over the OS zoneinfo")
+else()
+  set_source_files_properties(src/backend/zone_database.cpp PROPERTIES
+                              COMPILE_DEFINITIONS MINERA_PORTABLE_TZDB=0)
+  message(STATUS "Minera time zones: std::chrono time-zone database")
+endif()
 
 target_compile_features(minera_core PUBLIC cxx_std_20)
 target_include_directories(minera_core
@@ -1875,6 +1927,18 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_process_tree_reduction_tests PRIVATE cxx_std_20)
   target_compile_options(minera_process_tree_reduction_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_process_tree_reduction_tests COMMAND minera_process_tree_reduction_tests)
+
+  add_executable(minera_precision_prefix_semantics_tests src/backend/tests/test_precision_prefix_semantics.cpp)
+  target_link_libraries(minera_precision_prefix_semantics_tests PRIVATE minera::core)
+  target_compile_features(minera_precision_prefix_semantics_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_precision_prefix_semantics_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_precision_prefix_semantics_tests COMMAND minera_precision_prefix_semantics_tests)
+
+  add_executable(minera_zone_database_tests src/backend/tests/test_zone_database.cpp)
+  target_link_libraries(minera_zone_database_tests PRIVATE minera::core)
+  target_compile_features(minera_zone_database_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_zone_database_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_zone_database_tests COMMAND minera_zone_database_tests)
 
   add_executable(minera_petri_net_conversion_tests
     src/backend/tests/test_petri_net_conversion.cpp

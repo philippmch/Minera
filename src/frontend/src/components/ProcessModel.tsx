@@ -33,6 +33,8 @@ interface ProcessModelProps {
   powlPetriLayout: PetriLayout | null;
   /** Whether the backend can export PNML (a log was mined this session). */
   canExportPnml: boolean;
+  /** Mined source the shown models came from; binds playout to it. */
+  playoutSourceId?: string;
   mining?: boolean;
   onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
   onOpenPlayout?: (file: File,activityKey?:string,options?:CsvOptions) => void;
@@ -48,6 +50,7 @@ export function ProcessModel({
   heuristicPetriLayout,
   powlPetriLayout,
   canExportPnml,
+  playoutSourceId,
   mining = false,
   onUseModel,
   onOpenPlayout,
@@ -153,6 +156,7 @@ export function ProcessModel({
           heuristicPetriLayout={heuristicPetriLayout}
           powlPetriLayout={powlPetriLayout}
           canExportPnml={canExportPnml}
+          playoutSourceId={playoutSourceId}
           mining={mining}
           onUseModel={onUseModel}
           onOpenPlayout={onOpenPlayout}
@@ -173,6 +177,7 @@ interface ModelResultProps {
   heuristicPetriLayout: PetriLayout | null;
   powlPetriLayout: PetriLayout | null;
   canExportPnml: boolean;
+  playoutSourceId?: string;
   mining: boolean;
   onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
   onOpenPlayout?: (file: File,activityKey?:string,options?:CsvOptions) => void;
@@ -195,6 +200,7 @@ function ModelResult({
   heuristicPetriLayout,
   powlPetriLayout,
   canExportPnml,
+  playoutSourceId,
   mining,
   onUseModel,
   onOpenPlayout,
@@ -220,7 +226,7 @@ function ModelResult({
       <PnmlButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
       <BpmnButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
       <PtmlButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
-      <PlayoutButton minerId={minerId} dataset={data.dataset} />
+      <PlayoutButton minerId={minerId} dataset={data.dataset} sourceId={playoutSourceId} />
     </>
   ) : null;
 
@@ -371,7 +377,7 @@ function ModelResult({
         title={groupName}
         actions={
           canExportPnml ? (
-            <PlayoutButton minerId="declare" dataset={data.dataset} />
+            <PlayoutButton minerId="declare" dataset={data.dataset} sourceId={playoutSourceId} />
           ) : null
         }
       />
@@ -545,9 +551,11 @@ function PtmlButton({
 function PlayoutButton({
   minerId,
   dataset,
+  sourceId,
 }: {
   minerId: string;
   dataset: string;
+  sourceId?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -555,7 +563,7 @@ function PlayoutButton({
   const download = () => {
     setBusy(true);
     setError(null);
-    fetchPlayout(minerId)
+    fetchPlayout(minerId, {}, sourceId)
       .then((xml) => {
         const blob = new Blob([xml], { type: "application/xml" });
         const url = URL.createObjectURL(blob);

@@ -1811,7 +1811,10 @@ void write_conformance(std::ostream& out,
                        bool fitness_only = false) {
   out << "{\"fitness\": " << conformance.fitness
       << ", \"precision\": ";
-  if (fitness_only) out << "null"; else out << conformance.precision;
+  if (fitness_only || !conformance.precision_computed) out << "null";
+  else out << conformance.precision;
+  if (!fitness_only && !conformance.precision_computed)
+    out << ", \"precision_incomplete\": true";
   out << ", \"generalization\": ";
   if (fitness_only) out << "null"; else out << conformance.generalization;
   out << ", \"simplicity\": ";
@@ -1927,8 +1930,10 @@ void write_alignments(std::ostream& out,
   out << "{\"computed\": " << (alignments.computed ? "true" : "false")
       << ", \"exhausted\": " << (alignments.exhausted ? "true" : "false")
       << ", \"fitness\": " << alignments.fitness
-      << ", \"precision\": " << alignments.precision
-      << ", \"fitting_traces\": " << alignments.fitting_traces
+      << ", \"precision\": ";
+  if (alignments.precision_computed) out << alignments.precision;
+  else out << "null, \"precision_incomplete\": true";
+  out << ", \"fitting_traces\": " << alignments.fitting_traces
       << ", \"trace_count\": " << alignments.trace_count
       << ", \"total_cost\": " << alignments.total_cost
       << ", \"variant\": \"" << variant_name(alignments.variant) << "\""

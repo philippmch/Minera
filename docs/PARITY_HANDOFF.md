@@ -18,6 +18,34 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Parity review fixes — 2026-10-26
+
+An independent review of `0cf509b` reported eight findings (R1–R8); all were
+confirmed and fixed, each with a regression test:
+
+- R1: named zones go through `src/backend/zone_database.*`. CMake probes
+  `std::chrono::locate_zone`; Apple libc++ lacks it, so the vendored
+  `third_party/date` (MIT, OS zoneinfo) is built there
+  (`MINERA_PORTABLE_TZDB=AUTO|ON|OFF`). Test: `minera_zone_database_tests`.
+- R2: standard tree-to-net conversion gives loops a private exit place, so
+  `XOR(LOOP(A,B),C)` no longer accepts `C,B,A`. Languages are compared with
+  transition-bordered conversion in `minera_petri_net_conversion_tests`.
+- R5: dashboard token precision always discards invalid prefixes and keeps
+  unknown labels distinct (reference: `A→B` with `B,A,B` is 0;
+  `XOR(B,C)` with `X,B`/`Y,C` is 0.25, with `X,B`/`X,C` is 0.5).
+- R6: the eventually-enabled silent search has an explicit budget (65,536
+  expansions); exhaustion makes precision `null` with `precision_incomplete`
+  instead of a low number. A 13-branch optional split now yields all 14
+  labels and 1/14 like the reference. Test:
+  `minera_precision_prefix_semantics_tests`.
+- R7: label lists travel as `<field>_json` arrays from the frontend; the comma
+  form remains for CLI callers.
+- R3: Apply/Reset carry over only import settings (`source-import-options.ts`).
+- R4: playout is offered only for the live mined source and every request
+  sends `source_id`; `/api/playout` answers 409 when it no longer matches.
+- R8: graph pan/zoom map pointers through the SVG meet fit
+  (`graph-viewport.ts`), shared by all four graph views.
+
 ## ILP discovery — 2026-10-25
 
 New bank `docs/ilp-discovery-bank.json.gz` (1,169 calls, about 12 minutes to

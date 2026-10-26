@@ -102,6 +102,7 @@ export function Conformance({
   onRequestEmd,
   onRequestConceptDrift,
   onOpenSimulation,
+  playoutSourceId,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
@@ -121,6 +122,8 @@ export function Conformance({
   onRequestEmd?: (reference: File, options?: EmdOptions) => Promise<EmdResult>;
   onRequestConceptDrift?: (options?: ConceptDriftOptions) => Promise<ConceptDriftResult>;
   onOpenSimulation?: (file: File) => void;
+  /** Mined source behind `data`; absent for a saved analysis opened on its own. */
+  playoutSourceId?: string;
 }) {
   const analysisIdentity = useRef({ data, id: 0 });
   if (analysisIdentity.current.data !== data) {
@@ -392,11 +395,11 @@ export function Conformance({
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} onInspect={(result,model)=>saveDiagnostic("petri",result,model)} />
       <ModelDiagnosticsInspection key={`model-diagnostics-${analysisId}`} entries={diagnosticHistory.analysisId===analysisId?diagnosticHistory.entries:[]} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
-      <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
-      <PetriPlayoutPanel key={`petri-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
-      <StochasticPetriPlayoutPanel key={`stochastic-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
+      <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} sourceId={playoutSourceId} />
+      <PetriPlayoutPanel key={`petri-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} sourceId={playoutSourceId} />
+      <StochasticPetriPlayoutPanel key={`stochastic-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} sourceId={playoutSourceId} />
       <SimulationWorkspace key={`simulation-workspace-${analysisId}-${importedGeneration}`} dataset={data.dataset} models={evaluationModelIds(data,Boolean(currentImported || data.conformance?.imported))} live={!!onRequestDecisions} onOpenLog={onOpenSimulation} onOpenUnderlying={onCheckModel?(file,sourceId)=>void uploadModel(file,sourceId):undefined} />
-      <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
+      <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} sourceId={playoutSourceId} />
       <LiteralControlsPanel group="dfg_precision" available={Boolean(onRequestDfg)} configurationIdentity={data} />
       <PetriUsageComparisonPanel />
       <ConceptDriftPanel key={`concept-drift-${analysisId}`} onRequest={onRequestConceptDrift} />
@@ -531,14 +534,19 @@ function PetriUsageComparisonPanel() {
   </section>;
 }
 
-function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; available: boolean }) {
+// Playout runs on the server's mined session, so it is offered only while the
+// page shows that session's own analysis (not a saved export opened later).
+const PLAYOUT_NEEDS_SOURCE = "Playout runs on a mined event log. Open the event log behind this analysis to play out its models.";
+
+function ProcessTreePlayoutPanel({ dataset, available, sourceId }: { dataset: string; available: boolean; sourceId?: string }) {
   const [options, setOptions] = useState<ProcessTreePlayoutOptions>({ variant: "TOPBOTTOM", traces: 100, max_trace_cap: 1000 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async () => {
     setBusy(true); setError(null);
     try {
-      const xes = await fetchPlayout("process_tree", options);
+      if (sourceId === undefined) throw new Error(PLAYOUT_NEEDS_SOURCE);
+      const xes = await fetchPlayout("process_tree", options, sourceId);
       const blob = new Blob([xes], { type: "application/xml" });
       const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
       anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-process_tree-playout.xes`; anchor.click();
@@ -560,13 +568,14 @@ function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; avai
         <label>Max loop occurrences<input type="number" min={0} value={options.max_loop_occurrences ?? ""} onChange={e => number("max_loop_occurrences", e.target.value)} /></label>
         <label>Max trace cap<input type="number" min={1} value={options.max_trace_cap ?? ""} onChange={e => number("max_trace_cap", e.target.value)} /></label>
       </div>
-      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
+      {sourceId === undefined && <p className="conf-inline-note">{PLAYOUT_NEEDS_SOURCE}</p>}
+      <button className="button" disabled={busy || sourceId === undefined} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;
 }
 
-function PetriPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array<{ id: string; label: string }> }) {
+function PetriPlayoutPanel({ dataset, miners, sourceId }: { dataset: string; miners: Array<{ id: string; label: string }>; sourceId?: string }) {
   type VisitedResult = BasicPlayoutVisitedResult | ExtensivePlayoutVisitedResult;
   const [mode, setMode] = useState<"basic" | "extensive">("basic");
   const [miner, setMiner] = useState(miners[0]?.id ?? "inductive");
@@ -581,6 +590,7 @@ function PetriPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array
   const run = async () => {
     setBusy(true); setError(null); setVisited(null);
     try {
+      if (sourceId === undefined) throw new Error(PLAYOUT_NEEDS_SOURCE);
       const selectedMiner = miners.some((candidate) => candidate.id === miner) ? miner : (miners[0]?.id ?? "inductive");
       const common: BasicPlayoutOptions = {
         traces: options.traces,
@@ -592,15 +602,15 @@ function PetriPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array
       };
       if (returnVisited) {
         const result = mode === "basic"
-          ? await fetchBasicPlayoutVisited(selectedMiner, common)
-          : await fetchExtensivePlayoutVisited(selectedMiner, common);
+          ? await fetchBasicPlayoutVisited(selectedMiner, common, sourceId)
+          : await fetchExtensivePlayoutVisited(selectedMiner, common, sourceId);
         setVisited(result);
         const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
         const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
         anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-${mode}-playout.json`; anchor.click();
         URL.revokeObjectURL(anchor.href);
       } else {
-        const xes = await fetchPlayout(selectedMiner, common);
+        const xes = await fetchPlayout(selectedMiner, common, sourceId);
         const blob = new Blob([xes], { type: "application/xml" });
         const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
         anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-${mode}-playout.xes`; anchor.click();
@@ -629,14 +639,15 @@ function PetriPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array
         <label>Final marking<input value={finalText} placeholder="optional: 0,1" onChange={e => setFinalText(e.target.value)} /></label>
         <label><input type="checkbox" checked={returnVisited} onChange={e => setReturnVisited(e.target.checked)} /> Return visited elements</label>
       </div>
-      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : returnVisited ? "Download visited playout" : "Download Petri playout"}</button>
+      {sourceId === undefined && <p className="conf-inline-note">{PLAYOUT_NEEDS_SOURCE}</p>}
+      <button className="button" disabled={busy || sourceId === undefined} onClick={() => void run()}>{busy ? "Generating…" : returnVisited ? "Download visited playout" : "Download Petri playout"}</button>
       {error && <p className="conf-inline-note">{error}</p>}
       {visited && <details className="json-preview"><summary>Show visited elements</summary><pre>{JSON.stringify(visited, null, 2)}</pre></details>}
     </>}
   </section>;
 }
 
-function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array<{ id: string; label: string }> }) {
+function StochasticPetriPlayoutPanel({ dataset, miners, sourceId }: { dataset: string; miners: Array<{ id: string; label: string }>; sourceId?: string }) {
   const [options, setOptions] = useState<StochasticPlayoutOptions>({ traces: 1000, stop_at_final: true });
   const [miner, setMiner] = useState(miners[0]?.id ?? "inductive");
   const [busy, setBusy] = useState(false);
@@ -644,8 +655,9 @@ function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; min
   const run = async () => {
     setBusy(true); setError(null);
     try {
+      if (sourceId === undefined) throw new Error(PLAYOUT_NEEDS_SOURCE);
       const selectedMiner = miners.some((candidate) => candidate.id === miner) ? miner : (miners[0]?.id ?? "inductive");
-      const xes = await fetchPlayout(selectedMiner, options);
+      const xes = await fetchPlayout(selectedMiner, options, sourceId);
       const blob = new Blob([xes], { type: "application/xml" });
       const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
       anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-stochastic-playout.xes`; anchor.click();
@@ -669,20 +681,22 @@ function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; min
         <label>Event interval (s)<input type="number" min={0} step={0.1} value={options.event_interval ?? ""} onChange={e => number("event_interval", e.target.value)} /></label>
         <label><input type="checkbox" checked={Boolean(options.stop_at_final)} onChange={e => setOptions({ ...options, stop_at_final: e.target.checked })} /> Stop at final marking</label>
       </div>
-      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download stochastic playout"}</button>
+      {sourceId === undefined && <p className="conf-inline-note">{PLAYOUT_NEEDS_SOURCE}</p>}
+      <button className="button" disabled={busy || sourceId === undefined} onClick={() => void run()}>{busy ? "Generating…" : "Download stochastic playout"}</button>
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;
 }
 
-function DfgPlayoutPanel({ dataset, available }: { dataset: string; available: boolean }) {
+function DfgPlayoutPanel({ dataset, available, sourceId }: { dataset: string; available: boolean; sourceId?: string }) {
   const [options, setOptions] = useState<DfgPlayoutOptions>({ variant: "classic" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async () => {
     setBusy(true); setError(null);
     try {
-      const result = await fetchDfgPlayout(options);
+      if (sourceId === undefined) throw new Error(PLAYOUT_NEEDS_SOURCE);
+      const result = await fetchDfgPlayout(options, sourceId);
       const structured = typeof result !== "string";
       const body = structured ? JSON.stringify(result, null, 2) : result;
       const blob = new Blob([body], { type: structured ? "application/json" : "application/xml" });
@@ -729,7 +743,8 @@ function DfgPlayoutPanel({ dataset, available }: { dataset: string; available: b
         <label><input type="checkbox" checked={Boolean(options.return_variants)} onChange={e => flag("return_variants", e.target.checked)} /> Return discovered variants</label>
         <label><input type="checkbox" checked={Boolean(options.return_only_if_complete)} onChange={e => flag("return_only_if_complete", e.target.checked)} /> Complete variants only</label>
       </div>}
-      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download DFG playout"}</button>
+      {sourceId === undefined && <p className="conf-inline-note">{PLAYOUT_NEEDS_SOURCE}</p>}
+      <button className="button" disabled={busy || sourceId === undefined} onClick={() => void run()}>{busy ? "Generating…" : "Download DFG playout"}</button>
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;

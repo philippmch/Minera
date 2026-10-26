@@ -14,6 +14,7 @@
 
 #include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
+#include "zone_database.hpp"
 
 namespace minera {
 namespace {
@@ -177,12 +178,10 @@ std::string wall_text(std::int64_t nanoseconds) {
 std::string datetime_text(std::int64_t nanoseconds, const std::optional<std::string>& zone) {
   if (!zone) return wall_text(nanoseconds);
   if (*zone == "UTC") return wall_text(nanoseconds) + " UTC";
-  const std::chrono::time_zone* resolved = nullptr;
-  try { resolved = std::chrono::locate_zone(*zone); }
+  ::minera::zone_database::SysInfo info;
+  try { info = ::minera::zone_database::info_at_utc(*zone, floor_div(nanoseconds, 1000000000)); }
   catch (const std::runtime_error&) { throw std::invalid_argument("Polars datetime zones must be IANA names"); }
-  const auto info = resolved->get_info(std::chrono::sys_seconds{std::chrono::seconds{floor_div(nanoseconds, 1000000000)}});
-  return wall_text(nanoseconds + std::chrono::duration_cast<std::chrono::seconds>(info.offset).count() * 1000000000) +
-         " " + info.abbrev;
+  return wall_text(nanoseconds + info.offset_seconds * 1000000000) + " " + info.abbrev;
 }
 
 std::string quoted_raw(const std::string& value) { return "\"" + value + "\""; }

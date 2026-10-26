@@ -1680,7 +1680,7 @@ describe("mineFormEntries", () => {
     });
     expect(entries).toEqual([
       ["top_variants", "5"],
-      ["remove_activities", "a,b"],
+      ["remove_activities_json", '["a","b"]'],
       ["rework_activity", "check"],
       ["rework_min_occurrences", "3"],
       ["time_from", "2024-01-01"],
@@ -1782,9 +1782,9 @@ describe("mineFormEntries", () => {
       ["variant_min_coverage", "0.2"],
       ["variant_max_coverage", "0.8"],
       ["variant_percentage", "0"],
-      ["start_activities", "A"],
+      ["start_activities_json", '["A"]'],
       ["start_activities_positive", "false"],
-      ["end_activities", "Z"],
+      ["end_activities_json", '["Z"]'],
       ["end_activities_positive", "true"],
     ]);
     expect(mineFormEntries({ startActivitiesPositive: false })).toEqual([]);
@@ -1925,7 +1925,7 @@ describe("mineFormEntries", () => {
     });
     expect(entries).toEqual([
       ["attribute_key", "channel"],
-      ["remove_attribute_values", "fax,mail"],
+      ["remove_attribute_values_json", '["fax","mail"]'],
       ["attribute_mode", "traces"],
     ]);
     expect(
@@ -1935,7 +1935,7 @@ describe("mineFormEntries", () => {
       }),
     ).toEqual([
       ["attribute_key", "channel"],
-      ["keep_attribute_values", "web"],
+      ["keep_attribute_values_json", '["web"]'],
     ]);
     // Value lists or a mode without a key send nothing.
     expect(
@@ -1953,8 +1953,8 @@ describe("mineFormEntries", () => {
         removeLifecycles: ["schedule", "suspend"],
       }),
     ).toEqual([
-      ["keep_lifecycles", "complete"],
-      ["remove_lifecycles", "schedule,suspend"],
+      ["keep_lifecycles_json", '["complete"]'],
+      ["remove_lifecycles_json", '["schedule","suspend"]'],
     ]);
   });
 
@@ -1965,7 +1965,7 @@ describe("mineFormEntries", () => {
     });
     expect(entries).toEqual([
       ["case_attribute_key", "region"],
-      ["remove_case_attribute_values", "south,west"],
+      ["remove_case_attribute_values_json", '["south","west"]'],
     ]);
     expect(
       mineFormEntries({
@@ -1974,7 +1974,7 @@ describe("mineFormEntries", () => {
       }),
     ).toEqual([
       ["case_attribute_key", "region"],
-      ["keep_case_attribute_values", "north"],
+      ["keep_case_attribute_values_json", '["north"]'],
     ]);
     // Value lists without a key send nothing.
     expect(

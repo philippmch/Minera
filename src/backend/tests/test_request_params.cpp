@@ -1165,6 +1165,55 @@ void parse_mine_params_rejects_an_unknown_alpha_variant() {
   assert(threw);
 }
 
+void parse_mine_params_keeps_commas_in_json_label_lists() {
+  using List = std::vector<std::string>;
+  const auto params = minera::parse_mine_params(fields({
+      {"remove_activities_json", R"(["Review, approve"," padded ","back\\slash","Ünïcode"])"},
+      {"keep_activities_json", R"(["Review, approve"])"},
+      {"keep_resources_json", R"(["Smith, J."])"},
+      {"remove_resources_json", R"(["Doe, A."])"},
+      {"keep_lifecycles_json", R"(["a,b"])"},
+      {"remove_lifecycles_json", R"(["c,d"])"},
+      {"attribute_key", "org:group"},
+      {"keep_attribute_values_json", R"(["x,y"])"},
+      {"case_attribute_key", "region"},
+      {"remove_case_attribute_values_json", R"(["North, East"])"},
+      {"start_activities_json", R"(["Start, quick"])"},
+      {"end_activities_json", R"(["End, slow"])"},
+      {"end_activities_positive", "false"},
+  }));
+  assert((params.filter.remove_activities == List{"Review, approve", " padded ", "back\\slash", "Ünïcode"}));
+  assert((params.filter.keep_activities == List{"Review, approve"}));
+  assert((params.filter.keep_resources == List{"Smith, J."}));
+  assert((params.filter.remove_resources == List{"Doe, A."}));
+  assert((params.filter.keep_lifecycles == List{"a,b"}));
+  assert((params.filter.remove_lifecycles == List{"c,d"}));
+  assert((params.filter.keep_attribute_values == List{"x,y"}));
+  assert((params.filter.remove_case_attribute_values == List{"North, East"}));
+  assert((params.filter.start_activities == List{"Start, quick"}));
+  assert((params.filter.end_activities == List{"End, slow"}));
+  assert(!params.filter.end_activities_positive);
+
+  // The legacy comma form still splits for command-line callers.
+  const auto legacy = minera::parse_mine_params(fields({{"remove_activities", "Review, approve"}}));
+  assert((legacy.filter.remove_activities == List{"Review", "approve"}));
+
+  for (const auto& bad : std::vector<std::vector<std::pair<std::string, std::string>>>{
+           {{"remove_activities", "a"}, {"remove_activities_json", R"(["a"])"}},
+           {{"remove_activities_json", "a,b"}},
+           {{"keep_resources_json", "[1]"}},
+       }) {
+    bool threw = false;
+    try {
+      std::map<std::string, std::string> map(bad.begin(), bad.end());
+      (void)minera::parse_mine_params(fields(map));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
 void parse_mine_params_maps_filters() {
   const auto params = minera::parse_mine_params(fields({
       {"time_from", "2024-01-01"},
@@ -6191,6 +6240,7 @@ int main() {
   split_csv_trims_and_drops_empty_parts();
   error_json_escapes_quotes_and_backslashes();
   parse_mine_params_defaults_when_empty();
+  parse_mine_params_keeps_commas_in_json_label_lists();
   segment_filter_params_contract();
   adjacent_path_filter_params_contract();
   ltl_filter_params_contract();
