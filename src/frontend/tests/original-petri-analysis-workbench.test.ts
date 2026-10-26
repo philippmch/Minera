@@ -10,7 +10,8 @@ import {ORIGINAL_PETRI_ANALYSIS_ARTIFACTS, ORIGINAL_PETRI_ANALYSIS_DEFAULT_NET, 
 import {OriginalPetriAnalysisWorkspace} from "../src/components/OriginalPetriAnalysisWorkspace";
 import {PetriAnalysis} from "../src/components/PetriAnalysis";
 import {Landing} from "../src/components/Landing";
-import {TopBar} from "../src/components/TopBar";
+import {Sidebar} from "../src/components/Sidebar";
+import {toolById} from "../src/tools";
 import type {MineraExport} from "../src/types";
 
 // Synthetic protocol fixtures exercise the frontend storage/ownership boundary;
@@ -353,9 +354,9 @@ describe("original Petri-analysis standalone and cached entry surfaces", () => {
   if (operation === "analyze_soundness") {expect(html).toContain("Use native soundness variant"); expect(html).toContain("Use native woflan variant"); expect(html).toContain("variant_index");}
   expect(html).toContain("NaN payload/sign/signalling-bit identity is not claimed"); expect(html).toContain("Run original Petri-analysis function");
  });
- it("offers independent Landing and TopBar access with no loaded source", () => {
-  const noop = () => {}, landing = renderToStaticMarkup(createElement(Landing, {onOpenFile: noop, onLoadSample: noop, onLoadOcelSample: noop, onLoadResourceSample: noop, error: null, mining: false, onOriginalPetriAnalysis: noop})), top = renderToStaticMarkup(createElement(TopBar, {dataset: "current", onOpenFile: noop, onHome: noop, onOriginalPetriAnalysis: noop}));
-  expect(landing).toContain("Inspect original Petri analysis from a complete net"); expect(top).toContain("Original Petri analysis");
+ it("offers independent Landing and sidebar access with no loaded source", () => {
+  const noop = () => {}, landing = renderToStaticMarkup(createElement(Landing,{onOpenFile: noop,onLoadSample: noop,onLoadOcelSample: noop,onLoadResourceSample: noop,error: null,mining: false,onOpenTool:noop})), top = renderToStaticMarkup(createElement(Sidebar,{dataset:null,activeTool:null,onOpenTool:()=>{},onHome:()=>{},onOpenFile:()=>{},onOpenPalette:()=>{}}));
+  expect(landing).toContain(toolById("petri-analysis").title); expect(top).toContain(toolById("petri-analysis").title);
  });
  it("keeps all five cached families and a separate default invariant budget beside the state limit", () => {
   const data = {dataset: "cached models", conformance: {alpha: {}}} as unknown as MineraExport, html = renderToStaticMarkup(createElement(PetriAnalysis, {data}));

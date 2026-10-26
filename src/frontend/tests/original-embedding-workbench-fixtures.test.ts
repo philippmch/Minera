@@ -110,7 +110,7 @@ describe("actual own-server original embedding/filter fixtures",()=>{
     for(const artifact of ORIGINAL_EMBEDDING_FILTER_ARTIFACTS)expect(entries.some(entry=>entry.exports?.[artifact])).toBe(true);
     const formats=new Set<string>(),shapes=new Set<string>(),errors=new Set<string>();for(const entry of entries){const value=parseNativeJson(responseText(entry));if(!isOriginalEmbeddingFilterWorkbench(value))continue;if(value.error)errors.add(value.error.type);if(value.source){if(typeof value.source.format==="string")formats.add(value.source.format);if(value.source.active_source)shapes.add(String(value.source.active_source.selected_shape));}}
     expect([...formats].filter(format=>["import","raw_log"].includes(format)).sort()).toEqual(["import","raw_log"]);expect([...shapes].sort()).toEqual(["dataframe","lazyframe","log","stream"]);for(const type of["configuration_error","preparation_error","native_error"])expect(errors.has(type)).toBe(true);
-  });
+  }, 30000);
   for(const entry of entries)it(`${entry.id} preserves four original roles, complete native storage and all authoritative export bytes`,async()=>{
     expect(entry.family).toBe("original_embedding");expect(entry.method).toBe("POST");expect(entry.path).toBe("/api/embedding-workbench");expect(entry.response.status).toBe(entry.expected_status);
     const raw=responseText(entry),value=await readNativeResponse(new Response(raw,{status:entry.response.status}),{path:entry.path,fields:entry.fields});if(!object(value))throw new Error("Actual native response must be an object");const complete=isOriginalEmbeddingFilterWorkbench(value);

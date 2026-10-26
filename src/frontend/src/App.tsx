@@ -3,7 +3,7 @@ import {OriginalLabelSplittingWorkspace} from "./components/OriginalLabelSplitti
 import {OriginalFeaturesWorkspace} from "./components/OriginalFeaturesWorkspace";
 import {OwnedExactFilterResult,exactFilterRun,clearExactFilterControls,hasFullHeuristic,clearLegacyHeuristicOptions,type ExactFilterRun} from "./exact-filter-controls";
 import {ExactFilterInspection} from "./components/OriginalLtlFilter";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   type Alignments,
   type AlignmentOptions,
@@ -31,7 +31,10 @@ import {
 import { computeLayout } from "./layout";
 import { computeTreeLayout } from "./tree-layout";
 import { computePetriLayout } from "./petri-layout";
-import { TopBar } from "./components/TopBar";
+import { Sidebar, type SidebarDataset } from "./components/Sidebar";
+import { CommandPalette, paletteCommands } from "./components/CommandPalette";
+import { Advanced, PageHeader } from "./components/ui";
+import { toolById, toolGroup, viewById, VIEWS, VIEW_GROUPS, type ToolId } from "./tools";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
 import { ProcessModel } from "./components/ProcessModel";
@@ -154,49 +157,10 @@ export default function App() {
   const [previousExactSuccess,setPreviousExactSuccess] = useState<ExactFilterRun|null>(null);
   const [data, setData] = useState<MineraExport | null>(null);
   const [ocelResult, setOcelResult] = useState<OcelDiscoveryResult | null>(null);
-  const [showOcelIo, setShowOcelIo] = useState(false);
-  const [showRelatedLogs, setShowRelatedLogs] = useState(false);
-  const [showStreaming, setShowStreaming] = useState(false);
-  const [showModelExchange, setShowModelExchange] = useState(false);
-  const [showProcessCube, setShowProcessCube] = useState(false);
-  const [showTreeGeneration, setShowTreeGeneration] = useState(false);
-  const [showAcquisition, setShowAcquisition] = useState(false);
-  const [showTokenReplay, setShowTokenReplay] = useState(false);
-  const [showPetriAlignment, setShowPetriAlignment] = useState(false);
-  const [showWorkflowInputs, setShowWorkflowInputs] = useState(false);
-  const [showGraphAlignment, setShowGraphAlignment] = useState(false);
-  const [showInductiveInputs, setShowInductiveInputs] = useState(false);
-  const [showTreeAlignment, setShowTreeAlignment] = useState(false);
-  const [showPetriAntiMulti, setShowPetriAntiMulti] = useState(false);
-  const [showModelConversion, setShowModelConversion] = useState(false);
-  const [showMonteCarlo, setShowMonteCarlo] = useState(false);
-  const [showPlayout, setShowPlayout] = useState(false);
-  const [showOriginalDecision, setShowOriginalDecision] = useState(false);
-  const [showOriginalDeclare, setShowOriginalDeclare] = useState(false);
-  const [showOriginalLogSkeleton, setShowOriginalLogSkeleton] = useState(false);
-  const [showOriginalFootprints, setShowOriginalFootprints] = useState(false);
-  const [showOriginalGeneticMatrix, setShowOriginalGeneticMatrix] = useState(false);
-  const [showOriginalEmbeddingFilter, setShowOriginalEmbeddingFilter] = useState(false);
-  const [showOriginalEmd, setShowOriginalEmd] = useState(false);
-  const [showOriginalBose, setShowOriginalBose] = useState(false);
-  const [showOriginalDiscovery, setShowOriginalDiscovery] = useState(false);
-  const [showOriginalPetriAnalysis, setShowOriginalPetriAnalysis] = useState(false);
-  const [showOriginalRootCause, setShowOriginalRootCause] = useState(false);
-  const [showOriginalAnonymization, setShowOriginalAnonymization] = useState(false);
-  const [showOriginalQuality, setShowOriginalQuality] = useState(false);
-  const [showOriginalClustering, setShowOriginalClustering] = useState(false);
-  const [showOriginalOrganizational, setShowOriginalOrganizational] = useState(false);
-  const [showOriginalTemporal, setShowOriginalTemporal] = useState(false);
-  const [showOriginalTiming, setShowOriginalTiming] = useState(false);
-  const [showOriginalTimeAnalysis, setShowOriginalTimeAnalysis] = useState(false);
-  const [showSavedStructures, setShowSavedStructures] = useState(false);
-  const [showOriginalEditDistance, setShowOriginalEditDistance] = useState(false);
-  const [showOriginalOcPlayout, setShowOriginalOcPlayout] = useState(false);
-  const [showOriginalFeatures, setShowOriginalFeatures] = useState(false);
-  const [showOriginalLabels, setShowOriginalLabels] = useState(false);
-  const [showOriginalLogQuery, setShowOriginalLogQuery] = useState(false);
-  const [showPromptChat, setShowPromptChat] = useState(false);
-  const [showActiveSource, setShowActiveSource] = useState(false);
+  const [tool, setTool] = useState<ToolId | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [pendingSourceFile, setPendingSourceFile] = useState<File | null>(null);
   const [sourceOutcome, setSourceOutcome] = useState<ActiveSourceMining | null>(null);
   const [liveSourceId, setLiveSourceId] = useState<string | null>(null);
@@ -460,34 +424,7 @@ export default function App() {
   }, [ocelFile]);
 
   const loadFile = (file: File, xesActivityAttribute?: string, xesOptions?: CsvOptions, miningOptions?: MineOptions) => {
-    setShowOcelIo(false);
-    setShowRelatedLogs(false);
-    setShowStreaming(false);
-    setShowModelExchange(false);
-    setShowProcessCube(false);
-    setShowTreeGeneration(false);
-    setShowAcquisition(false);
-    setShowTokenReplay(false);
-    setShowPetriAlignment(false);
-    setShowWorkflowInputs(false);
-    setShowGraphAlignment(false);
-    setShowInductiveInputs(false);
-    setShowTreeAlignment(false);
-    setShowPetriAntiMulti(false);
-    setShowModelConversion(false);
-    setShowMonteCarlo(false);
-    setShowPlayout(false);
-    setShowOriginalDecision(false);
-    setShowOriginalDeclare(false);
-    setShowOriginalLogSkeleton(false);
-    setShowOriginalFootprints(false);
-    setShowOriginalGeneticMatrix(false);
-    setShowOriginalEmbeddingFilter(false);
-    setShowOriginalEmd(false);
-    setShowOriginalOcPlayout(false);
-    setShowSavedStructures(false);
-    setShowOriginalAnonymization(false);
-    setShowActiveSource(false);
+    setTool(null);
     setPendingSourceFile(file);
     const {ticket, controller} = beginSourceLoad();
     const accepts = () => sourceRequest.current?.controller === controller && sourceGate.current.accepts(ticket, controller.signal);
@@ -548,10 +485,10 @@ export default function App() {
         setSourceOutcome(isActiveSourceMining(result) ? result : null);
         setPendingSourceFile(null);
         setFiltersActive(false);
-        if (analysis) openData(analysis); else {setData(null); setOcelResult(null); setOcelFile(null); setOcelDataset(null); setShowActiveSource(true); setError(null);}
+        if (analysis) openData(analysis); else {setData(null); setOcelResult(null); setOcelFile(null); setOcelDataset(null); setTool("active-source"); setError(null);}
     })()
       .catch((cause: Error) => {
-        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setShowActiveSource(true);}
+        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setTool("active-source");}
       })
       .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; ocelRequest.current = null; setMining(false);}});
   };
@@ -583,7 +520,7 @@ export default function App() {
         liveSource.current = descriptor.source_id; setLiveSourceId(descriptor.source_id);
         setSource({...original, ...descriptor}); setSourceOutcome(isActiveSourceMining(result) ? result : null);
         setFiltersActive(hasActiveFilters(filters) || hasActiveMinerOptions(filters));
-        clearSourceCaches(); setData(analysis); if (!analysis) setShowActiveSource(true);
+        clearSourceCaches(); setData(analysis); if (!analysis) setTool("active-source");
         // The re-mine replaced the server session, so cached on-demand
         // results belong to the previous analysis.
         alignCache.current = {};
@@ -702,247 +639,231 @@ export default function App() {
     [data, selectedVariant],
   );
 
-  const standaloneVisualizationTools = <VisualizationExplain dataset={data?.dataset ?? ocelDataset ?? source?.file.name ?? "Independent workspace"} busy={mining} />;
+  const renderActiveSource = () => <main className="layout-log active-mining-source-workspace">{error&&<div className="error-banner" role="alert">{error}</div>}{exactInspection&&<details><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}<ActiveMiningSource source={source} initialFile={pendingSourceFile} data={data} outcome={sourceOutcome} available={sourceAvailable} mining={mining} onOpen={(file,options)=>{loadFile(file,undefined,undefined,options);setTool("active-source");}} onCancel={cancelSourceLoad}/>{source&&<QueryWorkspace key={cacheGeneration.current} sourceId={source.source_id} dataset={source.file.name} sourceOptions={{miningInputShape:source.shape,miningSelectors:source.selectors}} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)}/>}</main>;
+  const closeTool = () => setTool(null);
+  const openTool = (id: ToolId) => { setTool(id); setSidebarOpen(false); setExportOpen(false); window.scrollTo?.(0, 0); };
+  const selectView = (view: Tab) => { setTool(null); setOwnedExactInspection(false); setTab(view); setSidebarOpen(false); setExportOpen(false); window.scrollTo?.(0, 0); };
+  const goHome = () => {
+    setTool(null);
+    setSidebarOpen(false);
+    setExportOpen(false);
+    setOwnedExactInspection(false);
+    cancelSourceLoad();
+    liveSource.current = null; setLiveSourceId(null); setSourceOutcome(null); setPendingSourceFile(null);
+    cacheGeneration.current += 1;
+    setData(null);
+    setOcelResult(null);
+    setOcelFile(null);
+    setOcelDataset(null);
+    setError(null);
+    setSource(null);
+    setFiltersActive(false);
+    conceptDriftCache.current = {};
+  };
 
-  if (showSavedStructures) return <><TopBar dataset="Saved structures" datasetKind="saved trie and intervals" onOpenFile={loadFile} onHome={()=>setShowSavedStructures(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowSavedStructures(false)}>Return to current workspace</button><SavedStructuralWorkspace/></main></>;
-  if (showPromptChat) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Plain prompt" datasetKind="independent model call" onOpenFile={loadFile} onHome={()=>setShowPromptChat(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowPromptChat(false)}>Return to current workspace</button><PromptChat mining={mining} dataset="Plain prompt"/></main></>;
-  if (showOriginalLogQuery) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Original native SQL and query" datasetKind="independent logs, tables and serializers" onOpenFile={loadFile} onHome={()=>setShowOriginalLogQuery(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOriginalLogQuery(false)}>Return to current workspace</button><OriginalLogQueryWorkspace onOpenLog={(file,activityKey)=>{setShowOriginalLogQuery(false);loadFile(file,activityKey);}}/></main></>;
-  if (showOriginalLabels) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Original label splitting" datasetKind="independent contextual labels and serialization" onOpenFile={loadFile} onHome={()=>setShowOriginalLabels(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOriginalLabels(false)}>Return to current workspace</button><OriginalLabelSplittingWorkspace/></main></>;
-  if (showOriginalFeatures) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Original log features" datasetKind="independent feature extraction and serialization" onOpenFile={loadFile} onHome={()=>setShowOriginalFeatures(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOriginalFeatures(false)}>Return to current workspace</button><OriginalFeaturesWorkspace/></main></>;
-  if (showOriginalOcPlayout) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Original object-centric model" datasetKind="independent object-centric playout" onOpenFile={loadFile} onHome={()=>setShowOriginalOcPlayout(false)}/>{standaloneVisualizationTools}<main className="layout-log original-oc-playout-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalOcPlayout(false)}>Return to current workspace</button><OriginalObjectCentricPlayoutWorkspace onOpenOcel={loadFile}/></main></>;
-  if (showOriginalPetriAnalysis) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent complete Petri net" datasetKind="original Petri analysis" onOpenFile={loadFile} onHome={()=>setShowOriginalPetriAnalysis(false)}/>{standaloneVisualizationTools}<main className="layout-log original-petri-analysis-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalPetriAnalysis(false)}>Return to current workspace</button><OriginalPetriAnalysisWorkspace standalone/></main></>;
-  if (showOriginalAnonymization) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original source and released query" datasetKind="original anonymization" onOpenFile={loadFile} onHome={()=>setShowOriginalAnonymization(false)}/>{standaloneVisualizationTools}<main className="layout-log original-anonymization-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalAnonymization(false)}>Return to current workspace</button><OriginalAnonymizationWorkspace standalone/></main></>;
-  if (showOriginalClustering) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original EventLog or stored result" datasetKind="original clustering" onOpenFile={loadFile} onHome={()=>setShowOriginalClustering(false)}/>{standaloneVisualizationTools}<main className="layout-log original-clustering-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalClustering(false)}>Return to current workspace</button><OriginalClusteringWorkspace standalone/></main></>;
-  if (showOriginalOrganizational) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original EventLog or stored result" datasetKind="original organizational" onOpenFile={loadFile} onHome={()=>setShowOriginalOrganizational(false)}/>{standaloneVisualizationTools}<main className="layout-log original-organizational-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalOrganizational(false)}>Return to current workspace</button><OriginalOrganizationalWorkspace standalone/></main></>;
-  if (showOriginalTemporal) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original EventLog or stored result" datasetKind="original temporal" onOpenFile={loadFile} onHome={()=>setShowOriginalTemporal(false)}/>{standaloneVisualizationTools}<main className="layout-log original-temporal-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalTemporal(false)}>Return to current workspace</button><OriginalTemporalWorkspace standalone/></main></>;
-  if (showOriginalTiming) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original EventLog or stored result" datasetKind="original timing" onOpenFile={loadFile} onHome={()=>setShowOriginalTiming(false)}/>{standaloneVisualizationTools}<main className="layout-log original-timing-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalTiming(false)}>Return to current workspace</button><OriginalTimingWorkspace standalone/></main></>;
-  if (showOriginalTimeAnalysis) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original EventLog or stored result" datasetKind="original time analysis" onOpenFile={loadFile} onHome={()=>setShowOriginalTimeAnalysis(false)}/>{standaloneVisualizationTools}<main className="layout-log original-time-analysis-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalTimeAnalysis(false)}>Return to current workspace</button><OriginalTimeAnalysisWorkspace standalone/></main></>;
-  if (showOriginalQuality) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original source and model" datasetKind="original quality" onOpenFile={loadFile} onHome={()=>setShowOriginalQuality(false)}/>{standaloneVisualizationTools}<main className="layout-log original-quality-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalQuality(false)}>Return to current workspace</button><OriginalQualityWorkspace standalone/></main></>;
-  if (showOriginalRootCause) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original cohorts and shared contexts" datasetKind="original root cause" onOpenFile={loadFile} onHome={()=>setShowOriginalRootCause(false)}/>{standaloneVisualizationTools}<main className="layout-log original-root-cause-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalRootCause(false)}>Return to current workspace</button><OriginalRootCauseWorkspace standalone/></main></>;
-  if (showOriginalDiscovery) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original discovery inputs" datasetKind="original ILP and genetic discovery" onOpenFile={loadFile} onHome={()=>setShowOriginalDiscovery(false)}/>{standaloneVisualizationTools}<main className="layout-log original-discovery-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalDiscovery(false)}>Return to current workspace</button><OriginalDiscoveryWorkspace standalone/></main></>;
-  if (showOriginalBose) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original BOSE inputs" datasetKind="original concept drift and public helpers" onOpenFile={loadFile} onHome={()=>setShowOriginalBose(false)}/>{standaloneVisualizationTools}<main className="layout-log original-bose-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalBose(false)}>Return to current workspace</button><OriginalBoseWorkspace standalone/></main></>;
-  if (showOriginalEditDistance) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Independent original event inputs" datasetKind="original edit-distance alignment and projection" onOpenFile={loadFile} onHome={()=>setShowOriginalEditDistance(false)}/>{standaloneVisualizationTools}<main className="layout-log original-edit-distance-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalEditDistance(false)}>Return to current workspace</button><OriginalEditDistanceWorkspace standalone/></main></>;
-  if (showOriginalEmd) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Original weighted stochastic languages" datasetKind="independent original-language EMD" onOpenFile={loadFile} onHome={()=>setShowOriginalEmd(false)}/>{standaloneVisualizationTools}<main className="layout-log original-emd-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalEmd(false)}>Return to current workspace</button><OriginalEmdWorkspace/></main></>;
-  if (showOriginalEmbeddingFilter) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original embedding inputs'} datasetKind="independent original-log embedding and filtering" onOpenFile={loadFile} onHome={()=>setShowOriginalEmbeddingFilter(false)}/>{standaloneVisualizationTools}<main className="layout-log original-embedding-filter-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalEmbeddingFilter(false)}>Return to current workspace</button><OriginalEmbeddingFilterWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
-  if (showOriginalGeneticMatrix) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original genetic causal matrix'} datasetKind="independent supplied-matrix Petri conversion" onOpenFile={loadFile} onHome={()=>setShowOriginalGeneticMatrix(false)}/>{standaloneVisualizationTools}<main className="layout-log original-genetic-matrix-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalGeneticMatrix(false)}>Return to current workspace</button><OriginalGeneticMatrixWorkspace/></main></>;
-  if (showOriginalFootprints) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original Footprints'} datasetKind="independent original-footprint conformance, metrics and projection" onOpenFile={loadFile} onHome={()=>setShowOriginalFootprints(false)}/>{standaloneVisualizationTools}<main className="layout-log original-footprints-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalFootprints(false)}>Return to current workspace</button><OriginalFootprintsWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
-  if (showOriginalLogSkeleton) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original LogSkeleton model'} datasetKind="independent original-model LogSkeleton conformance and diagnostics" onOpenFile={loadFile} onHome={()=>setShowOriginalLogSkeleton(false)}/>{standaloneVisualizationTools}<main className="layout-log original-log-skeleton-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalLogSkeleton(false)}>Return to current workspace</button><OriginalLogSkeletonWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
-  if (showOriginalDeclare) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original Declare model'} datasetKind="independent original-model Declare conformance and playout" onOpenFile={loadFile} onHome={()=>setShowOriginalDeclare(false)}/>{standaloneVisualizationTools}<main className="layout-log original-declare-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalDeclare(false)}>Return to current workspace</button><OriginalDeclareWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
-  if (showOriginalDecision) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original-model decisions'} datasetKind="independent original-PNML decision mining" onOpenFile={loadFile} onHome={()=>setShowOriginalDecision(false)}/>{standaloneVisualizationTools}<main className="layout-log original-decision-workspace"><button className="btn-ghost" onClick={()=>setShowOriginalDecision(false)}>Return to current workspace</button><OriginalDecisionWorkspace file={source?.file??null} source={source}/></main></>;
-  if (showPlayout) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original-model playout'} datasetKind="independent model playout and stochastic fitting" onOpenFile={loadFile} onHome={()=>setShowPlayout(false)}/>{standaloneVisualizationTools}<main className="layout-log playout-workspace"><button className="btn-ghost" onClick={()=>setShowPlayout(false)}>Return to current workspace</button><PlayoutWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
-  if (showMonteCarlo) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original-model Monte Carlo'} datasetKind="independent Monte Carlo simulation and fitting" onOpenFile={loadFile} onHome={()=>setShowMonteCarlo(false)}/>{standaloneVisualizationTools}<main className="layout-log monte-carlo-workspace"><button className="btn-ghost" onClick={()=>setShowMonteCarlo(false)}>Return to current workspace</button><MonteCarloWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main></>;
-  if (showModelConversion) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Original model conversion'} datasetKind="independent model conversion and reduction" onOpenFile={loadFile} onHome={()=>setShowModelConversion(false)}/>{standaloneVisualizationTools}<main className="layout-log model-conversion-workspace"><button className="btn-ghost" onClick={()=>setShowModelConversion(false)}>Return to current workspace</button><ModelConversionWorkspace/></main></>;
-  if (showPetriAntiMulti) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Anti/multi alignment inputs'} datasetKind="independent Petri anti/multi alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAntiMulti(false)}/>{standaloneVisualizationTools}<main className="layout-log petri-anti-multi-workspace"><button className="btn-ghost" onClick={()=>setShowPetriAntiMulti(false)}>Return to current workspace</button><PetriAntiMultiWorkspace file={source?.file??null} source={source}/></main></>;
-  if (showTreeAlignment) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Tree alignment inputs'} datasetKind="independent process-tree alignment" onOpenFile={loadFile} onHome={()=>setShowTreeAlignment(false)}/>{standaloneVisualizationTools}<main className="layout-log process-tree-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowTreeAlignment(false)}>Return to current workspace</button><ProcessTreeAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
-  if (showInductiveInputs) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Inductive inputs'} datasetKind="independent Inductive discovery" onOpenFile={loadFile} onHome={()=>setShowInductiveInputs(false)}/>{standaloneVisualizationTools}<main className="layout-log inductive-input-workspace"><button className="btn-ghost" onClick={()=>setShowInductiveInputs(false)}>Return to current workspace</button><InductiveInputWorkspace file={source?.file??null} source={source}/></main></>;
-  if (showGraphAlignment) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Graph alignment inputs'} datasetKind="independent graph alignment" onOpenFile={loadFile} onHome={()=>setShowGraphAlignment(false)}/>{standaloneVisualizationTools}<main className="layout-log graph-alignment-workspace"><button className="btn-ghost" onClick={()=>setShowGraphAlignment(false)}>Return to current workspace</button><GraphAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
-  if (exactInspection && ownedExactInspection) return <><TopBar dataset="Exact native operation" datasetKind="complete native result and diagnostics" onOpenFile={loadFile} onHome={()=>setOwnedExactInspection(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setOwnedExactInspection(false)}>Return to current workspace</button><ExactFilterInspection run={exactInspection}/>{previousExactSuccess&&previousExactSuccess!==exactInspection&&<details><summary>Earlier returned exact native result</summary><ExactFilterInspection run={previousExactSuccess}/></details>}</main></>;
-  if (showWorkflowInputs) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Workflow inputs'} datasetKind="independent workflow discovery" onOpenFile={loadFile} onHome={()=>setShowWorkflowInputs(false)}/>{standaloneVisualizationTools}<main className="layout-log workflow-input-workspace"><button className="btn-ghost" onClick={()=>setShowWorkflowInputs(false)}>Return to current workspace</button><WorkflowInputWorkspace file={source?.file??null} source={source}/></main></>;
-  if (showPetriAlignment) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Alignment inputs'} datasetKind="Petri alignment" onOpenFile={loadFile} onHome={()=>setShowPetriAlignment(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowPetriAlignment(false)}>Return to current workspace</button><PetriAlignmentWorkspace file={source?.file??null} source={source}/></main></>;
-  if (showTokenReplay) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Replay inputs'} datasetKind="token replay" onOpenFile={loadFile} onHome={()=>setShowTokenReplay(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTokenReplay(false)}>Return to current workspace</button><TokenReplayWorkspace file={source?.file??null} source={source}/></main></>;
-  if (showOcelIo) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={ocelDataset??data?.dataset??'OCEL file exchange'} datasetKind="file exchange" onOpenFile={loadFile} onHome={()=>setShowOcelIo(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowOcelIo(false)}>Return to current workspace</button><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main></>;
-  if (showAcquisition) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Activity sources'} datasetKind="source acquisition" onOpenFile={loadFile} onHome={()=>setShowAcquisition(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowAcquisition(false)}>Return to current workspace</button><SourceAcquisitionWorkspace busy={mining} onOpen={loadFile}/></main></>;
+  // ⌘K / Ctrl+K opens the palette from anywhere.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPaletteOpen((open) => !open); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-  if (showModelExchange) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Model files'} datasetKind="model exchange" onOpenFile={loadFile} onHome={()=>setShowModelExchange(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowModelExchange(false)}>Return to current workspace</button><ModelExchangeWorkspace available={sourceAvailable} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setShowModelExchange(false);setTab("conformance");}}/></main></>;
-  if (showProcessCube) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Process cubes'} datasetKind="process cube" onOpenFile={loadFile} onHome={()=>setShowProcessCube(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowProcessCube(false)}>Return to current workspace</button><ProcessCubeWorkspace busy={mining}/></main></>;
-  if (showTreeGeneration) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset="Generated models" datasetKind="tree generation" onOpenFile={loadFile} onHome={()=>setShowTreeGeneration(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowTreeGeneration(false)}>Return to current workspace</button><TreeGenerationWorkspace onOpenLog={loadFile} sourceAvailable={sourceAvailable} onUseModel={async file=>{const generation=cacheGeneration.current;const schema=await requestLogQuerySchema();if(generation!==cacheGeneration.current)throw new Error("The active log changed; check this model again.");setDiscoveryModelDraft({generation,file,sourceId:schema.source_id,inferLegacyBoundaries:false});setShowTreeGeneration(false);setTab("conformance");}}/></main></>;
-  if (showStreaming) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Event streams'} datasetKind="streaming replay" onOpenFile={loadFile} onHome={()=>setShowStreaming(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowStreaming(false)}>Return to current workspace</button><StreamingWorkspace file={source?.file??null} sourceFormat={source?.format} busy={mining} data={data??undefined} onOpen={loadFile}/></main></>;
-  if (showRelatedLogs) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={data?.dataset??ocelDataset??'Related logs'} datasetKind="log relationships" onOpenFile={loadFile} onHome={()=>setShowRelatedLogs(false)}/>{standaloneVisualizationTools}<main className="layout-log"><button className="btn-ghost" onClick={()=>setShowRelatedLogs(false)}>Return to current workspace</button><RelatedLogsWorkspace file={source?.file??null} sourceFormat={source?.format} available={sourceAvailable} mining={mining} dataset={data?.dataset??source?.file.name} onOpen={loadFile}/></main></>;
-
-  if (showActiveSource || (!data && source)) return <><TopBar onSavedStructures={()=>setShowSavedStructures(true)} dataset={source?.file.name??pendingSourceFile?.name??"Original native source"} datasetKind="native event source" onOpenFile={loadFile} onHome={()=>{if(data||ocelResult)setShowActiveSource(false);else{cancelSourceLoad();liveSource.current=null;setLiveSourceId(null);setSource(null);setSourceOutcome(null);setPendingSourceFile(null);setShowActiveSource(false);setError(null);}}} onWorkflowInputs={()=>setShowWorkflowInputs(true)} onGraphAlignment={()=>setShowGraphAlignment(true)} onInductiveInputs={()=>setShowInductiveInputs(true)} onTreeAlignment={()=>setShowTreeAlignment(true)} onPetriAntiMulti={()=>setShowPetriAntiMulti(true)} onTokenReplay={()=>setShowTokenReplay(true)} onPetriAlignment={()=>setShowPetriAlignment(true)} onModelConversion={()=>setShowModelConversion(true)} onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)} onOriginalFootprints={()=>setShowOriginalFootprints(true)} onOriginalGeneticMatrix={()=>setShowOriginalGeneticMatrix(true)} onOriginalEmbeddingFilter={()=>setShowOriginalEmbeddingFilter(true)} onOriginalEmd={()=>setShowOriginalEmd(true)} onOriginalEditDistance={()=>setShowOriginalEditDistance(true)} onOriginalBose={()=>setShowOriginalBose(true)} onOriginalDiscovery={()=>setShowOriginalDiscovery(true)} onOriginalPetriAnalysis={()=>setShowOriginalPetriAnalysis(true)} onOriginalRootCause={()=>setShowOriginalRootCause(true)} onOriginalAnonymization={()=>setShowOriginalAnonymization(true)} onOriginalQuality={()=>setShowOriginalQuality(true)} onOriginalClustering={()=>setShowOriginalClustering(true)} onOriginalOrganizational={()=>setShowOriginalOrganizational(true)} onOriginalTemporal={()=>setShowOriginalTemporal(true)} onOriginalTiming={()=>setShowOriginalTiming(true)} onOriginalTimeAnalysis={()=>setShowOriginalTimeAnalysis(true)} onOriginalOcPlayout={()=>setShowOriginalOcPlayout(true)} onOriginalFeatures={()=>setShowOriginalFeatures(true)} onOriginalLabels={()=>setShowOriginalLabels(true)} onOriginalLogQuery={()=>setShowOriginalLogQuery(true)} onPromptChat={()=>setShowPromptChat(true)}/>{standaloneVisualizationTools}<main className="layout-log active-mining-source-workspace">{(data||ocelResult)&&<button className="btn-ghost" onClick={()=>setShowActiveSource(false)}>Return to current workspace</button>}{error&&<div className="error-banner" role="alert">{error}</div>}{exactInspection&&<details><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}<ActiveMiningSource source={source} initialFile={pendingSourceFile} data={data} outcome={sourceOutcome} available={sourceAvailable} mining={mining} onOpen={(file,options)=>{loadFile(file,undefined,undefined,options);setShowActiveSource(true);}} onCancel={cancelSourceLoad}/>{source&&<QueryWorkspace key={cacheGeneration.current} sourceId={source.source_id} dataset={source.file.name} sourceOptions={{miningInputShape:source.shape,miningSelectors:source.selectors}} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)}/>}</main></>;
-
-  if (!data && ocelResult) {
-    return (
-      <>
-        <TopBar onSavedStructures={()=>setShowSavedStructures(true)}
-          dataset={ocelDataset ?? "object-centric log"}
-          datasetKind="object-centric"
-          onOpenFile={loadFile}
-          onImportOcel={()=>setShowOcelIo(true)}
-          onRelateLogs={()=>setShowRelatedLogs(true)}
-          onStreaming={()=>setShowStreaming(true)}
-          onModelExchange={()=>setShowModelExchange(true)}
-          onProcessCube={()=>setShowProcessCube(true)}
-          onTreeGeneration={()=>setShowTreeGeneration(true)}
-          onAcquisition={()=>setShowAcquisition(true)}
-          onTokenReplay={()=>setShowTokenReplay(true)}
-          onPetriAlignment={()=>setShowPetriAlignment(true)}
-          onWorkflowInputs={()=>setShowWorkflowInputs(true)}
-          onGraphAlignment={()=>setShowGraphAlignment(true)}
-          onInductiveInputs={()=>setShowInductiveInputs(true)}
-          onTreeAlignment={()=>setShowTreeAlignment(true)}
-          onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
-          onModelConversion={()=>setShowModelConversion(true)}
-          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)} onOriginalFootprints={()=>setShowOriginalFootprints(true)} onOriginalGeneticMatrix={()=>setShowOriginalGeneticMatrix(true)} onOriginalEmbeddingFilter={()=>setShowOriginalEmbeddingFilter(true)} onOriginalEmd={()=>setShowOriginalEmd(true)} onOriginalEditDistance={()=>setShowOriginalEditDistance(true)} onOriginalBose={()=>setShowOriginalBose(true)} onOriginalDiscovery={()=>setShowOriginalDiscovery(true)} onOriginalPetriAnalysis={()=>setShowOriginalPetriAnalysis(true)} onOriginalRootCause={()=>setShowOriginalRootCause(true)} onOriginalAnonymization={()=>setShowOriginalAnonymization(true)} onOriginalQuality={()=>setShowOriginalQuality(true)} onOriginalClustering={()=>setShowOriginalClustering(true)} onOriginalOrganizational={()=>setShowOriginalOrganizational(true)} onOriginalTemporal={()=>setShowOriginalTemporal(true)} onOriginalTiming={()=>setShowOriginalTiming(true)} onOriginalTimeAnalysis={()=>setShowOriginalTimeAnalysis(true)} onOriginalOcPlayout={()=>setShowOriginalOcPlayout(true)} onOriginalFeatures={()=>setShowOriginalFeatures(true)} onOriginalLabels={()=>setShowOriginalLabels(true)} onOriginalLogQuery={()=>setShowOriginalLogQuery(true)} onPromptChat={()=>setShowPromptChat(true)}
-          onActiveSource={()=>setShowActiveSource(true)}
-          onHome={() => {
-            cancelSourceLoad();
-            liveSource.current = null; setLiveSourceId(null); setSourceOutcome(null); setPendingSourceFile(null);
-            cacheGeneration.current += 1;
-            setData(null);
-            setOcelResult(null);
-            setOcelFile(null);
-            setOcelDataset(null);
-            setError(null);
-            setSource(null);
-          }}
-        />
-        {error && <div className="error-banner">{error}</div>}
-        <VisualizationExplain key={cacheGeneration.current+":"+ocelResult.variant} dataset={ocelDataset??"object-centric log"} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});if(ocelQuestions.current)ocelQuestions.current.open=true;}} />
-        <main className="layout-log">
-          <OcelWorkspaceHub
-            result={ocelResult}
-            file={ocelFile}
-            busy={mining}
-            onDiscover={changeOcelModel}
-            onOpen={loadFile}
-          />
-          <details ref={ocelQuestions} className="ocel-model-question"><summary>Ask a model about this object-centric log</summary><PromptChat key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} mining={mining} available={ocelFile!==null} ocelFile={ocelFile} dataset={ocelDataset??undefined} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></details>
-        </main>
-        <footer className="footer reveal">
-          <span>{ocelDataset ?? "object-centric log"} · object-centric model</span>
-        </footer>
-        <div className={dragging ? "dropveil active" : "dropveil"}>
-          <div className="dropveil-card">Drop an event source, Minera export or OCEL file</div>
+  const views = data
+    ? VIEWS.filter((view) => {
+        if (view.id === "log") return Boolean(data.traces && data.traces.length > 0);
+        if (view.id === "dotted") return hasDottedChart;
+        if (view.id === "conformance") return Boolean(data.conformance);
+        if (view.id === "resources") return Boolean(source || (data.resources && data.resources.resources.length > 0));
+        return true;
+      })
+    : [];
+  const datasetCard: SidebarDataset | null = data
+    ? { kind: "Event log", name: data.dataset, detail: `${numberFormat.format(data.trace_count)} cases · ${numberFormat.format(data.event_count)} events` }
+    : ocelResult
+      ? { kind: "Object-centric log", name: ocelDataset ?? "object-centric log" }
+      : source
+        ? { kind: "Event source", name: source.file.name, detail: mining ? "Mining…" : "Not mined yet" }
+        : null;
+  const exportDataset = data?.dataset ?? ocelDataset ?? source?.file.name ?? "Independent workspace";
+  const commands = paletteCommands({
+    views,
+    onSelectView: selectView,
+    onOpenTool: openTool,
+    extra: [
+      { id: "action:home", title: "Go to start", section: "Navigate", detail: "Close the open data and return to the start page.", run: goHome },
+      ...(data || ocelResult ? [] : [
+        { id: "action:sample", title: "Open the sample log", section: "Samples", detail: "Order-to-cash sample with 320 cases.", run: loadSample },
+        { id: "action:ocel-sample", title: "Open the object-centric sample", section: "Samples", detail: "Orders and items.", run: loadOcelSample },
+      ]),
+    ],
+  });
+  const palette = paletteOpen && <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />;
+  const dropveil = (
+    <div className={dragging ? "dropveil active" : "dropveil"}>
+      <div className="dropveil-card">Drop an event source, Minera export or OCEL file</div>
+    </div>
+  );
+  const exportToggle = (
+    <button className={exportOpen ? "btn-ghost active" : "btn-ghost"} aria-expanded={exportOpen} onClick={() => setExportOpen((open) => !open)}>
+      Export or explain
+    </button>
+  );
+  const shell = (header: ReactNode, content: ReactNode, workspace?: { title: string; active: boolean; onSelect: () => void }, kind: "tool" | "workspace" = "workspace") => (
+    <div className="shell">
+      <Sidebar
+        dataset={datasetCard}
+        views={views}
+        activeView={tab}
+        onSelectView={selectView}
+        workspace={workspace}
+        activeTool={tool}
+        onOpenTool={openTool}
+        onHome={goHome}
+        onOpenFile={loadFile}
+        onOpenPalette={() => setPaletteOpen(true)}
+        mining={mining}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+      {sidebarOpen && <div className="sidebar-veil" onClick={() => setSidebarOpen(false)} />}
+      <div className="shell-main" data-view={kind}>
+        <div className="mobile-bar">
+          <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Open navigation">☰</button>
+          <span className="brand-name">Minera</span>
+          <button className="mobile-menu" onClick={() => setPaletteOpen(true)} aria-label="Search views and tools">⌕</button>
         </div>
-      </>
+        {header}
+        {content}
+      </div>
+      {palette}
+      {dropveil}
+    </div>
+  );
+  const ocelWorkspace = !data && ocelResult ? { title: "Object-centric workspace", active: tool === null, onSelect: closeTool } : undefined;
+
+  if (tool) {
+    const spec = toolById(tool);
+    const content = (() => {
+      switch (tool) {
+        case "saved-structures": return <main className="layout-log"><SavedStructuralWorkspace/></main>;
+        case "prompt-chat": return <main className="layout-log"><PromptChat mining={mining} dataset="Plain prompt"/></main>;
+        case "log-query": return <main className="layout-log"><OriginalLogQueryWorkspace onOpenLog={(file,activityKey)=>{setTool(null);loadFile(file,activityKey);}}/></main>;
+        case "labels": return <main className="layout-log"><OriginalLabelSplittingWorkspace/></main>;
+        case "features": return <main className="layout-log"><OriginalFeaturesWorkspace/></main>;
+        case "oc-playout": return <main className="layout-log original-oc-playout-workspace"><OriginalObjectCentricPlayoutWorkspace onOpenOcel={loadFile}/></main>;
+        case "petri-analysis": return <main className="layout-log original-petri-analysis-workspace"><OriginalPetriAnalysisWorkspace standalone/></main>;
+        case "anonymization": return <main className="layout-log original-anonymization-workspace"><OriginalAnonymizationWorkspace standalone/></main>;
+        case "clustering": return <main className="layout-log original-clustering-workspace"><OriginalClusteringWorkspace standalone/></main>;
+        case "organizational": return <main className="layout-log original-organizational-workspace"><OriginalOrganizationalWorkspace standalone/></main>;
+        case "temporal": return <main className="layout-log original-temporal-workspace"><OriginalTemporalWorkspace standalone/></main>;
+        case "timing": return <main className="layout-log original-timing-workspace"><OriginalTimingWorkspace standalone/></main>;
+        case "time-analysis": return <main className="layout-log original-time-analysis-workspace"><OriginalTimeAnalysisWorkspace standalone/></main>;
+        case "quality": return <main className="layout-log original-quality-workspace"><OriginalQualityWorkspace standalone/></main>;
+        case "root-cause": return <main className="layout-log original-root-cause-workspace"><OriginalRootCauseWorkspace standalone/></main>;
+        case "ilp-genetic": return <main className="layout-log original-discovery-workspace"><OriginalDiscoveryWorkspace standalone/></main>;
+        case "bose": return <main className="layout-log original-bose-workspace"><OriginalBoseWorkspace standalone/></main>;
+        case "edit-distance": return <main className="layout-log original-edit-distance-workspace"><OriginalEditDistanceWorkspace standalone/></main>;
+        case "emd": return <main className="layout-log original-emd-workspace"><OriginalEmdWorkspace/></main>;
+        case "embedding-filter": return <main className="layout-log original-embedding-filter-workspace"><OriginalEmbeddingFilterWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main>;
+        case "genetic-matrix": return <main className="layout-log original-genetic-matrix-workspace"><OriginalGeneticMatrixWorkspace/></main>;
+        case "footprints": return <main className="layout-log original-footprints-workspace"><OriginalFootprintsWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main>;
+        case "log-skeleton": return <main className="layout-log original-log-skeleton-workspace"><OriginalLogSkeletonWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main>;
+        case "declare": return <main className="layout-log original-declare-workspace"><OriginalDeclareWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main>;
+        case "decisions": return <main className="layout-log original-decision-workspace"><OriginalDecisionWorkspace file={source?.file??null} source={source}/></main>;
+        case "playout": return <main className="layout-log playout-workspace"><PlayoutWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main>;
+        case "monte-carlo": return <main className="layout-log monte-carlo-workspace"><MonteCarloWorkspace file={source?.file??null} source={source} onOpenLog={loadFile}/></main>;
+        case "model-conversion": return <main className="layout-log model-conversion-workspace"><ModelConversionWorkspace/></main>;
+        case "anti-multi": return <main className="layout-log petri-anti-multi-workspace"><PetriAntiMultiWorkspace file={source?.file??null} source={source}/></main>;
+        case "tree-alignment": return <main className="layout-log process-tree-alignment-workspace"><ProcessTreeAlignmentWorkspace file={source?.file??null} source={source}/></main>;
+        case "inductive-inputs": return <main className="layout-log inductive-input-workspace"><InductiveInputWorkspace file={source?.file??null} source={source}/></main>;
+        case "graph-alignment": return <main className="layout-log graph-alignment-workspace"><GraphAlignmentWorkspace file={source?.file??null} source={source}/></main>;
+        case "workflow-inputs": return <main className="layout-log workflow-input-workspace"><WorkflowInputWorkspace file={source?.file??null} source={source}/></main>;
+        case "petri-alignment": return <main className="layout-log"><PetriAlignmentWorkspace file={source?.file??null} source={source}/></main>;
+        case "token-replay": return <main className="layout-log"><TokenReplayWorkspace file={source?.file??null} source={source}/></main>;
+        case "ocel-io": return <main className="layout-log"><OcelIoWorkspace file={ocelFile} busy={mining} onOpen={loadFile}/></main>;
+        case "acquisition": return <main className="layout-log"><SourceAcquisitionWorkspace busy={mining} onOpen={loadFile}/></main>;
+        case "model-exchange": return <main className="layout-log"><ModelExchangeWorkspace available={sourceAvailable} busy={mining} onUseModel={(file,sourceId,activityKey)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries:false});setTool(null);setTab("conformance");}}/></main>;
+        case "process-cube": return <main className="layout-log"><ProcessCubeWorkspace busy={mining}/></main>;
+        case "tree-generation": return <main className="layout-log"><TreeGenerationWorkspace onOpenLog={loadFile} sourceAvailable={sourceAvailable} onUseModel={async file=>{const generation=cacheGeneration.current;const schema=await requestLogQuerySchema();if(generation!==cacheGeneration.current)throw new Error("The active log changed; check this model again.");setDiscoveryModelDraft({generation,file,sourceId:schema.source_id,inferLegacyBoundaries:false});setTool(null);setTab("conformance");}}/></main>;
+        case "streaming": return <main className="layout-log"><StreamingWorkspace file={source?.file??null} sourceFormat={source?.format} busy={mining} data={data??undefined} onOpen={loadFile}/></main>;
+        case "related-logs": return <main className="layout-log"><RelatedLogsWorkspace file={source?.file??null} sourceFormat={source?.format} available={sourceAvailable} mining={mining} dataset={data?.dataset??source?.file.name} onOpen={loadFile}/></main>;
+        default: { const unknown: never = tool; throw new Error(`no view for tool ${String(unknown)}`); }
+        case "active-source": return renderActiveSource();
+      }
+    })();
+    return shell(
+      <>
+        <PageHeader eyebrow={toolGroup(spec.group).title} title={spec.title} summary={spec.summary} actions={exportToggle} />
+        {exportOpen && <VisualizationExplain dataset={exportDataset} busy={mining} />}
+      </>,
+      content,
+      ocelWorkspace,
+      "tool",
     );
   }
-
+  if (exactInspection && ownedExactInspection) return shell(
+    <PageHeader eyebrow="Filter result" title="Exact native operation" summary="The complete native result and diagnostics of the last exact filter." actions={<button className="btn-ghost" onClick={() => setOwnedExactInspection(false)}>Back to the log</button>} />,
+    <main className="layout-log"><ExactFilterInspection run={exactInspection}/>{previousExactSuccess&&previousExactSuccess!==exactInspection&&<details><summary>Earlier returned exact native result</summary><ExactFilterInspection run={previousExactSuccess}/></details>}</main>,
+  );
+  if (!data && source) {
+    const spec = toolById("active-source");
+    return shell(<PageHeader eyebrow={toolGroup(spec.group).title} title={spec.title} summary={spec.summary} />, renderActiveSource());
+  }
+  if (!data && ocelResult) {
+    return shell(
+      <>
+        <PageHeader eyebrow="Object-centric log" title={ocelDataset ?? "Object-centric log"} summary="Discover object-centric models, explore objects and ask a model about the log." actions={exportToggle} />
+        {error && <div className="error-banner">{error}</div>}
+        {exportOpen && <VisualizationExplain key={cacheGeneration.current+":"+ocelResult.variant} dataset={ocelDataset??"object-centric log"} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});if(ocelQuestions.current)ocelQuestions.current.open=true;ocelQuestions.current?.scrollIntoView?.({behavior:"smooth",block:"start"});}} />}
+      </>,
+      <main className="layout-log">
+        <OcelWorkspaceHub
+          result={ocelResult}
+          file={ocelFile}
+          busy={mining}
+          onDiscover={changeOcelModel}
+          onOpen={loadFile}
+        />
+        <details ref={ocelQuestions} className="ocel-model-question"><summary>Ask a model about this object-centric log</summary><PromptChat key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} mining={mining} available={ocelFile!==null} ocelFile={ocelFile} dataset={ocelDataset??undefined} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></details>
+      </main>,
+      ocelWorkspace,
+    );
+  }
   if (!data || !layout) {
     return (
       <>
         <Landing
-          onSavedStructures={()=>setShowSavedStructures(true)}
           onOpenFile={loadFile}
           onLoadSample={loadSample}
           onLoadOcelSample={loadOcelSample}
           onLoadResourceSample={loadResourceSample}
-          onRelateLogs={()=>setShowRelatedLogs(true)}
-          onStreaming={()=>setShowStreaming(true)}
-          onModelExchange={()=>setShowModelExchange(true)}
-          onProcessCube={()=>setShowProcessCube(true)}
-          onTreeGeneration={()=>setShowTreeGeneration(true)}
-          onAcquisition={()=>setShowAcquisition(true)}
-          onTokenReplay={()=>setShowTokenReplay(true)}
-          onPetriAlignment={()=>setShowPetriAlignment(true)}
-          onWorkflowInputs={()=>setShowWorkflowInputs(true)}
-          onGraphAlignment={()=>setShowGraphAlignment(true)}
-          onInductiveInputs={()=>setShowInductiveInputs(true)}
-          onTreeAlignment={()=>setShowTreeAlignment(true)}
-          onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
-          onModelConversion={()=>setShowModelConversion(true)}
-          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)} onOriginalFootprints={()=>setShowOriginalFootprints(true)} onOriginalGeneticMatrix={()=>setShowOriginalGeneticMatrix(true)} onOriginalEmbeddingFilter={()=>setShowOriginalEmbeddingFilter(true)} onOriginalEmd={()=>setShowOriginalEmd(true)} onOriginalEditDistance={()=>setShowOriginalEditDistance(true)} onOriginalBose={()=>setShowOriginalBose(true)} onOriginalDiscovery={()=>setShowOriginalDiscovery(true)} onOriginalPetriAnalysis={()=>setShowOriginalPetriAnalysis(true)} onOriginalRootCause={()=>setShowOriginalRootCause(true)} onOriginalAnonymization={()=>setShowOriginalAnonymization(true)} onOriginalQuality={()=>setShowOriginalQuality(true)} onOriginalClustering={()=>setShowOriginalClustering(true)} onOriginalOrganizational={()=>setShowOriginalOrganizational(true)} onOriginalTemporal={()=>setShowOriginalTemporal(true)} onOriginalTiming={()=>setShowOriginalTiming(true)} onOriginalTimeAnalysis={()=>setShowOriginalTimeAnalysis(true)} onOriginalOcPlayout={()=>setShowOriginalOcPlayout(true)} onOriginalFeatures={()=>setShowOriginalFeatures(true)} onOriginalLabels={()=>setShowOriginalLabels(true)} onOriginalLogQuery={()=>setShowOriginalLogQuery(true)} onPromptChat={()=>setShowPromptChat(true)}
-          onActiveSource={()=>setShowActiveSource(true)}
-          onImportOcel={()=>setShowOcelIo(true)}
+          onOpenTool={openTool}
+          onOpenPalette={() => setPaletteOpen(true)}
           error={error}
           mining={mining}
         />
-        <div className={dragging ? "dropveil active" : "dropveil"}>
-          <div className="dropveil-card">Drop an event source, Minera export or OCEL file</div>
-        </div>
+        {palette}
+        {dropveil}
       </>
     );
   }
-
   const maxEdge = maxEdgeCount(data);
-
-  return (
+  const view = viewById(views.some((item) => item.id === tab) ? tab : views[0]?.id ?? "dfg");
+  const exportable = tab!=="llm"&&tab!=="query"&&tab!=="embeddings"&&tab!=="anonymization";
+  return shell(
     <>
-      <TopBar onSavedStructures={()=>setShowSavedStructures(true)}
-        dataset={data.dataset}
-        generator={data.generator}
-        onOpenFile={loadFile}
-        onImportOcel={()=>setShowOcelIo(true)}
-        onRelateLogs={()=>setShowRelatedLogs(true)}
-        onStreaming={()=>setShowStreaming(true)}
-        onModelExchange={()=>setShowModelExchange(true)}
-          onProcessCube={()=>setShowProcessCube(true)}
-          onTreeGeneration={()=>setShowTreeGeneration(true)}
-          onAcquisition={()=>setShowAcquisition(true)}
-          onTokenReplay={()=>setShowTokenReplay(true)}
-          onPetriAlignment={()=>setShowPetriAlignment(true)}
-          onWorkflowInputs={()=>setShowWorkflowInputs(true)}
-          onGraphAlignment={()=>setShowGraphAlignment(true)}
-          onInductiveInputs={()=>setShowInductiveInputs(true)}
-          onTreeAlignment={()=>setShowTreeAlignment(true)}
-          onPetriAntiMulti={()=>setShowPetriAntiMulti(true)}
-          onModelConversion={()=>setShowModelConversion(true)}
-          onMonteCarlo={()=>setShowMonteCarlo(true)} onPlayout={()=>setShowPlayout(true)} onOriginalDecision={()=>setShowOriginalDecision(true)} onOriginalDeclare={()=>setShowOriginalDeclare(true)} onOriginalLogSkeleton={()=>setShowOriginalLogSkeleton(true)} onOriginalFootprints={()=>setShowOriginalFootprints(true)} onOriginalGeneticMatrix={()=>setShowOriginalGeneticMatrix(true)} onOriginalEmbeddingFilter={()=>setShowOriginalEmbeddingFilter(true)} onOriginalEmd={()=>setShowOriginalEmd(true)} onOriginalEditDistance={()=>setShowOriginalEditDistance(true)} onOriginalBose={()=>setShowOriginalBose(true)} onOriginalDiscovery={()=>setShowOriginalDiscovery(true)} onOriginalPetriAnalysis={()=>setShowOriginalPetriAnalysis(true)} onOriginalRootCause={()=>setShowOriginalRootCause(true)} onOriginalAnonymization={()=>setShowOriginalAnonymization(true)} onOriginalQuality={()=>setShowOriginalQuality(true)} onOriginalClustering={()=>setShowOriginalClustering(true)} onOriginalOrganizational={()=>setShowOriginalOrganizational(true)} onOriginalTemporal={()=>setShowOriginalTemporal(true)} onOriginalTiming={()=>setShowOriginalTiming(true)} onOriginalTimeAnalysis={()=>setShowOriginalTimeAnalysis(true)} onOriginalOcPlayout={()=>setShowOriginalOcPlayout(true)} onOriginalFeatures={()=>setShowOriginalFeatures(true)} onOriginalLabels={()=>setShowOriginalLabels(true)} onOriginalLogQuery={()=>setShowOriginalLogQuery(true)} onPromptChat={()=>setShowPromptChat(true)}
-          onActiveSource={()=>setShowActiveSource(true)}
-        onHome={() => {
-          cancelSourceLoad(); liveSource.current = null; setLiveSourceId(null); setSourceOutcome(null); setPendingSourceFile(null);
-          cacheGeneration.current += 1;
-          setData(null);
-          setOcelResult(null);
-          setOcelFile(null);
-          setOcelDataset(null);
-          setError(null);
-          setSource(null);
-          setFiltersActive(false);
-          conceptDriftCache.current = {};
-        }}
+      <PageHeader
+        eyebrow={VIEW_GROUPS.find((group) => group.id === view.group)?.title}
+        title={view.title}
+        summary={view.summary}
+        actions={exportable ? exportToggle : undefined}
       />
       {error && <div className="error-banner">{error}</div>}
-      <nav className="tabs reveal">
-        {data.traces && data.traces.length > 0 && (
-          <button
-            className={tab === "log" ? "tab active" : "tab"}
-            onClick={() => setTab("log")}
-          >
-            Event Log
-          </button>
-        )}
-        {hasDottedChart && (
-          <button
-            className={tab === "dotted" ? "tab active" : "tab"}
-            onClick={() => setTab("dotted")}
-          >
-            Dotted Chart
-          </button>
-        )}
-        <button
-          className={tab === "dfg" ? "tab active" : "tab"}
-          onClick={() => setTab("dfg")}
-        >
-          Directly-Follows Graph
-        </button>
-        <button className={tab === "timing" ? "tab active" : "tab"} onClick={()=>setTab("timing")}>Timing discovery</button>
-        <button className={tab === "behavior" ? "tab active" : "tab"} onClick={()=>setTab("behavior")}>Behavior analysis</button>
-        <button
-          className={tab === "model" ? "tab active" : "tab"}
-          onClick={() => setTab("model")}
-        >
-          Mine a Process Model
-        </button>
-        {data.conformance && (
-          <button
-            className={tab === "conformance" ? "tab active" : "tab"}
-            onClick={() => setTab("conformance")}
-          >
-            Conformance
-          </button>
-        )}
-        {(source || (data.resources && data.resources.resources.length > 0)) && (
-          <button
-            className={tab === "resources" ? "tab active" : "tab"}
-            onClick={() => setTab("resources")}
-          >
-            Resources
-          </button>
-        )}
-        <button className={tab === "embeddings" ? "tab active" : "tab"} onClick={() => setTab("embeddings")}>
-          Search &amp; embeddings
-        </button>
-        <button className={tab === "llm" ? "tab active" : "tab"} onClick={() => setTab("llm")}>Ask a model</button>
-        <button className={tab === "query" ? "tab active" : "tab"} onClick={() => setTab("query")}>Query &amp; filter</button>
-        <button className={tab === "anonymization" ? "tab active" : "tab"} onClick={() => setTab("anonymization")}>Anonymize</button>
-        <button className={tab === "clustering" ? "tab active" : "tab"} onClick={() => setTab("clustering")}>Clustering</button>
-        <button className={tab === "transformation" ? "tab active" : "tab"} onClick={() => setTab("transformation")}>Transform</button>
-      </nav>
-      <Kpis data={data} />
-      {tab!=="llm"&&tab!=="query"&&tab!=="embeddings"&&tab!=="anonymization"&&<VisualizationExplain key={cacheGeneration.current+":"+tab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");}} />}
-      {exactInspection&&<details><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}
+      {exportable && exportOpen && <VisualizationExplain key={cacheGeneration.current+":"+tab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");setExportOpen(false);}} />}
+      {(tab === "log" || tab === "dotted" || tab === "dfg") && <Kpis data={data} />}
+      {exactInspection&&<details className="exact-result"><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}
       {source && (
         <Filters
           key={source.file.name}
@@ -957,6 +878,8 @@ export default function App() {
           onExactEdit={cancelSourceLoad}
         />
       )}
+    </>,
+    <>
       {tab === "log" && (
         <main className="layout-log">
           <EventLogView data={data} />
@@ -1029,7 +952,7 @@ export default function App() {
       {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={sourceAvailable} file={source?.file??null} sourceFormat={source?.format} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey,inferLegacyBoundaries)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries});setTab("conformance");}} /></main>}
       {tab === "dfg" && (
         <main className="layout">
-          <DfgDiscovery key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/>
+          <Advanced className="dfg-discovery-section" title="Configure DFG discovery" hint="Statistical and causal DFG variants on the current source"><DfgDiscovery key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/></Advanced>
           <ProcessMap
             layout={layout}
             threshold={threshold}
@@ -1047,15 +970,6 @@ export default function App() {
           <EventuallyFollows data={data} />
         </main>
       )}
-      <footer className="footer reveal">
-        <span>
-          {data.generator ?? "minera"} · {data.dataset} ·{" "}
-          {numberFormat.format(data.trace_count)} cases
-        </span>
-      </footer>
-      <div className={dragging ? "dropveil active" : "dropveil"}>
-        <div className="dropveil-card">Drop an event source, Minera export or OCEL file</div>
-      </div>
-    </>
+    </>,
   );
 }
