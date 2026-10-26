@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Tab } from "../app-logic";
 import { EVERYDAY_TOOLS, REFERENCE_TOOLS, VIEW_GROUPS, groupTools, searchTools, type ToolId, type ViewSpec } from "../tools";
-import { BrandMark, FileButton } from "./ui";
+import { BrandMark, FileButton, ThemeToggle } from "./ui";
 
 export interface SidebarDataset {
   kind: string;
@@ -146,6 +146,10 @@ export function Sidebar({ dataset, views, activeView, onSelectView, workspace, a
           )}
           {!groups.length && !reference.length && <p className="sidebar-empty">No tool matches “{query}”.</p>}
         </nav>
+      </div>
+      <div className="sidebar-foot">
+        <span className="sidebar-label">Theme</span>
+        <ThemeToggle />
       </div>
     </aside>
   );

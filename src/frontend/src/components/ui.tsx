@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 /** File types the main "Open log" entry points accept. */
 export const LOG_FILE_ACCEPT = ".csv,.tsv,.xes,.xes.gz,.gz,.json,text/csv,application/xml,application/gzip";
@@ -54,5 +54,34 @@ export function Advanced({ title, hint, className, defaultOpen, children }: { ti
       </summary>
       <div className="advanced-body">{children}</div>
     </details>
+  );
+}
+
+export type ThemeChoice = "system" | "light" | "dark";
+const THEME_KEY = "minera-theme";
+const THEME_ORDER: ThemeChoice[] = ["system", "light", "dark"];
+
+function storedTheme(): ThemeChoice {
+  try {
+    const value = typeof localStorage === "undefined" ? null : localStorage.getItem(THEME_KEY);
+    return value === "light" || value === "dark" ? value : "system";
+  } catch {
+    return "system";
+  }
+}
+
+/** Cycles system → light → dark and remembers the choice in this browser. */
+export function ThemeToggle() {
+  const [theme, setTheme] = useState<ThemeChoice>(storedTheme);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "system") delete root.dataset.theme; else root.dataset.theme = theme;
+    try { if (theme === "system") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, theme); } catch { /* storage unavailable */ }
+  }, [theme]);
+  const next = THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length];
+  return (
+    <button className="theme-toggle" onClick={() => setTheme(next)} title={`Theme: ${theme}. Switch to ${next}.`} aria-label={`Theme: ${theme}. Switch to ${next}.`}>
+      {theme === "system" ? "Auto" : theme === "light" ? "Light" : "Dark"}
+    </button>
   );
 }

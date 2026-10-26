@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { EVERYDAY_TOOLS, REFERENCE_TOOLS, groupTools, searchTools, type ToolGroup, type ToolId, type ToolSpec } from "../tools";
-import { BrandMark, LOG_FILE_ACCEPT } from "./ui";
+import { BrandMark, LOG_FILE_ACCEPT, ThemeToggle } from "./ui";
 
 interface LandingProps {
   onOpenFile: (file: File) => void;
@@ -33,12 +33,15 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
           <span className="brand-name">Minera</span>
           <span className="brand-tagline">process intelligence</span>
         </span>
-        {onOpenPalette && (
-          <button className="sidebar-search landing-search" onClick={onOpenPalette}>
-            <span>Search tools</span>
-            <kbd>⌘K</kbd>
-          </button>
-        )}
+        <span className="landing-bar-actions">
+          {onOpenPalette && (
+            <button className="sidebar-search landing-search" onClick={onOpenPalette}>
+              <span>Search tools</span>
+              <kbd>⌘K</kbd>
+            </button>
+          )}
+          <ThemeToggle />
+        </span>
       </header>
 
       <section className="landing-hero">
