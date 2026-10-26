@@ -559,7 +559,7 @@ bool g_embedding_runtime_enabled = false;
 minera::EmbeddingProviderCallback g_embedding_explicit_runtime;
 std::string g_llm_runtime_url;
 std::string g_query_runtime_url;
-std::set<std::string> g_llm_origins;
+std::set<std::string> g_allowed_origins;
 constexpr std::size_t kServerIlpMaxNodes = 1'000'000;
 constexpr std::size_t kServerGeneticMaxPopulation = 10'000;
 constexpr std::size_t kServerGeneticMaxGenerations = 10'000;
@@ -4701,7 +4701,7 @@ void handle_knowledge_injection(const httplib::Request& request,
 bool llm_origin_allowed(const httplib::Request& request, httplib::Response& response) {
   if (!request.has_header("Origin")) return true;
   const auto origin = request.get_header_value("Origin");
-  if (!g_llm_origins.contains(origin)) {
+  if (!g_allowed_origins.contains(origin)) {
     response.status = 403;
     response.set_content(error_json("LLM requests must come from the local Minera application"), "application/json");
     return false;
@@ -10473,7 +10473,10 @@ int usage(const char* program) {
                " (default: src/frontend/dist next to the working directory)\n"
                "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n"
                "  --llm-runtime-url <url> Optional language-model runtime (POST /complete)\n"
-               "  --query-runtime-url <url> Optional DuckDB query runtime (POST /query)\n";
+               "  --query-runtime-url <url> Optional DuckDB query runtime (POST /query)\n"
+               "  --allow-origin <origin> Extra browser origin allowed to call /api"
+               " (repeatable; the server's own port and the Vite ports 5173/4173"
+               " on 127.0.0.1 and localhost are always allowed)\n";
   return 2;
 }
 
@@ -10509,6 +10512,12 @@ int main(int argc, char** argv) {
       g_llm_runtime_url = value;
     } else if (arg == "--query-runtime-url") {
       const auto* value = next();if(!value)return usage(argv[0]);g_query_runtime_url=value;
+    } else if (arg == "--allow-origin") {
+      const auto* value = next();
+      if (!value || !*value || std::string_view(value) == "*") return usage(argv[0]);
+      std::string origin = value;
+      while (origin.ends_with('/')) origin.pop_back();
+      g_allowed_origins.insert(origin);
     } else {
       return usage(argv[0]);
     }
@@ -10524,8 +10533,8 @@ int main(int argc, char** argv) {
     if (!g_llm_runtime_url.empty()) minera::llm_runtime::validate_url(g_llm_runtime_url);
     if (!g_query_runtime_url.empty()) minera::llm_runtime::validate_url(g_query_runtime_url);
     for (const auto local_port : {port, 5173, 4173}) {
-      g_llm_origins.insert("http://127.0.0.1:" + std::to_string(local_port));
-      g_llm_origins.insert("http://localhost:" + std::to_string(local_port));
+      g_allowed_origins.insert("http://127.0.0.1:" + std::to_string(local_port));
+      g_allowed_origins.insert("http://localhost:" + std::to_string(local_port));
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';
@@ -10541,9 +10550,23 @@ int main(int argc, char** argv) {
       response.body = active_source_safe_json(response.body);
   });
 
-  // The app is local-first; permissive CORS keeps the Vite dev server (a
-  // different port) working against this backend.
-  server.set_default_headers({{"Access-Control-Allow-Origin", "*"}});
+  // The app is local-first. Browsers attach Origin to cross-origin and
+  // same-origin POSTs; only the app's own origins (this port, the Vite dev and
+  // preview ports, and any --allow-origin) may call the API, so a page open
+  // elsewhere in the browser can neither read responses nor trigger routes.
+  server.set_pre_routing_handler([](const httplib::Request& request, httplib::Response& response) {
+    if (!request.has_header("Origin")) return httplib::Server::HandlerResponse::Unhandled;
+    const auto origin = request.get_header_value("Origin");
+    response.set_header("Vary", "Origin");
+    if (g_allowed_origins.contains(origin)) {
+      response.set_header("Access-Control-Allow-Origin", origin);
+      return httplib::Server::HandlerResponse::Unhandled;
+    }
+    if (!request.path.starts_with("/api/")) return httplib::Server::HandlerResponse::Unhandled;
+    response.status = 403;
+    response.set_content(error_json("Origin " + origin + " is not allowed to call the Minera API; start the server with --allow-origin to permit it"), "application/json");
+    return httplib::Server::HandlerResponse::Handled;
+  });
   const auto preflight = [](const httplib::Request&, httplib::Response& response) {
     response.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
     response.set_header("Access-Control-Allow-Headers", "Content-Type");
