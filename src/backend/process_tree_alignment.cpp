@@ -1,6 +1,10 @@
 #include "minera/process_tree_alignment.hpp"
 
 #include "minera/dfg_variants.hpp"
+#include "minera/process_tree_approximated_reference.hpp"
+#include "minera/process_tree_milp_reference.hpp"
+#include "minera/process_tree_reference_alignment.hpp"
+#include "minera/process_tree_search_graph_reference.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -581,6 +585,200 @@ struct RecursiveAligner {
 
 } // namespace
 
+namespace {
+
+void preorder_labels(const ProcessTreeNode& node, const ProcessTree& tree,
+                     std::vector<std::string>& labels) {
+  labels.push_back(node.op == ProcessTreeOperator::kActivity
+                       ? tree.activities().at(node.activity)
+                       : std::string{});
+  for (const auto& child : node.children) preorder_labels(child, tree, labels);
+}
+
+ProcessTreeAlignmentMove sync_move(const std::string& label) {
+  return {ProcessTreeAlignmentMoveType::kSynchronous, label, label, label};
+}
+ProcessTreeAlignmentMove log_move(const std::string& label) {
+  return {ProcessTreeAlignmentMoveType::kLog, label, {}, label};
+}
+ProcessTreeAlignmentMove model_move(const std::string& label) {
+  return {ProcessTreeAlignmentMoveType::kModel, {}, label, label};
+}
+
+std::uint64_t whole_cost(double cost) {
+  return cost <= 0.0 ? 0 : static_cast<std::uint64_t>(std::llround(cost));
+}
+
+// One aligned row per distinct trace, from the variant's reference port.
+// nullopt marks a trace the reference leaves unaligned.
+std::vector<std::optional<ProcessTreeTraceAlignment>> reference_rows(
+    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces,
+    const ProcessTreeAlignmentOptions& options) {
+  std::vector<std::optional<ProcessTreeTraceAlignment>> rows;
+  const auto row_of = [](const std::vector<std::string>& trace) {
+    ProcessTreeTraceAlignment row;
+    row.trace = trace;
+    return row;
+  };
+  switch (options.variant) {
+    case ProcessTreeAlignmentVariant::kDynamicProgramming: {
+      const auto aligned = reference_process_tree_dp_alignments(tree, traces);
+      for (std::size_t i = 0; i < traces.size(); ++i) {
+        auto row = row_of(traces[i]);
+        for (const auto& move : aligned[i].moves) {
+          if (move.model == ">>") row.moves.push_back(log_move(move.log));
+          else if (move.log == ">>") row.moves.push_back(model_move(move.model));
+          else row.moves.push_back(sync_move(move.model));
+        }
+        row.cost = whole_cost(aligned[i].cost);
+        row.fitness = aligned[i].fitness;
+        rows.push_back(std::move(row));
+      }
+      break;
+    }
+    case ProcessTreeAlignmentVariant::kSearchGraphPt: {
+      std::vector<std::string> labels;
+      preorder_labels(tree.root(), tree, labels);
+      const auto aligned = reference_search_graph_alignments(tree, traces);
+      for (std::size_t i = 0; i < traces.size(); ++i) {
+        auto row = row_of(traces[i]);
+        for (const auto& move : aligned[i].alignment) {
+          if (!move.model) row.moves.push_back(log_move(move.log.value_or("")));
+          else if (!move.log) row.moves.push_back(model_move(labels.at(*move.model)));
+          else row.moves.push_back(sync_move(*move.log));
+        }
+        row.cost = whole_cost(static_cast<double>(aligned[i].cost));
+        row.fitness = aligned[i].fitness;
+        rows.push_back(std::move(row));
+      }
+      break;
+    }
+    case ProcessTreeAlignmentVariant::kMilp: {
+      const auto aligned = reference_milp_alignments(tree, traces);
+      for (std::size_t i = 0; i < traces.size(); ++i) {
+        if (!aligned[i].cost) {
+          rows.push_back(std::nullopt);
+          continue;
+        }
+        auto row = row_of(traces[i]);
+        for (const auto& move : aligned[i].alignment)
+          row.moves.push_back(move.model ? sync_move(*move.model) : log_move(move.log));
+        row.cost = whole_cost(*aligned[i].cost);
+        row.fitness = aligned[i].fitness;
+        rows.push_back(std::move(row));
+      }
+      break;
+    }
+    case ProcessTreeAlignmentVariant::kApproximatedOriginal: {
+      ProcessTreeApproximatedOptions approximated;
+      approximated.max_trace_length = options.max_trace_length;
+      approximated.max_tree_height = options.max_process_tree_height;
+      const auto aligned = reference_approximated_alignments(tree, traces, approximated);
+      for (std::size_t i = 0; i < traces.size(); ++i) {
+        if (!aligned[i]) {
+          rows.push_back(std::nullopt);
+          continue;
+        }
+        auto row = row_of(traces[i]);
+        // The port marks a log move with model ">>", a model move with log
+        // ">>", and a tau leaf with no model label.
+        for (const auto& move : aligned[i]->alignment) {
+          if (move.model == ">>") row.moves.push_back(log_move(move.log));
+          else if (move.log == ">>") row.moves.push_back(model_move(move.model.value_or("")));
+          else row.moves.push_back(sync_move(*move.model));
+        }
+        row.cost = aligned[i]->cost;
+        row.fitness = aligned[i]->fitness;
+        rows.push_back(std::move(row));
+      }
+      break;
+    }
+  }
+  return rows;
+}
+
+ProcessTreeAlignmentResult align_with_reference(const EventLog& log, const ProcessTree& tree,
+                                                const ProcessTreeAlignmentOptions& options) {
+  ProcessTreeAlignmentResult result;
+  result.variant = options.variant;
+  const auto total_start = Clock::now();
+  std::vector<std::vector<std::string>> words;
+  words.reserve(log.traces.size());
+  for (const auto& trace : log.traces) {
+    std::vector<std::string> word;
+    word.reserve(trace.events.size());
+    for (const auto& event : trace.events)
+      word.push_back(selected_activity(event, options.activity_attribute));
+    words.push_back(std::move(word));
+  }
+  // Distinct traces, aligned in first-seen order; the empty trace leads so
+  // that every variant derives its fitness floor the way its apply does.
+  std::map<std::vector<std::string>, std::size_t> index;
+  std::vector<std::vector<std::string>> distinct{{}};
+  index.emplace(std::vector<std::string>{}, 0);
+  for (const auto& word : words)
+    if (index.emplace(word, distinct.size()).second) distinct.push_back(word);
+
+  std::vector<std::optional<ProcessTreeTraceAlignment>> rows;
+  if (options.max_total_time_seconds <= 0.0) {
+    rows = reference_rows(tree, distinct, options);
+  } else {
+    // Batches keep the empty trace in front for the floor.
+    rows = reference_rows(tree, {distinct.front()}, options);
+    for (std::size_t i = 1; i < distinct.size(); ++i) {
+      if (std::chrono::duration<double>(Clock::now() - total_start).count() >=
+          options.max_total_time_seconds) {
+        result.timed_out = true;
+        rows.resize(distinct.size());
+        break;
+      }
+      auto batch = reference_rows(tree, {distinct.front(), distinct[i]}, options);
+      rows.push_back(std::move(batch.back()));
+    }
+  }
+
+  std::size_t denominator = 0;
+  const std::uint64_t floor = rows.front() ? rows.front()->cost : 0;
+  for (const auto& word : words) {
+    const auto& aligned = rows.at(index.at(word));
+    if (!aligned) {
+      ProcessTreeTraceAlignment row;
+      row.trace = word;
+      row.completed = false;
+      row.timed_out = result.timed_out;
+      row.fitness = 0.0;
+      result.computed = result.completed = false;
+      result.traces.push_back(std::move(row));
+      continue;
+    }
+    result.total_cost += aligned->cost;
+    denominator += word.size() + floor;
+    ++result.diagnostics.traces_aligned;
+    result.traces.push_back(*aligned);
+  }
+  result.fitness = !result.computed || denominator == 0
+                       ? 0.0
+                       : std::max(0.0, 1.0 - static_cast<double>(result.total_cost) /
+                                                 static_cast<double>(denominator));
+  switch (options.variant) {
+    case ProcessTreeAlignmentVariant::kSearchGraphPt:
+      result.diagnostics.message = "reference SEARCH_GRAPH_PT";
+      break;
+    case ProcessTreeAlignmentVariant::kDynamicProgramming:
+      result.diagnostics.message = "reference DYNAMIC_PROGRAMMING";
+      break;
+    case ProcessTreeAlignmentVariant::kMilp:
+      result.diagnostics.message = "reference MILP";
+      break;
+    case ProcessTreeAlignmentVariant::kApproximatedOriginal:
+      result.diagnostics.message = "reference APPROXIMATED_ORIGINAL";
+      break;
+  }
+  return result;
+}
+
+}  // namespace
+
 ProcessTreeAlignmentResult align_process_tree(
     const EventLog& log, const ProcessTree& tree,
     ProcessTreeAlignmentOptions options) {
@@ -610,6 +808,33 @@ ProcessTreeAlignmentResult align_process_tree(
        !options.clear_cache)) {
     throw std::invalid_argument(
         "process-tree alignment: cache and batch settings require a recursive variant");
+  }
+  // The reference ports have no state or per-trace time limits; setting one
+  // selects the native search. A tree a port rejects (for example an operator
+  // its variant does not cover) also runs natively.
+  const bool native_limits = options.max_states != 0 || options.max_time_seconds > 0.0 ||
+                             options.max_trace_time_seconds > 0.0 ||
+                             options.max_per_trace_time_seconds > 0.0;
+  if (!options.native_search && !native_limits) {
+    std::size_t checked_height = 0;
+    validate(tree.root(), tree, options.variant, checked_height);
+    std::string rejected;
+    try {
+      return align_with_reference(log, tree, options);
+    } catch (const ProcessTreeSearchGraphReferenceError& error) {
+      rejected = error.what();
+    } catch (const ProcessTreeReferenceAlignmentError& error) {
+      rejected = error.what();
+    } catch (const ProcessTreeMilpReferenceError& error) {
+      rejected = error.what();
+    } catch (const ProcessTreeApproximatedReferenceError& error) {
+      rejected = error.what();
+    }
+    options.native_search = true;
+    auto native = align_process_tree(log, tree, options);
+    native.diagnostics.message = "native search (reference: " + rejected + ")" +
+                                 (native.diagnostics.message.empty() ? "" : "; " + native.diagnostics.message);
+    return native;
   }
   ProcessTreeAlignmentResult result;
   result.variant = options.variant;

@@ -50,13 +50,22 @@ int main() {
   }
   ProcessTree dup({"a","a"},ProcessTreeNode{ProcessTreeOperator::kSequence,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}});
   ProcessTreeAlignmentOptions dp; dp.variant=ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING;
+  // The reference DP aligns each parallel child on the events of its labels
+  // and lists one move per event, so duplicate labels cost twice and model
+  // moves of a parallel child are left out.
+  ProcessTreeAlignmentOptions reference_dp=dp;
+  ProcessTree duplicate_branches({"a","a"},ProcessTreeNode{ProcessTreeOperator::kParallel,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}});
+  const auto twice=align_process_tree(log_of({"a","a"}),duplicate_branches,reference_dp); assert(twice.total_cost==2&&twice.traces.front().moves.size()==2&&twice.traces.front().fitness==0.5);
+  const auto hidden=align_process_tree(log_of({"a"}),parallel2(),reference_dp); assert(hidden.total_cost==1&&hidden.traces.front().moves.size()==1);
+  // The remaining DP checks cover the native search.
+  dp.native_search=true;
   assert(align_process_tree(log_of({"a"}),dup,dp).total_cost==1);
   ProcessTree nary({"a","b","c"},ProcessTreeNode{ProcessTreeOperator::kLoop,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1),ProcessTreeNode::leaf(2)}});
   for (auto v : {ProcessTreeAlignmentVariant::SEARCH_GRAPH_PT, ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING, ProcessTreeAlignmentVariant::APPROXIMATED_ORIGINAL}) {
     ProcessTreeAlignmentOptions o; o.variant=v; assert(align_process_tree(log_of({"a","c","a"}),nary,o).total_cost==0);
   }
   auto bad=seq({"a"}); ProcessTreeAlignmentOptions lim; lim.max_states=1; auto ex=align_process_tree(log_of({"a","b"}),bad,lim); assert(ex.exhausted&&!ex.traces.empty()&&!ex.traces.front().completed);
-  ProcessTreeAlignmentOptions ap; ap.variant=ProcessTreeAlignmentVariant::APPROXIMATED_ORIGINAL; ap.max_trace_length=1; auto ar=align_process_tree(log_of({"a","b","a"}),loop2(),ap); assert(ar.diagnostics.message.find("decomposition")!=std::string::npos);
+  ProcessTreeAlignmentOptions ap; ap.variant=ProcessTreeAlignmentVariant::APPROXIMATED_ORIGINAL; ap.max_trace_length=1; auto ar=align_process_tree(log_of({"a","b","a"}),loop2(),ap); assert(ar.diagnostics.message=="reference APPROXIMATED_ORIGINAL"); ap.native_search=true; assert(align_process_tree(log_of({"a","b","a"}),loop2(),ap).diagnostics.message.find("decomposition")!=std::string::npos); ap.native_search=false;
   ap.max_trace_length=10; auto abase=align_process_tree(log_of({"b","a"}),parallel2(),ap); assert(abase.total_cost==0);
   EventLog repeated=log_of({"b","a"}); repeated.traces.push_back(repeated.traces.front());
   dp.use_global_cache=true; dp.batch_size=1; dp.clear_cache=true;

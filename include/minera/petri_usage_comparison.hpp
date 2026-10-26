@@ -123,4 +123,11 @@ struct PetriUsageComparisonOptions {
     const PetriNet& net, const EventLog& log1, const EventLog& log2,
     TokenReplayOptions replay = {});
 
+// compare_element_usage_token_replay with the comparison options mapped onto
+// its token replay (markings, names, hidden routing, stop and flood controls).
+// This is what the CLI and server run.
+[[nodiscard]] PetriUsageComparison compare_petri_usage_reference(
+    const PetriNet& net, const EventLog& log1, const EventLog& log2,
+    const PetriUsageComparisonOptions& options = {});
+
 }  // namespace minera

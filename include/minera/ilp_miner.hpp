@@ -11,27 +11,28 @@
 
 namespace minera {
 
-// Bounded, deterministic discovery of a workflow net from a traditional
-// event log.  The activity key is read from Event::activity when empty (or
+// Classic ILP discovery of a workflow net from a traditional event log. Runs
+// the reference port (`reference_ilp_net`, see ilp_reference.hpp) and lays its
+// result out as a native PetriNet.  The activity key is read from Event::activity when empty (or
 // when set to "activity" / "concept:name"), otherwise from the named event
 // attribute.  Missing custom attributes fall back to Event::activity.
 struct ILPMinerOptions {
   std::string activity_key;
-  // Synthetic boundary labels.  The reference defaults are represented as
-  // silent transitions around every normalized trace; an explicitly empty
-  // value retains the native source/sink wiring for compatibility.
+  // Synthetic boundary labels wrapped around every trace; they become silent
+  // transitions. Both must be non-empty, distinct and unused by the log.
   std::string artificial_start_activity = "▶";
   std::string artificial_end_activity = "■";
   // Sequence-encoding retention: 1 keeps every observed continuation, while
   // 0 keeps only continuations tied for the strongest predecessor support.
   double alpha = 1.0;
+  // Native extension: drop variants rarer than noise_threshold times the most
+  // frequent one before discovery (0 keeps every trace, as the reference does).
   double noise_threshold = 0.0;
-  // Optional ordered causal pairs (source activity, target activity).  When
-  // present, these pairs define the bounded candidate region search.
+  // Optional ordered causal pairs (the reference's CAUSAL_RELATION). They must
+  // include the artificial start and end activities.
   std::vector<std::pair<std::string, std::string>> causal_relation;
-  // Bounds the number of causal-pair region solves rather than imposing a
-  // fixed activity cardinality ceiling; larger alphabets remain usable with a
-  // smaller cap. Each solve has its own bounded integer-search budget.
+  // Upper bound on the number of causal pairs, i.e. LP solves; discovery
+  // fails rather than exceeding it.
   std::size_t max_nodes = 100000;
 };
 

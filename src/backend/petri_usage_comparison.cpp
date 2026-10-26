@@ -674,4 +674,32 @@ PetriUsageComparison compare_element_usage_token_replay(const PetriNet& net, con
   return result;
 }
 
+PetriUsageComparison compare_petri_usage_reference(const PetriNet& net, const EventLog& log1,
+                                                   const EventLog& log2,
+                                                   const PetriUsageComparisonOptions& options) {
+  TokenReplayOptions replay;
+  const auto trimmed = [](const std::string& value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return std::string{};
+    return value.substr(first, value.find_last_not_of(" \t\r\n") - first + 1);
+  };
+  const auto attribute = trimmed(options.activity_attribute);
+  if (!options.activity_attribute.empty() && attribute.empty())
+    throw std::invalid_argument("Petri usage activity_attribute must not be blank");
+  replay.activity_attribute = attribute.empty() || attribute == "activity" ? "concept:name" : attribute;
+  replay.initial_marking.assign(options.initial_marking.begin(), options.initial_marking.end());
+  replay.final_marking.assign(options.final_marking.begin(), options.final_marking.end());
+  replay.walk_through_hidden_transitions = options.walk_through_hidden_trans;
+  replay.try_to_reach_final_marking_through_hidden =
+      options.try_to_reach_final_marking_through_hidden;
+  replay.stop_immediately_unfit = options.stop_immediately_unfit;
+  replay.cleaning_token_flood = options.cleaning_token_flood;
+  replay.place_names = options.place_names;
+  replay.transition_names = options.transition_names;
+  replay.initial_marking_keys = options.initial_marking_keys;
+  replay.final_marking_keys = options.final_marking_keys;
+  replay.exhaustive_invisible_exploration = options.exhaustive_invisible_exploration;
+  return compare_element_usage_token_replay(net, log1, log2, std::move(replay));
+}
+
 }  // namespace minera

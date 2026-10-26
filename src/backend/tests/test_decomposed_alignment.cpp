@@ -74,7 +74,9 @@ int main() {
   // is a real disagreement; threshold zero aborts before merging.
   auto conflict = align_decomposed(log_of({{"a","a"}}), boundary(true), [] { DecomposedAlignmentOptions o; o.threshold_border_agreement=0; return o; }());
   assert(!conflict.complete && conflict.traces.size()==1 && conflict.diagnostics.border_disagreements>0 && conflict.diagnostics.merges==0);
-  auto repaired = align_decomposed(log_of({{"a","a"}}), boundary(true));
+  auto repaired = align_decomposed(log_of({{"a","a"}}), boundary(true), [] { DecomposedAlignmentOptions o; o.native_search=true; return o; }());
+  // The reference port merges the disagreeing components as well.
+  assert(align_decomposed(log_of({{"a","a"}}), boundary(true)).complete);
   assert(repaired.complete && repaired.diagnostics.merges>0 && repaired.diagnostics.border_disagreements>0 && repaired.traces[0].cost==1.0 && repaired.traces[0].alignment.size()>=2);
 
   // Tau prerequisites remain ahead of a shared boundary event in the DAG.

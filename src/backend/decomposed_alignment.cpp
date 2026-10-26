@@ -1,5 +1,6 @@
 #include "minera/decomposed_alignment.hpp"
 
+#include "minera/decomposed_reference.hpp"
 #include "minera/dfg_variants.hpp"
 
 #include <algorithm>
@@ -264,7 +265,145 @@ double move_cost(const DecomposedAlignmentMove& m,const DecomposedAlignmentOptio
 
 } // namespace
 
+namespace {
+
+DecomposedAlignmentResult native_align_decomposed(const EventLog& log,const PetriNet& net,const DecomposedAlignmentOptions& o);
+
+bool standard_costs(const DecomposedAlignmentOptions& o) {
+  const DecomposedAlignmentOptions defaults;
+  return o.log_move_cost == defaults.log_move_cost && o.model_move_cost == defaults.model_move_cost &&
+         o.tau_model_cost == defaults.tau_model_cost && o.sync_cost == defaults.sync_cost &&
+         o.activity_log_costs.empty() && o.activity_model_costs.empty() &&
+         o.activity_sync_costs.empty() &&
+         o.threshold_border_agreement == defaults.threshold_border_agreement &&
+         o.max_time_trace == 0.0 && o.max_time_total == 0.0;
+}
+
+// The net in the reference's terms: places p<i> and transitions t<i> in
+// index order, markings from the options or the net's source and sink.
+DecomposedReferenceNet reference_net(const PetriNet& net, const DecomposedAlignmentOptions& o) {
+  DecomposedReferenceNet out;
+  for (std::size_t p = 0; p < net.place_count(); ++p) out.places.push_back("p" + std::to_string(p));
+  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+    const auto& transition = net.transitions()[t];
+    const auto name = "t" + std::to_string(t);
+    std::optional<std::string> label;
+    if (transition.activity) label = net.activities().at(*transition.activity);
+    out.transitions.emplace_back(name, label);
+    for (const auto p : transition.inputs) out.arcs.emplace_back(out.places.at(p), name);
+    for (const auto p : transition.outputs) out.arcs.emplace_back(name, out.places.at(p));
+  }
+  const auto marking = [&](const std::vector<std::size_t>& given, std::size_t boundary) {
+    std::vector<std::pair<std::string, std::size_t>> tokens;
+    if (given.empty()) {
+      tokens.emplace_back(out.places.at(boundary), 1);
+      return tokens;
+    }
+    if (given.size() != net.place_count())
+      throw std::invalid_argument("decomposed alignment marking size does not match the net");
+    for (std::size_t p = 0; p < given.size(); ++p)
+      if (given[p] != 0) tokens.emplace_back(out.places[p], given[p]);
+    return tokens;
+  };
+  out.initial = marking(o.initial_marking, net.source());
+  out.final = marking(o.final_marking, net.sink());
+  return out;
+}
+
+std::optional<DecomposedAlignmentResult> reference_align_decomposed(
+    const EventLog& log, const PetriNet& net, const DecomposedAlignmentOptions& o) {
+  if (!standard_costs(o) || net.place_count() == 0 || net.source() >= net.place_count() ||
+      net.sink() >= net.place_count())
+    return std::nullopt;
+  for (const auto& transition : net.transitions()) {
+    if (transition.has_extended_arcs() || transition.has_compact_ordinary_arcs()) return std::nullopt;
+    if (transition.activity && *transition.activity >= net.activities().size()) return std::nullopt;
+    for (const auto p : transition.inputs) if (p >= net.place_count()) return std::nullopt;
+    for (const auto p : transition.outputs) if (p >= net.place_count()) return std::nullopt;
+  }
+  if ((!o.initial_marking.empty() && o.initial_marking.size() != net.place_count()) ||
+      (!o.final_marking.empty() && o.final_marking.size() != net.place_count()))
+    return std::nullopt;
+  std::vector<std::vector<std::string>> traces;
+  traces.reserve(log.traces.size());
+  for (const auto& trace : log.traces) {
+    std::vector<std::string> names;
+    names.reserve(trace.events.size());
+    for (const auto& event : trace.events) names.push_back(selected_activity(event, o.activity_attribute));
+    traces.push_back(std::move(names));
+  }
+  // Each distinct trace is aligned once, in first-seen order.
+  std::map<std::vector<std::string>, std::size_t> index;
+  std::vector<std::vector<std::string>> distinct;
+  for (const auto& trace : traces)
+    if (index.emplace(trace, distinct.size()).second) distinct.push_back(trace);
+  const auto shaped = reference_net(net, o);
+  std::vector<DecomposedReferenceResult> aligned;
+  try {
+    aligned = reference_decomposed_alignments(shaped, distinct);
+  } catch (const DecomposedReferenceError&) {
+    return std::nullopt;  // the reference never returns on this log
+  }
+  // The reference reports model labels; a label (or silence) that only one
+  // transition carries also names that transition.
+  std::map<std::optional<std::string>, std::size_t> labelled;
+  std::set<std::optional<std::string>> ambiguous;
+  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+    const auto& transition = net.transitions()[t];
+    std::optional<std::string> label;
+    if (transition.activity) label = net.activities().at(*transition.activity);
+    if (!labelled.emplace(label, t).second) ambiguous.insert(label);
+  }
+  DecomposedAlignmentResult out;
+  out.trace_count = log.trace_count();
+  out.diagnostics.note = "reference RECOMPOS_MAXIMAL";
+  out.diagnostics.decompositions = 1;
+  out.diagnostics.components = reference_decompose(shaped).size();
+  out.diagnostics.cache_misses = distinct.size();
+  out.diagnostics.cache_hits = traces.size() - distinct.size();
+  double total_worst = 0.0;
+  for (const auto& trace : traces) {
+    const auto& reference = aligned.at(index.at(trace));
+    DecomposedAlignmentTrace row;
+    row.activities = trace;
+    row.complete = true;
+    row.cost = static_cast<double>(reference.cost);
+    row.best_worst_cost = static_cast<double>(reference.bwc.value_or(0));
+    row.fitness = reference.fitness.value_or(reference.cost == 0 ? 1.0 : 0.0);
+    for (const auto& [log_label, model_label] : reference.alignment) {
+      DecomposedAlignmentMove move{log_label, model_label};
+      if (model_label != ">>" && !ambiguous.contains(model_label))
+        if (const auto found = labelled.find(model_label); found != labelled.end())
+          move.transition = found->second;
+      row.alignment.push_back(std::move(move));
+    }
+    out.total_cost += row.cost;
+    total_worst += row.best_worst_cost;
+    out.best_worst_cost = std::max(out.best_worst_cost, row.best_worst_cost);
+    out.traces.push_back(std::move(row));
+  }
+  out.fitness = total_worst <= 1e-12 ? 1.0 : std::clamp(1.0 - out.total_cost / total_worst, 0.0, 1.0);
+  return out;
+}
+
+}  // namespace
+
+// Runs the reference port (decomposed_reference.hpp) when the options use the
+// standard costs and no time or state limits. The reference never returns on some
+// logs (a recomposition cycle); those, and non-standard options, use the
+// native search below.
 DecomposedAlignmentResult align_decomposed(const EventLog& log,const PetriNet& net,const DecomposedAlignmentOptions& o){
+  validate_selector(o.activity_attribute);
+  const DecomposedAlignmentOptions defaults;
+  if (!o.native_search && valid(o) && o.variant == DecomposedAlignmentVariant::kRecomposMaximal &&
+      o.max_states == defaults.max_states && o.max_total_states == defaults.max_total_states)
+    if (auto reference = reference_align_decomposed(log, net, o)) return std::move(*reference);
+  return native_align_decomposed(log, net, o);
+}
+
+namespace {
+
+DecomposedAlignmentResult native_align_decomposed(const EventLog& log,const PetriNet& net,const DecomposedAlignmentOptions& o){
   validate_selector(o.activity_attribute);
   DecomposedAlignmentResult out; out.trace_count=log.trace_count();
   if (o.clear_cache) out.diagnostics.note = "component and row caches are per-call; clear_cache has no persistent cache to clear";
@@ -335,4 +474,6 @@ std::unordered_map<std::string,std::vector<std::pair<std::size_t,std::vector<int
   out.fitness=total_worst<=1e-12?1.0:std::clamp(1.0-out.total_cost/total_worst,0.0,1.0); return out;
 }
 
-} // namespace minera
+}  // namespace
+
+}  // namespace minera

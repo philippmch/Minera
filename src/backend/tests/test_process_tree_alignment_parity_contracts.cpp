@@ -269,7 +269,7 @@ void check_alignment(const ProcessTree& tree, const std::vector<std::string>& tr
   assert(TreeLanguage(tree).accepts(model_side));
 }
 
-Tally run_variant(ProcessTreeAlignmentVariant variant) {
+Tally run_variant(ProcessTreeAlignmentVariant variant, bool native = true) {
   Tally tally;
   for (const auto& c : tree_parity_cases()) {
     for (const auto& expected : c.variants) {
@@ -281,6 +281,7 @@ Tally run_variant(ProcessTreeAlignmentVariant variant) {
       const auto tree = parse_tree(c.tree);
       ProcessTreeAlignmentOptions options;
       options.variant = variant;
+      options.native_search = native;
       const auto actual = align_process_tree(log_of(c.traces), tree, options);
       assert(actual.traces.size() == c.traces.size());
       for (std::size_t t = 0; t < c.traces.size(); ++t) {
@@ -299,12 +300,12 @@ Tally run_variant(ProcessTreeAlignmentVariant variant) {
         else if (below) ++tally.cheaper;
         else if (above) ++tally.costlier;
         else throw std::logic_error("native cost between reference runs");
-        if (variant == ProcessTreeAlignmentVariant::kSearchGraphPt)
+        if (native && variant == ProcessTreeAlignmentVariant::kSearchGraphPt)
           check_alignment(tree, c.traces[t], row);
       }
     }
   }
-  std::cout << "variant " << static_cast<int>(variant) << ": equal " << tally.equal
+  std::cerr << (native ? "native " : "default ") << "variant " << static_cast<int>(variant) << ": equal " << tally.equal
             << ", cheaper " << tally.cheaper << ", costlier " << tally.costlier
             << ", fitness " << tally.fitness << ", reference errors "
             << tally.reference_errors << "\n";
@@ -339,9 +340,30 @@ void approximated_original_reference_contract() {
   assert((tally == Tally{3976, 164, 0, 0, 0}));
 }
 
+// The default path runs the reference ports.
+void default_path_reference_contract() {
+  // SEARCH_GRAPH_PT reproduces every recorded row.
+  assert((run_variant(ProcessTreeAlignmentVariant::kSearchGraphPt, false) ==
+          Tally{4140, 0, 0, 0, 0}));
+  // The 24 MILP rows of root loops with a tau body have an infeasible empty
+  // trace program (the reference reports solver leftovers), so they run the
+  // native search and keep its tally.
+  assert((run_variant(ProcessTreeAlignmentVariant::kMilp, false) ==
+          Tally{4116, 10, 0, 14, 0}));
+  // DYNAMIC_PROGRAMMING: the 14 rows where the reference reuses a cached
+  // alignment of another segment (process_tree_reference_alignment.hpp).
+  assert((run_variant(ProcessTreeAlignmentVariant::kDynamicProgramming, false) ==
+          Tally{4126, 11, 3, 0, 0}));
+  // APPROXIMATED_ORIGINAL: 37 rows depend on CBC's choice among tied splits
+  // and on object-address order, which the port does not reproduce.
+  assert((run_variant(ProcessTreeAlignmentVariant::kApproximatedOriginal, false) ==
+          Tally{4103, 20, 17, 0, 0}));
+}
+
 }  // namespace
 
 int main() {
+  default_path_reference_contract();
   search_graph_pt_reference_contract();
   milp_reference_contract();
   dynamic_programming_reference_contract();

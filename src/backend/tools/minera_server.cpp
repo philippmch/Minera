@@ -667,6 +667,7 @@ void reject_unknown_monte_carlo_params(const httplib::Request& request,
       "monte_carlo_diagnostic_interval", "monte_carlo_small_scale_factor",
       "monte_carlo_max_thread_execution_time",
       "monte_carlo_token_replay_variant",
+      "monte_carlo_numpy_legacy_seed", "monte_carlo_numpy_choice_order",
       "monte_carlo_provided_stochastic_map",
       "process_tree_variant"};
   for (const auto& [key, value] : request.params) {
@@ -2564,9 +2565,28 @@ void handle_ocel_playout(const httplib::Request& request,
         options.event_binding = minera::OcpnEventBinding::kSharedActivity;
       } else if (binding == "synchronized") {
         options.event_binding = minera::OcpnEventBinding::kSynchronized;
+      } else if (binding == "reference") {
+        options.event_binding = minera::OcpnEventBinding::kReference;
       } else {
         throw std::invalid_argument(
-            "event_binding expects independent, shared_activity, or synchronized");
+            "event_binding expects independent, shared_activity, synchronized, or reference");
+      }
+    } else {
+      // Without an explicit binding, run the reference playout unless the
+      // request uses a control that only the native bindings understand.
+      static const std::vector<std::string> native_only = {
+          "branching_factor_transitions", "branching_factor_bindings",
+          "branching_factor_activities", "max_states", "objects", "initial_marking",
+          "final_marking", "seed", "start", "case_interval", "event_interval"};
+      bool native = std::any_of(native_only.begin(), native_only.end(),
+                                [&](const auto& key) { return request.has_param(key); });
+      if (model == "causal_net")
+        native = native || options.exists_trace || options.return_sequences ||
+                 options.return_traces;
+      if (!native) {
+        options.event_binding = minera::OcpnEventBinding::kReference;
+        if (!request.has_param("max_bindings_per_activity"))
+          options.max_bindings_per_activity = 1;
       }
     }
     options.start = ocel_query_number(request, "start", options.start);
@@ -7630,7 +7650,7 @@ void handle_compare_petri(const httplib::Request& request,
           reference, comparison_options.activity_attribute,
           session->powl_timestamp_key, session->powl_case_id_key);
     }
-    const auto comparison = minera::compare_petri_usage(
+    const auto comparison = minera::compare_petri_usage_reference(
         it->second, *comparison_log, reference, comparison_options);
     response.set_content(minera::petri_usage_comparison_json(comparison),
                          "application/json");

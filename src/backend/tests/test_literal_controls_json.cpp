@@ -115,7 +115,11 @@ void ilp_native_defaults_order_bytes_and_full_limit(){
  std::set<std::string> supplied;const auto exact=parse_literal_ilp_options_json("{\"activity_key\":\"\",\"artificial_start_activity\":\"\",\"artificial_end_activity\":\"\",\"causal_relation\":[[\"A,=>\",\" B \"],[\"A,=>\",\" B \"],[\"\",{\"native_bytes\":\"hex-v1\",\"data\":\"ffeda080edb080007a\"}]],\"max_nodes\":"+std::to_string(std::numeric_limits<std::size_t>::max())+"}",&supplied);
  assert(exact.artificial_start_activity.empty()&&exact.artificial_end_activity.empty()&&exact.causal_relation.size()==3&&exact.causal_relation[0]==exact.causal_relation[1]&&exact.causal_relation[2].second==odd()&&exact.max_nodes==std::numeric_limits<std::size_t>::max()&&supplied.size()==5);
  const auto tiny=parse_literal_ilp_options_json("{\"artificial_start_activity\":\"\",\"artificial_end_activity\":\"\",\"causal_relation\":[[\"A\",\"B\"],[\"A\",\"B\"]],\"max_nodes\":"+std::to_string(std::numeric_limits<std::size_t>::max())+"}");
- const auto result=mine_ilp(log_of(),tiny);assert(result.diagnostics.computed&&result.net.activities()==std::vector<std::string>({"A","B"})&&result.markings.initial.size()==result.net.place_count());assert(!literal_controls_transport_error(serialize_literal_controls_result_json(result)));
+ // Empty boundary labels are outside the reference port's domain (the
+ // reference itself raises for this causal relation), so discovery rejects.
+ rejects([&]{(void)mine_ilp(log_of(),tiny);});
+ auto labelled=tiny;labelled.artificial_start_activity="▶";labelled.artificial_end_activity="■";labelled.causal_relation={{"▶","A"},{"A","B"},{"B","■"}};
+ const auto result=mine_ilp(log_of(),labelled);assert(result.diagnostics.computed&&result.net.activities()==std::vector<std::string>({"A","B"})&&result.markings.initial.size()==result.net.place_count());assert(!literal_controls_transport_error(serialize_literal_controls_result_json(result)));
  auto invalid=parse_literal_ilp_options_json(R"({"alpha":"NaN","noise_threshold":-0.0,"max_nodes":0})");assert(std::isnan(invalid.alpha)&&std::signbit(invalid.noise_threshold)&&invalid.max_nodes==0);rejects([&]{(void)mine_ilp(log_of(),invalid);});
  Fields fields={{"ilp_options_json","{}"},{"ilp_alpha","1"}};rejects([&]{(void)parse_ilp_literal_params(lookup(fields),present(fields));});
  fields={{"ilp_artificial_start_activity",""}};rejects([&]{(void)parse_ilp_literal_params(lookup(fields),present(fields));});

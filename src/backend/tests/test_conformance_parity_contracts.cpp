@@ -546,14 +546,16 @@ void backwards_token_replay_reference_contract() {
 // skipped, events of unknown activities are dropped, disagreeing components
 // are merged) and must agree on the best-worst cost of every row; the cost
 // and fitness agreement is pinned as a tally.
-void decomposed_recompos_maximal_reference_contract() {
+std::pair<std::size_t, std::size_t> decomposed_tally(bool native) {
   std::size_t rows = 0, equal = 0, differ = 0;
   for (const auto& c : conformance_parity_cases()) {
     if (c.decomposed.empty()) continue;
     const auto net = parse_pnml(pnml(c));
     for (const auto& expected : c.decomposed) {
       // The reference aligns each trace in a log of its own.
-      const auto actual = align_decomposed(event_log({c.traces[expected.trace]}), net);
+      DecomposedAlignmentOptions options;
+      options.native_search = native;
+      const auto actual = align_decomposed(event_log({c.traces[expected.trace]}), net, options);
       assert(actual.traces.size() == 1);
       const auto& row = actual.traces.front();
       const bool empty = c.traces[expected.trace].empty();
@@ -562,7 +564,7 @@ void decomposed_recompos_maximal_reference_contract() {
                      : same(std::get<1>(t), row.best_worst_cost);
       }));
       // Fitness discounts silent moves: 1 - (cost - silent moves) / bwc.
-      if (!empty) {
+      if (native && !empty) {
         double visible = row.cost;
         for (const auto& move : row.alignment)
           if (!(move.log && *move.log != ">>") && !(move.model && *move.model != ">>")) visible -= DecomposedAlignmentOptions{}.tau_model_cost;
@@ -576,8 +578,16 @@ void decomposed_recompos_maximal_reference_contract() {
     }
   }
   assert(rows == kDecomposedRows);
-  std::cout << "decomposed RECOMPOS_MAXIMAL: " << equal << " equal, " << differ << " differ\n";
-  assert(equal == 770 && differ == 39);
+  std::cout << "decomposed RECOMPOS_MAXIMAL " << (native ? "native" : "default") << ": " << equal
+            << " equal, " << differ << " differ" << std::endl;
+  return {equal, differ};
+}
+
+void decomposed_recompos_maximal_reference_contract() {
+  assert((decomposed_tally(true) == std::pair<std::size_t, std::size_t>{770, 39}));
+  // The default path runs the reference port. Without the reference's own
+  // component alignments its tie choices differ, so it agrees on fewer rows.
+  assert((decomposed_tally(false) == std::pair<std::size_t, std::size_t>{765, 44}));
 }
 
 }  // namespace

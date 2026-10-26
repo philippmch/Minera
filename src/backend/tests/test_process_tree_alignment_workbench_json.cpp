@@ -152,7 +152,9 @@ void real_native_all_variants_deviations_blank_and_null_sources() {
     contains(encoded, R"("total_cost":2)"); contains(encoded, R"("trace":["a","x","b"])");
     contains(encoded, R"("type":"sync","type_index":0,"log_activity":"a","model_activity":"a","activity":"a")");
     contains(encoded, R"("type":"log","type_index":1,"log_activity":"x","model_activity":"","activity":"x")");
-    contains(encoded, R"("type":"model","type_index":2,"log_activity":"","model_activity":"a","activity":"a")");
+    // The reference MILP alignment lists only log and synchronous moves.
+    if (variant != ProcessTreeAlignmentVariant::kMilp)
+      contains(encoded, R"("type":"model","type_index":2,"log_activity":"","model_activity":"a","activity":"a")");
     assert(result.diagnostics.traces_aligned == 3);
     contains(encoded, "\"visited_states\":" + std::to_string(result.diagnostics.visited_states));
     contains(encoded, "\"queued_states\":" + std::to_string(result.diagnostics.queued_states));

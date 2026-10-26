@@ -4619,6 +4619,29 @@ MonteCarloParams parse_monte_carlo_params(
   if (supplied("monte_carlo_seed"))
     params.seed = parse_nonnegative_u64(require("monte_carlo_seed"),
                                        "monte_carlo_seed");
+  if (supplied("monte_carlo_numpy_legacy_seed")) {
+    const auto seed = parse_nonnegative_u64(require("monte_carlo_numpy_legacy_seed"),
+                                            "monte_carlo_numpy_legacy_seed");
+    if (seed > std::numeric_limits<std::uint32_t>::max())
+      throw std::invalid_argument("monte_carlo_numpy_legacy_seed must be below 2^32");
+    params.numpy_legacy_seed = static_cast<std::uint32_t>(seed);
+  }
+  if (supplied("monte_carlo_numpy_choice_order")) {
+    if (!supplied("monte_carlo_numpy_legacy_seed"))
+      throw std::invalid_argument(
+          "monte_carlo_numpy_choice_order requires monte_carlo_numpy_legacy_seed");
+    const auto text = std::string(require("monte_carlo_numpy_choice_order"));
+    std::size_t begin = 0;
+    while (begin <= text.size()) {
+      const auto end = text.find(',', begin);
+      const auto item = trim(std::string_view(text).substr(
+          begin, end == std::string::npos ? std::string::npos : end - begin));
+      params.numpy_choice_order.push_back(
+          parse_nonnegative_size(std::string(item), "monte_carlo_numpy_choice_order"));
+      if (end == std::string::npos) break;
+      begin = end + 1;
+    }
+  }
   if (supplied("monte_carlo_start"))
     params.start = parse_finite_double(require("monte_carlo_start"),
                                        "monte_carlo_start");

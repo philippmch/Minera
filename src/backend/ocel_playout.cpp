@@ -1,4 +1,5 @@
 #include "minera/ocel_playout.hpp"
+#include "minera/ocpn_reference_playout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -706,6 +707,7 @@ const char* ocpn_event_binding_name(OcpnEventBinding binding) {
     case OcpnEventBinding::kIndependent: return "independent";
     case OcpnEventBinding::kSharedActivity: return "shared_activity";
     case OcpnEventBinding::kSynchronized: return "synchronized";
+    case OcpnEventBinding::kReference: return "reference";
   }
   throw std::invalid_argument("OCPN event binding is invalid");
 }
@@ -934,6 +936,77 @@ Ocel legacy_ocpn_extensive_playout(
   return result;
 }
 
+void validate_reference_playout_controls(const OcpnPlayoutOptions& options) {
+  const OcpnPlayoutOptions defaults;
+  if (options.branching_factor_transitions != 0.0 ||
+      options.branching_factor_bindings != 0.0 ||
+      options.branching_factor_activities != 0.0 || !options.initial_markings.empty() ||
+      !options.final_markings.empty() || options.seed != defaults.seed ||
+      options.start != defaults.start || options.case_interval != defaults.case_interval ||
+      options.event_interval != defaults.event_interval)
+    throw std::invalid_argument(
+        "reference playout does not take branching factors, markings, seed or "
+        "timestamp controls; use event_binding independent, shared_activity or "
+        "synchronized");
+}
+
+namespace {
+
+OcpnPlayoutResult reference_mode_playout(const OcpnGraph& graph,
+                                         const OcpnPlayoutOptions& options) {
+  validate_reference_playout_controls(options);
+  if (!options.objects.empty())
+    throw std::invalid_argument(
+        "reference OCPN playout uses one object per type; objects need another event_binding");
+  OcpnReferencePlayoutOptions reference;
+  reference.max_bindings_per_activity = options.max_bindings_per_activity;
+  reference.objects_unique_per_trace = options.objects_unique_per_trace;
+  OcpnPlayoutResult result;
+  result.exists_trace_requested = options.exists_trace;
+  result.return_sequences_requested = options.return_sequences;
+  result.return_traces_requested = options.return_traces;
+  if (options.exists_trace) {
+    result.trace_exists = reference_ocpn_trace_exists(graph, reference);
+    return result;
+  }
+  auto traces = reference_ocpn_extensive_traces(graph, reference);
+  result.trace_exists = !traces.empty();
+  if (options.max_traces != 0 && traces.size() > options.max_traces)
+    traces.resize(options.max_traces);
+  std::map<std::string, std::string> object_types;
+  for (const auto& [type, net] : graph.petri_nets) {
+    (void)net;
+    object_types.emplace(type + "_0", type);
+  }
+  result.log = reference_ocpn_traces_to_ocel(traces, object_types,
+                                             options.objects_unique_per_trace);
+  if (options.return_sequences || options.return_traces) {
+    for (std::size_t index = 0; index < traces.size(); ++index) {
+      std::vector<OcpnBinding> sequence;
+      std::vector<OcpnTraceEvent> trace;
+      for (const auto& step : traces[index]) {
+        if (!step.activity) continue;
+        OcpnTraceEvent event;
+        event.activity = *step.activity;
+        for (const auto& object : step.objects) {
+          const auto& type = object_types.at(object);
+          const auto id = options.objects_unique_per_trace
+                              ? object + "_" + std::to_string(index)
+                              : object;
+          event.objects.emplace_back(type, id);
+        }
+        sequence.push_back({event.activity, event.objects});
+        trace.push_back(std::move(event));
+      }
+      if (options.return_sequences) result.sequences.push_back(std::move(sequence));
+      if (options.return_traces) result.traces.push_back(std::move(trace));
+    }
+  }
+  return result;
+}
+
+}  // namespace
+
 OcpnPlayoutResult ocpn_extensive_playout_result(
     const OcpnGraph& graph, const OcpnPlayoutOptions& options) {
   if (options.max_bindings_per_activity == 0)
@@ -941,10 +1014,13 @@ OcpnPlayoutResult ocpn_extensive_playout_result(
         "OCPN max_bindings_per_activity must be positive");
   if (options.event_binding != OcpnEventBinding::kIndependent &&
       options.event_binding != OcpnEventBinding::kSharedActivity &&
-      options.event_binding != OcpnEventBinding::kSynchronized) {
+      options.event_binding != OcpnEventBinding::kSynchronized &&
+      options.event_binding != OcpnEventBinding::kReference) {
     throw std::invalid_argument(
-        "OCPN event_binding must be independent, shared_activity, or synchronized");
+        "OCPN event_binding must be independent, shared_activity, synchronized, or reference");
   }
+  if (options.event_binding == OcpnEventBinding::kReference)
+    return reference_mode_playout(graph, options);
   if (!std::isfinite(options.branching_factor_transitions) ||
       options.branching_factor_transitions < 0.0 ||
       !std::isfinite(options.branching_factor_bindings) ||

@@ -1,18 +1,27 @@
 #include "minera/ilp_miner.hpp"
-#include "minera/conformance.hpp"
-#include "minera/petri_analysis.hpp"
+#include "minera/ilp_reference.hpp"
 #include "minera/json_export.hpp"
 
 #include <algorithm>
 #include <cassert>
+#include <map>
+#include <tuple>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 using namespace minera;
 
+// mine_ilp is an adapter over the reference classic ILP port
+// (ilp_reference.hpp, covered by the ILP discovery parity tests). These tests
+// check that the adapter lays the reference net out faithfully and keeps its
+// own validation, limits and native extensions.
+
 namespace {
-EventLog log_of(const std::vector<std::vector<std::string>>& rows) {
+using Rows = std::vector<std::vector<std::string>>;
+
+EventLog log_of(const Rows& rows) {
   EventLog log;
   for (std::size_t i = 0; i < rows.size(); ++i) {
     Trace trace;
@@ -24,446 +33,144 @@ EventLog log_of(const std::vector<std::vector<std::string>>& rows) {
   return log;
 }
 
-bool has_arc(const PetriNet& net, std::size_t from, std::size_t to) {
+template <class Fn>
+void rejects(Fn make) {
+  bool caught = false;
+  try {
+    make();
+  } catch (const std::invalid_argument&) {
+    caught = true;
+  }
+  assert(caught);
+}
+
+// Every arc as (transition label or "τ", place index, direction).
+using Arc = std::tuple<std::string, std::size_t, bool>;
+std::multiset<Arc> arcs_of(const PetriNet& net) {
+  std::multiset<Arc> arcs;
   for (const auto& transition : net.transitions()) {
-    if (!transition.activity || *transition.activity != from) continue;
-    for (const auto place : transition.outputs)
-      if (place >= 2 && std::find(transition.inputs.begin(), transition.inputs.end(), place) ==
-                            transition.inputs.end()) {
-        for (const auto& target : net.transitions()) {
-          if (!target.activity || *target.activity != to) continue;
-          if (std::find(target.inputs.begin(), target.inputs.end(), place) !=
-              target.inputs.end())
-            return true;
-        }
-      }
+    const auto label = transition.activity ? net.activities().at(*transition.activity) : "τ";
+    for (const auto place : transition.inputs) arcs.emplace(label, place, false);
+    for (const auto place : transition.outputs) arcs.emplace(label, place, true);
   }
-  return false;
+  return arcs;
 }
 
-bool has_self_loop(const PetriNet& net, std::size_t activity) {
-  for (const auto& transition : net.transitions()) {
-    if (!transition.activity || *transition.activity != activity) continue;
-    for (const auto place : transition.inputs)
-      if (std::find(transition.outputs.begin(), transition.outputs.end(), place) !=
-          transition.outputs.end())
-        return true;
+std::multiset<Arc> arcs_of(const ReferenceIlpNet& net) {
+  std::map<std::string, std::string> labels;
+  for (const auto& transition : net.transitions)
+    labels[transition.name] = transition.label.value_or("τ");
+  std::multiset<Arc> arcs;
+  for (std::size_t p = 0; p < net.places.size(); ++p) {
+    for (const auto& name : net.places[p].inputs) arcs.emplace(labels.at(name), p, true);
+    for (const auto& name : net.places[p].outputs) arcs.emplace(labels.at(name), p, false);
   }
-  return false;
+  return arcs;
 }
 
-std::size_t visible_transition_count(const PetriNet& net) {
-  return static_cast<std::size_t>(std::count_if(
-      net.transitions().begin(), net.transitions().end(),
-      [](const PetriTransition& transition) { return transition.activity.has_value(); }));
-}
-
-bool same_net(const PetriNet& left, const PetriNet& right) {
-  if (left.activities() != right.activities() ||
-      left.place_count() != right.place_count() ||
-      left.source() != right.source() || left.sink() != right.sink() ||
-      left.transitions().size() != right.transitions().size())
-    return false;
-  for (std::size_t i = 0; i < left.transitions().size(); ++i) {
-    const auto& a = left.transitions()[i];
-    const auto& b = right.transitions()[i];
-    if (a.activity != b.activity || a.inputs != b.inputs ||
-        a.outputs != b.outputs || a.reset_inputs != b.reset_inputs ||
-        a.inhibitor_inputs != b.inhibitor_inputs)
-      return false;
+void matches_reference(const Rows& rows, const ILPMinerOptions& options = {}) {
+  const auto result = mine_ilp(log_of(rows), options);
+  ReferenceIlpOptions reference;
+  reference.alpha = options.alpha;
+  reference.artificial_start_activity = options.artificial_start_activity;
+  reference.artificial_end_activity = options.artificial_end_activity;
+  if (!options.causal_relation.empty()) reference.causal_relation = options.causal_relation;
+  const auto expected = reference_ilp_net(rows, reference);
+  assert(result.diagnostics.computed);
+  assert(result.net.place_count() == expected.places.size());
+  assert(result.net.transitions().size() == expected.transitions.size());
+  assert(arcs_of(result.net) == arcs_of(expected));
+  for (std::size_t p = 0; p < expected.places.size(); ++p) {
+    assert((expected.places[p].name == "source") == (p == result.net.source()));
+    assert((expected.places[p].name == "sink") == (p == result.net.sink()));
   }
-  return true;
+  assert(result.markings.initial.size() == result.net.place_count());
+  assert(result.markings.initial[result.net.source()] == 1);
+  assert(result.markings.final[result.net.sink()] == 1);
+  assert(result.diagnostics.lp_solved == reference_ilp_causal_pairs(rows, reference).size());
 }
 }  // namespace
 
 int main() {
-  const auto sequence = mine_ilp(log_of({{"a", "b", "c"}, {"a", "b", "c"}}));
-  assert(sequence.diagnostics.computed);
-  assert(sequence.markings.initial.size() == sequence.net.place_count());
-  assert(sequence.net.activities() == std::vector<std::string>({"a", "b", "c"}));
-  assert(has_arc(sequence.net, 0, 1) && has_arc(sequence.net, 1, 2));
-  assert(std::count_if(sequence.net.transitions().begin(), sequence.net.transitions().end(),
-                       [](const PetriTransition& transition) { return transition.silent(); }) >=
-         2);
-  assert(check_workflow_net(sequence.net).valid);
+  matches_reference({{"a", "b", "c"}, {"a", "b", "c"}});
+  matches_reference({{"a", "b"}, {"a", "c"}});
+  matches_reference({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}});
+  matches_reference({{"a", "a", "b"}, {"a", "b"}});
+  matches_reference({{"a", "a"}, {"a"}});
+  matches_reference({{}, {"a"}});
+  matches_reference({{}});
 
-  const auto choice = mine_ilp(log_of({{"a", "b"}, {"a", "c"}}));
-  assert(choice.net.place_count() >= 3);
-  assert(check_workflow_net(choice.net).valid);
+  ILPMinerOptions alpha;
+  alpha.alpha = 0.5;
+  matches_reference({{"a", "b"}, {"a", "b"}, {"a", "b"}, {"a", "c"}}, alpha);
 
-  const auto parallel = mine_ilp(log_of({{"a", "b", "c", "d"},
-                                         {"a", "c", "b", "d"}}));
-  assert(parallel.net.activities().size() == 4);
-  assert(has_arc(parallel.net, 0, 1) && has_arc(parallel.net, 0, 2));
-  assert(check_workflow_net(parallel.net).valid);
-
-  // Region constraints must retain repeated activity and self-loop behavior.
-  const auto repeated_log = log_of({{"a", "a", "b"}, {"a", "b"}});
-  const auto repeated = mine_ilp(repeated_log);
-  assert(check_workflow_net(repeated.net).valid);
-  const auto repeated_replay = check_conformance(repeated_log, repeated.net);
-  assert(repeated_replay.fitting_traces == repeated_replay.trace_count);
-  const auto loop_log = log_of({{"a", "a"}, {"a"}});
-  const auto loop = mine_ilp(loop_log);
-  assert(loop.net.place_count() >= 3);
-  assert(check_workflow_net(loop.net).valid);
-  const auto loop_replay = check_conformance(loop_log, loop.net);
-  assert(loop_replay.fitting_traces == loop_replay.trace_count);
-
-  // Candidate ordering and diagnostics are stable across runs.
-  const auto repeat_again = mine_ilp(repeated_log);
-  assert(same_net(repeated.net, repeat_again.net));
-  assert(repeated.diagnostics.visited_nodes == repeat_again.diagnostics.visited_nodes);
-
-  ILPMinerOptions bounded;
-  bounded.max_nodes = 1;
-  const auto limited = mine_ilp(log_of({{"a", "b", "c"}}), bounded);
-  assert(limited.diagnostics.exhausted);
-  assert(limited.diagnostics.visited_nodes <= 1);
-  assert(limited.net.place_count() >= 2);
-
-  bool rejected = false;
-  try {
-    ILPMinerOptions invalid;
-    invalid.noise_threshold = 2.0;
-    (void)mine_ilp(log_of({{"a"}}), invalid);
-  } catch (const std::invalid_argument&) {
-    rejected = true;
-  }
-  assert(rejected);
-
-  // Larger alphabets use arbitrary-width binary region variables instead of
-  // an arbitrary fixed-width rejection.  The no-boundary form keeps the
-  // pair-solve count focused on the nine visible activities.
-  std::vector<std::vector<std::string>> many(1);
-  for (int i = 0; i < 9; ++i) many[0].push_back("activity_" + std::to_string(i));
-  ILPMinerOptions high_cardinality;
-  high_cardinality.artificial_start_activity.clear();
-  high_cardinality.artificial_end_activity.clear();
-  const auto nine = mine_ilp(log_of(many), high_cardinality);
-  assert(nine.diagnostics.computed);
-  assert(nine.net.activities().size() == 9);
-  assert(check_workflow_net(nine.net).valid);
-  const auto nine_again = mine_ilp(log_of(many), high_cardinality);
-  assert(nine.net.place_count() == nine_again.net.place_count());
-  assert(nine.diagnostics.visited_nodes == nine_again.diagnostics.visited_nodes);
-
-  std::vector<std::vector<std::string>> twelve(1);
-  for (int i = 0; i < 12; ++i) twelve[0].push_back("activity_" + std::to_string(i));
-  ILPMinerOptions bounded_high = high_cardinality;
-  bounded_high.max_nodes = 8;
-  const auto twelve_result = mine_ilp(log_of(twelve), bounded_high);
-  assert(twelve_result.diagnostics.exhausted);
-  assert(twelve_result.diagnostics.visited_nodes <= bounded_high.max_nodes);
-  assert(twelve_result.net.activities().size() == 12);
-
-  // A bounded binary solve is performed once per causal pair; a generous
-  // pair budget preserves every late relation in a larger alphabet.
-  ILPMinerOptions late_pairs = high_cardinality;
-  late_pairs.max_nodes = 64;
-  const auto late_result = mine_ilp(log_of(twelve), late_pairs);
-  const auto late_id = [&](const std::string& label) {
-    return static_cast<std::size_t>(std::distance(
-        late_result.net.activities().begin(),
-        std::find(late_result.net.activities().begin(),
-                  late_result.net.activities().end(), label)));
-  };
-  for (int i = 0; i < 11; ++i) {
-    assert(has_arc(late_result.net, late_id("activity_" + std::to_string(i)),
-                   late_id("activity_" + std::to_string(i + 1))));
-  }
-  assert(!late_result.diagnostics.exhausted);
-
-  // The dynamic signature crosses a machine-word boundary without changing
-  // activity identity or the requested causal arc.
-  std::vector<std::vector<std::string>> wide_rows(1);
-  for (int i = 0; i < 65; ++i) {
-    const auto index = i < 10 ? "0" + std::to_string(i) : std::to_string(i);
-    wide_rows[0].push_back("wide_" + index);
-  }
-  ILPMinerOptions wide_options = high_cardinality;
-  wide_options.causal_relation = {{"wide_63", "wide_64"}};
-  wide_options.max_nodes = 16;
-  const auto wide_result = mine_ilp(log_of(wide_rows), wide_options);
-  assert(wide_result.diagnostics.computed);
-  assert(wide_result.net.activities().size() == 65);
-  const auto wide_from = static_cast<std::size_t>(std::distance(
-      wide_result.net.activities().begin(),
-      std::find(wide_result.net.activities().begin(),
-                wide_result.net.activities().end(), "wide_63")));
-  const auto wide_to = static_cast<std::size_t>(std::distance(
-      wide_result.net.activities().begin(),
-      std::find(wide_result.net.activities().begin(),
-                wide_result.net.activities().end(), "wide_64")));
-  assert(wide_from < wide_result.net.activities().size());
-  assert(wide_to < wide_result.net.activities().size());
-  assert(has_arc(wide_result.net, wide_from, wide_to));
-  assert(wide_result.diagnostics.visited_nodes <= wide_options.max_nodes);
-
-  // Sparse large alphabets still respect the candidate budget; branch-and-
-  // bound may prove the remaining exponential suffix without exhausting it.
-  std::vector<std::vector<std::string>> sparse_wide_rows;
-  sparse_wide_rows.push_back({"sparse_00", "sparse_01"});
-  for (int i = 2; i < 24; ++i)
-    sparse_wide_rows.push_back({"sparse_" + std::to_string(i)});
-  ILPMinerOptions sparse_wide_options = high_cardinality;
-  sparse_wide_options.max_nodes = 26;
-  const auto sparse_wide = mine_ilp(log_of(sparse_wide_rows), sparse_wide_options);
-  assert(sparse_wide.diagnostics.visited_nodes <= sparse_wide_options.max_nodes);
-  assert(sparse_wide.diagnostics.computed);
-  assert(sparse_wide.net.activities().size() == 24);
-
-  // Artificial boundaries are represented as silent transitions and are not
-  // leaked into the visible activity alphabet.
   ILPMinerOptions boundaries;
   boundaries.artificial_start_activity = "BEGIN";
   boundaries.artificial_end_activity = "FINISH";
-  const auto boundary_result = mine_ilp(log_of({{"a", "b"}, {"a", "b"}}), boundaries);
-  assert(boundary_result.net.activities() == std::vector<std::string>({"a", "b"}));
-  assert(visible_transition_count(boundary_result.net) == 2);
-  assert(std::any_of(boundary_result.net.transitions().begin(), boundary_result.net.transitions().end(),
-                     [](const PetriTransition& transition) { return transition.silent(); }));
-  assert(check_workflow_net(boundary_result.net).valid);
+  matches_reference({{"a", "b"}, {"a", "b"}}, boundaries);
+  const auto bounded = mine_ilp(log_of({{"a", "b"}}), boundaries);
+  assert(bounded.net.activities() == std::vector<std::string>({"a", "b"}));
 
-  // Empty traces are retained as boundary-only variants.  A log containing
-  // such a trace therefore yields a valid silent workflow, while a log with
-  // no traces at all remains invalid.
-  EventLog empty_variant_log;
-  Trace empty_variant;
-  empty_variant.case_id = "empty-variant";
-  empty_variant_log.traces.push_back(std::move(empty_variant));
-  const auto empty_variant_result = mine_ilp(empty_variant_log);
-  assert(empty_variant_result.diagnostics.computed);
-  assert(empty_variant_result.net.activities().empty());
-  assert(check_workflow_net(empty_variant_result.net).valid);
-  const auto empty_variant_replay =
-      check_conformance(empty_variant_log, empty_variant_result.net);
-  assert(empty_variant_replay.fitting_traces == empty_variant_replay.trace_count);
+  ILPMinerOptions causal;
+  causal.causal_relation = {{"▶", "a"}, {"a", "c"}, {"c", "■"}};
+  matches_reference({{"a", "c"}}, causal);
 
-  const auto mixed_empty_result = mine_ilp(log_of({{}, {"a"}}));
-  assert(mixed_empty_result.net.activities() == std::vector<std::string>{"a"});
-  assert(check_workflow_net(mixed_empty_result.net).valid);
-  const auto mixed_empty_replay =
-      check_conformance(log_of({{}, {"a"}}), mixed_empty_result.net);
-  assert(mixed_empty_replay.fitting_traces == mixed_empty_replay.trace_count);
+  // The thirteen-activity sample size works; activities are the sorted
+  // visible labels.
+  Rows wide(1);
+  for (int i = 0; i < 13; ++i) wide[0].push_back("activity_" + std::to_string(100 + i));
+  matches_reference(wide);
+  assert(mine_ilp(log_of(wide)).net.activities().front() == "activity_100");
 
-  bool no_trace_rejected = false;
-  try {
-    (void)mine_ilp(EventLog{});
-  } catch (const std::invalid_argument&) {
-    no_trace_rejected = true;
-  }
-  assert(no_trace_rejected);
+  // Deterministic across runs.
+  const auto first = mine_ilp(log_of({{"a", "b"}, {"b", "a"}}));
+  const auto second = mine_ilp(log_of({{"a", "b"}, {"b", "a"}}));
+  assert(arcs_of(first.net) == arcs_of(second.net));
 
-  // Duplicate variants are collapsed for the bounded search, but their
-  // frequencies still drive noise filtering: the singleton branch disappears
-  // when it is below half of the dominant variant's support.
+  // max_nodes caps the number of causal pairs (LP solves).
+  ILPMinerOptions limited;
+  limited.max_nodes = 1;
+  rejects([&] { (void)mine_ilp(log_of({{"a", "b", "c"}}), limited); });
+
+  // Native noise extension: variants below half of the dominant one go.
   ILPMinerOptions noise;
   noise.noise_threshold = 0.5;
-  const auto denoised = mine_ilp(log_of({{"a", "b"}, {"a", "b"}, {"a", "b"},
-                                         {"a", "c"}}), noise);
-  assert(std::find(denoised.net.activities().begin(), denoised.net.activities().end(),
-                   "c") == denoised.net.activities().end());
+  const auto denoised = mine_ilp(log_of({{"a", "b"}, {"a", "b"}, {"a", "b"}, {"a", "c"}}), noise);
+  assert(std::find(denoised.net.activities().begin(), denoised.net.activities().end(), "c") ==
+         denoised.net.activities().end());
 
-  // Alpha=1 keeps every continuation; alpha=0.5 cuts a continuation whose
-  // support is less than half of its predecessor's strongest continuation.
-  ILPMinerOptions alpha_full;
-  const auto all_sequences = mine_ilp(log_of({{"a", "b"}, {"a", "b"}, {"a", "b"},
-                                               {"a", "c"}}), alpha_full);
-  ILPMinerOptions alpha_filtered;
-  alpha_filtered.alpha = 0.5;
-  const auto filtered_sequences = mine_ilp(
-      log_of({{"a", "b"}, {"a", "b"}, {"a", "b"}, {"a", "c"}}), alpha_filtered);
-  assert(all_sequences.diagnostics.visited_nodes <= alpha_full.max_nodes);
-  assert(filtered_sequences.diagnostics.visited_nodes <= alpha_filtered.max_nodes);
-  assert(has_arc(all_sequences.net, 0, 2));
-  assert(std::find(filtered_sequences.net.activities().begin(),
-                   filtered_sequences.net.activities().end(), "c") !=
-         filtered_sequences.net.activities().end());
+  // A missing or empty activity-key value falls back to the event activity.
+  EventLog keyed = log_of({{"a", "b"}});
+  keyed.traces[0].events[0].attributes.push_back({"phase", "x", AttributeKind::kString});
+  keyed.traces[0].events[1].attributes.push_back({"phase", "", AttributeKind::kString});
+  ILPMinerOptions phase;
+  phase.activity_key = "phase";
+  assert(mine_ilp(keyed, phase).net.activities() == std::vector<std::string>({"b", "x"}));
 
-  // Multiplicity changes support filtering but not the optimization rows: a
-  // duplicated variant has the same selected region while alpha keeps all
-  // variants.
-  ILPMinerOptions variant_rows;
-  variant_rows.artificial_start_activity.clear();
-  variant_rows.artificial_end_activity.clear();
-  variant_rows.causal_relation = {{"a", "b"}};
-  const auto one_each = mine_ilp(log_of({{"a", "b"}, {"a", "c"}}), variant_rows);
-  const auto one_duplicated = mine_ilp(
-      log_of({{"a", "b"}, {"a", "b"}, {"a", "b"}, {"a", "c"}}),
-      variant_rows);
-  assert(one_each.net.place_count() == one_duplicated.net.place_count());
-  assert(one_each.net.transitions().size() == one_duplicated.net.transitions().size());
-  assert(one_each.diagnostics.visited_nodes == one_duplicated.diagnostics.visited_nodes);
+  // Validation.
+  ILPMinerOptions invalid;
+  invalid.noise_threshold = 2.0;
+  rejects([&] { (void)mine_ilp(log_of({{"a"}}), invalid); });
+  invalid = {};
+  invalid.alpha = -0.1;
+  rejects([&] { (void)mine_ilp(log_of({{"a"}}), invalid); });
+  invalid = {};
+  invalid.artificial_start_activity.clear();
+  rejects([&] { (void)mine_ilp(log_of({{"a"}}), invalid); });
+  invalid = {};
+  invalid.artificial_end_activity = invalid.artificial_start_activity;
+  rejects([&] { (void)mine_ilp(log_of({{"a"}}), invalid); });
+  invalid = {};
+  invalid.artificial_start_activity = "a";
+  rejects([&] { (void)mine_ilp(log_of({{"a"}}), invalid); });
+  invalid = {};
+  invalid.max_nodes = 0;
+  rejects([&] { (void)mine_ilp(log_of({{"a"}}), invalid); });
+  rejects([&] { (void)mine_ilp(EventLog{}); });
+  // The reference rejects a causal relation without the boundary activities.
+  ILPMinerOptions partial;
+  partial.causal_relation = {{"a", "b"}};
+  rejects([&] { (void)mine_ilp(log_of({{"a", "b"}}), partial); });
 
-  // An empty resource is a missing activity-key value, so selection falls
-  // back to the event activity instead of silently dropping the event.
-  EventLog missing_resource;
-  Trace missing_resource_trace;
-  missing_resource_trace.case_id = "resource-fallback";
-  missing_resource_trace.events.push_back(
-      Event{"resource-fallback", "a", {}, {}, 0, {}, {}});
-  missing_resource.traces.push_back(std::move(missing_resource_trace));
-  ILPMinerOptions resource_key;
-  resource_key.activity_key = "org:resource";
-  resource_key.artificial_start_activity.clear();
-  resource_key.artificial_end_activity.clear();
-  const auto resource_fallback = mine_ilp(missing_resource, resource_key);
-  assert(resource_fallback.net.activities() == std::vector<std::string>{"a"});
-  assert(check_workflow_net(resource_fallback.net).valid);
-
-  EventLog empty_attribute;
-  Trace empty_attribute_trace;
-  empty_attribute_trace.case_id = "empty-attribute";
-  Event empty_value{"empty-attribute", "b", {}, {}, 0, {}, {}};
-  empty_value.attributes.push_back({"phase", "", AttributeKind::kString});
-  empty_attribute_trace.events.push_back(std::move(empty_value));
-  empty_attribute.traces.push_back(std::move(empty_attribute_trace));
-  ILPMinerOptions custom_key;
-  custom_key.activity_key = "phase";
-  custom_key.artificial_start_activity.clear();
-  custom_key.artificial_end_activity.clear();
-  const auto empty_fallback = mine_ilp(empty_attribute, custom_key);
-  assert(empty_fallback.net.activities() == std::vector<std::string>{"b"});
-  assert(check_workflow_net(empty_fallback.net).valid);
-
-  // Cumulative occurrence vectors compare continuations after the complete
-  // multiset prefix: the rare d continuation shares the {a,b} prefix with a
-  // frequent c continuation even though those events reached it in another
-  // order.  Causal pairs are derived before alpha filtering, so their
-  // composite places remain representable even when the rare suffix rows are
-  // omitted from the region constraints.
-  std::vector<std::vector<std::string>> cumulative_rows;
-  for (int i = 0; i < 20; ++i) cumulative_rows.push_back({"a", "b", "c"});
-  for (int i = 0; i < 20; ++i) cumulative_rows.push_back({"b", "a", "c"});
-  cumulative_rows.push_back({"b", "a", "d", "e"});
-  ILPMinerOptions cumulative_alpha;
-  cumulative_alpha.alpha = 0.5;
-  const auto cumulative_result = mine_ilp(log_of(cumulative_rows), cumulative_alpha);
-  assert(has_arc(cumulative_result.net, 0, 3));
-  assert(has_arc(cumulative_result.net, 3, 4));
-  assert(check_workflow_net(cumulative_result.net).valid);
-
-  // Final-row feasibility is a pre-fire equality, not a common post-fire
-  // marking requirement.  The simple a=>b region remains valid even though
-  // the two complete traces finish with different activities.
-  ILPMinerOptions final_row_options;
-  final_row_options.artificial_start_activity.clear();
-  final_row_options.artificial_end_activity.clear();
-  final_row_options.causal_relation = {{"a", "b"}};
-  const auto final_row_result = mine_ilp(
-      log_of({{"a", "b", "a"}, {"a", "b", "c"}}), final_row_options);
-  assert(has_arc(final_row_result.net, 0, 1));
-  assert(!has_arc(final_row_result.net, 2, 1));
-  assert(check_workflow_net(final_row_result.net).valid);
-
-  // Repeated final events remain feasible under the same cumulative-row
-  // constraints and retain a self-loop on the repeated activity.
-  ILPMinerOptions repeated_final_options;
-  repeated_final_options.artificial_start_activity.clear();
-  repeated_final_options.artificial_end_activity.clear();
-  repeated_final_options.causal_relation = {{"a", "b"}};
-  const auto repeated_final = mine_ilp(
-      log_of({{"a", "c", "b", "b"}}), repeated_final_options);
-  assert(has_arc(repeated_final.net, 0, 1));
-  assert(has_self_loop(repeated_final.net, 1));
-  assert(check_workflow_net(repeated_final.net).valid);
-
-  // A supplied causal relation is deterministic and receives priority under
-  // a tight node budget, so the requested directed region is discoverable.
-  ILPMinerOptions causal;
-  causal.causal_relation = {{"a", "c"}};
-  causal.max_nodes = 1;
-  const auto causal_result = mine_ilp(log_of({{"a", "c"}}), causal);
-  assert(causal_result.diagnostics.visited_nodes == 1);
-  assert(causal_result.diagnostics.lp_solved == 1);
-  assert(has_arc(causal_result.net, 0, 1));
-
-  // Explicit causal pairs constrain a region without making the pair list
-  // exhaustive.  The only place that fits both variants must add c as an
-  // additional consumer of the token produced by a.
-  ILPMinerOptions sparse_causal;
-  sparse_causal.causal_relation = {{"a", "b"}};
-  const auto sparse = mine_ilp(log_of({{"a", "b"}, {"a", "c"}}),
-                               sparse_causal);
-  assert(sparse.net.activities() == std::vector<std::string>({"a", "b", "c"}));
-  assert(has_arc(sparse.net, 0, 1));
-  assert(has_arc(sparse.net, 0, 2));
-  assert(check_workflow_net(sparse.net).valid);
-  const auto sparse_replay = check_conformance(
-      log_of({{"a", "b"}, {"a", "c"}}), sparse.net);
-  assert(sparse_replay.fitting_traces == sparse_replay.trace_count);
-  const auto sparse_repeat = mine_ilp(
-      log_of({{"a", "b"}, {"a", "c"}}), sparse_causal);
-  assert(same_net(sparse.net, sparse_repeat.net));
-  assert(sparse.diagnostics.visited_nodes == sparse_repeat.diagnostics.visited_nodes);
-  sparse_causal.max_nodes = 1;
-  const auto sparse_limited = mine_ilp(
-      log_of({{"a", "b"}, {"a", "c"}}), sparse_causal);
-  assert(sparse_limited.diagnostics.exhausted);
-  assert(sparse_limited.diagnostics.visited_nodes <= 1);
-
-  // A reversed observed order cannot satisfy a zero-initial-token place for
-  // the requested direction: b is consumed before a can produce anything.
-  // The workflow fallback remains valid, but it must not fabricate a=>b.
-  ILPMinerOptions reversed_causal;
-  reversed_causal.artificial_start_activity.clear();
-  reversed_causal.artificial_end_activity.clear();
-  reversed_causal.causal_relation = {{"a", "b"}};
-  const auto reversed = mine_ilp(log_of({{"b", "a"}}), reversed_causal);
-  assert(!has_arc(reversed.net, 0, 1));
-  assert(check_workflow_net(reversed.net).valid);
-
-  // Overlapping requested pairs still receive independent best regions.  The
-  // two variants make a=>b and a=>d share a feasible composite, while a=>b
-  // also has a smaller singleton optimum; the composite's c=>b arc must not
-  // be lost when the pair results are merged.
-  ILPMinerOptions overlapping_causal;
-  overlapping_causal.artificial_start_activity.clear();
-  overlapping_causal.artificial_end_activity.clear();
-  overlapping_causal.causal_relation = {{"a", "b"}, {"a", "d"}};
-  const auto overlapping = mine_ilp(
-      log_of({{"a", "b"}, {"c", "d"}}), overlapping_causal);
-  assert(overlapping.net.activities() ==
-         std::vector<std::string>({"a", "b", "c", "d"}));
-  assert(has_arc(overlapping.net, 2, 1));
-  assert(has_arc(overlapping.net, 0, 3));
-  assert(check_workflow_net(overlapping.net).valid);
-  const auto overlapping_replay = check_conformance(
-      log_of({{"a", "b"}, {"c", "d"}}), overlapping.net);
-  assert(overlapping_replay.fitting_traces == overlapping_replay.trace_count);
-  assert(!overlapping.diagnostics.exhausted);
-
-  // A continuation exactly on the alpha boundary is retained; moving below
-  // that boundary cuts its suffix deterministically.  This exercises the
-  // inclusive comparison used by the sequence-encoding support threshold.
-  ILPMinerOptions alpha_edge;
-  alpha_edge.alpha = 0.5;
-  alpha_edge.artificial_start_activity.clear();
-  alpha_edge.artificial_end_activity.clear();
-  alpha_edge.causal_relation = {{"a", "b"}};
-  const auto alpha_equal = mine_ilp(
-      log_of({{"a", "b"}, {"a", "b"}, {"a", "c"}}), alpha_edge);
-  alpha_edge.alpha = 0.499999;
-  const auto alpha_below = mine_ilp(
-      log_of({{"a", "b"}, {"a", "b"}, {"a", "c"}}), alpha_edge);
-  assert(alpha_equal.net.activities() == alpha_below.net.activities());
-  assert(alpha_equal.net.place_count() >= alpha_below.net.place_count());
-
-  bool invalid_alpha = false;
-  try {
-    ILPMinerOptions invalid;
-    invalid.alpha = 1.1;
-    (void)mine_ilp(log_of({{"a"}}), invalid);
-  } catch (const std::invalid_argument&) {
-    invalid_alpha = true;
-  }
-  assert(invalid_alpha);
-  auto malformed = sequence;
-  malformed.markings.initial.pop_back();
-  bool malformed_rejected = false;
-  try { (void)minera::ilp_miner_json(malformed); }
-  catch (const std::invalid_argument&) { malformed_rejected = true; }
-  assert(malformed_rejected);
-  return 0;
+  assert(!ilp_miner_json(first).empty());
 }

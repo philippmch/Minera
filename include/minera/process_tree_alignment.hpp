@@ -67,6 +67,14 @@ struct ProcessTreeAlignmentOptions {
   bool clear_cache = true;
   // Event field used to construct alignment words.
   std::string activity_attribute = "concept:name";
+  // By default every variant runs its reference port
+  // (process_tree_search_graph_reference.hpp, process_tree_reference_alignment.hpp,
+  // process_tree_milp_reference.hpp, process_tree_approximated_reference.hpp);
+  // only max_total_time_seconds applies, checked between distinct traces.
+  // true runs the older native searches, which honour every limit above.
+  // Setting max_states or a per-trace time limit also selects the native
+  // search, as does a tree the variant's port rejects.
+  bool native_search = false;
 };
 
 // fitness = 1 - cost / (trace length + floor), not clamped, where the floor is

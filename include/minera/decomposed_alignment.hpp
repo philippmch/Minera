@@ -47,6 +47,9 @@ struct DecomposedAlignmentOptions {
   std::vector<std::size_t> final_marking;
   // Event field used to construct alignment words.
   std::string activity_attribute = "concept:name";
+  // By default standard costs without time or state limits run the reference
+  // port (decomposed_reference.hpp); true always runs the native search.
+  bool native_search = false;
 };
 
 struct DecomposedAlignmentTrace {

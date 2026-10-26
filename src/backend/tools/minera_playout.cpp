@@ -125,6 +125,7 @@ int main(int argc, char** argv) {
       "monte_carlo_diagnostic_interval", "monte_carlo_small_scale_factor",
       "monte_carlo_max_thread_execution_time",
       "monte_carlo_token_replay_variant",
+      "monte_carlo_numpy_legacy_seed", "monte_carlo_numpy_choice_order",
       "monte_carlo_provided_stochastic_map"};
   const auto parse_marking = [](const char* value, const char* option) {
     if (!value || *value == '\0')

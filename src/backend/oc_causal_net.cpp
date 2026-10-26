@@ -1,4 +1,5 @@
 #include "minera/oc_causal_net.hpp"
+#include "minera/oc_causal_net_reference_playout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -948,6 +949,23 @@ Ocel oc_causal_net_extensive_playout(const OcCausalNet& net,
 
 OcpnPlayoutResult oc_causal_net_extensive_playout_result(
     const OcCausalNet& net, const OcpnPlayoutOptions& options) {
+  if (options.event_binding == OcpnEventBinding::kReference) {
+    validate_reference_playout_controls(options);
+    if (options.exists_trace || options.return_sequences || options.return_traces)
+      throw std::invalid_argument(
+          "reference causal-net playout returns the log only; exists_trace and "
+          "sequence/trace output need another event_binding");
+    std::map<std::string, std::vector<std::string>> objects = options.objects;
+    if (objects.empty())
+      for (const auto& type : net.object_types) objects[type] = {type + "_0"};
+    OcCausalReferencePlayoutOptions reference;
+    reference.max_bindings_per_activity = options.max_bindings_per_activity;
+    reference.objects_unique_per_sequence = options.objects_unique_per_trace;
+    OcpnPlayoutResult result;
+    result.log = reference_oc_causal_net_playout(net, objects, reference);
+    result.trace_exists = !result.log.events.empty();
+    return result;
+  }
   if (!has_marker_groups(net))
     return ocpn_extensive_playout_result(net.workflow_projection, options);
   const auto indices = activity_indices(net);

@@ -1,6 +1,7 @@
 #include "minera/trace_variant_query.hpp"
 
 #include "minera/secure_random.hpp"
+#include "minera/trace_variant_query_reference.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -418,6 +419,79 @@ void cap_final_states(std::map<Prefix, FinalState>& final,
 
 }  // namespace
 
+namespace {
+
+// SaCoFa runs the reference port (trace_variant_query_reference.hpp): the
+// reference seeds Python's random and numpy's legacy generator with the same
+// 32-bit seed. Released cases keep the reference's case ids.
+TraceVariantQueryResult reference_sacofa(const EventLog& log,
+                                         const TraceVariantQueryOptions& options) {
+  constexpr std::uint64_t kMaxSeed = std::numeric_limits<std::uint32_t>::max();
+  if (!options.secure_random && options.seed > kMaxSeed)
+    throw std::invalid_argument("trace variant query: SaCoFa seed must be below 2^32");
+  if (options.max_prefix_length > static_cast<std::size_t>(std::numeric_limits<long>::max()) ||
+      options.prune_threshold > static_cast<std::uint64_t>(std::numeric_limits<long>::max()))
+    throw std::invalid_argument("trace variant query: safety bound exceeded");
+  TraceVariantQueryReferenceOptions reference;
+  reference.epsilon = options.epsilon;
+  reference.k = static_cast<long>(options.max_prefix_length);
+  reference.p = static_cast<long>(options.prune_threshold);
+  reference.seed = static_cast<std::uint32_t>(
+      options.secure_random ? secure_random_u64() & kMaxSeed : options.seed);
+
+  std::vector<std::vector<std::string>> traces;
+  traces.reserve(log.traces.size());
+  for (const auto& trace : log.traces) {
+    std::vector<std::string> activities;
+    activities.reserve(trace.events.size());
+    for (const auto& event : trace.events) activities.push_back(event.activity);
+    traces.push_back(std::move(activities));
+  }
+  std::vector<TraceVariantQueryReferenceCase> cases;
+  std::string empty_message;
+  try {
+    cases = reference_sacofa_trace_variant_query(traces, reference);
+  } catch (const TraceVariantQueryReferenceError& error) {
+    // The reference raises a ValueError instead of releasing nothing; Minera
+    // returns the empty release and keeps the reference's explanation.
+    if (error.type != "ValueError") throw;
+    empty_message = error.what();
+  }
+
+  TraceVariantQueryResult result;
+  auto& diagnostics = result.diagnostics;
+  diagnostics.variant = options.variant;
+  diagnostics.epsilon = options.epsilon;
+  diagnostics.max_prefix_length = options.max_prefix_length;
+  diagnostics.prune_threshold = options.prune_threshold;
+  diagnostics.seed = options.secure_random ? reference.seed : options.seed;
+  diagnostics.secure_random = options.secure_random;
+  for (const auto& released : cases) ++result.frequencies[released.events];
+  diagnostics.retained_variant_count = result.frequencies.size();
+  if (result.frequencies.size() > options.max_output_variants)
+    throw std::invalid_argument("trace variant query: released variants exceed max_output_variants");
+  for (const auto& released : cases) {
+    if (result.log.traces.size() == options.max_output_traces) {
+      diagnostics.output_truncated = true;
+      break;
+    }
+    Trace trace;
+    trace.case_id = std::to_string(released.case_id);
+    trace.events.reserve(released.events.size());
+    for (std::size_t i = 0; i < released.events.size(); ++i)
+      trace.events.push_back(Event{trace.case_id, released.events[i],
+                                   "1970-01-01T00:00:00Z", "", i, {}, ""});
+    result.log.traces.push_back(std::move(trace));
+  }
+  diagnostics.released_trace_count = result.log.traces.size();
+  diagnostics.message = diagnostics.output_truncated ? "output safety bound applied"
+                        : !empty_message.empty()     ? empty_message
+                                                     : "reference SaCoFa";
+  return result;
+}
+
+}  // namespace
+
 TraceVariantQueryResult anonymize_trace_variant_query(
     const EventLog& log, const TraceVariantQueryOptions& options) {
   if (!std::isfinite(options.epsilon) || options.epsilon <= 0.0)
@@ -432,6 +506,13 @@ TraceVariantQueryResult anonymize_trace_variant_query(
     throw std::invalid_argument("trace variant query: safety bound exceeded");
 
   TraceVariantQueryResult result;
+  // The reference fails with an IndexError on logs that contain an empty
+  // trace; those keep the native SaCoFa below.
+  const bool has_empty_trace = std::any_of(log.traces.begin(), log.traces.end(),
+                                           [](const Trace& trace) { return trace.events.empty(); });
+  if (options.variant == TraceVariantQueryVariant::kSacofa &&
+      (options.max_prefix_length == 0 || !has_empty_trace))
+    return reference_sacofa(log, options);
   result.diagnostics.variant = options.variant;
   result.diagnostics.epsilon = options.epsilon;
   result.diagnostics.max_prefix_length = options.max_prefix_length;

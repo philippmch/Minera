@@ -22,9 +22,17 @@ enum class OcpnEventBinding {
   // the synchronized object-centric search; it uses the activity slot map on
   // OcpnGraph and keeps the exact object relations of every binding.
   kSynchronized,
+  // The reference EXTENSIVE playout (ocpn_reference_playout.hpp and
+  // oc_causal_net_reference_playout.hpp): one object per type unless objects
+  // are given, every complete sequence up to max_bindings_per_activity,
+  // reference event ids and timestamps. Native-only controls (markings,
+  // branching factors, max_states, seed and the timestamp layout) are
+  // rejected in this mode.
+  kReference,
   INDEPENDENT = kIndependent,
   SHARED_ACTIVITY = kSharedActivity,
   SYNCHRONIZED = kSynchronized,
+  REFERENCE = kReference,
 };
 
 [[nodiscard]] const char* ocpn_event_binding_name(OcpnEventBinding binding);
@@ -104,6 +112,11 @@ struct OcpnPlayoutResult {
 
 [[nodiscard]] OcpnPlayoutResult ocpn_extensive_playout_result(
     const OcpnGraph& graph, const OcpnPlayoutOptions& options = {});
+
+// Throws when options carry controls that only the native bindings use
+// (event_binding = kReference takes max_bindings_per_activity, max_traces,
+// objects_unique_per_trace and the result switches only).
+void validate_reference_playout_controls(const OcpnPlayoutOptions& options);
 
 [[nodiscard]] std::string serialize_ocpn_playout_json(const Ocel& log);
 [[nodiscard]] std::string serialize_ocpn_playout_json(

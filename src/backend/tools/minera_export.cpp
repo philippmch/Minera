@@ -7186,7 +7186,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       if (!compare_petri_final_marking_used)
         comparison_options.final_marking_keys = document.final_marking_keys;
       const auto body = minera::petri_usage_comparison_json(
-          minera::compare_petri_usage(document.net, log, reference, comparison_options));
+          minera::compare_petri_usage_reference(document.net, log, reference, comparison_options));
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);
@@ -7676,7 +7676,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         reference = minera::normalize_alpha_event_log(
             reference, alpha_projection_options);
       }
-      const auto comparison = minera::compare_petri_usage(
+      const auto comparison = minera::compare_petri_usage_reference(
           *model_it->second, *comparison_log, reference, comparison_options);
       const auto body = minera::petri_usage_comparison_json(comparison);
       if (output.empty()) {
