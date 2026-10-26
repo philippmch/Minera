@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Tab } from "../app-logic";
-import { VIEW_GROUPS, groupTools, searchTools, type ToolId, type ViewSpec } from "../tools";
+import { EVERYDAY_TOOLS, REFERENCE_TOOLS, VIEW_GROUPS, groupTools, searchTools, type ToolId, type ViewSpec } from "../tools";
 import { BrandMark, FileButton } from "./ui";
 
 export interface SidebarDataset {
@@ -28,7 +28,8 @@ interface SidebarProps {
 
 export function Sidebar({ dataset, views, activeView, onSelectView, workspace, activeTool, onOpenTool, onHome, onOpenFile, onOpenPalette, mining = false, open = false, onClose }: SidebarProps) {
   const [query, setQuery] = useState("");
-  const groups = useMemo(() => groupTools(searchTools(query)), [query]);
+  const groups = useMemo(() => groupTools(searchTools(query, EVERYDAY_TOOLS)), [query]);
+  const reference = useMemo(() => groupTools(searchTools(query, REFERENCE_TOOLS)), [query]);
   const searching = query.trim().length > 0;
   return (
     <aside className={open ? "sidebar open" : "sidebar"} aria-label="Navigation">
@@ -118,7 +119,32 @@ export function Sidebar({ dataset, views, activeView, onSelectView, workspace, a
               ))}
             </details>
           ))}
-          {!groups.length && <p className="sidebar-empty">No tool matches “{query}”.</p>}
+          {reference.length > 0 && (
+            <details
+              className="sidebar-tool-group sidebar-reference"
+              key={searching ? "reference:search" : "reference"}
+              open={searching || REFERENCE_TOOLS.some((tool) => tool.id === activeTool) || undefined}
+            >
+              <summary>Reference API<span className="sidebar-count">{reference.reduce((sum, entry) => sum + entry.tools.length, 0)}</span></summary>
+              {reference.map(({ group, tools }) => (
+                <div className="sidebar-reference-group" key={group.id}>
+                  <span className="sidebar-label">{group.title}</span>
+                  {tools.map((tool) => (
+                    <button
+                      key={tool.id}
+                      className={activeTool === tool.id ? "sidebar-item active" : "sidebar-item"}
+                      aria-current={activeTool === tool.id ? "page" : undefined}
+                      title={tool.summary}
+                      onClick={() => onOpenTool(tool.id)}
+                    >
+                      {tool.title}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </details>
+          )}
+          {!groups.length && !reference.length && <p className="sidebar-empty">No tool matches “{query}”.</p>}
         </nav>
       </div>
     </aside>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { groupTools, searchTools, type ToolId } from "../tools";
+import { EVERYDAY_TOOLS, REFERENCE_TOOLS, groupTools, searchTools, type ToolGroup, type ToolId, type ToolSpec } from "../tools";
 import { BrandMark, LOG_FILE_ACCEPT } from "./ui";
 
 interface LandingProps {
@@ -21,7 +21,9 @@ const SAMPLES = [
 
 export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, mining }: LandingProps) {
   const [query, setQuery] = useState("");
-  const groups = useMemo(() => groupTools(searchTools(query)), [query]);
+  const groups = useMemo(() => groupTools(searchTools(query, EVERYDAY_TOOLS)), [query]);
+  const reference = useMemo(() => groupTools(searchTools(query, REFERENCE_TOOLS)), [query]);
+  const searching = query.trim().length > 0;
   const loaders = { sample: onLoadSample, ocel: onLoadOcelSample, resource: onLoadResourceSample };
   return (
     <div className="landing">
@@ -100,23 +102,17 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          {groups.map(({ group, tools }) => (
-            <div className="tool-group" key={group.id}>
-              <div className="tool-group-head">
-                <h3>{group.title}</h3>
-                <span>{group.blurb}</span>
-              </div>
-              <div className="tool-grid">
-                {tools.map((tool) => (
-                  <button key={tool.id} className="tool-card" onClick={() => onOpenTool(tool.id)}>
-                    <span className="tool-card-title">{tool.title}</span>
-                    <span className="tool-card-summary">{tool.summary}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-          {!groups.length && <p className="landing-tools-empty">No tool matches “{query}”.</p>}
+          <ToolGroups groups={groups} onOpenTool={onOpenTool} />
+          {reference.length > 0 && (
+            <details className="landing-reference" key={searching ? "search" : "browse"} open={searching || undefined}>
+              <summary>
+                <span className="landing-reference-title">Reference API workbenches</span>
+                <span className="landing-reference-hint">One workbench per reference call, with every option exposed as JSON. Meant for parity checks and exact reproductions.</span>
+              </summary>
+              <ToolGroups groups={reference} onOpenTool={onOpenTool} />
+            </details>
+          )}
+          {!groups.length && !reference.length && <p className="landing-tools-empty">No tool matches “{query}”.</p>}
         </section>
       )}
 
@@ -125,5 +121,28 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         <code>resource</code> and <code>lifecycle</code> columns. JSON exports from <code>minera_export</code> open here too.
       </footer>
     </div>
+  );
+}
+
+function ToolGroups({ groups, onOpenTool }: { groups: { group: ToolGroup; tools: ToolSpec[] }[]; onOpenTool: (tool: ToolId) => void }) {
+  return (
+    <>
+      {groups.map(({ group, tools }) => (
+        <div className="tool-group" key={group.id}>
+          <div className="tool-group-head">
+            <h3>{group.title}</h3>
+            <span>{group.blurb}</span>
+          </div>
+          <div className="tool-grid">
+            {tools.map((tool) => (
+              <button key={tool.id} className="tool-card" onClick={() => onOpenTool(tool.id)}>
+                <span className="tool-card-title">{tool.title}</span>
+                <span className="tool-card-summary">{tool.summary}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }

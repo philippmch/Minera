@@ -22,7 +22,7 @@ export function paletteCommands({ views, onSelectView, onOpenTool, extra = [] }:
   const toolCommands = TOOLS.map((tool) => ({
     id: `tool:${tool.id}`,
     title: tool.title,
-    section: toolGroup(tool.group).title,
+    section: tool.reference ? `Reference API · ${toolGroup(tool.group).title}` : toolGroup(tool.group).title,
     detail: tool.summary,
     keywords: tool.keywords,
     run: () => onOpenTool(tool.id),

@@ -9,6 +9,7 @@ import { downloadQueryBlob } from "../log-query";
 import { DiagnosticTableView } from "./ModelDiagnosticsInspection";
 
 import { ReplayDurationWorkbench } from "./ReplayDurationWorkbench";
+import { Advanced } from "./ui";
 
 export function TokenReplayWorkspace({file,source=null}:{file:File|null;source?:ActiveMiningSourceDescriptor|null}){
   const [log,setLog]=useState<File|null>(file);const [model,setModel]=useState<File|null>(null);
@@ -30,7 +31,6 @@ export function TokenReplayWorkspace({file,source=null}:{file:File|null;source?:
   const download=(raw:string,name:string,type="application/json")=>downloadQueryBlob(new Blob([activeMiningSourceBytes(raw)],{type}),name);
   const isXes=/\.(?:xes|xes\.gz|gz)$/i.test(log?.name??"");
   return <>
-    <ReplayDurationWorkbench file={file} source={source} replayRun={run}/>
     <section className="panel" aria-label="Independent token replay">
       <div className="panel-head"><h2>Replay a log against a PNML model</h2><span className="panel-meta">Independent inputs</span></div>
       <p>Upload a log and its model, choose the replay policy, then inspect every trace, marking and diagnostic. The model keeps its supplied initial and final tokens.</p>
@@ -81,5 +81,6 @@ export function TokenReplayWorkspace({file,source=null}:{file:File|null;source?:
       <DiagnosticTableView key={run.raw+":"+table.id} table={table} noun="replay"/>
       <details><summary>Complete token replay JSON</summary><pre>{run.raw}</pre></details>
     </section>}
+    <Advanced title="Replay durations" hint="Compare problem cases with activity baselines, or reanalyse saved replay diagnostics"><ReplayDurationWorkbench file={file} source={source} replayRun={run}/></Advanced>
   </>;
 }

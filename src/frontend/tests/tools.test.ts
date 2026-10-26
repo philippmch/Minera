@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { groupTools, matchesQuery, searchTools, toolById, TOOL_GROUPS, TOOLS, VIEWS } from "../src/tools";
+import { EVERYDAY_TOOLS, groupTools, matchesQuery, REFERENCE_TOOLS, searchTools, toolById, TOOL_GROUPS, TOOLS, VIEWS } from "../src/tools";
 import { filterCommands, paletteCommands } from "../src/components/CommandPalette";
 import { Landing } from "../src/components/Landing";
 import { Sidebar } from "../src/components/Sidebar";
@@ -49,6 +49,12 @@ describe("tool registry", () => {
       expect(sidebar).toContain(`>${tool.title}</button>`);
     }
     expect(sidebar).toContain("orders.csv");
+    expect(EVERYDAY_TOOLS.length + REFERENCE_TOOLS.length).toBe(TOOLS.length);
+    const referenceAt = landing.indexOf("Reference API workbenches");
+    expect(referenceAt).toBeGreaterThan(0);
+    for (const tool of EVERYDAY_TOOLS) expect(landing.indexOf(`>${tool.title}</span>`)).toBeLessThan(referenceAt);
+    for (const tool of REFERENCE_TOOLS) expect(landing.indexOf(`>${tool.title}</span>`)).toBeGreaterThan(referenceAt);
+    expect(sidebar).toContain('<details class="sidebar-tool-group sidebar-reference" open="">');
     expect(sidebar).toContain('aria-current="page" title="Check a log against a Declare model or play the model out.">Declare models');
     expect(sidebar).not.toContain('aria-current="page">Process map');
   });

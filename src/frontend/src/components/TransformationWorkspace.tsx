@@ -1,4 +1,5 @@
 import {OriginalLabelSplittingWorkspace} from "./OriginalLabelSplittingWorkspace";
+import { Advanced } from "./ui";
 import {OriginalFeaturesWorkspace} from "./OriginalFeaturesWorkspace";
 import {LiteralControlsPanel} from "./LiteralControlsPanel";
 import {logToFeaturesQuery, logToTargetQuery} from "../api";
@@ -52,7 +53,6 @@ export function TransformationWorkspace({data,available,mining,onOpenTransformed
       {onUseCube&&run.result.family==="LOG_TO_FEATURES"&&run.result.variant==="trace_based"&&<div className="query-actions"><button className="btn-open" disabled={disabled} onClick={()=>{try{onUseCube(cubeFeatureFile(run));}catch(cause){setError(cause instanceof Error?cause.message:String(cause));}}}>Explore case features as a process cube</button></div>}
     </section>}
     {method!=="labels"&&<LiteralControlsPanel key={method} group={method==="targets"?"target":"features"} sourceId={schema?.source_id} available={available} mining={mining} configurationIdentity={method==="targets"?targets:features} legacyFields={literalFields}/>}
-    <OriginalFeaturesWorkspace/>
-    <OriginalLabelSplittingWorkspace/>
+    <Advanced title="Reference API: features and label splitting" hint="Extract features or split labels call by call on independent inputs"><OriginalFeaturesWorkspace/><OriginalLabelSplittingWorkspace/></Advanced>
   </>;
 }

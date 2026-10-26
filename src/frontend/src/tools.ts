@@ -84,6 +84,11 @@ export interface ToolSpec {
   group: ToolGroupId;
   title: string;
   summary: string;
+  /**
+   * A workbench that mirrors one reference API call by call, with raw option
+   * objects. Listed apart from the everyday tools under "Reference API".
+   */
+  reference?: boolean;
   /** Extra words the search matches besides the title and summary. */
   keywords?: string;
 }
@@ -95,16 +100,16 @@ export const TOOLS: readonly ToolSpec[] = [
   { id: "related-logs", group: "data", title: "Relate logs", summary: "Inspect event links, timestamp crossings and case-relation merges across logs.", keywords: "interleavings merge dataframe" },
   { id: "streaming", group: "data", title: "Event streams", summary: "Replay CSV or XES files as event streams and follow the streaming results batch by batch.", keywords: "live online reader declare monitor" },
   { id: "process-cube", group: "data", title: "Process cubes", summary: "Compare cases across two numeric, categorical or composite dimensions.", keywords: "dimensions slice dice" },
-  { id: "log-query", group: "data", title: "SQL and log queries", summary: "Run native SQL and queries over logs and tables, then open the result as a new log.", keywords: "sql filter table dataframe" },
-  { id: "features", group: "data", title: "Log features", summary: "Extract event, case or temporal features from a log.", keywords: "machine learning vectors" },
-  { id: "labels", group: "data", title: "Label splitting", summary: "Split activity labels by the context they occur in.", keywords: "relabel refine" },
-  { id: "embedding-filter", group: "data", title: "Embeddings and filters", summary: "Filter logs with the native filters, or embed logs and literal text.", keywords: "vector embedding" },
+  { id: "log-query", group: "data", reference: true, title: "SQL and log queries", summary: "Run native SQL and queries over logs and tables, then open the result as a new log.", keywords: "sql filter table dataframe" },
+  { id: "features", group: "data", reference: true, title: "Log features", summary: "Extract event, case or temporal features from a log.", keywords: "machine learning vectors" },
+  { id: "labels", group: "data", reference: true, title: "Label splitting", summary: "Split activity labels by the context they occur in.", keywords: "relabel refine" },
+  { id: "embedding-filter", group: "data", reference: true, title: "Embeddings and filters", summary: "Filter logs with the native filters, or embed logs and literal text.", keywords: "vector embedding" },
   { id: "saved-structures", group: "data", title: "Saved structures", summary: "Convert a saved trie, or query a saved list of intervals.", keywords: "trie interval tree" },
 
   { id: "workflow-inputs", group: "discover", title: "Workflow discovery", summary: "Upload a log, an event table or a DFG and discover a workflow model from it.", keywords: "alpha heuristics miner" },
   { id: "inductive-inputs", group: "discover", title: "Inductive discovery", summary: "Discover an Inductive process tree from a log, an event table, weighted variants or a DFG.", keywords: "inductive miner imf imd tree" },
-  { id: "ilp-genetic", group: "discover", title: "ILP and genetic mining", summary: "Run the ILP and genetic miners on a supplied log and inspect every step.", keywords: "integer linear programming evolutionary" },
-  { id: "genetic-matrix", group: "discover", title: "Causal matrix to Petri net", summary: "Convert a genetic causal matrix into a workflow net.", keywords: "genetic matrix" },
+  { id: "ilp-genetic", group: "discover", reference: true, title: "ILP and genetic mining", summary: "Run the ILP and genetic miners on a supplied log and inspect every step.", keywords: "integer linear programming evolutionary" },
+  { id: "genetic-matrix", group: "discover", reference: true, title: "Causal matrix to Petri net", summary: "Convert a genetic causal matrix into a workflow net.", keywords: "genetic matrix" },
   { id: "tree-generation", group: "discover", title: "Generate process trees", summary: "Generate random process trees and play them out into logs.", keywords: "synthetic random tree" },
 
   { id: "token-replay", group: "conformance", title: "Token replay", summary: "Replay a log on a PNML model and inspect missing, remaining and consumed tokens.", keywords: "fitness pnml" },
@@ -112,32 +117,32 @@ export const TOOLS: readonly ToolSpec[] = [
   { id: "graph-alignment", group: "conformance", title: "DFG and graph alignment", summary: "Align traces against a directly-follows graph or a PNML model.", keywords: "dfg alignment" },
   { id: "tree-alignment", group: "conformance", title: "Process tree alignment", summary: "Align traces against a process tree with the search, DP or MILP variants.", keywords: "tree alignment milp" },
   { id: "anti-multi", group: "conformance", title: "Anti- and multi-alignment", summary: "Compare a set of traces with a PNML model through anti- and multi-alignments.", keywords: "anti-alignment multi-alignment" },
-  { id: "edit-distance", group: "conformance", title: "Edit-distance alignment", summary: "Align or project event sequences against each other by edit distance.", keywords: "levenshtein" },
-  { id: "declare", group: "conformance", title: "Declare models", summary: "Check a log against a Declare model or play the model out.", keywords: "constraints ltl" },
-  { id: "log-skeleton", group: "conformance", title: "Log skeleton checks", summary: "Check a log against a log skeleton and diagnose the results.", keywords: "constraints" },
-  { id: "footprints", group: "conformance", title: "Footprints comparison", summary: "Compare log and model footprints and inspect the conformance metrics.", keywords: "footprint matrix" },
-  { id: "quality", group: "conformance", title: "Model quality", summary: "Score fitness, precision, generalization and simplicity of a model against a log.", keywords: "evaluation metrics" },
-  { id: "emd", group: "conformance", title: "Stochastic language distance", summary: "Compare two weighted stochastic languages with the earth mover's distance.", keywords: "emd stochastic" },
+  { id: "edit-distance", group: "conformance", reference: true, title: "Edit-distance alignment", summary: "Align or project event sequences against each other by edit distance.", keywords: "levenshtein" },
+  { id: "declare", group: "conformance", reference: true, title: "Declare models", summary: "Check a log against a Declare model or play the model out.", keywords: "constraints ltl" },
+  { id: "log-skeleton", group: "conformance", reference: true, title: "Log skeleton checks", summary: "Check a log against a log skeleton and diagnose the results.", keywords: "constraints" },
+  { id: "footprints", group: "conformance", reference: true, title: "Footprints comparison", summary: "Compare log and model footprints and inspect the conformance metrics.", keywords: "footprint matrix" },
+  { id: "quality", group: "conformance", reference: true, title: "Model quality", summary: "Score fitness, precision, generalization and simplicity of a model against a log.", keywords: "evaluation metrics" },
+  { id: "emd", group: "conformance", reference: true, title: "Stochastic language distance", summary: "Compare two weighted stochastic languages with the earth mover's distance.", keywords: "emd stochastic" },
 
   { id: "model-exchange", group: "models", title: "Model files", summary: "Open PNML, BPMN, PTML and DFG files, view them and convert between formats.", keywords: "import export bpmn pnml" },
   { id: "model-conversion", group: "models", title: "Convert and reduce models", summary: "Convert a process model to another notation, or reduce it.", keywords: "conversion reduction" },
-  { id: "petri-analysis", group: "models", title: "Petri net analysis", summary: "Check soundness, reachability and structural properties of a Petri net.", keywords: "soundness workflow net reachability" },
+  { id: "petri-analysis", group: "models", reference: true, title: "Petri net analysis", summary: "Check soundness, reachability and structural properties of a Petri net.", keywords: "soundness workflow net reachability" },
 
   { id: "monte-carlo", group: "simulate", title: "Monte Carlo simulation", summary: "Simulate a PNML model with fitted or supplied timing distributions.", keywords: "simulation stochastic" },
   { id: "playout", group: "simulate", title: "Model playout", summary: "Sample or enumerate the behavior of a Petri net, DFG or process tree.", keywords: "synthetic log generate" },
-  { id: "oc-playout", group: "simulate", title: "Object-centric playout", summary: "Play out an object-centric Petri net or causal net into an object-centric log.", keywords: "ocpn ocel" },
+  { id: "oc-playout", group: "simulate", reference: true, title: "Object-centric playout", summary: "Play out an object-centric Petri net or causal net into an object-centric log.", keywords: "ocpn ocel" },
 
-  { id: "timing", group: "time", title: "Performance spectra and batches", summary: "Compute performance spectra and detect batches in a supplied log.", keywords: "spectrum batch" },
-  { id: "time-analysis", group: "time", title: "Case and service times", summary: "Measure passed, service, cycle and case times.", keywords: "duration lead time" },
-  { id: "temporal", group: "time", title: "Temporal profiles", summary: "Build temporal profiles and check a log against them.", keywords: "temporal profile deviation" },
-  { id: "bose", group: "time", title: "Concept drift", summary: "Detect concept drift with the Bose method and inspect its statistics.", keywords: "bose drift change point" },
+  { id: "timing", group: "time", reference: true, title: "Performance spectra and batches", summary: "Compute performance spectra and detect batches in a supplied log.", keywords: "spectrum batch" },
+  { id: "time-analysis", group: "time", reference: true, title: "Case and service times", summary: "Measure passed, service, cycle and case times.", keywords: "duration lead time" },
+  { id: "temporal", group: "time", reference: true, title: "Temporal profiles", summary: "Build temporal profiles and check a log against them.", keywords: "temporal profile deviation" },
+  { id: "bose", group: "time", reference: true, title: "Concept drift", summary: "Detect concept drift with the Bose method and inspect its statistics.", keywords: "bose drift change point" },
 
-  { id: "organizational", group: "organization", title: "Social networks and roles", summary: "Discover handover networks, roles and resource profiles.", keywords: "sna resources handover working together" },
-  { id: "decisions", group: "organization", title: "Decision mining", summary: "Learn the decision rules behind the choices in a PNML model.", keywords: "decision tree guards" },
-  { id: "root-cause", group: "organization", title: "Root cause analysis", summary: "Compare two cohorts of cases and find the attributes that separate them.", keywords: "cohort" },
-  { id: "clustering", group: "organization", title: "Trace clustering", summary: "Cluster the cases of a log and inspect each cluster.", keywords: "cluster" },
+  { id: "organizational", group: "organization", reference: true, title: "Social networks and roles", summary: "Discover handover networks, roles and resource profiles.", keywords: "sna resources handover working together" },
+  { id: "decisions", group: "organization", reference: true, title: "Decision mining", summary: "Learn the decision rules behind the choices in a PNML model.", keywords: "decision tree guards" },
+  { id: "root-cause", group: "organization", reference: true, title: "Root cause analysis", summary: "Compare two cohorts of cases and find the attributes that separate them.", keywords: "cohort" },
+  { id: "clustering", group: "organization", reference: true, title: "Trace clustering", summary: "Cluster the cases of a log and inspect each cluster.", keywords: "cluster" },
 
-  { id: "anonymization", group: "privacy", title: "Anonymization", summary: "Anonymize a log or release differentially private trace-variant queries.", keywords: "privacy sacofa pripel differential" },
+  { id: "anonymization", group: "privacy", reference: true, title: "Anonymization", summary: "Anonymize a log or release differentially private trace-variant queries.", keywords: "privacy sacofa pripel differential" },
 
   { id: "prompt-chat", group: "assist", title: "Ask a model", summary: "Send a prompt to a language model without opening a dataset.", keywords: "llm chat openai anthropic" },
 ];
@@ -169,6 +174,9 @@ export function matchesQuery(query: string, ...fields: (string | undefined)[]): 
 export function searchTools(query: string, tools: readonly ToolSpec[] = TOOLS): ToolSpec[] {
   return tools.filter((tool) => matchesQuery(query, tool.title, tool.summary, tool.keywords, toolGroup(tool.group).title));
 }
+
+export const EVERYDAY_TOOLS: readonly ToolSpec[] = TOOLS.filter((tool) => !tool.reference);
+export const REFERENCE_TOOLS: readonly ToolSpec[] = TOOLS.filter((tool) => tool.reference);
 
 export function groupTools(tools: readonly ToolSpec[] = TOOLS): { group: ToolGroup; tools: ToolSpec[] }[] {
   return TOOL_GROUPS.map((group) => ({ group, tools: tools.filter((tool) => tool.group === group.id) })).filter((entry) => entry.tools.length > 0);
