@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -6,6 +7,7 @@
 
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/pnml.hpp"
+#include "minera/python_csv_stream.hpp"
 #include "minera/streaming_tbr.hpp"
 
 int usage(const char* program) {
@@ -64,12 +66,35 @@ int main(int argc, char** argv) {
     }
     options.activity_attribute = import_options.activity_column;
     options.case_id_attribute = import_options.case_id_column;
-    const auto net = minera::import_pnml(argv[1]);
-    const auto log = minera::import_csv_event_log(argv[2], import_options);
-    minera::StreamingTokenReplay replay(net, options);
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events)
-        (void)replay.receive(event, trace.case_id);
+    // The forward variant reads the document's markings as the reference
+    // PNML importer does; backwards keeps the workflow source and sink.
+    minera::PnmlImportOptions pnml_options;
+    if (options.variant == minera::StreamingTbrVariant::kForward)
+      pnml_options.public_marking_semantics = true;
+    const auto document = minera::import_pnml_document(argv[1], pnml_options);
+    if (options.variant == minera::StreamingTbrVariant::kForward) {
+      for (const auto& tokens : document.initial_marking)
+        options.initial_marking.push_back(static_cast<int>(tokens));
+      for (const auto& tokens : document.final_marking)
+        options.final_marking.push_back(static_cast<int>(tokens));
+      if (document.arc_occurrences) {
+        options.input_place_order.resize(document.net.transitions().size());
+        for (const auto& arc : *document.arc_occurrences) {
+          auto& order = options.input_place_order[arc.transition];
+          if (arc.input && std::find(order.begin(), order.end(), arc.place) == order.end())
+            order.push_back(arc.place);
+        }
+      }
+    }
+    minera::StreamingTokenReplay replay(document.net, options);
+    // Events arrive in file order as the reference CSV event stream reads
+    // them; one whose case is missing or None is skipped.
+    const auto records = minera::read_python_csv_event_stream(argv[2]);
+    for (std::size_t i = 0; i < records.size(); ++i) {
+      const auto* case_id = records[i].find(import_options.case_id_column);
+      if (!case_id || !case_id->has_value()) continue;
+      (void)replay.receive(minera::python_csv_record_event(records[i], i), **case_id);
+    }
     const auto payload = minera::serialize_streaming_tbr_json(replay.snapshot()) +
                          '\n';
     if (output_path.empty()) {

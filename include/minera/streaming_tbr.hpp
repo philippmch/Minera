@@ -27,6 +27,13 @@ struct StreamingTbrOptions {
   std::string case_id_attribute = "case_id";
   std::size_t maximum_iterations_invisibles = 10;
   bool stop_immediately_unfit = false;
+  // Token counts per place; empty puts one token on the net's source (initial)
+  // or sink (final).
+  std::vector<int> initial_marking;
+  std::vector<int> final_marking;
+  // Per transition, its input places in document arc order (each once); the
+  // reference checks missing tokens in this order. Empty uses net order.
+  std::vector<std::vector<std::size_t>> input_place_order;
 };
 
 struct StreamingTbrCaseSnapshot {
@@ -60,8 +67,13 @@ struct StreamingTbrSnapshot {
   std::map<std::string, StreamingTbrCaseSnapshot> cases;
 };
 
-// Stateful token replay over open cases. Visible events advance one marking;
-// silent transitions are searched with a bounded breadth-first closure.
+// Stateful token replay over open cases. The forward variant follows the
+// reference streaming replay: an enabled transition of the label fires;
+// otherwise silent shortest paths, each from a distinct marked place outside
+// the transition's preset, may enable it; otherwise missing tokens are
+// inserted for the first transition of the label. Termination compares the
+// marking with the final marking exactly. BACKWARDS keeps a bounded
+// breadth-first silent closure.
 class StreamingTokenReplay {
  public:
   explicit StreamingTokenReplay(PetriNet net, StreamingTbrOptions options = {});
@@ -90,6 +102,9 @@ class StreamingTokenReplay {
   using Marking = std::vector<int>;
   struct CaseState {
     Marking marking;
+    // Marked places in the order they gained a token, as the reference
+    // marking dictionary iterates them; this order picks silent-path sources.
+    std::vector<std::size_t> order;
     std::size_t events = 0;
     std::uint64_t missing = 0;
     bool hard_unfit = false;
@@ -110,11 +125,20 @@ class StreamingTokenReplay {
   [[nodiscard]] std::uint64_t final_missing(const Marking& marking) const;
   [[nodiscard]] std::uint64_t final_remaining(const Marking& marking) const;
   [[nodiscard]] std::string variant_name() const noexcept;
+  void ordered_fire(CaseState& state, std::size_t transition) const;
+  [[nodiscard]] std::optional<CaseState> enable_with_invisibles(
+      const CaseState& state, std::size_t transition) const;
 
   PetriNet net_;
   StreamingTbrOptions options_;
   std::map<std::string, std::vector<std::size_t>> transitions_by_activity_;
   std::vector<std::size_t> silent_transitions_;
+  Marking initial_;
+  std::vector<std::size_t> initial_order_;
+  Marking final_;
+  // silent_paths_[from][to]: a shortest sequence of silent transitions moving
+  // a token from one place to another (breadth first, index order).
+  std::vector<std::vector<std::optional<std::vector<std::size_t>>>> silent_paths_;
   std::map<std::string, CaseState> cases_;
   std::size_t total_events_processed_ = 0;
   std::uint64_t total_missing_ = 0;

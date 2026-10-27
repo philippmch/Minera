@@ -1,5 +1,7 @@
 #include "minera/streaming_tbr.hpp"
 
+#include "minera/streaming_dfg.hpp"
+
 #include <algorithm>
 #include <iomanip>
 #include <limits>
@@ -48,8 +50,11 @@ struct VectorLess {
 StreamingTokenReplay::StreamingTokenReplay(PetriNet net,
                                              StreamingTbrOptions options)
     : net_(std::move(net)), options_(std::move(options)) {
-  if (net_.place_count() == 0 || net_.source() >= net_.place_count() ||
-      net_.sink() >= net_.place_count())
+  const bool explicit_markings =
+      !options_.initial_marking.empty() && !options_.final_marking.empty();
+  if (net_.place_count() == 0 ||
+      (!explicit_markings && (net_.source() >= net_.place_count() ||
+                              net_.sink() >= net_.place_count())))
     throw std::invalid_argument("streaming token replay net has invalid boundaries");
   if (options_.activity_attribute.empty() || options_.case_id_attribute.empty())
     throw std::invalid_argument(
@@ -73,6 +78,85 @@ StreamingTokenReplay::StreamingTokenReplay(PetriNet net,
           transition);
     }
   }
+  const auto places = net_.place_count();
+  const auto marking_or = [&](const std::vector<int>& given, std::size_t place) {
+    if (given.empty()) {
+      Marking marking(places, 0);
+      marking[place] = 1;
+      return marking;
+    }
+    if (given.size() != places)
+      throw std::invalid_argument("streaming token replay marking size is invalid");
+    for (const auto tokens : given)
+      if (tokens < 0) throw std::invalid_argument("streaming token replay marking is negative");
+    return given;
+  };
+  initial_ = marking_or(options_.initial_marking, net_.source());
+  final_ = marking_or(options_.final_marking, net_.sink());
+  for (std::size_t place = 0; place < places; ++place)
+    if (initial_[place] > 0) initial_order_.push_back(place);
+  silent_paths_.assign(places, std::vector<std::optional<std::vector<std::size_t>>>(places));
+  for (std::size_t from = 0; from < places; ++from) {
+    auto& paths = silent_paths_[from];
+    paths[from] = std::vector<std::size_t>{};
+    std::queue<std::size_t> pending;
+    pending.push(from);
+    while (!pending.empty()) {
+      const auto place = pending.front();
+      pending.pop();
+      for (const auto silent : silent_transitions_) {
+        const auto& inputs = net_.transitions()[silent].inputs;
+        if (std::find(inputs.begin(), inputs.end(), place) == inputs.end()) continue;
+        for (const auto next : net_.transitions()[silent].outputs) {
+          if (paths[next]) continue;
+          auto path = *paths[place];
+          path.push_back(silent);
+          paths[next] = std::move(path);
+          pending.push(next);
+        }
+      }
+    }
+  }
+}
+
+void StreamingTokenReplay::ordered_fire(CaseState& state,
+                                        std::size_t transition) const {
+  const auto& current = net_.transitions()[transition];
+  for (const auto place : current.inputs) {
+    if (--state.marking[place] == 0)
+      state.order.erase(std::find(state.order.begin(), state.order.end(), place));
+  }
+  for (const auto place : current.outputs)
+    if (state.marking[place]++ == 0) state.order.push_back(place);
+}
+
+std::optional<StreamingTokenReplay::CaseState>
+StreamingTokenReplay::enable_with_invisibles(const CaseState& state,
+                                             std::size_t transition) const {
+  const auto& inputs = net_.transitions()[transition].inputs;
+  std::vector<int> required(net_.place_count(), 0);
+  for (const auto place : inputs) ++required[place];
+  CaseState copy = state;
+  std::set<std::size_t> used;
+  std::set<std::size_t> visited;
+  for (const auto place : inputs) {
+    if (!visited.insert(place).second || copy.marking[place] >= required[place]) continue;
+    const std::vector<std::size_t>* best = nullptr;
+    std::size_t best_source = 0;
+    for (const auto source : copy.order) {
+      if (required[source] > 0 || used.contains(source)) continue;
+      const auto& path = silent_paths_[source][place];
+      if (path && (!best || path->size() < best->size())) best = &*path, best_source = source;
+    }
+    if (!best) return std::nullopt;
+    for (const auto silent : *best) {
+      if (!enabled(copy.marking, silent)) return std::nullopt;
+      ordered_fire(copy, silent);
+    }
+    used.insert(best_source);
+  }
+  if (!enabled(copy.marking, transition)) return std::nullopt;
+  return copy;
 }
 
 std::string StreamingTokenReplay::variant_name() const noexcept {
@@ -144,8 +228,7 @@ StreamingTokenReplay::route_to_visible(
 
 std::optional<StreamingTokenReplay::Route>
 StreamingTokenReplay::route_to_final(const Marking& marking) const {
-  Marking target(marking.size(), 0);
-  target[net_.sink()] = 1;
+  const Marking& target = final_;
   if (marking == target) return Route{marking, {}};
   struct Node {
     Marking marking;
@@ -178,7 +261,7 @@ std::uint64_t StreamingTokenReplay::final_missing(
     const Marking& marking) const {
   std::uint64_t missing = 0;
   for (std::size_t place = 0; place < marking.size(); ++place) {
-    const int target = place == net_.sink() ? 1 : 0;
+    const int target = final_[place];
     if (marking[place] < target)
       missing += static_cast<std::uint64_t>(target - marking[place]);
   }
@@ -189,7 +272,7 @@ std::uint64_t StreamingTokenReplay::final_remaining(
     const Marking& marking) const {
   std::uint64_t remaining = 0;
   for (std::size_t place = 0; place < marking.size(); ++place) {
-    const int target = place == net_.sink() ? 1 : 0;
+    const int target = final_[place];
     if (marking[place] > target)
       remaining += static_cast<std::uint64_t>(marking[place] - target);
   }
@@ -198,7 +281,7 @@ std::uint64_t StreamingTokenReplay::final_remaining(
 
 StreamingTbrEventResult StreamingTokenReplay::receive(
     std::string_view case_id, std::string_view activity) {
-  if (case_id.empty() || activity.empty()) return {};
+  // Empty case ids and activities are ordinary values, as in the reference.
   std::lock_guard<std::mutex> lock(mutex_);
   const auto transitions_it = transitions_by_activity_.find(
       std::string(activity));
@@ -210,8 +293,7 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
   }
   const std::string case_key(case_id);
   auto [it, inserted] = cases_.try_emplace(case_key);
-  if (inserted) it->second.marking.assign(net_.place_count(), 0),
-                   it->second.marking[net_.source()] = 1;
+  if (inserted) it->second.marking = initial_, it->second.order = initial_order_;
   auto& state = it->second;
   if (options_.stop_immediately_unfit && state.hard_unfit)
     return {case_key, std::string(activity), 0, 0, false, false};
@@ -242,18 +324,47 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
         if (options_.stop_immediately_unfit) accepted = false;
       }
     }
-  } else if (const auto route = route_to_visible(state.marking, visible)) {
-    state.marking = route->marking;
-    auto selected = visible.front();
-    for (const auto transition : visible) {
+  } else {
+    bool fired = false;
+    for (const auto transition : visible)
       if (enabled(state.marking, transition)) {
-        selected = transition;
+        ordered_fire(state, transition);
+        fired = true;
         break;
       }
+    for (std::size_t i = 0; !fired && i < visible.size(); ++i)
+      if (auto next = enable_with_invisibles(state, visible[i])) {
+        next->events = state.events;
+        next->missing = state.missing;
+        state = std::move(*next);
+        ordered_fire(state, visible[i]);
+        fired = true;
+      }
+    if (!fired) {
+      // Missing tokens are inserted for the first transition, counted per
+      // input place in arc order. The reference fails on reaching an input
+      // place that still holds a token: the count so far stays and the
+      // marking is left unchanged.
+      const auto transition = visible.front();
+      const auto& inputs = net_.transitions()[transition].inputs;
+      std::vector<std::size_t> places;
+      if (transition < options_.input_place_order.size() &&
+          !options_.input_place_order[transition].empty())
+        places = options_.input_place_order[transition];
+      else
+        for (const auto place : inputs)
+          if (std::find(places.begin(), places.end(), place) == places.end()) places.push_back(place);
+      for (const auto place : places) {
+        if (state.marking[place] > 0) {
+          state.missing += missing_added;
+          total_missing_ += missing_added;
+          return {case_key, std::string(activity), 0, missing_added, false, state.missing == 0};
+        }
+        missing_added += static_cast<std::uint64_t>(std::count(inputs.begin(), inputs.end(), place));
+      }
+      for (const auto place : net_.transitions()[transition].outputs)
+        if (state.marking[place]++ == 0) state.order.push_back(place);
     }
-    missing_added += fire(state.marking, selected);
-  } else {
-    missing_added += fire(state.marking, visible.front());
   }
   ++state.events;
   state.missing += missing_added;
@@ -265,9 +376,12 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
 
 StreamingTbrEventResult StreamingTokenReplay::receive(
     const Event& event, std::string_view case_id) {
+  // The reference skips an event whose activity is missing or None.
+  const auto activity = streaming_event_present_value(event, options_.activity_attribute);
+  if (!activity) return {};
   const std::string resolved_case =
       case_id.empty() ? event.case_id : std::string(case_id);
-  return receive(resolved_case, event.activity);
+  return receive(resolved_case, *activity);
 }
 
 std::optional<StreamingTbrTerminationResult>
@@ -277,7 +391,9 @@ StreamingTokenReplay::terminate_case(const std::string& case_id) {
   if (it == cases_.end()) return std::nullopt;
   auto state = std::move(it->second);
   auto marking = state.marking;
-  if (const auto route = route_to_final(marking)) marking = route->marking;
+  // The reference compares the marking with the final one as it stands.
+  if (options_.variant == StreamingTbrVariant::kBackwards)
+    if (const auto route = route_to_final(marking)) marking = route->marking;
   const auto missing = state.missing + final_missing(marking);
   const auto remaining = final_remaining(marking);
   total_missing_ += final_missing(marking);
