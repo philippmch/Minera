@@ -6,6 +6,7 @@
 #include <string_view>
 
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/python_csv_stream.hpp"
 #include "minera/streaming_dfg.hpp"
 #include "minera/streaming_store.hpp"
 
@@ -46,7 +47,9 @@ int main(int argc, char** argv) {
         return usage(argv[0]);
       }
     }
-    const auto log = minera::import_csv_event_log(argv[1], import_options);
+    // Events arrive in file order as the reference CSV event stream reads
+    // them; one without the case column is skipped.
+    const auto records = minera::read_python_csv_event_stream(argv[1]);
     minera::StreamingDfgDiscovery stream(
         {import_options.activity_column, import_options.case_id_column});
     std::optional<minera::PersistentStreamingDfg> persistent;
@@ -56,12 +59,15 @@ int main(int argc, char** argv) {
           minera::StreamingDfgOptions{import_options.activity_column,
                                       import_options.case_id_column});
     }
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events)
-        if (persistent)
-          persistent->receive(event, trace.case_id);
-        else
-          stream.receive(event, trace.case_id);
+    for (std::size_t i = 0; i < records.size(); ++i) {
+      const auto case_id = minera::python_csv_case_key(records[i], import_options.case_id_column);
+      if (!case_id) continue;
+      const auto event = minera::python_csv_record_event(records[i], i);
+      if (persistent)
+        persistent->receive(event, *case_id);
+      else
+        stream.receive(event, *case_id);
+    }
     const auto snapshot = persistent ? persistent->snapshot() : stream.snapshot();
     const auto payload =
         minera::serialize_streaming_dfg_json(snapshot) + '\n';

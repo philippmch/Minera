@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/python_csv_stream.hpp"
 #include "minera/streaming_footprints.hpp"
 
 namespace {
@@ -109,13 +110,17 @@ int main(int argc, char** argv) {
     for (const auto& activity : model.end_activities)
       model.activities.insert(activity);
 
-    const auto log = minera::import_csv_event_log(argv[1], import_options);
+    // Events arrive in file order as the reference CSV event stream reads
+    // them; one whose case is missing or None is skipped.
+    const auto records = minera::read_python_csv_event_stream(argv[1]);
     minera::StreamingFootprintsConformance monitor(
         std::move(model),
         {import_options.activity_column, import_options.case_id_column});
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events)
-        (void)monitor.receive(event, trace.case_id);
+    for (std::size_t i = 0; i < records.size(); ++i) {
+      const auto* case_id = records[i].find(import_options.case_id_column);
+      if (!case_id || !case_id->has_value()) continue;
+      (void)monitor.receive(minera::python_csv_record_event(records[i], i), **case_id);
+    }
     if (terminate_all) monitor.terminate_all();
     const auto payload =
         minera::serialize_streaming_footprints_json(monitor.snapshot()) + '\n';

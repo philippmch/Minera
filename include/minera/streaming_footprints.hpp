@@ -59,8 +59,9 @@ class StreamingFootprintsConformance {
     return options_;
   }
 
-  // Empty identifiers are skipped and return false. Accepted events return a
-  // result containing only deviations introduced by that event.
+  // Empty identifiers are ordinary values. The result holds only deviations
+  // introduced by that event. The Event overload reads the selected activity
+  // and skips (default result) an event whose key is missing or null.
   [[nodiscard]] StreamingFootprintsEventResult receive(
       std::string_view case_id, std::string_view activity);
   [[nodiscard]] StreamingFootprintsEventResult receive(

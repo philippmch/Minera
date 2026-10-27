@@ -34,6 +34,10 @@ struct StreamingDfgSnapshot {
 // activity when the selector names it. nullopt when the key is missing.
 [[nodiscard]] std::optional<std::string> streaming_event_activity(
     const Event& event, std::string_view selector);
+// The selected value for the reference conformance monitors, which skip an
+// event whose key is missing or whose value is None: nullopt in both cases.
+[[nodiscard]] std::optional<std::string> streaming_event_present_value(
+    const Event& event, std::string_view selector);
 
 // Every accepted event updates its activity count and either starts a case or
 // increments the edge from that case's previous activity. End counts are

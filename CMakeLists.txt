@@ -265,6 +265,7 @@ add_library(minera_core
   src/backend/segment_filter.cpp
   src/backend/service_time.cpp
   src/backend/streaming_dfg.cpp
+  src/backend/python_csv_stream.cpp
   src/backend/streaming_store.cpp
   src/backend/streaming_footprints.cpp
   src/backend/streaming_import.cpp
@@ -1361,6 +1362,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_streaming_dfg_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_dfg_tests COMMAND minera_streaming_dfg_tests)
 
+  add_executable(minera_python_csv_stream_tests src/backend/tests/test_python_csv_stream.cpp)
+  target_link_libraries(minera_python_csv_stream_tests PRIVATE minera::core)
+  target_compile_features(minera_python_csv_stream_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_python_csv_stream_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_python_csv_stream_tests COMMAND minera_python_csv_stream_tests)
   add_executable(minera_streaming_store_tests src/backend/tests/test_streaming_store.cpp)
   target_link_libraries(minera_streaming_store_tests PRIVATE minera::core)
   target_compile_features(minera_streaming_store_tests PRIVATE cxx_std_20)

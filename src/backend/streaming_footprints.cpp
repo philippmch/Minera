@@ -1,5 +1,7 @@
 #include "minera/streaming_footprints.hpp"
 
+#include "minera/streaming_dfg.hpp"
+
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -46,41 +48,47 @@ StreamingFootprintsConformance::StreamingFootprintsConformance(
 
 StreamingFootprintsEventResult StreamingFootprintsConformance::receive(
     std::string_view case_id, std::string_view activity) {
-  if (case_id.empty() || activity.empty()) return {};
-
+  // As the reference monitor: empty identifiers are ordinary values. An
+  // activity outside the model is a deviation of its case when the case is
+  // open (its last activity stays), and opens no case otherwise.
   std::lock_guard<std::mutex> lock(mutex_);
   const std::string case_key(case_id);
   const std::string activity_key(activity);
-  auto [it, inserted] = cases_.try_emplace(case_key);
-  CaseState& state = it->second;
-  if (inserted) state.first_activity = activity_key;
-
-  std::size_t deviations = 0;
+  ++total_events_processed_;
+  auto it = cases_.find(case_key);
   if (!model_.activities.contains(activity_key)) {
-    ++deviations;
-  } else if (state.events == 0) {
+    ++total_deviations_;
+    if (it == cases_.end()) return {case_key, activity_key, total_events_processed_, 1, false};
+    ++it->second.events;
+    ++it->second.deviations;
+    return {case_key, activity_key, total_events_processed_, 1, false};
+  }
+  std::size_t deviations = 0;
+  if (it == cases_.end()) {
+    it = cases_.try_emplace(case_key).first;
+    it->second.first_activity = activity_key;
     if (model_.start_activities_present &&
         !model_.start_activities.contains(activity_key)) {
       ++deviations;
     }
-  } else if (!allowed_pairs_.contains({state.last_activity, activity_key})) {
+  } else if (!allowed_pairs_.contains({it->second.last_activity, activity_key})) {
     ++deviations;
   }
-
+  CaseState& state = it->second;
   ++state.events;
   state.last_activity = activity_key;
   state.deviations += deviations;
-  ++total_events_processed_;
   total_deviations_ += deviations;
   return {case_key, activity_key, total_events_processed_, deviations,
           state.deviations == 0};
 }
-
 StreamingFootprintsEventResult StreamingFootprintsConformance::receive(
     const Event& event, std::string_view case_id) {
-  return receive(case_id, event.activity);
+  // The reference skips an event whose activity is missing or None.
+  const auto activity = streaming_event_present_value(event, options_.activity_attribute);
+  if (!activity) return {};
+  return receive(case_id, *activity);
 }
-
 bool StreamingFootprintsConformance::terminate_case(
     const std::string& case_id) {
   std::lock_guard<std::mutex> lock(mutex_);

@@ -94,6 +94,18 @@ bool StreamingDfgDiscovery::receive(const Event& event,
   return activity && receive(case_id, *activity);
 }
 
+std::optional<std::string> streaming_event_present_value(const Event& event,
+                                                         std::string_view selector) {
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == selector)
+      return attribute.is_null ? std::nullopt : std::optional<std::string>(attribute.value);
+  try {
+    return reference_selected_activity(event, selector, "streaming conformance");
+  } catch (const std::invalid_argument&) {
+    return std::nullopt;
+  }
+}
+
 std::optional<std::string> streaming_event_activity(const Event& event,
                                                     std::string_view selector) {
   // The reference stream skips an event without the selected key and
