@@ -1,4 +1,5 @@
 #include "minera/connector_reference.hpp"
+#include "exact_divide.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -137,49 +138,6 @@ std::int64_t year_of(std::int64_t micros) {
   unsigned month, day;
   civil(days, year, month, day);
   return year;
-}
-
-// Python's int / int for an int64 numerator and a positive power of ten
-// below 2^53: the correctly rounded quotient.
-double true_divide(std::int64_t numerator, std::int64_t denominator) {
-  constexpr std::int64_t exact = std::int64_t{1} << 53;
-  if (numerator > -exact && numerator < exact) return static_cast<double>(numerator) / static_cast<double>(denominator);
-  const double guess = static_cast<double>(static_cast<long double>(numerator) / static_cast<long double>(denominator));
-  // Pick, among the guess and its neighbours, the double closest to the exact
-  // quotient, ties to an even mantissa: compare |d * denominator - numerator|
-  // exactly as d = mantissa * 2^exponent.
-  auto error = [&](double d) {
-    int exponent;
-    const double fraction = std::frexp(d, &exponent);
-    const auto mantissa = static_cast<__int128>(std::ldexp(fraction, 53));
-    exponent -= 53;
-    // d * denominator - numerator, scaled by 2^-exponent (exponent < 0 here).
-    const __int128 scaled = static_cast<__int128>(numerator) << (-exponent);
-    const __int128 diff = mantissa * denominator - scaled;
-    return std::pair<__int128, bool>(diff < 0 ? -diff : diff, (mantissa & 1) == 0);
-  };
-  double best = guess;
-  auto best_error = error(guess);
-  for (const double candidate : {std::nextafter(guess, -INFINITY), std::nextafter(guess, INFINITY)}) {
-    // Neighbours may change binade; compare their errors on a common scale.
-    int e1, e2;
-    std::frexp(candidate, &e1);
-    std::frexp(best, &e2);
-    if (e1 != e2) {
-      const long double exact_q = static_cast<long double>(numerator) / static_cast<long double>(denominator);
-      if (std::fabs(static_cast<long double>(candidate) - exact_q) < std::fabs(static_cast<long double>(best) - exact_q)) {
-        best = candidate;
-        best_error = error(candidate);
-      }
-      continue;
-    }
-    const auto e = error(candidate);
-    if (e.first < best_error.first || (e.first == best_error.first && e.second && !best_error.second)) {
-      best = candidate;
-      best_error = e;
-    }
-  }
-  return best;
 }
 
 double round_half_even(double x) {

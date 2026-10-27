@@ -1794,6 +1794,7 @@ input[type="range"]::-moz-range-thumb {
 .conf-gauge.good .conf-gauge-value { color: var(--good); }
 .conf-gauge.fair .conf-gauge-value { color: var(--fair); }
 .conf-gauge.poor .conf-gauge-value { color: var(--poor); }
+.conf-gauge.unavailable .conf-gauge-value { color: var(--muted); }
 
 .conf-gauge-label {
   font-family: var(--font-mono);

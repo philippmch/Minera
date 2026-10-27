@@ -18,6 +18,18 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Parity recheck fixes — 2026-10-27
+
+A recheck on macOS found five problems that Linux CI could not see:
+
+- F1: Apple builds of the vendored date/tz need `date/ios.h`; it and `ptz.h` are now vendored (see `third_party/date/README.minera`).
+- F2: the genetic miner's repair step took a `uint64_t` matrix while its callers build `size_t` counts, which differ on macOS.
+- F4: the portable time-zone backend now applies the TZif footer's POSIX rule after the last explicit transition (2037), so DST keeps recurring. `test_zone_database` checks 2030–2060 against Python `zoneinfo` for four zones, plus gaps and overlaps after 2037.
+- F5: `second_offset` is only set for nonexistent or ambiguous local times.
+- F3: the frontend shows precision that was not computed (`precision: null`, `precision_incomplete: true`) as unavailable instead of 0.0%.
+
+For portability, `__int128` was removed (MSVC has none): `exact_divide.hpp` does correctly rounded int64 division, and timestamp interleavings use a seconds-plus-nanoseconds instant. CI gained a `native-cross` job that builds and runs ctest on macOS and Windows (MSVC). `long double` is still used in places; it equals `double` on macOS arm64 and MSVC, so any parity drift there will show up in that job.
+
 ## Parity review fixes — 2026-10-26
 
 An independent review of `0cf509b` reported eight findings (R1–R8); all were

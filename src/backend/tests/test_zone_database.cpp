@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace {
 
@@ -61,6 +62,60 @@ void dst_gap_and_overlap() {
   assert(zd::info_at_local("Europe/Berlin", kOctober31 + 3 * 3600 + 1800).result == zd::LocalResult::kUnique);
 }
 
+// zic writes explicit transitions only up to 2037; later years follow each
+// file's POSIX rule. Expected values come from Python zoneinfo.
+void recurring_rules_after_2037() {
+  constexpr std::int64_t kJuly15_2038 = 2162808000;     // 12:00 UTC
+  constexpr std::int64_t kJanuary15_2038 = 2147169600;  // 12:00 UTC
+  auto at = zd::info_at_utc("Europe/Berlin", kJuly15_2038);
+  assert(at.offset_seconds == 7200 && at.abbrev == "CEST");
+  assert(zd::info_at_utc("America/New_York", kJuly15_2038).offset_seconds == -4 * 3600);
+  assert(zd::info_at_utc("Australia/Sydney", kJuly15_2038).offset_seconds == 10 * 3600);
+  assert(zd::info_at_utc("Australia/Sydney", kJanuary15_2038).offset_seconds == 11 * 3600);
+
+  const auto summer = minera::localize_timestamp_wall_time(wall(kJuly15_2038), "Europe/Berlin");
+  assert(summer && summer->offset_minutes == 120);
+  // Northern gap/overlap (Berlin) and southern ones (Sydney), all wall times.
+  constexpr std::int64_t kBerlinGap = 2153356200;      // 2038-03-28 02:30
+  constexpr std::int64_t kBerlinOverlap = 2172105000;  // 2038-10-31 02:30
+  constexpr std::int64_t kSydneyOverlap = 2153961000;  // 2038-04-04 02:30
+  constexpr std::int64_t kSydneyGap = 2169685800;      // 2038-10-03 02:30
+  auto local = zd::info_at_local("Europe/Berlin", kBerlinGap);
+  assert(local.result == zd::LocalResult::kNonexistent &&
+         local.first_offset_seconds == 3600 && local.second_offset_seconds == 7200);
+  local = zd::info_at_local("Europe/Berlin", kBerlinOverlap);
+  assert(local.result == zd::LocalResult::kAmbiguous &&
+         local.first_offset_seconds == 7200 && local.second_offset_seconds == 3600);
+  local = zd::info_at_local("Australia/Sydney", kSydneyOverlap);
+  assert(local.result == zd::LocalResult::kAmbiguous &&
+         local.first_offset_seconds == 39600 && local.second_offset_seconds == 36000);
+  local = zd::info_at_local("Australia/Sydney", kSydneyGap);
+  assert(local.result == zd::LocalResult::kNonexistent &&
+         local.first_offset_seconds == 36000 && local.second_offset_seconds == 39600);
+  assert(!minera::localize_timestamp_wall_time(wall(kBerlinGap), "Europe/Berlin"));
+  assert(!minera::localize_timestamp_wall_time(wall(kBerlinOverlap), "Europe/Berlin"));
+  assert(!minera::localize_timestamp_wall_time(wall(kSydneyGap), "Australia/Sydney"));
+
+  struct Expected { std::string_view zone; std::int64_t utc; std::int64_t offset; };
+  static constexpr Expected kExpected[] = {
+#include "zone_database_future_offsets.inc"
+  };
+  for (const auto& expected : kExpected) {
+    assert(zd::info_at_utc(expected.zone, expected.utc).offset_seconds == expected.offset);
+    // The same instant read back as wall time is unique at that offset.
+    const auto back = zd::info_at_local(expected.zone, expected.utc + expected.offset);
+    assert(back.result == zd::LocalResult::kUnique && back.first_offset_seconds == expected.offset);
+  }
+}
+
+// A unique wall time reports no second offset at all.
+void unique_local_times_have_no_second_offset() {
+  for (const std::int64_t wall_time : {kJanuary15, kJuly15, std::int64_t{2162808000}}) {
+    const auto info = zd::info_at_local("Europe/Berlin", wall_time);
+    assert(info.result == zd::LocalResult::kUnique && info.second_offset_seconds == 0);
+  }
+}
+
 void unknown_zones_are_rejected() {
   bool threw = false;
   try { (void)zd::info_at_utc("Not/AZone", 0); } catch (const std::runtime_error&) { threw = true; }
@@ -77,6 +132,8 @@ int main() {
   utc_and_fixed_offsets();
   iana_zones();
   dst_gap_and_overlap();
+  recurring_rules_after_2037();
+  unique_local_times_have_no_second_offset();
   unknown_zones_are_rejected();
   return 0;
 }

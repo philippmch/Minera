@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
+#include <compare>
 #include <iomanip>
 #include <limits>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
@@ -13,6 +15,7 @@
 #include <utility>
 
 #include "minera/timestamp.hpp"
+#include "exact_divide.hpp"
 
 namespace minera {
 namespace {
@@ -23,15 +26,37 @@ constexpr std::string_view kEndActivity = "■";
 // timestamps, so elapsed times against them are finite and exact.
 constexpr std::string_view kStartTimestamp = "1677-09-21T00:12:43.145224193Z";
 constexpr std::string_view kEndTimestamp = "2262-04-11T23:47:16.854775807Z";
-using Nanoseconds = __int128;
-constexpr Nanoseconds kStartTime = static_cast<Nanoseconds>(INT64_MIN);
-constexpr Nanoseconds kEndTime = static_cast<Nanoseconds>(INT64_MAX);
+// An instant as whole seconds plus 0 <= nanoseconds < 1e9; real timestamps
+// (years 1-9999) exceed an int64 nanosecond count, so no single integer is
+// used and no 128-bit type is needed.
+struct Instant {
+  std::int64_t seconds = 0;
+  std::int64_t nanoseconds = 0;
+  friend auto operator<=>(const Instant&, const Instant&) = default;
+};
+constexpr std::int64_t kNanosPerSecond = 1'000'000'000;
+// INT64_MIN and INT64_MAX nanoseconds.
+constexpr Instant kStartTime{-9'223'372'037, 145'224'192};
+constexpr Instant kEndTime{9'223'372'036, 854'775'807};
+
+// target - source in nanoseconds, or nullopt when it leaves the int64 range.
+std::optional<std::int64_t> elapsed_nanoseconds(const Instant& source, const Instant& target) {
+  std::int64_t seconds = target.seconds - source.seconds;
+  std::int64_t nanos = target.nanoseconds - source.nanoseconds;
+  if (nanos < 0) { nanos += kNanosPerSecond; --seconds; }
+  if (seconds > kEndTime.seconds || (seconds == kEndTime.seconds && nanos > kEndTime.nanoseconds))
+    return std::nullopt;
+  if (seconds < kStartTime.seconds || (seconds == kStartTime.seconds && nanos < kStartTime.nanoseconds))
+    return std::nullopt;
+  // (seconds + 1) * 1e9 stays in range even at the INT64_MIN edge.
+  return (seconds + 1) * kNanosPerSecond + (nanos - kNanosPerSecond);
+}
 
 struct BoundaryEvent {
   const Event* event = nullptr;
   std::string activity;
   std::string timestamp;
-  Nanoseconds time = 0;
+  Instant time;
   std::size_t index = 0;
   bool artificial = false;
 };
@@ -46,7 +71,7 @@ const std::string* timestamp_text(const Event& event,
 
 struct ParsedEvent {
   const Event* event = nullptr;
-  Nanoseconds time = 0;
+  Instant time;
   std::size_t sequence = 0;
 };
 
@@ -80,8 +105,7 @@ std::map<std::string, Timeline> build_timelines(const EventLog& log,
             *raw_timestamp + "'");
       }
       events.push_back({&event,
-                        static_cast<Nanoseconds>(parsed->seconds) * 1'000'000'000 +
-                            parsed->nanoseconds,
+                        Instant{parsed->seconds, static_cast<std::int64_t>(parsed->nanoseconds)},
                         sequence++});
     }
   }
@@ -179,12 +203,11 @@ TimestampInterleavingsResult discover_timestamp_interleavings(
     }
     // Elapsed times are nanosecond counts; one from the start boundary to a
     // real event does not fit and fails the whole discovery.
-    const Nanoseconds elapsed = target.time - source.time;
-    if (elapsed > kEndTime || elapsed < kStartTime)
+    const auto elapsed = elapsed_nanoseconds(source.time, target.time);
+    if (!elapsed)
       throw std::overflow_error(
           "timestamp interleavings: elapsed time overflows nanoseconds");
-    const auto difference = static_cast<double>(
-        static_cast<long double>(elapsed) / 1'000'000'000.0L);
+    const double difference = true_divide(*elapsed, kNanosPerSecond);
     result.interleavings.push_back(
         {source.activity, target.activity, source.timestamp, target.timestamp,
          left_index, right_index, direction, difference});

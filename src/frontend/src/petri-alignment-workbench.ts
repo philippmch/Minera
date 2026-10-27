@@ -156,7 +156,7 @@ export function isPetriAlignmentWorkflow(value: unknown): value is PetriAlignmen
   const marking = (items: unknown): boolean => Array.isArray(items) && items.length === places.length && items.every((_, i) => integer(items, i));
   const diagnostics = (item: unknown): boolean => item === undefined || (object(item) && Object.keys(item).every(key => integer(item, key)));
   if (typeof result.computed !== "boolean" || typeof result.exhausted !== "boolean" || !numeric(result, "fitness") ||
-    (result.precision !== undefined && !numeric(result, "precision")) || !index(result.fitting_traces) || !index(result.trace_count) ||
+    (result.precision !== undefined && !(result.precision === null ? result.precision_incomplete === true : numeric(result, "precision"))) || !index(result.fitting_traces) || !index(result.trace_count) ||
     result.fitting_traces > result.trace_count || !numeric(result, "total_cost") || !supportedVariant(result.variant) ||
     (result.alignment_variant !== undefined && result.alignment_variant !== result.variant) || typeof result.activity_attribute !== "string" ||
     result.activity_attribute !== input.activity_attribute || !diagnostics(result.diagnostics) || !Array.isArray(result.variants)) return false;
@@ -242,6 +242,6 @@ export function petriAlignmentWorkbenchReport(run: PetriAlignmentWorkbenchRun): 
     inputs: {log: metadata(run.inputs.log, run.inputs.log_sha256), model: metadata(run.inputs.model, run.inputs.model_sha256)}, native_result: run.value}, 2);
 }
 export function petriAlignmentResultSummary(result: Alignments): string {
-  return result.computed ? `Fitness ${nativeCell(result, "fitness")} · ${result.precision === undefined ? "Precision absent" : `Precision ${nativeCell(result, "precision")}`} · ${result.fitting_traces}/${result.trace_count} fitting traces · total cost ${nativeCell(result, "total_cost")}`
+  return result.computed ? `Fitness ${nativeCell(result, "fitness")} · ${result.precision === undefined ? "Precision absent" : result.precision === null ? "Precision not computed (silent-search budget exhausted)" : `Precision ${nativeCell(result, "precision")}`} · ${result.fitting_traces}/${result.trace_count} fitting traces · total cost ${nativeCell(result, "total_cost")}`
     : `Alignment was not computed${result.exhausted ? ": the search bound was reached" : ""}. Fitness, precision and cost fields are not valid measurements for this result.`;
 }

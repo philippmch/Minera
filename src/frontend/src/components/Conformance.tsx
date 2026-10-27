@@ -78,6 +78,25 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`;
 const grade = (value: number) =>
   value >= 0.95 ? "good" : value >= 0.8 ? "fair" : "poor";
 
+// A metric the backend could not compute (precision whose silent-transition
+// search ran out of budget) carries no value and is never graded.
+export interface Gauge { label: string; value: number | null; hint: string }
+const INCOMPLETE_PRECISION_HINT =
+  "Not computed: the model's silent transitions allow more states than the precision search explores, so any number would understate the escaping behavior.";
+/** The precision gauge: unavailable when the backend could not compute it. */
+export function precisionGauge(precision: number | null, incomplete: boolean | undefined, hint: string): Gauge {
+  return precision === null || incomplete
+    ? { label: "Precision", value: null, hint: INCOMPLETE_PRECISION_HINT }
+    : { label: "Precision", value: precision, hint };
+}
+export function GaugeTile({ metric }: { metric: Gauge }) {
+  return <div className={`conf-gauge ${metric.value === null ? "unavailable" : grade(metric.value)}`}>
+    <div className="conf-gauge-value">{metric.value === null ? "—" : percent(metric.value)}</div>
+    <div className="conf-gauge-label">{metric.label}</div>
+    <p className="conf-gauge-hint">{metric.hint}</p>
+  </div>;
+}
+
 // A small wizard mirroring ProcessModel: conformance checks a log against a
 // discovered model, so it takes two choices — which miner produced the model,
 // then which conformance method to replay with — before showing results.
@@ -1487,17 +1506,14 @@ function TokenReplay({
       : 1;
   const deviating = conformance.variants.filter((v) => v.fitness < 0.9999);
 
-  const metrics: { label: string; value: number; hint: string }[] = [
+  const metrics: Gauge[] = [
     {
       label: "Fitness",
       value: conformance.fitness,
       hint: "Token-replay: how much of the log the model reproduces.",
     },
-    {
-      label: "Precision",
-      value: conformance.precision,
-      hint: "Escaping edges: how tightly the model matches the log (lower = the model allows more unseen behavior).",
-    },
+    precisionGauge(conformance.precision, conformance.precision_incomplete,
+      "Escaping edges: how tightly the model matches the log (lower = the model allows more unseen behavior)."),
     ...(conformance.generalization !== undefined
       ? [
           {
@@ -1541,13 +1557,7 @@ function TokenReplay({
           </p>
         )}
       <section className="conf-metrics">
-        {metrics.map((metric) => (
-          <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>
-            <div className="conf-gauge-value">{percent(metric.value)}</div>
-            <div className="conf-gauge-label">{metric.label}</div>
-            <p className="conf-gauge-hint">{metric.hint}</p>
-          </div>
-        ))}
+        {metrics.map((metric) => <GaugeTile metric={metric} key={metric.label} />)}
       </section>
 
       <section className="panel conf-panel">
@@ -1687,13 +1697,7 @@ function Footprints({
         </p>
       )}
       <section className="conf-metrics">
-        {metrics.map((metric) => (
-          <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>
-            <div className="conf-gauge-value">{percent(metric.value)}</div>
-            <div className="conf-gauge-label">{metric.label}</div>
-            <p className="conf-gauge-hint">{metric.hint}</p>
-          </div>
-        ))}
+        {metrics.map((metric) => <GaugeTile metric={metric} key={metric.label} />)}
       </section>
 
       <section className="panel conf-panel">
@@ -2279,20 +2283,17 @@ function AlignmentResultView({
   const deviating = alignments.variants.filter((v) => v.cost > 0);
   const deviationRows = deviatingActivities(alignments.activity_deviations);
 
-  const metrics: { label: string; value: number; hint: string }[] = [
+  const metrics: Gauge[] = [
     {
       label: "Fitness",
       value: alignments.fitness,
       hint: "Cost-based: how cheaply the log aligns to the model (1 = no deviation).",
     },
     // Alignment-based precision is absent in exports from older versions.
-    ...(alignments.precision !== undefined
+    ...(alignments.precision !== undefined || alignments.precision_incomplete
       ? [
-          {
-            label: "Precision",
-            value: alignments.precision,
-            hint: "Escaping edges at the states the optimal alignments visit: how much extra behavior the model allows.",
-          },
+          precisionGauge(alignments.precision ?? null, alignments.precision_incomplete,
+            "Escaping edges at the states the optimal alignments visit: how much extra behavior the model allows."),
         ]
       : []),
     {
@@ -2326,13 +2327,7 @@ function AlignmentResultView({
           </p>
         )}
       <section className="conf-metrics">
-        {metrics.map((metric) => (
-          <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>
-            <div className="conf-gauge-value">{percent(metric.value)}</div>
-            <div className="conf-gauge-label">{metric.label}</div>
-            <p className="conf-gauge-hint">{metric.hint}</p>
-          </div>
-        ))}
+        {metrics.map((metric) => <GaugeTile metric={metric} key={metric.label} />)}
       </section>
 
       {deviationRows.length > 0 && (

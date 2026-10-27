@@ -67,6 +67,51 @@ jobs:
       - name: ctest
         run: ctest --test-dir build -j3 --output-on-failure --timeout 1800
 
+  # Linux CI alone missed breaks that only Apple libc++ (no std time-zone
+  # database, size_t != uint64_t) or MSVC (32-bit long, no __int128) see, so
+  # the same build and tests also run on macOS and Windows.
+  native-cross:
+    name: Native build and ctest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: ${{ env.SPARSE_CHECKOUT }}
+          sparse-checkout-cone-mode: false
+      # Git Bash puts its own link.exe ahead of MSVC's on PATH, so the build
+      # steps use the default shell (PowerShell on Windows).
+      - name: Install toolchain (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja ccache
+      - name: Install toolchain (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja ccache --no-progress -y
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-
+      - name: Configure
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          CCACHE_MAXSIZE: 4G
+        run: cmake --build build -j3
+      - name: ctest
+        run: ctest --test-dir build -j3 --output-on-failure --timeout 1800
+
   python:
     name: Python script tests
     runs-on: ubuntu-24.04

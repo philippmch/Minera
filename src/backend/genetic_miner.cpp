@@ -155,8 +155,9 @@ void add_singleton(std::vector<Partition>& partitions, std::size_t value) {
   normalize_partitions(partitions);
 }
 
-void repair(Individual& individual, const std::vector<std::vector<std::size_t>>&
-                                    causal) {
+// `causal` holds directly-follows counts, the same matrix the callers build.
+void repair(Individual& individual,
+            const std::vector<std::vector<std::uint64_t>>& causal) {
   const std::size_t n = individual.input.size();
   for (std::size_t i = 0; i < n; ++i) {
     if (i >= individual.output.size()) individual.output.resize(n);

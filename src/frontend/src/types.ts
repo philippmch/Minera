@@ -3164,8 +3164,14 @@ export interface TokenReplayRootCauseDiagnostics {
 export interface Conformance {
   /** Token fitness; immediate-stop replay can produce a negative value. */
   fitness: number;
-  /** Escaping-edges precision in [0, 1]: how much extra behavior the model allows. */
-  precision: number;
+  /**
+   * Escaping-edges precision in [0, 1]: how much extra behavior the model
+   * allows. Null when it could not be computed (see precision_incomplete), and
+   * in fitness-only replay results.
+   */
+  precision: number | null;
+  /** True when the silent-transition search for precision ran out of budget. */
+  precision_incomplete?: boolean;
   /** Token-replay generalization in [0, 1]: how evenly the log exercises the model. Absent in older exports. */
   generalization?: number;
   /** Inverse arc-degree simplicity in (0, 1]: how lean the net itself is. Absent in older exports. */
@@ -3278,9 +3284,11 @@ export interface Alignments {
   /**
    * Alignment-based escaping-edges precision in [0, 1]: how much extra
    * behavior the model allows at the states the optimal alignments visit.
-   * Absent in exports from older minera versions.
+   * Absent in exports from older minera versions; null when it could not be
+   * computed (precision_incomplete).
    */
-  precision?: number;
+  precision?: number | null;
+  precision_incomplete?: boolean;
   fitting_traces: number;
   trace_count: number;
   /** Summed optimal alignment cost over all traces. */
