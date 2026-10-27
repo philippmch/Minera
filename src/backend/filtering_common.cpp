@@ -11,6 +11,7 @@
 #include <optional>
 
 #include "root_cause_unicode.hpp"
+#include "portable_time.hpp"
 
 namespace minera {
 namespace {
@@ -213,7 +214,7 @@ std::int64_t wall_seconds(std::int64_t y, int m, int d, int hh, int mm, int ss) 
 std::int64_t local_wall(std::int64_t u) {
   const auto t = static_cast<std::time_t>(u);
   std::tm fields{};
-  if (!localtime_r(&t, &fields)) fail("OverflowError", "timestamp out of range for platform time_t");
+  if (!local_fields(t, fields)) fail("OverflowError", "timestamp out of range for platform time_t");
   return wall_seconds(fields.tm_year + 1900LL, fields.tm_mon + 1, fields.tm_mday, fields.tm_hour, fields.tm_min,
                       fields.tm_sec);
 }

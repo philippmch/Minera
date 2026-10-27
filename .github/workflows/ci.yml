@@ -77,7 +77,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, windows-2022]
+        # The macOS 15 SDK's libc++ cannot parse floating point with
+        # std::from_chars, which the core relies on.
+        os: [macos-26, windows-2022]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,7 +110,8 @@ jobs:
         env:
           CCACHE_DIR: ${{ github.workspace }}/.ccache
           CCACHE_MAXSIZE: 4G
-        run: cmake --build build -j3
+        # Keep going past failures so one run reports every platform break.
+        run: cmake --build build -j3 -- -k 0
       - name: ctest
         run: ctest --test-dir build -j3 --output-on-failure --timeout 1800
 

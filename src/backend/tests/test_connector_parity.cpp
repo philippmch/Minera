@@ -10,12 +10,12 @@
 #include <sqlite3.h>
 
 #include <cstdlib>
-#include <unistd.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -423,7 +423,7 @@ int main(int argc, char** argv) {
     std::cerr << "usage: minera_connector_parity_tests <bank>\n";
     return 2;
   }
-  const auto directory = std::filesystem::temp_directory_path() / ("minera-connector-parity-" + std::to_string(::getpid()));
+  const auto directory = std::filesystem::temp_directory_path() / ("minera-connector-parity-" + std::to_string(std::random_device{}()));
   std::filesystem::create_directories(directory);
   std::vector<std::string> failures;
   Tally tally;

@@ -1,5 +1,7 @@
 #include "minera/ocpn_reference_playout.hpp"
 
+#include "portable_time.hpp"
+
 #include <algorithm>
 #include <cstdint>
 #include <ctime>
@@ -175,7 +177,7 @@ Search prepare(const OcpnGraph& graph, const OcpnReferencePlayoutOptions& option
 std::string timestamp(long long seconds) {
   const std::time_t value = static_cast<std::time_t>(seconds);
   std::tm parts{};
-  gmtime_r(&value, &parts);
+  utc_fields(value, parts);
   char buffer[32];
   std::strftime(buffer, sizeof buffer, "%Y-%m-%d %H:%M:%S", &parts);
   return buffer;

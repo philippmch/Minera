@@ -1,5 +1,7 @@
 #include "minera/oc_causal_net_reference_playout.hpp"
 
+#include "portable_time.hpp"
+
 #include <algorithm>
 #include <array>
 #include <ctime>
@@ -258,7 +260,7 @@ struct Search {
 std::string timestamp(long long seconds) {
   const std::time_t value = static_cast<std::time_t>(seconds);
   std::tm parts{};
-  gmtime_r(&value, &parts);
+  utc_fields(value, parts);
   char buffer[32];
   std::strftime(buffer, sizeof buffer, "%Y-%m-%d %H:%M:%S", &parts);
   return buffer;

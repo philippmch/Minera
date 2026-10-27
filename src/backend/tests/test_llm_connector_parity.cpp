@@ -8,14 +8,13 @@
 
 #include "../gzip_codec.hpp"
 
-#include <unistd.h>
-
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -189,7 +188,7 @@ int main(int argc, char** argv) {
     std::cerr << "usage: minera_llm_connector_parity_tests <bank>\n";
     return 2;
   }
-  const auto directory = std::filesystem::temp_directory_path() / ("minera-llm-parity-" + std::to_string(::getpid()));
+  const auto directory = std::filesystem::temp_directory_path() / ("minera-llm-parity-" + std::to_string(std::random_device{}()));
   std::filesystem::create_directories(directory);
   std::vector<std::string> failures;
   Tally tally;
