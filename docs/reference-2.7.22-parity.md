@@ -15828,6 +15828,12 @@ values and passing controls.
 | C3 | A one-resource profile query with no observation matches the reference: the two averages raise "mean requires at least one data point", every other metric returns a zero row (the all-resources form still returns no rows). | `minera_resource_profiles_tests` |
 | OCEL C1 | Activity associations keep one pair per relation row (two qualifiers give the pair twice). | `minera_ocel_statistics_tests` |
 | S1, S2 | Streaming DFG keeps empty labels and case ids, reads the selected activity attribute, skips events without it and reads a present null as "None"; the persistent store keeps empty fields across reloads. | `minera_streaming_dfg_tests`, `minera_streaming_store_tests` |
+| S3 | The streaming CSV reader is the reference `csv.DictReader` over a text-mode file: universal newlines (also inside quotes), the excel dialect without trimming, short rows give null cells, long rows keep their surplus, blank lines are skipped, a repeated header keeps its first position and last value, an unterminated quote ends at end of file. Fuzzed 0/3000 through the streaming DFG. | `minera_python_csv_stream_tests`, `minera_streaming_dfg_tests` |
+| S4 | Streaming footprints skip events with a missing or null case or activity; an unknown activity is a deviation of an open case that does not move its last activity; start and end sets are always checked and termination removes the case. Fuzzed with 941 compared streams, 0 diffs. | `minera_streaming_footprints_tests` |
+| S5 | Streaming token replay (forward) fires the first enabled transition with the label, else the shortest silent paths from distinct marked places in marking order (kept only when they enable it), else inserts missing tokens in PNML arc order, including the reference's partial count when a needed place still holds a token; termination compares the final marking exactly. 0 diffs on the deterministic fuzz streams. | `minera_streaming_tbr_tests` |
+| S6 | Streaming temporal profile counts a pair only when `prev.end <= cur.start`, uses strict zeta bounds, distance `|diff-mean|/std` and `sys.maxsize` for std 0; the start key defaults to the timestamp key. Fuzzed 0/2000. | `minera_streaming_temporal_tests` |
+| S7 | Streaming Declare keys a missing case as "undefined_case" and a null case as its own case; a missing or null activity counts as an event that matches no constraint; empty strings are values. Fuzzed 0/2000. | `minera_declare_streaming_io_tests`, `minera_declare_variants_tests` |
+| S8 | The XES event stream gives each event its trace's attributes under `case:` keys (the trace value wins a clash). Fuzzed 0/300. | `minera_streaming_import_tests` |
 
 Declared exceptions (not equivalent, kept on purpose):
 
@@ -15840,7 +15846,13 @@ Declared exceptions (not equivalent, kept on purpose):
 - **Malformed OCEL (C3).** Native OCEL statistics reject duplicate ids and
   dangling relations that the public association helpers accept.
 - **Streaming.** The streaming surface stays Partial and outside the 86/387
-  catalog; S1/S2 are fixed, lifecycle and threading are not claimed.
+  catalog. S1 to S8 match on deterministic inputs. Not claimed: the
+  reference's default thread pool (it can deliver events out of order; the
+  comparisons use one worker), token-replay ties between duplicate labels or
+  equally short silent paths (the reference picks by memory address),
+  temporal profiles over string timestamps (the reference raises), XES events
+  outside any trace (the reference attaches them to the previous trace,
+  native drops them), and lifecycle/distributed orchestration.
 - **Windows.** Windows build and CTest are configured in CI but not yet
   executed: runner jobs currently fail before their first step.
 
