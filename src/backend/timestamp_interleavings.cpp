@@ -195,8 +195,9 @@ TimestampInterleavingsResult discover_timestamp_interleavings(
       throw std::invalid_argument(
           "timestamp interleavings: max_interleavings exceeded");
     }
-    // Elapsed times are nanosecond counts; one from the start boundary to a
-    // real event does not fit and fails the whole discovery.
+    // Elapsed times are int64 nanosecond counts; one outside that range (for
+    // example start boundary -> an event after the epoch, or an event before
+    // the epoch -> end boundary) fails the whole discovery.
     const auto elapsed = elapsed_nanoseconds(source.time, target.time);
     if (!elapsed)
       throw std::overflow_error(
