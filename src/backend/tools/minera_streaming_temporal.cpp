@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/python_csv_stream.hpp"
 #include "minera/streaming_temporal.hpp"
 
 namespace {
@@ -111,13 +112,19 @@ int main(int argc, char** argv) {
       }
     }
     if (!have_profile) return usage(argv[0]);
-    const auto log = minera::import_csv_event_log(argv[1], import_options);
     options.case_id_attribute = import_options.case_id_column;
     options.activity_attribute = import_options.activity_column;
+    if (options.timestamp_attribute.empty())
+      options.timestamp_attribute = import_options.timestamp_column;
     minera::StreamingTemporalConformance monitor(std::move(profile), options);
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events)
-        (void)monitor.receive(event, trace.case_id);
+    // Events arrive in file order as the reference CSV event stream reads
+    // them, with timestamp cells parsed; a missing or None case skips one.
+    const auto records = minera::read_python_csv_event_stream(argv[1]);
+    for (std::size_t i = 0; i < records.size(); ++i) {
+      const auto* case_id = records[i].find(import_options.case_id_column);
+      if (!case_id || !case_id->has_value()) continue;
+      (void)monitor.receive(minera::python_csv_record_event(records[i], i), **case_id);
+    }
     const auto payload =
         minera::serialize_streaming_temporal_json(monitor.snapshot()) + '\n';
     if (output_path.empty()) {

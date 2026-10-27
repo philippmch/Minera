@@ -1,8 +1,12 @@
 #include "minera/streaming_temporal.hpp"
 
+#include "minera/streaming_dfg.hpp"
+
 #include <cmath>
 #include <iomanip>
+#include <charconv>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -36,18 +40,22 @@ void write_json_string(std::ostream& out, std::string_view value) {
   out << '"';
 }
 
-const std::string* event_value(const Event& event, std::string_view key,
-                               bool activity) {
-  if (key.empty() || key == (activity ? "activity" : "timestamp")) {
-    if (activity) return &event.activity;
-    return &event.timestamp;
+// The selected value: a literal attribute wins (a null reads as missing, as
+// the reference skips None), then the first-class field the selector names.
+std::optional<std::string> event_value(const Event& event, std::string_view key,
+                                       bool activity) {
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == key)
+      return attribute.is_null ? std::nullopt : std::optional<std::string>(attribute.value);
+  if (activity) {
+    if (key.empty() || key == "activity") return event.activity;
+    return streaming_event_present_value(event, key);
   }
-  if (const auto* value = event.attribute(key)) return value;
-  // CSV import maps the configured activity/timestamp columns onto the
-  // canonical Event fields, so a custom column name may not remain in the
-  // generic attribute list.
-  if (activity) return &event.activity;
-  return &event.timestamp;
+  if (key.empty() || key == "timestamp" || key == "time:timestamp") {
+    if (event.timestamp.empty()) return std::nullopt;
+    return event.timestamp;
+  }
+  return std::nullopt;
 }
 
 }  // namespace
@@ -81,9 +89,8 @@ StreamingTemporalConformance::StreamingTemporalConformance(
 StreamingTemporalEventResult StreamingTemporalConformance::receive(
     std::string_view case_id, std::string_view activity,
     std::string_view start_timestamp, std::string_view timestamp) {
-  if (case_id.empty() || activity.empty() || start_timestamp.empty() ||
-      timestamp.empty())
-    return {};
+  // Empty case ids and activities are ordinary values, as in the reference;
+  // an unparseable timestamp skips the event (the reference fails on it).
   const auto start = parse_timestamp(start_timestamp);
   const auto end = parse_timestamp(timestamp);
   if (!start || !end) return {};
@@ -104,7 +111,8 @@ StreamingTemporalEventResult StreamingTemporalConformance::receive(
     double distance = 0.0;
     if (entry.standard_deviation_seconds == 0.0) {
       if (difference == 0.0) continue;
-      distance = std::numeric_limits<double>::max();
+      // The reference reports sys.maxsize.
+      distance = 9223372036854775807.0;
     } else {
       distance = difference / entry.standard_deviation_seconds;
       if (distance <= options_.zeta) continue;
@@ -129,13 +137,14 @@ StreamingTemporalEventResult StreamingTemporalConformance::receive(
     const Event& event, std::string_view case_id) {
   const std::string resolved_case =
       case_id.empty() ? event.case_id : std::string(case_id);
-  const auto* activity = event_value(event, options_.activity_attribute, true);
-  const auto* start = event_value(event, options_.start_timestamp_attribute,
-                                  false);
-  const auto* timestamp = event_value(event, options_.timestamp_attribute,
-                                      false);
-  if (activity == nullptr || start == nullptr || timestamp == nullptr)
-    return {};
+  const auto activity = event_value(event, options_.activity_attribute, true);
+  // The start timestamp defaults to the timestamp key, as in the reference.
+  const auto start = event_value(event,
+      options_.start_timestamp_attribute.empty() ? options_.timestamp_attribute
+                                                 : options_.start_timestamp_attribute,
+      false);
+  const auto timestamp = event_value(event, options_.timestamp_attribute, false);
+  if (!activity || !start || !timestamp) return {};
   return receive(resolved_case, *activity, *start, *timestamp);
 }
 
@@ -195,9 +204,17 @@ std::string serialize_streaming_temporal_json(
       write_json_string(out, deviation.source);
       out << ",\"target\":";
       write_json_string(out, deviation.target);
-      out << ",\"elapsed_seconds\":" << deviation.elapsed_seconds
-          << ",\"standard_deviation_distance\":"
-          << deviation.standard_deviation_distance << '}';
+      // Shortest round-trip text keeps every digit of the values.
+      const auto number = [&out](double value) {
+        char buffer[32];
+        const auto result = std::to_chars(buffer, buffer + sizeof(buffer), value);
+        out.write(buffer, result.ptr - buffer);
+      };
+      out << ",\"elapsed_seconds\":";
+      number(deviation.elapsed_seconds);
+      out << ",\"standard_deviation_distance\":";
+      number(deviation.standard_deviation_distance);
+      out << '}';
     }
     out << ']';
   }

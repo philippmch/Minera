@@ -5,6 +5,8 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <vector>
+#include <tuple>
 
 namespace {
 
@@ -51,8 +53,8 @@ void handles_zero_variance_and_attributes() {
   assert(monitor.receive(a).event_index == 1);
   const auto result = monitor.receive(b);
   assert(result.deviations.size() == 1);
-  assert(result.deviations[0].standard_deviation_distance ==
-         std::numeric_limits<double>::max());
+  // Reference: a zero deviation reports sys.maxsize.
+  assert(result.deviations[0].standard_deviation_distance == 9223372036854775807.0);
   const auto json = minera::serialize_streaming_temporal_json(monitor.snapshot());
   assert(json.find("STREAMING_TEMPORAL") != std::string::npos);
 }
@@ -71,9 +73,36 @@ void rejects_invalid_profile_options_and_resets() {
   assert(monitor.snapshot().total_events_processed == 0);
 }
 
+// Reference values (PM4Py 2.7.22 streaming temporal profile, public calls,
+// profile A->B mean 10 s, std 1 s, zeta 6).
+void reference_contract() {
+  minera::TemporalProfile p;
+  p.entries.push_back({"A", "B", 1, 10.0, 1.0});
+  const auto run = [&](std::vector<std::tuple<std::string, std::string, std::string>> events) {
+    minera::StreamingTemporalConformance monitor(p);
+    for (const auto& [c, a, t] : events) (void)monitor.receive(c, a, t, t);
+    return monitor.snapshot();
+  };
+  // Strict bounds: 16 s and 4 s pass, 3 s deviates (distance 7).
+  assert(run({{"c", "A", "2026-01-01T00:00:00Z"}, {"c", "B", "2026-01-01T00:00:16Z"}}).total_deviations == 0);
+  assert(run({{"c", "A", "2026-01-01T00:00:00Z"}, {"c", "B", "2026-01-01T00:00:04Z"}}).total_deviations == 0);
+  const auto low = run({{"c", "A", "2026-01-01T00:00:00Z"}, {"c", "B", "2026-01-01T00:00:03Z"}});
+  assert(low.deviations.at("c").size() == 1 && low.deviations.at("c")[0].standard_deviation_distance == 7.0);
+  // Equal timestamps pair (0 s, distance 10); a later predecessor does not.
+  assert(run({{"c", "A", "2026-01-01T00:00:05Z"}, {"c", "B", "2026-01-01T00:00:05Z"}}).total_deviations == 1);
+  assert(run({{"c", "A", "2026-01-01T00:00:30Z"}, {"c", "B", "2026-01-01T00:00:00Z"}}).total_deviations == 0);
+  // Empty case ids and activities are values.
+  minera::TemporalProfile empty_profile;
+  empty_profile.entries.push_back({"", "B", 1, 10.0, 1.0});
+  minera::StreamingTemporalConformance monitor(empty_profile);
+  assert(monitor.receive("", "", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z").event_index == 1);
+  assert(monitor.receive("", "B", "2026-01-01T00:00:50Z", "2026-01-01T00:00:50Z").deviations.size() == 1);
+}
+
 }  // namespace
 
 int main() {
+  reference_contract();
   checks_all_prior_events_and_isolates_cases();
   handles_zero_variance_and_attributes();
   rejects_invalid_profile_options_and_resets();
