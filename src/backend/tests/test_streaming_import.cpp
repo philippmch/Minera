@@ -83,9 +83,35 @@ void xes_event_and_trace_streams_deliver() {
   std::filesystem::remove(path);
 }
 
+// The reference XES event stream gives each event its trace's attributes
+// under "case:" keys; a trace value replaces an event's own "case:" key.
+void xes_events_carry_trace_attributes() {
+  const auto path = write_file(
+      "case-attributes.xes",
+      "<log><trace><string key=\"concept:name\" value=\"c1\"/>"
+      "<string key=\"region\" value=\"north\"/>"
+      "<event><string key=\"concept:name\" value=\"A\"/>"
+      "<string key=\"case:region\" value=\"own\"/></event>"
+      "</trace></log>");
+  minera::XesEventStreamReader events(path);
+  const auto event = events.read_event();
+  assert(event);
+  std::size_t regions = 0;
+  for (const auto& attribute : event->attributes) {
+    assert(attribute.key != "case:concept:name");
+    if (attribute.key == "case:region") {
+      ++regions;
+      assert(attribute.value == "north");
+    }
+  }
+  assert(regions == 1);
+  std::filesystem::remove(path);
+}
+
 }  // namespace
 
 int main() {
+  xes_events_carry_trace_attributes();
   csv_events_transform_filter_and_reset();
   xes_event_and_trace_streams_deliver();
   return 0;

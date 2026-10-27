@@ -1,5 +1,7 @@
 #include "minera/streaming_import.hpp"
 
+#include <algorithm>
+
 #include <utility>
 #include <iterator>
 #include <sstream>
@@ -90,7 +92,19 @@ void XesEventStreamReader::reset() {
   copy_event_log_context(log, context_);
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
-      auto selected = apply_event_options(event, options_);
+      // As the reference event stream, each event carries its trace's
+      // attributes under "case:" keys (the trace value wins a clash).
+      auto flattened = event;
+      for (const auto& attribute : trace.attributes) {
+        if (attribute.key == "concept:name") continue;  // the case id field
+        auto copy = attribute;
+        copy.key = "case:" + attribute.key;
+        const auto existing = std::find_if(flattened.attributes.begin(), flattened.attributes.end(),
+                                           [&](const auto& a) { return a.key == copy.key; });
+        if (existing != flattened.attributes.end()) *existing = std::move(copy);
+        else flattened.attributes.push_back(std::move(copy));
+      }
+      auto selected = apply_event_options(std::move(flattened), options_);
       if (selected) events_.push_back(std::move(*selected));
     }
   }

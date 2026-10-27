@@ -104,7 +104,9 @@ void snapshots_are_lossless_and_fallbacks_reset() {
   model.add("vendor", {"A,B", "C", true, 0, 0});
   DeclareStreamingConformance monitor(model);
   auto first = put(monitor, "", "A", "");
-  assert(first.case_id == "undefined_case");
+  // An empty case id is a value of its own; only a missing case column
+  // falls back to "undefined_case" (the CSV/XES record path).
+  assert(first.case_id == "");
   assert(first.timestamp == "1");
   assert(first.event_index == 1);
   assert(first.deviations == 2);
@@ -114,7 +116,7 @@ void snapshots_are_lossless_and_fallbacks_reset() {
   auto second = put(monitor, "", "B", "2026-01-01T00:00:00Z");
   assert(second.timestamp == "2026-01-01T00:00:00Z");
   const auto snapshot = monitor.snapshot();
-  const auto& states = snapshot.cases.at("undefined_case").constraint_states;
+  const auto& states = snapshot.cases.at("").constraint_states;
   assert(states.size() == 3);
   assert(states[0].constraint_index == 0);
   assert(states[1].constraint_index == 1);
