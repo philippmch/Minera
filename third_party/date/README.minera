@@ -4,6 +4,9 @@ Source: Ubuntu noble source package howardhinnant-date 3.0.1+ds
 (howardhinnant-date_3.0.1+ds.orig.tar.xz), files copied unmodified except:
 - include/date/ptz.h: time_zone::name() qualifies `date::hh_mm_ss`, which is
   ambiguous with std::chrono::hh_mm_ss under C++20 (as later upstream does).
+- include/date/ptz.h: read_date accepts signed rule times with hours up to
+  167 (RFC 8536 3.3.1), which TZif footers such as America/Nuuk's
+  `<-02>2<-01>,M3.5.0/-1,M10.5.0/0` use.
 
 Only built when the standard library lacks the C++20 time-zone database
 (Apple libc++); see MINERA_PORTABLE_TZDB in CMakeLists.txt. include/date/ios.h

@@ -713,9 +713,32 @@ read_date(const string_t& s, unsigned i, rule& r)
     if (i != s.size() && s[i] == '/')
     {
         ++i;
-        std::chrono::seconds t;
-        i = read_unsigned_time(s, i, t);
-        r.time_ = t;
+        // RFC 8536 3.3.1: a rule's transition time may be signed and its
+        // hours may reach 167 (e.g. America/Nuuk's M3.5.0/-1).
+        bool negative = false;
+        if (i != s.size() && (s[i] == '-' || s[i] == '+'))
+        {
+            negative = s[i] == '-';
+            ++i;
+        }
+        unsigned x;
+        i = read_unsigned(s, i, 3, x, "Expected to find hours [0, 167]");
+        if (x > 167)
+            throw_invalid(s, i, "Expected to find hours [0, 167]");
+        std::chrono::seconds t = std::chrono::hours{x};
+        if (i != s.size() && s[i] == ':')
+        {
+            ++i;
+            i = read_unsigned(s, i, 2, x, "Expected to find minutes [0, 59]");
+            t += std::chrono::minutes{x};
+            if (i != s.size() && s[i] == ':')
+            {
+                ++i;
+                i = read_unsigned(s, i, 2, x, "Expected to find seconds [0, 59]");
+                t += std::chrono::seconds{x};
+            }
+        }
+        r.time_ = negative ? -t : t;
     }
     return i;
 }

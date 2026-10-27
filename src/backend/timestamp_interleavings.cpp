@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
-#include <compare>
 #include <iomanip>
 #include <limits>
 #include <map>
@@ -16,9 +15,16 @@
 
 #include "minera/timestamp.hpp"
 #include "exact_divide.hpp"
+#include "nanosecond_instant.hpp"
 
 namespace minera {
 namespace {
+
+using nanosecond_instant::elapsed_nanoseconds;
+using nanosecond_instant::Instant;
+using nanosecond_instant::kEndTime;
+using nanosecond_instant::kNanosPerSecond;
+using nanosecond_instant::kStartTime;
 
 constexpr std::string_view kStartActivity = "▶";
 constexpr std::string_view kEndActivity = "■";
@@ -26,32 +32,6 @@ constexpr std::string_view kEndActivity = "■";
 // timestamps, so elapsed times against them are finite and exact.
 constexpr std::string_view kStartTimestamp = "1677-09-21T00:12:43.145224193Z";
 constexpr std::string_view kEndTimestamp = "2262-04-11T23:47:16.854775807Z";
-// An instant as whole seconds plus 0 <= nanoseconds < 1e9; real timestamps
-// (years 1-9999) exceed an int64 nanosecond count, so no single integer is
-// used and no 128-bit type is needed.
-struct Instant {
-  std::int64_t seconds = 0;
-  std::int64_t nanoseconds = 0;
-  friend auto operator<=>(const Instant&, const Instant&) = default;
-};
-constexpr std::int64_t kNanosPerSecond = 1'000'000'000;
-// INT64_MIN and INT64_MAX nanoseconds.
-constexpr Instant kStartTime{-9'223'372'037, 145'224'192};
-constexpr Instant kEndTime{9'223'372'036, 854'775'807};
-
-// target - source in nanoseconds, or nullopt when it leaves the int64 range.
-std::optional<std::int64_t> elapsed_nanoseconds(const Instant& source, const Instant& target) {
-  std::int64_t seconds = target.seconds - source.seconds;
-  std::int64_t nanos = target.nanoseconds - source.nanoseconds;
-  if (nanos < 0) { nanos += kNanosPerSecond; --seconds; }
-  if (seconds > kEndTime.seconds || (seconds == kEndTime.seconds && nanos > kEndTime.nanoseconds))
-    return std::nullopt;
-  if (seconds < kStartTime.seconds || (seconds == kStartTime.seconds && nanos < kStartTime.nanoseconds))
-    return std::nullopt;
-  // (seconds + 1) * 1e9 stays in range even at the INT64_MIN edge.
-  return (seconds + 1) * kNanosPerSecond + (nanos - kNanosPerSecond);
-}
-
 struct BoundaryEvent {
   const Event* event = nullptr;
   std::string activity;

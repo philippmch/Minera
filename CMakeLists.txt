@@ -11,6 +11,16 @@ option(MINERA_BUILD_TESTS "Build Minera tests" ON)
 set(MINERA_TEST_OPTIMIZATION "-O0" CACHE STRING
     "Optimization flag for test translation units (GCC/Clang); empty keeps the build type's")
 
+# The reference rounds every multiply and add separately (CPython floats,
+# NumPy's frozen 2.4.6 build), so fusing a*b+c into one FMA changes threshold
+# decisions and parity bits. Clang contracts by default and GCC does wherever
+# the target has FMA (every ARM64 Mac), so contraction is off everywhere;
+# deliberate std::fma calls are unaffected. MSVC's default /fp:precise does
+# not contract.
+if(NOT MSVC)
+  add_compile_options(-ffp-contract=off)
+endif()
+
 # Reuse earlier compilations when ccache is installed; a rebuild after a small
 # change then only recompiles what changed.
 find_program(MINERA_CCACHE ccache)

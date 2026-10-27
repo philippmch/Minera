@@ -18,6 +18,12 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Parity recheck of 4473f13 — 2026-10-27
+
+- G1: TZif footer rules may switch at a signed hour of up to 167 (RFC 8536). America/Nuuk, America/Godthab and America/Scoresbysund use `M3.5.0/-1`. The vendored `ptz.h` now parses these. A footer that still fails to parse is an error rather than a silently frozen offset. Both backends match Python `zoneinfo` for every installed zone (597 zones, about 40,000 probes from 2030 to 2075). `test_zone_database` covers UTC lookups, gaps, overlaps and unique times around every transition from 2038 to 2060 for seven zones.
+- G2: `nanosecond_instant.hpp` builds elapsed nanosecond counts without overflow at either end of the int64 range. Tests check exactly INT64_MIN and INT64_MAX, their neighbours, and one past each, plus a public reproduction of a row that is exactly INT64_MAX long. They pass under UBSan.
+- G3: the reference rounds each multiply and add separately, so CMake builds with `-ffp-contract=off` on GCC and Clang. Clang contracts by default, and so does GCC on FMA targets such as every ARM64 Mac. MSVC's /fp:precise does not contract. With x86 FMA objects and contraction on, the trace-attribute, heuristic-variants, filtering-bank and LLE tests fail; with contraction off they pass. LLE's frozen contract is NumPy 2.4.6 with scipy-openblas 0.3.31 and unfused rounding. Newer NumPy builds that fuse may differ in the last bits, and the bank does not try to match them.
+
 ## Parity recheck fixes — 2026-10-27
 
 A recheck on macOS found five problems that Linux CI could not see:

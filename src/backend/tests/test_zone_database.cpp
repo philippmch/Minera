@@ -12,6 +12,19 @@ namespace {
 
 namespace zd = minera::zone_database;
 
+// Ubuntu 24.04 moved backward links such as America/Godthab out of the
+// zoneinfo tree (tzdata-legacy) and keeps them only in tzdata.zi, which the
+// standard backend reads and the portable one does not.
+bool missing_backward_link(std::string_view zone) {
+  if (zone != "America/Godthab" || !zd::portable_backend()) return false;
+  try {
+    (void)zd::info_at_utc(zone, 0);
+    return false;
+  } catch (const std::runtime_error&) {
+    return true;
+  }
+}
+
 // 2021-03-28 and 2021-10-31 are Europe/Berlin's DST transitions.
 constexpr std::int64_t kMarch28 = 1616889600;    // 2021-03-28T00:00:00 (wall)
 constexpr std::int64_t kOctober31 = 1635638400;  // 2021-10-31T00:00:00 (wall)
@@ -101,11 +114,53 @@ void recurring_rules_after_2037() {
 #include "zone_database_future_offsets.inc"
   };
   for (const auto& expected : kExpected) {
+    if (missing_backward_link(expected.zone)) continue;
     assert(zd::info_at_utc(expected.zone, expected.utc).offset_seconds == expected.offset);
     // The same instant read back as wall time is unique at that offset.
     const auto back = zd::info_at_local(expected.zone, expected.utc + expected.offset);
     assert(back.result == zd::LocalResult::kUnique && back.first_offset_seconds == expected.offset);
   }
+
+  struct ExpectedLocal {
+    std::string_view zone;
+    std::int64_t wall;
+    int result;
+    std::int64_t first;
+    std::int64_t second;
+  };
+  static constexpr ExpectedLocal kExpectedLocal[] = {
+#include "zone_database_future_local.inc"
+  };
+  for (const auto& expected : kExpectedLocal) {
+    if (missing_backward_link(expected.zone)) continue;
+    const auto info = zd::info_at_local(expected.zone, expected.wall);
+    assert(static_cast<int>(info.result) == expected.result);
+    assert(info.first_offset_seconds == expected.first && info.second_offset_seconds == expected.second);
+    const auto localized = minera::localize_timestamp_wall_time(wall(expected.wall), expected.zone);
+    assert(localized.has_value() == (expected.result == 0));
+    if (localized) assert(localized->offset_minutes * 60 == expected.first);
+  }
+}
+
+// Greenland's footer rules switch at a negative hour (M3.5.0/-1), which the
+// rule parser must accept rather than freeze the last offset.
+void negative_transition_hours() {
+  constexpr std::int64_t kJuly15_2038 = 2162808000;  // 12:00 UTC
+  constexpr std::int64_t kGap = 2531950200;          // 2050-03-26 23:30
+  constexpr std::int64_t kOverlap = 2550699000;      // 2050-10-29 23:30
+  for (const std::string_view zone : {"America/Nuuk", "America/Godthab"}) {
+    if (missing_backward_link(zone)) continue;
+    assert(zd::info_at_utc(zone, kJuly15_2038).offset_seconds == -3600);
+    auto local = zd::info_at_local(zone, kGap);
+    assert(local.result == zd::LocalResult::kNonexistent &&
+           local.first_offset_seconds == -7200 && local.second_offset_seconds == -3600);
+    local = zd::info_at_local(zone, kOverlap);
+    assert(local.result == zd::LocalResult::kAmbiguous &&
+           local.first_offset_seconds == -3600 && local.second_offset_seconds == -7200);
+    assert(!minera::localize_timestamp_wall_time(wall(kGap), zone));
+    assert(!minera::localize_timestamp_wall_time(wall(kOverlap), zone));
+  }
+  assert(zd::info_at_utc("America/Scoresbysund", kJuly15_2038).offset_seconds == -3600);
 }
 
 // A unique wall time reports no second offset at all.
@@ -133,6 +188,7 @@ int main() {
   iana_zones();
   dst_gap_and_overlap();
   recurring_rules_after_2037();
+  negative_transition_hours();
   unique_local_times_have_no_second_offset();
   unknown_zones_are_rejected();
   return 0;

@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <climits>
@@ -106,10 +107,13 @@ const Zone& locate(std::string_view name) {
   zone->last_transition =
       zone->table->get_info(date::sys_seconds{date::sys_days{date::year{9000} / 1 / 1}}).begin;
   if (const auto footer = tzif_footer(std::string(name))) {
+    // Without its rule the zone would freeze its last offset forever, so an
+    // unreadable footer is an error, not a fallback.
     try {
       zone->rule.emplace(*footer);
-    } catch (const std::exception&) {
-      // An unparsable rule leaves the explicit table in charge.
+    } catch (const std::exception& error) {
+      throw std::runtime_error("time zone " + std::string(name) + ": unsupported TZif rule \"" + *footer +
+                               "\": " + error.what());
     }
   }
   return *cache.emplace(std::string(name), std::move(zone)).first->second;

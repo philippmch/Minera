@@ -1,9 +1,14 @@
 #include "minera/timestamp_interleavings.hpp"
 
+#include "../exact_divide.hpp"
+#include "../nanosecond_instant.hpp"
+
 #include <array>
 #include <cassert>
+#include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -192,7 +197,57 @@ void malformed_result_is_rejected() {
 
 }  // namespace
 
+// Elapsed counts reach exactly INT64_MIN and INT64_MAX without an
+// overflowing intermediate, and anything one nanosecond beyond is rejected.
+void elapsed_nanoseconds_cover_the_whole_int64_range() {
+  namespace ni = minera::nanosecond_instant;
+  constexpr auto kMax = std::numeric_limits<std::int64_t>::max();
+  constexpr auto kMin = std::numeric_limits<std::int64_t>::min();
+  const ni::Instant epoch{0, 0};
+  assert(ni::elapsed_nanoseconds(epoch, ni::kEndTime) == kMax);
+  assert(ni::elapsed_nanoseconds(epoch, ni::kStartTime) == kMin);
+  assert(ni::elapsed_nanoseconds(ni::kEndTime, epoch) == -kMax);
+  assert(ni::elapsed_nanoseconds({0, 1}, ni::kEndTime) == kMax - 1);
+  assert(ni::elapsed_nanoseconds({0, 1}, ni::kStartTime) == std::nullopt);
+  assert(ni::elapsed_nanoseconds({-1, 999'999'999}, ni::kEndTime) == std::nullopt);
+  assert(ni::elapsed_nanoseconds({0, 0}, {-9'223'372'037, 145'224'193}) == kMin + 1);
+  assert(ni::elapsed_nanoseconds({0, 1}, {-9'223'372'037, 145'224'193}) == kMin);
+  assert(ni::elapsed_nanoseconds({1, 0}, ni::kStartTime) == std::nullopt);
+  assert(ni::elapsed_nanoseconds({-1, 0}, ni::kEndTime) == std::nullopt);
+  assert(ni::elapsed_nanoseconds({5, 250}, {2, 500}) == -2'999'999'750);
+}
+
+// Through the public API: X at the epoch makes its X -> end row exactly
+// INT64_MAX nanoseconds long, while A before it keeps start -> A in range.
+void elapsed_to_end_boundary_at_int64_max() {
+  const auto run = [](const std::string& x_timestamp) {
+    return minera::discover_timestamp_interleavings(
+        log_with("L", {event("L", "A", "1969-12-31T23:59:59Z", 0)}),
+        log_with("R", {event("R", "X", x_timestamp, 0)}),
+        {minera::CaseRelation{"L", "R"}});
+  };
+  const auto find_x_to_end = [](const minera::TimestampInterleavingsResult& result) {
+    for (const auto& row : result.interleavings)
+      if (row.source_activity == "X" && row.target_activity == "■") return row.timestamp_diff_seconds;
+    assert(false && "no X -> end row");
+    return 0.0;
+  };
+  constexpr auto kMax = std::numeric_limits<std::int64_t>::max();
+  assert(find_x_to_end(run("1970-01-01T00:00:00Z")) == minera::true_divide(kMax, 1'000'000'000));
+  assert(find_x_to_end(run("1970-01-01T00:00:00.000000001Z")) ==
+         minera::true_divide(kMax - 1, 1'000'000'000));
+  bool threw = false;
+  try {
+    (void)run("1969-12-31T23:59:59.999999999Z");
+  } catch (const std::overflow_error&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 int main() {
+  elapsed_nanoseconds_cover_the_whole_int64_range();
+  elapsed_to_end_boundary_at_int64_max();
   finds_strict_lr_and_rl_crossings();
   naive_timestamps_and_start_overflow_raise();
   equality_and_unrelated_relations_are_excluded();
