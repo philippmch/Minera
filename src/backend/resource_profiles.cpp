@@ -366,6 +366,19 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
       break;
     }
   }
+  // A query for one resource with no observation: the reference averages
+  // raise StatisticsError and every other metric returns zero.
+  if (result.rows.empty() && (!o.resource.empty() || o.resource_given)) {
+    if (o.metric == ResourceProfileMetric::kAverageDurationActivity ||
+        o.metric == ResourceProfileMetric::kAverageCaseDuration)
+      throw std::invalid_argument("resource profiles: mean requires at least one data point");
+    if (o.metric != ResourceProfileMetric::kInteractionTwoResources &&
+        o.metric != ResourceProfileMetric::kSocialPosition) {
+      const bool by_activity = o.metric == ResourceProfileMetric::kActivityFrequency ||
+                               o.metric == ResourceProfileMetric::kActivityCompletions;
+      add_row(result, {o.resource, by_activity ? o.activity : std::string{}, "", 0.0, 0}, o.max_rows);
+    }
+  }
   std::sort(result.rows.begin(), result.rows.end(), [](const auto&a,const auto&b){return std::tie(a.resource,a.activity,a.resource2)<std::tie(b.resource,b.activity,b.resource2);});
   result.diagnostics.computed = true; result.diagnostics.message = result.diagnostics.output_truncated ? "row safety bound applied" : (result.rows.empty()?"no matching data":"ok");
   return result;
@@ -380,9 +393,7 @@ std::string resource_profiles_json(const ResourceProfilesResult& result) {
       throw std::invalid_argument("resource profile row is invalid");
     // Query-specific zero rows can name resources absent from the source.
     // Their identities do not change the native source resource_count.
-    const bool queried_zero = row.count == 0 && row.value == 0.0 &&
-        (result.metric == ResourceProfileMetric::kSocialPosition ||
-         result.metric == ResourceProfileMetric::kInteractionTwoResources);
+    const bool queried_zero = row.count == 0 && row.value == 0.0;
     if (!queried_zero) {
       resources.insert(row.resource);
       if (result.metric == ResourceProfileMetric::kInteractionTwoResources) resources.insert(row.resource2);

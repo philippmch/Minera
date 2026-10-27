@@ -15825,6 +15825,7 @@ values and passing controls.
 | O3 | Network analysis sorts int and float keys numerically, strings lexically, ties stably. | `minera_network_analysis_tests` |
 | O4 | Present empty resources, activities and case ids are values in network analysis, resource profiles (`*_given` selects the literal empty resource) and interval filters. | `minera_network_analysis_tests`, `minera_resource_profiles_tests`, `minera_interval_tree_tests` |
 | O5 | A zero-width open-path interval raises "Start must be less than end". | `minera_interval_tree_tests` |
+| C3 | A one-resource profile query with no observation matches the reference: the two averages raise "mean requires at least one data point", every other metric returns a zero row (the all-resources form still returns no rows). | `minera_resource_profiles_tests` |
 | OCEL C1 | Activity associations keep one pair per relation row (two qualifiers give the pair twice). | `minera_ocel_statistics_tests` |
 | S1, S2 | Streaming DFG keeps empty labels and case ids, reads the selected activity attribute, skips events without it and reads a present null as "None"; the persistent store keeps empty fields across reloads. | `minera_streaming_dfg_tests`, `minera_streaming_store_tests` |
 
@@ -15836,9 +15837,6 @@ Declared exceptions (not equivalent, kept on purpose):
   alignment precision and fitness. Native analysis uses the weights, so those
   nets solve with objective 2 and are accepted. Parity is claimed for
   unit-weight nets only; `minera_petri_analysis_tests` pins both values.
-- **No-observation averages (C3).** Resource-profile averages with no
-  observation return no row natively; the reference raises StatisticsError
-  (or returns 0.0 for `average_workload`, which positive-workload tests pin).
 - **Malformed OCEL (C3).** Native OCEL statistics reject duplicate ids and
   dangling relations that the public association helpers accept.
 - **Streaming.** The streaming surface stays Partial and outside the 86/387
