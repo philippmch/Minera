@@ -28,7 +28,15 @@ void prefix_state_violation_identity_and_time_history_survive_batches() {
   auto live=session.snapshot_json();assert(live.find("\"total_deviations\":2")!=std::string::npos&&live.find("\"native_event\":{")!=std::string::npos);session.action(StreamingSessionAction::kFinish,3);rejects([&]{session.action(StreamingSessionAction::kTerminateAll,4);});session.action(StreamingSessionAction::kResetCase,4,"case");assert(session.snapshot_json().find("\"cases\":{}")!=std::string::npos);
 }
 void empty_models_and_unknown_templates_preserve_native_prefix_behavior() {
-  DeclareModel model;model.add("unknown",{"","",false,0,0});DeclareStreamingConformance monitor(model);const auto r=monitor.receive("","","");assert(r.case_id=="undefined_case"&&r.event_index==1&&r.deviations==0);assert(monitor.snapshot().cases.at("undefined_case").constraint_states[0].state=="init");
+  DeclareModel model;model.add("unknown",{"","",false,0,0});DeclareStreamingConformance monitor(model);const auto r=monitor.receive("","","");assert(r.case_id==""&&r.event_index==1&&r.deviations==0);assert(monitor.snapshot().cases.at("").constraint_states[0].state=="init");
+  // Reference (PM4Py 2.7.22 streaming Declare): a missing case id is
+  // "undefined_case", None is its own case, a None activity matches nothing.
+  DeclareModel none_model;none_model.add("existence",{"None","",false,0,0});none_model.add("init",{"None","",false,0,0});DeclareStreamingConformance none_monitor(none_model);
+  assert(none_monitor.receive_record("c",false,std::nullopt).deviations==1);
+  assert(none_monitor.receive_record(std::nullopt,true,std::string("None")).deviations==0);
+  assert(none_monitor.receive_record(std::string("None"),false,std::string("A")).deviations==1);
+  assert(none_monitor.receive_record(std::nullopt,false,std::string("None")).case_id=="undefined_case");
+  const auto none_snapshot=none_monitor.snapshot();assert(none_snapshot.cases.size()==4&&none_snapshot.cases.at(std::string("\0None",5)).deviations==0&&none_snapshot.cases.at("None").deviations==1);
   const auto empty=parse_declare_stream_model_json("{\"rules\":[]}");DeclareStreamingConformance no_rules(empty);assert(no_rules.receive("c","A").deviations==0);
 }
 int main(){try{model_roundtrip_retains_labels_duplicates_unknown_rules_and_native_order();malformed_models_fail_before_execution();prefix_state_violation_identity_and_time_history_survive_batches();empty_models_and_unknown_templates_preserve_native_prefix_behavior();}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}return 0;}

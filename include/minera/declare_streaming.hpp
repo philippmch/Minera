@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -70,11 +71,20 @@ class DeclareStreamingConformance {
   [[nodiscard]] DeclareStreamingEventResult receive(std::string case_id,
                                                      std::string activity,
                                                      std::string timestamp = {});
+  // A raw stream record as the reference reads it: a missing case id is
+  // "undefined_case", a None case id is its own case (apart from "None"), and
+  // a missing or None activity matches no constraint activity.
+  [[nodiscard]] DeclareStreamingEventResult receive_record(
+      std::optional<std::string> case_id, bool case_is_null,
+      std::optional<std::string> activity, std::string timestamp = {});
   void reset_case(const std::string& case_id);
   void reset_all();
   [[nodiscard]] DeclareStreamingSnapshot snapshot() const;
 
  private:
+  DeclareStreamingEventResult process(std::string case_id,
+                                      std::optional<std::string> activity,
+                                      std::string timestamp);
   struct Rule;
   struct Case;
   DeclareModel model_;
