@@ -80,6 +80,13 @@ jobs:
         # The macOS 15 SDK's libc++ cannot parse floating point with
         # std::from_chars, which the core relies on.
         os: [macos-26, windows-2022]
+        include:
+          - os: macos-26
+            jobs: 3
+          # MSVC needs several GB for the largest fixture TUs; at three
+          # parallel compiles the 16 GB runner ran out of heap (C1060).
+          - os: windows-2022
+            jobs: 2
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,6 +104,13 @@ jobs:
       - name: Set up MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
+      - name: Enlarge the page file (Windows)
+        if: runner.os == 'Windows'
+        uses: al-cheb/configure-pagefile-action@v1.4
+        with:
+          minimum-size: 16GB
+          maximum-size: 24GB
+          disk-root: "D:"
       - uses: actions/cache@v4
         with:
           path: .ccache
@@ -111,9 +125,9 @@ jobs:
           CCACHE_DIR: ${{ github.workspace }}/.ccache
           CCACHE_MAXSIZE: 4G
         # Keep going past failures so one run reports every platform break.
-        run: cmake --build build -j3 -- -k 0
+        run: cmake --build build -j${{ matrix.jobs }} -- -k 0
       - name: ctest
-        run: ctest --test-dir build -j3 --output-on-failure --timeout 1800
+        run: ctest --test-dir build -j${{ matrix.jobs }} --output-on-failure --timeout 1800
 
   python:
     name: Python script tests

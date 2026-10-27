@@ -284,6 +284,9 @@ int run_ocel(int argc, char** argv) {
     };
     for (int i = 2; i < argc; ++i) {
       const std::string option = argv[i];
+      // MSVC caps nesting at 128 blocks, so the options are matched in two
+      // else-if chains; the first clears `handled` when it matches nothing.
+      bool handled = true;
       if (option == "--csv") {
         csv_input = true;
       } else if (option == "--xml") {
@@ -638,12 +641,16 @@ int run_ocel(int argc, char** argv) {
       } else if (option == "--features-no-prefix") {
         feature_options.include_prefix_features = false;
         prefix_control_used = true;
-      } else if (option == "--features-prefix-length" ||
-                 option == "--features-no-prefix-length" ||
-                 option == "--features-prefix-timediff" ||
-                 option == "--features-no-prefix-timediff" ||
-                 option == "--features-prefix-activities" ||
-                 option == "--features-no-prefix-activities") {
+      } else {
+        handled = false;
+      }
+      if (handled) continue;
+      if (option == "--features-prefix-length" ||
+          option == "--features-no-prefix-length" ||
+          option == "--features-prefix-timediff" ||
+          option == "--features-no-prefix-timediff" ||
+          option == "--features-prefix-activities" ||
+          option == "--features-no-prefix-activities") {
         const bool enabled = option.rfind("--features-no-", 0) != 0;
         if (option.ends_with("prefix-length"))
           feature_options.include_prefix_length_features = enabled;

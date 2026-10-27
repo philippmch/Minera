@@ -7,7 +7,11 @@
 
 #include "../gzip_codec.hpp"
 
+#ifdef _WIN32
+#include <winsqlite/winsqlite3.h>
+#else
 #include <sqlite3.h>
+#endif
 
 #include <cstdlib>
 #include <filesystem>

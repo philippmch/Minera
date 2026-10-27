@@ -923,8 +923,8 @@ weights and their runtime remain an optional application integration concern.
 Timestamp-interleavings evidence: the native discovery joins related left/right
 event logs through `CaseRelation` rows, adds deterministic extreme trace
 boundaries, and emits only strict four-timestamp LR/RL crossings with source /
-target activities, reference-numbered event indices, timestamps, and exact
-elapsed seconds (see "Link analysis and timestamp interleavings bank"). Missing or invalid timestamps, malformed relations, and result-bound
+target activities, reference-numbered event indices, timestamps, and
+reference-rounded elapsed seconds (see "Link analysis and timestamp interleavings bank"). Missing or invalid timestamps, malformed relations, and result-bound
 overruns are rejected during discovery. The standalone
 `minera_export --timestamp-interleavings` path, multipart local
 `POST /api/timestamp-interleavings`, strict request parser, frontend upload
@@ -9787,10 +9787,14 @@ Reference behavior found and now implemented natively in
   position), then the end boundaries. Native previously used input positions.
 - **Boundaries:** the start and end boundaries sit at the extreme nanosecond
   timestamps `1677-09-21T00:12:43.145224193Z` and
-  `2262-04-11T23:47:16.854775807Z`, and elapsed seconds are exact nanosecond
-  counts divided by 1e9. An elapsed time that does not fit in nanoseconds,
-  which happens whenever a row runs from the start boundary to a real event,
-  makes the whole call raise (`OverflowError`; natively `std::overflow_error`).
+  `2262-04-11T23:47:16.854775807Z` (INT64_MIN + 1 and INT64_MAX
+  nanoseconds). Elapsed seconds are whole seconds plus whole microseconds
+  times 1e-6 plus the remaining nanoseconds times 1e-9, each step rounded to
+  double; this can differ from the nanosecond count divided by 1e9 by one ulp.
+  An elapsed time that does not fit in nanoseconds makes the whole call raise
+  (`OverflowError`; natively `std::overflow_error`). That happens for a row
+  from the start boundary to an event after the epoch, or from an event
+  before the epoch to the end boundary.
 - **Naive timestamps:** timezone-naive timestamps raise (`TypeError` in the
   reference; natively `std::invalid_argument`).
 - **Row order:** rows are ordered by the indices of the two pairs' first

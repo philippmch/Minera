@@ -16,7 +16,11 @@
 #include "minera/filtering_common.hpp"
 
 #ifdef MINERA_HAS_SQLITE
+#ifdef _WIN32
+#include <winsqlite/winsqlite3.h>
+#else
 #include <sqlite3.h>
+#endif
 #endif
 
 namespace minera {

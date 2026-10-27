@@ -19,6 +19,9 @@ set(MINERA_TEST_OPTIMIZATION "-O0" CACHE STRING
 # not contract.
 if(NOT MSVC)
   add_compile_options(-ffp-contract=off)
+else()
+  # Generated fixture tables exceed COFF's default 2^16 sections per object.
+  add_compile_options(/bigobj)
 endif()
 
 # Reuse earlier compilations when ccache is installed; a rebuild after a small
@@ -2473,11 +2476,15 @@ if(MINERA_BUILD_TESTS)
            COMMAND minera_decomposed_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/decomposed-bank.txt.gz")
 
-  if(SQLite3_FOUND)
+  if(WIN32 OR SQLite3_FOUND)
     add_executable(minera_connector_parity_tests
       src/backend/tests/test_connector_parity.cpp
     )
-    target_link_libraries(minera_connector_parity_tests PRIVATE minera::core SQLite::SQLite3)
+    if(WIN32)
+      target_link_libraries(minera_connector_parity_tests PRIVATE minera::core winsqlite3)
+    else()
+      target_link_libraries(minera_connector_parity_tests PRIVATE minera::core SQLite::SQLite3)
+    endif()
     target_compile_features(minera_connector_parity_tests PRIVATE cxx_std_20)
     target_compile_options(minera_connector_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
     add_test(NAME minera_connector_parity_tests

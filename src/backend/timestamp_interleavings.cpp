@@ -14,7 +14,6 @@
 #include <utility>
 
 #include "minera/timestamp.hpp"
-#include "exact_divide.hpp"
 #include "nanosecond_instant.hpp"
 
 namespace minera {
@@ -24,7 +23,6 @@ using nanosecond_instant::elapsed_nanoseconds;
 using nanosecond_instant::Instant;
 using nanosecond_instant::kEndTime;
 using nanosecond_instant::kNanosPerSecond;
-using nanosecond_instant::kStartTime;
 
 constexpr std::string_view kStartActivity = "▶";
 constexpr std::string_view kEndActivity = "■";
@@ -32,6 +30,22 @@ constexpr std::string_view kEndActivity = "■";
 // timestamps, so elapsed times against them are finite and exact.
 constexpr std::string_view kStartTimestamp = "1677-09-21T00:12:43.145224193Z";
 constexpr std::string_view kEndTimestamp = "2262-04-11T23:47:16.854775807Z";
+// The start boundary is INT64_MIN + 1 nanoseconds (INT64_MIN itself is
+// pandas' NaT), so a row from it to the epoch is exactly INT64_MAX long.
+constexpr Instant kStartBoundary{-9'223'372'037, 145'224'193};
+
+// The reference's elapsed seconds: whole seconds, plus whole microseconds
+// times 1e-6, plus the remaining nanoseconds times 1e-9, each step rounded
+// to double (not one correctly rounded division).
+double elapsed_seconds(std::int64_t nanoseconds) {
+  std::int64_t seconds = nanoseconds / kNanosPerSecond;
+  std::int64_t fraction = nanoseconds % kNanosPerSecond;
+  if (fraction < 0) { fraction += kNanosPerSecond; --seconds; }
+  const double whole = static_cast<double>(seconds);
+  const double micros = static_cast<double>(fraction / 1000) * 1e-6;
+  const double nanos = static_cast<double>(fraction % 1000) * 1e-9;
+  return (whole + micros) + nanos;
+}
 struct BoundaryEvent {
   const Event* event = nullptr;
   std::string activity;
@@ -107,7 +121,7 @@ std::map<std::string, Timeline> build_timelines(const EventLog& log,
     Timeline timeline;
     timeline.reserve(events.size() + 2);
     timeline.push_back({nullptr, std::string(kStartActivity),
-                        std::string(kStartTimestamp), kStartTime, rank, true});
+                        std::string(kStartTimestamp), kStartBoundary, rank, true});
     for (const auto& parsed : events) {
       timeline.push_back({parsed.event, parsed.event->activity,
                           *timestamp_text(*parsed.event, key), parsed.time,
@@ -187,7 +201,7 @@ TimestampInterleavingsResult discover_timestamp_interleavings(
     if (!elapsed)
       throw std::overflow_error(
           "timestamp interleavings: elapsed time overflows nanoseconds");
-    const double difference = true_divide(*elapsed, kNanosPerSecond);
+    const double difference = elapsed_seconds(*elapsed);
     result.interleavings.push_back(
         {source.activity, target.activity, source.timestamp, target.timestamp,
          left_index, right_index, direction, difference});

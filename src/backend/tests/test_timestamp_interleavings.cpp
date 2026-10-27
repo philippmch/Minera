@@ -1,6 +1,5 @@
 #include "minera/timestamp_interleavings.hpp"
 
-#include "../exact_divide.hpp"
 #include "../nanosecond_instant.hpp"
 
 #include <array>
@@ -11,6 +10,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace {
@@ -219,6 +219,27 @@ void elapsed_nanoseconds_cover_the_whole_int64_range() {
 
 // Through the public API: X at the epoch makes its X -> end row exactly
 // INT64_MAX nanoseconds long, while A before it keeps start -> A in range.
+// Expected values come from PM4Py 2.7.22 (pandas 3.0.5).
+constexpr double kInt64MaxSeconds = 0x1.12e0be826d694p+33;  // 9223372036.854774
+
+double row_diff(const minera::TimestampInterleavingsResult& result, std::string_view source,
+                std::string_view target) {
+  for (const auto& row : result.interleavings)
+    if (row.source_activity == source && row.target_activity == target) return row.timestamp_diff_seconds;
+  assert(false && "row not found");
+  return 0.0;
+}
+
+template <typename Run>
+bool overflows(Run run) {
+  try {
+    (void)run();
+  } catch (const std::overflow_error&) {
+    return true;
+  }
+  return false;
+}
+
 void elapsed_to_end_boundary_at_int64_max() {
   const auto run = [](const std::string& x_timestamp) {
     return minera::discover_timestamp_interleavings(
@@ -226,28 +247,69 @@ void elapsed_to_end_boundary_at_int64_max() {
         log_with("R", {event("R", "X", x_timestamp, 0)}),
         {minera::CaseRelation{"L", "R"}});
   };
-  const auto find_x_to_end = [](const minera::TimestampInterleavingsResult& result) {
-    for (const auto& row : result.interleavings)
-      if (row.source_activity == "X" && row.target_activity == "■") return row.timestamp_diff_seconds;
-    assert(false && "no X -> end row");
-    return 0.0;
+  assert(row_diff(run("1970-01-01T00:00:00Z"), "X", "■") == kInt64MaxSeconds);
+  assert(row_diff(run("1970-01-01T00:00:00.000000001Z"), "X", "■") == kInt64MaxSeconds);
+  assert(overflows([&] { return run("1969-12-31T23:59:59.999999999Z"); }));
+}
+
+// The start boundary is INT64_MIN + 1 nanoseconds, so start -> epoch is
+// exactly INT64_MAX and representable; one nanosecond later overflows.
+void start_boundary_to_epoch_is_representable() {
+  const auto run = [](const std::string& x_timestamp) {
+    return minera::discover_timestamp_interleavings(
+        log_with("L", {event("L", "A", "1970-01-01T00:00:01Z", 0)}),
+        log_with("R", {event("R", "X", x_timestamp, 0),
+                       event("R", "Y", "1970-01-01T00:00:02Z", 1)}),
+        {minera::CaseRelation{"L", "R"}});
   };
-  constexpr auto kMax = std::numeric_limits<std::int64_t>::max();
-  assert(find_x_to_end(run("1970-01-01T00:00:00Z")) == minera::true_divide(kMax, 1'000'000'000));
-  assert(find_x_to_end(run("1970-01-01T00:00:00.000000001Z")) ==
-         minera::true_divide(kMax - 1, 1'000'000'000));
-  bool threw = false;
-  try {
-    (void)run("1969-12-31T23:59:59.999999999Z");
-  } catch (const std::overflow_error&) {
-    threw = true;
+  for (const char* x : {"1970-01-01T00:00:00Z", "1969-12-31T23:59:59.999999999Z"}) {
+    const auto result = run(x);
+    assert(result.interleavings.size() == 2);
+    assert(row_diff(result, "▶", "X") == kInt64MaxSeconds);
+    assert(row_diff(result, "Y", "■") == 0x1.12e0be816d694p+33);  // 9223372034.854774
   }
-  assert(threw);
+  assert(overflows([&] { return run("1970-01-01T00:00:00.000000001Z"); }));
+}
+
+// Elapsed seconds are whole seconds + microseconds * 1e-6 + nanoseconds *
+// 1e-9, each rounded separately, not one correctly rounded division.
+void elapsed_seconds_round_like_the_reference() {
+  struct Case { const char* a; const char* x; double seconds; };
+  static constexpr Case kCases[] = {
+      {"1970-01-01T00:00:00.000000000Z", "1970-01-01T00:00:00.000000001Z", 0x1.12e0be826d695p-30},
+      {"1969-12-31T23:59:59.999999999Z", "1970-01-01T00:00:00.000000002Z", 0x1.9c511dc3a41e0p-29},
+      {"1969-12-31T23:59:59.999999984Z", "1970-01-01T00:00:00.000000017Z", 0x1.1b77c47680d4ap-25},
+      {"1969-12-31T23:59:59.999999969Z", "1970-01-01T00:00:00.000000032Z", 0x1.0e953b8863b3bp-24},
+      {"1969-12-31T23:59:59.999999501Z", "1970-01-01T00:00:00.000000500Z", 0x1.0c2ac1dbbe3d8p-20},
+      {"1969-12-31T23:59:59.999999500Z", "1970-01-01T00:00:00.000000500Z", 0x1.0c6f7a0b5ed8dp-20},
+      {"1969-12-31T23:59:59.999999500Z", "1970-01-01T00:00:00.000000501Z", 0x1.0cb4323aff743p-20},
+      {"1969-12-31T23:59:59.999500001Z", "1970-01-01T00:00:00.000500000Z", 0x1.0624cc010eb79p-10},
+      {"1969-12-31T23:59:59.999500000Z", "1970-01-01T00:00:00.000500000Z", 0x1.0624dd2f1a9fcp-10},
+      {"1969-12-31T23:59:59.999500000Z", "1970-01-01T00:00:00.000500001Z", 0x1.0624ee5d2687ep-10},
+      {"1969-12-31T23:59:59.500000001Z", "1970-01-01T00:00:00.500000000Z", 0x1.fffffff768fa0p-1},
+      {"1969-12-31T23:59:59.500000000Z", "1970-01-01T00:00:00.500000000Z", 0x1.0000000000000p+0},
+      {"1969-12-31T23:59:59.500000000Z", "1970-01-01T00:00:00.500000001Z", 0x1.000000044b830p+0},
+      {"1969-12-31T23:59:59.499999501Z", "1970-01-01T00:00:00.500000500Z", 0x1.000010c2ac1dcp+0},
+      {"1969-12-31T23:59:59.499999500Z", "1970-01-01T00:00:00.500000500Z", 0x1.000010c6f7a0bp+0},
+      {"1969-12-31T23:59:59.499500001Z", "1970-01-01T00:00:00.500500000Z", 0x1.004189330043bp+0},
+      {"1969-12-31T23:59:39.509972721Z", "1970-01-01T00:00:20.490027280Z", 0x1.47d726d8399b1p+5},
+      {"1969-12-31T12:00:00.000000001Z", "1970-01-01T12:00:00.000000000Z", 0x1.517ffffffffbcp+16},
+  };
+  for (const auto& c : kCases) {
+    // A -> X crosses because B follows X and Y follows B.
+    const auto result = minera::discover_timestamp_interleavings(
+        log_with("L", {event("L", "A", c.a, 0), event("L", "B", "1970-01-01T13:00:00Z", 1)}),
+        log_with("R", {event("R", "X", c.x, 0), event("R", "Y", "1970-01-01T14:00:00Z", 1)}),
+        {minera::CaseRelation{"L", "R"}});
+    assert(row_diff(result, "A", "X") == c.seconds);
+  }
 }
 
 int main() {
   elapsed_nanoseconds_cover_the_whole_int64_range();
   elapsed_to_end_boundary_at_int64_max();
+  start_boundary_to_epoch_is_representable();
+  elapsed_seconds_round_like_the_reference();
   finds_strict_lr_and_rl_crossings();
   naive_timestamps_and_start_overflow_raise();
   equality_and_unrelated_relations_are_excluded();
