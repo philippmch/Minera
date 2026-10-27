@@ -17,14 +17,16 @@ int main() {
 
   {
     minera::PersistentStreamingDfg store(path);
-    assert(!store.receive("", "A"));
+    // Reference: an empty case id or activity is an ordinary value.
+    assert(store.receive("", "A"));
     assert(store.receive("case,1", "A"));
     assert(store.receive("case,1", "B"));
     assert(store.receive("case\"2", "A\nstart"));
     const auto snapshot = store.snapshot();
-    assert(snapshot.events == 3);
+    assert(snapshot.events == 4);
     assert(snapshot.graph.at({"A", "B"}) == 1);
-    assert(snapshot.start_activities.at("A") == 1);
+    assert(snapshot.start_activities.at("A") == 2);
+    assert(snapshot.open_cases.at("") == "A");
     assert(snapshot.open_cases.at("case,1") == "B");
     assert(snapshot.open_cases.at("case\"2") == "A\nstart");
   }
@@ -32,8 +34,9 @@ int main() {
   {
     minera::PersistentStreamingDfg reopened(path);
     const auto snapshot = reopened.snapshot();
-    assert(snapshot.events == 3);
+    assert(snapshot.events == 4);
     assert(snapshot.graph.at({"A", "B"}) == 1);
+    assert(snapshot.end_activities.at("A") == 1);
     assert(snapshot.end_activities.at("B") == 1);
     assert(snapshot.end_activities.at("A\nstart") == 1);
     reopened.reset();

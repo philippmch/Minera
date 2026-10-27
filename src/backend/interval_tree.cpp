@@ -91,12 +91,7 @@ std::vector<OpenPathInterval> discover_open_path_intervals(
   }
   if (!std::isfinite(options.epsilon) || options.epsilon < 0.0)
     throw std::invalid_argument("interval tree: epsilon must be finite and non-negative");
-  if (options.filter_activity_couple &&
-      (options.filter_activity_couple->first.empty() ||
-       options.filter_activity_couple->second.empty())) {
-    throw std::invalid_argument(
-        "interval tree: filter activity couple must contain two labels");
-  }
+  // A filter couple may name the empty activity; the reference accepts it.
 
   std::vector<OpenPathInterval> result;
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
@@ -124,6 +119,10 @@ std::vector<OpenPathInterval> discover_open_path_intervals(
           const double end = target_time + options.epsilon;
           if (!std::isfinite(start) || !std::isfinite(end))
             throw std::invalid_argument("interval tree: interval is not finite");
+          // The reference interval tree rejects an empty interval, such as
+          // two events at the same time with epsilon 0.
+          if (!(start < end))
+            throw std::invalid_argument("interval tree: Start must be less than end");
           result.push_back({start, end, trace.case_id, source_activity,
                             target_activity, trace_index, source_index,
                             target_index});

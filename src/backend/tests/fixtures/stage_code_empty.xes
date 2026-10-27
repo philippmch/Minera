@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1.0">
+<trace><string key="concept:name" value="c1"/>
+<event><string key="concept:name" value="Register"/><string key="stage.code" value="INTAKE"/><date key="time:timestamp" value="2024-01-01T00:00:00.000+00:00"/></event>
+<event><string key="concept:name" value="Assess"/><string key="stage.code" value=""/><date key="time:timestamp" value="2024-01-02T00:00:00.000+00:00"/></event>
+</trace></log>

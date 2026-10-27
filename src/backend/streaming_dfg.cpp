@@ -1,5 +1,7 @@
 #include "minera/streaming_dfg.hpp"
 
+#include "reference_activity_selector.hpp"
+
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -70,7 +72,6 @@ StreamingDfgDiscovery::StreamingDfgDiscovery(StreamingDfgOptions options)
 
 bool StreamingDfgDiscovery::receive(std::string_view case_id,
                                     std::string_view activity) {
-  if (case_id.empty() || activity.empty()) return false;
   std::lock_guard<std::mutex> lock(mutex_);
   const std::string case_key(case_id);
   const std::string activity_key(activity);
@@ -89,7 +90,21 @@ bool StreamingDfgDiscovery::receive(std::string_view case_id,
 
 bool StreamingDfgDiscovery::receive(const Event& event,
                                     std::string_view case_id) {
-  return receive(case_id, event.activity);
+  const auto activity = streaming_event_activity(event, options_.activity_attribute);
+  return activity && receive(case_id, *activity);
+}
+
+std::optional<std::string> streaming_event_activity(const Event& event,
+                                                    std::string_view selector) {
+  // The reference stream skips an event without the selected key and
+  // stringifies a present null as "None".
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == selector) return attribute.is_null ? std::string("None") : attribute.value;
+  try {
+    return reference_selected_activity(event, selector, "streaming DFG");
+  } catch (const std::invalid_argument&) {
+    return std::nullopt;
+  }
 }
 
 StreamingDfgSnapshot StreamingDfgDiscovery::snapshot() const {

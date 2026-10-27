@@ -73,8 +73,7 @@ std::vector<StateRow> read_state_rows(std::istream& input) {
     field.clear();
     if (fields.size() != 2)
       throw std::invalid_argument("streaming DFG state row must have two fields");
-    if (fields[0].empty() || fields[1].empty())
-      throw std::invalid_argument("streaming DFG state row contains an empty field");
+    // Empty case ids and activities are ordinary values, as in the reference.
     rows.emplace_back(std::move(fields[0]), std::move(fields[1]));
     fields.clear();
     field_start = true;
@@ -187,7 +186,6 @@ void PersistentStreamingDfg::append(std::string_view case_id,
 
 bool PersistentStreamingDfg::receive(std::string_view case_id,
                                      std::string_view activity) {
-  if (case_id.empty() || activity.empty()) return false;
   std::lock_guard<std::mutex> lock(mutex_);
   append(case_id, activity);
   return discovery_.receive(case_id, activity);
@@ -195,7 +193,8 @@ bool PersistentStreamingDfg::receive(std::string_view case_id,
 
 bool PersistentStreamingDfg::receive(const Event& event,
                                      std::string_view case_id) {
-  return receive(case_id, event.activity);
+  const auto activity = streaming_event_activity(event, discovery_.options().activity_attribute);
+  return activity && receive(case_id, *activity);
 }
 
 StreamingDfgSnapshot PersistentStreamingDfg::snapshot() const {

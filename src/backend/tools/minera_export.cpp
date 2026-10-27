@@ -257,6 +257,13 @@ std::string trim_text(std::string_view value) {
   return std::string(value.substr(first, last - first + 1));
 }
 
+// Attribute names are literal keys: " code " and "code" are different
+// fields, so only a blank name is rejected (as empty) and nothing is trimmed.
+std::string selector_name(std::string_view value) {
+  if (value.find_first_not_of(" \t\r\n") == std::string_view::npos) return {};
+  return std::string(value);
+}
+
 void register_activity_selector_values(
     minera::DirectlyFollowsGraph& graph, const minera::EventLog& log,
     std::string_view activity_attribute) {
@@ -1700,7 +1707,7 @@ PowlCliParseStatus parse_powl_cli_option(
     return PowlCliParseStatus::kParsed;
   }
 
-  const auto name = trim_text(value);
+  const auto name = selector_name(value);
   if (name.empty()) {
     std::cerr << "error: " << arg << " expects a non-empty name\n";
     return PowlCliParseStatus::kInvalid;
@@ -1727,7 +1734,7 @@ bool parse_footprints_extra_option(std::string_view arg, const char* value,
   if (arg == "--footprints-activity-attribute" ||
       arg == "--footprints-case-id-attribute" ||
       arg == "--footprints-timestamp-attribute") {
-    const auto selector = trim_text(value);
+    const auto selector = selector_name(value);
     if (selector.empty()) return selector_error();
     if (arg == "--footprints-activity-attribute")
       options.activity_attribute = selector;
@@ -1739,12 +1746,12 @@ bool parse_footprints_extra_option(std::string_view arg, const char* value,
   }
 
   if (arg == "--footprints-index-attribute") {
-    options.index_attribute = trim_text(value);
+    options.index_attribute = selector_name(value);
     return true;
   }
 
   if (arg == "--footprints-start-timestamp-attribute") {
-    const auto selector = trim_text(value);
+    const auto selector = selector_name(value);
     if (selector.empty())
       options.start_timestamp_attribute.reset();
     else
@@ -2316,7 +2323,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
           auto& selector = arg == "--token-replay-case-id-attribute"
                                ? token_replay_options.case_id_attribute
                                : token_replay_options.timestamp_attribute;
-          selector = trim_text(value);
+          selector = selector_name(value);
           if (selector.empty())
             throw std::invalid_argument(std::string(arg) + " expects a non-empty name");
         }
@@ -2408,18 +2415,18 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         arg == "--token-replay-activity-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      const auto trimmed = trim_text(value);
-      if (trimmed.empty()) {
+      const auto name = selector_name(value);
+      if (name.empty()) {
         std::cerr << "error: " << arg
                   << " expects a non-empty name\n";
         return 2;
       }
       if (arg == "--alignment-activity-attribute") {
-        alignment_options.activity_attribute = trimmed;
+        alignment_options.activity_attribute = name;
         alignment_option_used = true;
         alignment_activity_option_used = true;
       } else {
-        token_replay_options.activity_attribute = trimmed;
+        token_replay_options.activity_attribute = name;
         token_replay_activity_option_used = true;
       }
       continue;
@@ -2427,16 +2434,16 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     if (arg == "--heuristic-activity-attribute" ||
         arg == "--heuristic-timestamp-attribute") {
       const auto* value = next();
-      const auto trimmed = value == nullptr ? std::string{} : trim_text(value);
-      if (trimmed.empty()) {
+      const auto name = value == nullptr ? std::string{} : selector_name(value);
+      if (name.empty()) {
         std::cerr << "error: " << arg
                   << " expects a non-empty name\n";
         return 2;
       }
       if (arg == "--heuristic-activity-attribute")
-        heuristic_options.activity_attribute = trimmed;
+        heuristic_options.activity_attribute = name;
       else
-        heuristic_options.timestamp_attribute = trimmed;
+        heuristic_options.timestamp_attribute = name;
       continue;
     }
     if (arg == "--batch-activity-attribute" ||
@@ -3851,7 +3858,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         std::cerr << "error: --compare-petri-activity-attribute expects a non-empty name\n";
         return 2;
       }
-      compare_petri_activity_attribute = trim_text(value);
+      compare_petri_activity_attribute = selector_name(value);
       if (compare_petri_activity_attribute.empty()) {
         std::cerr << "error: --compare-petri-activity-attribute expects a non-empty name\n";
         return 2;
@@ -3930,12 +3937,12 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     // which is already close to MSVC's block-nesting limit.
     if (arg == "--decision-activity-attribute") {
       const auto* value = next();
-      if (!value || trim_text(value).empty()) {
+      if (!value || selector_name(value).empty()) {
         std::cerr << "error: " << arg
                   << " expects a non-empty name\n";
         return 2;
       }
-      decision_options.activity_attribute = trim_text(value);
+      decision_options.activity_attribute = selector_name(value);
       decision_option_used = true;
       decision_activity_option_used = true;
       continue;
@@ -4207,7 +4214,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         arg == "--declare-activity-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      const auto selector = trim_text(value);
+      const auto selector = selector_name(value);
       if (selector.empty()) {
         std::cerr << "error: " << arg
                   << " expects a non-empty attribute name\n";
@@ -4605,7 +4612,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       if (arg == "--pt-alignment-activity-attribute") {
-        const auto selector = trim_text(value);
+        const auto selector = selector_name(value);
         if (selector.empty()) {
           std::cerr << "error: " << arg
                     << " expects a non-empty attribute name\n";
@@ -5013,7 +5020,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                arg == "--correlation-case-id-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      const auto selector = trim_text(value);
+      const auto selector = selector_name(value);
       if (selector.empty() &&
           arg != "--correlation-start-timestamp-attribute") {
         std::cerr << "error: " << arg << " expects a non-empty name\n";
@@ -5148,7 +5155,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                arg == "--inductive-case-id-key") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      const auto selector = trim_text(value);
+      const auto selector = selector_name(value);
       if (selector.empty()) {
         std::cerr << "error: " << arg << " expects a non-empty name\n";
         return 2;
@@ -5174,7 +5181,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     } else if (arg == "--alpha-activity-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      const auto selector = trim_text(value);
+      const auto selector = selector_name(value);
       if (selector.empty()) {
         std::cerr << "error: --alpha-activity-attribute expects a non-empty name\n";
         return 2;
@@ -7171,6 +7178,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       minera::PetriUsageComparisonOptions comparison_options;
       comparison_options.place_names = document.place_ids;
       comparison_options.transition_names = document.transition_ids;
+      comparison_options.arc_occurrences = document.arc_occurrences;
       comparison_options.activity_attribute = compare_petri_activity_attribute;
       comparison_options.walk_through_hidden_trans = compare_petri_walk_through_hidden;
       comparison_options.try_to_reach_final_marking_through_hidden = compare_petri_reach_final_through_hidden;

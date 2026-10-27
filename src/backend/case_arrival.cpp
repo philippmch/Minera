@@ -132,10 +132,25 @@ double business_elapsed(double start, double end,
   return total;
 }
 
+// Seconds between two instants from their exact parsed values, like a
+// Python timedelta's total_seconds (whole microseconds / 10**6); rounded epoch
+// doubles would lose the gap, e.g. one microsecond in 2026 reads 9.5e-7.
+std::optional<double> exact_seconds_between(std::string_view start_text, std::string_view end_text) {
+  const auto start = parse_timestamp_exact(start_text);
+  const auto end = parse_timestamp_exact(end_text);
+  if (!start || !end) return std::nullopt;
+  const std::int64_t seconds = end->seconds - start->seconds;
+  const std::int64_t nanoseconds = static_cast<std::int64_t>(end->nanoseconds) - start->nanoseconds;
+  if (seconds > 9000000000LL || seconds < -9000000000LL) return std::nullopt;
+  if (nanoseconds % 1000 == 0)
+    return static_cast<double>(seconds * 1000000 + nanoseconds / 1000) / 1e6;
+  return static_cast<double>(seconds) + static_cast<double>(nanoseconds) / 1e9;
+}
+
 double elapsed(double start, double end, std::string_view start_text,
                 std::string_view end_text,
                 const std::vector<BusinessHourSlot>& slots) {
-  if (slots.empty()) return end - start;
+  if (slots.empty()) return exact_seconds_between(start_text, end_text).value_or(end - start);
   const auto local_start = local_wall_timestamp(start_text);
   const auto local_end = local_wall_timestamp(end_text);
   if (!local_start || !local_end)
@@ -169,8 +184,14 @@ CaseArrivalResult discover_case_arrival(const EventLog& log,
     starts.emplace_back(start, timestamp_text(first, options.timestamp_key, "start"));
     ends.emplace_back(end, timestamp_text(last, options.timestamp_key, "end"));
   }
-  std::sort(starts.begin(), starts.end());
-  std::sort(ends.begin(), ends.end());
+  // Order by the exact instant where both parse, so instants closer than one
+  // double ulp keep their true order.
+  const auto earlier = [](const std::pair<double, std::string>& a, const std::pair<double, std::string>& b) {
+    if (const auto gap = exact_seconds_between(a.second, b.second); gap && *gap != 0.0) return *gap > 0.0;
+    return a < b;
+  };
+  std::sort(starts.begin(), starts.end(), earlier);
+  std::sort(ends.begin(), ends.end(), earlier);
   std::vector<double> arrival;
   std::vector<double> dispersion;
   arrival.reserve(starts.size() > 1 ? starts.size() - 1 : 0);

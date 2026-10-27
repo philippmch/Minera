@@ -206,11 +206,20 @@ int main() {
   auto mixed_activity_options = custom_options;
   mixed_activity_options.case_id_key.clear();
   mixed_activity_options.activity_key = "phase";
-  const auto mixed_activity = minera::mine_genetic(
-      mixed_activity_attribute_log(), mixed_activity_options);
-  assert(mixed_activity.net.activities().size() == 2);
-  assert(mixed_activity.net.activities()[0] == "B");
-  assert(mixed_activity.net.activities()[1] == "Start");
+  // An event without the selected field is rejected rather than relabeled
+  // with its canonical activity; the reference fails on such a log as well.
+  threw = false;
+  try { (void)minera::mine_genetic(mixed_activity_attribute_log(), mixed_activity_options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  // A present empty selected value stays a visible "" label (reference
+  // labels for stage.code INTAKE and "": ['', 'INTAKE']).
+  auto empty_label_log = mixed_activity_attribute_log();
+  empty_label_log.traces[0].events[1].attributes.push_back({"phase", ""});
+  const auto empty_label = minera::mine_genetic(empty_label_log, mixed_activity_options);
+  assert(empty_label.net.activities().size() == 2);
+  assert(std::count(empty_label.net.activities().begin(), empty_label.net.activities().end(), "") == 1);
+  assert(std::count(empty_label.net.activities().begin(), empty_label.net.activities().end(), "Start") == 1);
 
   auto odd_no_crossover = custom_options;
   odd_no_crossover.population_size = 5;

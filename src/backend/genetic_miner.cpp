@@ -14,6 +14,7 @@
 
 #include "minera/genetic_reference.hpp"
 #include "minera/timestamp.hpp"
+#include "reference_activity_selector.hpp"
 
 namespace minera {
 namespace {
@@ -307,19 +308,7 @@ NormalizedLog normalize(const EventLog& log, const GeneticMinerOptions& options)
     }
     std::vector<std::string> sequence;
     for (const auto& event : raw_trace.events) {
-      std::string label = options.activity_key.empty()
-                              ? event.activity
-                              : event_value(event, options.activity_key);
-      if (!options.activity_key.empty() &&
-          options.activity_key != "activity" &&
-          options.activity_key != "concept:name" &&
-          options.activity_key != "resource" &&
-          options.activity_key != "org:resource" &&
-          event.attribute(options.activity_key) == nullptr)
-        label = event.activity;
-      if (!label.empty()) {
-        names.insert(label);
-      }
+      names.insert(reference_selected_label(event, options.activity_key, "genetic miner"));
     }
   }
   if (raw.empty() || names.empty())
@@ -334,17 +323,7 @@ NormalizedLog normalize(const EventLog& log, const GeneticMinerOptions& options)
   for (const auto& raw_trace : raw) {
     std::vector<std::string> sequence;
     for (const auto& event : raw_trace.events) {
-      std::string label = options.activity_key.empty()
-                              ? event.activity
-                              : event_value(event, options.activity_key);
-      if (!options.activity_key.empty() &&
-          options.activity_key != "activity" &&
-          options.activity_key != "concept:name" &&
-          options.activity_key != "resource" &&
-          options.activity_key != "org:resource" &&
-          event.attribute(options.activity_key) == nullptr)
-        label = event.activity;
-      if (!label.empty()) sequence.push_back(std::move(label));
+      sequence.push_back(reference_selected_label(event, options.activity_key, "genetic miner"));
     }
     if (sequence.empty()) continue;
     std::vector<std::size_t> encoded;
@@ -356,6 +335,7 @@ NormalizedLog normalize(const EventLog& log, const GeneticMinerOptions& options)
       Event event;
       event.case_id = raw_trace.case_id;
       event.activity = sequence[i];
+      event.activity_state = FirstClassAttributeState::kPresent;  // "" is a label
       event.input_order = i;
       conformance_trace.events.push_back(std::move(event));
     }

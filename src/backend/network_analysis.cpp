@@ -42,14 +42,40 @@ std::vector<BusinessHourSlot> normalized_slots(const NetworkAnalysisOptions& o) 
   return merged;
 }
 
+// First-class fields count only when present: an explicitly present empty
+// value is a value, a missing or null one is not (pandas drops NaN keys).
+std::optional<std::string> present(FirstClassAttributeState state, const std::string& text) {
+  if (state == FirstClassAttributeState::kPresent ||
+      (state == FirstClassAttributeState::kMissing && !text.empty()))
+    return text;
+  return std::nullopt;
+}
+
 std::optional<std::string> value(const Event& e, std::string_view selector) {
   if (selector.empty()) return std::nullopt;
-  if (selector == "concept:name") return e.activity;
-  if (selector == "time:timestamp") return e.timestamp;
-  if (selector == "org:resource") return e.resource;
-  if (selector == "case:concept:name" || selector == "case:id" || selector == "case_id") return e.case_id;
-  if (selector == "lifecycle:transition") return e.lifecycle;
   if (const auto* p = e.attribute(selector)) return *p;
+  if (selector == "concept:name") return present(e.activity_state, e.activity);
+  if (selector == "time:timestamp") return present(e.timestamp_state, e.timestamp);
+  if (selector == "org:resource") return present(e.resource_state, e.resource);
+  if (selector == "case:concept:name" || selector == "case:id" || selector == "case_id")
+    return present(e.case_id_state, e.case_id);
+  if (selector == "lifecycle:transition") return present(e.lifecycle_state, e.lifecycle);
+  return std::nullopt;
+}
+
+// Numeric sort keys keep their numeric order (1 < 2 < 10), as a numeric
+// dataframe column sorts; text keys sort lexically.
+std::optional<double> number(const Event& e, std::string_view selector) {
+  for (const auto& attribute : e.attributes) {
+    if (attribute.key != selector) continue;
+    if (attribute.is_null || (attribute.kind != AttributeKind::kInt && attribute.kind != AttributeKind::kFloat))
+      return std::nullopt;
+    try {
+      return std::stod(attribute.value);
+    } catch (const std::exception&) {
+      return std::nullopt;
+    }
+  }
   return std::nullopt;
 }
 
@@ -107,6 +133,7 @@ struct Ref {
   std::size_t index;
   std::string sort_text;
   std::optional<double> sort_time;
+  std::optional<double> sort_number;
 };
 
 }  // namespace
@@ -129,10 +156,13 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
   std::size_t input = 0;
   for (const auto& tr : log.traces) for (const auto& e : tr.events) {
     auto sv = value(e, &tr, o.sorting_attribute);
-    if (!sv || sv->empty()) continue;
-    refs.push_back({&e, &tr, input++, sv.value_or(""), instant(e, &tr, o.sorting_attribute)});
+    if (!sv) continue;
+    const auto numeric = number(e, o.sorting_attribute);
+    refs.push_back({&e, &tr, input++, *sv, numeric ? std::nullopt : instant(e, &tr, o.sorting_attribute), numeric});
   }
   std::stable_sort(refs.begin(), refs.end(), [](const Ref& a, const Ref& b) {
+    if (a.sort_number && b.sort_number) return *a.sort_number < *b.sort_number;
+    if (a.sort_number.has_value() != b.sort_number.has_value()) return a.sort_number.has_value();
     if (a.sort_time && b.sort_time && *a.sort_time != *b.sort_time) return *a.sort_time < *b.sort_time;
     if (a.sort_time.has_value() != b.sort_time.has_value()) return a.sort_time.has_value();
     if (a.sort_text != b.sort_text) return a.sort_text < b.sort_text;
@@ -142,13 +172,11 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
   std::vector<const Ref*> successors(refs.size(), nullptr);
   std::map<std::string, const Ref*> next_by_relation;
   for (std::size_t i = refs.size(); i-- > 0;) {
-    if (const auto relation = value(*refs[i].event, refs[i].trace, o.out_relation_attribute);
-        relation && !relation->empty()) {
+    if (const auto relation = value(*refs[i].event, refs[i].trace, o.out_relation_attribute)) {
       const auto target = next_by_relation.find(*relation);
       if (target != next_by_relation.end()) successors[i] = target->second;
     }
-    if (const auto relation = value(*refs[i].event, refs[i].trace, o.in_relation_attribute);
-        relation && !relation->empty()) {
+    if (const auto relation = value(*refs[i].event, refs[i].trace, o.in_relation_attribute)) {
       next_by_relation[*relation] = &refs[i];
     }
   }
@@ -157,15 +185,15 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
   for (std::size_t source_index = 0; source_index < refs.size(); ++source_index) {
     const auto& source = refs[source_index];
     const auto relation = value(*source.event, source.trace, o.out_relation_attribute);
-    if (!relation || relation->empty()) continue;
+    if (!relation) continue;
     const auto source_node = value(*source.event, source.trace, o.source_node_attribute);
-    if (!source_node || source_node->empty()) continue;
+    if (!source_node) continue;
     const Ref* target = successors[source_index];
     if (!target) continue;
     const auto target_node = value(*target->event, target->trace, o.target_node_attribute);
     const auto& edge_event = o.edge_reference == NetworkAnalysisEdgeReference::kOut ? source : *target;
     const auto edge_value = value(*edge_event.event, edge_event.trace, o.edge_attribute);
-    if (!target_node || target_node->empty() || !edge_value || edge_value->empty()) continue;
+    if (!target_node || !edge_value) continue;
     const Key key{*source_node, *target_node, *edge_value};
     auto [it, inserted] = grouped.emplace(key, NetworkAnalysisEdge{*source_node, *target_node, *edge_value, 0, {}});
     (void)inserted;

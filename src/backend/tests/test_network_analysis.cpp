@@ -5,6 +5,10 @@
 #include <cassert>
 #include <cmath>
 #include <map>
+#include <optional>
+#include <tuple>
+#include <utility>
+#include <vector>
 #include <string>
 #include <stdexcept>
 
@@ -28,7 +32,65 @@ static EventLog sample() {
   return log;
 }
 
+// Reference values from PM4Py 2.7.22 network_analysis (public calls).
+static Event present(std::string id, std::string activity, std::string resource, int second,
+                     std::optional<std::pair<std::string, AttributeKind>> rank = std::nullopt) {
+  auto e = event(std::move(id), std::move(activity), std::move(resource),
+                 "2026-01-01T00:00:" + std::string(second < 10 ? "0" : "") + std::to_string(second) + "Z");
+  e.case_id_state = e.activity_state = e.resource_state = e.timestamp_state = FirstClassAttributeState::kPresent;
+  if (rank) e.attributes.push_back({"rank", rank->first, rank->second});
+  return e;
+}
+static std::map<std::tuple<std::string, std::string, std::string>, std::uint64_t> edges_of(
+    std::vector<Event> events, NetworkAnalysisOptions options = {}) {
+  EventLog log;
+  Trace trace; trace.case_id = events.empty() ? "" : events.front().case_id;
+  trace.events = std::move(events);
+  log.traces.push_back(std::move(trace));
+  std::map<std::tuple<std::string, std::string, std::string>, std::uint64_t> out;
+  for (const auto& edge : discover_network_analysis(log, options).edges)
+    out[{edge.source, edge.target, edge.activity}] = edge.count;
+  return out;
+}
+
+static void reference_audit_contracts() {
+  using Edges = std::map<std::tuple<std::string, std::string, std::string>, std::uint64_t>;
+  NetworkAnalysisOptions ranked; ranked.sorting_attribute = "rank";
+  // O3: integer ranks 1, 2, 10 sort numerically: r->s (A), s->t (B).
+  const auto integer = edges_of({present("c", "A", "r", 0, {{"1", AttributeKind::kInt}}),
+                                 present("c", "B", "s", 5, {{"2", AttributeKind::kInt}}),
+                                 present("c", "C", "t", 10, {{"10", AttributeKind::kInt}})}, ranked);
+  assert((integer == Edges{{{"r", "s", "A"}, 1}, {{"s", "t", "B"}, 1}}));
+  const auto floating = edges_of({present("c", "A", "r", 0, {{"1.5", AttributeKind::kFloat}}),
+                                  present("c", "B", "s", 5, {{"2.0", AttributeKind::kFloat}}),
+                                  present("c", "C", "t", 10, {{"10.25", AttributeKind::kFloat}})}, ranked);
+  assert(floating == integer);
+  // Tied ranks keep input order: C (0) then A, B (1).
+  const auto tied = edges_of({present("c", "A", "r", 0, {{"1", AttributeKind::kInt}}),
+                              present("c", "B", "s", 5, {{"1", AttributeKind::kInt}}),
+                              present("c", "C", "t", 10, {{"0", AttributeKind::kInt}})}, ranked);
+  assert((tied == Edges{{{"r", "s", "A"}, 1}, {{"t", "r", "C"}, 1}}));
+  // String ranks stay lexical: "1" < "10" < "2".
+  const auto text = edges_of({present("c", "A", "r", 0, {{"1", AttributeKind::kString}}),
+                              present("c", "B", "s", 5, {{"2", AttributeKind::kString}}),
+                              present("c", "C", "t", 10, {{"10", AttributeKind::kString}})}, ranked);
+  assert((text == Edges{{{"r", "t", "A"}, 1}, {{"t", "s", "C"}, 1}}));
+  // O4: present empty resources, activities and case ids are values.
+  assert((edges_of({present("c", "A", "", 0), present("c", "B", "", 9)}) == Edges{{{"", "", "A"}, 1}}));
+  assert((edges_of({present("c", "", "r", 0), present("c", "B", "s", 9)}) == Edges{{{"r", "s", ""}, 1}}));
+  assert((edges_of({present("", "A", "r", 0), present("", "B", "s", 9)}) == Edges{{{"r", "s", "A"}, 1}}));
+  // A missing resource drops only the edges it would name.
+  auto unnamed = present("c", "A", "", 0);
+  unnamed.resource_state = FirstClassAttributeState::kMissing;
+  assert((edges_of({unnamed, present("c", "B", "s", 9), present("c", "C", "t", 10)}) == Edges{{{"s", "t", "B"}, 1}}));
+  // An empty sort value still sorts.
+  const auto empty_sort = edges_of({present("c", "A", "r", 0, {{"", AttributeKind::kString}}),
+                                    present("c", "B", "s", 9, {{"x", AttributeKind::kString}})}, ranked);
+  assert((empty_sort == Edges{{{"r", "s", "A"}, 1}}));
+}
+
 int main() {
+  reference_audit_contracts();
   auto result = discover_network_analysis(sample());
   assert(result.variant == NetworkAnalysisVariant::kDataframe);
   assert(result.edges.size() == 2);

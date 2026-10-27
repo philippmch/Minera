@@ -2,9 +2,12 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 using namespace minera;
 
@@ -20,7 +23,102 @@ static EventLog sample() {
   log.traces = {a,b}; return log;
 }
 
+// Reference values from PM4Py 2.7.22 resource_profiles (public calls).
+static Event timed(std::string activity, std::string resource, int second, std::string lifecycle = "") {
+  Event e{"c", std::move(activity), "2026-01-01T00:00:" + std::string(second < 10 ? "0" : "") + std::to_string(second) + "Z",
+          std::move(resource), 0, {}, std::move(lifecycle)};
+  e.resource_state = FirstClassAttributeState::kPresent;
+  e.activity_state = FirstClassAttributeState::kPresent;
+  return e;
+}
+static EventLog one_case(std::vector<Event> events) {
+  Trace trace; trace.case_id = "c";
+  for (std::size_t i = 0; i < events.size(); ++i) { events[i].input_order = i; trace.events.push_back(events[i]); }
+  EventLog log; log.traces.push_back(std::move(trace)); return log;
+}
+static ResourceProfilesResult query(const EventLog& log, ResourceProfileMetric metric, int t1, int t2,
+                                    std::string resource, std::string activity = "", bool literal = false) {
+  ResourceProfilesOptions o; o.metric = metric;
+  o.t1 = "2026-01-01T00:00:" + std::string(t1 < 10 ? "0" : "") + std::to_string(t1) + "Z";
+  o.t2 = "2026-01-01T00:00:" + std::string(t2 < 10 ? "0" : "") + std::to_string(t2) + "Z";
+  o.resource = std::move(resource); o.activity = std::move(activity);
+  o.resource_given = literal; o.activity_given = literal && !o.activity.empty();
+  return discover_resource_profiles(log, o);
+}
+static double only_value_at(const ResourceProfilesResult& result, int line) {
+  if (result.rows.size() != 1) std::fprintf(stderr, "line %d: %zu rows\n", line, result.rows.size());
+  assert(result.rows.size() == 1);
+  return result.rows.front().value;
+}
+#define only_value(result) only_value_at((result), __LINE__)
+
+static void reference_audit_contracts() {
+  // O1: a case counts for a window it spans, or that holds either endpoint
+  // (closed); A/r at 0s and B/s at 30s average 30s over [5,15).
+  const auto spanning = one_case({timed("A", "r", 0), timed("B", "s", 30)});
+  assert(only_value(query(spanning, ResourceProfileMetric::kAverageCaseDuration, 5, 15, "r")) == 30.0);
+  assert(only_value(query(spanning, ResourceProfileMetric::kAverageCaseDuration, 5, 15, "s")) == 30.0);
+  assert(only_value(query(spanning, ResourceProfileMetric::kAverageCaseDuration, 30, 40, "r")) == 30.0);
+  assert(only_value(query(spanning, ResourceProfileMetric::kAverageCaseDuration, 0, 5, "r")) == 30.0);
+  assert(query(spanning, ResourceProfileMetric::kAverageCaseDuration, 31, 40, "r").rows.empty());
+
+  // O2: only unmarked and "complete" events form intervals, each starting at
+  // the previous kept event: B gets 10s..15s, A's completion a zero interval.
+  const auto mixed = one_case({timed("A", "r", 0, "start"), timed("A", "r", 10, "complete"), timed("B", "r", 15)});
+  assert(only_value(query(mixed, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "B")) == 5.0);
+  assert(only_value(query(mixed, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "A")) == 0.0);
+  assert(only_value(query(mixed, ResourceProfileMetric::kMultitasking, 0, 20, "r")) == 1.0);
+  const auto upper = one_case({timed("A", "r", 0, "START"), timed("A", "r", 10, "COMPLETE"), timed("B", "r", 15, "COMPLETE")});
+  assert(only_value(query(upper, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "B")) == 5.0);
+  const auto paired = one_case({timed("A", "r", 0, "start"), timed("B", "r", 2, "start"),
+                                timed("A", "r", 10, "complete"), timed("B", "r", 12, "complete")});
+  assert(only_value(query(paired, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "B")) == 2.0);
+  const auto atomic = one_case({timed("A", "r", 0), timed("B", "r", 10), timed("C", "r", 15)});
+  assert(only_value(query(atomic, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "B")) == 10.0);
+  assert(only_value(query(atomic, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "C")) == 5.0);
+
+  // C2: an unsorted trace runs from its first to its last supplied event
+  // (-10s), completes at its last supplied event, and intervals still sort.
+  const auto unsorted = one_case({timed("A", "r", 20), timed("B", "r", 10)});
+  assert(only_value(query(unsorted, ResourceProfileMetric::kAverageCaseDuration, 0, 30, "r")) == -10.0);
+  assert(only_value(query(unsorted, ResourceProfileMetric::kAverageCaseDuration, 19, 21, "r")) == -10.0);
+  assert(query(unsorted, ResourceProfileMetric::kAverageCaseDuration, 12, 18, "r").rows.empty());
+  assert(only_value(query(unsorted, ResourceProfileMetric::kCaseCompletions, 0, 15, "r")) == 1.0);
+  assert(query(unsorted, ResourceProfileMetric::kCaseCompletions, 15, 25, "r").rows.empty());
+  assert(only_value(query(unsorted, ResourceProfileMetric::kAverageDurationActivity, 0, 30, "r", "A")) == 10.0);
+  assert(only_value(query(unsorted, ResourceProfileMetric::kAverageDurationActivity, 0, 30, "r", "B")) == 0.0);
+
+  // O4: a present empty resource is a resource; *_given selects it literally.
+  const auto empty = one_case({timed("A", "", 0), timed("B", "", 9)});
+  assert(only_value(query(empty, ResourceProfileMetric::kDistinctActivities, 0, 30, "", "", true)) == 2.0);
+  assert(only_value(query(empty, ResourceProfileMetric::kCaseCompletions, 0, 30, "", "", true)) == 1.0);
+  assert(only_value(query(empty, ResourceProfileMetric::kFractionCaseCompletions, 0, 30, "", "", true)) == 1.0);
+  assert(only_value(query(empty, ResourceProfileMetric::kAverageCaseDuration, 0, 30, "", "", true)) == 9.0);
+  assert(only_value(query(empty, ResourceProfileMetric::kSocialPosition, 0, 30, "", "", true)) == 1.0);
+  assert(only_value(query(empty, ResourceProfileMetric::kActivityFrequency, 0, 30, "", "A", true)) == 0.5);
+  assert(only_value(query(empty, ResourceProfileMetric::kAverageDurationActivity, 0, 30, "", "B", true)) == 9.0);
+  assert(only_value(query(empty, ResourceProfileMetric::kMultitasking, 0, 30, "", "", true)) == 1.0);
+  ResourceProfilesOptions pair; pair.metric = ResourceProfileMetric::kInteractionTwoResources;
+  pair.resource_given = pair.resource2_given = true;
+  assert(only_value(discover_resource_profiles(empty, pair)) == 1.0);
+  (void)resource_profiles_json(query(empty, ResourceProfileMetric::kDistinctActivities, 0, 30, "", "", true));
+  // A missing resource is no resource at all.
+  auto missing = empty;
+  for (auto& e : missing.traces[0].events) e.resource_state = FirstClassAttributeState::kMissing;
+  assert(discover_resource_profiles(missing, {}).rows.empty());
+
+  // Explicit start timestamps set each interval's start.
+  auto explicit_start = one_case({timed("A", "r", 10), timed("B", "r", 15)});
+  explicit_start.traces[0].events[0].attributes.push_back({"st", "2026-01-01T00:00:04Z"});
+  explicit_start.traces[0].events[1].attributes.push_back({"st", "2026-01-01T00:00:14Z"});
+  ResourceProfilesOptions with_start; with_start.metric = ResourceProfileMetric::kAverageDurationActivity;
+  with_start.start_timestamp_attribute = "st"; with_start.resource = "r";
+  const auto starts = discover_resource_profiles(explicit_start, with_start);
+  assert(starts.rows.size() == 2 && starts.rows[0].value == 6.0 && starts.rows[1].value == 1.0);
+}
+
 int main() {
+  reference_audit_contracts();
   const auto log = sample();
   auto distinct = discover_resource_profiles(log, {});
   assert(distinct.rows.size() == 2);
@@ -87,7 +185,8 @@ int main() {
   duration.resource = "alice";
   duration.activity = "A";
   const auto durations = discover_resource_profiles(log, duration);
-  assert(durations.rows.size() == 1 && durations.rows[0].value == 5.0);
+  // Reference: A completes atomically at 10s in both cases, so 0s.
+  assert(durations.rows.size() == 1 && durations.rows[0].value == 0.0);
 
   ResourceProfilesOptions activity_completions;
   activity_completions.metric = ResourceProfileMetric::kActivityCompletions;
@@ -129,8 +228,17 @@ int main() {
   workload.metric = ResourceProfileMetric::kAverageWorkload;
   workload.t2 = "2024-01-01T00:00:10Z";
   const auto average_workload = discover_resource_profiles(overlap, workload);
-  assert(average_workload.rows.size() == 1 && average_workload.rows[0].value == 2.0);
-
+  // Reference: no interval is open across t2 = 10s (0.0, no row); one is at 12s.
+  assert(average_workload.rows.empty());
+  workload.t2 = "2024-01-01T00:00:12Z";
+  assert(only_value(discover_resource_profiles(overlap, workload)) == 2.0);
+  {
+    auto P = one_case({timed("A", "alice", 0), timed("B", "alice", 5), timed("C", "alice", 10)});
+    auto P2 = one_case({timed("X", "alice", 2), timed("Y", "alice", 8)});
+    P2.traces[0].case_id = "d"; P.traces.push_back(P2.traces[0]);
+    assert(std::abs(only_value(query(P, ResourceProfileMetric::kAverageWorkload, 0, 7, "alice")) - 39.0 / 11.0) < 1e-12);
+    assert(only_value(query(P, ResourceProfileMetric::kAverageWorkload, 3, 9, "alice")) == 3.0);
+  }
   ResourceProfilesOptions capped;
   capped.max_rows = 1;
   const auto truncated = discover_resource_profiles(log, capped);

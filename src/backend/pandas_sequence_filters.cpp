@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <map>
 #include <set>
 #include <variant>
@@ -175,9 +176,24 @@ struct Key {
     return text < o.text;
   }
 };
+// Python dict/groupby keys: 1, True and 1.0 are one key (equal values hash
+// equally); the string '1' stays distinct.
 Key key_of(const EventAttribute& cell) {
   if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) return {0, *i, {}};
   if (const auto* u = std::get_if<std::uint64_t>(&cell.typed_value)) return {0, static_cast<std::int64_t>(*u), {}};
+  if (const auto* b = std::get_if<bool>(&cell.typed_value)) return {0, *b ? 1 : 0, {}};
+  if (cell.kind == AttributeKind::kBoolean && !cell.typed_value.index())
+    if (cell.value == "True" || cell.value == "true" || cell.value == "False" || cell.value == "false")
+      return {0, cell.value == "True" || cell.value == "true" ? 1 : 0, {}};
+  if (const auto* d = std::get_if<double>(&cell.typed_value);
+      d && std::isfinite(*d) && std::floor(*d) == *d && std::fabs(*d) < 9.2e18)
+    return {0, static_cast<std::int64_t>(*d), {}};
+  if ((cell.kind == AttributeKind::kFloat || cell.kind == AttributeKind::kInt) && !cell.typed_value.index()) {
+    char* end = nullptr;
+    const double d = std::strtod(cell.value.c_str(), &end);
+    if (end && *end == '\0' && !cell.value.empty() && std::isfinite(d) && std::floor(d) == d && std::fabs(d) < 9.2e18)
+      return {0, static_cast<std::int64_t>(d), {}};
+  }
   if (cell.kind == AttributeKind::kString) return {1, 0, cell.value};
   return {2, 0, std::to_string(static_cast<int>(cell.kind)) + ":" + cell.value};
 }
@@ -782,7 +798,20 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
     else runs.push_back({i});
     previous = key;
   }
-  return merge_groups(df, runs, first, identity_order(df.columns.size()));
+  auto out = merge_groups(df, runs, first, identity_order(df.columns.size()));
+  // In an object column a missing case id (None, NaN or pd.NA) comes back as
+  // None, as the reference groups it; typed columns keep their own missing.
+  bool missing_case = false;
+  const bool object_case = case_column < df.dtypes.size() && df.dtypes[case_column] == "object";
+  if (object_case) for (auto& row : out.rows)
+    if (null_cell(row[case_column])) {
+      EventAttribute none{df.columns[case_column], "", AttributeKind::kString};
+      none.is_null = true;
+      row[case_column] = std::move(none);
+      missing_case = true;
+    }
+  if (missing_case && !out.dtypes.empty()) out.dtypes[case_column] = "object";
+  return out;
 }
 
 EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const PandasFilterParameters& parameters) {
@@ -829,7 +858,23 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   std::vector<std::size_t> order{case_column, timestamp};
   for (std::size_t c = 0; c < df.columns.size(); ++c)
     if (c != case_column && c != timestamp) order.push_back(c);
-  return merge_groups(df, groups, first, order);
+  auto out = merge_groups(df, groups, first, order);
+  // The group keys form a new column whose dtype pandas infers from the keys:
+  // object ids 1 and True give int64, strings give str, a mix stays object.
+  if (!out.dtypes.empty() && out.dtypes[0] == "object" && !out.rows.empty()) {
+    bool integers = true, strings = true;
+    for (const auto& row : out.rows) {
+      const auto& cell = row[0];
+      const bool integer = cell && !null_cell(cell) &&
+          (std::holds_alternative<std::int64_t>(cell->typed_value) ||
+           (cell->kind == AttributeKind::kInt && !cell->typed_value.index()));
+      integers = integers && integer;
+      strings = strings && is_text(cell);
+    }
+    if (integers) out.dtypes[0] = "int64";
+    else if (strings) out.dtypes[0] = "str";
+  }
+  return out;
 }
 
 namespace {

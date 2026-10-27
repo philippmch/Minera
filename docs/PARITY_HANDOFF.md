@@ -18,6 +18,19 @@ hashes. Never inspect reference implementation source, AST, bytecode or private
 state. Do not replay retained calls. Preserve failed attempts and execute new
 uncovered banks only in new output directories.
 
+## Broad audit of 962196a — 2026-10-27
+
+The broad black-box audit (755 primary and 21 minimized comparisons) found
+wrong results in discovery (DC1-DC6), organizational mining (O1-O5, C2),
+OCEL associations, streaming (S1, S2) and pandas filters (FS1-FS8). All are
+fixed with reference-valued regression tests; the table, the declared
+exceptions (DC4 weighted marking equation, C3, streaming Partial, Windows not
+executed) and the list of areas still without fresh comparisons are in
+`docs/reference-2.7.22-parity.md`, section "Broad audit fixes and exception
+list". Probe the reference through public calls only; resource-profile
+semantics (complete-only intervals, closed-window case intersection, supplied
+order) were found that way and are pinned in `test_resource_profiles.cpp`.
+
 ## Parity recheck of 4473f13 — 2026-10-27
 
 - G1: TZif footer rules may switch at a signed hour of up to 167 (RFC 8536). America/Nuuk, America/Godthab and America/Scoresbysund use `M3.5.0/-1`. The vendored `ptz.h` now parses these. A footer that still fails to parse is an error rather than a silently frozen offset. Both backends match Python `zoneinfo` for every installed zone (597 zones, about 40,000 probes from 2030 to 2075). `test_zone_database` covers UTC lookups, gaps, overlaps and unique times around every transition from 2038 to 2060 for seven zones.

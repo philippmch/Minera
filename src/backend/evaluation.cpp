@@ -5,6 +5,7 @@
 #include "root_cause_unicode.hpp"
 #include "evaluation_internal.hpp"
 #include "petri_replay_internal.hpp"
+#include "reference_activity_selector.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -140,23 +141,7 @@ namespace {
 
 std::string selected_evaluation_activity(
     const Event& event, std::string_view activity_attribute) {
-  if (activity_attribute.empty() || activity_attribute == "concept:name" ||
-      activity_attribute == "activity") {
-    return event.activity;
-  }
-  // Flat adapters retain the selected source spelling on the first-class
-  // projection. Consult it before generic attributes so a selected field
-  // remains available even when it has no nested attribute payload.
-  if ((!event.activity_source_key.empty() &&
-       event.activity_source_key == activity_attribute) ||
-      (event.activity_attribute &&
-       event.activity_attribute->key == activity_attribute)) {
-    return event.activity;
-  }
-  if (const auto* value = event.attribute(activity_attribute)) return *value;
-  throw std::invalid_argument(
-      "evaluation: event is missing activity attribute '" +
-      std::string(activity_attribute) + "'");
+  return reference_selected_activity(event, activity_attribute, "evaluation");
 }
 
 void validate_evaluation_selector(std::string_view selector,

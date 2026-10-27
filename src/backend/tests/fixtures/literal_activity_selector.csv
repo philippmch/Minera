@@ -1,0 +1,3 @@
+case:concept:name,concept:name,activity,time:timestamp
+c1,Register,INTAKE,2024-01-01T00:00:00Z
+c1,Assess,RISK,2024-01-02T00:00:00Z

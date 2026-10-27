@@ -63,16 +63,17 @@ void replay_policy_request_contract() {
   assert(options.cleaning_token_flood);
   assert(options.exhaustive_invisible_exploration);
   assert(options.variant == minera::TokenReplayVariant::kBackwards);
-  assert(options.activity_attribute == "phase" && options.stop_immediately_unfit);
+  // Attribute names are literal keys: " phase " is not trimmed to "phase".
+  assert(options.activity_attribute == " phase " && options.stop_immediately_unfit);
   assert(!options.consider_remaining_in_fitness);
   assert(!options.try_to_reach_final_marking_through_hidden);
   assert(!options.consider_activities_not_in_model_in_fitness);
   assert(!options.walk_through_hidden_transitions && options.include_trace_diagnostics);
-  assert(options.include_duration_diagnostics && options.timestamp_attribute == "completed_at");
+  assert(options.include_duration_diagnostics && options.timestamp_attribute == " completed_at ");
   assert(options.include_root_cause_diagnostics && options.root_cause.enable_multiplier);
   assert((options.root_cause.string_attributes == std::vector<std::string>{"team", "region", "team"}));
   assert((options.root_cause.numeric_attributes == std::vector<std::string>{"cost", "cost"}));
-  assert(options.case_id_attribute == "group");
+  assert(options.case_id_attribute == " group ");
   assert(options.max_rows_to_materialize && *options.max_rows_to_materialize == 0);
   const auto mine = minera::parse_mine_params(lookup(configured), presence(configured));
   assert(mine.token_replay.cleaning_token_flood);
@@ -82,7 +83,7 @@ void replay_policy_request_contract() {
   assert(mine.token_replay.include_duration_diagnostics);
   assert(mine.token_replay.include_root_cause_diagnostics && mine.token_replay.root_cause.enable_multiplier);
   assert(mine.token_replay.root_cause.numeric_attributes == options.root_cause.numeric_attributes);
-  assert(mine.token_replay.timestamp_attribute == "completed_at");
+  assert(mine.token_replay.timestamp_attribute == " completed_at ");
   assert(!mine.token_replay.walk_through_hidden_transitions);
   assert(!mine.token_replay.consider_remaining_in_fitness);
 

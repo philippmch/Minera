@@ -178,13 +178,9 @@ EventTable subset(const EventTable& source,const std::vector<bool>& keep){
  if(result.index->kind=="RangeIndex"&&!arithmetic_index(result.index->labels))result.index->kind="Index";
  return result;
 }
-void validate_bound(const EventAttribute& bound,bool lower,bool duration,std::size_t count){
+void validate_bound(const EventAttribute& bound,bool lower,bool duration){
  const std::string dtype=duration?"float64":"int64";
  if(text_value(bound))error("TypeError","Invalid comparison between dtype="+dtype+" and str");
- if(bound.container==AttributeContainerKind::kList){
-  if(bound.children.size()!=count)error("ValueError","('Lengths must match to compare', ("+std::to_string(count)+",), ("+std::to_string(bound.children.size())+",))");
-  error("ValueError","case filter vector bounds are outside the captured native domain");
- }
  if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
  if(!bound.is_null&&!numeric(bound))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of '"+(duration?"float":"int")+"' and '"+type_name(bound)+"'");
 }
@@ -192,13 +188,14 @@ void validate_bound(const EventAttribute& bound,bool lower,bool duration,std::si
 // length, a list must have one item per case and compares item by item, a
 // tuple broadcasts like a numpy operand, and other objects fail on the first
 // case.
-std::vector<bool> duration_mask(const std::vector<double>& durations,const std::vector<std::size_t>& cases,const EventAttribute& bound,bool lower){
- const auto n=cases.size();const std::string op=lower?"'>='":"'<='";
- if(text_value(bound))error("TypeError","Invalid comparison between dtype=float64 and str");
+// The same rules hold for the int64 Series of per-row case sizes.
+std::vector<bool> duration_mask(const std::vector<double>& durations,const std::vector<std::size_t>& cases,const EventAttribute& bound,bool lower,bool sizes=false){
+ const auto n=cases.size();const std::string op=lower?"'>='":"'<='";const std::string item_type=sizes?"int":"float";
+ if(text_value(bound))error("TypeError",std::string("Invalid comparison between dtype=")+(sizes?"int64":"float64")+" and str");
  if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",op+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
  const auto compare=[&](double value,const EventAttribute& item)->bool{
   if(item.is_null)return false;
-  if(item.container!=AttributeContainerKind::kScalar||!numeric(item)||is_native_na_attribute(item))error("TypeError",op+" not supported between instances of 'float' and '"+type_name(item)+"'");
+  if(item.container!=AttributeContainerKind::kScalar||!numeric(item)||is_native_na_attribute(item))error("TypeError",op+" not supported between instances of '"+item_type+"' and '"+type_name(item)+"'");
   const auto number=native_attribute_number(item);return lower?value>=number:value<=number;
  };
  std::vector<bool> result(n);
@@ -236,7 +233,7 @@ std::vector<BusinessHourSlot> business_slots(const EventAttribute& value){
  for(const auto& slot:result){if(!merged.empty()&&slot.start_seconds<=merged.back().end_seconds+1)merged.back().end_seconds=std::max(merged.back().end_seconds,slot.end_seconds);else merged.push_back(slot);}
  return merged;
 }
-double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>& slots){
+double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>& slots,std::int64_t unit_nanoseconds=1){
  if(!g.first||!g.last){if(business)error("ValueError","cannot convert float NaN to integer");return std::numeric_limits<double>::quiet_NaN();}
  if(!date_value(*g.first)||!date_value(*g.last)){
   if(text_value(*g.first)||text_value(*g.last))error("TypeError","unsupported operand type(s) for -: '"+type_name(*g.last)+"' and '"+type_name(*g.first)+"'");
@@ -249,7 +246,14 @@ double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>
   return detail::business_elapsed_seconds_microseconds(*start,*end,slots);
  }
  const auto a=instant(*g.first),b=instant(*g.last);if(!a||!b)return std::numeric_limits<double>::quiet_NaN();
- return static_cast<double>(b->seconds-a->seconds)+(static_cast<double>(b->nanoseconds)-a->nanoseconds)/1e9;
+ // Timedelta.total_seconds: the exact integer count of the column's units,
+ // converted once and divided by the units per second. Subtracting rounded
+ // seconds would cancel digits near second boundaries.
+ const std::int64_t per_second=1000000000/unit_nanoseconds,seconds=b->seconds-a->seconds;
+ const std::int64_t fraction=(static_cast<std::int64_t>(b->nanoseconds)-a->nanoseconds)/unit_nanoseconds;
+ if(seconds>std::numeric_limits<std::int64_t>::max()/per_second-1||seconds<std::numeric_limits<std::int64_t>::min()/per_second+1)
+  return static_cast<double>(seconds)+static_cast<double>(fraction)/static_cast<double>(per_second);
+ return static_cast<double>(seconds*per_second+fraction)/static_cast<double>(per_second);
 }
 } // namespace
 
@@ -263,17 +267,22 @@ PandasCaseFilterOptions::PandasCaseFilterOptions(){
 EventTable filter_pandas_case_size(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const PandasCaseFilterOptions& o){
  s.validate();const auto c=size_column(s,o.case_id_key);const auto grouped=groups(s,c);
  if(s.size()&&grouped.values.empty())error("IndexError","cannot do a non-empty take from an empty axes.");
- validate_bound(minimum,true,false,s.size());
- std::vector<bool> lower(s.size());std::vector<double> selected_counts;
- for(std::size_t i=0;i<s.size();++i){const auto count=grouped.rows[i]?static_cast<double>(grouped.values[*grouped.rows[i]].count):std::numeric_limits<double>::quiet_NaN();lower[i]=accepts(count,minimum,true);if(lower[i])selected_counts.push_back(count);}
+ // Each row carries its case size. A list or tuple bound compares with the
+ // rows item by item (a list needs one item per row; a tuple broadcasts).
+ std::vector<double> counts(s.size());std::vector<std::size_t> rows(s.size());std::iota(rows.begin(),rows.end(),0);
+ for(std::size_t i=0;i<s.size();++i)counts[i]=grouped.rows[i]?static_cast<double>(grouped.values[*grouped.rows[i]].count):std::numeric_limits<double>::quiet_NaN();
+ const auto vector_bound=[](const EventAttribute& bound){return bound.container==AttributeContainerKind::kList||bound.container==AttributeContainerKind::kTuple;};
+ std::vector<bool> lower(s.size());
+ if(vector_bound(minimum))lower=duration_mask(counts,rows,minimum,true,true);
+ else{validate_bound(minimum,true,false);for(std::size_t i=0;i<s.size();++i)lower[i]=accepts(counts[i],minimum,true);}
  auto result=subset(s,lower);
  if(maximum.is_null)return result;
- validate_bound(maximum,false,false,selected_counts.size());
  // The upper mask is computed on every row and aligned to the kept rows by
  // label: a duplicated label takes every row carrying it, then the mask is
  // applied by position.
  std::vector<bool> upper(s.size());
- for(std::size_t i=0;i<s.size();++i){const auto count=grouped.rows[i]?static_cast<double>(grouped.values[*grouped.rows[i]].count):std::numeric_limits<double>::quiet_NaN();upper[i]=accepts(count,maximum,false);}
+ if(vector_bound(maximum))upper=duration_mask(counts,rows,maximum,false,true);
+ else{validate_bound(maximum,false,false);for(std::size_t i=0;i<s.size();++i)upper[i]=accepts(counts[i],maximum,false);}
  const auto labels=[](const EventTable& t){std::vector<EventTableIndexLabel> r;for(std::size_t i=0;i<t.size();++i){if(t.index)r.push_back(t.index->labels[i]);else {EventAttribute label{"",std::to_string(i),AttributeKind::kInt};label.typed_value=static_cast<std::uint64_t>(i);r.push_back({std::move(label)});}}return r;};
  const auto all=labels(s),kept=labels(result);
  std::vector<bool> aligned;
@@ -303,13 +312,22 @@ EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribu
  s.validate();const auto [c,t]=performance_columns(s,o);const auto grouped=groups(s,c,t);const bool business=truth(o.business_hours);
  if(business&&grouped.values.empty())error("ValueError","Cannot set a DataFrame with multiple columns to the single column caseDuration");
  const auto slots=business?business_slots(o.business_hour_slots):std::vector<BusinessHourSlot>{};
- std::vector<double> durations;for(const auto& g:grouped.values)durations.push_back(duration(g,business,slots));
+ // The datetime column's resolution (ns by default) sets the Timedelta unit.
+ std::int64_t unit=1;
+ if(!s.dtypes.empty()){const auto& dtype=s.dtypes[t];
+  if(dtype.starts_with("datetime64[us"))unit=1000;else if(dtype.starts_with("datetime64[ms"))unit=1000000;else if(dtype.starts_with("datetime64[s"))unit=1000000000;}
+ std::vector<double> durations;for(const auto& g:grouped.values)durations.push_back(duration(g,business,slots,unit));
  if(!business&&!s.dtypes.empty()&&!s.dtypes[t].starts_with("datetime64"))error("AttributeError","Can only use .dt accessor with datetimelike values");
  // Durations are a Series over the cases in sorted case order. The maximum
  // is applied first, then the minimum to the cases that remain.
  std::vector<std::size_t> order(grouped.values.size());std::iota(order.begin(),order.end(),0);
  {std::vector<const EventAttribute*> ids(grouped.values.size());for(std::size_t i=0;i<s.size();++i)if(grouped.rows[i]&&!ids[*grouped.rows[i]])ids[*grouped.rows[i]]=&*s.rows[i][c];
-  std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){return native_scalar_key_compare(*ids[a],*ids[b])<0;});}
+  // pandas sorts group keys; keys that cannot be compared (such as 1 and
+  // 'a') fall back to its mixed order: numbers, then strings.
+  std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){
+   try{return native_scalar_key_compare(*ids[a],*ids[b])<0;}
+   catch(const std::invalid_argument&){return !text_value(*ids[a])&&text_value(*ids[b]);}
+  });}
  std::vector<bool> accepted(grouped.values.size());
  std::vector<std::size_t> remaining;
  const auto upper=duration_mask(durations,order,maximum,false);

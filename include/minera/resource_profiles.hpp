@@ -48,11 +48,18 @@ struct ResourceProfilesOptions {
   // Empty bounds are unbounded. Bounds are half-open [t1,t2).
   std::string t1;
   std::string t2;
+  // Empty query values select every resource/activity, unless the matching
+  // *_given flag below selects the literal value.
   std::string resource;
   std::string activity;
   std::string resource2;
   std::size_t max_resources = 10000;
   std::size_t max_rows = 100000;
+  // Select the literal (possibly present empty) resource/activity/resource2
+  // instead of treating an empty value as "all".
+  bool resource_given = false;
+  bool activity_given = false;
+  bool resource2_given = false;
 };
 
 struct ResourceProfileRow {

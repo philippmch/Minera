@@ -968,10 +968,10 @@ void parse_mine_params_maps_correlation_options() {
   }));
   assert((params.correlation_variants ==
           std::vector<std::string>{"classic", "classic_split", "trace_based"}));
-  assert(params.correlation.activity_attribute == "event_kind");
-  assert(params.correlation.timestamp_attribute == "finished_at");
+  assert(params.correlation.activity_attribute == " event_kind ");
+  assert(params.correlation.timestamp_attribute == " finished_at ");
   assert(params.correlation.start_timestamp_attribute == "started_at");
-  assert(params.correlation.case_id_attribute == "case_ref");
+  assert(params.correlation.case_id_attribute == " case_ref ");
   assert(params.correlation.exact_time_matching);
   assert(params.correlation.sample_size == 42);
 }
@@ -1102,9 +1102,9 @@ void parse_mine_params_maps_csv_and_inductive_options() {
           std::vector<std::string>{"cost", "region"}));
   assert(params.inductive.noise_threshold == 0.25);
   assert(params.inductive.variant == minera::InductiveMinerVariant::kDfg);
-  assert(params.inductive.activity_key == "phase");
-  assert(params.inductive.timestamp_key == "finished_at");
-  assert(params.inductive.case_id_key == "case_ref");
+  assert(params.inductive.activity_key == " phase ");
+  assert(params.inductive.timestamp_key == " finished_at ");
+  assert(params.inductive.case_id_key == " case_ref ");
   assert(params.inductive.sort_events_by_timestamp);
   assert(params.inductive.disable_strict_sequence_cut);
   assert(!params.inductive.disable_fallthroughs);
@@ -1506,10 +1506,10 @@ void parse_mine_params_maps_alpha_options_and_presence() {
       {"alpha_max_rows_to_materialize", "12"},
   }));
   assert(params.alpha.short_loops);
-  assert(params.alpha.activity_attribute == "phase");
-  assert(params.alpha.case_id_attribute == "batch");
-  assert(params.alpha.timestamp_attribute == "finished_at");
-  assert(params.alpha.start_timestamp_attribute == "began_at");
+  assert(params.alpha.activity_attribute == " phase ");
+  assert(params.alpha.case_id_attribute == " batch ");
+  assert(params.alpha.timestamp_attribute == " finished_at ");
+  assert(params.alpha.start_timestamp_attribute == " began_at ");
   assert(!params.alpha.sort_caseid_required);
   assert(!params.alpha.sort_timestamp_along_case_id);
   assert(params.alpha.remove_unconnected);
@@ -1571,7 +1571,7 @@ void parse_mine_params_preserves_flat_discovery_presence_and_ieee_cutoffs() {
       {"heuristic_min_activity_count", "7"},
       {"min_edge_frequency", "9"},
   }));
-  assert(custom.heuristic.case_id_attribute == "bucket");
+  assert(custom.heuristic.case_id_attribute == " bucket ");
   assert(custom.heuristic.connect_all);
   assert(custom.heuristic.plusplus_min_activity_count == -0.5);
   assert(custom.heuristic.plusplus_min_frequency == 2.25);
@@ -2059,8 +2059,8 @@ void parse_mine_params_maps_transition_system_options() {
   assert(params.transition_system.direction == minera::TransitionDirection::kBackward);
   assert(params.transition_system.window == 0);
   assert(params.transition_system.include_data);
-  assert(params.transition_system.activity_attribute == "phase");
-  assert(params.transition_system.case_id_attribute == "case_ref");
+  assert(params.transition_system.activity_attribute == " phase ");
+  assert(params.transition_system.case_id_attribute == " case_ref ");
   const auto signed_params = minera::parse_mine_params(fields({{"transition_window", "-8"}}));
   assert(signed_params.transition_system.window == -8);
 }
@@ -2082,9 +2082,9 @@ void parse_mine_params_maps_powl_options() {
   assert(params.powl.filtering_threshold == 0.25);
   assert(params.powl.order_frequency_ratio == 0.8);
   assert(params.powl.brute_force_activity_limit == 12);
-  assert(params.powl.activity_key == "phase");
-  assert(params.powl.timestamp_key == "finished_at");
-  assert(params.powl.case_id_key == "case_ref");
+  assert(params.powl.activity_key == " phase ");
+  assert(params.powl.timestamp_key == " finished_at ");
+  assert(params.powl.case_id_key == " case_ref ");
 }
 
 void parse_mine_params_rejects_invalid_powl_fields() {
@@ -2174,7 +2174,7 @@ void parse_mine_params_maps_token_replay_options() {
   assert(params.token_replay.variant ==
          minera::TokenReplayVariant::kBackwards);
   assert(params.token_replay.stop_immediately_unfit);
-  assert(params.token_replay.activity_attribute == "phase");
+  assert(params.token_replay.activity_attribute == " phase ");
   assert(params.token_replay_activity_attribute_supplied);
 }
 
@@ -2202,7 +2202,7 @@ void parse_mine_params_maps_log_skeleton_options() {
        " always_after, equivalence, always_after,, activ_freq "},
   }));
   assert(params.log_skeleton.noise_threshold == 0.25);
-  assert(params.log_skeleton.activity_key == "phase");
+  assert(params.log_skeleton.activity_key == " phase ");
   assert(params.log_skeleton.considered_constraints_present);
   assert((params.log_skeleton.considered_constraints ==
           std::vector<std::string>{"activ_freq", "always_after",
@@ -2235,8 +2235,8 @@ void parse_mine_params_maps_declare_options() {
       {"declare_auto_selection_multiplier", "0.75"},
   }));
   assert(params.declare_options.considered_activities.has_value());
-  assert(params.declare_options.activity_key == "phase");
-  assert(params.declare_conformance_options.activity_key == "phase");
+  assert(params.declare_options.activity_key == " phase ");
+  assert(params.declare_conformance_options.activity_key == " phase ");
   assert((params.declare_options.considered_activities.value() ==
           std::vector<std::string>{"B", "A", "B"}));
   assert((params.declare_options.allowed_templates.value() ==
@@ -2497,12 +2497,12 @@ void parse_mine_params_maps_footprints_options() {
           std::set<std::string>{"log_model", "trace_extensive"}));
   assert(params.footprints.strict);
   assert(!params.footprints.enable_act_always_executed);
-  assert(params.footprints.activity_attribute == "phase");
-  assert(params.footprints.case_id_attribute == "case_ref");
+  assert(params.footprints.activity_attribute == " phase ");
+  assert(params.footprints.case_id_attribute == " case_ref ");
   assert(params.footprints.start_timestamp_attribute &&
-         *params.footprints.start_timestamp_attribute == "started_at");
-  assert(params.footprints.timestamp_attribute == "finished_at");
-  assert(params.footprints.index_attribute == "row_number");
+         *params.footprints.start_timestamp_attribute == " started_at ");
+  assert(params.footprints.timestamp_attribute == " finished_at ");
+  assert(params.footprints.index_attribute == " row_number ");
   assert(!params.footprints.sort_required);
   const std::vector<std::uint64_t> expected_marking = {
       0, 18446744073709551615ULL};
@@ -3127,7 +3127,7 @@ void parse_alignment_params_maps_variants_and_costs() {
   assert(p.max_time_seconds == 0.5 && p.exponent == 2.5);
   assert(p.synchronous_dijkstra && p.default_trace_cost.value() == 3.0);
   assert(p.default_model_cost.value() == 4.0 && p.default_silent_cost.value() == 2.0);
-  assert(p.activity_attribute == "phase");
+  assert(p.activity_attribute == " phase ");
 }
 
 void parse_alignment_params_rejects_invalid_and_dependent_values() {
@@ -3465,7 +3465,7 @@ void parse_process_tree_alignment_params_maps_variants_and_limits() {
   assert(p.max_states == 0 && p.max_time_seconds == 1.5);
   assert(p.max_total_time_seconds == 0.0 && p.max_trace_length == 0);
   assert(p.max_process_tree_height == 3 && p.use_global_cache && p.batch_size == 2 && !p.clear_cache);
-  assert(p.activity_attribute == "phase");
+  assert(p.activity_attribute == " phase ");
 }
 
 void parse_process_tree_alignment_params_rejects_bad_values() {
@@ -3503,7 +3503,7 @@ void parse_native_adapter_params_contract() {
   assert(d.max_states == 42 && d.initial_marking.size() == 2 &&
          d.tau_model_cost == 3.0 && d.sync_cost == 0.5 &&
          d.activity_log_costs.at("A,B") == 7.0 &&
-         d.activity_attribute == "phase");
+         d.activity_attribute == " phase ");
   assert(minera::parse_activity_costs("A\\=B:4", "costs").at("A=B") ==
          4.0);
   const auto a = minera::parse_petri_anti_alignment_params(fields({
@@ -3511,7 +3511,7 @@ void parse_native_adapter_params_contract() {
       {"marking_limit", "10"}, {"max_states", "0"},
       {"activity_attribute", " phase "}}));
   assert(a.marking_limit == 10 && a.max_states == 0 &&
-         a.activity_attribute == "phase");
+         a.activity_attribute == " phase ");
   for (const auto name : {"activity_attribute"}) {
     const std::map<std::string, std::string> values = {{name, "\t"}};
     bool rejected = false;
@@ -3730,14 +3730,14 @@ void parse_evaluation_params_defaults_and_variants() {
       {"simplicity_weight", "0"}, {"generalization_weight", "0"}}));
   assert(all.precision_options.use_task_ids && all.precision_options.max_states == 1);
   assert(all.replay_fitness_options.cleaning_token_flood);
-  assert(all.replay_fitness_options.activity_attribute == "phase" &&
-         all.precision_options.activity_attribute == "phase" &&
-         all.generalization_options.activity_attribute == "phase" &&
-         all.composite_options.activity_attribute == "phase");
-  assert(all.replay_fitness_options.case_id_attribute == "case:order" &&
-         all.precision_options.case_id_attribute == "case:order" &&
-         all.generalization_options.case_id_attribute == "case:order" &&
-         all.composite_options.case_id_attribute == "case:order");
+  assert(all.replay_fitness_options.activity_attribute == " phase " &&
+         all.precision_options.activity_attribute == " phase " &&
+         all.generalization_options.activity_attribute == " phase " &&
+         all.composite_options.activity_attribute == " phase ");
+  assert(all.replay_fitness_options.case_id_attribute == " case:order " &&
+         all.precision_options.case_id_attribute == " case:order " &&
+         all.generalization_options.case_id_attribute == " case:order " &&
+         all.composite_options.case_id_attribute == " case:order ");
   assert(all.replay_fitness_options.max_rows_to_materialize &&
          *all.replay_fitness_options.max_rows_to_materialize == 78 &&
          all.precision_options.max_rows_to_materialize &&
@@ -4224,7 +4224,7 @@ void graph_alignment_decomposed_entry_preserves_every_native_control() {
          options.max_total_states == 17 && !options.use_cache && options.clear_cache &&
          options.log_move_cost == 2 && options.model_move_cost == 3 &&
          options.tau_model_cost == 4 && options.sync_cost == 0.25 &&
-         options.activity_attribute == "phase");
+         options.activity_attribute == " phase ");
   const auto largest = std::to_string(std::numeric_limits<std::size_t>::max());
   const auto bounds = minera::parse_graph_alignment_decomposed_params(fields({
       {"max_states", largest}, {"max_total_states", largest}}));
@@ -4252,8 +4252,8 @@ void parse_dfg_and_edit_alignment_params_contract() {
       {"dfg_model_move_cost", "A=4"}, {"dfg_log_move_cost", "B=5"},
       {"dfg_internal_log_move_cost", "A=0.25"}}));
   assert(d.max_visited_states == 0 && d.max_time_ms == 12);
-  assert(d.activity_attribute == "phase");
-  assert(d.timestamp_attribute == "occurred_at");
+  assert(d.activity_attribute == " phase ");
+  assert(d.timestamp_attribute == " occurred_at ");
   assert(d.sync_cost.at("A") == 3.0 && d.sync_cost.at("B") == 2.0);
   assert(d.sync_cost.at("A,B") == 4.0 && d.sync_cost.at("A=B") == 5.0);
   assert(d.sync_cost.at("A:B") == 6.0 && d.sync_cost.at("A\\B") == 7.0);
@@ -4278,8 +4278,8 @@ void parse_dfg_and_edit_alignment_params_contract() {
       {"deviation_cost", "7"}, {"edit_activity_attribute", " phase "},
       {"edit_timestamp_attribute", " occurred_at "}}));
   assert(e.perform_anti_alignment && e.deviation_cost == 7);
-  assert(e.activity_attribute == "phase");
-  assert(e.timestamp_attribute == "occurred_at");
+  assert(e.activity_attribute == " phase ");
+  assert(e.timestamp_attribute == " occurred_at ");
 
   const auto expect_throw = [](std::map<std::string, std::string> values,
                                bool dfg) {

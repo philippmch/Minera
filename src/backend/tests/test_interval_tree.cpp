@@ -164,9 +164,39 @@ void json_round_trips_subsecond_epoch_boundaries_and_queries() {
   assert(std::stod(json.substr(json.find(',', range) + 1)) == options.range->second);
 }
 
+// Reference interval tree (PM4Py 2.7.22): an empty interval raises
+// "Start must be less than end"; a filter couple may name the empty label.
+void zero_width_and_empty_labels() {
+  Trace tied;
+  tied.case_id = "tied";
+  tied.events = {event("A", "2024-01-01T00:00:00Z"), event("B", "2024-01-01T00:00:00Z")};
+  OpenPathIntervalOptions zero;
+  zero.epsilon = 0.0;
+  bool threw = false;
+  try {
+    (void)discover_open_path_intervals(EventLog{{tied}}, zero);
+  } catch (const std::invalid_argument& error) {
+    threw = std::string(error.what()).find("Start must be less than end") != std::string::npos;
+  }
+  assert(threw);
+  assert(discover_open_path_intervals(EventLog{{tied}}).size() == 1);
+  assert(discover_open_path_intervals(sample(), zero).size() == 2);
+
+  Trace empty_label;
+  empty_label.case_id = "empty";
+  empty_label.events = {event("", "2024-01-01T00:00:00Z"), event("B", "2024-01-01T00:00:01Z")};
+  empty_label.events[0].activity_state = FirstClassAttributeState::kPresent;
+  OpenPathIntervalOptions couple;
+  couple.filter_activity_couple = std::pair{std::string(), std::string("B")};
+  const auto intervals = discover_open_path_intervals(EventLog{{empty_label}}, couple);
+  assert(intervals.size() == 1 && intervals[0].source_activity.empty() &&
+         intervals[0].target_activity == "B");
+}
+
 }  // namespace
 
 int main() {
+  zero_width_and_empty_labels();
   first_following_and_epsilon();
   filter_and_custom_attributes();
   invalid_and_empty();

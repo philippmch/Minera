@@ -196,6 +196,7 @@ inline PnmlImportOptions pnml_model_import_options(bool public_markings = false)
   base.final_marking_keys = document.final_marking_keys;
   base.place_names = document.place_ids;
   base.transition_names = document.transition_ids;
+  base.arc_occurrences = document.arc_occurrences;
   return base;
 }
 

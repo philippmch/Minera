@@ -156,21 +156,24 @@ std::string check_comparison(const Bank& bank, const BankCase& item) {
   Output actual;
   try {
     const auto result =
-        compare_element_usage_token_replay(document.net, event_log(item.log1), event_log(item.log2), replay);
+        compare_element_usage_token_replay(document.net, event_log(item.log1), event_log(item.log2), replay,
+                                           document.arc_occurrences ? &*document.arc_occurrences : nullptr);
     const auto row = [](std::string kind, std::string element, const auto& value) {
       return Row{std::move(kind), std::move(element), value.log1_occurrences, value.log2_occurrences,
                  value.total_occurrences, value.label, value.direction, value.color};
     };
-    std::set<Row> rows;
-    for (const auto& place : result.places) rows.insert(row("place", document.place_ids.at(place.id), place));
+    // A multiset: duplicated records must not collapse into one row.
+    std::vector<Row> rows;
+    for (const auto& place : result.places) rows.push_back(row("place", document.place_ids.at(place.id), place));
     for (const auto& transition : result.transitions)
-      rows.insert(row("transition", document.transition_ids.at(transition.id), transition));
+      rows.push_back(row("transition", document.transition_ids.at(transition.id), transition));
     for (const auto& arc : result.arcs) {
       const auto& place = document.place_ids.at(arc.place);
       const auto& transition = document.transition_ids.at(arc.transition);
-      rows.insert(row("arc", arc.input ? place + "->" + transition : transition + "->" + place, arc));
+      rows.push_back(row("arc", arc.input ? place + "->" + transition : transition + "->" + place, arc));
     }
-    actual.assign(rows.begin(), rows.end());
+    std::sort(rows.begin(), rows.end());
+    actual = std::move(rows);
   } catch (const std::exception& error) {
     actual.push_back({"error", "native", 0, 0, 0, error.what(), 0.0, ""});
   }

@@ -12,12 +12,14 @@
 #include <vector>
 
 #include "minera/ilp_reference.hpp"
+#include "reference_activity_selector.hpp"
 
 namespace minera {
 namespace {
 
-// Activity labels per trace under the configured activity key. Events without
-// a label are dropped; empty traces stay (they wrap to start/end only).
+// Activity labels per trace under the configured activity key. A present
+// empty label is a visible activity; a missing one is an error, as in the
+// reference (KeyError). Empty traces stay (they wrap to start/end only).
 std::vector<std::vector<std::string>> label_traces(const EventLog& log,
                                                    const ILPMinerOptions& options) {
   std::vector<std::vector<std::string>> traces;
@@ -25,19 +27,8 @@ std::vector<std::vector<std::string>> label_traces(const EventLog& log,
   for (const auto& trace : log.traces) {
     std::vector<std::string> sequence;
     sequence.reserve(trace.events.size());
-    for (const auto& event : trace.events) {
-      std::string label = event.activity;
-      if (!options.activity_key.empty() && options.activity_key != "activity" &&
-          options.activity_key != "concept:name") {
-        if (options.activity_key == "resource" || options.activity_key == "org:resource") {
-          if (!event.resource.empty()) label = event.resource;
-        } else if (const auto* value = event.attribute(options.activity_key);
-                   value != nullptr && !value->empty()) {
-          label = *value;
-        }
-      }
-      if (!label.empty()) sequence.push_back(std::move(label));
-    }
+    for (const auto& event : trace.events)
+      sequence.push_back(reference_selected_label(event, options.activity_key, "ILP miner"));
     traces.push_back(std::move(sequence));
   }
   return traces;

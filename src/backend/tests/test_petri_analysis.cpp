@@ -843,7 +843,30 @@ void caps_markings_determinism_and_weights() {
 
 }  // namespace
 
+// Declared exception (2026-10-27 audit, DC4): for the sequence A -> B with
+// every arc weighted w and w tokens in/out, the reference marking equation
+// reports 2w (it counts each arc once, ignoring its weight) and rejects the
+// w > 1 nets as not easy sound. Native analysis keeps the weights, so both
+// transitions fire once. Unit weights match the reference exactly.
+void weighted_marking_equation_is_a_declared_exception() {
+  for (const std::int64_t w : {1, 2, 3}) {
+    minera::PetriNet net;
+    const auto p0 = net.add_place(), p1 = net.add_place(), p2 = net.add_place();
+    net.set_activities({"A", "B"});
+    net.add_transition(0, std::vector<std::size_t>(w, p0), std::vector<std::size_t>(w, p1));
+    net.add_transition(1, std::vector<std::size_t>(w, p1), std::vector<std::size_t>(w, p2));
+    minera::MarkingEquationOptions options;
+    options.initial_marking = {w, 0, 0};
+    options.final_marking = {0, 0, w};
+    options.transition_costs = {1.0, 1.0};
+    const auto result = minera::solve_marking_equation(net, options);
+    assert(result.computed && result.feasible);
+    assert(result.objective == 2.0);  // reference: 2, 4, 6
+  }
+}
+
 int main() {
+  weighted_marking_equation_is_a_declared_exception();
   classic_equation();
   incidence_feasible_not_realizable();
   classic_equation_requires_integer_solutions();

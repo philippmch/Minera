@@ -2,12 +2,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "minera/conformance.hpp"
 #include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/pnml.hpp"
 
 namespace minera {
 
@@ -91,6 +93,9 @@ struct PetriUsageComparisonOptions {
   std::vector<bool> final_marking_keys;
   // Select the public exhaustive pre-event hidden-routing policy.
   bool exhaustive_invisible_exploration = false;
+  // Physical PNML arcs. When present, arc usage has one record per arc object,
+  // so a weight-2 arc stays one record and genuine parallel arcs stay two.
+  std::optional<std::vector<PnmlArcOccurrence>> arc_occurrences;
 };
 
 // Dynamic comparison palette for a finite direction in [-1, 1]. Uses the
@@ -118,10 +123,13 @@ struct PetriUsageComparisonOptions {
 // `replay` (markings, names and arc order as for replay_token_result). A
 // transition's usage is the number of times it appears in the traces'
 // activated transitions; a place's usage is its consumed plus remaining
-// tokens in the PLTR place fitness. Arcs carry their transition's record.
+// tokens in the PLTR place fitness. Arcs carry their transition's record:
+// one per physical arc when `arc_occurrences` is given, otherwise one per
+// endpoint entry of the net's arc vectors.
 [[nodiscard]] PetriUsageComparison compare_element_usage_token_replay(
     const PetriNet& net, const EventLog& log1, const EventLog& log2,
-    TokenReplayOptions replay = {});
+    TokenReplayOptions replay = {},
+    const std::vector<PnmlArcOccurrence>* arc_occurrences = nullptr);
 
 // compare_element_usage_token_replay with the comparison options mapped onto
 // its token replay (markings, names, hidden routing, stop and flood controls).

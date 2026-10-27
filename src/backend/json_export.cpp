@@ -6870,7 +6870,7 @@ std::string genetic_miner_json(const GeneticMinerResult& result) {
     throw std::invalid_argument("genetic miner result is inconsistent");
   std::set<std::string> activities;
   for (const auto& activity : result.matrix.activities)
-    if (activity.empty() || !activities.insert(activity).second)
+    if (!activities.insert(activity).second)
       throw std::invalid_argument("genetic miner activities are invalid");
   const auto validate_map = [&](const GeneticMatrixMap& map) {
     for (const auto& groups : map)
@@ -7192,10 +7192,14 @@ std::string case_arrival_json(const CaseArrivalResult& result) {
         "case arrival averages must be finite and non-negative");
   }
   std::ostringstream out;
+  // Shortest round-trip numbers: six significant digits would turn a one
+  // microsecond gap in 2026 into a different value than the reference.
   out << "{\"family\":\"CASE_ARRIVAL\",\"variant\":\"CLASSIC\","
-      << "\"arrival_average\":" << result.arrival_average
-      << ",\"dispersion_average\":" << result.dispersion_average
-      << ",\"timed_starts\":" << result.timed_starts
+      << "\"arrival_average\":";
+  write_finite_or_null(out, result.arrival_average);
+  out << ",\"dispersion_average\":";
+  write_finite_or_null(out, result.dispersion_average);
+  out << ",\"timed_starts\":" << result.timed_starts
       << ",\"timed_ends\":" << result.timed_ends << '}';
   return out.str();
 }

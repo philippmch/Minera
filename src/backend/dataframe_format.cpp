@@ -36,8 +36,9 @@ bool timestamp_less(const ExactTimestamp& left, const ExactTimestamp& right) {
   return left.nanoseconds < right.nanoseconds;
 }
 
+// None, pd.NA, NaN and NaT are missing; a present empty string is a value.
 bool cell_missing(const std::optional<EventAttribute>& cell) {
-  if (!cell || cell->is_null ||
+  if (!cell || cell->is_null || is_native_na_attribute(*cell) ||
       cell->first_class_state == FirstClassAttributeState::kNull)
     return true;
   if (const auto* number = std::get_if<double>(&cell->typed_value))
@@ -746,23 +747,23 @@ EventTable format_dataframe(EventTable& input,
   // A canonical identifier column whose values all parse as dates (a column
   // of four-digit years, say) is converted first and then printed as pandas
   // prints a timestamp.
-  auto identifier_strings = [&](std::size_t column, bool custom) {
-    if (!custom) {
-      convert_column_to_dates(working, column, options.timestamp_format);
-      if (working.dtypes[column].rfind("datetime64", 0) == 0) {
-        for (auto& row : working.rows) {
-          if (cell_missing(row[column])) continue;
-          auto& cell = *row[column];
-          if (cell.value.size() > 10 && cell.value[10] == 'T') cell.value[10] = ' ';
-          cell.typed_value = std::monostate{};
-          cell.kind = AttributeKind::kString;
-        }
+  // This holds for custom selectors too: a custom object case column of 1
+  // gives the canonical case '1970-01-01 00:00:00.000000001+00:00'.
+  auto identifier_strings = [&](std::size_t column) {
+    convert_column_to_dates(working, column, options.timestamp_format);
+    if (working.dtypes[column].rfind("datetime64", 0) == 0) {
+      for (auto& row : working.rows) {
+        if (cell_missing(row[column])) continue;
+        auto& cell = *row[column];
+        if (cell.value.size() > 10 && cell.value[10] == 'T') cell.value[10] = ' ';
+        cell.typed_value = std::monostate{};
+        cell.kind = AttributeKind::kString;
       }
     }
     convert_column_to_strings(working, column);
   };
-  identifier_strings(canonical_case, custom_case);
-  identifier_strings(canonical_activity, custom_activity);
+  identifier_strings(canonical_case);
+  identifier_strings(canonical_activity);
 
   // Source selector columns are eligible date columns. Empty custom source
   // schemas are intentionally included: pandas converts an empty object/string

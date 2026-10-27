@@ -83,6 +83,7 @@ std::optional<double> parse_timestamp(std::string_view text) {
 
   double seconds =
       static_cast<double>(days_from_civil(year, month, day)) * 86400.0;
+  std::int64_t fraction_nanoseconds = 0;
 
   // Optional time, introduced by 'T' or a space.
   if (pos < text.size() && (text[pos] == 'T' || text[pos] == 't' ||
@@ -116,12 +117,13 @@ std::optional<double> parse_timestamp(std::string_view text) {
       seconds += second;
       if (pos < text.size() && text[pos] == '.') {
         ++pos;
-        double scale = 0.1;
+        // Keep the fraction as exact nanoseconds and round once at the end.
+        std::int64_t scale = 100000000;
         bool any = false;
         while (pos < text.size() &&
                std::isdigit(static_cast<unsigned char>(text[pos])) != 0) {
-          seconds += (text[pos] - '0') * scale;
-          scale *= 0.1;
+          fraction_nanoseconds += (text[pos] - '0') * scale;
+          scale /= 10;
           ++pos;
           any = true;
         }
@@ -165,7 +167,14 @@ std::optional<double> parse_timestamp(std::string_view text) {
   if (pos != text.size()) {
     return std::nullopt;
   }
-  return seconds;
+  if (fraction_nanoseconds == 0) return seconds;
+  // Whole seconds are an exact integer here. A microsecond instant is the
+  // correctly rounded microseconds / 10**6, as Python's datetime.timestamp()
+  // gives; adding each decimal digit to a large double would drift.
+  if (fraction_nanoseconds % 1000 == 0 && std::fabs(seconds) < 9.0e9)
+    return static_cast<double>(static_cast<std::int64_t>(seconds) * 1000000 +
+                               fraction_nanoseconds / 1000) / 1e6;
+  return seconds + static_cast<double>(fraction_nanoseconds) / 1e9;
 }
 
 std::optional<ParsedExactTimestamp> parse_timestamp_exact(std::string_view text) {

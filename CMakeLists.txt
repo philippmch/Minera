@@ -1130,6 +1130,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_case_arrival_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_case_arrival_tests COMMAND minera_case_arrival_tests)
 
+  add_executable(minera_reference_audit_tables_tests src/backend/tests/test_reference_audit_tables.cpp)
+  target_link_libraries(minera_reference_audit_tables_tests PRIVATE minera::core)
+  target_compile_features(minera_reference_audit_tables_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_reference_audit_tables_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_reference_audit_tables_tests COMMAND minera_reference_audit_tables_tests)
+
   add_executable(minera_attribute_statistics_tests src/backend/tests/test_attribute_statistics.cpp)
   target_link_libraries(minera_attribute_statistics_tests PRIVATE minera::core)
   target_compile_features(minera_attribute_statistics_tests PRIVATE cxx_std_20)
@@ -1523,6 +1529,75 @@ if(MINERA_BUILD_TESTS)
                    --dfg-activity-attribute causal_label)
   set_tests_properties(minera_dfg_causal_cli_custom_activity PROPERTIES
     PASS_REGULAR_EXPRESSION "\"name\": \"begin\"")
+
+  # A field literally named "activity" wins over the canonical concept:name
+  # (PM4Py's activity_key), for every evaluator on an imported model.
+  foreach(case IN ITEMS
+      "precision_etconformance_token|--evaluation-family;precision;--precision-variant;etconformance_token|\"imported\": {\"precision\": {\"variant\": \"etconformance_token\", \"computed\": true, \"exhausted\": false, \"error\": null, \"precision\": 1}"
+      "precision_align_etconformance|--evaluation-family;precision;--precision-variant;align_etconformance|\"imported\": {\"precision\": {\"variant\": \"align_etconformance\", \"computed\": true, \"exhausted\": false, \"error\": null, \"precision\": 1}"
+      "fitness_alignment_based|--evaluation-family;replay_fitness;--fitness-variant;alignment_based|\"imported\": {\"replay_fitness\": {\"variant\": \"alignment_based\", \"computed\": true, \"exhausted\": false, \"error\": null, \"fitness\": 1,")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(LENGTH parts count)
+    math(EXPR last "${count} - 1")
+    math(EXPR arg_count "${count} - 2")
+    list(GET parts ${last} expected)
+    list(SUBLIST parts 1 ${arg_count} args)
+    string(REGEX REPLACE "([][{}()+*.?^$\\])" "\\\\\\1" expected_regex "${expected}")
+    add_test(NAME minera_evaluation_cli_literal_activity_${name}
+             COMMAND minera_export
+                     "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/literal_activity_selector.csv"
+                     --case-column case:concept:name --activity-column concept:name
+                     --timestamp-column time:timestamp --no-alignments
+                     --check-pnml "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/literal_activity_selector.pnml"
+                     ${args} --evaluation-activity-attribute activity)
+    set_tests_properties(minera_evaluation_cli_literal_activity_${name} PROPERTIES
+      PASS_REGULAR_EXPRESSION "${expected_regex}")
+  endforeach()
+
+  # Attribute names are literal keys; " code " is not trimmed to "code".
+  add_test(NAME minera_token_replay_cli_spaced_activity_key
+           COMMAND minera_export
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/spaced_activity_key.xes"
+                   --no-alignments
+                   --check-pnml "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/literal_activity_selector.pnml"
+                   --token-replay-activity-attribute " code ")
+  set_tests_properties(minera_token_replay_cli_spaced_activity_key PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"imported\": {\"sound\": true, \"token_replay\": {\"fitness\": 1,")
+  # Broad audit DC2: a present empty label is an activity; a missing key fails.
+  set(MINERA_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures")
+  add_test(NAME minera_ilp_cli_empty_activity_label
+           COMMAND minera_export "${MINERA_FIXTURES}/stage_code_empty.xes"
+                   --ilp-mine --ilp-activity-key stage.code)
+  set_tests_properties(minera_ilp_cli_empty_activity_label PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"activities\":\\[\"\",\"INTAKE\"\\]")
+  add_test(NAME minera_ilp_cli_missing_activity_key
+           COMMAND minera_export "${MINERA_FIXTURES}/stage_code_missing.xes"
+                   --ilp-mine --ilp-activity-key stage.code)
+  set_tests_properties(minera_ilp_cli_missing_activity_key PROPERTIES WILL_FAIL TRUE)
+  add_test(NAME minera_genetic_cli_empty_activity_label
+           COMMAND minera_export "${MINERA_FIXTURES}/stage_code_empty.xes"
+                   --genetic-mine --genetic-activity-key stage.code
+                   --genetic-seed 1 --genetic-population-size 4)
+  set_tests_properties(minera_genetic_cli_empty_activity_label PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"activities\":\\[\"\",\"INTAKE\"\\]")
+  add_test(NAME minera_genetic_cli_missing_activity_key
+           COMMAND minera_export "${MINERA_FIXTURES}/stage_code_missing.xes"
+                   --genetic-mine --genetic-activity-key stage.code)
+  set_tests_properties(minera_genetic_cli_missing_activity_key PROPERTIES WILL_FAIL TRUE)
+  # Broad audit DC3: one element-usage arc record per physical arc object.
+  add_test(NAME minera_petri_usage_cli_weighted_arcs
+           COMMAND minera_export "${MINERA_FIXTURES}/ab_two_cases.csv"
+                   --compare-petri-reference "${MINERA_FIXTURES}/ab_two_cases.csv"
+                   --compare-petri-model "${MINERA_FIXTURES}/weighted_sequence_w2.pnml")
+  set_tests_properties(minera_petri_usage_cli_weighted_arcs PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"arcs\":\\[{\"id\":0,[^]]*{\"id\":3,[^]{}]*}\\]")
+  add_test(NAME minera_petri_usage_cli_parallel_arcs
+           COMMAND minera_export "${MINERA_FIXTURES}/ab_two_cases.csv"
+                   --compare-petri-reference "${MINERA_FIXTURES}/ab_two_cases.csv"
+                   --compare-petri-model "${MINERA_FIXTURES}/parallel_arc_sequence.pnml")
+  set_tests_properties(minera_petri_usage_cli_parallel_arcs PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"arcs\":\\[{\"id\":0,[^]]*{\"id\":5,[^]{}]*}\\]")
 
   add_executable(minera_perspective_tests
     src/backend/tests/test_perspectives.cpp

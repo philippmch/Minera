@@ -15795,3 +15795,59 @@ the reference's up to sign within 1e-7. In the other 165 logs, the
 reference's vector is an eigenvector of the native matrix for the same
 eigenvalue. Dots of 16 or more terms (logs over 224 traces, or longer
 smoothing boxes) depend on the BLAS SIMD kernel and are outside the bank.
+
+## Broad audit fixes and exception list (2026-10-27)
+
+The broad audit of 962196a (755 primary and 21 minimized black-box
+comparisons, handoff `docs/PARITY_BROAD_AUDIT_962196AF_2026-10-27.md` on the
+reviewer's machine) found wrong results that the green suite did not catch.
+Each item below was reproduced against public PM4Py 2.7.22 calls (pandas
+3.0.5, NumPy 2.4.6) and is now bound by a regression test with the reference
+values and passing controls.
+
+| ID | Fix | Test |
+| --- | --- | --- |
+| DC1, DC5 | Precision and fitness read a literal selected field (an `activity` column wins over the canonical name); a missing `concept:name` raises instead of reading as empty. | `minera_evaluation_tests`, three `minera_evaluation_cli_literal_activity_*` CLI tests |
+| DC2 | ILP and genetic discovery keep the selected label, including a present empty one, and reject events without the selected key. | `minera_ilp_miner_tests`, `minera_genetic_miner_tests`, `minera_{ilp,genetic}_cli_{empty_activity_label,missing_activity_key}` |
+| DC3 | Arc usage has one record per physical PNML arc: weights 1/2/3 give 4/4/4 records; two parallel arcs stay two. The parity test compares multisets. | `minera_petri_usage_comparison_tests`, `minera_element_usage_comparison_parity_tests`, `minera_petri_usage_cli_{weighted,parallel}_arcs` |
+| DC6 | CLI and HTTP attribute names are literal keys (`" code "` is not trimmed). | `minera_token_replay_cli_spaced_activity_key`, `minera_request_params_tests` |
+| FS1 | List and tuple case-size bounds compare row by row (upper bound against every row, then label alignment). | `minera_reference_audit_tables_tests` |
+| FS2 | Case durations are `Timedelta.total_seconds` of the exact unit count (1 ns stays 1e-9). | same |
+| FS3 | Case ids that do not compare (1 and 'a') sort numbers first, as pandas' mixed sort. | same |
+| FS4 | pd.NA case/activity/timestamp cells drop their row in `format_dataframe`. | same |
+| FS5 | 1, True and 1.0 are one sequence-filter key; '1' stays distinct. | same |
+| FS6 | Case arrival and dispersion gaps come from exact instants and are written with full precision. | same |
+| FS7 | Timestamp fractions are parsed exactly and rounded once (Python `datetime.timestamp()`). | same |
+| FS8 | Custom numeric case/activity selectors convert to dates before the canonical identifier is printed. | same |
+| FS metadata | Timestamp grouping infers the key column dtype (int64, str or object); consecutive grouping returns a missing case id of an object column as None (typed columns keep their dtype). | same |
+| O1, C2 | Average case duration counts a case when either endpoint is in the closed window or the case spans it; first and last are the supplied order (an unsorted case can be negative); completions use the last supplied event. | `minera_resource_profiles_tests` |
+| O2 | Activity intervals use only unmarked and `complete` events, each starting at the previous kept event (or its explicit start). | same |
+| O3 | Network analysis sorts int and float keys numerically, strings lexically, ties stably. | `minera_network_analysis_tests` |
+| O4 | Present empty resources, activities and case ids are values in network analysis, resource profiles (`*_given` selects the literal empty resource) and interval filters. | `minera_network_analysis_tests`, `minera_resource_profiles_tests`, `minera_interval_tree_tests` |
+| O5 | A zero-width open-path interval raises "Start must be less than end". | `minera_interval_tree_tests` |
+| OCEL C1 | Activity associations keep one pair per relation row (two qualifiers give the pair twice). | `minera_ocel_statistics_tests` |
+| S1, S2 | Streaming DFG keeps empty labels and case ids, reads the selected activity attribute, skips events without it and reads a present null as "None"; the persistent store keeps empty fields across reloads. | `minera_streaming_dfg_tests`, `minera_streaming_store_tests` |
+
+Declared exceptions (not equivalent, kept on purpose):
+
+- **Weighted arcs in linear analysis (DC4).** The reference marking equation
+  counts every arc once regardless of its weight (objectives 2/4/6 for the
+  weight 1/2/3 sequence) and rejects weight-2/3 nets as not easy sound in
+  alignment precision and fitness. Native analysis uses the weights, so those
+  nets solve with objective 2 and are accepted. Parity is claimed for
+  unit-weight nets only; `minera_petri_analysis_tests` pins both values.
+- **No-observation averages (C3).** Resource-profile averages with no
+  observation return no row natively; the reference raises StatisticsError
+  (or returns 0.0 for `average_workload`, which positive-workload tests pin).
+- **Malformed OCEL (C3).** Native OCEL statistics reject duplicate ids and
+  dangling relations that the public association helpers accept.
+- **Streaming.** The streaming surface stays Partial and outside the 86/387
+  catalog; S1/S2 are fixed, lifecycle and threading are not claimed.
+- **Windows.** Windows build and CTest are configured in CI but not yet
+  executed: runner jobs currently fail before their first step.
+
+Not yet covered by fresh comparisons (no claim either way): calendar or time-zone interactions, nullable/categorical/MultiIndex and
+Polars tables, OCEL aggregates and graphs, genetic evolution and wider ILP
+parameters, reset/inhibitor/parallel arcs with full PLTR maps, decomposed
+alignments, generalization and simplicity, extended marking equations, WOFLAN,
+and public flat adapters with HTTP/UI forwarding.

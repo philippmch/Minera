@@ -23,10 +23,12 @@ using OcelObjectsOtCount =
     std::map<std::string, std::map<std::string, std::size_t>>;
 
 // Deterministic association summaries used by the native OCEL statistics
-// implementation.  The pair is (event id, object id).
+// implementation.  The pair is (event id, object id). One pair is kept per
+// relation row, as in the reference: an event related to the same object
+// under two qualifiers contributes the pair twice.
 using OcelAssociationPair = std::pair<std::string, std::string>;
 using OcelActivityAssociations =
-    std::map<std::string, std::set<OcelAssociationPair>>;
+    std::map<std::string, std::multiset<OcelAssociationPair>>;
 using OcelObjectTypeActivityAssociations =
     std::map<std::string, OcelActivityAssociations>;
 using OcelActivityAssociationMap = OcelActivityAssociations;

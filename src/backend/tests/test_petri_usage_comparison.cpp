@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <string>
 #include <string_view>
 #include <cmath>
 #include <sstream>
@@ -14,6 +15,7 @@
 #include "minera/petri_usage_comparison.hpp"
 #include "minera/powl_discovery.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "../tools/pnml_model_options.hpp"
 
 namespace {
 
@@ -1144,6 +1146,65 @@ void cleaning_combines_nested_split_branches() {
 }
 }  // namespace
 
+// Reference compare_element_usage_two_logs returns one record per arc object:
+// the sequence A -> B with arc weights 1, 2 and 3 always has four arc records,
+// while two genuine parallel arcs stay two records (six in total).
+std::string weighted_sequence_pnml(int weight, bool parallel) {
+  const auto w = std::to_string(weight);
+  std::string xml = "<?xml version=\"1.0\"?><pnml><net id=\"n\" type=\"http://www.pnml.org/version-2009/grammar/pnmlcoremodel\"><page id=\"pg\">"
+      "<place id=\"p0\"><name><text>p0</text></name><initialMarking><text>" + w + "</text></initialMarking></place>"
+      "<place id=\"p1\"><name><text>p1</text></name></place><place id=\"p2\"><name><text>p2</text></name></place>"
+      "<transition id=\"t1\"><name><text>A</text></name></transition><transition id=\"t2\"><name><text>B</text></name></transition>";
+  const auto arc = [&](std::string id, std::string source, std::string target, bool weighted) {
+    xml += "<arc id=\"" + id + "\" source=\"" + source + "\" target=\"" + target + "\">";
+    if (weighted) xml += "<inscription><text>" + w + "</text></inscription>";
+    xml += "</arc>";
+  };
+  arc("a1", "p0", "t1", true);
+  arc("a2", "t1", "p1", true);
+  arc("a3", "p1", "t2", true);
+  arc("a4", "t2", "p2", true);
+  if (parallel) {
+    arc("a1b", "p0", "t1", false);
+    arc("a2b", "t1", "p1", false);
+  }
+  xml += "</page><finalmarkings><marking><place idref=\"p2\"><text>" + w +
+         "</text></place></marking></finalmarkings></net></pnml>";
+  return xml;
+}
+
+void weighted_arcs_keep_physical_arc_multiplicity() {
+  const auto two_cases = [] {
+    auto log = log_of({"A", "B"});
+    log.traces.push_back(log.traces.front());
+    log.traces.back().case_id = "case2";
+    return log;
+  }();
+  const auto arcs_of = [&](int weight, bool parallel) {
+    const auto document = minera::parse_pnml_document(weighted_sequence_pnml(weight, parallel));
+    const auto options = minera::tools::pnml_comparison_options(document);
+    return minera::compare_petri_usage_reference(document.net, two_cases, two_cases, options).arcs;
+  };
+  for (const int weight : {1, 2, 3}) {
+    const auto arcs = arcs_of(weight, false);
+    assert(arcs.size() == 4);
+    for (const auto& arc : arcs) {
+      assert(arc.log1_occurrences == 2 && arc.log2_occurrences == 2 && arc.total_occurrences == 4);
+      assert(arc.label == (arc.transition == 0 ? "A (2/2/4)" : "B (2/2/4)"));
+    }
+  }
+  const auto parallel = arcs_of(1, true);
+  assert(parallel.size() == 6);
+  const auto count = [&](std::size_t transition, minera::PetriArcUsageKind kind) {
+    return std::count_if(parallel.begin(), parallel.end(),
+                         [&](const auto& arc) { return arc.transition == transition && arc.kind == kind; });
+  };
+  assert(count(0, minera::PetriArcUsageKind::kInput) == 2);
+  assert(count(0, minera::PetriArcUsageKind::kOutput) == 2);
+  assert(count(1, minera::PetriArcUsageKind::kInput) == 1);
+  assert(count(1, minera::PetriArcUsageKind::kOutput) == 1);
+}
+
 int main() {
   cleaning_uses_duplicate_place_names();
   cleaning_preserves_a_newly_produced_name_alias();
@@ -1178,4 +1239,5 @@ int main() {
   xes_exact_selector_beats_alias_in_any_order();
   invalid_net_indices_are_rejected();
   silent_search_budget_is_reported();
+  weighted_arcs_keep_physical_arc_multiplicity();
 }

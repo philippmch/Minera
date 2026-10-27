@@ -4,6 +4,7 @@
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
 #include "token_replay_context.hpp"
+#include "reference_activity_selector.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -1804,17 +1805,9 @@ ReplayActivity replay_activity_from_legacy_string(std::string_view activity) {
   return replay_activity_from_attribute(attribute);
 }
 
-bool standard_activity_attribute(std::string_view key) {
-  return key.empty() || key == "concept:name" || key == "activity";
-}
-
 std::string selected_activity(const Event& event,
                               std::string_view activity_attribute) {
-  if (standard_activity_attribute(activity_attribute)) return event.activity;
-  if (const auto* value = event.attribute(activity_attribute)) return *value;
-  throw std::invalid_argument(
-      "conformance: event is missing activity attribute '" +
-      std::string(activity_attribute) + "'");
+  return reference_selected_activity(event, activity_attribute, "conformance");
 }
 
 ReplayActivity selected_replay_activity(

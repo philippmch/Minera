@@ -630,7 +630,8 @@ PetriUsageComparison compare_element_usage_two_logs(const PetriNet& net,
 }
 
 PetriUsageComparison compare_element_usage_token_replay(const PetriNet& net, const EventLog& log1,
-                                                       const EventLog& log2, TokenReplayOptions replay) {
+                                                       const EventLog& log2, TokenReplayOptions replay,
+                                                       const std::vector<PnmlArcOccurrence>* arc_occurrences) {
   replay.variant = TokenReplayVariant::kForward;
   replay.enable_pltr_fitness = true;
   const auto usage = [&](const EventLog& log) {
@@ -666,6 +667,22 @@ PetriUsageComparison compare_element_usage_token_replay(const PetriNet& net, con
                              stats.log2_occurrences, stats.total_occurrences, stats.direction, stats.label,
                              stats.color});
     };
+    if (arc_occurrences) {
+      const auto physical = [&](PetriArcUsageKind kind) {
+        for (const auto& arc : *arc_occurrences) {
+          if (arc.transition != t) continue;
+          const auto arc_kind = !arc.input ? PetriArcUsageKind::kOutput
+                                : arc.type == PetriArcType::kReset ? PetriArcUsageKind::kReset
+                                : arc.type == PetriArcType::kInhibitor ? PetriArcUsageKind::kInhibitor
+                                : PetriArcUsageKind::kInput;
+          if (arc_kind == kind) append_arc(arc.place, kind);
+        }
+      };
+      for (const auto kind : {PetriArcUsageKind::kInput, PetriArcUsageKind::kOutput, PetriArcUsageKind::kReset,
+                              PetriArcUsageKind::kInhibitor})
+        physical(kind);
+      continue;
+    }
     for (const auto place : transition.inputs) append_arc(place, PetriArcUsageKind::kInput);
     for (const auto place : transition.outputs) append_arc(place, PetriArcUsageKind::kOutput);
     for (const auto place : transition.reset_inputs) append_arc(place, PetriArcUsageKind::kReset);
@@ -686,7 +703,22 @@ PetriUsageComparison compare_petri_usage_reference(const PetriNet& net, const Ev
   const auto attribute = trimmed(options.activity_attribute);
   if (!options.activity_attribute.empty() && attribute.empty())
     throw std::invalid_argument("Petri usage activity_attribute must not be blank");
-  replay.activity_attribute = attribute.empty() || attribute == "activity" ? "concept:name" : attribute;
+  // The default selector names the log's first-class activity, whatever
+  // source column it came from (a CSV "activity" column, say); a literal
+  // "activity" field wins when "activity" is requested.
+  const auto projected_key = [&]() -> std::string {
+    for (const auto* log : {&log1, &log2})
+      for (const auto& trace : log->traces)
+        for (const auto& event : trace.events)
+          for (const auto& field : event.attributes)
+            if (attribute == "activity" && field.key == "activity") return "activity";
+    for (const auto* log : {&log1, &log2})
+      for (const auto& trace : log->traces)
+        for (const auto& event : trace.events)
+          if (!event.activity_source_key.empty()) return event.activity_source_key;
+    return "concept:name";
+  };
+  replay.activity_attribute = attribute.empty() || attribute == "activity" ? projected_key() : attribute;
   replay.initial_marking.assign(options.initial_marking.begin(), options.initial_marking.end());
   replay.final_marking.assign(options.final_marking.begin(), options.final_marking.end());
   replay.walk_through_hidden_transitions = options.walk_through_hidden_trans;
@@ -699,7 +731,8 @@ PetriUsageComparison compare_petri_usage_reference(const PetriNet& net, const Ev
   replay.initial_marking_keys = options.initial_marking_keys;
   replay.final_marking_keys = options.final_marking_keys;
   replay.exhaustive_invisible_exploration = options.exhaustive_invisible_exploration;
-  return compare_element_usage_token_replay(net, log1, log2, std::move(replay));
+  return compare_element_usage_token_replay(net, log1, log2, std::move(replay),
+                                            options.arc_occurrences ? &*options.arc_occurrences : nullptr);
 }
 
 }  // namespace minera

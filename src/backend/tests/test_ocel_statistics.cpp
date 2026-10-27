@@ -46,17 +46,19 @@ int main() {
   assert(!counts.contains("e3"));
 
   const auto associations = minera::activity_associations(log);
-  assert(associations.at("Create").size() == 2);
-  assert(associations.at("Create").contains({"e1", "o1"}));
-  assert(associations.at("Create").contains({"e1", "o2"}));
+  // One pair per relation row, as in the reference: e1/o2 is related under
+  // two qualifiers, so it appears twice.
+  assert(associations.at("Create").size() == 3);
+  assert(associations.at("Create").count({"e1", "o1"}) == 1);
+  assert(associations.at("Create").count({"e1", "o2"}) == 2);
   assert(associations.at("Ship").contains({"e2", "o2"}));
   const auto aggregate = minera::aggregate_associations(associations);
   assert(aggregate.event_ids == std::set<std::string>({"e1", "e2"}));
   assert(aggregate.object_ids == std::set<std::string>({"o1", "o2"}));
-  assert(aggregate.pair_count == 3);
+  assert(aggregate.pair_count == 4);
   assert(minera::association_event_ids(associations) == aggregate.event_ids);
   assert(minera::association_object_ids(associations) == aggregate.object_ids);
-  assert(minera::association_pair_count(associations) == 3);
+  assert(minera::association_pair_count(associations) == 4);
 
   const auto starts = minera::activity_associations(
       log, minera::OcelAssociationPrefilter::kStart);

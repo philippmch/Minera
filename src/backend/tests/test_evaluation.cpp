@@ -968,7 +968,84 @@ void emd_pyemd_variant_is_deterministic_and_strict() {
   assert(fallback_json.find("\"use_fast_emd\": false") != std::string::npos);
 }
 
+// PM4Py 2.7.22: activity_key="activity" reads a field literally named
+// activity, even when concept:name differs (precision 1, fitness 1), and an
+// event without concept:name makes precision and alignment fitness raise.
+void literal_activity_selector_and_missing_canonical_name() {
+  const auto make = [](bool drop_second_name) {
+    EventLog result;
+    Trace trace;
+    trace.case_id = "c1";
+    Event first;
+    first.case_id = "c1";
+    first.activity = "Register";
+    first.activity_state = FirstClassAttributeState::kPresent;
+    first.attributes.push_back({"activity", "INTAKE", AttributeKind::kString});
+    Event second = first;
+    second.activity = "Assess";
+    second.attributes = {{"activity", "RISK", AttributeKind::kString}};
+    if (drop_second_name) {
+      second.activity.clear();
+      second.activity_state = FirstClassAttributeState::kMissing;
+    }
+    trace.events = {first, second};
+    result.traces.push_back(trace);
+    return result;
+  };
+  const auto net_of = [](std::vector<std::string> labels) {
+    PetriNet net;
+    net.set_activities(std::move(labels));
+    const auto source = net.add_place();
+    const auto middle = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source}, {middle});
+    net.add_transition(1, {middle}, {sink});
+    return net;
+  };
+  const auto conflicting = make(false);
+  const auto literal_net = net_of({"INTAKE", "RISK"});
+  for (const auto variant : {PrecisionVariant::ETCONFORMANCE_TOKEN, PrecisionVariant::ALIGN_ETCONFORMANCE}) {
+    PrecisionOptions options;
+    options.activity_attribute = "activity";
+    const auto result = evaluate_precision(conflicting, literal_net, variant, options);
+    assert(result.computed && result.precision == 1.0);
+  }
+  for (const auto variant : {ReplayFitnessVariant::TOKEN_BASED, ReplayFitnessVariant::ALIGNMENT_BASED}) {
+    ReplayFitnessOptions options;
+    options.activity_attribute = "activity";
+    assert(evaluate_replay_fitness(conflicting, literal_net, variant, options).fitness == 1.0);
+  }
+  // Control: the canonical selector still reads concept:name.
+  assert(evaluate_precision(conflicting, net_of({"Register", "Assess"}),
+                            PrecisionVariant::ALIGN_ETCONFORMANCE).precision == 1.0);
+
+  const auto missing = make(true);
+  const auto canonical_net = net_of({"Register", "Assess"});
+  const auto rejects = [](auto run) {
+    try {
+      (void)run();
+    } catch (const std::exception&) {
+      return true;
+    }
+    return false;
+  };
+  for (const auto variant : {PrecisionVariant::ETCONFORMANCE_TOKEN, PrecisionVariant::ALIGN_ETCONFORMANCE})
+    assert(rejects([&] { return evaluate_precision(missing, canonical_net, variant); }));
+  assert(rejects([&] {
+    return evaluate_replay_fitness(missing, canonical_net, ReplayFitnessVariant::ALIGNMENT_BASED);
+  }));
+  // A present empty label is a real activity, not a missing one.
+  auto empty_label = make(true);
+  empty_label.traces[0].events[1].activity_state = FirstClassAttributeState::kPresent;
+  const auto empty_result =
+      evaluate_precision(empty_label, net_of({"Register", ""}), PrecisionVariant::ALIGN_ETCONFORMANCE);
+  assert(empty_result.computed && empty_result.precision == 1.0);
+}
+
 int main() {
+  literal_activity_selector_and_missing_canonical_name();
   auto n=sequence_net(); auto l=log({{"A","B"},{"A"}});
   auto f=evaluate_replay_fitness(l,n,ReplayFitnessVariant::TOKEN_BASED); assert(f.trace_count==2&&f.fitness<1&&f.percentage_fit_traces==50);
   auto p=evaluate_precision(l,n,PrecisionVariant::ETCONFORMANCE_TOKEN); assert(p.computed&&p.precision>=0&&p.precision<=1);

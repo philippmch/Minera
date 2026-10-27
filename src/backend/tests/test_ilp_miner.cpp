@@ -139,13 +139,18 @@ int main() {
   assert(std::find(denoised.net.activities().begin(), denoised.net.activities().end(), "c") ==
          denoised.net.activities().end());
 
-  // A missing or empty activity-key value falls back to the event activity.
+  // As in the reference, the selected field always wins: a present empty value
+  // is a visible "" label, and an event without the field is rejected (the
+  // reference raises KeyError) instead of falling back to the event activity.
   EventLog keyed = log_of({{"a", "b"}});
   keyed.traces[0].events[0].attributes.push_back({"phase", "x", AttributeKind::kString});
   keyed.traces[0].events[1].attributes.push_back({"phase", "", AttributeKind::kString});
   ILPMinerOptions phase;
   phase.activity_key = "phase";
-  assert(mine_ilp(keyed, phase).net.activities() == std::vector<std::string>({"b", "x"}));
+  assert(mine_ilp(keyed, phase).net.activities() == std::vector<std::string>({"", "x"}));
+  EventLog partly_keyed = log_of({{"a", "b"}});
+  partly_keyed.traces[0].events[0].attributes.push_back({"phase", "x", AttributeKind::kString});
+  rejects([&] { (void)mine_ilp(partly_keyed, phase); });
 
   // Validation.
   ILPMinerOptions invalid;

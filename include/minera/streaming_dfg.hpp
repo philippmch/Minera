@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -28,6 +29,12 @@ struct StreamingDfgSnapshot {
 };
 
 // Incrementally discovers a directly-follows graph from case-ordered events.
+// The selected activity of an event for the stream: a literal attribute of that
+// name wins (a present null reads "None"), otherwise the projected first-class
+// activity when the selector names it. nullopt when the key is missing.
+[[nodiscard]] std::optional<std::string> streaming_event_activity(
+    const Event& event, std::string_view selector);
+
 // Every accepted event updates its activity count and either starts a case or
 // increments the edge from that case's previous activity. End counts are
 // derived from the current last activity of every open case at snapshot time.
@@ -41,10 +48,13 @@ class StreamingDfgDiscovery {
     return options_;
   }
 
-  // Returns false for an event with an empty case id or activity, matching the
-  // stream's skip-invalid-record behavior. Accepted events return true.
+  // Empty case ids and activities are ordinary values, as in the reference
+  // stream: every call is accepted and returns true.
   bool receive(std::string_view case_id, std::string_view activity);
 
+  // Reads the activity named by options().activity_attribute (see
+  // streaming_event_activity). Returns false, skipping the event, when the
+  // event has no such key.
   bool receive(const Event& event, std::string_view case_id);
 
   [[nodiscard]] StreamingDfgSnapshot snapshot() const;

@@ -505,6 +505,13 @@ std::string trim_text(std::string_view value) {
   return std::string(value.substr(first, last - first + 1));
 }
 
+// Attribute names are literal keys: " code " and "code" are different
+// fields, so only a blank name is rejected (as empty) and nothing is trimmed.
+std::string selector_name(std::string_view value) {
+  if (value.find_first_not_of(" \t\r\n") == std::string_view::npos) return {};
+  return std::string(value);
+}
+
 std::vector<std::string> parse_strict_csv(std::string_view value,
                                           std::string_view name) {
   if (value.empty())
@@ -970,13 +977,13 @@ DfgAlignmentOptions parse_dfg_alignment_params(const FieldLookup& field,
   if (supplied("dfg_max_time_ms")) o.max_time_ms = parse_nonnegative_size(require("dfg_max_time_ms"), "dfg_max_time_ms");
   if (supplied("max_time_ms")) o.max_time_ms = parse_nonnegative_size(require("max_time_ms"), "max_time_ms");
   if (supplied("dfg_activity_attribute")) {
-    o.activity_attribute = trim_text(require("dfg_activity_attribute"));
+    o.activity_attribute = selector_name(require("dfg_activity_attribute"));
     if (o.activity_attribute.empty())
       throw std::invalid_argument(
           "dfg_activity_attribute: expected a non-empty attribute name");
   }
   if (supplied("dfg_timestamp_attribute")) {
-    o.timestamp_attribute = trim_text(require("dfg_timestamp_attribute"));
+    o.timestamp_attribute = selector_name(require("dfg_timestamp_attribute"));
     if (o.timestamp_attribute.empty())
       throw std::invalid_argument(
           "dfg_timestamp_attribute: expected a non-empty attribute name");
@@ -1029,13 +1036,13 @@ EditDistanceOptions parse_edit_distance_params(const FieldLookup& field,
   const std::string_view cost_name = supplied("deviation_cost") ? "deviation_cost" : (supplied("edit_deviation_cost") ? "edit_deviation_cost" : "");
   if (!cost_name.empty()) o.deviation_cost = parse_positive_u64(require(cost_name), cost_name);
   if (supplied("edit_activity_attribute")) {
-    o.activity_attribute = trim_text(require("edit_activity_attribute"));
+    o.activity_attribute = selector_name(require("edit_activity_attribute"));
     if (o.activity_attribute.empty())
       throw std::invalid_argument(
           "edit_activity_attribute: expected a non-empty attribute name");
   }
   if (supplied("edit_timestamp_attribute")) {
-    o.timestamp_attribute = trim_text(require("edit_timestamp_attribute"));
+    o.timestamp_attribute = selector_name(require("edit_timestamp_attribute"));
     if (o.timestamp_attribute.empty())
       throw std::invalid_argument(
           "edit_timestamp_attribute: expected a non-empty attribute name");
@@ -1071,17 +1078,17 @@ TokenReplayOptions parse_token_replay_params(const FieldLookup& field,
         "token_replay_variant: expected forward or backwards");
   }
   if (supplied("token_replay_activity_attribute")) {
-    options.activity_attribute = trim_text(field("token_replay_activity_attribute"));
+    options.activity_attribute = selector_name(field("token_replay_activity_attribute"));
     if (options.activity_attribute.empty()) throw std::invalid_argument(
         "token_replay_activity_attribute: expected a non-empty name");
   }
   if (supplied("token_replay_case_id_attribute")) {
-    options.case_id_attribute = trim_text(field("token_replay_case_id_attribute"));
+    options.case_id_attribute = selector_name(field("token_replay_case_id_attribute"));
     if (options.case_id_attribute.empty()) throw std::invalid_argument(
         "token_replay_case_id_attribute: expected a non-empty name");
   }
   if (supplied("token_replay_timestamp_attribute")) {
-    options.timestamp_attribute = trim_text(field("token_replay_timestamp_attribute"));
+    options.timestamp_attribute = selector_name(field("token_replay_timestamp_attribute"));
     if (options.timestamp_attribute.empty()) throw std::invalid_argument(
         "token_replay_timestamp_attribute: expected a non-empty name");
   }
@@ -1166,7 +1173,7 @@ AlignmentOptions parse_alignment_params(const FieldLookup& field,
   };
   if (supplied("alignment_activity_attribute")) {
     options.activity_attribute =
-        trim_text(require("alignment_activity_attribute"));
+        selector_name(require("alignment_activity_attribute"));
     if (options.activity_attribute.empty()) {
       throw std::invalid_argument(
           "alignment_activity_attribute: expected a non-empty name");
@@ -1338,7 +1345,7 @@ ProcessTreeAlignmentOptions parse_process_tree_alignment_params(
   }
   if (supplied("pt_alignment_activity_attribute")) {
     options.activity_attribute =
-        trim_text(require("pt_alignment_activity_attribute"));
+        selector_name(require("pt_alignment_activity_attribute"));
     if (options.activity_attribute.empty())
       throw std::invalid_argument(
           "pt_alignment_activity_attribute: expected a non-empty attribute name");
@@ -1393,7 +1400,7 @@ DecomposedAlignmentOptions parse_decomposed_alignment_options(
   marking("initial_marking", "initial_marking_json", o.initial_marking);
   marking("final_marking", "final_marking_json", o.final_marking);
   if (supplied("activity_attribute")) {
-    o.activity_attribute = trim_text(require("activity_attribute"));
+    o.activity_attribute = selector_name(require("activity_attribute"));
     if (o.activity_attribute.empty())
       throw std::invalid_argument(
           "activity_attribute: expected a non-empty attribute name");
@@ -1419,7 +1426,7 @@ PetriAntiAlignmentOptions parse_petri_anti_alignment_params(const FieldLookup& f
   if(supplied("exponent")){o.exponent=parse_finite_double(require("exponent"),"exponent");if(o.exponent<=1)throw std::invalid_argument("exponent: expected > 1");} if(supplied("epsilon")){o.epsilon=parse_finite_double(require("epsilon"),"epsilon");if(o.epsilon<0)throw std::invalid_argument("epsilon: expected non-negative");}
   if(supplied("marking_limit"))o.marking_limit=parse_positive_size(require("marking_limit"),"marking_limit"); if(supplied("max_states"))o.max_states=parse_nonnegative_size(require("max_states"),"max_states"); if(supplied("initial_marking"))o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking"))o.final_marking=parse_marking(require("final_marking"),"final_marking");
   if (supplied("activity_attribute")) {
-    o.activity_attribute = trim_text(require("activity_attribute"));
+    o.activity_attribute = selector_name(require("activity_attribute"));
     if (o.activity_attribute.empty())
       throw std::invalid_argument(
           "activity_attribute: expected a non-empty attribute name");
@@ -1431,7 +1438,7 @@ PetriMultiAlignmentOptions parse_petri_multi_alignment_params(const FieldLookup&
   PetriMultiAlignmentOptions o; const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();}; const auto require=[&](std::string_view n){auto v=field(n);if(!supplied(n)||v.empty())throw std::invalid_argument(std::string(n)+": expected a value");return v;};
   if(supplied("variant")){auto v=require("variant");if(v!="version_discounted_a_star"&&v!="VERSION_DISCOUNTED_A_STAR"&&v!="discounted_a_star")throw std::invalid_argument("variant: expected version_discounted_a_star");} if(supplied("exponent")){o.exponent=parse_finite_double(require("exponent"),"exponent");if(o.exponent<=1)throw std::invalid_argument("exponent: expected > 1");} if(supplied("marking_limit"))o.marking_limit=parse_positive_size(require("marking_limit"),"marking_limit"); if(supplied("max_states"))o.max_states=parse_nonnegative_size(require("max_states"),"max_states"); if(supplied("initial_marking"))o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking"))o.final_marking=parse_marking(require("final_marking"),"final_marking");
   if (supplied("activity_attribute")) {
-    o.activity_attribute = trim_text(require("activity_attribute"));
+    o.activity_attribute = selector_name(require("activity_attribute"));
     if (o.activity_attribute.empty())
       throw std::invalid_argument(
           "activity_attribute: expected a non-empty attribute name");
@@ -1533,7 +1540,7 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
   }
 
   if (supplied("evaluation_activity_attribute")) {
-    const auto value = trim_text(require("evaluation_activity_attribute"));
+    const auto value = selector_name(require("evaluation_activity_attribute"));
     if (value.empty()) {
       throw std::invalid_argument(
           "evaluation_activity_attribute: expected a non-empty name");
@@ -1544,7 +1551,7 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
     params.composite_options.activity_attribute = value;
   }
   if (supplied("evaluation_case_id_attribute")) {
-    const auto value = trim_text(require("evaluation_case_id_attribute"));
+    const auto value = selector_name(require("evaluation_case_id_attribute"));
     if (value.empty()) {
       throw std::invalid_argument(
           "evaluation_case_id_attribute: expected a non-empty name");
@@ -2746,7 +2753,7 @@ MineParams parse_mine_params(const FieldLookup& field,
   const auto parse_inductive_selector = [&](std::string_view name,
                                              std::string& destination) {
     if (!supplied(name)) return;
-    destination = trim_text(field(name));
+    destination = selector_name(field(name));
     if (destination.empty()) {
       throw std::invalid_argument(std::string(name) +
                                   ": expected a non-empty name");
@@ -2767,7 +2774,7 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.alpha.short_loops = value == "plus";
   }
   if (supplied("alpha_activity_attribute")) {
-    const auto value = trim_text(field("alpha_activity_attribute"));
+    const auto value = selector_name(field("alpha_activity_attribute"));
     if (value.empty()) {
       throw std::invalid_argument(
           "alpha_activity_attribute: expected a non-empty name");
@@ -2779,7 +2786,7 @@ MineParams parse_mine_params(const FieldLookup& field,
                "alpha_case_id_attribute", &params.alpha.case_id_attribute},
            {"alpha_timestamp_attribute", &params.alpha.timestamp_attribute}}) {
     if (!supplied(name)) continue;
-    const auto value = trim_text(field(name));
+    const auto value = selector_name(field(name));
     if (value.empty())
       throw std::invalid_argument(std::string(name) +
                                   ": expected a non-empty name");
@@ -2789,7 +2796,7 @@ MineParams parse_mine_params(const FieldLookup& field,
     // An explicit empty selector retains the native conventional start-column
     // probe followed by completion-time fallback.
     params.alpha.start_timestamp_attribute =
-        trim_text(field("alpha_start_timestamp_attribute"));
+        selector_name(field("alpha_start_timestamp_attribute"));
   }
   if (supplied("alpha_sort_caseid_required")) {
     params.alpha.sort_caseid_required = parse_boolean(
@@ -2820,21 +2827,21 @@ MineParams parse_mine_params(const FieldLookup& field,
           "'");
   }
   if (supplied("heuristic_activity_attribute")) {
-    const auto value = trim_text(field("heuristic_activity_attribute"));
+    const auto value = selector_name(field("heuristic_activity_attribute"));
     if (value.empty())
       throw std::invalid_argument(
           "heuristic_activity_attribute: expected a non-empty name");
     params.heuristic.activity_attribute = value;
   }
   if (supplied("heuristic_case_id_attribute")) {
-    const auto value = trim_text(field("heuristic_case_id_attribute"));
+    const auto value = selector_name(field("heuristic_case_id_attribute"));
     if (value.empty())
       throw std::invalid_argument(
           "heuristic_case_id_attribute: expected a non-empty name");
     params.heuristic.case_id_attribute = value;
   }
   if (supplied("heuristic_timestamp_attribute")) {
-    const auto value = trim_text(field("heuristic_timestamp_attribute"));
+    const auto value = selector_name(field("heuristic_timestamp_attribute"));
     if (value.empty())
       throw std::invalid_argument(
           "heuristic_timestamp_attribute: expected a non-empty name");
@@ -3033,7 +3040,7 @@ MineParams parse_mine_params(const FieldLookup& field,
   const auto parse_powl_selector = [&](std::string_view name,
                                        std::string& destination) {
     if (!supplied(name)) return;
-    destination = trim_text(field(name));
+    destination = selector_name(field(name));
     if (destination.empty()) {
       throw std::invalid_argument(std::string(name) +
                                   ": expected a non-empty name");
@@ -3057,7 +3064,7 @@ MineParams parse_mine_params(const FieldLookup& field,
                "temporal_target_timestamp_attribute",
                &params.temporal_profile.target_timestamp_attribute}}) {
     if (!supplied(name)) continue;
-    *target = trim_text(field(name));
+    *target = selector_name(field(name));
     if (target->empty()) {
       throw std::invalid_argument(std::string(name) +
                                   ": expected a non-empty attribute name");
@@ -3112,7 +3119,7 @@ MineParams parse_mine_params(const FieldLookup& field,
                "transition_case_id_attribute",
                &params.transition_system.case_id_attribute}}) {
     if (!supplied(name)) continue;
-    *target = trim_text(field(name));
+    *target = selector_name(field(name));
     if (target->empty()) {
       throw std::invalid_argument(std::string(name) +
                                   ": expected a non-empty attribute name");
@@ -3158,7 +3165,7 @@ MineParams parse_mine_params(const FieldLookup& field,
   const auto parse_selector = [&](std::string_view field_name,
                                   std::string& destination) {
     if (!supplied(field_name)) return;
-    destination = trim_text(field(field_name));
+    destination = selector_name(field(field_name));
     if (destination.empty()) {
       throw std::invalid_argument(std::string(field_name) +
                                   ": expected a non-empty attribute name");
@@ -3300,7 +3307,7 @@ MineParams parse_mine_params(const FieldLookup& field,
   const auto parse_footprints_selector = [&](std::string_view field_name,
                                              std::string& destination) {
     if (!supplied(field_name)) return;
-    destination = trim_text(field(field_name));
+    destination = selector_name(field(field_name));
     if (destination.empty()) {
       throw std::invalid_argument(std::string(field_name) +
                                   ": expected a non-empty selector");
@@ -3314,10 +3321,10 @@ MineParams parse_mine_params(const FieldLookup& field,
                             params.footprints.timestamp_attribute);
   if (supplied("footprints_index_attribute")) {
     params.footprints.index_attribute =
-        trim_text(field("footprints_index_attribute"));
+        selector_name(field("footprints_index_attribute"));
   }
   if (supplied("footprints_start_timestamp_attribute")) {
-    const auto value = trim_text(field("footprints_start_timestamp_attribute"));
+    const auto value = selector_name(field("footprints_start_timestamp_attribute"));
     if (value.empty()) {
       params.footprints.start_timestamp_attribute.reset();
     } else {
@@ -3654,7 +3661,7 @@ MineParams parse_mine_params(const FieldLookup& field,
                                               bool allow_empty) {
     const auto value = field(field_name);
     if (!(present ? present(field_name) : !value.empty())) return;
-    destination = trim_text(value);
+    destination = selector_name(value);
     if (!allow_empty && destination.empty()) {
       throw std::invalid_argument(std::string(field_name) +
                                   ": expected a non-empty attribute name");
@@ -6928,7 +6935,7 @@ LogConversionOptions parse_log_conversion_params(const FieldLookup& field,
     return value;
   };
   const auto require_name = [&](std::string_view name) {
-    const auto value = trim_text(require(name));
+    const auto value = selector_name(require(name));
     if (value.empty())
       throw std::invalid_argument(std::string(name) +
                                   ": expected a non-empty name");
