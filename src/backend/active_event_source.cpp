@@ -808,7 +808,7 @@ std::string serialize_active_source_temporal_conformance_json(const TemporalConf
     return array_json(bucket, [](const auto& deviation) {
       return object_json({{"case_id", quote(deviation.case_id)}, {"source", quote(deviation.source)},
           {"target", quote(deviation.target)}, {"elapsed_seconds", real_json(deviation.elapsed_seconds)},
-          {"standard_deviation_distance", real_json(deviation.standard_deviation_distance)}});
+          {"standard_deviation_distance", deviation.zero_variance_sentinel ? std::string("9223372036854775807") : real_json(deviation.standard_deviation_distance)}});
     });
   });
 }

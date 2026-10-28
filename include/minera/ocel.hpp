@@ -103,7 +103,8 @@ enum class OcelJsonFormat { kClassic, kStandard };
 // The reference importers order events by timestamp (ties keep file order)
 // and relations by their event's new position (ties keep file order). Events
 // whose timestamp does not parse keep the file order of the whole log.
-void sort_ocel_events_by_timestamp(Ocel& log);
+// Instants compare at microseconds unless `nanoseconds` (the SQLite importer).
+void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
 
 Ocel parse_ocel_json(std::string_view json,
                      const OcelJsonLimits& limits = {});

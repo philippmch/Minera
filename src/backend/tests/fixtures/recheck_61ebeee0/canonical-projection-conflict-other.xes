@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0"><trace><string key="concept:name" value="fresh-0" /><event><string key="concept:name" value="OpenCase" /><string key="stage.code" value="DeskA" /><date key="time:timestamp" value="2026-10-12T10:00:00Z" /></event><event><string key="concept:name" value="AssessRisk" /><string key="stage.code" value="DeskB" /><date key="time:timestamp" value="2026-10-12T10:00:01Z" /></event></trace></log>

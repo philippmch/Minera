@@ -13,9 +13,9 @@ namespace minera {
 
 // Classic ILP discovery of a workflow net from a traditional event log. Runs
 // the reference port (`reference_ilp_net`, see ilp_reference.hpp) and lays its
-// result out as a native PetriNet.  The activity key is read from Event::activity when empty (or
-// when set to "activity" / "concept:name"), otherwise from the named event
-// attribute.  Missing custom attributes fall back to Event::activity.
+// result out as a native PetriNet.  An empty activity key reads Event::activity.
+// An explicit key reads the literal attribute of that name, or the projection
+// only when it was read from that same field; a missing key is an error.
 struct ILPMinerOptions {
   std::string activity_key;
   // Synthetic boundary labels wrapped around every trace; they become silent

@@ -7447,7 +7447,9 @@ std::string network_analysis_json(const NetworkAnalysisResult& result) {
   std::size_t performance_values = 0;
   std::uint64_t links = 0;
   for (const auto& edge : result.edges) {
-    if (edge.source.empty() || edge.target.empty() || edge.activity.empty() || edge.count == 0 ||
+    // Present empty labels are valid nodes and activities (the reference
+    // groups "" like any other string); only a count of zero is malformed.
+    if (edge.count == 0 ||
         std::any_of(edge.performance.begin(), edge.performance.end(),
                     [](double value) { return !std::isfinite(value); }))
       throw std::invalid_argument("network analysis edge is invalid");

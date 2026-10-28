@@ -36,7 +36,19 @@ void empty_models_and_unknown_templates_preserve_native_prefix_behavior() {
   assert(none_monitor.receive_record(std::nullopt,true,std::string("None")).deviations==0);
   assert(none_monitor.receive_record(std::string("None"),false,std::string("A")).deviations==1);
   assert(none_monitor.receive_record(std::nullopt,false,std::string("None")).case_id=="undefined_case");
-  const auto none_snapshot=none_monitor.snapshot();assert(none_snapshot.cases.size()==4&&none_snapshot.cases.at(std::string("\0None",5)).deviations==0&&none_snapshot.cases.at("None").deviations==1);
+  const auto none_snapshot=none_monitor.snapshot();assert(none_snapshot.cases.size()==3&&none_snapshot.null_case&&none_snapshot.null_case->deviations==0&&none_snapshot.cases.at("None").deviations==1);
+  assert(serialize_declare_streaming_json(none_snapshot,none_model).find("\"null_case\":{\"events\":1,")!=std::string::npos);
+  // init(Intake28): a None-case Intake28 then a missing-case Decide28 are two
+  // cases with one violation, through both receive paths; a literal string
+  // "\0None" id stays apart from None.
+  DeclareModel init_model;init_model.add("init",{"Intake28","",false,0,0});
+  {DeclareStreamingConformance m(init_model);Event none_case{"","Intake28","","",0,{},""};none_case.case_id_state=FirstClassAttributeState::kNull;none_case.activity_state=FirstClassAttributeState::kPresent;
+   const auto first=m.receive(none_case);assert(first.case_is_null&&first.deviations==0&&serialize_declare_stream_event_json(first).find("{\"case_id\":null,")==0);
+   Event missing_case{"","Decide28","","",1,{},""};missing_case.activity_state=FirstClassAttributeState::kPresent;
+   const auto second=m.receive(missing_case);assert(second.case_id=="undefined_case"&&second.deviations==1);
+   const auto snap=m.snapshot();assert(snap.total_deviations==1&&snap.null_case&&snap.cases.size()==1);}
+  {DeclareStreamingConformance m(init_model);assert(m.receive_record(std::nullopt,true,std::string("Intake28")).deviations==0);assert(m.receive_record(std::nullopt,false,std::string("Decide28")).deviations==1);assert(m.snapshot().total_deviations==1);}
+  {DeclareStreamingConformance m(init_model);assert(m.receive_record(std::string("\0None",5),false,std::string("Intake28")).deviations==0);assert(m.receive_record(std::nullopt,true,std::string("Decide28")).deviations==1);const auto snap=m.snapshot();assert(snap.cases.size()==1&&snap.null_case&&snap.total_deviations==1);}
   const auto empty=parse_declare_stream_model_json("{\"rules\":[]}");DeclareStreamingConformance no_rules(empty);assert(no_rules.receive("c","A").deviations==0);
 }
 int main(){try{model_roundtrip_retains_labels_duplicates_unknown_rules_and_native_order();malformed_models_fail_before_execution();prefix_state_violation_identity_and_time_history_survive_batches();empty_models_and_unknown_templates_preserve_native_prefix_behavior();}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}return 0;}

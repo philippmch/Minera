@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 using namespace minera;
@@ -70,6 +71,50 @@ int main() {
     assert(s.end_activities.at("c,3") == 2 && s.end_activities.at("c2") == 2);
     const auto other = stream_dfg("case:concept:name,other\nc1,A\n");
     assert(other.events == 0);
+  }
+  {
+    // NUL is an ordinary character in values, quoted values and headers, and
+    // the DFG JSON escapes it.
+    const std::string text("case:concept:name,concept\0name\nc\0,A\0B\nc\0,\"Q\0\"\n", 46);
+    std::istringstream input(text);
+    const auto records = read_python_csv_event_stream(input);
+    assert(records.size() == 2 && records[0].fields[1].first == std::string("concept\0name", 12));
+    assert(**records[0].find("case:concept:name") == std::string("c\0", 2));
+    assert(**records[1].find(std::string("concept\0name", 12)) == std::string("Q\0", 2));
+    StreamingDfgDiscovery dfg({std::string("concept\0name", 12), "case:concept:name"});
+    for (std::size_t i = 0; i < records.size(); ++i)
+      dfg.receive(python_csv_record_event(records[i], i), *python_csv_case_key(records[i], "case:concept:name"));
+    const auto json = serialize_streaming_dfg_json(dfg.snapshot());
+    assert(json.find("A\\u0000B") != std::string::npos && json.find(std::string(1, '\0')) == std::string::npos);
+  }
+  {
+    // Strict UTF-8 text: a malformed byte fails before any record.
+    for (const std::string bad : {std::string("a\n\xff\n"), std::string("a\n\xc3\n"), std::string("a\n\xed\xa0\x80\n"),
+                                  std::string("a\n\xc0\xaf\n")}) {
+      std::istringstream input(bad);
+      bool threw = false;
+      try { (void)read_python_csv_event_stream(input); } catch (const std::runtime_error& e) {
+        threw = std::string(e.what()).find("'utf-8' codec can't decode") == 0;
+      }
+      assert(threw);
+    }
+  }
+  {
+    // csv.field_size_limit(): 131072 characters, counted as code points.
+    const auto read = [](const std::string& field) {
+      std::istringstream input("a,b\n" + field + ",y\n");
+      return read_python_csv_event_stream(input);
+    };
+    assert(read(std::string(131072, 'x')).size() == 1);
+    std::string accented;
+    for (int i = 0; i < 70001; ++i) accented += "\xc3\xa9";
+    assert(read(accented).size() == 1);
+    assert(read("\"" + std::string(131071, 'x') + "\"\"\"").size() == 1);
+    bool threw = false;
+    try { (void)read(std::string(131073, 'x')); } catch (const std::runtime_error& e) {
+      threw = std::string(e.what()) == "field larger than field limit (131072)";
+    }
+    assert(threw);
   }
   return 0;
 }

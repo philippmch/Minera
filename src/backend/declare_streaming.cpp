@@ -72,13 +72,16 @@ DeclareStreamingConformance::DeclareStreamingConformance(const DeclareModel& mod
 }
 
 DeclareStreamingEventResult DeclareStreamingConformance::receive(const Event& event) {
-  // A present case id is a value even when empty; only an event without one
-  // falls back to "undefined_case", as in the reference.
-  std::string case_id = event.case_id;
-  if (case_id.empty() && event.case_id_state != FirstClassAttributeState::kPresent)
+  // A present case id is a value even when empty and a None one is its own
+  // case; only an event without one falls back to "undefined_case", as in the
+  // reference.
+  std::optional<std::string> case_id = event.case_id;
+  if (event.case_id_state == FirstClassAttributeState::kNull) case_id.reset();
+  else if (event.case_id.empty() && event.case_id_state != FirstClassAttributeState::kPresent)
     case_id = "undefined_case";
   std::optional<std::string> activity;
-  if (!event.activity.empty() || event.activity_state == FirstClassAttributeState::kPresent)
+  if (event.activity_state != FirstClassAttributeState::kNull &&
+      (!event.activity.empty() || event.activity_state == FirstClassAttributeState::kPresent))
     activity = event.activity;
   return process(std::move(case_id), std::move(activity), event.timestamp);
 }
@@ -86,18 +89,22 @@ DeclareStreamingEventResult DeclareStreamingConformance::receive(const Event& ev
 DeclareStreamingEventResult DeclareStreamingConformance::receive_record(
     std::optional<std::string> case_id, bool case_is_null,
     std::optional<std::string> activity, std::string timestamp) {
-  std::string key = case_is_null ? std::string("\0None", 5)
-                                 : case_id.value_or("undefined_case");
-  return process(std::move(key), std::move(activity), std::move(timestamp));
+  if (case_is_null) case_id.reset();
+  else if (!case_id) case_id = "undefined_case";
+  return process(std::move(case_id), std::move(activity), std::move(timestamp));
 }
 
 DeclareStreamingEventResult DeclareStreamingConformance::process(
-    std::string case_id, std::optional<std::string> act, std::string event_timestamp) {
+    std::optional<std::string> case_id, std::optional<std::string> act, std::string event_timestamp) {
   const std::lock_guard lock(mutex_);
   ++total_events_;
-  auto [it, inserted] = cases_.try_emplace(case_id, std::make_shared<Case>());
-  if (inserted) it->second->states.resize(rules_.size());
-  Case& cs = *it->second;
+  std::shared_ptr<Case>* slot = &null_case_;
+  if (case_id) slot = &cases_[*case_id];
+  if (!*slot) {
+    *slot = std::make_shared<Case>();
+    (*slot)->states.resize(rules_.size());
+  }
+  Case& cs = **slot;
   ++cs.events;
   std::size_t deviations = 0;
   std::vector<DeclareStreamingConstraintIdentity> violated;
@@ -172,7 +179,8 @@ DeclareStreamingEventResult DeclareStreamingConformance::process(
   total_deviations_ += deviations;
   const std::string timestamp = event_timestamp.empty() ? std::to_string(total_events_) : event_timestamp;
   deviations_per_time_.push_back({timestamp, deviations});
-  return {case_id, act.value_or(std::string{}), timestamp, total_events_, deviations, std::move(violated)};
+  return {case_id.value_or(std::string{}), !case_id, act.value_or(std::string{}), timestamp, total_events_, deviations,
+          std::move(violated)};
 }
 
 DeclareStreamingEventResult DeclareStreamingConformance::receive(std::string case_id,
@@ -186,18 +194,22 @@ void DeclareStreamingConformance::reset_case(const std::string& case_id) {
   const std::lock_guard lock(mutex_);
   cases_.erase(case_id);
 }
+void DeclareStreamingConformance::reset_null_case() {
+  const std::lock_guard lock(mutex_);
+  null_case_.reset();
+}
 void DeclareStreamingConformance::reset_all() {
   const std::lock_guard lock(mutex_);
   cases_.clear();
+  null_case_.reset();
   total_events_ = total_deviations_ = 0;
   deviations_per_time_.clear();
 }
 
 DeclareStreamingSnapshot DeclareStreamingConformance::snapshot() const {
   const std::lock_guard lock(mutex_);
-  DeclareStreamingSnapshot out{total_events_, total_deviations_, deviations_per_time_, {}};
-  for (const auto& [id, csp] : cases_) {
-    const auto& cs = *csp;
+  DeclareStreamingSnapshot out{total_events_, total_deviations_, deviations_per_time_, {}, std::nullopt};
+  const auto row_of = [&](const Case& cs) {
     DeclareStreamingCaseSnapshot row; row.events = cs.events; row.deviations = cs.deviations;
     row.constraint_states.reserve(rules_.size());
     for (std::size_t i = 0; i < rules_.size(); ++i) {
@@ -206,8 +218,10 @@ DeclareStreamingSnapshot DeclareStreamingConformance::snapshot() const {
           {i, rule.family, rule.constraint.first, rule.constraint.second,
            rule.constraint.binary, cs.states[i].name});
     }
-    out.cases.emplace(id, std::move(row));
-  }
+    return row;
+  };
+  for (const auto& [id, csp] : cases_) out.cases.emplace(id, row_of(*csp));
+  if (null_case_) out.null_case = row_of(*null_case_);
   return out;
 }
 

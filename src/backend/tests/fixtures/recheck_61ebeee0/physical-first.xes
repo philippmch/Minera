@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<log xes.version="1.0"><trace><string key="concept:name" value="p-0" /><event><string key="concept:name" value="Collect" /></event><event><string key="concept:name" value="Verify" /></event><event><string key="concept:name" value="Archive" /></event></trace><trace><string key="concept:name" value="p-1" /><event><string key="concept:name" value="Collect" /></event><event><string key="concept:name" value="Verify" /></event><event><string key="concept:name" value="Archive" /></event></trace></log>

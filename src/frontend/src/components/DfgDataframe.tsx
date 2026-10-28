@@ -58,9 +58,9 @@ function PerformanceRows({
   title: string;
   durationValues?: boolean;
 }) {
-  const formatValue = (value: number) => durationValues
-    ? seconds(value)
-    : numberFormat.format(value);
+  const formatValue = (value: number | null) => value === null
+    ? "—"
+    : durationValues ? seconds(value) : numberFormat.format(value);
   return (
     <div className="dfg-dataframe-result-table">
       <h3>{title}</h3>
@@ -76,7 +76,7 @@ function PerformanceRows({
           <tbody>
             {edges.map((edge, index) => (
               <tr key={`${edge.source}-${edge.target}-${index}`}>
-                <td>{edge.source}</td>
+                <td>{edge.source === null ? <span className="muted">null</span> : edge.source}</td>
                 <td>{edge.target}</td>
                 <td className="num">{formatValue(edge.summary.mean)}</td>
                 <td className="num">{formatValue(edge.summary.median)}</td>

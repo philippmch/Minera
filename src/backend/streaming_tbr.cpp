@@ -139,8 +139,14 @@ StreamingTokenReplay::enable_with_invisibles(const CaseState& state,
   CaseState copy = state;
   std::set<std::size_t> used;
   std::set<std::size_t> visited;
+  // MAXIMUM_ITERATIONS_INVISIBLES bounds the reference loop: each iteration
+  // either finds the transition enabled or fires one silent path towards one
+  // missing input place. A chain of any length is one iteration, and the
+  // enabling check itself takes one, so a single path needs a limit of 2.
+  std::size_t iterations = 0;
   for (const auto place : inputs) {
     if (!visited.insert(place).second || copy.marking[place] >= required[place]) continue;
+    if (iterations++ >= options_.maximum_iterations_invisibles) return std::nullopt;
     const std::vector<std::size_t>* best = nullptr;
     std::size_t best_source = 0;
     for (const auto source : copy.order) {
@@ -155,7 +161,7 @@ StreamingTokenReplay::enable_with_invisibles(const CaseState& state,
     }
     used.insert(best_source);
   }
-  if (!enabled(copy.marking, transition)) return std::nullopt;
+  if (iterations >= options_.maximum_iterations_invisibles || !enabled(copy.marking, transition)) return std::nullopt;
   return copy;
 }
 

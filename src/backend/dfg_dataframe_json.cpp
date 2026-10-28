@@ -42,6 +42,16 @@ void write_number(std::ostream& out, double value, std::string_view name) {
   out << std::setprecision(17) << value;
 }
 
+// A statistic the backend models as null (a singleton standard deviation, or
+// any aggregate over only null observations) is written as JSON null.
+void write_nullable_number(std::ostream& out, double value, std::string_view name) {
+  if (std::isnan(value)) {
+    out << "null";
+    return;
+  }
+  write_number(out, value, name);
+}
+
 const char* backend_name(DfgTableBackend backend) {
   switch (backend) {
     case DfgTableBackend::kPandas: return "pandas";
@@ -248,17 +258,17 @@ void write_event(std::ostream& out, const Event& event) {
 
 void write_summary(std::ostream& out, const DfgPerformanceSummary& summary) {
   out << "{\"count\":" << summary.count << ",\"mean\":";
-  write_number(out, summary.mean, "performance mean");
+  write_nullable_number(out, summary.mean, "performance mean");
   out << ",\"median\":";
-  write_number(out, summary.median, "performance median");
+  write_nullable_number(out, summary.median, "performance median");
   out << ",\"min\":";
-  write_number(out, summary.minimum, "performance minimum");
+  write_nullable_number(out, summary.minimum, "performance minimum");
   out << ",\"max\":";
-  write_number(out, summary.maximum, "performance maximum");
+  write_nullable_number(out, summary.maximum, "performance maximum");
   out << ",\"stdev\":";
-  write_number(out, summary.standard_deviation, "performance standard deviation");
+  write_nullable_number(out, summary.standard_deviation, "performance standard deviation");
   out << ",\"sum\":";
-  write_number(out, summary.sum, "performance sum");
+  write_nullable_number(out, summary.sum, "performance sum");
   out << '}';
 }
 
@@ -266,7 +276,7 @@ void write_values(std::ostream& out, const std::vector<double>& values) {
   out << '[';
   for (std::size_t i = 0; i < values.size(); ++i) {
     if (i) out << ',';
-    write_number(out, values[i], "performance observation");
+    write_nullable_number(out, values[i], "performance observation");
   }
   out << ']';
 }
@@ -276,7 +286,7 @@ void write_selected_value(std::ostream& out, const DfgPerformanceValue& value) {
       [&](const auto& selected) {
         using T = std::decay_t<decltype(selected)>;
         if constexpr (std::is_same_v<T, double>) {
-          write_number(out, selected, "selected performance value");
+          write_nullable_number(out, selected, "selected performance value");
         } else if constexpr (std::is_same_v<T, std::vector<double>>) {
           write_values(out, selected);
         } else {
@@ -286,16 +296,19 @@ void write_selected_value(std::ostream& out, const DfgPerformanceValue& value) {
       value);
 }
 
-void write_performance_entries(std::ostream& out, const DfgPerformance& values,
-                               std::string_view value_name) {
+void write_performance_entries(
+    std::ostream& out, const DfgPerformance& values, std::string_view value_name,
+    const std::map<std::string, DfgPerformanceStatistics>* null_source = nullptr) {
   out << '[';
   std::size_t index = 0;
-  for (const auto& [pair, statistics] : values) {
+  const auto entry = [&](const std::string* source, const std::string& target,
+                         const DfgPerformanceStatistics& statistics) {
     if (index++) out << ',';
     out << "{\"source\":";
-    write_string(out, pair.first);
+    if (source) write_string(out, *source);
+    else out << "null";
     out << ",\"target\":";
-    write_string(out, pair.second);
+    write_string(out, target);
     out << ",\"summary\":";
     write_summary(out, statistics.summary);
     out << ",\"raw_values\":";
@@ -305,7 +318,12 @@ void write_performance_entries(std::ostream& out, const DfgPerformance& values,
     out << ":";
     write_selected_value(out, statistics.value);
     out << '}';
-  }
+  };
+  // Edges from a null source activity (Polars keeps them) come first, as
+  // nulls sort first; they stay distinct from any string label.
+  if (null_source)
+    for (const auto& [target, statistics] : *null_source) entry(nullptr, target, statistics);
+  for (const auto& [pair, statistics] : values) entry(&pair.first, pair.second, statistics);
   out << ']';
 }
 
@@ -339,11 +357,13 @@ std::string serialize_dfg_dataframe_json(const DfgTableResult& result) {
   if (result.measure == DfgTableMeasure::kPerformance ||
       result.measure == DfgTableMeasure::kBoth) {
     out << ",\"performance\":";
-    write_performance_entries(out, result.performance, "value");
+    write_performance_entries(out, result.performance, "value",
+                              &result.null_source_performance);
   }
   if (result.measure == DfgTableMeasure::kCost) {
     out << ",\"cost\":";
-    write_performance_entries(out, result.performance, "value");
+    write_performance_entries(out, result.performance, "value",
+                              &result.null_source_performance);
   }
   out << '}';
   return out.str();

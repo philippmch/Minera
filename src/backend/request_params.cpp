@@ -6222,15 +6222,26 @@ ResourceProfilesOptions parse_resource_profiles_params(const FieldLookup& field,
   if (supplied("resource_profiles_case_id_attribute")) options.case_id_attribute = require("resource_profiles_case_id_attribute");
   if (supplied("resource_profiles_t1")) options.t1 = require("resource_profiles_t1");
   if (supplied("resource_profiles_t2")) options.t2 = require("resource_profiles_t2");
-  if (supplied("resource_profiles_resource")) options.resource = require("resource_profiles_resource");
-  if (supplied("resource_profiles_activity")) options.activity = require("resource_profiles_activity");
-  if (supplied("resource_profiles_resource2")) options.resource2 = require("resource_profiles_resource2");
+  // Selected values: a supplied empty value selects the literal empty
+  // resource or activity; an omitted one means every value.
+  if (supplied("resource_profiles_resource")) {
+    options.resource = std::string(field("resource_profiles_resource"));
+    options.resource_given = true;
+  }
+  if (supplied("resource_profiles_activity")) {
+    options.activity = std::string(field("resource_profiles_activity"));
+    options.activity_given = true;
+  }
+  if (supplied("resource_profiles_resource2")) {
+    options.resource2 = std::string(field("resource_profiles_resource2"));
+    options.resource2_given = true;
+  }
   if (supplied("resource_profiles_max_resources")) options.max_resources = parse_positive_size(require("resource_profiles_max_resources"), "resource_profiles_max_resources");
   if (supplied("resource_profiles_max_rows")) options.max_rows = parse_positive_size(require("resource_profiles_max_rows"), "resource_profiles_max_rows");
   if (options.metric == ResourceProfileMetric::kAverageWorkload && options.t2.empty()) throw std::invalid_argument("resource_profiles_t2: required for average_workload");
   if (options.metric == ResourceProfileMetric::kMultitasking && (options.t1.empty() || options.t2.empty())) throw std::invalid_argument("resource_profiles_t1/t2: required for multitasking");
-  if (options.metric == ResourceProfileMetric::kInteractionTwoResources && (options.resource.empty() || options.resource2.empty())) throw std::invalid_argument("resource_profiles_resource/resource2: required for interaction_two_resources");
-  if ((options.metric == ResourceProfileMetric::kActivityFrequency || options.metric == ResourceProfileMetric::kAverageDurationActivity) && options.activity.empty()) throw std::invalid_argument("resource_profiles_activity: required for selected metric");
+  if (options.metric == ResourceProfileMetric::kInteractionTwoResources && (!options.resource_given || !options.resource2_given)) throw std::invalid_argument("resource_profiles_resource/resource2: required for interaction_two_resources");
+  if ((options.metric == ResourceProfileMetric::kActivityFrequency || options.metric == ResourceProfileMetric::kAverageDurationActivity) && !options.activity_given) throw std::invalid_argument("resource_profiles_activity: required for selected metric");
   return options;
 }
 

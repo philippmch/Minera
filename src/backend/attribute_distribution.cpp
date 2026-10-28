@@ -111,7 +111,13 @@ AttributeDistributionResult discover_event_distribution(
       if (!parsed || !std::isfinite(*parsed))
         throw std::invalid_argument(
             "attribute distribution: invalid timestamp");
-      const auto parts = utc_parts(*parsed);
+      // The datetime's own calendar: an aware value bins by its represented
+      // local wall time (its offset), not by the UTC instant.
+      const auto exact = parse_timestamp_exact(*text);
+      const double wall = *parsed + (exact && exact->timezone_aware
+                                         ? exact->offset_minutes * 60.0
+                                         : 0.0);
+      const auto parts = utc_parts(wall);
       ++result.timed_events;
       int bucket = 0;
       switch (options.distribution) {

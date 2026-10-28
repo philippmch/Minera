@@ -77,6 +77,9 @@ struct TemporalDeviation {
   std::string target;
   double elapsed_seconds = 0.0;
   double standard_deviation_distance = 0.0;
+  // Streaming conformance of a zero-variance pair reports the exact integer
+  // sys.maxsize, which a double cannot hold; the distance then carries 2**63.
+  bool zero_variance_sentinel = false;
 
   [[nodiscard]] double distance() const noexcept {
     return standard_deviation_distance;

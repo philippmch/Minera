@@ -1,6 +1,7 @@
 #include "minera/streaming_tbr.hpp"
 
 #include <cassert>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -149,7 +150,61 @@ void reference_contract() {
 
 }  // namespace
 
+
+// MAXIMUM_ITERATIONS_INVISIBLES on the forward path (PM4Py 2.7.22): a silent
+// chain of any length before A is one iteration plus the enabling check, so
+// it needs a limit of 2; two parallel branches that each need their own path
+// need 3. Reference missing counts per limit 0, 1, 2, 3, 10.
+std::uint64_t limited_missing(std::size_t silent_chain, bool parallel, std::size_t limit) {
+  minera::PetriNet net;
+  net.set_activities({"A", "B"});
+  const auto p0 = net.add_place();
+  std::vector<std::size_t> ends;
+  if (!parallel) {
+    auto previous = p0;
+    for (std::size_t i = 0; i < silent_chain; ++i) {
+      const auto next = net.add_place();
+      net.add_transition(std::nullopt, {previous}, {next});
+      previous = next;
+    }
+    ends.push_back(previous);
+  } else {
+    const auto a = net.add_place(), b = net.add_place();
+    net.add_transition(std::nullopt, {p0}, {a, b});
+    for (auto branch : {a, b}) {
+      for (std::size_t i = 0; i < silent_chain; ++i) {
+        const auto next = net.add_place();
+        net.add_transition(std::nullopt, {branch}, {next});
+        branch = next;
+      }
+      ends.push_back(branch);
+    }
+  }
+  const auto q = net.add_place(), end = net.add_place();
+  net.add_transition(0, ends, {q});
+  net.add_transition(1, {q}, {end});
+  minera::StreamingTbrOptions options;
+  options.maximum_iterations_invisibles = limit;
+  options.initial_marking.assign(net.place_count(), 0);
+  options.initial_marking[p0] = 1;
+  options.final_marking.assign(net.place_count(), 0);
+  options.final_marking[end] = 1;
+  minera::StreamingTokenReplay replay(net, options);
+  (void)replay.receive("c", "A");
+  (void)replay.receive("c", "B");
+  return replay.snapshot().cases.at("c").missing;
+}
+void forward_invisible_iteration_limit() {
+  const std::size_t limits[] = {0, 1, 2, 3, 10};
+  const struct { std::size_t chain; bool parallel; std::uint64_t expected[5]; } cases[] = {
+      {3, false, {1, 1, 0, 0, 0}}, {12, false, {1, 1, 0, 0, 0}}, {0, false, {0, 0, 0, 0, 0}},
+      {0, true, {2, 2, 0, 0, 0}}, {1, true, {2, 2, 2, 0, 0}}, {3, true, {2, 2, 2, 0, 0}}};
+  for (const auto& c : cases)
+    for (std::size_t i = 0; i < 5; ++i) assert(limited_missing(c.chain, c.parallel, limits[i]) == c.expected[i]);
+}
+
 int main() {
+  forward_invisible_iteration_limit();
   reference_contract();
   forward_replay_and_termination();
   missing_tokens_and_silent_routing_are_reported();

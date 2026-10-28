@@ -55,14 +55,58 @@ void handles_zero_variance_and_attributes() {
   assert(result.deviations.size() == 1);
   // Reference: a zero deviation reports sys.maxsize.
   assert(result.deviations[0].standard_deviation_distance == 9223372036854775807.0);
+  assert(result.deviations[0].zero_variance_sentinel);
   const auto json = minera::serialize_streaming_temporal_json(monitor.snapshot());
   assert(json.find("STREAMING_TEMPORAL") != std::string::npos);
+  // The JSON keeps the exact integer, not the double 2**63.
+  assert(json.find("\"standard_deviation_distance\":9223372036854775807}") != std::string::npos);
+}
+
+// Reference (PM4Py 2.7.22): any finite zeta, with distance > zeta reported.
+// Mean 10 s, std 2 s.
+void finite_zeta_values() {
+  const auto distances = [](double zeta, const char* second) {
+    minera::StreamingTemporalConformance monitor(profile(), {.zeta = zeta});
+    (void)monitor.receive("c", "A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z");
+    return monitor.receive("c", "B", second, second).deviations;
+  };
+  for (const double zeta : {0.0, -1.0}) {
+    const auto d = distances(zeta, "2024-01-01T00:00:13Z");
+    assert(d.size() == 1 && d[0].standard_deviation_distance == 1.5);
+  }
+  assert(distances(0.0, "2024-01-01T00:00:10Z").empty());
+  const auto exact = distances(-1.0, "2024-01-01T00:00:10Z");
+  assert(exact.size() == 1 && exact[0].standard_deviation_distance == 0.0);
+  assert(distances(6.0, "2024-01-01T00:00:13Z").empty());
+}
+
+// A projected null activity or a missing literal activity key is skipped,
+// never read as the empty activity.
+void null_and_missing_activities_are_skipped() {
+  minera::TemporalProfile p;
+  p.entries.push_back({"", "B", 1, 10.0, 1.0});
+  minera::StreamingTemporalConformance monitor(p, {.activity_attribute = "concept:name"});
+  minera::Event null_activity;
+  null_activity.case_id = "c";
+  null_activity.timestamp = "2024-01-01T00:00:00Z";
+  null_activity.activity_state = minera::FirstClassAttributeState::kNull;
+  assert(monitor.receive(null_activity).event_index == 0);
+  minera::StreamingTemporalConformance literal(p, {.activity_attribute = "kind"});
+  minera::Event missing = null_activity;
+  missing.activity_state = minera::FirstClassAttributeState::kMissing;
+  assert(literal.receive(missing).event_index == 0);
+  minera::Event b;
+  b.case_id = "c";
+  b.activity = "B";
+  b.activity_state = minera::FirstClassAttributeState::kPresent;
+  b.timestamp = "2024-01-01T00:00:50Z";
+  assert(monitor.receive(b).deviations.empty());
 }
 
 void rejects_invalid_profile_options_and_resets() {
   bool rejected = false;
   try {
-    minera::StreamingTemporalConformance invalid(profile(), {.zeta = 0.0});
+    minera::StreamingTemporalConformance invalid(profile(), {.zeta = std::numeric_limits<double>::quiet_NaN()});
   } catch (const std::invalid_argument&) {
     rejected = true;
   }
@@ -106,5 +150,7 @@ int main() {
   checks_all_prior_events_and_isolates_cases();
   handles_zero_variance_and_attributes();
   rejects_invalid_profile_options_and_resets();
+  finite_zeta_values();
+  null_and_missing_activities_are_skipped();
   return 0;
 }

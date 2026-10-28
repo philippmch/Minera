@@ -55,6 +55,10 @@ struct TableRow {
   bool index_is_generated = true;
   std::optional<double> completion;
   std::optional<double> start;
+  // Exact instants: ordering and Polars durations must not collapse
+  // neighbouring nanoseconds through a double.
+  std::optional<ParsedExactTimestamp> completion_exact;
+  std::optional<ParsedExactTimestamp> start_exact;
   std::optional<double> cost;
   // This is assigned after adapter sorting. It is the fallback index used by
   // both pair-producing adapters when no source index column is available.
@@ -509,6 +513,8 @@ std::vector<TableRow> read_rows(const EventTable& table,
                             : std::nullopt;
     result.start = need_start ? parse_time(result.start_text, "start")
                               : std::nullopt;
+    if (result.completion) result.completion_exact = parse_timestamp_exact(*result.completion_text);
+    if (result.start) result.start_exact = parse_timestamp_exact(*result.start_text);
     result.cost = parse_number(result.cost_text);
     result.event = event_from_row(result.cells, table, i, case_selector,
                                   activity_selector, timestamp_selector);
@@ -517,22 +523,30 @@ std::vector<TableRow> read_rows(const EventTable& table,
   return rows;
 }
 
-// Missing timestamps sort last, except that Polars sorts them first.
+// Rows sort by start, then completion, comparing exact instants. A null cell
+// in an explicit start column is a missing start (it does not borrow the
+// completion time); missing values sort last, except that Polars sorts them
+// first.
 void sort_rows(std::vector<TableRow>& rows, const DfgTableOptions& options,
                bool nulls_first = false) {
   if (!options.sort_caseid_required) return;
-  const double missing = nulls_first ? -std::numeric_limits<double>::infinity()
-                                     : std::numeric_limits<double>::infinity();
+  // -1: lhs first, 1: rhs first, 0: tie.
+  const auto compare = [&](const std::optional<ParsedExactTimestamp>& lhs,
+                           const std::optional<ParsedExactTimestamp>& rhs) {
+    if (!lhs || !rhs) {
+      if (!lhs && !rhs) return 0;
+      return (!lhs) == nulls_first ? -1 : 1;
+    }
+    if (lhs->seconds != rhs->seconds) return lhs->seconds < rhs->seconds ? -1 : 1;
+    if (lhs->nanoseconds != rhs->nanoseconds) return lhs->nanoseconds < rhs->nanoseconds ? -1 : 1;
+    return 0;
+  };
   std::stable_sort(rows.begin(), rows.end(), [&](const TableRow& lhs,
                                                  const TableRow& rhs) {
     if (lhs.case_value != rhs.case_value) return lhs.case_value < rhs.case_value;
     if (options.sort_timestamp_along_case_id) {
-      const auto lhs_start = lhs.start.value_or(lhs.completion.value_or(missing));
-      const auto rhs_start = rhs.start.value_or(rhs.completion.value_or(missing));
-      if (lhs_start != rhs_start) return lhs_start < rhs_start;
-      const auto lhs_complete = lhs.completion.value_or(missing);
-      const auto rhs_complete = rhs.completion.value_or(missing);
-      if (lhs_complete != rhs_complete) return lhs_complete < rhs_complete;
+      if (const int order = compare(lhs.start_exact, rhs.start_exact)) return order < 0;
+      if (const int order = compare(lhs.completion_exact, rhs.completion_exact)) return order < 0;
     }
     return lhs.original_position < rhs.original_position;
   });
@@ -774,16 +788,33 @@ double business_elapsed(double begin, double end,
   return total;
 }
 
+// Polars measures a flow in whole seconds: Duration.total_seconds() truncates
+// the exact nanosecond difference toward zero.
+double polars_whole_seconds(const ParsedExactTimestamp& from, const ParsedExactTimestamp& to) {
+  auto seconds = to.seconds - from.seconds;
+  const auto nanoseconds =
+      static_cast<std::int64_t>(to.nanoseconds) - static_cast<std::int64_t>(from.nanoseconds);
+  if (seconds > 0 && nanoseconds < 0) --seconds;
+  else if (seconds < 0 && nanoseconds > 0) ++seconds;
+  return static_cast<double>(seconds);
+}
+
 double flow_time(const TableRow& source, const TableRow& target,
-                 const DfgTableOptions& options, bool clamp_start) {
+                 const DfgTableOptions& options, bool clamp_start, bool polars = false) {
   if (!source.completion || !target.start) return 0.0;
   double target_start = *target.start;
   std::optional<std::string> target_start_text = target.start_text;
+  auto target_start_exact = target.start_exact;
   if (clamp_start && target_start < *source.completion) {
     target_start = *source.completion;
     target_start_text = source.completion_text;
+    target_start_exact = source.completion_exact;
   }
-  if (!options.business_hours) return target_start - *source.completion;
+  if (!options.business_hours) {
+    if (polars && source.completion_exact && target_start_exact)
+      return polars_whole_seconds(*source.completion_exact, *target_start_exact);
+    return target_start - *source.completion;
+  }
   const auto source_local = source.completion_text
                                 ? local_wall_timestamp(*source.completion_text)
                                 : std::nullopt;
@@ -921,7 +952,8 @@ DfgTableResult discover_table_dfg(const EventTable& table,
       computes_duration ||
       (backend == DfgTableBackend::kPandas && timestamp_sort_requested);
   const bool polars = backend == DfgTableBackend::kPolars;
-  if (polars && computes_duration && !options.custom_aggregation) {
+  if (polars && (computes_duration || options.measure == DfgTableMeasure::kCost) &&
+      !options.custom_aggregation) {
     // The lazy adapter names its aggregations differently from the eager one.
     if (options.performance_aggregation == DfgPerformanceAggregation::kStandardDeviation)
       throw std::invalid_argument("Unsupported aggregation key: stdev");
@@ -976,15 +1008,17 @@ DfgTableResult discover_table_dfg(const EventTable& table,
     const auto& target = rows[target_position];
     if (!target.target_activity_value || !source.case_value) continue;
     if (!source.activity_value) {
-      if (!polars || !calculate_performance ||
-          options.measure == DfgTableMeasure::kCost)
-        continue;
+      if (!polars || !calculate_performance) continue;
       if (options.keep_once_per_case &&
           !kept_null_source.emplace(*source.case_value, *target.target_activity_value).second)
         continue;
       auto& values = null_source_values[*target.target_activity_value];
-      if (source.completion && target.start)
-        values.push_back(flow_time(source, target, options, clamp_start));
+      if (options.measure == DfgTableMeasure::kCost)
+        values.push_back(target.cost.value_or(0.0));
+      else if (source.completion && target.start)
+        values.push_back(flow_time(source, target, options, clamp_start, polars));
+      else if (source.completion && clamp_start)
+        values.push_back(0.0);
       continue;
     }
     const DfgActivityPair pair{*source.activity_value,
@@ -1001,11 +1035,16 @@ DfgTableResult discover_table_dfg(const EventTable& table,
       performance_values[pair].push_back(target.cost.value_or(0.0));
     } else {
       if (!source.completion || !target.start) {
-        if (polars) (void)performance_values[pair];
+        // Polars clamps the start with max_horizontal(start, completion),
+        // which ignores a null start: the flow is then zero seconds.
+        if (polars && clamp_start && source.completion)
+          performance_values[pair].push_back(0.0);
+        else if (polars)
+          (void)performance_values[pair];
         continue;
       }
       performance_values[pair].push_back(
-          flow_time(source, target, options, clamp_start));
+          flow_time(source, target, options, clamp_start, polars));
     }
   }
   finish_performance(performance_values, options, polars, result.performance);
@@ -1055,10 +1094,9 @@ DfgTripleTable discover_triples_table(const EventTable& table,
     }
     return table_result;
   }
-  std::map<std::string, std::vector<const TableRow*>> by_case;
-  for (const auto& row : rows) {
-    if (row.case_value) by_case[*row.case_value].push_back(&row);
-  }
+  // Polars groups the null case id as one more case.
+  std::map<std::optional<std::string>, std::vector<const TableRow*>> by_case;
+  for (const auto& row : rows) by_case[row.case_value].push_back(&row);
   for (const auto& [case_id, events] : by_case) {
     (void)case_id;
     for (std::size_t i = 0; i + 2 < events.size(); ++i) {

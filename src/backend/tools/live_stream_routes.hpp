@@ -117,6 +117,10 @@ void handle_live_append(const httplib::Request& request,httplib::Response& respo
     const auto bytes=ocel_request_body(request,"log");if(bytes.empty())throw std::invalid_argument("live event upload is empty");std::istringstream input(bytes);minera::EventLog log;
     if(format=="csv")log=minera::import_csv_event_log(input,s->csv);else if(format=="xes")log=minera::import_xes_event_log(input,s->xes);else throw std::invalid_argument("live batches require CSV or XES format");
     httplib::Request order;order.params.emplace("streaming_event_order",s->configuration.contains("streaming_event_order")?s->configuration.find("streaming_event_order")->second:"input");std::vector<minera::Event> events;for(const auto* event:streaming_events(log,order))events.push_back(*event);
+    // The monitors select the session's activity and timestamp fields by its
+    // column names; an XES batch exposes its selected XES attributes under
+    // them unless the event carries a literal field of that name.
+    if(format=="xes")for(auto& event:events){const auto literal=[&](const std::string& key){return std::any_of(event.attributes.begin(),event.attributes.end(),[&](const auto& a){return a.key==key;});};if(!literal(s->csv.activity_column))event.activity_source_key=s->csv.activity_column;if(!literal(s->csv.timestamp_column))event.timestamp_source_key=s->csv.timestamp_column;}
     s->monitor->append(std::move(events),batch,revision);s->sources.push_back({batch,request.has_param("source_name")?request.get_param_value("source_name"):batch,format,request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",bytes});
     response.set_content(live_payload(*s,wait),"application/json");
   });

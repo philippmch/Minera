@@ -47,6 +47,8 @@ struct Json {
   std::variant<std::nullptr_t, bool, std::int64_t, std::uint64_t, double, std::string, Array,
                Object>
       value;
+  // An object's keys in document order, as the reference's dict keeps them.
+  std::vector<std::string> keys;
   bool is_null() const { return std::holds_alternative<std::nullptr_t>(value); }
   bool is_bool() const { return std::holds_alternative<bool>(value); }
   bool is_int() const { return std::holds_alternative<std::int64_t>(value); }
@@ -158,16 +160,17 @@ class Parser {
     const char c = input_[pos_];
     if (c == '"') return Json{string_value()};
     if (c == '{') {
-      ++pos_; Json::Object object; skip();
-      if (pos_ < input_.size() && input_[pos_] == '}') { ++pos_; return Json{std::move(object)}; }
+      ++pos_; Json::Object object; std::vector<std::string> keys; skip();
+      if (pos_ < input_.size() && input_[pos_] == '}') { ++pos_; return Json{std::move(object), {}}; }
       while (true) {
         skip(); if (pos_ >= input_.size() || input_[pos_] != '"') fail("object key must be string");
         auto key = string_value(); if (object.find(key) != object.end()) fail("duplicate object key");
+        keys.push_back(key);
         expect(':'); object.emplace(std::move(key), value(depth + 1)); skip();
         if (pos_ < input_.size() && input_[pos_] == '}') { ++pos_; break; }
         expect(',');
       }
-      return Json{std::move(object)};
+      return Json{std::move(object), std::move(keys)};
     }
     if (c == '[') {
       ++pos_; Json::Array array; skip();
@@ -447,14 +450,20 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
                              log.object_type_attributes, "ocel:objectTypes",literal_names);
   parse_classic_type_catalog(optional(root, "ocel:eventTypes"),
                              log.event_type_attributes, "ocel:eventTypes",literal_names);
-  const auto& objects = obj(required(root, "ocel:objects"), "ocel:objects");
-  for (const auto& [id, raw] : objects) {
+  // Objects and events are read in document order; the stable timestamp
+  // sort then keeps that order among equal instants.
+  const auto& objects_json = required(root, "ocel:objects");
+  const auto& objects = obj(objects_json, "ocel:objects");
+  for (const auto& id : objects_json.keys) {
+    const auto& raw = objects.at(id);
     if (!object_ids.insert(id).second) throw std::invalid_argument("duplicate object id");
     const auto& x = obj(raw, "object"); OcelObject o{id, str(required(x, "ocel:type"), "ocel:type"), {}}; attrs(optional(x, "ocel:ovmap"), o.attributes, "ocel:ovmap"); log.objects.push_back(std::move(o)); log.object_type_attributes.try_emplace(log.objects.back().type); types.emplace(id, log.objects.back().type);
     if (const auto* rs = optional(x, "ocel:o2o")) { if (!rs->is_array()) throw std::invalid_argument("ocel:o2o must be array"); for (const auto& r : rs->array()) { const auto& rr = obj(r, "ocel:o2o"); log.o2o.push_back({id, str(required(rr, "ocel:oid"), "ocel:oid"), optional(rr, "ocel:qualifier") ? str(*optional(rr, "ocel:qualifier"), "ocel:qualifier") : ""}); } }
   }
-  const auto& events = obj(required(root, "ocel:events"), "ocel:events");
-  for (const auto& [id, raw] : events) {
+  const auto& events_json = required(root, "ocel:events");
+  const auto& events = obj(events_json, "ocel:events");
+  for (const auto& id : events_json.keys) {
+    const auto& raw = events.at(id);
     if (!event_ids.insert(id).second) throw std::invalid_argument("duplicate event id");
     const auto& x = obj(raw, "event"); OcelEvent e{id, str(required(x, "ocel:activity"), "ocel:activity"), str(required(x, "ocel:timestamp"), "ocel:timestamp"), {}}; attrs(optional(x, "ocel:vmap"), e.attributes, "ocel:vmap"); log.events.push_back(std::move(e)); log.event_type_attributes.try_emplace(log.events.back().activity);
     const auto* omap = optional(x, "ocel:omap"); if (!omap || !omap->is_array()) throw std::invalid_argument("ocel:omap must be array");
@@ -1045,21 +1054,30 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   return result;
 }
 
-void sort_ocel_events_by_timestamp(Ocel& log) {
-  std::vector<std::pair<std::int64_t, std::size_t>> keys;
+void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds) {
+  // The key is the instant at the importer's precision: SQLite keeps
+  // nanoseconds, the JSON and XML importers microseconds.
+  std::vector<std::tuple<std::int64_t, std::int64_t, std::size_t>> keys;
   keys.reserve(log.events.size());
   for (std::size_t index = 0; index < log.events.size(); ++index) {
-    const auto instant = parse_timestamp_microseconds(log.events[index].timestamp);
-    if (!instant) return;
-    keys.emplace_back(*instant, index);
+    if (nanoseconds) {
+      const auto instant = parse_timestamp_exact(log.events[index].timestamp);
+      if (!instant) return;
+      keys.emplace_back(instant->seconds, instant->nanoseconds, index);
+    } else {
+      const auto instant = parse_timestamp_microseconds(log.events[index].timestamp);
+      if (!instant) return;
+      keys.emplace_back(*instant, 0, index);
+    }
   }
-  if (std::is_sorted(keys.begin(), keys.end())) return;
+  // Relations follow their events' order even when the events already are
+  // in order.
   std::stable_sort(keys.begin(), keys.end());
   std::vector<OcelEvent> events;
   events.reserve(log.events.size());
   std::unordered_map<std::string, std::size_t> position;
-  for (const auto& [instant, index] : keys) {
-    (void)instant;
+  for (const auto& key : keys) {
+    const auto index = std::get<2>(key);
     position.emplace(log.events[index].id, events.size());
     events.push_back(std::move(log.events[index]));
   }

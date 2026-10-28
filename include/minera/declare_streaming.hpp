@@ -22,7 +22,9 @@ struct DeclareStreamingConstraintIdentity {
 };
 
 struct DeclareStreamingEventResult {
+  // A None case id is its own case, apart from every string id.
   std::string case_id;
+  bool case_is_null = false;
   std::string activity;
   std::string timestamp;
   std::size_t event_index = 0;
@@ -55,6 +57,8 @@ struct DeclareStreamingSnapshot {
   std::size_t total_deviations = 0;
   std::vector<DeclareStreamingTimeDeviation> deviations_per_time;
   std::map<std::string, DeclareStreamingCaseSnapshot> cases;
+  // The case of the None case id, when one was received.
+  std::optional<DeclareStreamingCaseSnapshot> null_case;
 };
 
 // Stateful, prefix-only Declare conformance monitor. It intentionally has no
@@ -78,11 +82,12 @@ class DeclareStreamingConformance {
       std::optional<std::string> case_id, bool case_is_null,
       std::optional<std::string> activity, std::string timestamp = {});
   void reset_case(const std::string& case_id);
+  void reset_null_case();
   void reset_all();
   [[nodiscard]] DeclareStreamingSnapshot snapshot() const;
 
  private:
-  DeclareStreamingEventResult process(std::string case_id,
+  DeclareStreamingEventResult process(std::optional<std::string> case_id,
                                       std::optional<std::string> activity,
                                       std::string timestamp);
   struct Rule;
@@ -90,6 +95,7 @@ class DeclareStreamingConformance {
   DeclareModel model_;
   std::vector<std::shared_ptr<Rule>> rules_;
   std::map<std::string, std::shared_ptr<Case>> cases_;
+  std::shared_ptr<Case> null_case_;
   std::size_t total_events_ = 0;
   std::size_t total_deviations_ = 0;
   std::vector<DeclareStreamingTimeDeviation> deviations_per_time_;

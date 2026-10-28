@@ -96,9 +96,6 @@ bool StreamingDfgDiscovery::receive(const Event& event,
 
 std::optional<std::string> streaming_event_present_value(const Event& event,
                                                          std::string_view selector) {
-  for (const auto& attribute : event.attributes)
-    if (attribute.key == selector)
-      return attribute.is_null ? std::nullopt : std::optional<std::string>(attribute.value);
   try {
     return reference_selected_activity(event, selector, "streaming conformance");
   } catch (const std::invalid_argument&) {
@@ -106,14 +103,39 @@ std::optional<std::string> streaming_event_present_value(const Event& event,
   }
 }
 
+namespace {
+
+// str() of a selected scalar: a Boolean is True/False whatever its lexical
+// carrier; other values keep their text.
+std::string python_label(const EventAttribute& attribute) {
+  if (const auto* flag = std::get_if<bool>(&attribute.typed_value)) return *flag ? "True" : "False";
+  if (attribute.kind == AttributeKind::kBoolean && !attribute.typed_value.index()) {
+    if (attribute.value == "true" || attribute.value == "True" || attribute.value == "1") return "True";
+    if (attribute.value == "false" || attribute.value == "False" || attribute.value == "0") return "False";
+  }
+  return attribute.value;
+}
+
+}  // namespace
+
 std::optional<std::string> streaming_event_activity(const Event& event,
                                                     std::string_view selector) {
   // The reference stream skips an event without the selected key and
   // stringifies a present null as "None".
   for (const auto& attribute : event.attributes)
-    if (attribute.key == selector) return attribute.is_null ? std::string("None") : attribute.value;
+    if (attribute.key == selector)
+      return attribute.is_null ? std::string("None") : python_label(attribute);
+  const bool projected =
+      selector.empty() ||
+      detail::projection_names(event.activity_source_key, event.activity_attribute, "concept:name",
+                               selector);
+  if (projected && event.activity_state == FirstClassAttributeState::kNull) return std::string("None");
   try {
-    return reference_selected_activity(event, selector, "streaming DFG");
+    const auto& value = reference_selected_activity(event, selector, "streaming DFG");
+    if (projected && &value == &event.activity && event.activity_attribute &&
+        event.activity_attribute->kind == AttributeKind::kBoolean)
+      return python_label(*event.activity_attribute);
+    return value;
   } catch (const std::invalid_argument&) {
     return std::nullopt;
   }

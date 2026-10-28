@@ -29,18 +29,60 @@ std::string universal_newlines(std::string text) {
   return out;
 }
 
-// csv.reader with the excel dialect over newline-terminated lines.
+// The file is opened as strict UTF-8 text: a malformed sequence raises
+// before any record is produced.
+void require_utf8(const std::string& bytes) {
+  const auto fail = [](std::size_t at, unsigned char byte, const char* reason) {
+    static const char* hex = "0123456789abcdef";
+    throw std::runtime_error(std::string("'utf-8' codec can't decode byte 0x") + hex[byte >> 4] + hex[byte & 15] +
+                             " in position " + std::to_string(at) + ": " + reason);
+  };
+  for (std::size_t i = 0; i < bytes.size();) {
+    const auto lead = static_cast<unsigned char>(bytes[i]);
+    if (lead < 0x80) { ++i; continue; }
+    std::size_t length = 0;
+    unsigned char low = 0x80, high = 0xBF;
+    if (lead >= 0xC2 && lead <= 0xDF) length = 2;
+    else if (lead >= 0xE0 && lead <= 0xEF) {
+      length = 3;
+      if (lead == 0xE0) low = 0xA0;
+      if (lead == 0xED) high = 0x9F;
+    } else if (lead >= 0xF0 && lead <= 0xF4) {
+      length = 4;
+      if (lead == 0xF0) low = 0x90;
+      if (lead == 0xF4) high = 0x8F;
+    } else fail(i, lead, "invalid start byte");
+    for (std::size_t k = 1; k < length; ++k) {
+      if (i + k >= bytes.size()) fail(i, lead, "unexpected end of data");
+      const auto next = static_cast<unsigned char>(bytes[i + k]);
+      if (next < (k == 1 ? low : 0x80) || next > (k == 1 ? high : 0xBF)) fail(i, lead, "invalid continuation byte");
+    }
+    i += length;
+  }
+}
+
+// csv.field_size_limit() default: a field may hold at most 131072
+// characters (code points, not bytes).
+constexpr std::size_t kFieldSizeLimit = 131072;
+
+// csv.reader with the excel dialect over newline-terminated lines. NUL is an
+// ordinary character.
 std::vector<std::vector<std::string>> parse_rows(const std::string& text) {
   enum class State { kStartRecord, kStartField, kInField, kInQuoted, kQuoteInQuoted };
   std::vector<std::vector<std::string>> rows;
   std::vector<std::string> row;
   std::string field;
+  std::size_t field_characters = 0;
   State state = State::kStartRecord;
-  const auto save = [&] { row.push_back(std::move(field)); field.clear(); };
+  const auto save = [&] { row.push_back(std::move(field)); field.clear(); field_characters = 0; };
+  const auto add = [&](char c) {
+    if ((static_cast<unsigned char>(c) & 0xC0) != 0x80 && field_characters++ >= kFieldSizeLimit)
+      throw std::runtime_error("field larger than field limit (131072)");
+    field.push_back(c);
+  };
   const auto end_record = [&] { save(); rows.push_back(std::move(row)); row.clear(); state = State::kStartRecord; };
   for (std::size_t i = 0; i < text.size(); ++i) {
     const char c = text[i];
-    if (c == '\0') throw std::runtime_error("line contains NUL");
     switch (state) {
       case State::kStartRecord:
         if (c == '\n') { rows.emplace_back(); break; }
@@ -50,22 +92,22 @@ std::vector<std::vector<std::string>> parse_rows(const std::string& text) {
         if (c == '\n') end_record();
         else if (c == '"') state = State::kInQuoted;
         else if (c == ',') save();
-        else { field.push_back(c); state = State::kInField; }
+        else { add(c); state = State::kInField; }
         break;
       case State::kInField:
         if (c == '\n') end_record();
         else if (c == ',') { save(); state = State::kStartField; }
-        else field.push_back(c);
+        else add(c);
         break;
       case State::kInQuoted:
         if (c == '"') state = State::kQuoteInQuoted;
-        else field.push_back(c);
+        else add(c);
         break;
       case State::kQuoteInQuoted:
-        if (c == '"') { field.push_back('"'); state = State::kInQuoted; }
+        if (c == '"') { add('"'); state = State::kInQuoted; }
         else if (c == ',') { save(); state = State::kStartField; }
         else if (c == '\n') end_record();
-        else { field.push_back(c); state = State::kInField; }
+        else { add(c); state = State::kInField; }
         break;
     }
   }
@@ -79,6 +121,7 @@ std::vector<std::vector<std::string>> parse_rows(const std::string& text) {
 
 std::vector<PythonCsvRecord> read_python_csv_event_stream(std::istream& input) {
   const std::string bytes{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+  require_utf8(bytes);
   const auto rows = parse_rows(universal_newlines(bytes));
   std::vector<PythonCsvRecord> records;
   if (rows.empty()) return records;

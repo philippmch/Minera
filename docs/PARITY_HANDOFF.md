@@ -4086,3 +4086,16 @@ then descending activity tuple; after the first variant with an unknown
 activity everything is unfit) and all its rows are bound.
 `minera_petri_analysis_tests` crashed on main too: `positive_invariant_diagnostics`
 iterated the transitions of a temporary net; fixed by binding it first.
+
+## Recheck of 61ebeee0 (2026-10-28, cloud container)
+
+J1-J34 and K1-K4 from the reviewer's recheck are fixed and K5 plus two older
+representations are declared; see "Recheck of 61ebeee0" in the parity doc.
+The reviewer's saved reference outputs are bound by
+`minera_recheck_conformance_fixture_tests` (fixtures in
+`src/backend/tests/fixtures/recheck_61ebeee0/`). Regenerate its table with
+`python scripts/generate-recheck-61ebeee0-fixture.py <evidence>/discovery-conformance <evidence>/ocel-organizational src/backend/tests/recheck_61ebeee0_cases.inc`.
+Delta-minimal cases are in `minera_recheck_regression_tests`. The new
+`resource_is_null` (batches) and `zero_variance_sentinel` (temporal) members
+of the stored workbench JSON are written only when true, so the recorded UI
+fixture bundles stay byte-exact; absent reads as false.

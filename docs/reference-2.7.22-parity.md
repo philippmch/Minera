@@ -15873,3 +15873,51 @@ Declared exceptions (not equivalent, kept on purpose):
 Not yet covered by fresh comparisons (no claim either way): Polars tables other than the DFG, minimum self-distance, batch and footprints adapters (P1-P3, B1), genetic evolution and wider ILP
 parameters, decomposed
 alignments. Every public pandas/Polars adapter variant (batches, footprints, minimum self-distance, performance spectrum, case relations, network analysis, roles, SNA, DuckDB knowledge) is selectable over HTTP and in the UI.
+
+## Recheck of 61ebeee0: fixes and declarations (2026-10-28)
+
+The full recheck of 61ebeee0 (handoff `PARITY_HANDOFF.md` and evidence
+`minera-recheck-61ebeee0/` on the reviewer's machine) reported 34 fix groups
+(J1-J34) and five reference-contract decisions (K1-K5). Each fix below was
+reproduced against public PM4Py 2.7.22 calls and is bound by a regression test.
+`minera_recheck_conformance_fixture_tests` replays the reviewer's saved
+reference outputs over the copied fixtures in
+`src/backend/tests/fixtures/recheck_61ebeee0/` (64 selector, 51 replay, 105
+analysis and 3 physical-usage cases plus 13 organizational repros);
+`minera_recheck_regression_tests` holds the delta-minimal cases.
+
+| ID | Fix | Test |
+| --- | --- | --- |
+| J1 | An explicit selector reads the literal field of that name, or a first-class projection only when it was read from that same field; the omitted selector reads the projection. Missing and null selections raise (evaluators, miners, usage) or are skipped (streaming), present empty labels stay labels. Resource profiles read their selected activity, resource and timestamp fields the same way. A manually built event with no recorded source still answers the native member names (`activity`, `resource`, `timestamp`, the streaming defaults); live XES batches expose their selected fields under the session's column names. | fixture matrix (selector and profile cases), `minera_recheck_regression_tests` |
+| J2 | Network analysis JSON accepts present empty sources, targets and activities. | `minera_network_analysis_cli_empty_labels` |
+| J3 | `resource_profiles_resource/activity/resource2` set their `*_given` flags from field presence, so an explicit empty value selects the empty resource. | `minera_resource_profiles_cli_empty_*`, `minera_request_params_tests` |
+| J4 | Usage comparison keeps the selector exactly as given (`" stage "`); only an all-blank key is rejected. | fixture matrix (spaced-key) |
+| J5, J6 | Network sorting compares bool/int/uint/float keys by exact value, datetimes by instant, strings lexically (date-looking strings too), and puts None/NaN/NA last; relation keys join null-like values, node and edge columns drop them. | fixture matrix (network cases) |
+| J7 | Case-duration thresholds use the reference component sum (`86400*days + seconds`, then microseconds, then nanoseconds). | `minera_recheck_regression_tests` |
+| J8, J9, J11 | Sequence filters key numbers by value across bool/int/uint/float/lexical carriers; timestamp grouping keys by exact instant; grouped key columns follow the pandas dtype inference (bool, int64, uint64, float64, str, object). | same |
+| J10 | Usage place statistics count physically parallel input arcs from one place with the last arc's weight per firing, as the reference's place-keyed preset does (10/5/15 on the minimized net). | fixture matrix |
+| J12 | A selected Boolean streams as `True`/`False`. | `minera_recheck_regression_tests` |
+| J13, K3 | The streaming CSV reader accepts NUL, rejects invalid UTF-8 with the Python decode error, and enforces the 131072-character field limit counted in code points. | `minera_python_csv_stream_tests` |
+| J14 | Streaming conformance skips a projected null activity. | `minera_recheck_regression_tests` |
+| J15-J20, K4 | Polars DFG: singleton deviations serialize as null, null-source edges serialize with `"source":null`, explicit null starts and nanosecond order follow the reference, null case groups keep their triples, cost mode keeps null sources and rejects stdev/raw_values, durations are whole seconds as in the reference. | same |
+| J21, J22 | A category column without its dictionary stays category; calendar distributions bin by the datetime's own offset. | same |
+| J23 | Thinning picks split positions, not values, so repeated explicit split points keep their repetitions (no solution for `[0,0,0]` with `max_k_value=1`, as the reference). | fixture matrix (analysis cases) |
+| J24 | Backwards replay checks each parallel input arc against the marking before the firing and fitness follows the reference's place-keyed preset, so the two-unit-arc net is fit with no missing token. | fixture matrix (replay cases) |
+| J25 | Forward streaming replay counts one iteration per silent path plus the final enabling check against `MAXIMUM_ITERATIONS_INVISIBLES`. | `minera_streaming_tbr_tests` |
+| J26 | Streaming Declare keeps a None case as its own case (also in snapshots and the UI). | `minera_declare_streaming_io_tests` |
+| J27, J28 | Streaming temporal accepts any finite zeta and reports the exact `sys.maxsize` for zero variance. | `minera_streaming_temporal_tests` |
+| J29, J30, J34 | Batches deduplicate tuples by Python equality, compare mixed scalars like Python (raising on number versus str), Polars seconds are `epoch_ns * 1e-9`, and stored results keep `resource_is_null`. | `minera_recheck_regression_tests` |
+| J31-J33 | Classic OCEL JSON keeps document order for ties; relations always follow event order; SQLite sorts at nanoseconds. | same |
+| K1, K2 | Case performance on a nanosecond column raises the int64 overflow; object case ids that pandas keys as float64 drop ids no double holds. | same |
+
+Declared (not equivalent, kept on purpose):
+
+- **K5.** Standard OCEL JSON and XML ties between offset-equivalent instants
+  keep their file order (alpha, zeta, middle); the reference orders them
+  alpha, middle, zeta. SQLite agrees with native.
+- **Pandas batch None case.** A None case id in a pandas batch is written as
+  the text `"nan"`.
+- **PNML zero marking key.** An explicit zero initial-marking annotation stays
+  a key in native reached markings (`{"p0":0}` where the reference gives `{}`);
+  counters and fitness agree.
+- The earlier DC4, C3, streaming and Windows declarations stay in force.

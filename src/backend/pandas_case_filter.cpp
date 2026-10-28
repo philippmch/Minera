@@ -1,6 +1,7 @@
 #include "minera/pandas_case_filter.hpp"
 #include "pandas_parameter_carrier.hpp"
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <limits>
 #include <numeric>
@@ -233,7 +234,7 @@ std::vector<BusinessHourSlot> business_slots(const EventAttribute& value){
  for(const auto& slot:result){if(!merged.empty()&&slot.start_seconds<=merged.back().end_seconds+1)merged.back().end_seconds=std::max(merged.back().end_seconds,slot.end_seconds);else merged.push_back(slot);}
  return merged;
 }
-double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>& slots,std::int64_t unit_nanoseconds=1){
+double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>& slots,bool nanosecond_column=true){
  if(!g.first||!g.last){if(business)error("ValueError","cannot convert float NaN to integer");return std::numeric_limits<double>::quiet_NaN();}
  if(!date_value(*g.first)||!date_value(*g.last)){
   if(text_value(*g.first)||text_value(*g.last))error("TypeError","unsupported operand type(s) for -: '"+type_name(*g.last)+"' and '"+type_name(*g.first)+"'");
@@ -246,14 +247,21 @@ double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>
   return detail::business_elapsed_seconds_microseconds(*start,*end,slots);
  }
  const auto a=instant(*g.first),b=instant(*g.last);if(!a||!b)return std::numeric_limits<double>::quiet_NaN();
- // Timedelta.total_seconds: the exact integer count of the column's units,
- // converted once and divided by the units per second. Subtracting rounded
- // seconds would cancel digits near second boundaries.
- const std::int64_t per_second=1000000000/unit_nanoseconds,seconds=b->seconds-a->seconds;
- const std::int64_t fraction=(static_cast<std::int64_t>(b->nanoseconds)-a->nanoseconds)/unit_nanoseconds;
- if(seconds>std::numeric_limits<std::int64_t>::max()/per_second-1||seconds<std::numeric_limits<std::int64_t>::min()/per_second+1)
-  return static_cast<double>(seconds)+static_cast<double>(fraction)/static_cast<double>(per_second);
- return static_cast<double>(seconds*per_second+fraction)/static_cast<double>(per_second);
+ // The filter sums the Timedelta components rather than dividing once:
+ // 86400*days + seconds is an exact integer, then 1e-6*microseconds and
+ // 1e-9*nanoseconds are added as floats, in that order. A 3 ns case is
+ // 3.0000000000000004e-9 and a 999 us case 0.0009989999999999999.
+ std::int64_t seconds=b->seconds-a->seconds,nanos=static_cast<std::int64_t>(b->nanoseconds)-a->nanoseconds;
+ if(nanos<0){nanos+=1000000000;--seconds;}
+ // A nanosecond column subtracts int64 nanosecond counts: a difference
+ // beyond that range (1800 to 2201, say) overflows.
+ constexpr std::int64_t kBillion=1000000000,kMax=std::numeric_limits<std::int64_t>::max();
+ if(nanosecond_column&&(seconds>kMax/kBillion||(seconds==kMax/kBillion&&nanos>kMax%kBillion)||seconds<-(kMax/kBillion)-1||(seconds==-(kMax/kBillion)-1&&nanos<kBillion-kMax%kBillion-1)))
+  error("OverflowError","Overflow in int64 addition");
+ double total=static_cast<double>(seconds);
+ total+=1e-6*static_cast<double>(nanos/1000);
+ total+=1e-9*static_cast<double>(nanos%1000);
+ return total;
 }
 } // namespace
 
@@ -308,21 +316,69 @@ EventTable filter_pandas_ncases(const EventTable& s,const EventAttribute& maximu
  std::vector<bool> keep(s.size());for(std::size_t i=0;i<s.size();++i)keep[i]=grouped.rows[i]&&accepted[*grouped.rows[i]];
  return subset(s,keep);
 }
+namespace {
+// How a key cell reads for pandas dtype inference.
+enum class KeyClass{kBool,kInteger,kReal,kOther};
+struct KeyNumber{KeyClass kind=KeyClass::kOther;bool negative=false,above_int64=false,beyond_uint64=false;};
+KeyNumber key_number(const EventAttribute& v){
+ KeyNumber n;
+ if(std::holds_alternative<bool>(v.typed_value)){n.kind=KeyClass::kBool;return n;}
+ if(const auto* i=std::get_if<std::int64_t>(&v.typed_value)){n.kind=KeyClass::kInteger;n.negative=*i<0;return n;}
+ if(const auto* u=std::get_if<std::uint64_t>(&v.typed_value)){n.kind=KeyClass::kInteger;n.above_int64=*u>static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());return n;}
+ if(std::holds_alternative<double>(v.typed_value)){n.kind=KeyClass::kReal;return n;}
+ if(v.typed_value.index()!=0)return n;
+ if(v.kind==AttributeKind::kBoolean){n.kind=KeyClass::kBool;return n;}
+ if(v.kind==AttributeKind::kFloat){n.kind=KeyClass::kReal;return n;}
+ if(v.kind==AttributeKind::kInt&&!v.value.empty()){
+  n.kind=KeyClass::kInteger;const char* first=v.value.data();const char* last=first+v.value.size();if(*first=='+')++first;
+  std::int64_t i=0;std::uint64_t u=0;
+  if(const auto r=std::from_chars(first,last,i);r.ec==std::errc{}&&r.ptr==last)n.negative=i<0;
+  else if(const auto r2=std::from_chars(first,last,u);r2.ec==std::errc{}&&r2.ptr==last)n.above_int64=u>static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+  else{n.beyond_uint64=true;n.negative=*first=='-';}
+ }
+ return n;
+}
+// Whether the group keys infer a float64 index: ints with floats, no bool
+// or other kinds, and every int in a range numpy converts.
+bool float_key_index(const std::vector<const EventAttribute*>& keys){
+ bool reals=false,negative=false,above=false;
+ for(const auto* key:keys){
+  if(!key)continue;
+  const auto n=key_number(*key);
+  if(n.kind==KeyClass::kOther||n.kind==KeyClass::kBool||n.beyond_uint64)return false;
+  reals=reals||n.kind==KeyClass::kReal;negative=negative||n.negative;above=above||n.above_int64;
+ }
+ return reals&&!(negative&&above);
+}
+// Whether a double equals the cell's value exactly.
+bool double_holds(const EventAttribute& v){
+ const auto n=key_number(v);
+ if(n.kind!=KeyClass::kInteger)return true;
+ std::uint64_t magnitude=0;
+ if(const auto* i=std::get_if<std::int64_t>(&v.typed_value))magnitude=*i<0?0-static_cast<std::uint64_t>(*i):static_cast<std::uint64_t>(*i);
+ else if(const auto* u=std::get_if<std::uint64_t>(&v.typed_value))magnitude=*u;
+ else{
+  const char* first=v.value.data();const char* last=first+v.value.size();if(*first=='+'||*first=='-')++first;
+  if(std::from_chars(first,last,magnitude).ec!=std::errc{})return false;
+ }
+ // A double holds an integer whose significant bits fit in 53.
+ while(magnitude>(std::uint64_t{1}<<53)&&(magnitude&1)==0)magnitude>>=1;
+ return magnitude<=(std::uint64_t{1}<<53);
+}
+} // namespace
 EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const PandasCaseFilterOptions& o){
  s.validate();const auto [c,t]=performance_columns(s,o);const auto grouped=groups(s,c,t);const bool business=truth(o.business_hours);
  if(business&&grouped.values.empty())error("ValueError","Cannot set a DataFrame with multiple columns to the single column caseDuration");
  const auto slots=business?business_slots(o.business_hour_slots):std::vector<BusinessHourSlot>{};
  // The datetime column's resolution (ns by default) sets the Timedelta unit.
- std::int64_t unit=1;
- if(!s.dtypes.empty()){const auto& dtype=s.dtypes[t];
-  if(dtype.starts_with("datetime64[us"))unit=1000;else if(dtype.starts_with("datetime64[ms"))unit=1000000;else if(dtype.starts_with("datetime64[s"))unit=1000000000;}
- std::vector<double> durations;for(const auto& g:grouped.values)durations.push_back(duration(g,business,slots,unit));
+ const bool nanosecond_column=s.dtypes.empty()||!(s.dtypes[t].starts_with("datetime64[us")||s.dtypes[t].starts_with("datetime64[ms")||s.dtypes[t].starts_with("datetime64[s"));
+ std::vector<double> durations;for(const auto& g:grouped.values)durations.push_back(duration(g,business,slots,nanosecond_column));
  if(!business&&!s.dtypes.empty()&&!s.dtypes[t].starts_with("datetime64"))error("AttributeError","Can only use .dt accessor with datetimelike values");
  // Durations are a Series over the cases in sorted case order. The maximum
  // is applied first, then the minimum to the cases that remain.
  std::vector<std::size_t> order(grouped.values.size());std::iota(order.begin(),order.end(),0);
- {std::vector<const EventAttribute*> ids(grouped.values.size());for(std::size_t i=0;i<s.size();++i)if(grouped.rows[i]&&!ids[*grouped.rows[i]])ids[*grouped.rows[i]]=&*s.rows[i][c];
-  // pandas sorts group keys; keys that cannot be compared (such as 1 and
+ std::vector<const EventAttribute*> ids(grouped.values.size());for(std::size_t i=0;i<s.size();++i)if(grouped.rows[i]&&!ids[*grouped.rows[i]])ids[*grouped.rows[i]]=&*s.rows[i][c];
+ {// pandas sorts group keys; keys that cannot be compared (such as 1 and
   // 'a') fall back to its mixed order: numbers, then strings.
   std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){
    try{return native_scalar_key_compare(*ids[a],*ids[b])<0;}
@@ -335,6 +391,12 @@ EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribu
  const auto lower=duration_mask(durations,remaining,minimum,true);
  for(std::size_t i=0;i<remaining.size();++i)if(lower[i])accepted[remaining[i]]=true;
  std::vector<bool> keep(s.size());for(std::size_t i=0;i<s.size();++i)keep[i]=grouped.rows[i]&&accepted[*grouped.rows[i]];
+ // The accepted case ids select rows through an index whose dtype pandas
+ // infers from the group keys: ints mixed with floats become float64, so an
+ // int case id that no double holds (2**53 + 1) no longer matches its own
+ // key and its rows drop out.
+ if(!s.dtypes.empty()&&s.dtypes[c]=="object"&&float_key_index(ids))
+  for(std::size_t i=0;i<s.size();++i)if(keep[i]&&!double_holds(*s.rows[i][c]))keep[i]=false;
  return subset(s,keep);
 }
 EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const EventAttribute& parameters){

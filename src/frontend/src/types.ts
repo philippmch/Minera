@@ -3757,23 +3757,26 @@ function isDfgDataframeEvent(value: unknown): value is DfgDataframeEvent {
 function isDfgDataframeSummary(value: unknown): value is DfgDataframePerformanceSummary {
   if (!isRecord(value) || Array.isArray(value) ||
       !Number.isSafeInteger(value.count) || (value.count as number) < 0) return false;
+  // A statistic the backend models as null (singleton stdev, all-null
+  // observations) arrives as null, never as a substituted zero.
   return [value.mean, value.median, value.min, value.max, value.stdev, value.sum]
-    .every((item) => finite(item));
+    .every((item) => item === null || finite(item));
 }
 
 function isDfgDataframePerformanceValue(
   value: unknown,
 ): value is DfgDataframePerformanceValue {
-  return finite(value) ||
-    (Array.isArray(value) && value.every((item) => finite(item))) ||
+  return value === null || finite(value) ||
+    (Array.isArray(value) && value.every((item) => item === null || finite(item))) ||
     isDfgDataframeSummary(value);
 }
 
 function isDfgDataframePerformanceEdge(value: unknown): value is DfgDataframePerformanceEdge {
   if (!isRecord(value) || Array.isArray(value) ||
-      typeof value.source !== "string" || typeof value.target !== "string" ||
+      (typeof value.source !== "string" && value.source !== null) ||
+      typeof value.target !== "string" ||
       !isDfgDataframeSummary(value.summary) || !Array.isArray(value.raw_values) ||
-      !value.raw_values.every((item) => finite(item)) ||
+      !value.raw_values.every((item) => item === null || finite(item)) ||
       !isDfgDataframePerformanceValue(value.value)) return false;
   return value.raw_values.length === value.summary.count;
 }
@@ -4871,22 +4874,24 @@ export interface DfgDataframeFrequencyEdge {
 }
 export interface DfgDataframePerformanceSummary {
   count: number;
-  mean: number;
-  median: number;
-  min: number;
-  max: number;
-  stdev: number;
-  sum: number;
+  mean: number | null;
+  median: number | null;
+  min: number | null;
+  max: number | null;
+  stdev: number | null;
+  sum: number | null;
 }
 export type DfgDataframePerformanceValue =
   | number
-  | number[]
+  | null
+  | (number | null)[]
   | DfgDataframePerformanceSummary;
 export interface DfgDataframePerformanceEdge {
-  source: string;
+  // null: a Polars edge from a null source activity, distinct from "".
+  source: string | null;
   target: string;
   summary: DfgDataframePerformanceSummary;
-  raw_values: number[];
+  raw_values: (number | null)[];
   value: DfgDataframePerformanceValue;
 }
 export interface DfgDataframeGraphResult {

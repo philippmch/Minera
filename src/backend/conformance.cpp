@@ -780,16 +780,21 @@ class Replayer {
         }
       } else {
         // No route: weak-fire the unique visible transition, creating any
-        // missing inputs and retaining the deviation for fitness.
+        // missing inputs and retaining the deviation for fitness. Parallel
+        // arcs can leave the per-place preset satisfied; that firing still
+        // counts its missing tokens but is not a fitness problem.
+        const bool problem = !preset_satisfied(marking, visible);
         fire(marking, visible, counts);
         if (executions) ++(*executions)[visible];
         if (diagnostics) {
           diagnostics->activated_transitions.push_back(visible);
-          diagnostics->transitions_with_problems.push_back(visible);
           diagnostics->event_diagnostics.back().activated_transitions.push_back(visible);
-          diagnostics->event_diagnostics.back().transitions_with_problems.push_back(visible);
+          if (problem) {
+            diagnostics->transitions_with_problems.push_back(visible);
+            diagnostics->event_diagnostics.back().transitions_with_problems.push_back(visible);
+          }
         }
-        outcome.fitting = false;
+        if (problem) outcome.fitting = false;
         if (stop_immediately_unfit) {
           if (diagnostics) diagnostics->replay_stopped = true;
           break;
@@ -798,7 +803,9 @@ class Replayer {
     }
 
     // Compare the exact requested final marking, with no end routing in the
-    // legacy variation.
+    // legacy variation. Fitness is decided by this final comparison and the
+    // firings above, not by tokens a fitting firing reported missing.
+    const auto missing_before_final = counts.missing;
     for (std::size_t p = 0; p < marking.size(); ++p) {
       const auto& target = final_[p];
       if (markings_.final_keys[p] && marking[p] != 0) {
@@ -816,7 +823,7 @@ class Replayer {
         counts.places[p].missing += value;
       }
     }
-    if (counts.missing != 0 || counts.remaining != 0) outcome.fitting = false;
+    if (counts.missing != missing_before_final || counts.remaining != 0) outcome.fitting = false;
     outcome.marking = marking;
     if (diagnostics) diagnostics->reached_marking = marking;
     return outcome;
@@ -1512,6 +1519,19 @@ class Replayer {
     return true;
   }
 
+  // The reference keys a transition's preset by place, so of several
+  // physically parallel input arcs from one place only the last one's weight
+  // decides whether a backwards weak firing still counts as fitting.
+  [[nodiscard]] bool preset_satisfied(const Marking& marking, std::size_t t) const {
+    const auto& transition = net_.transitions()[t];
+    std::vector<std::optional<TokenInteger>> last(marking.size());
+    for (std::size_t index = 0; index < transition.inputs.size(); ++index)
+      last[transition.inputs[index]] = arc_tokens(transition.input_arc_weight(index));
+    for (std::size_t place = 0; place < last.size(); ++place)
+      if (last[place] && marking[place] < *last[place]) return false;
+    return true;
+  }
+
   [[nodiscard]] bool any_enabled(const Marking& marking,
                                  const std::vector<std::size_t>& ts) const {
     return std::any_of(ts.begin(), ts.end(),
@@ -1530,16 +1550,34 @@ class Replayer {
     if (counts.places.size() < marking.size())
       counts.places.resize(marking.size());
     const auto& transition = net_.transitions()[t];
-    for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
-      const auto place = transition.inputs[index];
-      const auto weight = arc_tokens(transition.input_arc_weight(index));
-      if (counts.forward_replay || marking[place] >= weight) marking[place] -= weight;
-      else {
-        const auto missing = weight - marking[place];
-        counts.missing += missing; counts.places[place].missing += missing;
-        marking[place] = 0;
+    if (counts.forward_replay) {
+      for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+        const auto place = transition.inputs[index];
+        const auto weight = arc_tokens(transition.input_arc_weight(index));
+        marking[place] -= weight;
+        counts.consumed += weight; counts.places[place].consumed += weight;
       }
-      counts.consumed += weight; counts.places[place].consumed += weight;
+    } else {
+      // Backwards replay: every input arc is checked against the marking
+      // before the firing, so physically parallel arcs from one place each
+      // report their own shortfall; the place then loses all their tokens and
+      // never drops below zero.
+      for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+        const auto place = transition.inputs[index];
+        const auto weight = arc_tokens(transition.input_arc_weight(index));
+        if (marking[place] < weight) {
+          const auto missing = weight - marking[place];
+          counts.missing += missing; counts.places[place].missing += missing;
+        }
+      }
+      for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+        const auto place = transition.inputs[index];
+        const auto weight = arc_tokens(transition.input_arc_weight(index));
+        marking[place] -= weight;
+        counts.consumed += weight; counts.places[place].consumed += weight;
+      }
+      for (const auto place : transition.inputs)
+        if (marking[place] < 0) marking[place] = 0;
     }
     for (const std::size_t place : transition.reset_inputs) {
       if (marking[place] > 0) {

@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "minera/timestamp.hpp"
+#include "reference_activity_selector.hpp"
 
 namespace minera {
 namespace {
@@ -60,29 +61,28 @@ const char* metric_name(ResourceProfileMetric m) {
 }
 
 // Presence-aware selectors: an explicitly present empty value is an ordinary
-// resource or activity, while a missing or null one is no value at all.
-std::optional<std::string> resource_of(const Event& e, const ResourceProfilesOptions& o) {
-  if (o.resource_attribute.empty() || o.resource_attribute == "org:resource" ||
-      o.resource_attribute == "resource") {
-    if (e.resource_state == FirstClassAttributeState::kPresent ||
-        (e.resource_state == FirstClassAttributeState::kMissing && !e.resource.empty()))
-      return e.resource;
+// resource or activity, while a missing or null one is no value at all. An
+// omitted selector reads the projection; an explicit key reads the literal
+// field of that name, or a projection read from that same field.
+std::optional<std::string> selected_value(const Event& e, const std::string& key,
+                                          const std::string& projection,
+                                          FirstClassAttributeState state) {
+  if (key.empty()) {
+    if (state == FirstClassAttributeState::kPresent ||
+        (state == FirstClassAttributeState::kMissing && !projection.empty()))
+      return projection;
     return std::nullopt;
   }
-  if (const auto* value = e.attribute(o.resource_attribute)) return *value;
+  if (const auto* value = reference_selected_field(e, key)) return *value;
   return std::nullopt;
 }
 
+std::optional<std::string> resource_of(const Event& e, const ResourceProfilesOptions& o) {
+  return selected_value(e, o.resource_attribute, e.resource, e.resource_state);
+}
+
 std::optional<std::string> activity_of(const Event& e, const ResourceProfilesOptions& o) {
-  if (o.activity_attribute.empty() || o.activity_attribute == "concept:name" ||
-      o.activity_attribute == "activity") {
-    if (e.activity_state == FirstClassAttributeState::kPresent ||
-        (e.activity_state == FirstClassAttributeState::kMissing && !e.activity.empty()))
-      return e.activity;
-    return std::nullopt;
-  }
-  if (const auto* value = e.attribute(o.activity_attribute)) return *value;
-  return std::nullopt;
+  return selected_value(e, o.activity_attribute, e.activity, e.activity_state);
 }
 
 // An empty query value means every value unless the *_given flag selects the
@@ -95,10 +95,8 @@ bool activity_matches(const std::string& value, const ResourceProfilesOptions& o
 }
 
 std::string timestamp_of(const Event& e, const ResourceProfilesOptions& o) {
-  if (o.timestamp_attribute.empty() ||
-      o.timestamp_attribute == "time:timestamp" ||
-      o.timestamp_attribute == "timestamp") return e.timestamp;
-  if (const auto* value = e.attribute(o.timestamp_attribute)) return *value;
+  if (o.timestamp_attribute.empty()) return e.timestamp;
+  if (const auto* value = reference_selected_field(e, o.timestamp_attribute)) return *value;
   return {};
 }
 

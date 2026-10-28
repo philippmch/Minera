@@ -1,0 +1,18 @@
+<log>
+<trace><string key="concept:name" value="c0"/>
+</trace>
+<trace><string key="concept:name" value="c1"/>
+<event><string key="concept:name" value="AuditParcel"/></event>
+</trace>
+<trace><string key="concept:name" value="c2"/>
+<event><string key="concept:name" value="AuditParcel"/></event>
+<event><string key="concept:name" value="AuditParcel"/></event>
+</trace>
+<trace><string key="concept:name" value="c3"/>
+<event><string key="concept:name" value="WrongParcel"/></event>
+<event><string key="concept:name" value="AuditParcel"/></event>
+</trace>
+<trace><string key="concept:name" value="c4"/>
+<event><string key="concept:name" value="WrongParcel"/></event>
+</trace>
+</log>

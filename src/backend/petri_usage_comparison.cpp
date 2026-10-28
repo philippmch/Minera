@@ -1,6 +1,7 @@
 #include "minera/petri_usage_comparison.hpp"
 #include "petri_replay_internal.hpp"
 
+#include <map>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -645,6 +646,28 @@ PetriUsageComparison compare_element_usage_token_replay(const PetriNet& net, con
         places[place] = std::stoull(fitness.consumed.decimal()) + std::stoull(fitness.remaining.decimal());
       }
     }
+    // The reference place statistics key a transition's preset by place, so
+    // physically parallel input arcs from one place count only the last
+    // arc's weight per firing (the marking itself still loses every arc's
+    // tokens). Replace their summed weight by that one weight.
+    if (arc_occurrences) {
+      std::map<std::pair<std::size_t, std::size_t>, std::pair<std::uint64_t, std::uint64_t>> parallel;
+      std::map<std::pair<std::size_t, std::size_t>, std::size_t> arcs;
+      for (const auto& arc : *arc_occurrences) {
+        if (!arc.input || arc.type != PetriArcType::kNormal || arc.negative_weight) continue;
+        const auto weight = std::stoull(TokenInteger(arc.weight).decimal());
+        auto& [sum, last] = parallel[{arc.place, arc.transition}];
+        sum += weight;
+        last = weight;
+        ++arcs[{arc.place, arc.transition}];
+      }
+      for (const auto& [key, weights] : parallel) {
+        const auto [place, transition] = key;
+        if (arcs[key] < 2 || place >= places.size() || transition >= transitions.size()) continue;
+        const auto excess = (weights.first - weights.second) * transitions[transition];
+        places[place] = places[place] > excess ? places[place] - excess : 0;
+      }
+    }
     return std::pair{places, transitions};
   };
   const auto [places1, transitions1] = usage(log1);
@@ -695,30 +718,22 @@ PetriUsageComparison compare_petri_usage_reference(const PetriNet& net, const Ev
                                                    const EventLog& log2,
                                                    const PetriUsageComparisonOptions& options) {
   TokenReplayOptions replay;
-  const auto trimmed = [](const std::string& value) {
-    const auto first = value.find_first_not_of(" \t\r\n");
-    if (first == std::string::npos) return std::string{};
-    return value.substr(first, value.find_last_not_of(" \t\r\n") - first + 1);
-  };
-  const auto attribute = trimmed(options.activity_attribute);
-  if (!options.activity_attribute.empty() && attribute.empty())
+  // The key is used exactly as given (a spaced " code " is its own field);
+  // only an all-blank key is rejected.
+  const auto& attribute = options.activity_attribute;
+  if (!attribute.empty() && attribute.find_first_not_of(" \t\r\n") == std::string::npos)
     throw std::invalid_argument("Petri usage activity_attribute must not be blank");
-  // The default selector names the log's first-class activity, whatever
-  // source column it came from (a CSV "activity" column, say); a literal
-  // "activity" field wins when "activity" is requested.
+  // The omitted selector names the log's first-class activity, whatever
+  // source column it came from; an explicit key follows the reference
+  // selector rule (its literal field, or a projection read from it).
   const auto projected_key = [&]() -> std::string {
-    for (const auto* log : {&log1, &log2})
-      for (const auto& trace : log->traces)
-        for (const auto& event : trace.events)
-          for (const auto& field : event.attributes)
-            if (attribute == "activity" && field.key == "activity") return "activity";
     for (const auto* log : {&log1, &log2})
       for (const auto& trace : log->traces)
         for (const auto& event : trace.events)
           if (!event.activity_source_key.empty()) return event.activity_source_key;
     return "concept:name";
   };
-  replay.activity_attribute = attribute.empty() || attribute == "activity" ? projected_key() : attribute;
+  replay.activity_attribute = attribute.empty() ? projected_key() : attribute;
   replay.initial_marking.assign(options.initial_marking.begin(), options.initial_marking.end());
   replay.final_marking.assign(options.final_marking.begin(), options.final_marking.end());
   replay.walk_through_hidden_transitions = options.walk_through_hidden_trans;

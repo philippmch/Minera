@@ -22,23 +22,25 @@ constexpr std::int64_t kMaxExactSolverInteger =
 // Select a deterministic, evenly spaced subset while retaining both ends.
 // Endpoint additions intentionally allow up to two more points than the
 // requested interior sample count.
+// Thinning picks positions in the split list, then adds the first and last
+// positions when they were not picked. Positions, not values, are compared,
+// so a repeated split point (say [0, 0, 0]) keeps its repetitions.
 std::vector<std::size_t> select_evenly_spaced_splits(
     const std::vector<std::size_t>& splits, std::size_t requested) {
   if (splits.size() <= requested) return splits;
 
   const auto count = splits.size();
+  std::vector<std::size_t> positions;
+  positions.reserve(requested + 2);
+  for (std::size_t i = 0; i < requested; ++i)
+    positions.push_back(i * count / requested + count / (2 * requested));
+  if (std::find(positions.begin(), positions.end(), 0) == positions.end())
+    positions.insert(positions.begin(), 0);
+  if (std::find(positions.begin(), positions.end(), count - 1) == positions.end())
+    positions.push_back(count - 1);
   std::vector<std::size_t> selected;
-  selected.reserve(requested + 2);
-  for (std::size_t i = 0; i < requested; ++i) {
-    const auto point = i * count / requested + count / (2 * requested);
-    selected.push_back(splits[point]);
-  }
-  if (std::find(selected.begin(), selected.end(), splits.front()) ==
-      selected.end())
-    selected.insert(selected.begin(), splits.front());
-  if (std::find(selected.begin(), selected.end(), splits.back()) ==
-      selected.end())
-    selected.push_back(splits.back());
+  selected.reserve(positions.size());
+  for (const auto position : positions) selected.push_back(splits[position]);
   return selected;
 }
 
@@ -1429,7 +1431,7 @@ ExtendedMarkingEquationResult solve_extended_marking_equation(
 
   // Split points index trace events. Given points keep their order and
   // repetitions; without them every interior position is a candidate. More
-  // candidates than max_k_value are thinned to evenly spaced points.
+  // candidates than max_k_value are thinned to evenly spaced positions.
   for (const auto split : options.split_indices) {
     if (split >= trace.size())
       throw std::invalid_argument("split index must lie inside the trace");

@@ -289,6 +289,23 @@ void resource_profiles_params_contract() {
          p.case_id_attribute == "case:custom");
   try { (void)minera::parse_resource_profiles_params(fields({{"resource_profiles_metric", "bogus"}})); assert(false); } catch (const std::invalid_argument&) {}
   try { (void)minera::parse_resource_profiles_params(fields({{"resource_profiles_metric", "interaction_two_resources"}, {"resource_profiles_resource", "a"}})); assert(false); } catch (const std::invalid_argument&) {}
+  // J3: a supplied empty value selects the empty resource/activity; an
+  // omitted one means every value.
+  const std::map<std::string, std::string> empty_selectors = {
+      {"resource_profiles_metric", "interaction_two_resources"},
+      {"resource_profiles_resource", ""}, {"resource_profiles_resource2", ""},
+      {"resource_profiles_activity", ""}};
+  const auto lookup = fields(empty_selectors);
+  const minera::FieldPresence present = [&](std::string_view name) {
+    return empty_selectors.contains(std::string(name));
+  };
+  const auto empty = minera::parse_resource_profiles_params(lookup, present);
+  assert(empty.resource_given && empty.resource2_given && empty.activity_given &&
+         empty.resource.empty() && empty.resource2.empty() && empty.activity.empty());
+  const auto omitted = minera::parse_resource_profiles_params(
+      fields({{"resource_profiles_metric", "distinct_activities"}}),
+      [](std::string_view name) { return name == "resource_profiles_metric"; });
+  assert(!omitted.resource_given && !omitted.activity_given && !omitted.resource2_given);
 }
 
 void clustering_params_contract() {

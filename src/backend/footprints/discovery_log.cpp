@@ -260,6 +260,13 @@ std::vector<TableRow> read_table_rows(const EventTable& table,
         return left_rank < right_rank ? -1 : 1;
       if (left && right && *left != *right)
         return *left < *right ? -1 : 1;
+      if (left && right) {
+        // Equal doubles can still be distinct nanosecond instants.
+        const auto a = parse_timestamp_exact(left_raw);
+        const auto b = parse_timestamp_exact(right_raw);
+        if (a && b && (a->seconds != b->seconds || a->nanoseconds != b->nanoseconds))
+          return std::pair(a->seconds, a->nanoseconds) < std::pair(b->seconds, b->nanoseconds) ? -1 : 1;
+      }
       if (!left && !right && left_raw != right_raw)
         return left_raw < right_raw ? -1 : 1;
       return 0;

@@ -934,7 +934,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
           read_value(statement.get(), 1, 2, 3, 4, 5);
     }
   }
-  sort_ocel_events_by_timestamp(log);
+  sort_ocel_events_by_timestamp(log, true);
   return log;
 #endif
 }

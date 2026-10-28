@@ -1,0 +1,7 @@
+<pnml><net id="net" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="p">
+<place id="p0"><initialMarking><text>1</text></initialMarking></place>
+<place id="p1"></place>
+<transition id="t0"><name><text>AuditParcel</text></name></transition>
+<arc id="a0" source="p0" target="t0"><inscription><text>1</text></inscription><arctype><text>reset</text></arctype></arc>
+<arc id="a1" source="t0" target="p1"><inscription><text>1</text></inscription></arc>
+</page><finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings></net></pnml>

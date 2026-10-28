@@ -630,6 +630,19 @@ if(MINERA_BUILD_TESTS)
          $<$<CXX_COMPILER_ID:MSVC>:/Od>)
   endif()
 
+  add_executable(minera_recheck_regression_tests src/backend/tests/test_recheck_regressions.cpp)
+  target_link_libraries(minera_recheck_regression_tests PRIVATE minera::core)
+  target_compile_features(minera_recheck_regression_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_recheck_regression_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_recheck_regression_tests COMMAND minera_recheck_regression_tests)
+  add_executable(minera_recheck_conformance_fixture_tests
+    src/backend/tests/test_recheck_conformance_fixtures.cpp)
+  target_link_libraries(minera_recheck_conformance_fixture_tests PRIVATE minera::core)
+  target_compile_features(minera_recheck_conformance_fixture_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_recheck_conformance_fixture_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_recheck_conformance_fixture_tests
+           COMMAND minera_recheck_conformance_fixture_tests
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_61ebeee0")
   add_executable(minera_root_cause_tests src/backend/tests/test_root_cause.cpp)
   target_link_libraries(minera_root_cause_tests PRIVATE minera::core)
   target_compile_features(minera_root_cause_tests PRIVATE cxx_std_20)
@@ -1604,6 +1617,28 @@ if(MINERA_BUILD_TESTS)
                    --compare-petri-model "${MINERA_FIXTURES}/parallel_arc_sequence.pnml")
   set_tests_properties(minera_petri_usage_cli_parallel_arcs PROPERTIES
     PASS_REGULAR_EXPRESSION "\"arcs\":\\[{\"id\":0,[^]]*{\"id\":5,[^]{}]*}\\]")
+  # Recheck 61ebeee0 J2/J3: present empty resources are network nodes and
+  # explicit empty profile selectors pick them (reference: edge ""->"" with
+  # Review Ω and [7]; distinct_activities 2; interaction_two_resources 1).
+  add_test(NAME minera_network_analysis_cli_empty_labels
+           COMMAND minera_export "${MINERA_FIXTURES}/empty_resource_network.xes"
+                   --network-analysis --network-analysis-include-performance true)
+  set_tests_properties(minera_network_analysis_cli_empty_labels PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"edges\":\\[{\"source\":\"\",\"target\":\"\",\"activity\":\"Review Ω\",\"count\":1,\"performance\":\\[7\\]}\\]")
+  add_test(NAME minera_resource_profiles_cli_empty_resource
+           COMMAND minera_export "${MINERA_FIXTURES}/empty_resource_network.xes"
+                   --resource-profiles --resource-profile-metric distinct_activities
+                   --resource-profile-resource ""
+                   --resource-profile-t1 2026-10-28T00:00:00Z --resource-profile-t2 2026-10-29T00:00:00Z)
+  set_tests_properties(minera_resource_profiles_cli_empty_resource PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"rows\":\\[{\"resource\":\"\",\"activity\":\"\",\"resource2\":\"\",\"value\":2,")
+  add_test(NAME minera_resource_profiles_cli_empty_resource_pair
+           COMMAND minera_export "${MINERA_FIXTURES}/empty_resource_network.xes"
+                   --resource-profiles --resource-profile-metric interaction_two_resources
+                   --resource-profile-resource "" --resource-profile-resource2 ""
+                   --resource-profile-t1 2026-10-28T00:00:00Z --resource-profile-t2 2026-10-29T00:00:00Z)
+  set_tests_properties(minera_resource_profiles_cli_empty_resource_pair PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"rows\":\\[{\"resource\":\"\",\"activity\":\"\",\"resource2\":\"\",\"value\":1,")
 
   add_executable(minera_perspective_tests
     src/backend/tests/test_perspectives.cpp

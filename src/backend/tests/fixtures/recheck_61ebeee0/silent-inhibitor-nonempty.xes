@@ -1,0 +1,13 @@
+<log>
+<trace><string key="concept:name" value="nonempty0"/>
+<event><string key="concept:name" value="AuditParcel"/></event>
+</trace>
+<trace><string key="concept:name" value="nonempty1"/>
+<event><string key="concept:name" value="AuditParcel"/></event>
+<event><string key="concept:name" value="AuditParcel"/></event>
+</trace>
+<trace><string key="concept:name" value="nonempty2"/>
+<event><string key="concept:name" value="WrongParcel"/></event>
+<event><string key="concept:name" value="AuditParcel"/></event>
+</trace>
+</log>

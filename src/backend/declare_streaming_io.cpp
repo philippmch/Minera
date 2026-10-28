@@ -239,12 +239,16 @@ std::string serialize_declare_stream_model_json(const DeclareModel& model) {
 std::string serialize_declare_streaming_json(const DeclareStreamingSnapshot& snapshot,const DeclareModel& model) {
   std::ostringstream out;out<<"{\"family\":\"STREAMING_DECLARE\",\"total_events_processed\":"<<snapshot.total_events_processed<<",\"total_deviations\":"<<snapshot.total_deviations<<",\"model\":"<<serialize_declare_stream_model_json(model)<<",\"deviations_per_time\":[";
   for(std::size_t i=0;i<snapshot.deviations_per_time.size();++i){const auto& d=snapshot.deviations_per_time[i];if(i)out<<',';out<<"{\"timestamp\":"<<json_quote(d.timestamp)<<",\"deviations\":"<<d.deviations<<'}';}out<<"],\"cases\":{";bool first=true;
-  for(const auto& [id,c]:snapshot.cases){if(!first)out<<',';first=false;out<<json_quote(id)<<":{\"events\":"<<c.events<<",\"deviations\":"<<c.deviations<<",\"constraint_states\":[";
-    for(std::size_t i=0;i<c.constraint_states.size();++i){const auto& s=c.constraint_states[i];if(i)out<<',';identity(out,s.constraint_index,s.template_name,{s.first,s.second,s.binary,0,0});out<<",\"state\":"<<json_quote(s.state)<<'}';}out<<"]}";}
-  out<<"}}";return out.str();
+  const auto write_case=[&](const DeclareStreamingCaseSnapshot& c){out<<"{\"events\":"<<c.events<<",\"deviations\":"<<c.deviations<<",\"constraint_states\":[";
+    for(std::size_t i=0;i<c.constraint_states.size();++i){const auto& s=c.constraint_states[i];if(i)out<<',';identity(out,s.constraint_index,s.template_name,{s.first,s.second,s.binary,0,0});out<<",\"state\":"<<json_quote(s.state)<<'}';}out<<"]}";};
+  for(const auto& [id,c]:snapshot.cases){if(!first)out<<',';first=false;out<<json_quote(id)<<':';write_case(c);}
+  out<<'}';
+  // The None case id cannot be an object key; it has its own member.
+  if(snapshot.null_case){out<<",\"null_case\":";write_case(*snapshot.null_case);}
+  out<<'}';return out.str();
 }
 std::string serialize_declare_stream_event_json(const DeclareStreamingEventResult& event) {
-  std::ostringstream out;out<<"{\"case_id\":"<<json_quote(event.case_id)<<",\"activity\":"<<json_quote(event.activity)<<",\"timestamp\":"<<json_quote(event.timestamp)<<",\"event_index\":"<<event.event_index<<",\"deviations\":"<<event.deviations<<",\"violated_constraints\":[";
+  std::ostringstream out;out<<"{\"case_id\":"<<(event.case_is_null?std::string("null"):json_quote(event.case_id))<<",\"activity\":"<<json_quote(event.activity)<<",\"timestamp\":"<<json_quote(event.timestamp)<<",\"event_index\":"<<event.event_index<<",\"deviations\":"<<event.deviations<<",\"violated_constraints\":[";
   for(std::size_t i=0;i<event.violated_constraints.size();++i){if(i)out<<',';event_identity(out,event.violated_constraints[i]);}out<<"]}";return out.str();
 }
 } // namespace minera

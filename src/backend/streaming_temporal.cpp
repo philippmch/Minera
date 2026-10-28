@@ -44,13 +44,12 @@ void write_json_string(std::ostream& out, std::string_view value) {
 // the reference skips None), then the first-class field the selector names.
 std::optional<std::string> event_value(const Event& event, std::string_view key,
                                        bool activity) {
+  // The activity follows the shared selector rule: a missing literal key or
+  // a projected null is skipped, never read as the empty activity.
+  if (activity) return streaming_event_present_value(event, key == "activity" ? std::string_view{} : key);
   for (const auto& attribute : event.attributes)
     if (attribute.key == key)
       return attribute.is_null ? std::nullopt : std::optional<std::string>(attribute.value);
-  if (activity) {
-    if (key.empty() || key == "activity") return event.activity;
-    return streaming_event_present_value(event, key);
-  }
   if (key.empty() || key == "timestamp" || key == "time:timestamp") {
     if (event.timestamp.empty()) return std::nullopt;
     return event.timestamp;
@@ -66,9 +65,10 @@ StreamingTemporalConformance::StreamingTemporalConformance(
   if (options_.case_id_attribute.empty())
     throw std::invalid_argument(
         "streaming temporal case-id attribute must not be empty");
-  if (!std::isfinite(options_.zeta) || options_.zeta <= 0.0)
-    throw std::invalid_argument(
-        "streaming temporal zeta must be finite and greater than zero");
+  // Any finite zeta is accepted, as in the reference: zero or a negative
+  // value reports every observed pair whose distance exceeds it.
+  if (!std::isfinite(options_.zeta))
+    throw std::invalid_argument("streaming temporal zeta must be finite");
   for (const auto& entry : profile_.entries) {
     if (entry.count == 0 || !std::isfinite(entry.mean_seconds) ||
         entry.mean_seconds < 0.0 ||
@@ -109,16 +109,18 @@ StreamingTemporalEventResult StreamingTemporalConformance::receive(
     const double elapsed = *start - previous.end;
     const double difference = std::abs(elapsed - entry.mean_seconds);
     double distance = 0.0;
+    bool sentinel = false;
     if (entry.standard_deviation_seconds == 0.0) {
       if (difference == 0.0) continue;
-      // The reference reports sys.maxsize.
+      // The reference reports the integer sys.maxsize.
       distance = 9223372036854775807.0;
+      sentinel = true;
     } else {
       distance = difference / entry.standard_deviation_seconds;
       if (distance <= options_.zeta) continue;
     }
     new_deviations.push_back(
-        {case_key, previous.activity, activity_key, elapsed, distance});
+        {case_key, previous.activity, activity_key, elapsed, distance, sentinel});
   }
   ++state.events;
   state.events_in_order.push_back({*start, *end, activity_key});
@@ -213,7 +215,8 @@ std::string serialize_streaming_temporal_json(
       out << ",\"elapsed_seconds\":";
       number(deviation.elapsed_seconds);
       out << ",\"standard_deviation_distance\":";
-      number(deviation.standard_deviation_distance);
+      if (deviation.zero_variance_sentinel) out << "9223372036854775807";
+      else number(deviation.standard_deviation_distance);
       out << '}';
     }
     out << ']';

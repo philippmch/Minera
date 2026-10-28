@@ -133,17 +133,20 @@ template<class T>struct Vector:std::false_type{};
 template<class T>struct Vector<std::vector<T>>:std::true_type{using Item=T;};
 template<class T>struct Map:std::false_type{};
 template<class T>struct Map<std::map<std::string,T>>:std::true_type{using Item=T;};
-template<class T,class M>struct Member{std::string_view name;M T::*pointer;};
-template<class T,class M>auto member(std::string_view name,M T::*pointer){return Member<T,M>{name,pointer};}
+// omit_false members are written only when true, so stored results from
+// before the member existed keep their exact bytes; absent reads as false.
+template<class T,class M>struct Member{std::string_view name;M T::*pointer;bool omit_false=false;};
+template<class T,class M>auto member(std::string_view name,M T::*pointer,bool omit_false=false){return Member<T,M>{name,pointer,omit_false};}
 template<class T>struct Record;
 #define F(name) member(#name,&V::name)
+#define O(name) member(#name,&V::name,true)
 #define RECORD(Type,...) template<>struct Record<Type>{static auto members(){using V=Type;return std::make_tuple(__VA_ARGS__);}};
 RECORD(PerformanceSpectrumOptions,F(variant),F(sample_size),F(sort_log),F(activity_attribute),F(timestamp_attribute),F(case_id_attribute))
 RECORD(SpectrumObservation,F(case_id),F(instants),F(activities),F(pattern_offset))
 RECORD(PerformanceSpectrum,F(activities),F(observations),F(variant),F(activity_attribute),F(timestamp_attribute),F(case_id_attribute))
 RECORD(BatchEvent,F(start),F(complete),F(case_id),F(trace_index),F(event_index),F(event_id))
 RECORD(Batch,F(type),F(start),F(complete),F(events))
-RECORD(BatchGroup,F(activity),F(resource),F(batch_count),F(event_count),F(batches))
+RECORD(BatchGroup,F(activity),F(resource),F(batch_count),F(event_count),F(batches),O(resource_is_null))
 RECORD(BatchDiscoveryOptions,F(variant),F(merge_distance_seconds),F(min_batch_size),F(start_timestamp_attribute),F(activity_attribute),F(resource_attribute),F(timestamp_attribute),F(case_id_attribute),F(event_id_attribute))
 RECORD(BatchDiscovery,F(options),F(variant),F(groups))
 template<class T>struct Enum;
@@ -158,6 +161,7 @@ template<class T>T read_enum(const Json& value){
 }
 #undef RECORD
 #undef F
+#undef O
 template<class T>concept HasRecord=requires{Record<T>::members();};
 template<class T>T read_value(const Json&);
 template<class T>void write(std::ostream&,const T&);
@@ -186,7 +190,7 @@ template<class T>void write(std::ostream& out,const T& value){
  else if constexpr(std::is_same_v<T,double>){const auto text=serialize_embedding_workbench_vector_json({value});out.write(text.data()+1,static_cast<std::streamsize>(text.size()-2));}
  else if constexpr(Vector<T>::value){out<<'[';bool first=true;for(const auto& item:value){if(!first)out<<',';first=false;write(out,item);}out<<']';}
  else if constexpr(Map<T>::value){out<<'[';bool first=true;for(const auto& [key,item]:value){if(!first)out<<',';first=false;out<<"{\"key\":"<<q(key)<<",\"value\":";write(out,item);out<<'}';}out<<']';}
- else{out<<'{';bool first=true;std::apply([&](const auto&...entry){([&]{if(!first)out<<',';first=false;out<<q(entry.name)<<':';write(out,value.*(entry.pointer));}(),...);},Record<T>::members());out<<'}';}
+ else{out<<'{';bool first=true;std::apply([&](const auto&...entry){([&]{if constexpr(std::is_same_v<std::remove_cvref_t<decltype(value.*(entry.pointer))>,bool>){if(entry.omit_false&&!(value.*(entry.pointer)))return;}if(!first)out<<',';first=false;out<<q(entry.name)<<':';write(out,value.*(entry.pointer));}(),...);},Record<T>::members());out<<'}';}
 }
 std::string hex(std::string_view bytes){constexpr char digits[]="0123456789abcdef";std::string result;result.reserve(bytes.size()*2);for(unsigned char c:bytes){result+=digits[c>>4];result+=digits[c&15];}return result;}
 std::string carrier(std::string_view dataset,std::string_view bytes){const bool utf8=q(bytes).starts_with('"');return "{\"dataset\":"+q(dataset)+",\"encoding\":"+q(utf8?"utf8":"hex")+",\"data\":"+q(utf8?bytes:std::string_view(hex(bytes)))+",\"bytes\":"+std::to_string(bytes.size())+",\"sha256\":"+q(footprints_workbench_sha256(bytes))+'}';}

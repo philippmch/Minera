@@ -560,9 +560,12 @@ void convert_column_to_dates(EventTable& table, std::size_t column,
                              const std::optional<std::string>& format) {
   // Categorical columns keep their categories; the reference never converts
   // them to dates, even when every category is a date or all cells are null.
+  // The declared dtype decides: "category" is categorical even when the
+  // optional dictionary details are absent.
   if (!table.categorical_dtypes.empty() && column < table.categorical_dtypes.size() &&
       table.categorical_dtypes[column])
     return;
+  if (column < table.dtypes.size() && table.dtypes[column] == "category") return;
   std::vector<std::optional<ExactTimestamp>> parsed;
   if (!all_date_eligible(table, column, format, parsed)) return;
   const auto precision = date_precision(table, column, parsed);

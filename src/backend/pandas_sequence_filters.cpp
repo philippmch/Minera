@@ -1,13 +1,17 @@
 #include "minera/pandas_sequence_filters.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <variant>
 
 #include "minera/filtering_common.hpp"
+#include "minera/timestamp.hpp"
 #include "numpy_object_sort.hpp"
 
 namespace minera {
@@ -163,39 +167,112 @@ bool null_cell(const Cell& cell) {
   return false;
 }
 
-// A hashable, orderable identity of a non-null cell: ints by value, every
-// other scalar by its kind and text.
+// A hashable identity of a non-null cell, as Python dict/groupby keys see
+// it: equal numbers are one key whatever their type or spelling (1, True,
+// 1.0 and uint64 1; 0.125 and .125; uint64 and float 2**63), distinct
+// numbers stay distinct (uint64 max and -1), and the string '1' is its own
+// key. Numbers are keyed by their exact value: an integral value by its full
+// decimal digits, any other by the shortest text that round-trips.
 struct Key {
-  int tag = 0;  // 0 int, 1 string, 2 other
-  std::int64_t integer = 0;
+  int tag = 0;  // 0 number, 1 string, 2 other
   std::string text;
   bool operator==(const Key&) const = default;
-  bool operator<(const Key& o) const {
-    if (tag != o.tag) return tag < o.tag;
-    if (tag == 0) return integer < o.integer;
-    return text < o.text;
-  }
+  bool operator<(const Key& o) const { return tag != o.tag ? tag < o.tag : text < o.text; }
 };
-// Python dict/groupby keys: 1, True and 1.0 are one key (equal values hash
-// equally); the string '1' stays distinct.
+Key real_key(double d) {
+  char buffer[512];
+  if (std::isfinite(d) && std::trunc(d) == d) {
+    if (d == 0) return {0, "I0"};
+    const auto r = std::to_chars(buffer, buffer + sizeof(buffer), d, std::chars_format::fixed, 0);
+    return {0, "I" + std::string(buffer, r.ptr)};
+  }
+  const auto r = std::to_chars(buffer, buffer + sizeof(buffer), d);
+  return {0, "R" + std::string(buffer, r.ptr)};
+}
+std::optional<Key> lexical_number_key(const std::string& text) {
+  if (text.empty()) return std::nullopt;
+  const char* first = text.data();
+  const char* last = first + text.size();
+  if (*first == '+') ++first;
+  std::int64_t i = 0;
+  if (const auto r = std::from_chars(first, last, i); r.ec == std::errc{} && r.ptr == last)
+    return Key{0, "I" + std::to_string(i)};
+  std::uint64_t u = 0;
+  if (const auto r = std::from_chars(first, last, u); r.ec == std::errc{} && r.ptr == last)
+    return Key{0, "I" + std::to_string(u)};
+  char* end = nullptr;
+  const double d = std::strtod(text.c_str(), &end);
+  if (end && *end == '\0' && !std::isnan(d)) return real_key(d);
+  return std::nullopt;
+}
 Key key_of(const EventAttribute& cell) {
-  if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) return {0, *i, {}};
-  if (const auto* u = std::get_if<std::uint64_t>(&cell.typed_value)) return {0, static_cast<std::int64_t>(*u), {}};
-  if (const auto* b = std::get_if<bool>(&cell.typed_value)) return {0, *b ? 1 : 0, {}};
+  if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) return {0, "I" + std::to_string(*i)};
+  if (const auto* u = std::get_if<std::uint64_t>(&cell.typed_value)) return {0, "I" + std::to_string(*u)};
+  if (const auto* b = std::get_if<bool>(&cell.typed_value)) return {0, *b ? "I1" : "I0"};
+  if (const auto* d = std::get_if<double>(&cell.typed_value)) return real_key(*d);
   if (cell.kind == AttributeKind::kBoolean && !cell.typed_value.index())
     if (cell.value == "True" || cell.value == "true" || cell.value == "False" || cell.value == "false")
-      return {0, cell.value == "True" || cell.value == "true" ? 1 : 0, {}};
-  if (const auto* d = std::get_if<double>(&cell.typed_value);
-      d && std::isfinite(*d) && std::floor(*d) == *d && std::fabs(*d) < 9.2e18)
-    return {0, static_cast<std::int64_t>(*d), {}};
-  if ((cell.kind == AttributeKind::kFloat || cell.kind == AttributeKind::kInt) && !cell.typed_value.index()) {
-    char* end = nullptr;
-    const double d = std::strtod(cell.value.c_str(), &end);
-    if (end && *end == '\0' && !cell.value.empty() && std::isfinite(d) && std::floor(d) == d && std::fabs(d) < 9.2e18)
-      return {0, static_cast<std::int64_t>(d), {}};
+      return {0, cell.value == "True" || cell.value == "true" ? "I1" : "I0"};
+  if ((cell.kind == AttributeKind::kFloat || cell.kind == AttributeKind::kInt) && !cell.typed_value.index())
+    if (auto key = lexical_number_key(cell.value)) return *key;
+  if (cell.kind == AttributeKind::kString) return {1, cell.value};
+  return {2, std::to_string(static_cast<int>(cell.kind)) + ":" + cell.value};
+}
+// The numeric reading of a scalar cell for dtype inference.
+struct ScalarNumber {
+  enum Kind { kNone, kBool, kInteger, kReal } kind = kNone;
+  bool negative = false, above_int64 = false, beyond_uint64 = false;
+  std::int64_t integer = 0;
+  std::uint64_t unsigned_integer = 0;
+  double real = 0;
+};
+ScalarNumber scalar_number(const EventAttribute& cell) {
+  ScalarNumber n;
+  const auto set_signed = [&](std::int64_t v) {
+    n.kind = ScalarNumber::kInteger;
+    n.integer = v;
+    n.negative = v < 0;
+    n.unsigned_integer = static_cast<std::uint64_t>(v);
+    n.real = static_cast<double>(v);
+  };
+  const auto set_unsigned = [&](std::uint64_t v) {
+    n.kind = ScalarNumber::kInteger;
+    n.unsigned_integer = v;
+    n.above_int64 = v > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+    n.integer = static_cast<std::int64_t>(v);
+    n.real = static_cast<double>(v);
+  };
+  if (const auto* b = std::get_if<bool>(&cell.typed_value)) {
+    n.kind = ScalarNumber::kBool;
+    n.real = *b ? 1 : 0;
+  } else if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) {
+    set_signed(*i);
+  } else if (const auto* u = std::get_if<std::uint64_t>(&cell.typed_value)) {
+    set_unsigned(*u);
+  } else if (const auto* d = std::get_if<double>(&cell.typed_value)) {
+    n.kind = ScalarNumber::kReal;
+    n.real = *d;
+  } else if (!cell.typed_value.index() && cell.kind == AttributeKind::kBoolean) {
+    n.kind = ScalarNumber::kBool;
+  } else if (!cell.typed_value.index() && cell.kind == AttributeKind::kInt && !cell.value.empty()) {
+    const char* first = cell.value.data();
+    const char* last = first + cell.value.size();
+    if (*first == '+') ++first;
+    std::int64_t i = 0;
+    std::uint64_t u = 0;
+    if (const auto r = std::from_chars(first, last, i); r.ec == std::errc{} && r.ptr == last) set_signed(i);
+    else if (const auto r2 = std::from_chars(first, last, u); r2.ec == std::errc{} && r2.ptr == last) set_unsigned(u);
+    else {
+      n.kind = ScalarNumber::kInteger;
+      n.beyond_uint64 = true;
+      n.negative = *first == '-';
+      n.real = std::strtod(cell.value.c_str(), nullptr);
+    }
+  } else if (!cell.typed_value.index() && cell.kind == AttributeKind::kFloat) {
+    n.kind = ScalarNumber::kReal;
+    n.real = std::strtod(cell.value.c_str(), nullptr);
   }
-  if (cell.kind == AttributeKind::kString) return {1, 0, cell.value};
-  return {2, 0, std::to_string(static_cast<int>(cell.kind)) + ":" + cell.value};
+  return n;
 }
 bool is_text(const Cell& cell) { return cell && !null_cell(cell) && cell->kind == AttributeKind::kString; }
 
@@ -846,12 +923,22 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   const auto timestamp = require_column(df, timestamp_name);
   if (!first && !last) fail("AttributeError", "'NoneType' object has no attribute 'reset_index'");
   std::vector<std::vector<std::size_t>> groups;
-  std::map<std::pair<Key, std::string>, std::size_t> group_of;
+  // Datetime cells group by their exact instant, so equal instants spelled
+  // with Z or +00:00, or with different fractional digits, are one group.
+  const auto timestamp_key = [](const EventAttribute& cell) -> Key {
+    const auto* date = std::get_if<NativeDate>(&cell.typed_value);
+    if (date || cell.kind == AttributeKind::kDate)
+      if (const auto t = parse_timestamp_exact(date ? date->value : cell.value))
+        return {3, std::string(t->timezone_aware ? "A" : "N") + std::to_string(t->seconds) + ":" +
+                       std::to_string(t->nanoseconds)};
+    return key_of(cell);
+  };
+  std::map<std::pair<Key, Key>, std::size_t> group_of;
   for (std::size_t i = 0; i < df.size(); ++i) {
     const auto& c = df.rows[i][case_column];
     const auto& t = df.rows[i][timestamp];
     if (null_cell(c) || null_cell(t)) continue;
-    const auto [it, added] = group_of.emplace(std::make_pair(key_of(*c), t->value), groups.size());
+    const auto [it, added] = group_of.emplace(std::make_pair(key_of(*c), timestamp_key(*t)), groups.size());
     if (added) groups.emplace_back();
     groups[it->second].push_back(i);
   }
@@ -859,20 +946,64 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   for (std::size_t c = 0; c < df.columns.size(); ++c)
     if (c != case_column && c != timestamp) order.push_back(c);
   auto out = merge_groups(df, groups, first, order);
-  // The group keys form a new column whose dtype pandas infers from the keys:
-  // object ids 1 and True give int64, strings give str, a mix stays object.
-  if (!out.dtypes.empty() && out.dtypes[0] == "object" && !out.rows.empty()) {
-    bool integers = true, strings = true;
-    for (const auto& row : out.rows) {
-      const auto& cell = row[0];
-      const bool integer = cell && !null_cell(cell) &&
-          (std::holds_alternative<std::int64_t>(cell->typed_value) ||
-           (cell->kind == AttributeKind::kInt && !cell->typed_value.index()));
-      integers = integers && integer;
-      strings = strings && is_text(cell);
+  // Group keys come back as the first-seen member of each equal-key class
+  // over the whole column (rows dropped for a null partner key included):
+  // ids 1 and True show as whichever came first.
+  std::map<Key, Cell> case_rep, time_rep;
+  for (const auto& row : df.rows) {
+    if (!null_cell(row[case_column])) case_rep.emplace(key_of(*row[case_column]), row[case_column]);
+    if (!null_cell(row[timestamp])) time_rep.emplace(timestamp_key(*row[timestamp]), row[timestamp]);
+  }
+  std::vector<Cell> unique_cases;
+  {
+    std::set<Key> seen;
+    for (const auto& row : df.rows)
+      if (!null_cell(row[case_column]) && seen.insert(key_of(*row[case_column])).second)
+        unique_cases.push_back(row[case_column]);
+  }
+  for (std::size_t g = 0; g < groups.size(); ++g) {
+    const auto& member = df.rows[groups[g].front()];
+    out.rows[g][0] = case_rep.at(key_of(*member[case_column]));
+    out.rows[g][1] = time_rep.at(timestamp_key(*member[timestamp]));
+  }
+  // The key column's dtype is inferred from those distinct values: all bool
+  // gives bool, all int int64 (or uint64 when none is negative), ints with
+  // floats float64, all str str; any other mix stays object.
+  if (!out.dtypes.empty() && out.dtypes[0] == "object" && !unique_cases.empty()) {
+    bool booleans = false, integers = false, reals = false, strings = false, other = false;
+    bool negative = false, above_int64 = false, beyond_uint64 = false;
+    for (const auto& cell : unique_cases) {
+      const auto n = scalar_number(*cell);
+      if (n.kind == ScalarNumber::kBool) booleans = true;
+      else if (n.kind == ScalarNumber::kInteger) {
+        integers = true;
+        negative = negative || n.negative;
+        above_int64 = above_int64 || n.above_int64;
+        beyond_uint64 = beyond_uint64 || n.beyond_uint64;
+      } else if (n.kind == ScalarNumber::kReal) reals = true;
+      else if (is_text(cell)) strings = true;
+      else other = true;
     }
-    if (integers) out.dtypes[0] = "int64";
-    else if (strings) out.dtypes[0] = "str";
+    const bool numbers = integers || reals;
+    const bool exact_integers = !beyond_uint64 && !(negative && above_int64);
+    std::string dtype = "object";
+    if (other) dtype = "object";
+    else if (strings) dtype = booleans || numbers ? "object" : "str";
+    else if (booleans) dtype = numbers ? "object" : "bool";
+    else if (reals) dtype = exact_integers ? "float64" : "object";
+    else if (integers && exact_integers) dtype = above_int64 ? "uint64" : "int64";
+    out.dtypes[0] = dtype;
+    const auto& name = out.columns[0];
+    for (auto& row : out.rows) {
+      const auto n = scalar_number(*row[0]);
+      if (dtype == "float64") row[0] = float_cell(name, n.real);
+      else if (dtype == "int64" && n.kind == ScalarNumber::kInteger) row[0] = int_cell(name, n.integer);
+      else if (dtype == "uint64" && n.kind == ScalarNumber::kInteger) {
+        auto cell = make_cell(name, std::to_string(n.unsigned_integer), AttributeKind::kInt);
+        cell.typed_value = n.unsigned_integer;
+        row[0] = std::move(cell);
+      }
+    }
   }
   return out;
 }

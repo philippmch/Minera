@@ -7534,12 +7534,12 @@ void handle_compare_petri(const httplib::Request& request,
     };
     if (request.has_param("activity_attribute")) {
       comparison_options.activity_attribute =
-          trim_text(request.get_param_value("activity_attribute"));
+          request.get_param_value("activity_attribute");
     } else if (request.has_file("activity_attribute")) {
       comparison_options.activity_attribute =
-          trim_text(request.get_file_value("activity_attribute").content);
+          request.get_file_value("activity_attribute").content;
     }
-    if (comparison_options.activity_attribute.empty() &&
+    if (trim_text(comparison_options.activity_attribute).empty() &&
         (request.has_param("activity_attribute") ||
          request.has_file("activity_attribute"))) {
       throw std::invalid_argument(

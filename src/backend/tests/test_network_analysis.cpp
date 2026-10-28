@@ -149,7 +149,13 @@ int main() {
   assert(discover_network_analysis(missing_target).edges.empty());
   EventLog missing_sort = sample();
   missing_sort.traces[0].events[0].timestamp.clear();
-  assert(discover_network_analysis(missing_sort).edges.size() <= 1);
+  {
+    // A missing sort value sorts last (pandas NaT): bob->carol (B), carol->alice (C).
+    const auto edges = discover_network_analysis(missing_sort).edges;
+    assert(edges.size() == 2);
+    assert(edges[0].source == "bob" && edges[0].target == "carol" && edges[0].activity == "B");
+    assert(edges[1].source == "carol" && edges[1].target == "alice" && edges[1].activity == "C");
+  }
   const auto json = network_analysis_json(p);
   assert(json.find("NETWORK_ANALYSIS") != std::string::npos);
   assert(json.find("\"variant\":\"dataframe\"") != std::string::npos);
