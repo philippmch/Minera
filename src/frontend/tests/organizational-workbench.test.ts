@@ -10,7 +10,7 @@ import {
 } from "../src/organizational-workbench";
 import { diagnosticCsv, diagnosticPage } from "../src/model-diagnostics";
 import { nativeCell, nativeJson, parseNativeJson } from "../src/native-json";
-import type { MineraExport } from "../src/types";
+import { isResourceProfilesResult, type MineraExport } from "../src/types";
 import type { LogQuerySchema } from "../src/log-query";
 
 const source: OrganizationalSource = {source_id: "cached:42", dataset: "orders.xes", case_count: 2, event_count: 4};
@@ -209,5 +209,43 @@ describe("native organizational shape, incomplete results and complete exports",
     const network = payload("network"); const edge = (network.edges as Array<Record<string, unknown>>)[0]; edge.performance = Array.from({length: 80}, (_, index) => index - 20);
     (network.diagnostics as Record<string, unknown>).performance_value_count = 80;
     const run = asRun("network", network); expect(run.tables.find(item => item.id === "network_performance")!.rows).toHaveLength(80); expect(organizationalAllTablesCsv(run)).toContain('"79"');
+  });
+});
+
+describe("empty native labels (recheck of d5b33ef, F1)", () => {
+  // Unchanged HTTP 200 bodies captured from the backend for a log whose only resource is empty.
+  const emptySource: OrganizationalSource = {source_id: "9", dataset: "empty-resource.xes", case_count: 1, event_count: 2};
+  const networkBody = '{"family": "NETWORK_ANALYSIS", "variant": "dataframe", "edges": [{"source": "", "target": "", "activity": "Review \\u03a9", "count": 1, "performance": [7]}], "diagnostics": {"computed": true, "output_truncated": false, "trace_count": 1, "event_count": 2, "link_count": 1, "row_count": 1, "performance_value_count": 1, "message": "ok"}, "input_context": {"source_id": "9", "dataset": "empty-resource.xes", "case_count": 1, "event_count": 2}}';
+  const profileBody = '{"family": "RESOURCE_PROFILES", "metric": "distinct_activities", "rows": [{"resource": "", "activity": "", "resource2": "", "value": 2, "count": 2}], "diagnostics": {"computed": true, "output_truncated": false, "trace_count": 1, "event_count": 2, "resource_count": 1, "message": "ok"}, "input_context": {"source_id": "9", "dataset": "empty-resource.xes", "case_count": 1, "event_count": 2}}';
+  const rolesBody = '{"family": "ROLE_DISCOVERY", "variant": "log", "roles": [], "diagnostics": {"computed": true, "output_truncated": false, "trace_count": 1, "event_count": 2, "activity_count": 0, "resource_count": 0, "role_count": 0, "message": "no resource activity pairs"}, "input_context": {"source_id": "9", "dataset": "empty-resource.xes", "case_count": 1, "event_count": 2}}';
+  it("runs the actual empty-label network, profile and roles responses through the workbench", async () => {
+    for (const [family, body] of [["network", networkBody], ["profiles", profileBody], ["roles", rolesBody]] as Array<[OrganizationalFamily, string]>) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body)));
+      const run = await runOrganizationalWorkbench(family, emptySource, defaultOrganizationalWorkbenchForm());
+      expect(run.raw).toBe(body); expect(organizationalWorkbenchReport(run)).toContain('"native_result"');
+    }
+  });
+  it("accepts each empty network label alone and keeps the structural and count checks", () => {
+    for (const key of ["source", "target", "activity"]) {
+      const value = payload("network"); (value.edges as Array<Record<string, unknown>>)[0][key] = "";
+      expect(isOrganizationalWorkbenchResult(value, "network")).toBe(true);
+      (value.edges as Array<Record<string, unknown>>)[0][key] = null; expect(isOrganizationalWorkbenchResult(value, "network")).toBe(false);
+    }
+    const network = parseNativeJson(networkBody) as Record<string, unknown>;
+    (network.diagnostics as Record<string, unknown>).link_count = 2; expect(isOrganizationalWorkbenchResult(network, "network")).toBe(false);
+  });
+  it("accepts an empty profile resource in both validators and still counts it", () => {
+    const profile = parseNativeJson(profileBody) as Record<string, unknown>;
+    expect(isOrganizationalWorkbenchResult(profile, "profiles")).toBe(true); expect(isResourceProfilesResult(profile)).toBe(true);
+    (profile.diagnostics as Record<string, unknown>).resource_count = 0;
+    expect(isOrganizationalWorkbenchResult(profile, "profiles")).toBe(false); expect(isResourceProfilesResult(profile)).toBe(false);
+    const missing = parseNativeJson(profileBody) as {rows: Array<Record<string, unknown>>}; missing.rows[0].resource = undefined;
+    expect(isOrganizationalWorkbenchResult(missing, "profiles")).toBe(false); expect(isResourceProfilesResult(missing)).toBe(false);
+  });
+  it("keeps the native role-label rules: an empty activity or resource name is not a role member", () => {
+    const role = payload("roles"); (role.roles as Array<{activities: string[]}>)[0].activities[0] = "";
+    expect(isOrganizationalWorkbenchResult(role, "roles")).toBe(false);
+    const resource = payload("roles"); (resource.roles as Array<{resources: Array<{name: string}>}>)[0].resources[0].name = "";
+    expect(isOrganizationalWorkbenchResult(resource, "roles")).toBe(false);
   });
 });

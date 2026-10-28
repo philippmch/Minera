@@ -286,35 +286,29 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
   std::vector<Ref> refs;
   refs.reserve(log.event_count());
   std::size_t input = 0;
-  bool numbers = false, texts = false, dates = false;
-  for (const auto& tr : log.traces) for (const auto& e : tr.events) {
-    auto key = sort_key(e, &tr, o.sorting_attribute);
-    numbers |= key.kind == SortKey::Kind::kNumber;
-    texts |= key.kind == SortKey::Kind::kText;
-    dates |= key.kind == SortKey::Kind::kDate;
-    refs.push_back({&e, &tr, input++, std::move(key)});
+  for (const auto& tr : log.traces) for (const auto& e : tr.events)
+    refs.push_back({&e, &tr, input++, sort_key(e, &tr, o.sorting_attribute)});
+  // sort_values on the object column (pandas' nargsort): numpy's default
+  // quicksort argsorts the non-missing values, so equal keys come out in its
+  // partition order (from 17 values on, not input order), then the missing
+  // ones follow in input order. The first pair it cannot compare is the
+  // error.
+  std::vector<std::size_t> present, missing;
+  for (std::size_t i = 0; i < refs.size(); ++i)
+    (refs[i].sort.kind == SortKey::Kind::kMissing ? missing : present).push_back(i);
+  std::vector<std::size_t> order;
+  try {
+    order = detail::numpy_object_quick_argsort(present.size(), [&](std::size_t a, std::size_t b) {
+      return python::compare(refs[present[a]].sort.value, refs[present[b]].sort.value);
+    });
+  } catch (const python::TypeError& error) {
+    throw std::invalid_argument(std::string("network analysis: ") + error.what());
   }
-  if (static_cast<int>(numbers) + static_cast<int>(texts) + static_cast<int>(dates) > 1) {
-    // sort_values argsorts the non-missing values; the first pair numpy's
-    // quicksort cannot compare is the error.
-    std::vector<const python::Scalar*> present_values;
-    for (const auto& ref : refs)
-      if (ref.sort.kind != SortKey::Kind::kMissing) present_values.push_back(&ref.sort.value);
-    try {
-      (void)detail::numpy_object_quick_argsort(present_values.size(), [&](std::size_t a, std::size_t b) {
-        return python::compare(*present_values[a], *present_values[b]);
-      });
-    } catch (const python::TypeError& error) {
-      throw std::invalid_argument(std::string("network analysis: ") + error.what());
-    }
-    throw std::invalid_argument("network analysis: '<' not supported between mixed sorting values");
-  }
-  std::stable_sort(refs.begin(), refs.end(), [](const Ref& a, const Ref& b) {
-    const bool a_missing = a.sort.kind == SortKey::Kind::kMissing;
-    const bool b_missing = b.sort.kind == SortKey::Kind::kMissing;
-    if (a_missing || b_missing) return !a_missing && b_missing;
-    return python::compare(a.sort.value, b.sort.value) < 0;
-  });
+  std::vector<Ref> sorted;
+  sorted.reserve(refs.size());
+  for (const auto i : order) sorted.push_back(std::move(refs[present[i]]));
+  for (const auto i : missing) sorted.push_back(std::move(refs[i]));
+  refs = std::move(sorted);
   for (std::size_t i = 0; i < refs.size(); ++i) refs[i].index = i;
   std::vector<const Ref*> successors(refs.size(), nullptr);
   std::map<std::string, const Ref*> next_by_relation;

@@ -4132,3 +4132,30 @@ there), parse numbers with `src/backend/full_double.hpp` rather than
 difference against several `PYTHONHASHSEED` values before treating it as a
 bug.
 
+## Recheck of d5b33ef (2026-10-28, cloud container)
+
+N1-N6 from the reviewer's recheck are fixed: no 128-bit integer type in core
+code (guarded by `minera_portable_integers`), network ties ordered by numpy's
+object quicksort, exact and numpy-typed run-key addition with float64 run
+comparison, NaN batch-tuple identity with pandas' shared "str" NaN and the
+reference's merge order (equal mixed-type representatives are no longer
+declared), Python float()/int() grammar for PNML stochastic properties, and
+empty native labels in the organizational workbench. Declared: the weight and
+priority range policy, seed-dependent set-order outcomes (plus two fuzz
+tables where CPython's set layout fixes a different failing pair), NaN
+object identity in object columns, and None labels. See "Recheck of d5b33ef" in the parity
+doc. The reviewer's cases and the fuzz cases are bound by
+`minera_recheck_d5b33ef_tests` (fixtures in
+`src/backend/tests/fixtures/recheck_d5b33ef/`). Regenerate them with the
+pinned reference environment:
+`python scripts/capture-recheck-d5b33ef-reference.py fuzz-run-keys|fuzz-org|fuzz-representatives ...`,
+then `filters` and `org` (40 hash seeds) for the public results and `pnml`
+for the property cases, and
+`python scripts/generate-recheck-d5b33ef-fixture.py <evidence> src/backend/tests/fixtures/recheck_d5b33ef --filters CASES RESULTS --org CASES RESULTS ... --pnml RESULTS`
+(pass the reviewer's org cases captured with `org` too, so their
+seed-dependent alternatives are listed).
+Lessons: compare a numeric run key as float64 (pandas shifts it to float64),
+model batch merging as remove-pair, append, sort and restart, treat a "str"
+column's missing cells as one `np.nan` object, and capture any result that
+may depend on set order over many hash seeds (40 here) before calling a
+difference a bug: two seeds missed several.

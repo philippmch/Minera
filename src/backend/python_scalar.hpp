@@ -285,6 +285,41 @@ inline int compare_integers(bool negative_a, std::string_view a, bool negative_b
   return negative_a ? -magnitude : magnitude;
 }
 
+// Python's int + int for two signed decimal magnitudes, exact at any width
+// and on every compiler (no 128-bit extension).
+inline Scalar add_integers(bool negative_a, std::string_view a, bool negative_b, std::string_view b) {
+  const auto digit = [](std::string_view d, std::size_t i) { return i < d.size() ? d[d.size() - 1 - i] - '0' : 0; };
+  std::string out;
+  bool negative = negative_a;
+  if (negative_a == negative_b) {
+    int carry = 0;
+    for (std::size_t i = 0; i < std::max(a.size(), b.size()) || carry; ++i) {
+      const int sum = digit(a, i) + digit(b, i) + carry;
+      out.push_back(static_cast<char>('0' + sum % 10));
+      carry = sum / 10;
+    }
+  } else {
+    // |larger| - |smaller|, signed like the larger magnitude.
+    if (compare_digits(a, b) < 0) {
+      std::swap(a, b);
+      negative = negative_b;
+    }
+    int borrow = 0;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      int difference = digit(a, i) - digit(b, i) - borrow;
+      borrow = difference < 0;
+      out.push_back(static_cast<char>('0' + difference + (borrow ? 10 : 0)));
+    }
+  }
+  while (out.size() > 1 && out.back() == '0') out.pop_back();
+  std::reverse(out.begin(), out.end());
+  Scalar s;
+  s.kind = Scalar::Kind::kInt;
+  s.digits = std::move(out);
+  s.negative = negative && s.digits != "0";
+  return s;
+}
+
 // Python's a < b / a > b for numbers, exact across int and float. NaN orders
 // with nothing (0).
 inline int compare_numbers(const Scalar& a, const Scalar& b) {

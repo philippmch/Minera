@@ -50,6 +50,10 @@ struct IndexedEvent {
   std::optional<ScalarValue> event_id;
   // A pandas NaN case id is a float in the reference's event tuples.
   bool case_nan = false;
+  // A NaN in a "str" column is pandas' one np.nan object, the same tuple
+  // member in every row; any other NaN is a float of its own row.
+  bool case_shared_nan = false;
+  bool event_id_shared_nan = false;
   ScalarValue case_value;
   ScalarValue activity_value;
   ScalarValue resource_value;
@@ -400,14 +404,15 @@ std::vector<Interval> heapified_intervals(const std::vector<IndexedEvent>& value
   return intervals;
 }
 
-// Adjacent intervals merge in place while the next starts strictly before
-// the current end; the list is sorted (Python's sort, which compares the
-// event sets on tied bounds) after the first merge and the scan repeats
-// until nothing merges.
+// When the next interval starts strictly before the current end, the pair
+// is removed, their union is appended, the list is sorted again (Python's
+// sort, which compares the event sets on tied bounds) and the scan starts
+// over, until nothing merges. Appending (rather than replacing the pair in
+// place) and restarting decide which of two equal events, such as case ids
+// 0 and 0.0, a batch keeps: a union keeps its left set's.
 void merge_overlapping(std::vector<Interval>& intervals,
                        const std::vector<std::string>& identities) {
   bool changed = true;
-  bool sorted = false;
   while (changed) {
     changed = false;
     std::size_t index = 0;
@@ -416,15 +421,13 @@ void merge_overlapping(std::vector<Interval>& intervals,
         ++index;
         continue;
       }
-      intervals[index] =
-          merged_interval(intervals[index], intervals[index + 1], identities);
-      intervals.erase(intervals.begin() +
-                      static_cast<std::ptrdiff_t>(index + 1));
+      auto merged = merged_interval(intervals[index], intervals[index + 1], identities);
+      intervals.erase(intervals.begin() + static_cast<std::ptrdiff_t>(index),
+                      intervals.begin() + static_cast<std::ptrdiff_t>(index + 2));
+      intervals.push_back(std::move(merged));
+      python::sort(intervals, interval_less);
       changed = true;
-      if (!sorted) {
-        python::sort(intervals, interval_less);
-        sorted = true;
-      }
+      index = 0;
     }
   }
 }
@@ -483,10 +486,11 @@ BatchType classify(const std::vector<BatchEvent>& events) {
 
 // One tuple member's identity, length-prefixed so that no member's text can
 // run into the next. A NaN is a float object of its own row, equal to no
-// other row's NaN (the reference boxes each float64 cell separately).
-std::string tuple_member(const ScalarValue& value, std::size_t row) {
+// other row's NaN (the reference boxes each float64 cell separately), unless
+// it is the np.nan a "str" column holds for every missing cell.
+std::string tuple_member(const ScalarValue& value, std::size_t row, bool shared_nan = false) {
   const auto id = value.kind == ScalarValue::Kind::kFloat && std::isnan(value.real)
-                      ? "Fnan#" + std::to_string(row)
+                      ? (shared_nan ? std::string("Fnan#shared") : "Fnan#" + std::to_string(row))
                       : python::identity(value);
   return std::to_string(id.size()) + ":" + id;
 }
@@ -495,21 +499,37 @@ std::string tuple_member(const ScalarValue& value, std::size_t row) {
 // tuples are one set member.
 std::string event_identity(const IndexedEvent& value, std::size_t row, bool include_event_id) {
   std::string key = tuple_member(python::real(value.event.start), row) +
-                    tuple_member(python::real(value.event.complete), row) + tuple_member(value.case_value, row);
-  if (include_event_id) key += tuple_member(value.event_id.value_or(python::none()), row);
+                    tuple_member(python::real(value.event.complete), row) +
+                    tuple_member(value.case_value, row, value.case_shared_nan);
+  if (include_event_id)
+    key += tuple_member(value.event_id.value_or(python::none()), row, value.event_id_shared_nan);
   return key;
 }
 
-// Python's ordering of two event tuples: the first differing member decides,
-// and a member pair that cannot be ordered raises.
-int compare_events(const IndexedEvent& a, const IndexedEvent& b, bool include_event_id) {
+// Whether two tuple members are the same (Python's `is`, then ==): a NaN is
+// the float of its own row, so two rows' NaNs differ (and order neither way),
+// except the shared np.nan of "str" columns.
+bool same_member(const ScalarValue& a, std::size_t row_a, bool shared_a,
+                 const ScalarValue& b, std::size_t row_b, bool shared_b) {
+  if (row_a == row_b) return true;
+  const auto nan = [](const ScalarValue& v) { return v.kind == ScalarValue::Kind::kFloat && std::isnan(v.real); };
+  if (nan(a) && nan(b)) return shared_a && shared_b;
+  if (nan(a) || nan(b)) return false;
+  return python::equal(a, b);
+}
+
+// Python's ordering of two event tuples: the first member pair that is not
+// the same decides with `<`, and a pair that cannot be ordered raises.
+int compare_events(const IndexedEvent& a, std::size_t row_a, const IndexedEvent& b, std::size_t row_b,
+                   bool include_event_id) {
   if (a.event.start != b.event.start) return a.event.start < b.event.start ? -1 : 1;
   if (a.event.complete != b.event.complete) return a.event.complete < b.event.complete ? -1 : 1;
-  if (!python::equal(a.case_value, b.case_value)) return compare_scalars(a.case_value, b.case_value);
+  if (!same_member(a.case_value, row_a, a.case_shared_nan, b.case_value, row_b, b.case_shared_nan))
+    return compare_scalars(a.case_value, b.case_value);
   if (!include_event_id) return 0;
   const auto id_a = a.event_id.value_or(python::none());
   const auto id_b = b.event_id.value_or(python::none());
-  if (python::equal(id_a, id_b)) return 0;
+  if (same_member(id_a, row_a, a.event_id_shared_nan, id_b, row_b, b.event_id_shared_nan)) return 0;
   return compare_scalars(id_a, id_b);
 }
 
@@ -560,7 +580,7 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
       // case (or id) with equal bounds cannot be ordered.
       auto ordered = interval.members;
       python::sort(ordered, [&](std::size_t left, std::size_t right) {
-        return compare_events(values[left], values[right], include_event_id) < 0;
+        return compare_events(values[left], left, values[right], right, include_event_id) < 0;
       });
       Batch batch;
       for (const auto member : ordered) batch.events.push_back(values[member].event);
@@ -642,7 +662,7 @@ void append_log_events(
                                                 options.case_id_attribute);
       BatchEvent batch_event{start, *complete, case_id, trace_index, event_index,
                              {}};
-      values.push_back(IndexedEvent{std::move(batch_event), activity, resource, std::nullopt, false,
+      values.push_back(IndexedEvent{std::move(batch_event), activity, resource, std::nullopt, false, false, false,
                                     text_scalar(case_id), text_scalar(activity), text_scalar(resource), false});
     }
   }
@@ -693,6 +713,13 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
                                            SelectorRole::kGeneric, "event id", true);
   const bool event_id_selected = !options.event_id_attribute.empty() &&
                                  event_id_selector.column.has_value();
+  // pandas' "str" columns hold one np.nan object for every missing cell.
+  const auto str_column = [&](const TableSelector& selector) {
+    return pandas && selector.column && *selector.column < table.dtypes.size() &&
+           table.dtypes[*selector.column] == "str";
+  };
+  const bool case_str = str_column(case_selector);
+  const bool event_id_str = event_id_selected && str_column(event_id_selector);
 
   // Polars requires a string (or categorical) case column, even when empty.
   if (polars && case_selector.column && *case_selector.column < table.dtypes.size()) {
@@ -756,9 +783,12 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
     constexpr double kNaT =
         static_cast<double>(std::numeric_limits<std::int64_t>::min()) / 1e9;
     if (pandas && (missing(activity_cell) || missing(resource_cell))) continue;
-    // A pd.NA case id stays pd.NA (str "<NA>"; comparing it raises).
-    const bool case_na = case_cell && std::holds_alternative<NativeNA>(case_cell->typed_value);
-    const bool pandas_case_nan = pandas && !case_na && missing(case_cell);
+    // A pd.NA case id stays pd.NA (str "<NA>"; comparing it raises), except
+    // in a "str" column, which holds it as np.nan.
+    const bool case_na = !case_str && case_cell && std::holds_alternative<NativeNA>(case_cell->typed_value);
+    // A "str" column holds every missing cell (None included) as np.nan.
+    const bool pandas_case_nan =
+        pandas && !case_na && (missing(case_cell) || (case_str && case_cell->is_null));
     // In an object column a missing case is None, not NaN: it orders against
     // nothing but None, so comparing it with another case id raises. Its
     // label stays the declared "nan".
@@ -817,9 +847,14 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
     // The selected event id stays a typed scalar (a null cell is None) so
     // equal ids of different types are one event and incomparable ids raise.
     std::optional<ScalarValue> event_id;
+    bool event_id_shared_nan = false;
     if (event_id_selected) {
       const auto& event_id_cell = *event_id_selector.column < row.size() ? row[*event_id_selector.column] : std::optional<EventAttribute>{};
       event_id = event_id_cell ? scalar_value(*event_id_cell) : python::none();
+      if (event_id_str && (!event_id_cell || event_id_cell->is_null || missing(&*event_id_cell))) {
+        event_id = python::real(std::numeric_limits<double>::quiet_NaN());
+        event_id_shared_nan = true;
+      }
     }
     BatchEvent batch_event{start_time, completion, case_id, 0, row_index,
                            event_id ? python::str(*event_id) : std::string{}};
@@ -829,6 +864,7 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
     auto activity_value = scalar_value(*activity_cell);
     auto resource_value = null_resource ? python::none() : scalar_value(*resource_cell);
     values.push_back(IndexedEvent{std::move(batch_event), activity, resource, std::move(event_id), pandas_case_nan,
+                                  pandas_case_nan && case_str, event_id_shared_nan,
                                   std::move(case_value), std::move(activity_value), std::move(resource_value),
                                   null_resource});
   }

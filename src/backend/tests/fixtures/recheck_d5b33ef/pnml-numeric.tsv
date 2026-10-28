@@ -1,0 +1,18 @@
+d5-pnml-weight-subnormal.pnml	OK 5e-324
+d5-pnml-weight-negative-subnormal.pnml	POLICY
+d5-pnml-weight-underflow-zero.pnml	OK 0.0
+d5-pnml-weight-negative-underflow-zero.pnml	OK -0.0
+d5-pnml-weight-minimum-normal.pnml	OK 2.2250738585072014e-308
+d5-pnml-weight-maximum-finite.pnml	OK 1.7976931348623157e+308
+d5-pnml-weight-overflow.pnml	POLICY
+d5-pnml-weight-nan.pnml	POLICY
+d5-pnml-weight-infinity.pnml	POLICY
+d5-pnml-weight-signed-inf.pnml	POLICY
+d5-pnml-weight-whitespace.pnml	OK 3.5
+d5-pnml-weight-underscore.pnml	OK 1000.5
+d5-pnml-weight-suffix.pnml	ERR could not convert string to float: '1.25junk'
+d5-pnml-weight-hex.pnml	ERR could not convert string to float: '0x1p+2'
+d5-pnml-weight-incomplete-exponent.pnml	ERR could not convert string to float: '1e'
+d5-pnml-weight-empty.pnml	ERR float() argument must be a string or a real number, not 'NoneType'
+d5-pnml-weight-unicode-digits.pnml	OK 3.5
+d5-pnml-weight-comma.pnml	ERR could not convert string to float: '1,5'

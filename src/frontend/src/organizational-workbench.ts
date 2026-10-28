@@ -167,7 +167,7 @@ export function isOrganizationalWorkbenchResult(value: unknown, family?: Organiz
     if (!RESOURCE_PROFILE_METRICS.includes(value.metric as typeof RESOURCE_PROFILE_METRICS[number]) || !Array.isArray(value.rows) || !diagnosticsShape(d, ["resource_count"])) return false;
     const resources = new Set<string>(), keys = new Set<string>();
     for (const row of value.rows) {
-      if (!object(row) || typeof row.resource !== "string" || !row.resource || typeof row.activity !== "string" || typeof row.resource2 !== "string" || numeric(row, "value") === undefined || unsigned(row, "count") === undefined) return false;
+      if (!object(row) || typeof row.resource !== "string" || typeof row.activity !== "string" || typeof row.resource2 !== "string" || numeric(row, "value") === undefined || unsigned(row, "count") === undefined) return false;
       const key = JSON.stringify([row.resource, row.activity, row.resource2]); if (keys.has(key)) return false; keys.add(key);
       const queriedZero = ["social_position", "interaction_two_resources"].includes(String(value.metric)) && unsigned(row, "count") === 0n && numeric(row, "value") === 0;
       if (!queriedZero) {resources.add(row.resource); if (row.resource2) resources.add(row.resource2);}
@@ -202,7 +202,7 @@ export function isOrganizationalWorkbenchResult(value: unknown, family?: Organiz
     if (value.variant !== "dataframe" || !Array.isArray(value.edges) || !diagnosticsShape(d, ["link_count", "row_count", "performance_value_count"])) return false;
     let links = 0n, performance = 0;
     for (const edge of value.edges) {
-      if (!object(edge) || !["source", "target", "activity"].every(key => typeof edge[key] === "string" && edge[key] !== "") || unsigned(edge, "count") === undefined || unsigned(edge, "count") === 0n || !Array.isArray(edge.performance) || !edge.performance.every((_, i) => numeric(edge.performance as unknown[], i) !== undefined)) return false;
+      if (!object(edge) || !["source", "target", "activity"].every(key => typeof edge[key] === "string") || unsigned(edge, "count") === undefined || unsigned(edge, "count") === 0n || !Array.isArray(edge.performance) || !edge.performance.every((_, i) => numeric(edge.performance as unknown[], i) !== undefined)) return false;
       links += unsigned(edge, "count")!; performance += edge.performance.length;
     }
     return equalCount(d, "row_count", value.edges.length) && (d.output_truncated ? unsigned(d, "link_count")! >= links && unsigned(d, "performance_value_count")! >= BigInt(performance) : equalCount(d, "link_count", links) && equalCount(d, "performance_value_count", performance));

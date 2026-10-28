@@ -347,40 +347,30 @@ bool column_equals(const Cell& cell, const Value& v) {
 }
 
 // Python's a + b for the values a dataframe holds: str + str concatenates,
-// numbers add (bool as int; exact for integers that fit 64 bits), anything
-// else raises the TypeError Python (or pandas' Timestamp) raises.
+// numbers add (bool as int, integers exactly at any width, a float side makes
+// the sum a float), anything else raises the TypeError Python (or pandas'
+// Timestamp) raises.
 python::Scalar python_add(const python::Scalar& a, const python::Scalar& b) {
   using K = python::Scalar::Kind;
   if (a.kind == K::kText && b.kind == K::kText) return python::text(a.text + b.text);
   if (a.kind == K::kText)
     fail("TypeError", "can only concatenate str (not \"" + python::type_name(b) + "\") to str");
   if (python::is_number(a) && python::is_number(b)) {
-    const auto as_double = [](const python::Scalar& s) {
-      if (s.kind == K::kBool) return s.boolean ? 1.0 : 0.0;
-      if (s.kind == K::kFloat) return s.real;
-      return std::strtod(python::str(s).c_str(), nullptr);
+    const auto as_integer = [](const python::Scalar& s) {
+      return s.kind == K::kBool ? python::integer(s.boolean ? 1 : 0) : s;
     };
     if (a.kind != K::kFloat && b.kind != K::kFloat) {
-      const auto as_int = [](const python::Scalar& s) -> std::optional<__int128> {
-        if (s.kind == K::kBool) return s.boolean ? 1 : 0;
-        if (s.digits.size() > 30) return std::nullopt;
-        __int128 v = 0;
-        for (const char d : s.digits) v = v * 10 + (d - '0');
-        return s.negative ? -v : v;
-      };
-      const auto x = as_int(a), y = as_int(b);
-      if (x && y) {
-        __int128 sum = *x + *y;
-        const bool negative = sum < 0;
-        unsigned __int128 magnitude = negative ? -static_cast<unsigned __int128>(sum) : static_cast<unsigned __int128>(sum);
-        std::string digits;
-        do {
-          digits.insert(digits.begin(), static_cast<char>('0' + static_cast<int>(magnitude % 10)));
-          magnitude /= 10;
-        } while (magnitude);
-        return *python::integer_literal((negative ? "-" : "") + digits);
-      }
+      const auto x = as_integer(a), y = as_integer(b);
+      return python::add_integers(x.negative, x.digits, y.negative, y.digits);
     }
+    // int + float converts the int to the nearest float, as float(int) does.
+    const auto as_double = [&](const python::Scalar& s) {
+      if (s.kind == K::kFloat) return s.real;
+      const auto i = as_integer(s);
+      const double value = std::strtod(python::str(i).c_str(), nullptr);
+      if (std::isinf(value)) fail("OverflowError", "int too large to convert to float");
+      return value;
+    };
     return python::real(as_double(a) + as_double(b));
   }
   // Timestamp + int raises pandas' own message; bool is not an int to it.
@@ -1001,20 +991,69 @@ EventTable pandas_suffix_filter_apply(const EventTable& df, const PandasFilterVa
   return position_filter(df, activity, parameters, false);
 }
 
+// numpy's add for two numeric columns (pandas adds column to column): int64
+// and uint64 wrap around modulo 2**64, bool + bool is logical or, bool joins
+// the other side's integer type, and int64 + uint64 or a float64 side adds as
+// float64. nullopt when either column is not one of those dtypes, so the
+// cells add as Python objects.
+std::optional<python::Scalar> numpy_column_add(const std::string& left, const std::string& right,
+                                               const python::Scalar& a, const python::Scalar& b) {
+  using K = python::Scalar::Kind;
+  const auto numeric = [](const std::string& dtype) {
+    return dtype == "int64" || dtype == "uint64" || dtype == "bool" || dtype == "float64";
+  };
+  if (!numeric(left) || !numeric(right)) return std::nullopt;
+  if (!python::is_number(a) || !python::is_number(b)) return std::nullopt;
+  const auto to_double = [](const python::Scalar& s) {
+    if (s.kind == K::kBool) return s.boolean ? 1.0 : 0.0;
+    if (s.kind == K::kFloat) return s.real;
+    return std::strtod(python::str(s).c_str(), nullptr);
+  };
+  // Two's-complement bits of an integer cell (it fits its column's type).
+  const auto bits = [](const python::Scalar& s) -> std::uint64_t {
+    if (s.kind == K::kBool) return s.boolean ? 1 : 0;
+    const std::uint64_t magnitude = std::strtoull(s.digits.c_str(), nullptr, 10);
+    return s.negative ? std::uint64_t(0) - magnitude : magnitude;
+  };
+  if (left == "bool" && right == "bool") return python::boolean(bits(a) | bits(b));
+  if (left == "float64" || right == "float64" || (left == "int64" && right == "uint64") ||
+      (left == "uint64" && right == "int64"))
+    return python::real(to_double(a) + to_double(b));
+  const std::uint64_t sum = bits(a) + bits(b);
+  if (left == "uint64" || right == "uint64") return python::unsigned_integer(sum);
+  return python::integer(static_cast<std::int64_t>(sum));
+}
+
 EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, const PandasFilterParameters& parameters) {
   const auto case_column = require_column(df, case_key(parameters));
   const auto act = require_column(df, activity_key(parameters));
   const auto filter_type = parameter_or(parameters, "FILTER_TYPE", "filter_type", Value::of("first"));
   // The run key is case id + activity, row by row over the rows where both
-  // are present: two str concatenate, two numbers add, and the first pair
-  // that does not add raises Python's TypeError.
+  // are present: two numeric columns add as numpy does, otherwise two str
+  // concatenate, two numbers add, and the first pair that does not add raises
+  // Python's TypeError.
+  const auto dtype = [&](std::size_t c) { return c < df.dtypes.size() ? df.dtypes[c] : std::string("object"); };
   std::vector<std::optional<python::Scalar>> run_keys(df.size());
+  // A numeric key column is compared with its shifted copy, which pandas
+  // holds as float64: neighbouring int64 or uint64 keys are equal when their
+  // doubles are (a bool key shifts to object and compares exactly).
+  bool float_keys = false;
   for (std::size_t i = 0; i < df.size(); ++i) {
     const auto& c = df.rows[i][case_column];
     const auto& a = df.rows[i][act];
     if (null_cell(c) || null_cell(a)) continue;
-    run_keys[i] = python_add(scalar_of(c), scalar_of(a));
+    const auto x = scalar_of(c), y = scalar_of(a);
+    if (auto sum = numpy_column_add(dtype(case_column), dtype(act), x, y)) {
+      float_keys = float_keys || sum->kind != python::Scalar::Kind::kBool;
+      run_keys[i] = std::move(*sum);
+    } else {
+      run_keys[i] = python_add(x, y);
+    }
   }
+  if (float_keys)
+    for (auto& key : run_keys)
+      if (key && key->kind != python::Scalar::Kind::kFloat)
+        key = python::real(std::strtod(python::str(*key).c_str(), nullptr));
   const bool first = filter_type.kind == Kind::kString && filter_type.text == "first";
   const bool last = filter_type.kind == Kind::kString && filter_type.text == "last";
   if (!first && !last) {

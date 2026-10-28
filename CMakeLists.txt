@@ -666,6 +666,17 @@ if(MINERA_BUILD_TESTS)
                    --timestamp-column time:timestamp)
   set_tests_properties(minera_recheck_c8ee22d_zeta_cli PROPERTIES
     PASS_REGULAR_EXPRESSION "\"elapsed_seconds\":3,\"standard_deviation_distance\":2")
+  add_executable(minera_recheck_d5b33ef_tests src/backend/tests/test_recheck_d5b33ef.cpp)
+  target_link_libraries(minera_recheck_d5b33ef_tests PRIVATE minera::core)
+  target_compile_features(minera_recheck_d5b33ef_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_recheck_d5b33ef_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_recheck_d5b33ef_tests
+           COMMAND minera_recheck_d5b33ef_tests
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_d5b33ef")
+  # MSVC has no 128-bit integer type or GCC builtins; core code stays portable.
+  add_test(NAME minera_portable_integers
+           COMMAND ${CMAKE_COMMAND} -DMINERA_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/check_portable_integers.cmake")
   add_executable(minera_root_cause_tests src/backend/tests/test_root_cause.cpp)
   target_link_libraries(minera_root_cause_tests PRIVATE minera::core)
   target_compile_features(minera_root_cause_tests PRIVATE cxx_std_20)

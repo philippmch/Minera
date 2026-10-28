@@ -16035,3 +16035,68 @@ Declared (not equivalent, kept on purpose):
   is missing); they are reference failures, not expectations. The weighted
   Woflan analysis, the 65572296 and 61ebeee0 declarations and the earlier DC4,
   C3, streaming and Windows declarations stay in force.
+
+## Recheck of d5b33ef: fixes and declarations (2026-10-28)
+
+The recheck of d5b33ef (reviewer handoff and evidence
+`minera-recheck-d5b33ef/`) reported six targets (N1-N6) beyond the M1-M10
+reproductions. Each behavioral fix was reproduced against public PM4Py 2.7.22
+calls and fuzzed past the reviewer's cases until native and reference agreed
+(filters: 1,800 random tables over wide object integers and typed int64,
+uint64, bool and float64 case and activity columns; organizational: 1,517
+random network tables with tied, paired and missing sorting keys over 2-90
+rows, and 2,483 random batch tables with NaN, None and equal mixed-type case
+and event ids in object, str and float64 columns, 1,000 of them for the merge
+representative; PNML: 83 stochastic property texts). Reference results that
+depend on Python's hash seed were captured over 40 `PYTHONHASHSEED` values.
+`minera_recheck_d5b33ef_tests` binds the reviewer's 182 filtering cases, 101
+organizational cases, six tied-sort XES logs and 18 PNML weight fixtures, plus
+600 filter, 1,400 organizational and 83 PNML property fuzz cases
+with their saved reference results (`src/backend/tests/fixtures/recheck_d5b33ef/`,
+written by `scripts/generate-recheck-d5b33ef-fixture.py` from the evidence and
+`scripts/capture-recheck-d5b33ef-reference.py` output);
+`minera_portable_integers` fails when core code uses a 128-bit integer type,
+`_BitInt` or a GCC builtin outside comments.
+
+| ID | Fix | Test |
+| --- | --- | --- |
+| N1 | The run-key addition no longer uses `__int128`: Python's `int + int` is exact decimal addition at any width (`python::add_integers`), which MSVC compiles like any other code. | `minera_portable_integers`; the Windows CI job |
+| N2 | Network analysis orders events as pandas' `sort_values` does on the object sorting column: numpy's default quicksort argsorts the non-missing keys, so equal keys come out in its partition order from 17 rows on (not input order), then the missing keys follow in input order. Successor links and durations follow that order (R0 to R14 with duration 14 for the reviewer's 17 tied rows). | same (reviewer wider cases, network fuzz); `network-cli.tsv` (6/6 XES logs) |
+| N3 | Consecutive activity/case grouping adds the case and activity cells exactly at any width (`10**30` and `10**30 + 1` stay two runs). Generalized by fuzzing typed columns: two numeric columns add as numpy does (int64 and uint64 wrap modulo 2**64, bool + bool is a logical or, int64 + uint64 or a float64 side adds as float64), and a numeric run key is compared with its shifted copy, which pandas holds as float64, so neighbouring int64 or uint64 keys are one run when their doubles are equal; bool keys compare exactly. | same (reviewer d5-neighbors cases, run-key fuzz) |
+| N4 | A NaN in a batch event tuple is the float of its own row: two rows' NaN case ids are different members and order neither way, so the comparison stops there and never reaches the event ids (the reviewer's `1` and `"1"` ids no longer raise). A "str" column holds pandas' one `np.nan` object for every missing cell (None, NaN or NA), so those NaNs are the same member, as in the reference. Merging overlapping intervals now follows the reference exactly: the overlapping pair is removed, their union appended, the list sorted again and the scan restarted, and a union keeps its left set's members, which decides which of two equal values (`0`, `0.0`, `False`) a batch reports for case and event ids. | same (nan-case-order 4/4, wider cases, batch and representative fuzz) |
+| N5 | PNML stochastic properties convert as PM4Py converts them while the document is read: `weight` with Python's `float()` over the whole text (Unicode digits and whitespace, underscores only between digits, `inf`/`infinity`/`nan` in any case, overflow to infinity, underflow to a subnormal or zero; hexadecimal, a trailing suffix, `1e` and `1,5` raise `could not convert string to float: ...`), `priority` with `int()` (`invalid literal for int() with base 10: ...`), and `invisible` true only for `true` in any case. An empty property element is None in the reference and raises float()'s, int()'s or `.lower()`'s error; an absent one keeps the default. | same (`pnml-numeric.tsv` 13/13 plus the policy cases, `pnml-properties.tsv.gz`) |
+| N6 | The organizational workbench and `isResourceProfilesResult` accept empty native labels (network source, target and activity, profile resource), keeping the structural and count checks; role labels keep their own rules. | `organizational-workbench.test.ts` |
+
+Declared (not equivalent, kept on purpose):
+
+- **Weight and priority range.** Native activation weights must be finite and
+  non-negative and priorities must fit a native int; PM4Py keeps any float
+  (`inf`, `nan`, `-5e-324`) and any Python int. Native raises a policy error
+  for those, which the test checks.
+- **Set-order outcomes.** When a batch's event tuples or merged sets hold
+  values that cannot be compared, which pair the reference compares first
+  depends on the iteration order of a Python set and, with NaN ids, on
+  object identity: over 40 hash seeds the same input names different pairs
+  (or `boolean value of NA is ambiguous`) and some inputs even succeed under
+  one seed and raise under another (the reviewer's five qualified message
+  cases are of this kind, and native's message is among the reference's).
+  The test lists every observed result and accepts any. Two of the 1,400
+  fuzz tables are the remaining layout case: the tuples whose comparison
+  fails first hold no strings or NaN, so CPython's hash-table layout puts
+  them first under every seed, while native sorts the set in insertion order
+  and names another failing pair of the same inputs; both raise TypeError
+  (`DECLARED set-layout` in the fixture).
+- **NaN object identity in object columns.** An object column holding one NaN
+  object in several cells dedupes those event ids in the reference; native
+  reads cells from files, where every NaN is its own value (the reference's
+  float64 columns and separately created NaNs agree, and "str" columns now
+  share their NaN as the reference does).
+- **None labels.** A None event id is listed as the text `None` and a None case
+  id in an object column as `nan` in native batch events, where the reference
+  tuple holds None.
+- **Equal mixed-type representatives** are no longer declared: the merge
+  model above reports the reference's value for case and event ids (1,000
+  fuzz tables, all representatives equal).
+- MSVC is not available in the cloud container; the Windows CI job is the
+  build check. Earlier declarations (c8ee22d, 65572296, 61ebeee0, DC4, C3,
+  streaming, Windows) stay in force.

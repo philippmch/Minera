@@ -20,7 +20,7 @@
 #include "xml_pull_parser.hpp"
 #include "pnml_arc_weight.hpp"
 #include "root_cause_unicode.hpp"
-#include "full_double.hpp"
+#include "python_float_text.hpp"
 
 namespace minera {
 namespace {
@@ -586,7 +586,9 @@ char32_t pnml_codepoint(const std::string& value, std::size_t& position) {
   return code;
 }
 
-std::string pnml_integer_literal(const std::string& value) {
+// Python repr() of a str; int() messages cut it to 200 code points (%.200R),
+// float() messages keep it whole.
+std::string pnml_integer_literal(const std::string& value, std::size_t limit = 200) {
   const char quote = value.find('\'') != std::string::npos && value.find('"') == std::string::npos ? '"' : '\'';
   std::string result(1, quote);
   constexpr char hex[] = "0123456789abcdef";
@@ -607,7 +609,7 @@ std::string pnml_integer_literal(const std::string& value) {
   }
   result += quote;
   std::size_t end = 0;
-  for (unsigned count = 0; end < result.size() && count < 200; ++count)
+  for (std::size_t count = 0; end < result.size() && count < limit; ++count)
     (void)pnml_codepoint(result, end);
   result.resize(end);
   return result;
@@ -633,6 +635,35 @@ TokenInteger parse_token_count(const std::string& text, bool public_markings) {
           std::to_string(digits) + " digits; use sys.set_int_max_str_digits() to increase the limit");
   }
   return value.negative ? -value.magnitude : value.magnitude;
+}
+
+// A stochastic priority property read as int(text): the int() grammar and
+// messages of public markings, then the native int range.
+int parse_stochastic_priority(const std::string& text) {
+  if (text.empty())
+    throw std::runtime_error("int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
+  const auto value = parse_token_count(text, true);
+  if (value < TokenInteger(std::numeric_limits<int>::min()) || value > TokenInteger(std::numeric_limits<int>::max()))
+    throw std::runtime_error("PNML stochastic priority is outside the native integer range");
+  return static_cast<int>(value);
+}
+
+// A stochastic activation weight read as float(text). Non-finite and negative
+// weights still reach the stochastic-map validation.
+double parse_stochastic_weight(const std::string& text) {
+  if (text.empty())
+    throw std::runtime_error("float() argument must be a string or a real number, not 'NoneType'");
+  const auto value = detail::parse_python_float_text(text);
+  if (!value)
+    throw std::runtime_error("could not convert string to float: " +
+                             pnml_integer_literal(text, std::numeric_limits<std::size_t>::max()));
+  return *value;
+}
+
+std::string ascii_lower(std::string text) {
+  for (auto& ch : text)
+    if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+  return text;
 }
 
 // True when `stack` (element names from the document root down) ends with the
@@ -779,7 +810,12 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     return true;
   };
 
-  std::string stochastic_property_key;
+  // A stochastic <property> reads its element text (the text before any
+  // child), as the public importer does: an empty element is a missing
+  // value, and weight/priority/invisible convert like float(), int() and
+  // .lower() == "true".
+  struct PropertyText { std::string key; std::size_t depth; std::string value; bool first_segment = true; };
+  std::optional<PropertyText> property_text;
   struct ArcText { bool inscription; std::size_t depth; std::string value; bool first_segment = true; };
   std::optional<ArcText> arc_text;
   struct LabelText { std::size_t depth; std::string value; bool first_segment = true; };
@@ -797,6 +833,21 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (marking_text->initial) places.back().initial_tokens = count;
     else final_marking.back().second = count;
     marking_text.reset();
+  };
+  const auto finish_property_text = [&] {
+    auto& transition = transitions.back();
+    const auto& key = property_text->key;
+    const auto& value = property_text->value;
+    if (!value.empty()) transition.has_stochastic_data = true;
+    if (key == "distributionType") transition.distribution_type = value;
+    else if (key == "distributionParameters") transition.distribution_parameters = value;
+    else if (key == "priority") transition.priority = parse_stochastic_priority(value);
+    else if (key == "weight") transition.weight = parse_stochastic_weight(value);
+    else if (key == "invisible") {
+      if (value.empty()) throw std::runtime_error("'NoneType' object has no attribute 'lower'");
+      if (ascii_lower(value) == "true") transition.invisible = true;
+    }
+    property_text.reset();
   };
   const auto finish_label_text = [&] {
     if (!label_text->value.empty() && !transitions.back().has_named_label) {
@@ -821,20 +872,6 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (stack_ends_with(stack, {"place", "initialMarking", "text"}) &&
         !places.empty()) {
       places.back().initial_tokens = parse_token_count(value, public_markings);
-    } else if (stack_ends_with(stack, {"transition", "toolspecific", "property"}) &&
-               !transitions.empty() && !stochastic_property_key.empty()) {
-      auto& transition = transitions.back();
-      transition.has_stochastic_data = true;
-      if (stochastic_property_key == "distributionType")
-        transition.distribution_type = value;
-      else if (stochastic_property_key == "distributionParameters")
-        transition.distribution_parameters = value;
-      else if (stochastic_property_key == "priority")
-        transition.priority = std::stoi(value);
-      else if (stochastic_property_key == "weight")
-        transition.weight = ::minera::detail::stod(value);
-      else if (stochastic_property_key == "invisible" && value == "true")
-        transition.invisible = true;
     } else if (stack_ends_with(stack, {"marking", "place", "text"}) &&
                (markings_seen == 1 || public_markings) && !final_marking.empty() &&
                final_marking.back().first == final_place_ref) {
@@ -858,6 +895,11 @@ PnmlDocument parse_pnml_document(std::string_view xml,
           label_text->value += token.text;
         continue;
       }
+      if (property_text) {
+        if (property_text->first_segment && stack.size() == property_text->depth)
+          property_text->value += token.text;
+        continue;
+      }
       if (arc_text) {
         if (arc_text->first_segment && stack.size() == arc_text->depth)
           arc_text->value += token.text;
@@ -870,6 +912,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       if (marking_text) marking_text->first_segment = false;
       if (arc_text) arc_text->first_segment = false;
       if (label_text) label_text->first_segment = false;
+      if (property_text) property_text->first_segment = false;
       continue;
     }
     if (token.kind == detail::XmlPullParser::Kind::StartElement) {
@@ -894,10 +937,14 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         arc_text = ArcText{stack.back() == "inscription", stack.size() + 1, {}};
         if (token.self_closing) finish_arc_text();
       }
-      if (token.name == "property" &&
+      if (property_text) property_text->first_segment = false;
+      if (in_net && !transitions.empty() && token.name == "property" &&
           stack_ends_with(stack, {"transition", "toolspecific"})) {
         const auto* key = detail::attribute(token.attributes, "key");
-        stochastic_property_key = key ? *key : std::string{};
+        if (key && !key->empty()) {
+          property_text = PropertyText{*key, stack.size() + 1, {}};
+          if (token.self_closing) finish_property_text();
+        }
       }
       const bool entered = open(token);
       if (!token.self_closing) stack.push_back(token.name);
@@ -925,9 +972,10 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       finish_arc_text();
     if (label_text && token.name == "text" && stack.size() == label_text->depth)
       finish_label_text();
+    if (property_text && token.name == "property" && stack.size() == property_text->depth)
+      finish_property_text();
     while (!stack.empty() && stack.back() != token.name) stack.pop_back();
     if (!stack.empty()) stack.pop_back();
-    if (token.name == "property") stochastic_property_key.clear();
     if (token.name == "net") in_net = false;
   }
 
