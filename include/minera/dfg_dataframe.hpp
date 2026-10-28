@@ -2,6 +2,7 @@
 
 #include <any>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <optional>
@@ -88,6 +89,17 @@ struct DfgTableResult {
   DfgTableMeasure measure = DfgTableMeasure::kFrequency;
   DfgFrequency frequency;
   DfgPerformance performance;
+  // Polars only: the lazy adapter keeps performance edges whose source
+  // activity is null (frequency drops them). They are keyed here by target
+  // activity, since an activity pair cannot hold a null.
+  std::map<std::string, DfgPerformanceStatistics> null_source_performance;
+};
+
+// Polars frequency triples keep a null first activity; those triples are
+// keyed by their second and third activities in `null_first`.
+struct DfgTripleTable {
+  DfgTripleFrequency triples;
+  std::map<DfgActivityPair, std::uint64_t> null_first;
 };
 
 struct DfgPartialOrderPair {
@@ -205,6 +217,8 @@ struct DfgConcurrentResult {
 [[nodiscard]] DfgTripleFrequency discover_pandas_frequency_triples(
     const EventTable& table, const DfgTableOptions& options = {});
 [[nodiscard]] DfgTripleFrequency discover_polars_frequency_triples(
+    const LazyEventTable& table, const DfgTableOptions& options = {});
+[[nodiscard]] DfgTripleTable discover_polars_frequency_triple_table(
     const LazyEventTable& table, const DfgTableOptions& options = {});
 
 [[nodiscard]] inline DfgTripleFrequency get_freq_triples(

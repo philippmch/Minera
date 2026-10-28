@@ -666,6 +666,56 @@ void event_log_projection_selector_contract() {
 
 }  // namespace
 
+// Polars null handling and aggregation keys (fresh public comparison).
+void polars_null_and_aggregation_contract() {
+  const auto event = [](const char* activity, const char* time) {
+    return row({value("case:concept:name", "c"),
+                activity ? value("concept:name", activity) : null_value("concept:name"),
+                time ? value("time:timestamp", time) : null_value("time:timestamp")});
+  };
+  // [null, a, b]: frequency drops the null source, performance keeps it.
+  auto table = make_table({"case:concept:name", "concept:name", "time:timestamp"},
+                          {event(nullptr, "2020-01-01T00:00:00Z"),
+                           event("a", "2020-01-01T00:01:00Z"),
+                           event("b", "2020-01-01T00:02:00Z")});
+  DfgTableOptions options;
+  options.measure = DfgTableMeasure::kBoth;
+  auto lazy = discover_polars_dfg(LazyEventTable::from_table(table), options);
+  assert(lazy.frequency.size() == 1 && count(lazy.frequency, "a", "b") == 1);
+  assert(lazy.performance.size() == 1 && lazy.null_source_performance.size() == 1);
+  assert(std::get<double>(lazy.null_source_performance.at("a").value) == 60.0);
+  auto triples = discover_polars_frequency_triple_table(LazyEventTable::from_table(table), options);
+  assert(triples.triples.empty() && triples.null_first.at({"a", "b"}) == 1);
+  const auto eager = discover_pandas_dfg(table, options);
+  assert(eager.performance.size() == 1 && eager.null_source_performance.empty());
+
+  // A null timestamp sorts first and leaves its edge with a null duration.
+  table = make_table({"case:concept:name", "concept:name", "time:timestamp"},
+                     {event("a", "2020-01-01T00:00:00Z"), event("b", nullptr),
+                      event("c", "2020-01-02T00:00:00Z")});
+  lazy = discover_polars_dfg(LazyEventTable::from_table(table), options);
+  assert(count(lazy.frequency, "b", "a") == 1 && count(lazy.frequency, "a", "c") == 1);
+  assert(std::isnan(std::get<double>(lazy.performance.at({"b", "a"}).value)));
+  assert(std::get<double>(lazy.performance.at({"a", "c"}).value) == 86400.0);
+  // A Polars sum over only null durations is 0, not null.
+  options.performance_aggregation = DfgPerformanceAggregation::kSum;
+  lazy = discover_polars_dfg(LazyEventTable::from_table(table), options);
+  assert(std::get<double>(lazy.performance.at({"b", "a"}).value) == 0.0);
+
+  // The lazy adapter has no stdev or raw_values aggregation.
+  for (const auto aggregation : {DfgPerformanceAggregation::kStandardDeviation,
+                                 DfgPerformanceAggregation::kRawValues}) {
+    options.performance_aggregation = aggregation;
+    bool rejected = false;
+    try { (void)discover_polars_dfg(LazyEventTable::from_table(table), options); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+    (void)discover_pandas_dfg(table, options);
+  }
+  options.measure = DfgTableMeasure::kFrequency;
+  (void)discover_polars_dfg(LazyEventTable::from_table(table), options);
+}
+
 int main() {
   graph_measure_selectors_and_ordering();
   dataframe_triples_contract();
@@ -677,5 +727,6 @@ int main() {
   concurrency_contracts();
   first_class_selector_contract();
   event_log_projection_selector_contract();
+  polars_null_and_aggregation_contract();
   return 0;
 }

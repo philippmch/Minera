@@ -18,7 +18,13 @@ namespace {
 struct ActivitySequence {
   std::string case_id;
   std::vector<MinimumSelfDistanceActivity> activities;
+  // The Polars adapter groups null case ids together but gives each of
+  // their rows the same position, so a repeat there wraps the unsigned
+  // 32-bit distance.
+  bool null_case = false;
 };
+
+constexpr std::uint64_t kPolarsNullCaseDistance = 4294967295u;
 
 struct DistanceSegment {
   MinimumSelfDistanceActivity activity;
@@ -496,6 +502,48 @@ std::vector<ActivitySequence> table_sequences(
                         });
 }
 
+bool is_null_cell(const EventAttribute* field) {
+  return field == nullptr || field->is_null ||
+         field->first_class_state == FirstClassAttributeState::kNull;
+}
+
+// The Polars adapter keeps null activities as their own label and groups
+// null case ids into one sequence; only a selector naming no column fails.
+std::vector<ActivitySequence> polars_table_sequences(
+    const EventTable& table, const MinimumSelfDistanceOptions& options) {
+  table.validate();
+  const auto activity_key = effective_activity_key(options);
+  const auto case_id_key = effective_case_id_key(options);
+  const auto has_column = [&](const std::string& key) {
+    return std::find(table.columns.begin(), table.columns.end(), key) !=
+           table.columns.end();
+  };
+  if (!has_column(activity_key) || !has_column(case_id_key))
+    return table_sequences(table, options);
+  std::vector<ActivitySequence> sequences;
+  std::map<std::optional<std::string>, std::size_t> groups;
+  for (const auto& row : table.rows) {
+    const auto* activity = find_activity_table_field(table, row, activity_key);
+    const auto* case_id = find_table_field(
+        table, row, case_id_key, FirstClassAttributeRole::kCaseId,
+        {"case_id", "case:id", "case:concept:name"});
+    const auto key = is_null_cell(case_id)
+                         ? std::optional<std::string>{}
+                         : std::optional<std::string>{case_id->value};
+    const auto [found, inserted] = groups.emplace(key, sequences.size());
+    if (inserted) {
+      ActivitySequence sequence;
+      sequence.case_id = key.value_or("");
+      sequence.null_case = !key;
+      sequences.push_back(std::move(sequence));
+    }
+    sequences[found->second].activities.push_back(
+        is_null_cell(activity) ? MinimumSelfDistanceActivity{}
+                               : MinimumSelfDistanceActivity{activity->value});
+  }
+  return sequences;
+}
+
 DiscoveryData discover_from_sequences(std::vector<ActivitySequence> sequences) {
   DiscoveryData data;
   data.sequences = std::move(sequences);
@@ -509,8 +557,10 @@ DiscoveryData discover_from_sequences(std::vector<ActivitySequence> sequences) {
       const auto& activity = activities[index];
       const auto found = previous.find(activity);
       if (found != previous.end()) {
-        const auto distance = static_cast<std::uint64_t>(
-            index - found->second.first - 1);
+        const auto distance =
+            data.sequences[sequence_index].null_case
+                ? kPolarsNullCaseDistance
+                : static_cast<std::uint64_t>(index - found->second.first - 1);
         data.segments.push_back(
             {activity, sequence_index, found->second.second, index, distance});
         const auto minimum = minima.find(activity);
@@ -626,8 +676,10 @@ MinimumSelfDistances discover_minimum_self_distances(
 MinimumSelfDistances discover_minimum_self_distances(
     const EventTable& table, const MinimumSelfDistanceOptions& options) {
   validate_variant(options.variant);
-  return attach_witnesses(
-      discover_from_sequences(table_sequences(table, options)));
+  return attach_witnesses(discover_from_sequences(
+      options.variant == MinimumSelfDistanceVariant::kPolars
+          ? polars_table_sequences(table, options)
+          : table_sequences(table, options)));
 }
 
 MinimumSelfDistances discover_minimum_self_distances(

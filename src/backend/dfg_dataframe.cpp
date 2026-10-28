@@ -517,21 +517,21 @@ std::vector<TableRow> read_rows(const EventTable& table,
   return rows;
 }
 
-void sort_rows(std::vector<TableRow>& rows, const DfgTableOptions& options) {
+// Missing timestamps sort last, except that Polars sorts them first.
+void sort_rows(std::vector<TableRow>& rows, const DfgTableOptions& options,
+               bool nulls_first = false) {
   if (!options.sort_caseid_required) return;
+  const double missing = nulls_first ? -std::numeric_limits<double>::infinity()
+                                     : std::numeric_limits<double>::infinity();
   std::stable_sort(rows.begin(), rows.end(), [&](const TableRow& lhs,
                                                  const TableRow& rhs) {
     if (lhs.case_value != rhs.case_value) return lhs.case_value < rhs.case_value;
     if (options.sort_timestamp_along_case_id) {
-      const auto lhs_start = lhs.start.value_or(
-          lhs.completion.value_or(std::numeric_limits<double>::infinity()));
-      const auto rhs_start = rhs.start.value_or(
-          rhs.completion.value_or(std::numeric_limits<double>::infinity()));
+      const auto lhs_start = lhs.start.value_or(lhs.completion.value_or(missing));
+      const auto rhs_start = rhs.start.value_or(rhs.completion.value_or(missing));
       if (lhs_start != rhs_start) return lhs_start < rhs_start;
-      const auto lhs_complete =
-          lhs.completion.value_or(std::numeric_limits<double>::infinity());
-      const auto rhs_complete =
-          rhs.completion.value_or(std::numeric_limits<double>::infinity());
+      const auto lhs_complete = lhs.completion.value_or(missing);
+      const auto rhs_complete = rhs.completion.value_or(missing);
       if (lhs_complete != rhs_complete) return lhs_complete < rhs_complete;
     }
     return lhs.original_position < rhs.original_position;
@@ -843,14 +843,26 @@ DfgPerformanceValue select_value(const DfgPerformanceSummary& summary,
   throw std::invalid_argument("DFG table discovery: unsupported aggregation");
 }
 
-void finish_performance(const std::map<DfgActivityPair, std::vector<double>>& values,
-                        const DfgTableOptions& options, DfgPerformance& output) {
-  for (const auto& [pair, observations] : values) {
-    const auto summary = summarize_values(observations);
-    output.emplace(pair, DfgPerformanceStatistics{
-                             summary, observations,
-                             select_value(summary, observations, options)});
-  }
+DfgPerformanceStatistics performance_statistics(
+    const std::vector<double>& observations, const DfgTableOptions& options,
+    bool polars) {
+  auto summary = summarize_values(observations);
+  // Polars aggregates skip null durations and give null (NaN here) for an
+  // edge with none left (except sum, which is 0), and a null sample
+  // deviation for one observation.
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  if (polars && observations.empty())
+    summary = {0, nan, nan, nan, nan, nan, 0.0};
+  if (polars && observations.size() == 1) summary.standard_deviation = nan;
+  return {summary, observations, select_value(summary, observations, options)};
+}
+
+template <typename Key>
+void finish_performance(const std::map<Key, std::vector<double>>& values,
+                        const DfgTableOptions& options, bool polars,
+                        std::map<Key, DfgPerformanceStatistics>& output) {
+  for (const auto& [key, observations] : values)
+    output.emplace(key, performance_statistics(observations, options, polars));
 }
 
 using PairPositions = std::vector<std::pair<std::size_t, std::size_t>>;
@@ -908,12 +920,20 @@ DfgTableResult discover_table_dfg(const EventTable& table,
   const bool requires_completion =
       computes_duration ||
       (backend == DfgTableBackend::kPandas && timestamp_sort_requested);
+  const bool polars = backend == DfgTableBackend::kPolars;
+  if (polars && computes_duration && !options.custom_aggregation) {
+    // The lazy adapter names its aggregations differently from the eager one.
+    if (options.performance_aggregation == DfgPerformanceAggregation::kStandardDeviation)
+      throw std::invalid_argument("Unsupported aggregation key: stdev");
+    if (options.performance_aggregation == DfgPerformanceAggregation::kRawValues)
+      throw std::invalid_argument("'ExprListNameSpace' object is not callable");
+  }
   auto rows = read_rows(table, options, backend, reads_timestamps,
                         reads_timestamps,
                         false, options.measure == DfgTableMeasure::kCost, false,
                         backend == DfgTableBackend::kPandas,
                         requires_completion);
-  sort_rows(rows, options);
+  sort_rows(rows, options, polars);
   assign_generated_indices(rows);
   const auto pairs = graph_pairs(rows, options, backend);
 
@@ -947,12 +967,26 @@ DfgTableResult discover_table_dfg(const EventTable& table,
       (backend == DfgTableBackend::kPolars &&
        !options.start_timestamp_attribute && conventional_start_column &&
        timestamp_column && *conventional_start_column != *timestamp_column);
+  // Polars keeps an edge whose duration is null and one whose source activity
+  // is null in the performance result, but neither counts in frequency.
+  std::map<std::string, std::vector<double>> null_source_values;
+  std::set<std::pair<std::string, std::string>> kept_null_source;
   for (const auto [source_position, target_position] : pairs) {
     const auto& source = rows[source_position];
     const auto& target = rows[target_position];
-    if (!source.activity_value || !target.target_activity_value ||
-        !source.case_value)
+    if (!target.target_activity_value || !source.case_value) continue;
+    if (!source.activity_value) {
+      if (!polars || !calculate_performance ||
+          options.measure == DfgTableMeasure::kCost)
+        continue;
+      if (options.keep_once_per_case &&
+          !kept_null_source.emplace(*source.case_value, *target.target_activity_value).second)
+        continue;
+      auto& values = null_source_values[*target.target_activity_value];
+      if (source.completion && target.start)
+        values.push_back(flow_time(source, target, options, clamp_start));
       continue;
+    }
     const DfgActivityPair pair{*source.activity_value,
                                *target.target_activity_value};
     if (options.keep_once_per_case) {
@@ -966,12 +1000,17 @@ DfgTableResult discover_table_dfg(const EventTable& table,
     if (options.measure == DfgTableMeasure::kCost) {
       performance_values[pair].push_back(target.cost.value_or(0.0));
     } else {
-      if (!source.completion || !target.start) continue;
+      if (!source.completion || !target.start) {
+        if (polars) (void)performance_values[pair];
+        continue;
+      }
       performance_values[pair].push_back(
           flow_time(source, target, options, clamp_start));
     }
   }
-  finish_performance(performance_values, options, result.performance);
+  finish_performance(performance_values, options, polars, result.performance);
+  finish_performance(null_source_values, options, polars,
+                     result.null_source_performance);
   return result;
 }
 
@@ -990,16 +1029,17 @@ DfgTableResult discover_polars_dfg(const LazyEventTable& table,
 
 namespace {
 
-DfgTripleFrequency discover_triples_table(const EventTable& table,
-                                          const DfgTableOptions& options,
-                                          DfgTableBackend backend) {
+DfgTripleTable discover_triples_table(const EventTable& table,
+                                      const DfgTableOptions& options,
+                                      DfgTableBackend backend) {
   const bool needs_completion = options.sort_caseid_required &&
                                 options.sort_timestamp_along_case_id;
   auto rows = read_rows(table, options, backend, needs_completion, false,
                         false, false);
-  sort_rows(rows, options);
+  sort_rows(rows, options, backend == DfgTableBackend::kPolars);
   assign_generated_indices(rows);
-  DfgTripleFrequency result;
+  DfgTripleTable table_result;
+  auto& result = table_result.triples;
   if (backend == DfgTableBackend::kPandas) {
     for (std::size_t i = 0; i + 2 < rows.size(); ++i) {
       const auto& first = rows[i];
@@ -1013,7 +1053,7 @@ DfgTripleFrequency discover_triples_table(const EventTable& table,
       ++result[{*first.activity_value, *second.activity_value,
                 *third.activity_value}];
     }
-    return result;
+    return table_result;
   }
   std::map<std::string, std::vector<const TableRow*>> by_case;
   for (const auto& row : rows) {
@@ -1022,14 +1062,18 @@ DfgTripleFrequency discover_triples_table(const EventTable& table,
   for (const auto& [case_id, events] : by_case) {
     (void)case_id;
     for (std::size_t i = 0; i + 2 < events.size(); ++i) {
-      if (!events[i]->activity_value || !events[i + 1]->activity_value ||
-          !events[i + 2]->activity_value)
+      if (!events[i + 1]->activity_value || !events[i + 2]->activity_value)
         continue;
+      if (!events[i]->activity_value) {
+        ++table_result.null_first[{*events[i + 1]->activity_value,
+                                   *events[i + 2]->activity_value}];
+        continue;
+      }
       ++result[{*events[i]->activity_value, *events[i + 1]->activity_value,
                 *events[i + 2]->activity_value}];
     }
   }
-  return result;
+  return table_result;
 }
 
 DfgPartialOrderResult discover_partial_table(const EventTable& table,
@@ -1194,10 +1238,15 @@ DfgConcurrentResult discover_polars_concurrent_events(
 
 DfgTripleFrequency discover_pandas_frequency_triples(
     const EventTable& table, const DfgTableOptions& options) {
-  return discover_triples_table(table, options, DfgTableBackend::kPandas);
+  return discover_triples_table(table, options, DfgTableBackend::kPandas).triples;
 }
 
 DfgTripleFrequency discover_polars_frequency_triples(
+    const LazyEventTable& table, const DfgTableOptions& options) {
+  return discover_polars_frequency_triple_table(table, options).triples;
+}
+
+DfgTripleTable discover_polars_frequency_triple_table(
     const LazyEventTable& table, const DfgTableOptions& options) {
   return discover_triples_table(table.materialize(), options,
                                 DfgTableBackend::kPolars);
