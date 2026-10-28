@@ -269,6 +269,34 @@ void native_start_timestamp_resolution_is_preserved() {
 
 }  // namespace
 
+// Categorical columns are never converted to dates (fresh public comparison):
+// a categorical timestamp stays categorical in every projection, as does an
+// all-null categorical extra column.
+void categorical_columns_are_not_dates() {
+  EventTable table;
+  table.columns = {"case", "act", "time", "extra"};
+  table.rows = {{text_cell("case", "C"), text_cell("act", "A"),
+                 text_cell("time", "2020-01-02 08:46:00"), null_cell("extra")}};
+  table.dtypes = {"str", "str", "category", "category"};
+  const EventTableCategoricalDtype times{"str", {text_cell("", "2020-01-02 08:46:00")}, false};
+  table.categorical_dtypes = {std::nullopt, std::nullopt, times,
+                              EventTableCategoricalDtype{"float64", {}, false}};
+  DataFrameFormatOptions options;
+  options.case_id = "case";
+  options.activity_key = "act";
+  options.timestamp_key = "time";
+  options.start_timestamp_key = "time";
+  const auto result = format_dataframe(table, options);
+  assert(result.rows.size() == 1);
+  for (const std::string name : {"time", "extra", "time:timestamp", "start_timestamp"}) {
+    std::size_t column = 0;
+    while (result.columns[column] != name) ++column;
+    assert(result.dtypes[column] == "category");
+    assert(result.categorical_dtypes[column].has_value());
+    if (name != "extra") assert(result.rows[0][column]->kind == AttributeKind::kString);
+  }
+}
+
 int main() try {
   check_public_format_dataframe_reference_cases();
   exact_unsigned_identifier_projection();
@@ -280,6 +308,7 @@ int main() try {
   mixed_native_date_resolution_promotes_to_nanoseconds();
   undeclared_native_nanosecond_dtype_is_inferred();
   native_start_timestamp_resolution_is_preserved();
+  categorical_columns_are_not_dates();
 } catch (const std::exception& error) {
   return (std::fputs(error.what(), stderr), 1);
 }

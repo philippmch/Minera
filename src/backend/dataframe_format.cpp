@@ -558,6 +558,11 @@ std::size_t require_column(const EventTable& table, const std::string& name,
 
 void convert_column_to_dates(EventTable& table, std::size_t column,
                              const std::optional<std::string>& format) {
+  // Categorical columns keep their categories; the reference never converts
+  // them to dates, even when every category is a date or all cells are null.
+  if (!table.categorical_dtypes.empty() && column < table.categorical_dtypes.size() &&
+      table.categorical_dtypes[column])
+    return;
   std::vector<std::optional<ExactTimestamp>> parsed;
   if (!all_date_eligible(table, column, format, parsed)) return;
   const auto precision = date_precision(table, column, parsed);
@@ -886,12 +891,15 @@ EventTable format_dataframe(EventTable& input,
         result.rows[row][*existing_start] = copy_cell(
             result.rows[row][*start_source], std::string(kStartTimestampColumn));
       result.dtypes[*existing_start] = source_dtype(result, *start_source);
+      if (!result.categorical_dtypes.empty())
+        result.categorical_dtypes[*existing_start] = result.categorical_dtypes[*start_source];
       convert_column_to_dates(result, *existing_start, options.timestamp_format);
     } else {
       result.columns.emplace_back(kStartTimestampColumn);
       result.dtypes.emplace_back(source_dtype(result, *start_source));
+      // The projection is a copy, so a categorical source stays categorical.
       if (!result.categorical_dtypes.empty())
-        result.categorical_dtypes.push_back(std::nullopt);
+        result.categorical_dtypes.push_back(result.categorical_dtypes[*start_source]);
       for (std::size_t row = 0; row < result.rows.size(); ++row)
         result.rows[row].push_back(copy_cell(
             result.rows[row][*start_source], std::string(kStartTimestampColumn)));

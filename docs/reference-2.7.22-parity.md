@@ -15843,6 +15843,7 @@ values and passing controls.
 | OC1 | OCEL JSON (both formats), XML and SQLite imports order events by timestamp (ties keep file or table order) and relations by their event's position, as every reference importer does; native kept file order (SQLite: id order), so object graphs on unsorted files differed. The five object graphs then match on 600 random OCELs (300 time-sorted, 300 unsorted). Not claimed: the OCEL 2.0 JSON reader's relation order inside one event. | `minera_ocel_codeath_module_tests` |
 | OC2 | The OCEL 2.0 JSON reader keeps one relation per event and object with the last qualifier, as the reference reader does (XML and SQLite keep repeats; the classic JSON format stays lossless because native adapters use it as transport, a declared difference). Fresh comparisons then match on random OCELs with unsorted times and repeated relations: OCDFG activity/start/end/edge metrics and edge performance 0/500, object-type activities, per-event object-type counts, ETOT and OTG 0/285. | `minera_ocel_codeath_module_tests` |
 | R1 | Token replay reads reset and inhibitor arcs as ordinary inputs of their weight, as the reference does. PNML parallel arcs stay distinct arcs: a place needs the weight of one arc to enable, firing consumes every arc, and repair walks the arcs in order, adding each arc's weight when the place is below it. Fresh comparisons of full forward per-trace results (fitness, activated and enabled transitions, reached marking, token counters) match 0/240 random nets with reset, inhibitor, weighted and parallel arcs and no silent transitions, and 225/232 with silent transitions; the 7 left are reference set-order ties (equal-length silent paths, or parallel arcs of different kinds and weights on one place), which follow memory addresses and are not claimed. Backwards replay uses the same arc reading (spot-checked only). | `minera_petri_extended_arcs_tests`, `minera_token_replay_diagnostics_tests` |
+| F1 | `format_dataframe` never converts a categorical column to dates: a categorical timestamp stays categorical (strings) in its source column, in `time:timestamp` and in the `start_timestamp` copy, and an all-null categorical column stays categorical. Fresh comparisons of the full formatted frame and the post-call input match 0/660 random frames mixing nullable Int64/Float64/boolean, string, object, categorical and ordered categorical, numpy int/float/bool, naive, UTC and categorical timestamps, missing values, duplicate and MultiIndex indexes, with and without a start timestamp. | `minera_dataframe_format_tests` |
 
 Declared exceptions (not equivalent, kept on purpose):
 
@@ -15865,7 +15866,6 @@ Declared exceptions (not equivalent, kept on purpose):
 - **Windows.** Windows build and CTest are configured in CI but not yet
   executed: runner jobs currently fail before their first step.
 
-Not yet covered by fresh comparisons (no claim either way): nullable/categorical/MultiIndex and
-Polars tables, genetic evolution and wider ILP
+Not yet covered by fresh comparisons (no claim either way): Polars tables, genetic evolution and wider ILP
 parameters, decomposed
 alignments, and public flat adapters with HTTP/UI forwarding.
