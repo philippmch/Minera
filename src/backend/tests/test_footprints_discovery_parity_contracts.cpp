@@ -282,27 +282,33 @@ void table_selector_and_null_contract() {
   assert(lazy.dfg.at({"E", "L"}) == 1);
   assert(lazy.dfg.at({"L", "X"}) == 1);
 
-  // Native footprint labels are strings, so a null activity is rejected as
-  // an unsupported non-label rather than being fabricated as an empty name.
+  // The eager adapter rejects a null activity or case id. The Polars adapter,
+  // like the reference, keeps a null activity as an activity (never in a
+  // pair) and groups null case ids into one case without pairs.
   auto null_activity = make_table();
   null_activity.rows.front()[1] = null_cell("concept:name");
   expect_invalid([&] {
     (void)EntireDataframeFootprintsDiscovery::apply(null_activity);
   });
-  expect_invalid([&] {
-    (void)PolarsLazyframesFootprintsDiscovery::apply(
-        LazyEventTable::from_table(null_activity));
-  });
-  // Case identity is required by the native grouping representation.
+  const auto lazy_null_activity = PolarsLazyframesFootprintsDiscovery::apply(
+      LazyEventTable::from_table(null_activity));
+  assert(lazy_null_activity.dfg.size() == 1 &&
+         lazy_null_activity.dfg.at({"C", "D"}) == 1);
+  assert(lazy_null_activity.activities_include_null &&
+         !lazy_null_activity.start_activities_include_null &&
+         lazy_null_activity.end_activities_include_null);
+  assert((lazy_null_activity.activities == std::set<std::string>{"A", "C", "D"}));
+  assert(*lazy_null_activity.min_trace_length == 2);
   auto null_case = make_table();
   null_case.rows.front()[0] = null_cell("case:concept:name");
   expect_invalid([&] {
     (void)EntireDataframeFootprintsDiscovery::apply(null_case);
   });
-  expect_invalid([&] {
-    (void)PolarsLazyframesFootprintsDiscovery::apply(
-        LazyEventTable::from_table(null_case));
-  });
+  const auto lazy_null_case = PolarsLazyframesFootprintsDiscovery::apply(
+      LazyEventTable::from_table(null_case));
+  assert(lazy_null_case.dfg.size() == 1 && *lazy_null_case.min_trace_length == 1);
+  assert((lazy_null_case.start_activities == std::set<std::string>{"A", "B", "C"}));
+  assert((lazy_null_case.end_activities == std::set<std::string>{"A", "B", "D"}));
 
   EventTable empty;
   empty.columns = {"case:concept:name", "concept:name", "time:timestamp"};

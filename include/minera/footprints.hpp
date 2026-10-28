@@ -43,6 +43,11 @@ struct Footprint {
   bool min_trace_length_present = true;
   std::optional<std::size_t> max_trace_length_without_loops;
   std::optional<std::vector<std::string>> trace;
+  // The Polars lazy adapter keeps a null activity as an activity (and as a
+  // start or end activity); it never takes part in a directly-follows pair.
+  bool activities_include_null = false;
+  bool start_activities_include_null = false;
+  bool end_activities_include_null = false;
 };
 
 // Selectors shared by the event-log, table, lazy-table, and Petri discovery

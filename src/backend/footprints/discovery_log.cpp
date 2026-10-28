@@ -141,6 +141,9 @@ struct TableRow {
   std::size_t input_order = 0;
   std::string case_id;
   std::string activity;
+  // Only the lazy adapter accepts null case ids and activities.
+  bool case_null = false;
+  bool activity_null = false;
   std::string timestamp;
   std::optional<double> timestamp_value;
   bool timestamp_present = false;
@@ -184,12 +187,16 @@ std::vector<TableRow> read_table_rows(const EventTable& table,
     const auto& row = table.rows[row_index];
     TableRow item;
     item.input_order = row_index;
-    item.case_id = required_cell_value(row, case_column, "case");
+    if (lazy_ordering && !cell_value(row, case_column))
+      item.case_null = true;
+    else
+      item.case_id = required_cell_value(row, case_column, "case");
     const auto* activity_cell = cell_value(row, activity_column);
-    if (!activity_cell)
+    if (!activity_cell && !lazy_ordering)
       throw std::invalid_argument(
           "activity selector contains a null or missing row value");
-    item.activity = activity_cell->value;
+    item.activity_null = !activity_cell;
+    if (activity_cell) item.activity = activity_cell->value;
     const auto timestamp_cell = cell_value(row, timestamp_column);
     if (timestamp_cell) {
       item.timestamp = timestamp_cell->value;
@@ -263,6 +270,7 @@ std::vector<TableRow> read_table_rows(const EventTable& table,
                                                 compare_timestamp](
                                                    const TableRow& left,
                                                    const TableRow& right) {
+      if (left.case_null != right.case_null) return left.case_null;
       if (left.case_id != right.case_id) return left.case_id < right.case_id;
       const auto order = use_start_timestamp
                              ? compare_timestamp(
@@ -293,15 +301,22 @@ std::vector<TableRow> read_table_rows(const EventTable& table,
   return rows;
 }
 
+using CaseKey = std::pair<bool, std::string>;
+
+CaseKey case_key(const TableRow& row) { return {row.case_null, row.case_id}; }
+
 Footprint footprint_from_table_rows(const std::vector<TableRow>& rows) {
   Footprint result;
   result.min_trace_length = 0;
   if (rows.empty()) return result;
 
-  std::map<std::string, std::size_t> case_lengths;
+  std::map<CaseKey, std::size_t> case_lengths;
   for (const auto& row : rows) {
-    ++case_lengths[row.case_id];
-    result.activities.insert(row.activity);
+    ++case_lengths[case_key(row)];
+    if (row.activity_null)
+      result.activities_include_null = true;
+    else
+      result.activities.insert(row.activity);
   }
   bool first_length = true;
   for (const auto& [case_id, length] : case_lengths) {
@@ -312,20 +327,31 @@ Footprint footprint_from_table_rows(const std::vector<TableRow>& rows) {
     }
   }
 
-  std::map<std::string, std::size_t> last_position;
+  std::map<CaseKey, std::size_t> last_position;
   for (std::size_t i = 0; i < rows.size(); ++i)
-    last_position[rows[i].case_id] = i;
-  std::set<std::string> first_seen;
+    last_position[case_key(rows[i])] = i;
+  std::set<CaseKey> first_seen;
   for (std::size_t i = 0; i < rows.size(); ++i) {
     const auto& row = rows[i];
-    if (first_seen.insert(row.case_id).second)
-      result.start_activities.insert(row.activity);
-    if (last_position.at(row.case_id) == i)
-      result.end_activities.insert(row.activity);
+    if (first_seen.insert(case_key(row)).second) {
+      if (row.activity_null)
+        result.start_activities_include_null = true;
+      else
+        result.start_activities.insert(row.activity);
+    }
+    if (last_position.at(case_key(row)) == i) {
+      if (row.activity_null)
+        result.end_activities_include_null = true;
+      else
+        result.end_activities.insert(row.activity);
+    }
     // Directly-follows is derived only from physically adjacent rows that
     // belong to the same case. This preserves the unsorted adapter behavior
     // when cases are interleaved.
-    if (i > 0 && rows[i - 1].case_id == row.case_id)
+    // Null case ids and null activities never form a pair.
+    if (i > 0 && !row.case_null && !rows[i - 1].case_null &&
+        rows[i - 1].case_id == row.case_id && !row.activity_null &&
+        !rows[i - 1].activity_null)
       increment(result.dfg[{rows[i - 1].activity, row.activity}],
                "footprint DFG");
   }
@@ -394,8 +420,9 @@ Footprint PolarsLazyframesFootprintsDiscovery::apply(
     // Lazy grouping preserves each case's row subsequence before flattening.
     // This differs intentionally from the eager table adapter, whose
     // unsorted mode considers only physically adjacent equal-case rows.
-    std::map<std::string, std::vector<TableRow>> by_case;
-    for (const auto& row : rows) by_case[row.case_id].push_back(row);
+    std::map<std::pair<bool, std::string>, std::vector<TableRow>> by_case;
+    for (const auto& row : rows)
+      by_case[{!row.case_null, row.case_id}].push_back(row);
     std::vector<TableRow> grouped;
     grouped.reserve(rows.size());
     for (auto& [case_id, case_rows] : by_case) {
