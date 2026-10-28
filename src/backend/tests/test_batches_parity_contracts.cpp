@@ -1,6 +1,7 @@
 #include "batches/discovery_registry.hpp"
 
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <initializer_list>
 #include <optional>
@@ -527,13 +528,24 @@ void reference_interval_merging_contract() {
   const auto polars = BatchPolarsDiscovery::apply(LazyEventTable::from_table(table), options);
   assert(only_group(polars).resource_is_null);
   assert(only_group(polars).batches.front().events.size() == 2);
-  bool pandas_rejected = false;
-  try {
-    (void)BatchPandasDiscovery::apply(table, options);
-  } catch (const std::invalid_argument&) {
-    pandas_rejected = true;
-  }
-  assert(pandas_rejected);
+  // pandas drops rows with a missing resource instead.
+  assert(BatchPandasDiscovery::apply(table, options).groups.empty());
+
+  // pandas reads a microsecond datetime column as its units over 1e9, drops
+  // rows with a missing activity or resource and keeps a missing case as nan.
+  auto micro = timed_table({0, 30, 6000});
+  micro.dtypes = {"str", "str", "str", "datetime64[us, UTC]",
+                  "datetime64[us, UTC]", "str"};
+  micro.rows[1][0].reset();
+  micro.rows[2][2].reset();
+  options.merge_distance_seconds = 0.05;
+  options.min_batch_size = 2;
+  const auto scaled = BatchPandasDiscovery::apply(micro, options);
+  const auto& scaled_batch = only_group(scaled).batches.at(0);
+  assert(scaled_batch.events.size() == 2);
+  assert(std::abs(scaled_batch.complete - scaled_batch.start - 0.03) < 1e-6);
+  assert(scaled_batch.start < 2e6);
+  assert(scaled_batch.events[1].case_id == "nan");
 }
 
 }  // namespace

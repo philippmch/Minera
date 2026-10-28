@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -27,6 +28,8 @@ struct IndexedEvent {
   // A numeric event id orders numerically, as the reference's event tuples
   // compare it.
   std::optional<double> event_id_number;
+  // A pandas NaN case id is a float in the reference's event tuples.
+  bool case_nan = false;
 };
 
 // Groups are keyed by activity and resource; a null resource (Polars only)
@@ -509,6 +512,18 @@ BatchDiscovery detect_grouped(GroupedEvents grouped,
           batch.events.push_back(value.event);
       }
       if (batch.events.size() < options.min_batch_size) continue;
+      // The reference sorts a kept batch's event tuples, so a NaN case and a
+      // text case at the same start and completion cannot be ordered.
+      std::map<std::pair<double, double>, std::pair<bool, bool>> case_kinds;
+      for (const auto member : interval.members) {
+        const auto& value = values[member];
+        auto& kinds = case_kinds[{value.event.start, value.event.complete}];
+        (value.case_nan ? kinds.first : kinds.second) = true;
+        if (kinds.first && kinds.second)
+          throw std::invalid_argument(
+              "batches: '<' not supported between instances of 'float' and "
+              "'str'");
+      }
       batch.start = interval.start;
       batch.complete = interval.end;
       batch.type = classify(batch.events);
@@ -617,6 +632,7 @@ std::optional<double> numeric_value(const EventAttribute& cell) {
 GroupedEvents table_events(const EventTable& table,
                            const BatchDiscoveryOptions& options) {
   const bool polars = options.variant == BatchDiscoveryVariant::kPolars;
+  const bool pandas = options.variant == BatchDiscoveryVariant::kPandas;
   table.validate();
   const auto case_selector = resolve_selector(
       table, options.case_id_attribute, SelectorRole::kCase, "case-id", true);
@@ -649,6 +665,28 @@ GroupedEvents table_events(const EventTable& table,
       throw std::invalid_argument(
           "batches: the case ID column should be of type string.");
   }
+  // The pandas adapter reads a datetime column as its integer units divided
+  // by 1e9, so a microsecond, millisecond or second column gives seconds
+  // scaled down by 1e3, 1e6 or 1e9.
+  const auto pandas_scale = [&](const TableSelector& selector)
+      -> std::optional<double> {
+    if (options.variant != BatchDiscoveryVariant::kPandas || !selector.column ||
+        *selector.column >= table.dtypes.size())
+      return std::nullopt;
+    const std::string_view dtype = table.dtypes[*selector.column];
+    if (dtype.starts_with("datetime64[us")) return 1e6;
+    if (dtype.starts_with("datetime64[ms")) return 1e3;
+    if (dtype.starts_with("datetime64[s")) return 1.0;
+    return std::nullopt;
+  };
+  const auto rescale = [](double seconds, std::optional<double> units) {
+    if (!units) return seconds;
+    return static_cast<double>(std::llround(seconds * *units)) / 1e9;
+  };
+  const auto completion_scale = pandas_scale(timestamp_selector);
+  const auto start_scale = options.start_timestamp_attribute.empty()
+                               ? std::nullopt
+                               : pandas_scale(start_selector);
   GroupedEvents grouped;
   for (std::size_t row_index = 0; row_index < table.rows.size(); ++row_index) {
     const auto& row = table.rows[row_index];
@@ -656,10 +694,22 @@ GroupedEvents table_events(const EventTable& table,
     const auto* resource_cell = row_cell(row, table, resource_selector);
     const auto* timestamp_cell = row_cell(row, table, timestamp_selector);
     const auto* case_cell = row_cell(row, table, case_selector);
+    // pandas drops rows whose activity or resource is missing (NaN), keeps a
+    // missing case id as nan and reads NaT as the minimum int64 over 1e9.
+    const auto missing = [](const EventAttribute* cell) {
+      if (!cell || std::holds_alternative<NativeNA>(cell->typed_value))
+        return true;
+      const auto number = numeric_value(*cell);
+      return number && std::isnan(*number);
+    };
+    constexpr double kNaT =
+        static_cast<double>(std::numeric_limits<std::int64_t>::min()) / 1e9;
+    if (pandas && (missing(activity_cell) || missing(resource_cell))) continue;
+    const bool pandas_case_nan = pandas && missing(case_cell);
     // Polars groups a null resource as its own key.
     const bool null_resource = polars && !resource_cell;
     if (!activity_cell || (!resource_cell && !null_resource) ||
-        !timestamp_cell || !case_cell) {
+        (!timestamp_cell && !pandas) || (!case_cell && !pandas_case_nan)) {
       throw std::invalid_argument("batches: a required table cell is missing");
     }
     if (polars && numeric_value(*case_cell))
@@ -668,27 +718,40 @@ GroupedEvents table_events(const EventTable& table,
     const auto activity = attribute_text(*activity_cell);
     const auto resource = null_resource ? std::string{}
                                         : attribute_text(*resource_cell);
-    const auto case_id = attribute_text(*case_cell);
-    const auto complete = parse_timestamp(attribute_text(*timestamp_cell));
-    if (!complete || !std::isfinite(*complete))
+    const auto case_id =
+        pandas_case_nan ? std::string("nan") : attribute_text(*case_cell);
+    const auto complete =
+        timestamp_cell ? parse_timestamp(attribute_text(*timestamp_cell))
+                       : std::optional<double>{};
+    if (timestamp_cell && (!complete || !std::isfinite(*complete)))
       throw std::invalid_argument(
           "batches: table row has an invalid completion timestamp");
 
-    double start = *complete;
+    std::optional<double> start = complete;
     if (!options.start_timestamp_attribute.empty()) {
       const auto* start_cell = row_cell(row, table, start_selector);
-      if (!start_cell || attribute_text(*start_cell).empty())
-        throw std::invalid_argument(
-            "batches: configured start timestamp is missing");
-      const auto parsed = parse_timestamp(attribute_text(*start_cell));
-      if (!parsed || !std::isfinite(*parsed))
-        throw std::invalid_argument(
-            "batches: configured start timestamp is invalid");
-      start = *parsed;
+      if (!start_cell && pandas) {
+        start.reset();
+      } else {
+        if (!start_cell || attribute_text(*start_cell).empty())
+          throw std::invalid_argument(
+              "batches: configured start timestamp is missing");
+        const auto parsed = parse_timestamp(attribute_text(*start_cell));
+        if (!parsed || !std::isfinite(*parsed))
+          throw std::invalid_argument(
+              "batches: configured start timestamp is invalid");
+        start = parsed;
+      }
     }
-    if (start > *complete)
+    if (start && complete && *start > *complete)
       throw std::invalid_argument(
           "batches: start timestamp is after completion");
+    const double completion =
+        complete ? rescale(*complete, completion_scale) : kNaT;
+    const double start_time =
+        options.start_timestamp_attribute.empty()
+            ? completion
+            : (start ? rescale(*start, start_scale) : kNaT);
 
     std::string event_id;
     std::optional<double> event_id_number;
@@ -698,9 +761,10 @@ GroupedEvents table_events(const EventTable& table,
         event_id_number = numeric_value(*event_id_cell);
       }
     }
-    BatchEvent batch_event{start, *complete, case_id, 0, row_index, event_id};
-    grouped[{activity, resource, null_resource}].push_back(IndexedEvent{
-        std::move(batch_event), activity, resource, event_id_number});
+    BatchEvent batch_event{start_time, completion, case_id, 0, row_index, event_id};
+    grouped[{activity, resource, null_resource}].push_back(
+        IndexedEvent{std::move(batch_event), activity, resource,
+                     event_id_number, pandas_case_nan});
   }
   return grouped;
 }
