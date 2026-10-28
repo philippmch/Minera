@@ -460,6 +460,7 @@ void petri_public_byte_vectors(){
 }
 // Native byte strings are an extension, not replacement-decoded Python text.
 // Four NEW root public controls retain distinct arc objects, not firing multiplicity.
+// Imported parallel arcs stay distinct in the primitive net as well.
 // Supplemental capture SHA-256: 751ccc85d7c796670b425bc7a38da82feaa25dfecaa2011d3798ac0503e94862.
 void petri_arc_occurrence_byte_vectors(){
  { // one-weighted-two
@@ -482,7 +483,7 @@ void petri_arc_occurrence_byte_vectors(){
   assert(serialize_original_context_model_json(document)==before);
   assert(document.net.transitions().at(0).inputs.size()==2);
   auto primitive=document;primitive.arc_occurrences.reset();const auto primitive_before=serialize_original_context_model_json(primitive);
-  assert(abstract_petri_net(primitive,false).text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(serialize_original_context_model_json(primitive)==primitive_before);
+  assert(abstract_petri_net(primitive,false).text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A'), source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(serialize_original_context_model_json(primitive)==primitive_before);
   auto stale=document;stale.arc_occurrences->pop_back();const auto stale_before=serialize_original_context_model_json(stale);
   bool rejected=false;try{(void)abstract_petri_net(stale,false);}catch(const std::invalid_argument&){rejected=true;}assert(rejected);assert(serialize_original_context_model_json(stale)==stale_before);
  }
@@ -492,9 +493,9 @@ void petri_arc_occurrence_byte_vectors(){
   const auto before=serialize_original_context_model_json(document);const auto result=abstract_petri_net(document,false);
   assert(result.text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A'), source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(result.characters==220&&!result.truncated);
   assert(serialize_original_context_model_json(document)==before);
-  assert(document.net.transitions().at(0).inputs.size()==5);
+  assert(document.net.transitions().at(0).inputs.size()==2);
   auto primitive=document;primitive.arc_occurrences.reset();const auto primitive_before=serialize_original_context_model_json(primitive);
-  assert(abstract_petri_net(primitive,false).text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(serialize_original_context_model_json(primitive)==primitive_before);
+  assert(abstract_petri_net(primitive,false).text=="\n\nplaces: [ sink, source ]\ntransitions: [ (transition-00, 'A') ]\narcs: [ (transition-00, 'A')->sink, source->(transition-00, 'A'), source->(transition-00, 'A') ]\n\ninitial marking: ['source:2']\nfinal marking: ['sink:1']\n\n");assert(serialize_original_context_model_json(primitive)==primitive_before);
   auto stale=document;stale.arc_occurrences->pop_back();const auto stale_before=serialize_original_context_model_json(stale);
   bool rejected=false;try{(void)abstract_petri_net(stale,false);}catch(const std::invalid_argument&){rejected=true;}assert(rejected);assert(serialize_original_context_model_json(stale)==stale_before);
  }

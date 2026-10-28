@@ -965,6 +965,15 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (source != transition_index.end()) compact[source->second] = true;
     if (target != transition_index.end()) compact[target->second] = true;
   }
+  // Parallel arcs stay distinct arcs; repeated units would merge them into one.
+  std::set<std::pair<std::string, std::string>> arc_endpoints;
+  for (const auto& arc : arcs) if (arc.type == PetriArcType::kNormal &&
+      !arc_endpoints.emplace(arc.source, arc.target).second) {
+    const auto source = transition_index.find(arc.source);
+    const auto target = transition_index.find(arc.target);
+    if (source != transition_index.end()) compact[source->second] = true;
+    if (target != transition_index.end()) compact[target->second] = true;
+  }
 
   std::vector<PnmlArcOccurrence> arc_occurrences;
   for (const auto& arc : arcs) {

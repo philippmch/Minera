@@ -1006,7 +1006,8 @@ void simplicity_presented_reachability_contract() {
   options = {};
   options.initial_marking = {1, 0};
   assert(evaluate_simplicity(document, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 1.0);
-  assert(evaluate_simplicity(document.net, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 0.0);
+  // The imported net keeps both parallel arcs, so it matches the document.
+  assert(evaluate_simplicity(document.net, SimplicityVariant::EXTENDED_CYCLOMATIC, options).value == 1.0);
   auto stale = document;
   stale.net.add_arc(0, 0);
   assert(!evaluate_simplicity(stale, SimplicityVariant::EXTENDED_CYCLOMATIC, options).computed);

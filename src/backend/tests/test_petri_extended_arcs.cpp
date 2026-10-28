@@ -594,8 +594,11 @@ void pnml_document_preserves_arc_occurrences() {
   </page><finalmarkings><marking><place idref="p1"><text>3</text></place></marking></finalmarkings>
   </net></pnml>)");
   assert(document.arc_occurrences && document.arc_occurrences->size() == 7);
-  assert(document.net.transitions()[0].inputs == std::vector<std::size_t>({0, 0, 0}));
-  assert(document.net.transitions()[0].outputs == std::vector<std::size_t>({1, 1, 1}));
+  // Parallel arcs stay distinct weighted arcs rather than repeated units.
+  assert(document.net.transitions()[0].inputs == std::vector<std::size_t>({0, 0}));
+  assert(document.net.transitions()[0].outputs == std::vector<std::size_t>({1, 1}));
+  assert(document.net.transitions()[0].input_arc_weight(1).magnitude == 2);
+  assert(document.net.transitions()[0].output_arc_weight(0).magnitude == 2);
   const auto graph = to_petri_net_presentation(document);
   assert(graph.arcs.size() == 7 && graph.arcs[1].weight == 2 && graph.arcs[2].weight == 2);
   assert(graph.transitions[0].label == "A" && graph.transitions[1].label == "t1");
@@ -1014,9 +1017,67 @@ void pnml_exact_public_markings() {
 
 }  // namespace
 
+// Token replay reads reset and inhibitor arcs as ordinary inputs of their
+// weight, and keeps parallel PNML arcs distinct (observed reference results).
+void token_replay_reads_extended_and_parallel_arcs_as_arcs() {
+  PetriNet inhibitor;
+  inhibitor.set_activities({"a", "b", "c"});
+  for (int p = 0; p < 4; ++p) inhibitor.add_place();  // s, p, q, e
+  inhibitor.add_transition(0, {0}, {1, 2});
+  inhibitor.add_transition(1, {1}, {3});
+  const auto c = inhibitor.add_transition(2, {}, {3});
+  inhibitor.add_inhibitor_arc(c, 2);
+  TokenReplayOptions options;
+  options.initial_marking = {1, 0, 0, 0};
+  options.final_marking = {0, 0, 0, 1};
+  const auto blocked = replay_token_traces(log_of({{"a", "c"}}), inhibitor, options).front();
+  assert(!blocked.trace_is_fit && blocked.missing == 0 && blocked.consumed == 3);
+  assert(blocked.remaining == 1 && blocked.produced == 4);
+  assert((blocked.activated_transitions == std::vector<std::size_t>{0, 2}));
+  assert((blocked.reached_marking == TokenMarking{0, 1, 0, 1}));
+  assert((blocked.enabled_transitions == std::vector<std::size_t>{1}));
+
+  // A reset arc of weight two requires and consumes two tokens; repair adds
+  // the full weight, so the one available token remains.
+  PetriNet reset;
+  reset.set_activities({"a", "b"});
+  for (int p = 0; p < 2; ++p) reset.add_place();
+  reset.add_transition(0, {}, {0});
+  const auto drain = reset.add_transition(1, {}, {1});
+  reset.add_reset_arc(drain, 0, 2);
+  options.initial_marking = {0, 0};
+  options.final_marking = {0, 1};
+  const auto drained = replay_token_traces(log_of({{"a", "b"}}), reset, options).front();
+  assert(drained.missing == 1 && drained.consumed == 3 && drained.remaining == 1);
+  assert(drained.produced == 2 && (drained.reached_marking == TokenMarking{1, 1}));
+
+  // Two parallel unit arcs: one token enables, both arcs consume, and each arc
+  // is repaired in turn once the place is negative.
+  const std::string parallel = R"(<?xml version="1.0"?>
+<pnml><net id="n" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="g">
+<place id="p"><initialMarking><text>1</text></initialMarking></place><place id="q"/>
+<transition id="t"><name><text>t</text></name></transition>
+<arc id="a1" source="p" target="t"/><arc id="a2" source="p" target="t"/><arc id="a3" source="t" target="q"/>
+</page><finalmarkings><marking><place idref="q"><text>2</text></place></marking></finalmarkings></net></pnml>)";
+  PnmlImportOptions import_options;
+  import_options.require_workflow_boundaries = false;
+  const auto document = parse_pnml_document(parallel, import_options);
+  TokenReplayOptions parallel_options;
+  parallel_options.initial_marking = {1, 0};
+  parallel_options.final_marking = {0, 1};
+  const auto once = replay_token_traces(log_of({{"t"}}), document.net, parallel_options).front();
+  assert(once.missing == 0 && once.consumed == 3 && once.transitions_with_problems.empty());
+  assert((once.reached_marking == TokenMarking{-1, 1}));
+  parallel_options.final_marking = {0, 2};
+  const auto twice = replay_token_traces(log_of({{"t", "t"}}), document.net, parallel_options).front();
+  assert(twice.missing == 3 && twice.consumed == 6 && twice.transitions_with_problems.size() == 1);
+  assert((twice.reached_marking == TokenMarking{-1, 2}));
+}
+
 int main() {
   pnml_exact_public_markings();
   reset_and_inhibitor_enablement();
+  token_replay_reads_extended_and_parallel_arcs_as_arcs();
   playout_and_pnml_round_trip();
   weighted_arc_round_trip();
   import_options_and_stochastic_metadata();

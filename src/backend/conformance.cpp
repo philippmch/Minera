@@ -343,6 +343,56 @@ detail::ReplayMarkingKeys resolve_domain_marking_keys(
 
 // Holds the net plus the lookups token replay needs and drives both the
 // fitness and precision passes over a single shared translation.
+// Token replay reads every place-to-transition arc as an ordinary input of its
+// weight, so reset and inhibitor arcs consume like normal arcs there.
+std::optional<PetriNet> ordinary_token_replay_net(const PetriNet& net) {
+  if (!net.has_extended_arcs()) return std::nullopt;
+  PetriNetLiteralStorage storage;
+  storage.place_count = net.place_count();
+  storage.source_storage = net.source();
+  storage.sink_storage = net.sink();
+  storage.has_source = net.has_source();
+  storage.has_sink = net.has_sink();
+  storage.transitions = net.transitions();
+  storage.activities = net.activities();
+  storage.discovery_markings = net.discovery_markings();
+  storage.transition_names = net.transition_names();
+  for (auto& transition : storage.transitions) {
+    if (!transition.has_extended_arcs()) continue;
+    std::vector<PetriArcWeight> weights;
+    if (transition.input_weights.empty()) {
+      // Repeated-unit endpoints are one arc whose weight is their multiplicity.
+      std::vector<std::size_t> places;
+      for (const auto place : transition.inputs) {
+        const auto found = std::find(places.begin(), places.end(), place);
+        if (found != places.end()) {
+          weights[found - places.begin()].magnitude += 1;
+          continue;
+        }
+        places.push_back(place);
+        weights.push_back({});
+      }
+      transition.inputs = std::move(places);
+    } else {
+      weights = transition.input_weights;
+    }
+    for (std::size_t index = 0; index < transition.reset_inputs.size(); ++index) {
+      transition.inputs.push_back(transition.reset_inputs[index]);
+      weights.push_back(transition.reset_arc_weight(index));
+    }
+    for (std::size_t index = 0; index < transition.inhibitor_inputs.size(); ++index) {
+      transition.inputs.push_back(transition.inhibitor_inputs[index]);
+      weights.push_back(transition.inhibitor_arc_weight(index));
+    }
+    if (transition.output_weights.empty())
+      transition.output_weights.assign(transition.outputs.size(), PetriArcWeight{});
+    transition.input_weights = std::move(weights);
+    transition.reset_inputs.clear(); transition.reset_weights.clear();
+    transition.inhibitor_inputs.clear(); transition.inhibitor_weights.clear();
+  }
+  return PetriNet::from_literal_storage(std::move(storage));
+}
+
 class Replayer {
  public:
   using Marking = TokenMarking;
@@ -361,7 +411,8 @@ class Replayer {
                     const std::vector<int>& final = {},
                     const TokenReplayOptions* replay_options = nullptr,
                     bool match_null_activity = false)
-      : net_(net),
+      : ordinary_net_(replay_options ? ordinary_token_replay_net(net) : std::nullopt),
+        net_(ordinary_net_ ? *ordinary_net_ : net),
         markings_(resolve_replay_markings(net, initial, final, replay_options)),
         initial_(std::move(markings_.initial)), final_(std::move(markings_.final)),
         full_result_(match_null_activity) {
@@ -1066,12 +1117,19 @@ class Replayer {
   static TokenInteger arc_tokens(PetriArcWeight weight) {
     TokenInteger result(weight.magnitude); return weight.negative ? -result : result;
   }
+  // Repeated-unit endpoints add up to one arc weight. Compact endpoints are
+  // distinct arcs: like the reference, a place requires the weight of one arc
+  // (the largest of parallel arcs) while firing still consumes every arc.
   static Marking input_requirements(const PetriTransition& transition, std::size_t places) {
     Marking result(places, 0);
+    std::vector<bool> seen(transition.input_weights.empty() ? 0 : places, false);
     for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
       const auto place = transition.inputs[index];
       if (place >= places) throw std::invalid_argument("token replay arc place is outside marking");
-      result[place] += arc_tokens(transition.input_arc_weight(index));
+      const auto weight = arc_tokens(transition.input_arc_weight(index));
+      if (seen.empty()) result[place] += weight;
+      else if (!seen[place] || result[place] < weight) result[place] = weight;
+      if (!seen.empty()) seen[place] = true;
     }
     return result;
   }
@@ -1105,17 +1163,25 @@ class Replayer {
     const auto required = input_requirements(fired, marking.size());
     std::vector<bool> input_places(marking.size(), false);
     for (const auto place : fired.inputs) input_places[place] = true;
-    for (std::size_t place = 0; place < marking.size(); ++place) {
-      if (!input_places[place]) continue;
-      if (marking[place] >= required[place]) continue;
-      const auto missing = TokenInteger(required[place] - marking[place]);
+    const auto repair = [&](std::size_t place, const TokenInteger& weight) {
+      if (marking[place] >= weight) return;
+      const auto missing = TokenInteger(weight - marking[place]);
       counts.missing += missing;
       counts.places[place].missing += missing;
       // Public forward repair adds the full input weight before consumption,
       // retaining any partially available tokens after the firing.
-      marking[place] += required[place];
+      marking[place] += weight;
       if (order && !keys[place]) order->push_back(place);
       keys[place] = true;
+    };
+    if (fired.has_compact_ordinary_arcs()) {
+      // Distinct arcs are repaired one after another, so parallel arcs on a
+      // place deficient by more than one weight are each repaired in turn.
+      for (std::size_t index = 0; index < fired.inputs.size(); ++index)
+        repair(fired.inputs[index], arc_tokens(fired.input_arc_weight(index)));
+    } else {
+      for (std::size_t place = 0; place < marking.size(); ++place)
+        if (input_places[place]) repair(place, required[place]);
     }
     // Signed input state can remain below its required weight even after the
     // public full-weight repair. Bookkeeping records the attempted transition,
@@ -1680,6 +1746,7 @@ class Replayer {
     if (fired) fired->insert(fired->end(), path->begin(), path->end());
   }
 
+  std::optional<PetriNet> ordinary_net_;
   const PetriNet& net_;
   ResolvedReplayMarkings markings_;
   Marking initial_;

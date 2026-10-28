@@ -1260,6 +1260,9 @@ void forward_empty_log_cleaning_initialization_contract() {
 }
 
 void forward_extended_arc_silent_completion_contract() {
+  // Token replay reads extended arcs as ordinary unit inputs (public results):
+  // the reset arc consumes one of two tokens, the inhibitor arc blocks on an
+  // empty place.
   for (const bool reset : {false, true}) {
     PetriNet net;
     net.add_place(); net.add_place();
@@ -1271,14 +1274,15 @@ void forward_extended_arc_silent_completion_contract() {
     options.initial_marking = {reset ? 2 : 0, 0};
     const auto log = log_of({{}});
     const auto row = replay_token_traces(log, net, options).front();
-    assert((row.activated_transitions == std::vector<std::size_t>{transition}));
-    assert((row.reached_marking == std::vector<int>{0, 1}));
-    assert(row.missing == 0 && row.remaining == 0 && row.trace_is_fit);
-    assert(row.event_diagnostics.empty());
-    consistent(log, net, options);
+    assert(row.activated_transitions.size() == (reset ? 1u : 0u));
+    assert((row.reached_marking == std::vector<int>{reset ? 1 : 0, reset ? 1 : 0}));
+    assert(row.trace_is_fit == !reset && row.missing == (reset ? 0 : 1));
+    assert(row.remaining == (reset ? 1 : 0));
     options.try_to_reach_final_marking_through_hidden = false;
     const auto unrouted = replay_token_traces(log, net, options).front();
     assert(unrouted.activated_transitions.empty() && unrouted.missing == 1);
+    assert(unrouted.trace_is_fit == !reset && unrouted.remaining == (reset ? 2 : 0));
+    consistent(log, net, options);
   }
 }
 
