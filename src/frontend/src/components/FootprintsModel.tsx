@@ -63,12 +63,15 @@ function TraceDiscovery({ data, rows }: { data: MineraExport; rows: FootprintsTr
   </div>;
 }
 
+// A null activity (Polars adapter) has no activity id and is shown as "null".
+const withNull = (names: string[], includeNull?: boolean) => includeNull ? [...names, "null"] : names;
+
 function FootprintCard({ data, footprint }: { data: MineraExport; footprint?: AggregateFootprint }) {
   if (!footprint) return null;
   return <div className="footprints-card">
-    <div className="footprints-summary"><span>activities {footprint.activities?.length ?? 0}</span><span>skippable {footprint.skippable === undefined ? "—" : String(footprint.skippable)}</span><span>min length {footprint.min_trace_length ?? "—"}</span><span>max without loops {footprint.max_trace_length_without_loops ?? "—"}</span></div>
+    <div className="footprints-summary"><span>activities {(footprint.activities?.length ?? 0) + (footprint.activities_include_null ? 1 : 0)}</span><span>skippable {footprint.skippable === undefined ? "—" : String(footprint.skippable)}</span><span>min length {footprint.min_trace_length ?? "—"}</span><span>max without loops {footprint.max_trace_length_without_loops ?? "—"}</span></div>
     <div className="footprints-tables"><Table title="Sequence" data={data} values={footprint.sequence} /><Table title="Parallel" data={data} values={footprint.parallel} /><Table title="Atomic interleaving" data={data} values={footprint.atomic_interleaving} /></div>
-    <div className="footprints-summary"><span>starts: {(footprint.start_activities ?? []).map((id) => name(data, id)).join(", ") || "—"}</span><span>ends: {(footprint.end_activities ?? []).map((id) => name(data, id)).join(", ") || "—"}</span><span>always: {(footprint.activities_always_happening ?? []).map((id) => name(data, id)).join(", ") || "—"}</span></div>
+    <div className="footprints-summary"><span>starts: {withNull((footprint.start_activities ?? []).map((id) => name(data, id)), footprint.start_activities_include_null).join(", ") || "—"}</span><span>ends: {withNull((footprint.end_activities ?? []).map((id) => name(data, id)), footprint.end_activities_include_null).join(", ") || "—"}</span><span>always: {(footprint.activities_always_happening ?? []).map((id) => name(data, id)).join(", ") || "—"}</span></div>
   </div>;
 }
 

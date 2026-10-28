@@ -332,7 +332,7 @@ template<class T,class Write>void set_json(std::ostream& out,const std::set<T>& 
 void pairs_json(std::ostream& out,const FootprintViolations& values){set_json(out,values,pair_json);}
 void strings_json(std::ostream& out,const std::set<std::string>& values){set_json(out,values,quoted);}
 Footprint footprint_value(const Json& value){
- const auto& o=value.object();allowed_fields(o,{"dfg","dfg_present","sequence","parallel","atomic_interleaving","start_activities","end_activities","start_activities_present","end_activities_present","activities","skippable","activities_always_happening","min_trace_length","min_trace_length_present","max_trace_length_without_loops","trace"});Footprint r;
+ const auto& o=value.object();allowed_fields(o,{"dfg","dfg_present","sequence","parallel","atomic_interleaving","start_activities","end_activities","start_activities_present","end_activities_present","activities","skippable","activities_always_happening","min_trace_length","min_trace_length_present","max_trace_length_without_loops","trace","activities_include_null","start_activities_include_null","end_activities_include_null"});Footprint r;
  if(const auto* v=field(o,"dfg"))for(const auto& entry:v->array()){const auto& e=entry.object();allowed_fields(e,{"source","target","count"});const FootprintPair key{required(e,"source").string(),required(e,"target").string()};if(!r.dfg.emplace(key,unsigned_integer(required(e,"count"))).second)invalid("duplicate DFG map edge");}
  if(const auto* v=field(o,"dfg_present"))r.dfg_present=v->boolean();
  if(const auto* v=field(o,"sequence"))r.sequence=pairs(*v);
@@ -349,6 +349,9 @@ Footprint footprint_value(const Json& value){
  if(const auto* v=field(o,"min_trace_length_present"))r.min_trace_length_present=v->boolean();
  if(const auto* v=field(o,"max_trace_length_without_loops"))r.max_trace_length_without_loops=v->null()?std::nullopt:std::optional<std::size_t>{native_unsigned<std::size_t>(*v)};
  if(const auto* v=field(o,"trace"))r.trace=v->null()?std::nullopt:std::optional<std::vector<std::string>>{words(*v)};
+ if(const auto* v=field(o,"activities_include_null"))r.activities_include_null=v->boolean();
+ if(const auto* v=field(o,"start_activities_include_null"))r.start_activities_include_null=v->boolean();
+ if(const auto* v=field(o,"end_activities_include_null"))r.end_activities_include_null=v->boolean();
  return r;
 }
 void footprint_json(std::ostream& out,const Footprint& r){
@@ -361,7 +364,12 @@ void footprint_json(std::ostream& out,const Footprint& r){
  out<<",\"min_trace_length\":";if(r.min_trace_length)out<<*r.min_trace_length;else out<<"null";
  out<<",\"min_trace_length_present\":";boolean(out,r.min_trace_length_present);
  out<<",\"max_trace_length_without_loops\":";if(r.max_trace_length_without_loops)out<<*r.max_trace_length_without_loops;else out<<"null";
- out<<",\"trace\":";if(r.trace)array_json(out,*r.trace,quoted);else out<<"null";out<<'}';
+ out<<",\"trace\":";if(r.trace)array_json(out,*r.trace,quoted);else out<<"null";
+ // Null-activity flags (Polars adapter) are written only when set.
+ if(r.activities_include_null)out<<",\"activities_include_null\":true";
+ if(r.start_activities_include_null)out<<",\"start_activities_include_null\":true";
+ if(r.end_activities_include_null)out<<",\"end_activities_include_null\":true";
+ out<<'}';
 }
 FootprintsExtensiveResult extensive_value(const Json& value){const auto& o=value.object();allowed_fields(o,{"footprints","start_activities","end_activities","activities_always_happening","min_length_fit","is_footprints_fit","is_fit"});FootprintsExtensiveResult r;r.footprints=pairs(required(o,"footprints"));r.start_activities=strings(required(o,"start_activities"));r.end_activities=strings(required(o,"end_activities"));r.activities_always_happening=strings(required(o,"activities_always_happening"));r.min_length_fit=required(o,"min_length_fit").boolean();r.is_footprints_fit=required(o,"is_footprints_fit").boolean();r.is_fit=required(o,"is_fit").boolean();return r;}
 void extensive_json(std::ostream& out,const FootprintsExtensiveResult& r){out<<"{\"footprints\":";pairs_json(out,r.footprints);out<<",\"start_activities\":";strings_json(out,r.start_activities);out<<",\"end_activities\":";strings_json(out,r.end_activities);out<<",\"activities_always_happening\":";strings_json(out,r.activities_always_happening);out<<",\"min_length_fit\":";boolean(out,r.min_length_fit);out<<",\"is_footprints_fit\":";boolean(out,r.is_footprints_fit);out<<",\"is_fit\":";boolean(out,r.is_fit);out<<'}';}

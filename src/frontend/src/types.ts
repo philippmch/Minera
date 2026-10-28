@@ -4126,6 +4126,10 @@ export interface AggregateFootprint {
   min_trace_length?: number | null;
   max_trace_length_without_loops?: number;
   trace?: number[];
+  /** Set only when the Polars adapter saw a null activity (it has no id). */
+  activities_include_null?: true;
+  start_activities_include_null?: true;
+  end_activities_include_null?: true;
 }
 export interface FootprintsLogModelConformance {
   strict: boolean;
@@ -4304,6 +4308,10 @@ function isAggregateFootprint(
       !isFootprintActivityTrace(value.trace, activityCount)) return false;
   if (value.trace !== undefined && minimum !== undefined && minimum !== null &&
       value.trace.length !== minimum) return false;
+  for (const flag of ["activities_include_null", "start_activities_include_null",
+                      "end_activities_include_null"]) {
+    if (value[flag] !== undefined && value[flag] !== true) return false;
+  }
   return true;
 }
 

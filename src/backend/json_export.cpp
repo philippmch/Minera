@@ -733,6 +733,20 @@ void write_footprint(std::ostream& out, const Footprint& footprint,
   }
   field("activities");
   write_footprint_ids(out, footprint.activities, graph);
+  // A null activity (Polars adapter) has no graph id, so it is reported as a
+  // flag only when present.
+  if (footprint.activities_include_null) {
+    field("activities_include_null");
+    out << "true";
+  }
+  if (footprint.start_activities_include_null) {
+    field("start_activities_include_null");
+    out << "true";
+  }
+  if (footprint.end_activities_include_null) {
+    field("end_activities_include_null");
+    out << "true";
+  }
   if (footprint.skippable) {
     field("skippable");
     out << (*footprint.skippable ? "true" : "false");
