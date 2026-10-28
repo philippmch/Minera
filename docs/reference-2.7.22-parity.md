@@ -15839,6 +15839,7 @@ values and passing controls.
 | E2 | The extended marking equation solves the reference's program on the trace/net synchronous product: k = max(2, split points) blocks x_0..x_{k-1}, blocks y_1..y_{k-1} that each fire exactly one move consumable after the earlier blocks, y_a limited to log or synchronous moves of events labelled like the event at the a-th split point, and the state equation over all blocks. Given split points keep order and repeats (0 allowed); more than max_k_value points are thinned like the default; standard costs 10000/1/0. The objective is priced from the integral solution; the reference truncates its solver float (`int(19999.99...)` gives 19999), so comparisons use its raw objective. Fuzzed 0/200 random nets, traces and split options. | `minera_petri_analysis_tests` |
 | T1 | Fresh calendar/time-zone comparison: business-hour durations match `soj_time_business_hours_diff` and `BusinessHours.get_seconds` on 6,000 random pairs (UTC offsets including mixed and +05:30/+14:00/-12:00, pre-1970 dates, microseconds, overlapping and touching slots); event distributions match on 700 random XES logs with mixed offsets. Fixed: YEARS on a log without timed events raises like the reference (`min()` of an empty sequence). | `minera_attribute_distribution_tests` |
 | OC1 | OCEL JSON (both formats), XML and SQLite imports order events by timestamp (ties keep file or table order) and relations by their event's position, as every reference importer does; native kept file order (SQLite: id order), so object graphs on unsorted files differed. The five object graphs then match on 600 random OCELs (300 time-sorted, 300 unsorted). Not claimed: the OCEL 2.0 JSON reader's relation order inside one event. | `minera_ocel_codeath_module_tests` |
+| OC2 | The OCEL 2.0 JSON reader keeps one relation per event and object with the last qualifier, as the reference reader does (XML and SQLite keep repeats; the classic JSON format stays lossless because native adapters use it as transport, a declared difference). Fresh comparisons then match on random OCELs with unsorted times and repeated relations: OCDFG activity/start/end/edge metrics and edge performance 0/500, object-type activities, per-event object-type counts, ETOT and OTG 0/285. | `minera_ocel_codeath_module_tests` |
 
 Declared exceptions (not equivalent, kept on purpose):
 
@@ -15862,6 +15863,6 @@ Declared exceptions (not equivalent, kept on purpose):
   executed: runner jobs currently fail before their first step.
 
 Not yet covered by fresh comparisons (no claim either way): nullable/categorical/MultiIndex and
-Polars tables, OCEL aggregates and graphs, genetic evolution and wider ILP
+Polars tables, genetic evolution and wider ILP
 parameters, reset/inhibitor/parallel arcs with full PLTR maps, decomposed
 alignments, and public flat adapters with HTTP/UI forwarding.

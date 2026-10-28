@@ -372,6 +372,20 @@ void imported_events_follow_timestamps() {
   assert(graph.edges == std::vector<Edge>({{"o3", "o4"}}));
 }
 
+// The reference OCEL 2.0 JSON reader keeps one relation per event and
+// object, with the last qualifier.
+void standard_json_collapses_repeated_relations() {
+  const auto log = parse_ocel_json(R"({"objectTypes":[{"name":"x","attributes":[]}],
+    "eventTypes":[{"name":"A","attributes":[]}],
+    "objects":[{"id":"o1","type":"x"},{"id":"o2","type":"x"}],
+    "events":[{"id":"e0","type":"A","time":"2024-01-01T00:00:00","relationships":[
+      {"objectId":"o1","qualifier":"a"},{"objectId":"o2","qualifier":""},
+      {"objectId":"o1","qualifier":"b"}]}]})");
+  assert(log.relations.size() == 2);
+  assert(log.relations[0].object_id == "o2");
+  assert(log.relations[1].object_id == "o1" && log.relations[1].qualifier == "b");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -382,5 +396,6 @@ int main(int argc, char** argv) {
   metadata_and_literal_identity_invariance();
   preserved_validation_and_other_selectors();
   imported_events_follow_timestamps();
+  standard_json_collapses_repeated_relations();
   std::cout << "Codeath metadata/identity invariance and preserved validation passed\n";
 }

@@ -1017,8 +1017,19 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     if(!marker->is_bool())throw std::invalid_argument("minera:literalNames must be boolean");
     literal_names=literal_names || std::get<bool>(marker->value);
   }
-  Ocel result = r.find("events") != r.end() || r.find("objects") != r.end()
-                    ? parse_standard(r,literal_names) : parse_classic(r,literal_names);
+  const bool standard = r.find("events") != r.end() || r.find("objects") != r.end();
+  Ocel result = standard ? parse_standard(r,literal_names) : parse_classic(r,literal_names);
+  // The reference OCEL 2.0 JSON reader keeps one relation per event and
+  // object; the last one wins (its qualifier and its place). The classic
+  // format stays lossless because native adapters use it as transport.
+  if (standard) {
+    std::set<std::pair<std::string, std::string>> seen;
+    std::vector<OcelRelation> kept;
+    for (auto it = result.relations.rbegin(); it != result.relations.rend(); ++it)
+      if (seen.emplace(it->event_id, it->object_id).second) kept.push_back(std::move(*it));
+    result.relations.assign(std::make_move_iterator(kept.rbegin()),
+                            std::make_move_iterator(kept.rend()));
+  }
   sort_ocel_events_by_timestamp(result);
   if (const auto* raw = optional(r, "minera:tableColumns")) {
     const auto& columns = obj(*raw, "minera:tableColumns");
