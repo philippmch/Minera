@@ -1,3 +1,4 @@
+#include "minera/ocel.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/object_centric_playout_workbench_json.hpp"
 
@@ -350,6 +351,27 @@ void preserved_validation_and_other_selectors() {
     assert(threw);
   }
 }
+// Reference importers order events by timestamp (ties keep file order), so
+// an object's death is its latest event in time, not in the file. Here o4's
+// events are e0 (00:30), e3 (00:30) and e4 (00:03): it dies with o3 at e3.
+void imported_events_follow_timestamps() {
+  const std::string json = R"({"objectTypes":[{"name":"item","attributes":[]},
+    {"name":"pack","attributes":[]}],"eventTypes":[{"name":"B","attributes":[]},
+    {"name":"C","attributes":[]}],
+    "objects":[{"id":"o3","type":"item"},{"id":"o4","type":"pack"},{"id":"o5","type":"item"}],
+    "events":[
+      {"id":"e0","type":"B","time":"2024-01-01T00:30:00","relationships":[{"objectId":"o4","qualifier":""}]},
+      {"id":"e3","type":"C","time":"2024-01-01T00:30:00","relationships":[{"objectId":"o3","qualifier":""},{"objectId":"o4","qualifier":""}]},
+      {"id":"e4","type":"B","time":"2024-01-01T00:03:00","relationships":[{"objectId":"o4","qualifier":""},{"objectId":"o5","qualifier":""}]}]})";
+  const auto log = parse_ocel_json(json);
+  assert(log.events.size() == 3 && log.events[0].id == "e4" &&
+         log.events[1].id == "e0" && log.events[2].id == "e3");
+  assert(log.relations.front().event_id == "e4" &&
+         log.relations.back().event_id == "e3");
+  const auto graph = discover_ocel_object_graph(log, OcelEnrichmentGraph::kCodeath);
+  assert(graph.edges == std::vector<Edge>({{"o3", "o4"}}));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -359,5 +381,6 @@ int main(int argc, char** argv) {
   if (failures) return 1;
   metadata_and_literal_identity_invariance();
   preserved_validation_and_other_selectors();
+  imported_events_follow_timestamps();
   std::cout << "Codeath metadata/identity invariance and preserved validation passed\n";
 }

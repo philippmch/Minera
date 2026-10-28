@@ -806,6 +806,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
 
   Ocel log;
   std::map<std::string, std::string> event_types;
+  std::vector<std::string> event_order;
   std::map<std::string, std::string> object_types;
   {
     Statement statement(db, "SELECT ocel_id, ocel_type FROM event ORDER BY rowid");
@@ -818,6 +819,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       const auto activity = column_string(statement.get(), 1);
       if (id.empty() || !event_types.emplace(id, activity).second)
         throw std::invalid_argument("OCEL SQLite event table contains duplicate or empty ids");
+      event_order.push_back(id);
     }
   }
   {
@@ -846,7 +848,9 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   read_attributes(db, "event_attributes", event_attributes);
   read_attributes(db, "object_attributes", object_attributes);
 
-  for (const auto& [id, activity] : event_types) {
+  // Rows in table order, then ordered by timestamp below like the reference.
+  for (const auto& id : event_order) {
+    const auto& activity = event_types.at(id);
     auto mapped = event_map.find(activity);
     const auto table = mapped == event_map.end()
                            ? "event_" + type_table_token(activity, options)
@@ -930,6 +934,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
           read_value(statement.get(), 1, 2, 3, 4, 5);
     }
   }
+  sort_ocel_events_by_timestamp(log);
   return log;
 #endif
 }

@@ -1019,6 +1019,7 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   }
   Ocel result = r.find("events") != r.end() || r.find("objects") != r.end()
                     ? parse_standard(r,literal_names) : parse_classic(r,literal_names);
+  sort_ocel_events_by_timestamp(result);
   if (const auto* raw = optional(r, "minera:tableColumns")) {
     const auto& columns = obj(*raw, "minera:tableColumns");
     const auto read = [&](const char* name,
@@ -1031,6 +1032,35 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     read("relations", result.table_columns.relations);
   }
   return result;
+}
+
+void sort_ocel_events_by_timestamp(Ocel& log) {
+  std::vector<std::pair<std::int64_t, std::size_t>> keys;
+  keys.reserve(log.events.size());
+  for (std::size_t index = 0; index < log.events.size(); ++index) {
+    const auto instant = parse_timestamp_microseconds(log.events[index].timestamp);
+    if (!instant) return;
+    keys.emplace_back(*instant, index);
+  }
+  if (std::is_sorted(keys.begin(), keys.end())) return;
+  std::stable_sort(keys.begin(), keys.end());
+  std::vector<OcelEvent> events;
+  events.reserve(log.events.size());
+  std::unordered_map<std::string, std::size_t> position;
+  for (const auto& [instant, index] : keys) {
+    (void)instant;
+    position.emplace(log.events[index].id, events.size());
+    events.push_back(std::move(log.events[index]));
+  }
+  log.events = std::move(events);
+  const auto rank = [&](const OcelRelation& relation) {
+    const auto found = position.find(relation.event_id);
+    return found == position.end() ? position.size() : found->second;
+  };
+  std::stable_sort(log.relations.begin(), log.relations.end(),
+                   [&](const auto& left, const auto& right) {
+                     return rank(left) < rank(right);
+                   });
 }
 
 Ocel parse_ocel_json(std::string_view json, const OcelJsonLimits& limits) {
