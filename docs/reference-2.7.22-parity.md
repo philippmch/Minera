@@ -15836,6 +15836,7 @@ values and passing controls.
 | S8 | The XES event stream gives each event its trace's attributes under `case:` keys (the trace value wins a clash). Fuzzed 0/300. | `minera_streaming_import_tests` |
 | W1 | Woflan returns unsound (no exception) when the initial or final marking names more or fewer than one place; with one place each it analyzes one token on the source to one token on the sink, whatever place or count the markings gave. Fuzzed 0/300 random nets. | `minera_petri_analysis_tests` |
 | E1 | Fresh comparison, no change needed: arc-degree, extended Cardoso and extended cyclomatic simplicity match on 270 random nets; token generalization matches on 120 unique-label nets (silent-path ties stay inside the reference's observed values). Duplicate-label nets follow the declared replay tie. | fuzz only |
+| E2 | The extended marking equation solves the reference's program on the trace/net synchronous product: k = max(2, split points) blocks x_0..x_{k-1}, blocks y_1..y_{k-1} that each fire exactly one move consumable after the earlier blocks, y_a limited to log or synchronous moves of events labelled like the event at the a-th split point, and the state equation over all blocks. Given split points keep order and repeats (0 allowed); more than max_k_value points are thinned like the default; standard costs 10000/1/0. The objective is priced from the integral solution; the reference truncates its solver float (`int(19999.99...)` gives 19999), so comparisons use its raw objective. Fuzzed 0/200 random nets, traces and split options. | `minera_petri_analysis_tests` |
 
 Declared exceptions (not equivalent, kept on purpose):
 
@@ -15861,4 +15862,4 @@ Declared exceptions (not equivalent, kept on purpose):
 Not yet covered by fresh comparisons (no claim either way): calendar or time-zone interactions, nullable/categorical/MultiIndex and
 Polars tables, OCEL aggregates and graphs, genetic evolution and wider ILP
 parameters, reset/inhibitor/parallel arcs with full PLTR maps, decomposed
-alignments, extended marking equations, and public flat adapters with HTTP/UI forwarding.
+alignments, and public flat adapters with HTTP/UI forwarding.

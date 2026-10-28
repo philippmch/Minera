@@ -24,7 +24,7 @@ constexpr std::int64_t kMaxExactSolverInteger =
 // requested interior sample count.
 std::vector<std::size_t> select_evenly_spaced_splits(
     const std::vector<std::size_t>& splits, std::size_t requested) {
-  if (requested == 0 || splits.size() <= requested) return splits;
+  if (splits.size() <= requested) return splits;
 
   const auto count = splits.size();
   std::vector<std::size_t> selected;
@@ -1427,50 +1427,89 @@ ExtendedMarkingEquationResult solve_extended_marking_equation(
                        : options.log_move_costs;
   validate_costs(log_costs, trace.size(), "log move costs");
 
+  // Split points index trace events. Given points keep their order and
+  // repetitions; without them every interior position is a candidate. More
+  // candidates than max_k_value are thinned to evenly spaced points.
   for (const auto split : options.split_indices) {
-    if (split == 0 || split >= trace.size())
-      throw std::invalid_argument(
-          "split index must lie strictly inside the trace");
+    if (split >= trace.size())
+      throw std::invalid_argument("split index must lie inside the trace");
   }
   result.retained_splits = options.split_indices;
-  std::sort(result.retained_splits.begin(), result.retained_splits.end());
-  if (std::adjacent_find(result.retained_splits.begin(),
-                         result.retained_splits.end()) !=
-      result.retained_splits.end())
-    throw std::invalid_argument("split indices must be unique");
-  if (result.retained_splits.empty() && trace.size() > 1) {
-    if (options.max_k_value == 0) {
-      result.retained_splits = {1, trace.size() - 1};
-    } else {
-      result.retained_splits.reserve(trace.size() - 1);
-      for (std::size_t i = 1; i < trace.size(); ++i)
-        result.retained_splits.push_back(i);
-    }
+  if (result.retained_splits.empty()) {
+    for (std::size_t i = 1; i < trace.size(); ++i)
+      result.retained_splits.push_back(i);
   }
-  if (options.max_k_value > 0 &&
-      result.retained_splits.size() > options.max_k_value) {
+  if (result.retained_splits.size() > options.max_k_value) {
     result.retained_splits = select_evenly_spaced_splits(
         result.retained_splits, options.max_k_value);
   }
-  result.segment_count = result.retained_splits.size() + 1;
-  const auto segments = result.segment_count;
-  const auto places = net.place_count();
-  const auto matrix = incidence(net);
-  const auto model_base = std::size_t{0};
-  const auto sync_base = segments * transition_count;
-  const auto log_base = sync_base + segments * transition_count;
-  const auto variable_count = log_base + trace.size();
-  std::vector<double> costs(variable_count, 0.0);
-  for (std::size_t segment = 0; segment < segments; ++segment) {
-    for (std::size_t transition = 0; transition < transition_count; ++transition) {
-      costs[model_base + segment * transition_count + transition] =
-          model_costs[transition];
-      costs[sync_base + segment * transition_count + transition] =
-          sync_costs[transition];
+
+  // The program runs on the synchronous product of the trace and the net:
+  // model moves (one per net transition), then per event its log move and
+  // its synchronous moves with equally labelled net transitions. Places are
+  // the net places followed by the n+1 trace places.
+  struct Move { std::optional<std::size_t> transition; std::optional<std::size_t> event; };
+  std::vector<Move> moves;
+  for (std::size_t t = 0; t < transition_count; ++t) moves.push_back({t, std::nullopt});
+  for (std::size_t position = 0; position < trace.size(); ++position) {
+    moves.push_back({std::nullopt, position});
+    for (std::size_t t = 0; t < transition_count; ++t) {
+      const auto activity = net.transitions()[t].activity;
+      if (activity && *activity < net.activities().size() &&
+          net.activities()[*activity] == trace[position])
+        moves.push_back({t, position});
     }
   }
-  for (std::size_t position = 0; position < trace.size(); ++position)
-    costs[log_base + position] = log_costs[position];
+  const auto places = net.place_count();
+  const auto product_places = places + trace.size() + 1;
+  const auto move_count = moves.size();
+  const auto matrix = incidence(net);
+  std::vector<std::vector<double>> change(product_places, std::vector<double>(move_count, 0.0));
+  std::vector<std::vector<double>> consumption(product_places, std::vector<double>(move_count, 0.0));
+  std::vector<double> move_costs(move_count, 0.0);
+  for (std::size_t m = 0; m < move_count; ++m) {
+    const auto& move = moves[m];
+    if (move.transition) {
+      for (std::size_t place = 0; place < places; ++place)
+        change[place][m] = matrix[place][*move.transition];
+      // Consumption counts each input place once, like the reference matrix.
+      for (const auto place : net.transitions()[*move.transition].inputs)
+        consumption[place][m] = -1.0;
+    }
+    if (move.event) {
+      change[places + *move.event][m] -= 1.0;
+      change[places + *move.event + 1][m] += 1.0;
+      consumption[places + *move.event][m] = -1.0;
+    }
+    move_costs[m] = !move.event ? model_costs[*move.transition]
+                    : !move.transition ? log_costs[*move.event]
+                                       : sync_costs[*move.transition];
+  }
+  std::vector<double> initial(product_places, 0.0), target(product_places, 0.0);
+  for (std::size_t place = 0; place < places; ++place) {
+    initial[place] = static_cast<double>(markings.initial[place]);
+    target[place] = static_cast<double>(markings.final[place]);
+  }
+  initial[places] += 1.0;
+  target[places + trace.size()] += 1.0;
+
+  // Variables: k blocks x_0..x_{k-1} and k-1 blocks y_1..y_{k-1}, with
+  // k = max(2, number of split points). Each y_a is exactly one move that
+  // the marking reached by x_0 and the earlier x_b + y_b can consume, and it
+  // is a log or synchronous move of an event labelled like the event at the
+  // a-th split point (unrestricted when there are no split points).
+  const auto segments = std::max<std::size_t>(2, result.retained_splits.size());
+  result.segment_count = segments;
+  const auto x_var = [&](std::size_t block, std::size_t m) { return block * move_count + m; };
+  const auto y_var = [&](std::size_t block, std::size_t m) {
+    return (segments + block - 1) * move_count + m;
+  };
+  const auto variable_count = (2 * segments - 1) * move_count;
+  std::vector<double> costs(variable_count, 0.0);
+  for (std::size_t m = 0; m < move_count; ++m) {
+    for (std::size_t block = 0; block < segments; ++block) costs[x_var(block, m)] = move_costs[m];
+    for (std::size_t block = 1; block < segments; ++block) costs[y_var(block, m)] = move_costs[m];
+  }
 
   std::vector<std::vector<double>> inequalities;
   std::vector<double> bounds;
@@ -1481,84 +1520,38 @@ ExtendedMarkingEquationResult solve_extended_marking_equation(
     inequalities.push_back(std::move(row));
     bounds.push_back(-bound);
   };
-  const auto segment_for = [&](std::size_t position) {
-    return static_cast<std::size_t>(std::upper_bound(
-        result.retained_splits.begin(), result.retained_splits.end(), position) -
-                                    result.retained_splits.begin());
-  };
-  for (std::size_t position = 0; position < trace.size(); ++position) {
-    const auto segment = segment_for(position);
+  for (std::size_t place = 0; place < product_places; ++place) {
     std::vector<double> row(variable_count, 0.0);
-    row[log_base + position] = 1.0;
-    for (std::size_t transition = 0; transition < transition_count;
-         ++transition) {
-      const auto activity = net.transitions()[transition].activity;
-      if (activity && *activity < net.activities().size() &&
-          net.activities()[*activity] == trace[position]) {
-        row[sync_base + segment * transition_count + transition] = 1.0;
-      }
+    for (std::size_t m = 0; m < move_count; ++m) {
+      for (std::size_t block = 0; block < segments; ++block) row[x_var(block, m)] = change[place][m];
+      for (std::size_t block = 1; block < segments; ++block) row[y_var(block, m)] = change[place][m];
     }
-    add_equality(std::move(row), 1.0);
+    add_equality(std::move(row), target[place] - initial[place]);
   }
-  for (std::size_t segment = 0; segment < segments; ++segment) {
-    for (std::size_t transition = 0; transition < transition_count;
-         ++transition) {
-      const auto activity = net.transitions()[transition].activity;
-      if (!activity || *activity >= net.activities().size()) continue;
-      bool appears = false;
-      const auto begin = segment == 0 ? 0 : result.retained_splits[segment - 1];
-      const auto end = segment < result.retained_splits.size()
-                           ? result.retained_splits[segment]
-                           : trace.size();
-      for (std::size_t position = begin; position < end; ++position) {
-        if (net.activities()[*activity] == trace[position]) {
-          appears = true;
-          break;
-        }
-      }
-      if (!appears) {
-        std::vector<double> row(variable_count, 0.0);
-        row[sync_base + segment * transition_count + transition] = 1.0;
-        inequalities.push_back(std::move(row));
-        bounds.push_back(0.0);
-      }
-    }
-  }
-
-  // Every segment boundary must denote a non-negative marking. The final
-  // boundary is also fixed exactly below, so this keeps the state equation
-  // split-aware without pretending to prove an interior firing order.
-  for (std::size_t segment = 0; segment < segments; ++segment) {
-    for (std::size_t place = 0; place < places; ++place) {
+  for (std::size_t a = 1; a < segments; ++a) {
+    for (std::size_t place = 0; place < product_places; ++place) {
       std::vector<double> row(variable_count, 0.0);
-      for (std::size_t prior = 0; prior <= segment; ++prior) {
-        for (std::size_t transition = 0; transition < transition_count;
-             ++transition) {
-          const auto coefficient = -matrix[place][transition];
-          row[model_base + prior * transition_count + transition] =
-              coefficient;
-          row[sync_base + prior * transition_count + transition] =
-              coefficient;
+      for (std::size_t m = 0; m < move_count; ++m) {
+        row[x_var(0, m)] = -change[place][m];
+        for (std::size_t b = 1; b < a; ++b) {
+          row[x_var(b, m)] = -change[place][m];
+          row[y_var(b, m)] = -change[place][m];
         }
+        row[y_var(a, m)] = -consumption[place][m];
       }
       inequalities.push_back(std::move(row));
-      bounds.push_back(static_cast<double>(markings.initial[place]));
+      bounds.push_back(initial[place]);
     }
-  }
-  for (std::size_t place = 0; place < places; ++place) {
-    std::vector<double> row(variable_count, 0.0);
-    for (std::size_t segment = 0; segment < segments; ++segment) {
-      for (std::size_t transition = 0; transition < transition_count;
-           ++transition) {
-        row[model_base + segment * transition_count + transition] =
-            matrix[place][transition];
-        row[sync_base + segment * transition_count + transition] =
-            matrix[place][transition];
-      }
+    std::vector<double> one(variable_count, 0.0);
+    for (std::size_t m = 0; m < move_count; ++m) one[y_var(a, m)] = 1.0;
+    add_equality(std::move(one), 1.0);
+    if (a - 1 < result.retained_splits.size()) {
+      const auto& label = trace[result.retained_splits[a - 1]];
+      std::vector<double> other(variable_count, 0.0);
+      for (std::size_t m = 0; m < move_count; ++m)
+        if (!moves[m].event || trace[*moves[m].event] != label) other[y_var(a, m)] = 1.0;
+      add_equality(std::move(other), 0.0);
     }
-    const auto delta = static_cast<double>(markings.final[place]) -
-                       static_cast<double>(markings.initial[place]);
-    add_equality(std::move(row), delta);
   }
 
   const auto program = solve_integer_program(inequalities, bounds, costs,
@@ -1574,15 +1567,16 @@ ExtendedMarkingEquationResult solve_extended_marking_equation(
   result.feasible = true;
   result.objective = program.objective;
   result.lower_bound = program.root_lower_bound;
+  // The solution is integral; price it exactly instead of keeping the
+  // simplex's rounding noise.
+  result.objective = 0.0;
+  for (std::size_t variable = 0; variable < variable_count; ++variable)
+    result.objective += costs[variable] * std::round(program.solution[variable]);
   result.transition_counts.assign(transition_count, 0.0);
-  for (std::size_t segment = 0; segment < segments; ++segment) {
-    for (std::size_t transition = 0; transition < transition_count;
-         ++transition) {
-      result.transition_counts[transition] +=
-          program.solution[model_base + segment * transition_count + transition];
-      result.transition_counts[transition] +=
-          program.solution[sync_base + segment * transition_count + transition];
-    }
+  for (std::size_t variable = 0; variable < variable_count; ++variable) {
+    const auto& move = moves[variable % move_count];
+    if (move.transition)
+      result.transition_counts[*move.transition] += std::round(program.solution[variable]);
   }
   bool recovery_exhausted = false;
   result.firing_sequence = recover_sequence(

@@ -216,7 +216,9 @@ void extended_equation() {
   ExtendedMarkingEquationOptions no_splits;
   no_splits.max_k_value = 0;
   const auto empty = solve_extended_marking_equation({}, net, no_splits);
-  assert(empty.feasible && empty.segment_count == 1 &&
+  // The reference always builds at least two segments, so even an empty
+  // trace must fire one move as y_1.
+  assert(empty.feasible && empty.segment_count == 2 &&
          std::abs(empty.objective - 20000.0) < 1e-7);
 
   ExtendedMarkingEquationOptions explicit_splits;
@@ -224,18 +226,22 @@ void extended_equation() {
   const auto split = solve_extended_marking_equation({"A", "B"}, net,
                                                       explicit_splits);
   assert(split.retained_splits == std::vector<std::size_t>({1}));
+  // Like the reference, given split points keep their order and
+  // repetitions and may name the first event; only positions past the
+  // trace are rejected.
+  explicit_splits.split_indices = {1, 0, 1};
+  const auto repeated = solve_extended_marking_equation({"A", "B"}, net,
+                                                         explicit_splits);
+  assert(repeated.retained_splits == std::vector<std::size_t>({1, 0, 1}));
+  // y_1 is a B move, so x_0 spends the A event that y_2 would need.
+  assert(repeated.segment_count == 3 && repeated.computed && !repeated.feasible);
+  explicit_splits.split_indices = {0, 1};
+  const auto from_start = solve_extended_marking_equation({"A", "B"}, net,
+                                                           explicit_splits);
+  assert(from_start.feasible && std::abs(from_start.objective) < 1e-9);
   bool threw = false;
   try {
-    explicit_splits.split_indices = {0};
-    (void)solve_extended_marking_equation({"A", "B"}, net, explicit_splits);
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  assert(threw);
-
-  threw = false;
-  try {
-    explicit_splits.split_indices = {1, 1};
+    explicit_splits.split_indices = {2};
     (void)solve_extended_marking_equation({"A", "B"}, net, explicit_splits);
   } catch (const std::invalid_argument&) {
     threw = true;
