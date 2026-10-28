@@ -369,21 +369,19 @@ int main() {
   merge_options.merge_distance_seconds = 0.0;
   auto strict = minera::discover_batches(merge_log, merge_options);
   assert(strict.groups.size() == 1 && strict.groups[0].batches.size() == 2);
-  assert(throws([&] {
-    auto bad = merge_options;
-    bad.merge_distance_seconds = -1.0;
-    (void)minera::discover_batches(merge_log, bad);
-  }));
+  // A negative distance merges only overlaps, and a minimum of one keeps
+  // single-event intervals, as in the reference.
+  auto negative = merge_options;
+  negative.merge_distance_seconds = -1.0;
+  (void)minera::discover_batches(merge_log, negative);
   assert(throws([&] {
     auto bad = merge_options;
     bad.merge_distance_seconds = std::numeric_limits<double>::infinity();
     (void)minera::discover_batches(merge_log, bad);
   }));
-  assert(throws([&] {
-    auto bad = merge_options;
-    bad.min_batch_size = 1;
-    (void)minera::discover_batches(merge_log, bad);
-  }));
+  auto singles = merge_options;
+  singles.min_batch_size = 1;
+  assert(!minera::discover_batches(merge_log, singles).groups.empty());
   assert(throws([&] {
     auto bad = merge_options;
     bad.start_timestamp_attribute = "missing";

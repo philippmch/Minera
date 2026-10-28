@@ -200,12 +200,12 @@ export function temporalValidationMessage(input: {
   if (input.batches) {
     const mergeRaw = input.batchMergeDistanceSeconds.trim();
     const merge = Number(mergeRaw);
-    if (!mergeRaw || !Number.isFinite(merge) || merge < 0)
-      return "Batch merge distance must be a finite, non-negative number.";
+    if (!mergeRaw || !Number.isFinite(merge))
+      return "Batch merge distance must be a finite number.";
     const minRaw = input.batchMinSize.trim();
     const min = Number(minRaw);
-    if (!minRaw || !Number.isFinite(min) || !Number.isInteger(min) || min < 2)
-      return "Batch minimum size must be an integer of at least 2.";
+    if (!minRaw || !Number.isFinite(min) || !Number.isInteger(min) || min < 0)
+      return "Batch minimum size must be a non-negative integer.";
   }
   if (input.transitionActivityKey !== undefined &&
       !input.transitionActivityKey.trim())
@@ -1743,10 +1743,10 @@ export function Filters({
       batches: batches || undefined,
       batchVariant: batches && batchVariant !== "log" ? batchVariant : undefined,
       batchMergeDistanceSeconds: batches
-        ? (() => { const n = Number(batchMergeDistanceSeconds); return Number.isFinite(n) && n >= 0 ? n : undefined; })()
+        ? (() => { const n = Number(batchMergeDistanceSeconds); return Number.isFinite(n) ? n : undefined; })()
         : undefined,
       batchMinSize: batches
-        ? (() => { const n = Number(batchMinSize); return Number.isInteger(n) && n >= 2 ? n : undefined; })()
+        ? (() => { const n = Number(batchMinSize); return Number.isInteger(n) && n >= 0 ? n : undefined; })()
         : undefined,
       batchActivityAttribute: batches ? batchActivityAttribute.trim() || undefined : undefined,
       batchResourceAttribute: batches ? batchResourceAttribute.trim() || undefined : undefined,
@@ -4349,7 +4349,6 @@ export function Filters({
               <span>Batch merge distance (seconds)</span>
               <input
                 type="number"
-                min={0}
                 step={1}
                 value={batchMergeDistanceSeconds}
                 disabled={!batches}
@@ -4360,7 +4359,7 @@ export function Filters({
               <span>Batch minimum size</span>
               <input
                 type="number"
-                min={2}
+                min={0}
                 step={1}
                 value={batchMinSize}
                 disabled={!batches}

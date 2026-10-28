@@ -3792,18 +3792,11 @@ MineParams parse_mine_params(const FieldLookup& field,
       present ? present("batch_merge_distance_seconds") : !value.empty()) {
     params.batch_options.merge_distance_seconds =
         parse_finite_double(value, "batch_merge_distance_seconds");
-    if (params.batch_options.merge_distance_seconds < 0.0) {
-      throw std::invalid_argument(
-          "batch_merge_distance_seconds: expected a non-negative number");
-    }
   }
   if (const auto value = field("batch_min_size");
       present ? present("batch_min_size") : !value.empty()) {
     params.batch_options.min_batch_size =
         parse_nonnegative_size(value, "batch_min_size");
-    if (params.batch_options.min_batch_size < 2) {
-      throw std::invalid_argument("batch_min_size: expected an integer >= 2");
-    }
   }
   if (const auto value = field("batch_start_timestamp_attribute");
       present ? present("batch_start_timestamp_attribute") : !value.empty()) {

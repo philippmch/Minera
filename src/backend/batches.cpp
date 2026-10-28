@@ -24,7 +24,23 @@ struct IndexedEvent {
   BatchEvent event;
   std::string activity;
   std::string resource;
+  // A numeric event id orders numerically, as the reference's event tuples
+  // compare it.
+  std::optional<double> event_id_number;
 };
+
+// Groups are keyed by activity and resource; a null resource (Polars only)
+// is its own key.
+struct GroupKey {
+  std::string activity;
+  std::string resource;
+  bool resource_is_null = false;
+  bool operator<(const GroupKey& other) const {
+    return std::tie(activity, resource_is_null, resource) <
+           std::tie(other.activity, other.resource_is_null, other.resource);
+  }
+};
+using GroupedEvents = std::map<GroupKey, std::vector<IndexedEvent>>;
 
 struct TableSelector {
   std::string name;
@@ -283,13 +299,11 @@ void validate_options(const BatchDiscoveryOptions& options) {
       options.variant != BatchDiscoveryVariant::kPolars) {
     throw std::invalid_argument("batches: unknown discovery variant");
   }
-  if (!std::isfinite(options.merge_distance_seconds) ||
-      options.merge_distance_seconds < 0.0) {
-    throw std::invalid_argument(
-        "batches: merge distance must be finite and non-negative");
-  }
-  if (options.min_batch_size < 2) {
-    throw std::invalid_argument("batches: min_batch_size must be at least two");
+  // The reference accepts any merge distance and minimum size: a negative
+  // distance merges nothing that does not overlap, and a minimum of zero or
+  // one keeps every interval.
+  if (!std::isfinite(options.merge_distance_seconds)) {
+    throw std::invalid_argument("batches: merge distance must be finite");
   }
   if (options.activity_attribute.empty() || options.resource_attribute.empty() ||
       options.timestamp_attribute.empty() || options.case_id_attribute.empty()) {
@@ -302,14 +316,128 @@ struct EventIdentity {
   double start = 0.0;
   double complete = 0.0;
   std::string case_id;
+  std::optional<double> event_id_number;
   std::string event_id;
 
   bool operator<(const EventIdentity& other) const {
-    return std::tie(start, complete, case_id, event_id) <
+    return std::tie(start, complete, case_id, event_id_number, event_id) <
            std::tie(other.start, other.complete, other.case_id,
-                    other.event_id);
+                    other.event_id_number, other.event_id);
   }
 };
+
+struct Interval {
+  double start = 0.0;
+  double end = 0.0;
+  std::vector<std::size_t> members;
+};
+
+// Interval lists compare as the reference's (start, end, events) tuples; the
+// event sets are disjoint, so ties never order.
+bool interval_less(const Interval& left, const Interval& right) {
+  return left.start < right.start ||
+         (left.start == right.start && left.end < right.end);
+}
+
+Interval merged_interval(const Interval& left, const Interval& right) {
+  Interval merged{std::min(left.start, right.start),
+                  std::max(left.end, right.end), left.members};
+  merged.members.insert(merged.members.end(), right.members.begin(),
+                        right.members.end());
+  return merged;
+}
+
+void sift_down(std::vector<Interval>& heap, std::size_t start,
+               std::size_t position) {
+  auto item = std::move(heap[position]);
+  while (position > start) {
+    const auto parent = (position - 1) / 2;
+    if (!interval_less(item, heap[parent])) break;
+    heap[position] = std::move(heap[parent]);
+    position = parent;
+  }
+  heap[position] = std::move(item);
+}
+
+void sift_up(std::vector<Interval>& heap, std::size_t position) {
+  const auto end = heap.size();
+  const auto start = position;
+  auto item = std::move(heap[position]);
+  auto child = 2 * position + 1;
+  while (child < end) {
+    const auto right = child + 1;
+    if (right < end && !interval_less(heap[child], heap[right])) child = right;
+    heap[position] = std::move(heap[child]);
+    position = child;
+    child = 2 * position + 1;
+  }
+  heap[position] = std::move(item);
+  sift_down(heap, start, position);
+}
+
+// The reference builds one interval per event in input order and heapifies
+// the list (Python heapq order) before merging.
+std::vector<Interval> heapified_intervals(const std::vector<IndexedEvent>& values) {
+  std::vector<Interval> intervals;
+  intervals.reserve(values.size());
+  for (std::size_t index = 0; index < values.size(); ++index)
+    intervals.push_back(
+        {values[index].event.start, values[index].event.complete, {index}});
+  for (auto index = intervals.size() / 2; index > 0; --index)
+    sift_up(intervals, index - 1);
+  return intervals;
+}
+
+// Adjacent intervals merge in place while the next starts strictly before
+// the current end; the list is stably sorted after a merge (after the first
+// one it stays sorted) and the scan repeats until nothing merges.
+void merge_overlapping(std::vector<Interval>& intervals) {
+  bool changed = true;
+  bool sorted = false;
+  while (changed) {
+    changed = false;
+    std::size_t index = 0;
+    while (index + 1 < intervals.size()) {
+      if (!(intervals[index + 1].start < intervals[index].end)) {
+        ++index;
+        continue;
+      }
+      intervals[index] =
+          merged_interval(intervals[index], intervals[index + 1]);
+      intervals.erase(intervals.begin() +
+                      static_cast<std::ptrdiff_t>(index + 1));
+      changed = true;
+      if (!sorted) {
+        std::stable_sort(intervals.begin(), intervals.end(), interval_less);
+        sorted = true;
+      }
+    }
+  }
+}
+
+// The reference merges near intervals by scanning adjacent pairs, removing a
+// merged pair and heap-pushing the union back into the list, and repeating
+// the scan until nothing merges. The list is not re-sorted, so later scans
+// see heap order and can join intervals farther apart than the distance.
+void merge_near(std::vector<Interval>& intervals, double distance) {
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    std::size_t index = 0;
+    while (index + 1 < intervals.size()) {
+      if (intervals[index + 1].start - intervals[index].end > distance) {
+        ++index;
+        continue;
+      }
+      auto merged = merged_interval(intervals[index], intervals[index + 1]);
+      intervals.erase(intervals.begin() + static_cast<std::ptrdiff_t>(index),
+                      intervals.begin() + static_cast<std::ptrdiff_t>(index + 2));
+      intervals.push_back(std::move(merged));
+      sift_down(intervals, 0, intervals.size() - 1);
+      changed = true;
+    }
+  }
+}
 
 BatchType classify(const std::vector<BatchEvent>& events) {
   if (events.empty()) return BatchType::kConcurrent;
@@ -338,91 +466,99 @@ BatchType classify(const std::vector<BatchEvent>& events) {
   return sequential ? BatchType::kSequential : BatchType::kConcurrent;
 }
 
-BatchDiscovery detect_grouped(
-    std::map<std::pair<std::string, std::string>, std::vector<IndexedEvent>> grouped,
-    BatchDiscoveryOptions options, bool include_event_id) {
+BatchDiscovery detect_grouped(GroupedEvents grouped,
+                              BatchDiscoveryOptions options,
+                              bool include_event_id) {
   validate_options(options);
 
-  std::vector<BatchGroup> result;
+  struct KeyedGroup {
+    GroupKey key;
+    BatchGroup group;
+  };
+  std::vector<KeyedGroup> result;
   for (auto& [key, values] : grouped) {
-    std::sort(values.begin(), values.end(), [](const IndexedEvent& left,
-                                               const IndexedEvent& right) {
-      return std::tie(left.event.start, left.event.complete,
-                      left.event.trace_index, left.event.event_index,
-                      left.event.event_id) <
-             std::tie(right.event.start, right.event.complete,
-                      right.event.trace_index, right.event.event_index,
-                      right.event.event_id);
-    });
+    auto intervals = heapified_intervals(values);
+    merge_overlapping(intervals);
+    merge_near(intervals, options.merge_distance_seconds);
 
-    // The detector consumes a set of event tuples.  A table event id extends
-    // that tuple; without one, repeated timestamp/case tuples are one event.
-    std::set<EventIdentity> identities;
-    std::vector<IndexedEvent> unique;
-    unique.reserve(values.size());
-    for (auto& value : values) {
-      EventIdentity identity{value.event.start, value.event.complete,
-                             value.event.case_id,
-                             include_event_id ? value.event.event_id : ""};
-      if (identities.insert(std::move(identity)).second)
-        unique.push_back(std::move(value));
-    }
-    values = std::move(unique);
-
+    // An interval's events are a set of (start, complete, case[, id]) tuples,
+    // so repeated events count once.
     std::vector<Batch> batches;
-    std::size_t cursor = 0;
-    while (cursor < values.size()) {
-      std::vector<BatchEvent> component;
-      component.push_back(values[cursor].event);
-      double envelope_end = values[cursor].event.complete;
-      ++cursor;
-      while (cursor < values.size()) {
-        const auto& candidate = values[cursor].event;
-        const double gap = candidate.start - envelope_end;
-        if (candidate.start < envelope_end ||
-            gap <= options.merge_distance_seconds) {
-          component.push_back(candidate);
-          envelope_end = std::max(envelope_end, candidate.complete);
-          ++cursor;
-        } else {
-          break;
-        }
-      }
-      if (component.size() < options.min_batch_size) continue;
+    for (auto& interval : intervals) {
+      std::sort(interval.members.begin(), interval.members.end(),
+                [&](std::size_t left, std::size_t right) {
+                  const auto& a = values[left];
+                  const auto& b = values[right];
+                  return std::tie(a.event.start, a.event.complete,
+                                  a.event.case_id, a.event_id_number,
+                                  a.event.event_id, left) <
+                         std::tie(b.event.start, b.event.complete,
+                                  b.event.case_id, b.event_id_number,
+                                  b.event.event_id, right);
+                });
+      std::set<EventIdentity> identities;
       Batch batch;
-      batch.start = component.front().start;
-      batch.complete = component.front().complete;
-      for (const auto& event : component) {
-        batch.start = std::min(batch.start, event.start);
-        batch.complete = std::max(batch.complete, event.complete);
+      for (const auto member : interval.members) {
+        const auto& value = values[member];
+        EventIdentity identity{value.event.start, value.event.complete,
+                               value.event.case_id,
+                               include_event_id ? value.event_id_number
+                                                : std::nullopt,
+                               include_event_id ? value.event.event_id : ""};
+        if (identities.insert(std::move(identity)).second)
+          batch.events.push_back(value.event);
       }
-      batch.events = std::move(component);
+      if (batch.events.size() < options.min_batch_size) continue;
+      batch.start = interval.start;
+      batch.complete = interval.end;
       batch.type = classify(batch.events);
       batches.push_back(std::move(batch));
     }
     if (batches.empty()) continue;
+    // Batches are listed by start; the reference lists them per type in its
+    // final interval order.
+    std::stable_sort(batches.begin(), batches.end(),
+                     [](const Batch& left, const Batch& right) {
+                       return left.start < right.start;
+                     });
     BatchGroup group;
-    group.activity = key.first;
-    group.resource = key.second;
+    group.activity = key.activity;
+    group.resource = key.resource;
+    group.resource_is_null = key.resource_is_null;
     group.batch_count = batches.size();
     for (const auto& batch : batches) group.event_count += batch.events.size();
     group.batches = std::move(batches);
-    result.push_back(std::move(group));
+    result.push_back({key, std::move(group)});
   }
-  std::sort(result.begin(), result.end(), [](const BatchGroup& left,
-                                             const BatchGroup& right) {
-    if (left.batch_count != right.batch_count)
-      return left.batch_count > right.batch_count;
-    return std::tie(left.activity, left.resource) >
-           std::tie(right.activity, right.resource);
+  // Groups sort by batch count, then (activity, resource), both descending.
+  // A null resource cannot be compared with a text one, as in the reference.
+  for (std::size_t i = 0; i < result.size(); ++i) {
+    for (std::size_t j = i + 1; j < result.size(); ++j) {
+      const auto& left = result[i].group;
+      const auto& right = result[j].group;
+      if (left.batch_count == right.batch_count &&
+          left.activity == right.activity &&
+          left.resource_is_null != right.resource_is_null)
+        throw std::invalid_argument(
+            "batches: '<' not supported between instances of 'str' and "
+            "'NoneType'");
+    }
+  }
+  std::sort(result.begin(), result.end(), [](const KeyedGroup& left,
+                                             const KeyedGroup& right) {
+    if (left.group.batch_count != right.group.batch_count)
+      return left.group.batch_count > right.group.batch_count;
+    return right.key < left.key;
   });
-  return BatchDiscovery{options, options.variant, std::move(result)};
+  std::vector<BatchGroup> groups;
+  groups.reserve(result.size());
+  for (auto& entry : result) groups.push_back(std::move(entry.group));
+  return BatchDiscovery{options, options.variant, std::move(groups)};
 }
 
 void append_log_events(
     const EventLog& log, const BatchDiscoveryOptions& options,
-    std::map<std::pair<std::string, std::string>, std::vector<IndexedEvent>>&
-        grouped) {
+    GroupedEvents& grouped) {
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
        ++trace_index) {
     const auto& trace = log.traces[trace_index];
@@ -461,14 +597,26 @@ void append_log_events(
                                                 options.case_id_attribute);
       BatchEvent batch_event{start, *complete, case_id, trace_index, event_index,
                              {}};
-      grouped[{activity, resource}].push_back(
-          IndexedEvent{std::move(batch_event), activity, resource});
+      grouped[{activity, resource, false}].push_back(
+          IndexedEvent{std::move(batch_event), activity, resource, {}});
     }
   }
 }
 
-std::map<std::pair<std::string, std::string>, std::vector<IndexedEvent>>
-table_events(const EventTable& table, const BatchDiscoveryOptions& options) {
+std::optional<double> numeric_value(const EventAttribute& cell) {
+  if (const auto* integer = std::get_if<std::int64_t>(&cell.typed_value))
+    return static_cast<double>(*integer);
+  if (const auto* unsigned_integer =
+          std::get_if<std::uint64_t>(&cell.typed_value))
+    return static_cast<double>(*unsigned_integer);
+  if (const auto* floating = std::get_if<double>(&cell.typed_value))
+    return *floating;
+  return std::nullopt;
+}
+
+GroupedEvents table_events(const EventTable& table,
+                           const BatchDiscoveryOptions& options) {
+  const bool polars = options.variant == BatchDiscoveryVariant::kPolars;
   table.validate();
   const auto case_selector = resolve_selector(
       table, options.case_id_attribute, SelectorRole::kCase, "case-id", true);
@@ -492,18 +640,34 @@ table_events(const EventTable& table, const BatchDiscoveryOptions& options) {
   const bool event_id_selected = !options.event_id_attribute.empty() &&
                                  event_id_selector.column.has_value();
 
-  std::map<std::pair<std::string, std::string>, std::vector<IndexedEvent>> grouped;
+  // Polars requires a string (or categorical) case column, even when empty.
+  if (polars && case_selector.column && *case_selector.column < table.dtypes.size()) {
+    const std::string_view dtype = table.dtypes[*case_selector.column];
+    const bool text = dtype.starts_with("String") || dtype.starts_with("Utf8") ||
+                      dtype.starts_with("Categorical") || dtype.starts_with("Enum");
+    if (!text)
+      throw std::invalid_argument(
+          "batches: the case ID column should be of type string.");
+  }
+  GroupedEvents grouped;
   for (std::size_t row_index = 0; row_index < table.rows.size(); ++row_index) {
     const auto& row = table.rows[row_index];
     const auto* activity_cell = row_cell(row, table, activity_selector);
     const auto* resource_cell = row_cell(row, table, resource_selector);
     const auto* timestamp_cell = row_cell(row, table, timestamp_selector);
     const auto* case_cell = row_cell(row, table, case_selector);
-    if (!activity_cell || !resource_cell || !timestamp_cell || !case_cell) {
+    // Polars groups a null resource as its own key.
+    const bool null_resource = polars && !resource_cell;
+    if (!activity_cell || (!resource_cell && !null_resource) ||
+        !timestamp_cell || !case_cell) {
       throw std::invalid_argument("batches: a required table cell is missing");
     }
+    if (polars && numeric_value(*case_cell))
+      throw std::invalid_argument(
+          "batches: the case ID column should be of type string.");
     const auto activity = attribute_text(*activity_cell);
-    const auto resource = attribute_text(*resource_cell);
+    const auto resource = null_resource ? std::string{}
+                                        : attribute_text(*resource_cell);
     const auto case_id = attribute_text(*case_cell);
     const auto complete = parse_timestamp(attribute_text(*timestamp_cell));
     if (!complete || !std::isfinite(*complete))
@@ -527,13 +691,16 @@ table_events(const EventTable& table, const BatchDiscoveryOptions& options) {
           "batches: start timestamp is after completion");
 
     std::string event_id;
+    std::optional<double> event_id_number;
     if (event_id_selected) {
-      if (const auto* event_id_cell = row_cell(row, table, event_id_selector))
+      if (const auto* event_id_cell = row_cell(row, table, event_id_selector)) {
         event_id = attribute_text(*event_id_cell);
+        event_id_number = numeric_value(*event_id_cell);
+      }
     }
     BatchEvent batch_event{start, *complete, case_id, 0, row_index, event_id};
-    grouped[{activity, resource}].push_back(
-        IndexedEvent{std::move(batch_event), activity, resource});
+    grouped[{activity, resource, null_resource}].push_back(IndexedEvent{
+        std::move(batch_event), activity, resource, event_id_number});
   }
   return grouped;
 }
@@ -552,7 +719,7 @@ BatchDiscovery discover_table(const EventTable& table,
 BatchDiscovery discover_batches(const EventLog& log,
                                 BatchDiscoveryOptions options) {
   validate_options(options);
-  std::map<std::pair<std::string, std::string>, std::vector<IndexedEvent>> grouped;
+  GroupedEvents grouped;
   append_log_events(log, options, grouped);
   return detect_grouped(std::move(grouped), std::move(options), false);
 }

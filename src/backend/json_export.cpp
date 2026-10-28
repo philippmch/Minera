@@ -2841,8 +2841,6 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
     throw std::invalid_argument("batch discovery has an unknown variant");
   }
   if (!std::isfinite(discovery.options.merge_distance_seconds) ||
-      discovery.options.merge_distance_seconds < 0.0 ||
-      discovery.options.min_batch_size < 2 ||
       discovery.options.activity_attribute.empty() ||
       discovery.options.resource_attribute.empty() ||
       discovery.options.timestamp_attribute.empty() ||
@@ -2853,6 +2851,7 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
   std::size_t previous_group_batch_count = std::numeric_limits<std::size_t>::max();
   std::string previous_group_activity;
   std::string previous_group_resource;
+  bool previous_group_resource_is_null = false;
   bool first_group = true;
   for (const auto& group : discovery.groups) {
     if (discovery.options.activity_attribute == "activity" ||
@@ -2868,14 +2867,16 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
     if (!first_group &&
         (group.batch_count > previous_group_batch_count ||
          (group.batch_count == previous_group_batch_count &&
-          std::tie(group.activity, group.resource) >=
-              std::tie(previous_group_activity, previous_group_resource)))) {
+          std::tie(group.activity, group.resource_is_null, group.resource) >=
+              std::tie(previous_group_activity, previous_group_resource_is_null,
+                       previous_group_resource)))) {
       throw std::invalid_argument("batch discovery groups are not ordered");
     }
     first_group = false;
     previous_group_batch_count = group.batch_count;
     previous_group_activity = group.activity;
     previous_group_resource = group.resource;
+    previous_group_resource_is_null = group.resource_is_null;
     double previous_start = -std::numeric_limits<double>::infinity();
     for (const auto& batch : group.batches) {
       (void)batch_type_name(batch.type);
@@ -2883,8 +2884,9 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
           batch.start > batch.complete) {
         throw std::invalid_argument("batch discovery has invalid batch range");
       }
-      if (batch.events.size() < discovery.options.min_batch_size) {
-        throw std::invalid_argument("batch discovery batch must contain at least two events");
+      if (batch.events.empty() ||
+          batch.events.size() < discovery.options.min_batch_size) {
+        throw std::invalid_argument("batch discovery batch is smaller than the minimum size");
       }
       if (batch.type != classify_batch_events(batch.events)) {
         throw std::invalid_argument("batch discovery type does not match event intervals");
@@ -2962,7 +2964,10 @@ void write_batch_discovery(std::ostream& out, const BatchDiscovery& discovery,
     out << ", \"activity_label\": ";
     write_json_string(out, group.activity);
     out << ", \"resource\": ";
-    write_json_string(out, group.resource);
+    if (group.resource_is_null)
+      out << "null";
+    else
+      write_json_string(out, group.resource);
     out << ", \"event_count\": " << group.event_count
         << ", \"batch_count\": " << group.batch_count << ", \"batches\": [";
     for (std::size_t j = 0; j < group.batches.size(); ++j) {

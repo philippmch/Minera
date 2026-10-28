@@ -1,6 +1,7 @@
 #include "batches/discovery_registry.hpp"
 
 #include <cassert>
+#include <cstdio>
 #include <initializer_list>
 #include <optional>
 #include <sstream>
@@ -455,6 +456,86 @@ void required_columns_are_reported() {
   assert(threw);
 }
 
+std::string at_seconds(int seconds) {
+  char text[32];
+  std::snprintf(text, sizeof(text), "2021-03-01T%02d:%02d:%02dZ",
+                seconds / 3600, seconds / 60 % 60, seconds % 60);
+  return text;
+}
+
+EventTable timed_table(const std::vector<int>& seconds) {
+  EventTable table;
+  table.columns = {"case_ref", "phase", "team", "started_at", "finished_at",
+                   "event_id"};
+  for (std::size_t index = 0; index < seconds.size(); ++index) {
+    const auto stamp = at_seconds(seconds[index]);
+    EventTable::Row row;
+    row.emplace_back(cell("case_ref", "c"));
+    row.emplace_back(cell("phase", "p"));
+    row.emplace_back(cell("team", "t"));
+    row.emplace_back(cell("started_at", stamp));
+    row.emplace_back(cell("finished_at", stamp));
+    row.emplace_back(cell("event_id", std::to_string(index)));
+    table.rows.push_back(std::move(row));
+  }
+  return table;
+}
+
+std::vector<std::vector<double>> batch_offsets(const BatchDiscovery& discovery) {
+  std::vector<std::vector<double>> result;
+  for (const auto& batch : only_group(discovery).batches) {
+    std::vector<double> offsets;
+    for (const auto& event : batch.events)
+      offsets.push_back(event.start - only_group(discovery).batches.front().events.front().start);
+    result.push_back(offsets);
+  }
+  return result;
+}
+
+void reference_interval_merging_contract() {
+  // The reference heapifies one interval per event in input order and merges
+  // near intervals by heap-pushing each union back, so input order matters and
+  // intervals farther apart than the distance can join.
+  auto options = table_options();
+  options.merge_distance_seconds = 60.0;
+  options.min_batch_size = 1;
+  const auto unsorted = BatchPandasDiscovery::apply(timed_table({0, 6000, 3000}), options);
+  assert((batch_offsets(unsorted) ==
+          std::vector<std::vector<double>>{{0.0}, {3000.0, 6000.0}}));
+  const auto sorted = BatchPandasDiscovery::apply(timed_table({0, 3000, 6000}), options);
+  assert(only_group(sorted).batches.size() == 3);
+
+  options.merge_distance_seconds = 300.0;
+  const auto far = BatchPandasDiscovery::apply(timed_table({0, 10, 1000, 5000}), options);
+  assert((batch_offsets(far) ==
+          std::vector<std::vector<double>>{{0.0, 10.0}, {1000.0, 5000.0}}));
+
+  // A negative distance and a minimum of zero are accepted; a repeated event
+  // then stays in two single-event batches.
+  options.merge_distance_seconds = -10.0;
+  options.min_batch_size = 0;
+  assert(only_group(BatchPandasDiscovery::apply(timed_table({0, 0}), options))
+             .batches.size() == 2);
+
+  // Polars keeps a null resource as its own group.
+  auto table = timed_table({0, 0});
+  table.rows[0][2].reset();
+  table.rows[1][2].reset();
+  table.rows[1][0] = cell("case_ref", "d");
+  options.min_batch_size = 2;
+  options.merge_distance_seconds = 0.0;
+  const auto polars = BatchPolarsDiscovery::apply(LazyEventTable::from_table(table), options);
+  assert(only_group(polars).resource_is_null);
+  assert(only_group(polars).batches.front().events.size() == 2);
+  bool pandas_rejected = false;
+  try {
+    (void)BatchPandasDiscovery::apply(table, options);
+  } catch (const std::invalid_argument&) {
+    pandas_rejected = true;
+  }
+  assert(pandas_rejected);
+}
+
 }  // namespace
 
 int main() {
@@ -466,4 +547,5 @@ int main() {
   imported_first_class_activity_and_resource_selectors_round_trip_to_json();
   imported_custom_case_selectors_reach_tabular_adapters();
   required_columns_are_reported();
+  reference_interval_merging_contract();
 }

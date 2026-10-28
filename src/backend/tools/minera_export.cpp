@@ -5064,8 +5064,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       if (!value) return usage(argv[0]);
       char* end = nullptr;
       const double parsed = std::strtod(value, &end);
-      if (end != value + std::strlen(value) || !std::isfinite(parsed) || parsed < 0.0) {
-        std::cerr << "error: --batch-merge-distance-seconds expects a finite non-negative number\n";
+      if (end != value + std::strlen(value) || !std::isfinite(parsed)) {
+        std::cerr << "error: --batch-merge-distance-seconds expects a finite number\n";
         return 2;
       }
       batch_options.merge_distance_seconds = parsed;
@@ -5074,8 +5074,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
-        batch_options.min_batch_size = parse_positive_size(value, arg);
-        if (batch_options.min_batch_size < 2) throw std::invalid_argument("--batch-min-size expects an integer >= 2");
+        batch_options.min_batch_size = parse_nonnegative_size(value, arg);
       } catch (const std::invalid_argument& error) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;

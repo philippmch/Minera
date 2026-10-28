@@ -781,7 +781,7 @@ std::string serialize_active_source_batches_json(const BatchDiscovery& result) {
       {"case_id_attribute", quote(options.case_id_attribute)}, {"event_id_attribute", quote(options.event_id_attribute)}})},
       {"variant", batch_variant_json(result.variant)}, {"variant_index", std::to_string(static_cast<int>(result.variant))},
       {"groups", array_json(result.groups, [](const auto& group) {
-    return object_json({{"activity", quote(group.activity)}, {"resource", quote(group.resource)},
+    return object_json({{"activity", quote(group.activity)}, {"resource", group.resource_is_null ? std::string("null") : quote(group.resource)},
         {"batch_count", std::to_string(group.batch_count)}, {"event_count", std::to_string(group.event_count)},
         {"batches", array_json(group.batches, [](const auto& batch) {
       return object_json({{"type", batch_type_json(batch.type)}, {"type_index", std::to_string(static_cast<int>(batch.type))},

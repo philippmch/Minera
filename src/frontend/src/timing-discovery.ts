@@ -21,8 +21,8 @@ export function timingQuery(family:TimingFamily,form:TimingForm,sourceId:string)
     if(form.eventId.trim()&&form.variant==='log')throw new Error('Event identity requires the pandas or polars batch adapter.');
     text('batch_activity_attribute',form.activity);text('batch_timestamp_attribute',form.timestamp);text('batch_case_id_attribute',form.caseId);text('batch_resource_attribute',form.resource);text('batch_event_id_attribute',form.eventId);
     if(form.overrideStart)q.set('batch_start_timestamp_attribute',form.start.trim());
-    integer('batch_min_size',form.minimum,2n);
-    if(form.merge.trim()){const n=Number(form.merge);if(!Number.isFinite(n)||n<0)throw new Error('Batch merge distance must be a finite non-negative number.');q.set('batch_merge_distance_seconds',form.merge.trim());}
+    integer('batch_min_size',form.minimum);
+    if(form.merge.trim()){const n=Number(form.merge);if(!Number.isFinite(n))throw new Error('Batch merge distance must be a finite number.');q.set('batch_merge_distance_seconds',form.merge.trim());}
   }
   return q;
 }

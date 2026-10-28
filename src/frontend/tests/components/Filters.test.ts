@@ -230,9 +230,11 @@ describe("temporal filter validation", () => {
     expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "2.5" })).toContain("Spectrum sample size");
     expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "-1" })).toContain("Spectrum sample size");
     expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "9007199254740992" })).toContain("Spectrum sample size");
-    expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "-1" })).toContain("merge distance");
+    // The reference accepts negative distances and minimum sizes of 0 or 1.
+    expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "-1" })).toBeNull();
     expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "Infinity" })).toContain("merge distance");
-    expect(temporalValidationMessage({ ...valid, batchMinSize: "1" })).toContain("minimum size");
+    expect(temporalValidationMessage({ ...valid, batchMinSize: "1" })).toBeNull();
+    expect(temporalValidationMessage({ ...valid, batchMinSize: "-1" })).toContain("minimum size");
     expect(temporalValidationMessage({ ...valid, batchMinSize: "2.1" })).toContain("minimum size");
   });
 

@@ -60,6 +60,8 @@ struct BatchGroup {
   std::size_t batch_count = 0;
   std::size_t event_count = 0;
   std::vector<Batch> batches;
+  // The Polars adapter groups a null resource as its own key.
+  bool resource_is_null = false;
 };
 
 struct BatchDiscoveryOptions {
