@@ -585,8 +585,27 @@ void woflan_short_circuit_diagnostics() {
   assert(stale_result.status == SoundnessStatus::SOUND);
   assert(stale_result.completion_witness == std::vector<std::size_t>({0, 1}));
 
+  // Reference Woflan: a marking naming more or fewer than one place makes the
+  // net unsound; with one place each, it analyzes source -> sink with one
+  // token whatever place or count was given (a 2-token source, a token on the
+  // middle place, or a 2-token sink are all sound on this chain).
   SoundnessOptions malformed_marking = options;
-  malformed_marking.initial_marking = {1, 0, 1};
+  malformed_marking.initial_marking = {1, 1, 0};
+  const auto two_places = analyze_soundness(chain(), malformed_marking);
+  assert(two_places.status == SoundnessStatus::UNSOUND && two_places.computed);
+  assert(two_places.error == "initial marking must contain exactly one marked place");
+  malformed_marking.initial_marking = {1, 0, 0};
+  malformed_marking.final_marking = {0, 0, 0};
+  assert(analyze_soundness(chain(), malformed_marking).status == SoundnessStatus::UNSOUND);
+  for (const auto& [initial, final] : std::vector<std::pair<Marking, Marking>>{
+           {{2, 0, 0}, {0, 0, 1}}, {{0, 1, 0}, {0, 0, 1}},
+           {{1, 0, 0}, {0, 0, 2}}, {{1, 0, 0}, {0, 1, 0}}}) {
+    SoundnessOptions single = options;
+    single.initial_marking = initial;
+    single.final_marking = final;
+    assert(analyze_soundness(chain(), single).status == SoundnessStatus::SOUND);
+  }
+  malformed_marking.initial_marking = {-1, 0, 0};
   bool threw = false;
   try {
     (void)analyze_soundness(chain(), malformed_marking);

@@ -306,12 +306,12 @@ void validate_marking(const Marking& marking, std::size_t places,
                                 " exceeds the exact numeric solver range");
 }
 
-void validate_single_place_marking(const Marking& marking, const char* name) {
+std::string single_place_marking_error(const Marking& marking, const char* name) {
   const auto marked_places = static_cast<std::size_t>(std::count_if(
       marking.begin(), marking.end(), [](const auto value) { return value > 0; }));
   if (marked_places != 1)
-    throw std::invalid_argument(std::string(name) +
-                                " must contain exactly one marked place");
+    return std::string(name) + " must contain exactly one marked place";
+  return {};
 }
 
 WorkflowMarkings resolved_markings(const PetriNet& net, const Marking& initial,
@@ -1669,11 +1669,22 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   result.workflow = check_workflow_net(net);
   const auto validation_error = validate_net(net);
   std::optional<WorkflowMarkings> woflan_markings;
+  std::string woflan_marking_error;
   if (options.variant == SoundnessVariant::kWoflan && validation_error.empty()) {
     woflan_markings.emplace(resolved_woflan_markings(
         net, result.workflow, options.initial_marking, options.final_marking));
-    validate_single_place_marking(woflan_markings->initial, "initial marking");
-    validate_single_place_marking(woflan_markings->final, "final marking");
+    // The reference only asks that each marking names exactly one place; it
+    // then analyzes the workflow net from one token on its source to one
+    // token on its sink, whichever place or count the markings gave.
+    woflan_marking_error = single_place_marking_error(woflan_markings->initial, "initial marking");
+    if (woflan_marking_error.empty())
+      woflan_marking_error = single_place_marking_error(woflan_markings->final, "final marking");
+    if (woflan_marking_error.empty() && result.workflow.valid) {
+      woflan_markings->initial.assign(net.place_count(), 0);
+      woflan_markings->initial[result.workflow.source_candidates.front()] = 1;
+      woflan_markings->final.assign(net.place_count(), 0);
+      woflan_markings->final[result.workflow.sink_candidates.front()] = 1;
+    }
   }
   std::optional<PetriNet> short_circuited;
   if (options.variant == SoundnessVariant::kWoflan) {
@@ -1729,6 +1740,14 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     return result;
   }
   if (!validation_error.empty()) throw std::invalid_argument(validation_error);
+  if (!woflan_marking_error.empty()) {
+    result.status = SoundnessStatus::UNSOUND;
+    result.computed = true;
+    result.returned_asap = options.return_asap_when_unsound;
+    result.error = woflan_marking_error;
+    if (options.diagnostics) result.diagnostic_messages.push_back(result.error);
+    return result;
+  }
 
   // The structural Woflan pipeline stops at the first conclusive S-component
   // failure when the caller requests an early result.  Keep this decision

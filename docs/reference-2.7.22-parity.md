@@ -15834,6 +15834,8 @@ values and passing controls.
 | S6 | Streaming temporal profile counts a pair only when `prev.end <= cur.start`, uses strict zeta bounds, distance `|diff-mean|/std` and `sys.maxsize` for std 0; the start key defaults to the timestamp key. Fuzzed 0/2000. | `minera_streaming_temporal_tests` |
 | S7 | Streaming Declare keys a missing case as "undefined_case" and a null case as its own case; a missing or null activity counts as an event that matches no constraint; empty strings are values. Fuzzed 0/2000. | `minera_declare_streaming_io_tests`, `minera_declare_variants_tests` |
 | S8 | The XES event stream gives each event its trace's attributes under `case:` keys (the trace value wins a clash). Fuzzed 0/300. | `minera_streaming_import_tests` |
+| W1 | Woflan returns unsound (no exception) when the initial or final marking names more or fewer than one place; with one place each it analyzes one token on the source to one token on the sink, whatever place or count the markings gave. Fuzzed 0/300 random nets. | `minera_petri_analysis_tests` |
+| E1 | Fresh comparison, no change needed: arc-degree, extended Cardoso and extended cyclomatic simplicity match on 270 random nets; token generalization matches on 120 unique-label nets (silent-path ties stay inside the reference's observed values). Duplicate-label nets follow the declared replay tie. | fuzz only |
 
 Declared exceptions (not equivalent, kept on purpose):
 
@@ -15859,5 +15861,4 @@ Declared exceptions (not equivalent, kept on purpose):
 Not yet covered by fresh comparisons (no claim either way): calendar or time-zone interactions, nullable/categorical/MultiIndex and
 Polars tables, OCEL aggregates and graphs, genetic evolution and wider ILP
 parameters, reset/inhibitor/parallel arcs with full PLTR maps, decomposed
-alignments, generalization and simplicity, extended marking equations, WOFLAN,
-and public flat adapters with HTTP/UI forwarding.
+alignments, extended marking equations, and public flat adapters with HTTP/UI forwarding.
