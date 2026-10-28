@@ -193,7 +193,9 @@ void batch_scalar_identity(){
  const auto A=text_id("A"),R=text_id("R");
  const auto run=[](const EventTable& t){return discover_batches(t,BatchDiscoveryOptions{.variant=BatchDiscoveryVariant::kPandas,.merge_distance_seconds=900,.min_batch_size=2});};
  const auto raises=[&](const EventTable& t,const std::string& name){
-  bool threw=false;try{(void)run(t);}catch(const std::invalid_argument& e){threw=std::string(e.what())=="batches: '<' not supported between instances of 'int' and 'str'";if(!threw)std::cerr<<"  "<<e.what()<<"\n";}
+  // The reference's operand order ('int' and 'str' or 'str' and 'int') varies
+  // across hash seeds (checked with PYTHONHASHSEED 0-7); either is accepted.
+  bool threw=false;try{(void)run(t);}catch(const std::invalid_argument& e){const std::string what=e.what();threw=what=="batches: '<' not supported between instances of 'int' and 'str'"||what=="batches: '<' not supported between instances of 'str' and 'int'";if(!threw)std::cerr<<"  "<<e.what()<<"\n";}
   check(threw,name);};
  // [1, 1.0] is one event: no batch of two.
  check(run(batch_table({signed_id(1),real_id(1.0,"1.0")},repeat(A,2),repeat(R,2),{0,0})).groups.empty(),"J29 1 and 1.0 deduplicate");
@@ -211,7 +213,9 @@ void batch_scalar_identity(){
  {const auto r=run(batch_table({text_id("a"),text_id("b"),text_id("c"),text_id("d")},repeat(A,4),{bool_id(true),bool_id(true),signed_id(1),signed_id(1)},{0,0,0,0}));
   check(r.groups.size()==1&&r.groups[0].event_count==4,"J29 True and 1 resources are one group");}
  {const auto r=run(batch_table({text_id("a"),text_id("b"),text_id("c"),text_id("d")},repeat(A,4),{signed_id(5),signed_id(5),real_id(1.0,"1.0"),real_id(1.0,"1.0")},{0,0,0,0}));
-  check(r.groups.size()==2&&r.groups[0].resource=="5"&&r.groups[1].resource=="1.0","J29 numeric resources sort by value, descending");}
+  // A resource level holding ints and a float is inferred as float64 by the
+  // reference's groupby, so the int label 5 is reported as 5.0.
+  check(r.groups.size()==2&&r.groups[0].resource=="5.0"&&r.groups[1].resource=="1.0","J29 numeric resources sort by value, descending");}
 }
 
 // J30: the Polars adapter's epoch-nanoseconds-times-1e-9 seconds decide

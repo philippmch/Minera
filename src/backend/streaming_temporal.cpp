@@ -1,6 +1,7 @@
 #include "minera/streaming_temporal.hpp"
 
 #include "minera/streaming_dfg.hpp"
+#include "reference_activity_selector.hpp"
 
 #include <cmath>
 #include <iomanip>
@@ -46,15 +47,29 @@ std::optional<std::string> event_value(const Event& event, std::string_view key,
                                        bool activity) {
   // The activity follows the shared selector rule: a missing literal key or
   // a projected null is skipped, never read as the empty activity.
-  if (activity) return streaming_event_present_value(event, key == "activity" ? std::string_view{} : key);
-  for (const auto& attribute : event.attributes)
-    if (attribute.key == key)
-      return attribute.is_null ? std::nullopt : std::optional<std::string>(attribute.value);
-  if (key.empty() || key == "timestamp" || key == "time:timestamp") {
+  if (activity) return streaming_event_present_value(event, key);
+  if (key.empty()) {
     if (event.timestamp.empty()) return std::nullopt;
     return event.timestamp;
   }
-  return std::nullopt;
+  // An explicit timestamp key reads the literal attribute, else the
+  // projection read from exactly that field; a canonical key is not read
+  // from a timestamp imported from another field. A stream event is a plain
+  // dictionary, so a recorded source key is the only field the projection
+  // stands for (no adapter copies it under the canonical key).
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == key) {
+      if (attribute.is_null || attribute.value.empty()) return std::nullopt;
+      return attribute.value;
+    }
+  const std::string_view source = !event.timestamp_source_key.empty() ? std::string_view(event.timestamp_source_key)
+                                  : event.timestamp_attribute ? std::string_view(event.timestamp_attribute->key)
+                                                              : std::string_view();
+  const bool names = source.empty() ? (key == "time:timestamp" || key == "timestamp") : source == key;
+  if (!names) return std::nullopt;
+  const auto* value = detail::present_projection(event.timestamp, event.timestamp_state);
+  if (!value || value->empty()) return std::nullopt;
+  return *value;
 }
 
 }  // namespace

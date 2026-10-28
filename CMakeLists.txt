@@ -643,6 +643,13 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_recheck_conformance_fixture_tests
            COMMAND minera_recheck_conformance_fixture_tests
                    "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_61ebeee0")
+  add_executable(minera_recheck_65572296_tests src/backend/tests/test_recheck_65572296.cpp)
+  target_link_libraries(minera_recheck_65572296_tests PRIVATE minera::core)
+  target_compile_features(minera_recheck_65572296_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_recheck_65572296_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_recheck_65572296_tests
+           COMMAND minera_recheck_65572296_tests
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_65572296")
   add_executable(minera_root_cause_tests src/backend/tests/test_root_cause.cpp)
   target_link_libraries(minera_root_cause_tests PRIVATE minera::core)
   target_compile_features(minera_root_cause_tests PRIVATE cxx_std_20)

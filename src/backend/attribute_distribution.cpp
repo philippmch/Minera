@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <ctime>
 #include <iomanip>
 #include <map>
@@ -11,6 +12,7 @@
 #include <string_view>
 
 #include "minera/timestamp.hpp"
+#include "reference_activity_selector.hpp"
 
 namespace minera {
 namespace {
@@ -40,10 +42,43 @@ UtcParts utc_parts(double seconds) {
           value.tm_hour, (value.tm_wday + 6) % 7, value.tm_yday};
 }
 
+// The selected timestamp: the omitted default reads the timestamp
+// projection; an explicit key names a literal attribute or the projection
+// read from exactly that field (J1), never another field.
 const std::string* timestamp_value(const Event& event, std::string_view key) {
-  if (key.empty() || key == "timestamp" || key == "time:timestamp")
-    return &event.timestamp;
-  return event.attribute(key);
+  if (key.empty()) return &event.timestamp;
+  return reference_selected_field(event, key);
+}
+
+// Civil date of a day count since 1970-01-01 (proleptic Gregorian).
+void civil_from_days(std::int64_t z, int& year, int& month, int& day) {
+  z += 719468;
+  const std::int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+  const auto doe = static_cast<std::uint64_t>(z - era * 146097);
+  const auto yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const std::int64_t y = static_cast<std::int64_t>(yoe) + era * 400;
+  const auto doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const auto mp = (5 * doy + 2) / 153;
+  day = static_cast<int>(doy - (153 * mp + 2) / 5 + 1);
+  month = static_cast<int>(mp < 10 ? mp + 3 : mp - 9);
+  year = static_cast<int>(y + (month <= 2 ? 1 : 0));
+}
+
+// Calendar parts of an exact instant at its own offset, from integer seconds
+// alone: no epoch double, so a nanosecond before midnight stays in its day.
+UtcParts exact_parts(const ParsedExactTimestamp& exact) {
+  const std::int64_t wall = exact.seconds + (exact.timezone_aware ? std::int64_t(exact.offset_minutes) * 60 : 0);
+  std::int64_t days = wall / 86400;
+  std::int64_t rest = wall % 86400;
+  if (rest < 0) { rest += 86400; --days; }
+  UtcParts parts;
+  civil_from_days(days, parts.year, parts.month, parts.day);
+  parts.hour = static_cast<int>(rest / 3600);
+  parts.weekday = static_cast<int>(((days + 3) % 7 + 7) % 7);  // 1970-01-01 was a Thursday
+  constexpr int before_month[] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+  const bool leap = parts.year % 4 == 0 && (parts.year % 100 != 0 || parts.year % 400 == 0);
+  parts.day_of_year = before_month[parts.month - 1] + (parts.month > 2 && leap ? 1 : 0) + parts.day - 1;
+  return parts;
 }
 
 std::string padded(int value) {
@@ -114,10 +149,7 @@ AttributeDistributionResult discover_event_distribution(
       // The datetime's own calendar: an aware value bins by its represented
       // local wall time (its offset), not by the UTC instant.
       const auto exact = parse_timestamp_exact(*text);
-      const double wall = *parsed + (exact && exact->timezone_aware
-                                         ? exact->offset_minutes * 60.0
-                                         : 0.0);
-      const auto parts = utc_parts(wall);
+      const auto parts = exact ? exact_parts(*exact) : utc_parts(*parsed);
       ++result.timed_events;
       int bucket = 0;
       switch (options.distribution) {

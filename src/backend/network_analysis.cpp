@@ -12,6 +12,8 @@
 #include <variant>
 
 #include "minera/timestamp.hpp"
+#include "python_scalar.hpp"
+#include "reference_activity_selector.hpp"
 
 namespace minera {
 namespace {
@@ -46,18 +48,11 @@ std::vector<BusinessHourSlot> normalized_slots(const NetworkAnalysisOptions& o) 
 
 // First-class fields count only when present: an explicitly present empty
 // value is a value, a missing or null one is not (pandas drops NaN keys).
-std::optional<std::string> present(FirstClassAttributeState state, const std::string& text) {
+const std::string* present(FirstClassAttributeState state, const std::string& text) {
   if (state == FirstClassAttributeState::kPresent ||
       (state == FirstClassAttributeState::kMissing && !text.empty()))
-    return text;
-  return std::nullopt;
-}
-
-// A present scalar that pandas treats as missing: None, pd.NA or NaN.
-bool missing_scalar(const EventAttribute& attribute) {
-  if (attribute.is_null || std::holds_alternative<NativeNA>(attribute.typed_value)) return true;
-  if (const auto* d = std::get_if<double>(&attribute.typed_value)) return std::isnan(*d);
-  return false;
+    return &text;
+  return nullptr;
 }
 
 // The literal cell a selector names: the event attribute, then (for "case:"
@@ -75,30 +70,74 @@ const EventAttribute* literal_cell(const Event& e, const Trace* trace, std::stri
   return nullptr;
 }
 
-std::optional<std::string> value(const Event& e, std::string_view selector) {
-  if (selector.empty()) return std::nullopt;
-  for (const auto& attribute : e.attributes)
-    if (attribute.key == selector)
-      return missing_scalar(attribute) ? std::nullopt : std::optional<std::string>(attribute.value);
-  if (selector == "concept:name") return present(e.activity_state, e.activity);
-  if (selector == "time:timestamp") return present(e.timestamp_state, e.timestamp);
-  if (selector == "org:resource") return present(e.resource_state, e.resource);
-  if (selector == "case:concept:name" || selector == "case:id" || selector == "case_id")
-    return present(e.case_id_state, e.case_id);
-  if (selector == "lifecycle:transition") return present(e.lifecycle_state, e.lifecycle);
-  return std::nullopt;
+// Whether a selector names the case column. A flat adapter's case column
+// keeps its header name; an XES trace attribute (a trace with a selected
+// case cell) is a dataframe column only under its "case:" prefix, so its
+// bare key is not a column (the bare "concept:name" is the activity).
+bool case_selector(const Event& e, const Trace* trace, std::string_view selector) {
+  if (e.case_id_source_key.empty())
+    return selector == "case:concept:name" || selector == "case:id" || selector == "case_id";
+  if (selector == "case:" + e.case_id_source_key) return true;
+  return selector == e.case_id_source_key && !(trace && trace->case_id_attribute);
 }
 
-std::optional<std::string> value(const Event& e, const Trace* trace,
-                                 std::string_view selector) {
-  if (const auto event_value = value(e, selector)) return event_value;
-  for (const auto& attribute : e.attributes)
-    if (attribute.key == selector) return std::nullopt;  // a present missing scalar
-  if (trace && selector.rfind("case:", 0) == 0) {
-    if (const auto* attribute = literal_cell(e, trace, selector))
-      return missing_scalar(*attribute) ? std::nullopt : std::optional<std::string>(attribute->value);
+// The first-class projection a selector names on this event, with its
+// presence: a projection answers only for the field it was read from (J1).
+const std::string* projection(const Event& e, const Trace* trace, std::string_view selector) {
+  using detail::projection_names;
+  if (projection_names(e.activity_source_key, e.activity_attribute, "concept:name", selector))
+    return present(e.activity_state, e.activity);
+  if (projection_names(e.timestamp_source_key, e.timestamp_attribute, "time:timestamp", selector))
+    return present(e.timestamp_state, e.timestamp);
+  if (projection_names(e.resource_source_key, e.resource_attribute, "org:resource", selector))
+    return present(e.resource_state, e.resource);
+  if (projection_names(e.lifecycle_source_key, e.lifecycle_attribute, "lifecycle:transition", selector))
+    return present(e.lifecycle_state, e.lifecycle);
+  if (case_selector(e, trace, selector)) return present(e.case_id_state, e.case_id);
+  return nullptr;
+}
+
+// Whether the event's dataframe row has the named column at all (a present
+// null still is a column).
+bool has_column(const Event& e, const Trace* trace, std::string_view selector) {
+  if (literal_cell(e, trace, selector)) return true;
+  using detail::projection_names;
+  const auto owns = [&](const std::string& source, const std::optional<EventAttribute>& cell,
+                        std::string_view canonical, FirstClassAttributeState state, const std::string& text) {
+    return projection_names(source, cell, canonical, selector) &&
+           (state != FirstClassAttributeState::kMissing || !text.empty());
+  };
+  if (owns(e.activity_source_key, e.activity_attribute, "concept:name", e.activity_state, e.activity)) return true;
+  if (owns(e.timestamp_source_key, e.timestamp_attribute, "time:timestamp", e.timestamp_state, e.timestamp)) return true;
+  if (owns(e.resource_source_key, e.resource_attribute, "org:resource", e.resource_state, e.resource)) return true;
+  if (owns(e.lifecycle_source_key, e.lifecycle_attribute, "lifecycle:transition", e.lifecycle_state, e.lifecycle)) return true;
+  if (case_selector(e, trace, selector) && (e.case_id_state != FirstClassAttributeState::kMissing || !e.case_id.empty() ||
+                                     (trace && trace->has_case_id())))
+    return true;
+  return false;
+}
+
+// The Python object the selector names on this event: a literal cell as it
+// is typed, else the projection's text (a timestamp projection is a
+// Timestamp). nullopt when the value is missing (None, NaN, pd.NA, absent).
+std::optional<python::Scalar> typed_value(const Event& e, const Trace* trace, std::string_view selector) {
+  if (selector.empty()) return std::nullopt;
+  if (const auto* cell = literal_cell(e, trace, selector)) {
+    auto scalar = python::from_attribute(*cell);
+    if (python::is_missing(scalar)) return std::nullopt;
+    return scalar;
   }
-  return std::nullopt;
+  const auto* text = projection(e, trace, selector);
+  if (!text) return std::nullopt;
+  if (detail::projection_names(e.timestamp_source_key, e.timestamp_attribute, "time:timestamp", selector))
+    if (auto date = python::date_literal(*text)) return date;
+  return python::text(*text);
+}
+
+std::optional<std::string> value(const Event& e, const Trace* trace, std::string_view selector) {
+  const auto typed = typed_value(e, trace, selector);
+  if (!typed) return std::nullopt;
+  return python::str(*typed);
 }
 
 // Sort keys compare like the pandas column they come from: numbers (bool,
@@ -108,137 +147,18 @@ std::optional<std::string> value(const Event& e, const Trace* trace,
 // column cannot be ordered (Python raises TypeError).
 struct SortKey {
   enum class Kind { kMissing, kNumber, kDate, kText } kind = Kind::kMissing;
-  std::variant<std::int64_t, std::uint64_t, double> number;
-  ParsedExactTimestamp date;
-  std::string text;
+  python::Scalar value;
 };
-
-SortKey number_key(std::variant<std::int64_t, std::uint64_t, double> n) {
-  SortKey key;
-  key.kind = SortKey::Kind::kNumber;
-  key.number = n;
-  return key;
-}
 
 SortKey sort_key(const Event& e, const Trace* trace, std::string_view selector) {
   SortKey key;
-  const EventAttribute* cell = literal_cell(e, trace, selector);
-  if (cell) {
-    if (missing_scalar(*cell)) return key;
-    if (const auto* i = std::get_if<std::int64_t>(&cell->typed_value)) return number_key(*i);
-    if (const auto* u = std::get_if<std::uint64_t>(&cell->typed_value)) return number_key(*u);
-    if (const auto* d = std::get_if<double>(&cell->typed_value)) return number_key(*d);
-    if (const auto* b = std::get_if<bool>(&cell->typed_value)) return number_key(std::int64_t(*b ? 1 : 0));
-    if (const auto* date = std::get_if<NativeDate>(&cell->typed_value)) {
-      if (const auto exact = parse_timestamp_exact(date->value)) {
-        key.kind = SortKey::Kind::kDate;
-        key.date = *exact;
-        return key;
-      }
-    }
-    switch (cell->kind) {
-      case AttributeKind::kInt: {
-        std::int64_t i = 0;
-        std::uint64_t u = 0;
-        const auto& text = cell->value;
-        if (std::from_chars(text.data(), text.data() + text.size(), i).ec == std::errc{} &&
-            std::to_string(i) == text) return number_key(i);
-        if (std::from_chars(text.data(), text.data() + text.size(), u).ec == std::errc{} &&
-            std::to_string(u) == text) return number_key(u);
-        break;
-      }
-      case AttributeKind::kFloat:
-        try {
-          std::size_t used = 0;
-          const double d = std::stod(cell->value, &used);
-          if (used == cell->value.size()) return std::isnan(d) ? key : number_key(d);
-        } catch (const std::exception&) {}
-        break;
-      case AttributeKind::kBoolean:
-        if (cell->value == "true" || cell->value == "True") return number_key(std::int64_t(1));
-        if (cell->value == "false" || cell->value == "False") return number_key(std::int64_t(0));
-        break;
-      case AttributeKind::kDate:
-        if (const auto exact = parse_timestamp_exact(cell->value)) {
-          key.kind = SortKey::Kind::kDate;
-          key.date = *exact;
-          return key;
-        }
-        break;
-      default: break;
-    }
-    key.kind = SortKey::Kind::kText;
-    key.text = cell->value;
-    return key;
-  }
-  if (selector == "time:timestamp") {
-    const auto text = present(e.timestamp_state, e.timestamp);
-    if (!text) return key;
-    if (const auto exact = parse_timestamp_exact(*text)) {
-      key.kind = SortKey::Kind::kDate;
-      key.date = *exact;
-      return key;
-    }
-    key.kind = SortKey::Kind::kText;
-    key.text = *text;
-    return key;
-  }
-  if (const auto text = value(e, trace, selector)) {
-    key.kind = SortKey::Kind::kText;
-    key.text = *text;
-  }
+  auto typed = typed_value(e, trace, selector);
+  if (!typed) return key;
+  if (python::is_number(*typed)) key.kind = SortKey::Kind::kNumber;
+  else if (typed->kind == python::Scalar::Kind::kDate) key.kind = SortKey::Kind::kDate;
+  else key.kind = SortKey::Kind::kText;
+  key.value = std::move(*typed);
   return key;
-}
-
-// Exact three-way comparison of two numbers of any supported kind.
-int compare_numbers(const std::variant<std::int64_t, std::uint64_t, double>& a,
-                    const std::variant<std::int64_t, std::uint64_t, double>& b) {
-  struct Parts {
-    bool is_double = false;
-    double d = 0;
-    bool negative = false;
-    std::uint64_t magnitude = 0;
-  };
-  const auto parts = [](const std::variant<std::int64_t, std::uint64_t, double>& v) {
-    Parts p;
-    if (const auto* i = std::get_if<std::int64_t>(&v)) {
-      p.negative = *i < 0;
-      p.magnitude = p.negative ? std::uint64_t(0) - static_cast<std::uint64_t>(*i)
-                               : static_cast<std::uint64_t>(*i);
-    } else if (const auto* u = std::get_if<std::uint64_t>(&v)) {
-      p.magnitude = *u;
-    } else {
-      p.is_double = true;
-      p.d = std::get<double>(v);
-    }
-    return p;
-  };
-  const auto pa = parts(a), pb = parts(b);
-  const auto integers = [](const Parts& x, const Parts& y) {
-    if (x.magnitude == 0 && y.magnitude == 0) return 0;
-    if (x.negative != y.negative) return x.negative ? -1 : 1;
-    if (x.magnitude == y.magnitude) return 0;
-    return ((x.magnitude < y.magnitude) != x.negative) ? -1 : 1;
-  };
-  if (!pa.is_double && !pb.is_double) return integers(pa, pb);
-  if (pa.is_double && pb.is_double) return pa.d < pb.d ? -1 : (pa.d > pb.d ? 1 : 0);
-  const bool swapped = pa.is_double;
-  const auto& integer = swapped ? pb : pa;
-  const double d = swapped ? pa.d : pb.d;
-  int result = 0;
-  constexpr double kTwo64 = 18446744073709551616.0;
-  if (std::fabs(d) >= kTwo64) {
-    result = d > 0 ? -1 : 1;
-  } else {
-    // Compare with the integer part first; a fractional rest breaks ties.
-    const double whole = std::trunc(d);
-    Parts w;
-    w.negative = whole < 0;
-    w.magnitude = static_cast<std::uint64_t>(std::fabs(whole));
-    result = integers(integer, w);
-    if (result == 0 && whole != d) result = d > whole ? -1 : 1;
-  }
-  return swapped ? -result : result;
 }
 
 std::optional<double> instant(const Event& e, const Trace* trace,
@@ -285,11 +205,44 @@ struct Ref {
   SortKey sort;
 };
 
-// The relation value pandas merges on: null-like keys (None, NaN, pd.NA or
-// an absent value) join each other, unlike in grouping.
+// The relation value pandas merges on: equal keys of any numeric type join
+// (1, 1.0 and True), a number and its text do not, and null-like keys (None,
+// NaN, pd.NA or an absent value) join each other, unlike in grouping.
 std::string relation_key(const Event& e, const Trace* trace, std::string_view selector) {
-  if (const auto v = value(e, trace, selector)) return std::string(1, '\x01') + *v;
+  if (const auto v = typed_value(e, trace, selector)) return python::identity(*v);
   return std::string(1, '\0');
+}
+
+// df[[columns]] on the selected columns: every one must exist in some row.
+void require_columns(const EventLog& log, const NetworkAnalysisOptions& o) {
+  if (log.event_count() == 0) return;
+  const std::vector<std::string> selected{o.out_relation_attribute, o.in_relation_attribute,
+                                          o.source_node_attribute, o.target_node_attribute,
+                                          o.edge_attribute, o.sorting_attribute, o.timestamp_attribute};
+  std::vector<std::string> distinct, absent;
+  for (const auto& name : selected) {
+    if (std::find(distinct.begin(), distinct.end(), name) != distinct.end()) continue;
+    distinct.push_back(name);
+    bool found = false;
+    for (const auto& tr : log.traces) {
+      for (const auto& e : tr.events)
+        if (has_column(e, &tr, name)) { found = true; break; }
+      if (found) break;
+    }
+    if (!found) absent.push_back(name);
+  }
+  if (absent.empty()) return;
+  const auto list = [](const std::vector<std::string>& names) {
+    std::string out = "[";
+    for (std::size_t i = 0; i < names.size(); ++i) out += (i ? ", '" : "'") + names[i] + "'";
+    return out + "]";
+  };
+  // The reference lists the absent names in set order; native lists them in
+  // selector order.
+  if (absent.size() == distinct.size())
+    throw std::invalid_argument("network analysis: KeyError: \"None of [Index(" + list(absent) +
+                                ", dtype='str')] are in the [columns]\"");
+  throw std::invalid_argument("network analysis: KeyError: \"" + list(absent) + " not in index\"");
 }
 
 }  // namespace
@@ -302,6 +255,7 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
     throw std::invalid_argument("network analysis edge_reference must be _out or _in");
   if (o.max_rows == 0 || o.max_rows > 1000000) throw std::invalid_argument("network analysis max_rows safety bound exceeded");
   if (o.max_values == 0 || o.max_values > 10000000) throw std::invalid_argument("network analysis max_values safety bound exceeded");
+  require_columns(log, o);
   const auto slots = o.business_hours ? normalized_slots(o) : std::vector<BusinessHourSlot>{};
   NetworkAnalysisResult result;
   result.variant = o.variant;
@@ -324,13 +278,7 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
     const bool a_missing = a.sort.kind == SortKey::Kind::kMissing;
     const bool b_missing = b.sort.kind == SortKey::Kind::kMissing;
     if (a_missing || b_missing) return !a_missing && b_missing;
-    switch (a.sort.kind) {
-      case SortKey::Kind::kNumber: return compare_numbers(a.sort.number, b.sort.number) < 0;
-      case SortKey::Kind::kDate:
-        return std::pair(a.sort.date.seconds, a.sort.date.nanoseconds) <
-               std::pair(b.sort.date.seconds, b.sort.date.nanoseconds);
-      default: return a.sort.text < b.sort.text;
-    }
+    return python::compare(a.sort.value, b.sort.value) < 0;
   });
   for (std::size_t i = 0; i < refs.size(); ++i) refs[i].index = i;
   std::vector<const Ref*> successors(refs.size(), nullptr);
@@ -341,22 +289,25 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
     if (target != next_by_relation.end()) successors[i] = target->second;
     next_by_relation[relation_key(*refs[i].event, refs[i].trace, o.in_relation_attribute)] = &refs[i];
   }
-  using Key = std::tuple<std::string, std::string, std::string>;
-  std::map<Key, NetworkAnalysisEdge> grouped;
+  // Each link is a row of the joined frame; the edges are its groupby over
+  // (source, target, edge), with pandas' typed key identity and labels.
+  struct Link {
+    std::optional<double> duration;
+  };
+  std::vector<std::vector<python::Scalar>> keys;
+  std::vector<Link> links;
   for (std::size_t source_index = 0; source_index < refs.size(); ++source_index) {
     const auto& source = refs[source_index];
-    const auto source_node = value(*source.event, source.trace, o.source_node_attribute);
+    const auto source_node = typed_value(*source.event, source.trace, o.source_node_attribute);
     if (!source_node) continue;
     const Ref* target = successors[source_index];
     if (!target) continue;
-    const auto target_node = value(*target->event, target->trace, o.target_node_attribute);
+    const auto target_node = typed_value(*target->event, target->trace, o.target_node_attribute);
     const auto& edge_event = o.edge_reference == NetworkAnalysisEdgeReference::kOut ? source : *target;
-    const auto edge_value = value(*edge_event.event, edge_event.trace, o.edge_attribute);
+    const auto edge_value = typed_value(*edge_event.event, edge_event.trace, o.edge_attribute);
     if (!target_node || !edge_value) continue;
-    const Key key{*source_node, *target_node, *edge_value};
-    auto [it, inserted] = grouped.emplace(key, NetworkAnalysisEdge{*source_node, *target_node, *edge_value, 0, {}});
-    (void)inserted;
-    ++it->second.count;
+    keys.push_back({*source_node, *target_node, *edge_value});
+    Link link;
     ++result.diagnostics.link_count;
     if (o.include_performance) {
       const auto st = instant(*source.event, source.trace, o.timestamp_attribute);
@@ -366,15 +317,20 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
             ? business_elapsed(local_wall(value(*source.event, source.trace, o.timestamp_attribute).value_or("")).value_or(*st), local_wall(value(*target->event, target->trace, o.timestamp_attribute).value_or("")).value_or(*tt), slots)
             : (*tt - *st);
         if (std::isfinite(duration) && result.diagnostics.performance_value_count < o.max_values) {
-          it->second.performance.push_back(duration);
+          link.duration = duration;
           ++result.diagnostics.performance_value_count;
         } else if (result.diagnostics.performance_value_count >= o.max_values) result.diagnostics.output_truncated = true;
       }
     }
+    links.push_back(link);
   }
-  for (auto& [key, edge] : grouped) {
-    (void)key;
+  for (const auto& group : python::groupby(keys)) {
     if (result.edges.size() >= o.max_rows) { result.diagnostics.output_truncated = true; break; }
+    NetworkAnalysisEdge edge{python::str(group.labels[0]), python::str(group.labels[1]), python::str(group.labels[2]), 0, {}};
+    for (const auto row : group.rows) {
+      ++edge.count;
+      if (links[row].duration) edge.performance.push_back(*links[row].duration);
+    }
     result.edges.push_back(std::move(edge));
   }
   result.diagnostics.row_count = result.edges.size();

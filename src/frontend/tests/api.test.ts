@@ -1202,7 +1202,14 @@ describe("streaming temporal API", () => {
     expect(streamingTemporalQuery(options)).toBe(
       "streaming_temporal_profile=A-%3EB%3A10%3A2&streaming_temporal_zeta=3",
     );
-    expect(() => streamingTemporalQuery({ streaming_temporal_profile: options.streaming_temporal_profile, streaming_temporal_zeta: 0 })).toThrow(/greater than zero/);
+    // Any finite zeta is accepted, as in the reference (zero and negative included).
+    expect(streamingTemporalQuery({ streaming_temporal_profile: options.streaming_temporal_profile, streaming_temporal_zeta: 0 })).toBe(
+      "streaming_temporal_profile=A-%3EB%3A10%3A2&streaming_temporal_zeta=0",
+    );
+    expect(streamingTemporalQuery({ streaming_temporal_profile: options.streaming_temporal_profile, streaming_temporal_zeta: -1 })).toBe(
+      "streaming_temporal_profile=A-%3EB%3A10%3A2&streaming_temporal_zeta=-1",
+    );
+    expect(() => streamingTemporalQuery({ streaming_temporal_profile: options.streaming_temporal_profile, streaming_temporal_zeta: Infinity })).toThrow(/finite/);
   });
   it("uploads CSV and validates deviations", async () => {
     const payload = {

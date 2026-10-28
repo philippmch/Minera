@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <map>
@@ -12,6 +13,7 @@
 
 #include "minera/filtering_common.hpp"
 #include "minera/timestamp.hpp"
+#include "python_scalar.hpp"
 #include "numpy_object_sort.hpp"
 
 namespace minera {
@@ -189,23 +191,32 @@ Key real_key(double d) {
   const auto r = std::to_chars(buffer, buffer + sizeof(buffer), d);
   return {0, "R" + std::string(buffer, r.ptr)};
 }
-std::optional<Key> lexical_number_key(const std::string& text) {
+// A lexical integer of any width keeps its exact digits (Python ints are
+// unbounded, so 2**64 and 2**64+1 are distinct keys); a lexical float keys
+// by its value.
+std::optional<Key> lexical_number_key(const std::string& text, bool integer) {
   if (text.empty()) return std::nullopt;
-  const char* first = text.data();
-  const char* last = first + text.size();
-  if (*first == '+') ++first;
-  std::int64_t i = 0;
-  if (const auto r = std::from_chars(first, last, i); r.ec == std::errc{} && r.ptr == last)
-    return Key{0, "I" + std::to_string(i)};
-  std::uint64_t u = 0;
-  if (const auto r = std::from_chars(first, last, u); r.ec == std::errc{} && r.ptr == last)
-    return Key{0, "I" + std::to_string(u)};
+  if (integer) {
+    if (const auto parsed = python::integer_literal(text)) return Key{0, python::identity(*parsed)};
+    return std::nullopt;
+  }
   char* end = nullptr;
   const double d = std::strtod(text.c_str(), &end);
   if (end && *end == '\0' && !std::isnan(d)) return real_key(d);
   return std::nullopt;
 }
+// A datetime keys by its exact instant (nanoseconds); an aware and a naive
+// value never share a key. A date-looking string is still a string.
+std::optional<Key> date_key(const EventAttribute& cell) {
+  const auto* date = std::get_if<NativeDate>(&cell.typed_value);
+  if (!date && cell.kind != AttributeKind::kDate) return std::nullopt;
+  const auto exact = parse_timestamp_exact(date ? date->value : cell.value);
+  if (!exact) return std::nullopt;
+  return Key{2, std::string(exact->timezone_aware ? "DA" : "DN") + std::to_string(exact->seconds) + ":" +
+                    std::to_string(exact->nanoseconds)};
+}
 Key key_of(const EventAttribute& cell) {
+  if (const auto key = date_key(cell)) return *key;
   if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) return {0, "I" + std::to_string(*i)};
   if (const auto* u = std::get_if<std::uint64_t>(&cell.typed_value)) return {0, "I" + std::to_string(*u)};
   if (const auto* b = std::get_if<bool>(&cell.typed_value)) return {0, *b ? "I1" : "I0"};
@@ -214,7 +225,7 @@ Key key_of(const EventAttribute& cell) {
     if (cell.value == "True" || cell.value == "true" || cell.value == "False" || cell.value == "false")
       return {0, cell.value == "True" || cell.value == "true" ? "I1" : "I0"};
   if ((cell.kind == AttributeKind::kFloat || cell.kind == AttributeKind::kInt) && !cell.typed_value.index())
-    if (auto key = lexical_number_key(cell.value)) return *key;
+    if (auto key = lexical_number_key(cell.value, cell.kind == AttributeKind::kInt)) return *key;
   if (cell.kind == AttributeKind::kString) return {1, cell.value};
   return {2, std::to_string(static_cast<int>(cell.kind)) + ":" + cell.value};
 }
@@ -972,6 +983,10 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   if (!out.dtypes.empty() && out.dtypes[0] == "object" && !unique_cases.empty()) {
     bool booleans = false, integers = false, reals = false, strings = false, other = false;
     bool negative = false, above_int64 = false, beyond_uint64 = false;
+    // Datetime keys: all aware or all naive, microsecond unless one needs
+    // nanoseconds, and a UTC frame when the offsets differ.
+    bool dates = false, naive = false, aware = false, nanoseconds = false, mixed_offsets = false;
+    std::optional<std::int32_t> offset;
     for (const auto& cell : unique_cases) {
       const auto n = scalar_number(*cell);
       if (n.kind == ScalarNumber::kBool) booleans = true;
@@ -982,12 +997,37 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
         beyond_uint64 = beyond_uint64 || n.beyond_uint64;
       } else if (n.kind == ScalarNumber::kReal) reals = true;
       else if (is_text(cell)) strings = true;
-      else other = true;
+      else if (date_key(*cell)) {
+        dates = true;
+        const auto* date = std::get_if<NativeDate>(&cell->typed_value);
+        const auto exact = *parse_timestamp_exact(date ? date->value : cell->value);
+        (exact.timezone_aware ? aware : naive) = true;
+        nanoseconds = nanoseconds || exact.nanoseconds % 1000 != 0;
+        if (exact.timezone_aware) {
+          if (offset && *offset != exact.offset_minutes) mixed_offsets = true;
+          offset = exact.offset_minutes;
+        }
+      } else other = true;
     }
     const bool numbers = integers || reals;
     const bool exact_integers = !beyond_uint64 && !(negative && above_int64);
     std::string dtype = "object";
     if (other) dtype = "object";
+    else if (dates) {
+      if (!(booleans || numbers || strings) && naive != aware) {
+        dtype = std::string("datetime64[") + (nanoseconds ? "ns" : "us");
+        if (aware) {
+          const auto minutes = mixed_offsets ? 0 : *offset;
+          if (minutes == 0) dtype += ", UTC";
+          else {
+            char zone[16];
+            std::snprintf(zone, sizeof(zone), ", UTC%c%02d:%02d", minutes < 0 ? '-' : '+', std::abs(minutes) / 60, std::abs(minutes) % 60);
+            dtype += zone;
+          }
+        }
+        dtype += "]";
+      }
+    }
     else if (strings) dtype = booleans || numbers ? "object" : "str";
     else if (booleans) dtype = numbers ? "object" : "bool";
     else if (reals) dtype = exact_integers ? "float64" : "object";

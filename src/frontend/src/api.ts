@@ -4251,8 +4251,10 @@ export function streamingTemporalQuery(options: StreamingTemporalOptions): strin
     }
   }
   if (options.streaming_temporal_zeta !== undefined) {
-    if (!Number.isFinite(options.streaming_temporal_zeta) || options.streaming_temporal_zeta <= 0)
-      throw new Error("streaming_temporal_zeta must be finite and greater than zero");
+    // Any finite zeta is accepted, as in the reference: zero or a negative
+    // value reports every observed pair whose distance exceeds it.
+    if (!Number.isFinite(options.streaming_temporal_zeta))
+      throw new Error("streaming_temporal_zeta must be finite");
     query.set("streaming_temporal_zeta", String(options.streaming_temporal_zeta));
   }
   return query.toString();

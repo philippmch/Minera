@@ -4099,3 +4099,18 @@ Delta-minimal cases are in `minera_recheck_regression_tests`. The new
 `resource_is_null` (batches) and `zero_variance_sentinel` (temporal) members
 of the stored workbench JSON are written only when true, so the recorded UI
 fixture bundles stay byte-exact; absent reads as false.
+
+## Recheck of 65572296 (2026-10-28, cloud container)
+
+L1-L9 from the reviewer's recheck are fixed; absent-column set order and
+TypeError operand order are declared nondeterministic in the reference and
+K5 is expanded to classic OCEL JSON. See "Recheck of 65572296" in the parity
+doc. The reviewer's cases are bound by `minera_recheck_65572296_tests`
+(fixtures in `src/backend/tests/fixtures/recheck_65572296/`); regenerate the
+typed batch/network table with
+`python scripts/generate-recheck-65572296-fixture.py <evidence>/ocel-organizational/delta-comparison.json src/backend/tests/recheck_65572296_cases.inc`.
+The Python scalar model shared by batches, network analysis and the sequence
+filters lives in `src/backend/python_scalar.hpp`; when a pandas grouping or
+ordering rule is in doubt, fuzz a Python model of the public call against the
+reference first (the approach that pinned these rules) and then port it.
+

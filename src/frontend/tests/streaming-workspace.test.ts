@@ -43,13 +43,42 @@ describe("native streaming workflow delivery", () => {
     form.starts = "[]"; expect(() => streamingQuery(form)).toThrow(/non-empty/);
     form.starts = ""; form.activities = '["A,東京"]'; expect(() => streamingQuery(form)).toThrow(/activity names/);
   });
-  it("validates temporal profiles and finite positive zeta before a request", () => {
+  it("validates temporal profiles and any finite zeta before a request", () => {
     const form = defaultStreaming(); form.method = "temporal";
     form.profile = '[["A","B",5,0]]'; form.zeta = "2";
     expect(new URLSearchParams(streamingQuery(form)).get("streaming_temporal_profile")).toBe("A->B:5:0");
-    form.zeta = "0"; expect(() => streamingQuery(form)).toThrow(/greater than zero/);
+    // The reference accepts zero and negative zeta (every pair beyond it deviates).
+    for (const zeta of ["0", "-1", "1"]) {
+      form.zeta = zeta;
+      expect(new URLSearchParams(streamingQuery(form)).get("streaming_temporal_zeta")).toBe(zeta);
+    }
+    form.zeta = "abc"; expect(() => streamingQuery(form)).toThrow(/finite/);
+    form.zeta = "Infinity"; expect(() => streamingQuery(form)).toThrow(/finite/);
     form.zeta = ""; form.profile = '[["A","B",-1,1]]'; expect(() => streamingQuery(form)).toThrow(/mean/);
     form.profile = "bad"; expect(() => streamingQuery(form)).toThrow(/JSON array/);
+  });
+  it("lists a Declare stream's null case in the open-cases table and CSV apart from the empty-string case", async () => {
+    const state = { constraint_index: 0, template: "existence", first: "A", second: "", binary: false, satisfied: false, state: "seen" };
+    const rule = { constraint_index: 0, template: "existence", first: "A", second: "", binary: false, support: 1, confidence: 1 };
+    for (const ids of [[null], [""], [null, ""]] as (string | null)[][]) {
+      const cases: Record<string, unknown> = {}; let nullCase: unknown;
+      for (const id of ids) { const c = { events: 1, deviations: 0, constraint_states: [{ ...state }] }; if (id === null) nullCase = c; else cases[id] = c; }
+      const result = { family: "STREAMING_DECLARE", total_events_processed: ids.length, total_deviations: 0,
+        model: { family: "DECLARE_STREAM_MODEL", rule_count: 1, rules: [rule] },
+        deviations_per_time: ids.map((_, i) => ({ timestamp: String(i + 1), deviations: 0 })), cases,
+        ...(nullCase ? { null_case: nullCase } : {}),
+        event_results: ids.map((id, i) => ({ case_id: id, activity: "A", timestamp: String(i + 1), event_index: i + 1, deviations: 0, violated_constraints: [] })),
+        input: { event_order: "input", parsed_events: ids.length } } as unknown as StreamingResult;
+      const form = defaultStreaming(); form.method = "declare";
+      expect(validStreamingResult(result, form)).toBe(true);
+      const table = streamingTables(result).open_cases;
+      expect(table.count).toBe(ids.length);
+      // The keyed cases come first and the separate null case is listed last.
+      const expected: (string | null)[] = [...ids.filter(id => id !== null), ...(ids.some(id => id === null) ? [null] : [])];
+      expect(Array.from({ length: table.count }, (_, i) => table.rowAt(i)[0])).toEqual(expected);
+      const csv = await ocelPreparedCsv(table).text();
+      expect(csv.split("\r\n").filter(line => line).length).toBe(ids.length + 1);
+    }
   });
   it("accepts all four actual native fixtures and verifies order and variant", () => {
     for (const [method, raw] of [["dfg", dfgRaw], ["footprints", footprintsRaw], ["temporal", temporalRaw], ["tbr", tbrRaw]] as const) {

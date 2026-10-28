@@ -50,11 +50,12 @@ function jsonList<T>(text: string, name: string): T[] {
   if (!Array.isArray(value)) throw new Error(name + " must be a JSON array.");
   return value as T[];
 }
-function positiveNumber(text: string, name: string): number | undefined {
+/** A finite number; the reference accepts zero and negative zeta values. */
+function finiteNumber(text: string, name: string): number | undefined {
   if (!text) return undefined;
   const value = Number(text);
-  if (!text.trim() || !Number.isFinite(value) || value <= 0)
-    throw new Error(name + " must be finite and greater than zero.");
+  if (!text.trim() || !Number.isFinite(value))
+    throw new Error(name + " must be a finite number.");
   return value;
 }
 /** Preserve safety bounds as decimal text rather than rounding through Number. */
@@ -76,7 +77,7 @@ export function streamingQuery(form: StreamingForm): string {
   });
   else if (form.method === "temporal") query = streamingTemporalQuery({
     streaming_temporal_profile: jsonList<[string, string, number, number]>(form.profile, "Temporal profile"),
-    streaming_temporal_zeta: positiveNumber(form.zeta, "Zeta"),
+    streaming_temporal_zeta: finiteNumber(form.zeta, "Zeta"),
   });
   else if(form.method==="declare")query="";
   else query = streamingTbrQuery({
@@ -161,8 +162,12 @@ export function streamingTables(result: StreamingResult): Record<string, OcelPre
       const columns = value.family === "STREAMING_TBR"
         ? ["case_id", "events", "missing", "remaining", "is_fit", "marking"]
         : ["case_id", "events", "deviations"];
-      tables[name] = rows(columns, Object.entries(value.cases).map(([id, item]) =>
-        [id, ...columns.slice(1).map(key => key === "marking" ? nativeJson((item as StreamingTbrResult["cases"][string]).marking) : nativeCell(item, key))]));
+      // A Declare stream keeps the null case apart from the named cases
+      // (including the empty-string case); it is listed with a null id.
+      const entries: [string | null, unknown][] = Object.entries(value.cases);
+      if ("null_case" in value && value.null_case !== undefined) entries.push([null, value.null_case]);
+      tables[name] = rows(columns, entries.map(([id, item]) =>
+        [id, ...columns.slice(1).map(key => key === "marking" ? nativeJson((item as StreamingTbrResult["cases"][string]).marking) : nativeCell(item as object, key))]));
     }
   };
   if (result.family === "STREAMING_DFG") {
