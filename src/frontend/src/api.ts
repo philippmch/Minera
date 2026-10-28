@@ -2898,9 +2898,8 @@ export function attributeDistributionQuery(options: AttributeDistributionOptions
       throw new Error("attribute_distribution_type is not supported");
     query.set("attribute_distribution_type", options.attribute_distribution_type);
   }
+  // An empty key is the field named "", not the omitted default.
   if (options.attribute_distribution_timestamp_key !== undefined) {
-    if (!options.attribute_distribution_timestamp_key)
-      throw new Error("attribute_distribution_timestamp_key must not be empty");
     query.set("attribute_distribution_timestamp_key", options.attribute_distribution_timestamp_key);
   }
   return query.toString();

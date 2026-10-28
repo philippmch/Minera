@@ -15,6 +15,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include "full_double.hpp"
 
 namespace minera {
 namespace {
@@ -517,7 +518,7 @@ bool profile_numeric_kind(AttributeKind kind) {
 double profile_number(const std::string& value, const std::string& key) {
   try {
     std::size_t end = 0;
-    const double number = std::stod(value, &end);
+    const double number = ::minera::detail::stod(value, &end);
     if (end != value.size() || !std::isfinite(number)) throw std::invalid_argument("bad");
     return number;
   } catch (...) {

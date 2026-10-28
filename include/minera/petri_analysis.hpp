@@ -131,7 +131,9 @@ struct SoundnessResult {
   bool proper_completion = false;
   std::vector<std::size_t> dead_transitions;
   // Alias used by structural soundness diagnostics: transition ids that are
-  // never enabled from the resolved initial marking.
+  // never enabled from the resolved initial marking. For Woflan, the visible
+  // tasks dead in the short-circuited coverability graph, including the
+  // short-circuit transition itself (short_circuit_transition) when dead.
   std::vector<std::size_t> dead_tasks;
   std::vector<Marking> deadlocks;
   std::vector<std::vector<std::size_t>> deadlock_witnesses;

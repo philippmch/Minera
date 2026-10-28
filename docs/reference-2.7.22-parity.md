@@ -1227,8 +1227,10 @@ Bounded exploration also returns every shortest path to a marking that cannot
 reach the final marking as `locking_scenarios`, alongside the compact first
 witness and the `dead_tasks` alias for never-enabled transitions. Woflan's task
 projection is derived from the short-circuited coverability graph and reports
-visible tasks, while the generic `dead_transitions` field retains the exact
-original-net firing result. The native `not_well_handled_pairs` name is
+the dead visible tasks plus the short-circuit transition itself when it is
+dead (its id is `short_circuit_transition`, after the input transitions),
+while the generic `dead_transitions` field retains the exact original-net
+firing result. The native `not_well_handled_pairs` name is
 serialized alongside the historical `handled_pairs` compatibility field.
 Every pair coordinate also has a stable place/transition input-output label for
 renderers.
@@ -15951,7 +15953,7 @@ least one float is inferred as float64. `str()` of a label follows Python
 | L2 | Batch event ids are typed scalars: `[1, 1.0]` is one event, `[True, 1, 2]` two, `[1, "1", 2]` and `[None, None, 2]` raise the Python TypeError (pandas and Polars nullable Int64 alike), and the minimum batch size applies after deduplication. Intervals are `(start, end, set)` tuples through `heapq.heapify`, union on merge, Python `sorted` after the first merge (proper-subset set order on ties) and `heappush` for the near merge. | same (J29/L2 cases) |
 | L3 | Batch keys (case, activity, resource, event id) keep exact integers of any width; `9007199254740993` and `9007199254740992` stay distinct as case ids and as group keys, and mixed-number equivalence (`1`, `1.0`, `True`) still joins. | same (delta table, batches rows) |
 | L4 | Network relation keys join by Python equality (`[1, 1.0]`, `[True, 1]` link; `[1, "1"]` does not); source, target and edge groups follow the pandas `groupby` model above with first-seen labels (`"1"`, `"True"`), so equal numeric keys form one count-2 edge and a number and its text stay two count-1 edges. | same (delta table, network rows) |
-| L5 | Sequence-filter case identity for datetime cells is the exact instant (nanoseconds, offset-normalized): `2031-07-12T08:09:00Z` and `11:09:00+03:00` are one case for timestamp grouping and strict suffix filtering; distinct nanoseconds stay distinct; the grouped key dtype is `datetime64[us, UTC]` (ns when needed, `UTC+HH:MM` for one fixed offset, UTC for mixed offsets, object when naive and aware mix). | same (L5 cases) |
+| L5 | Sequence-filter case identity for datetime cells is the exact instant (nanoseconds, offset-normalized): `2031-07-12T08:09:00Z` and `11:09:00+03:00` are one case for timestamp grouping and strict suffix filtering; distinct nanoseconds stay distinct; the grouped key dtype is `datetime64[us, UTC]` (ns when needed, `UTC+HH:MM` for one fixed offset; object when offsets differ, corrected by M8, or when naive and aware mix). | same (L5 cases) |
 | L6 | Lexical integer cells beyond 64 bits (`18446744073709551616`, `18446744073709551617`, `-2**63-1`) keep exact identity through the shared key instead of a double fallback; a float cell of `2**64` stays distinct from the integer `2**64+1`. | same (L6 cases) |
 | L7 | Calendar fields (year, month, day, hour, weekday, day of year) derive from the exact timestamp parts; `2031-12-31T23:59:59.999999999Z` bins to 2031/12/31, hour 23, Wednesday, and 9998-12-31T23:59:59.999999Z stays in 9998. | same (L7 table) |
 | L8 | The frontend API and both streaming forms accept any finite temporal zeta (0, -1) and reject only non-finite text. | `streaming-workspace.test.ts` (vitest) |
@@ -15974,3 +15976,62 @@ Declared (not equivalent, kept on purpose):
   marking key) and the earlier DC4, C3, streaming and Windows declarations
   stay in force.
 
+## Recheck of c8ee22d: fixes and declarations (2026-10-28)
+
+The recheck of c8ee22d (reviewer handoff and evidence
+`minera-recheck-c8ee22d/`) reported ten fix groups (M1-M10) in inputs beyond
+the L1-L9 reproductions. Each fix was reproduced against public PM4Py 2.7.22
+calls and then fuzzed past the reviewer's cases until native and reference
+agreed on every deterministic input (filters: 3,900 random tables over all
+eleven sequence and case filters plus 2,000 with 17-50 mixed-type case ids;
+organizational: 4,200 random batch tables, 1,400 of them with varied
+intervals and 2,000 with 15-60 mixed-type activity or resource keys, and 480
+random network tables, besides the reviewer's extended and boundary tables).
+`minera_recheck_c8ee22d_tests` binds the reviewer's 174 filtering and 139
+organizational cases, 1,300 filter and 900 batch fuzz cases with their saved
+reference results, 300 numpy argsort comparison logs, and the calendar,
+selector, zeta and Woflan cases (`src/backend/tests/fixtures/recheck_c8ee22d/`,
+written by `scripts/generate-recheck-c8ee22d-fixture.py` from the evidence and
+`scripts/capture-recheck-c8ee22d-reference.py` output);
+`minera_recheck_c8ee22d_zeta_cli` runs the temporal CLI on a subnormal zeta.
+
+| ID | Fix | Test |
+| --- | --- | --- |
+| M1 | The calendar distribution's default timestamp key is `time:timestamp`, the reference default; an omitted selector reads it, and any explicit key (`timestamp`, `""`) is a literal field name read exactly. | `minera_recheck_c8ee22d_tests` (calendar selector cases) |
+| M2 | Sequence filters compare activities as Python objects: `1`, `1.0` and `True` are one activity, `"1"` another, None matches only None, a NaN cell nothing. Start, end, rework, prefix, suffix and split agree for numeric and text arguments; split takes a str as one activity and a list, tuple or dict as several, and raises `argument of type ... is not a container or iterable` for any other scalar. Generalized by fuzzing: `first()`/`last()` of an object column with only missing values is None (group activities and group times), a Timestamp plus a bool raises Python's unsupported-operand error (plus an int, pandas' own), and rework raises the sorted-groupby TypeError over the case ids of the matching rows only. | same (activity-neighbors and fuzz cases) |
+| M3 | Network analysis joins and groups a selected projection by the typed cell it was read from (XES int, float, boolean), so a projected `2` and `2.0` link and `2` and `"2"` do not, in every role. | same (network cases); CLI replay 17/17 |
+| M4 | Batch event tuples have a structural identity (each member length-prefixed), so `("a\|Sb", "c")` and `("a", "b\|Sc")` stay two events. | same (batch cases) |
+| M5 | Every NaN event id is its own value: two NaN ids at one interval are two events, as for any float64 column. Missing network join keys keep their separate rules. | same |
+| M6 | A level of ints and floats becomes float64 only when its integers fit numpy beside the floats (all within int64, or all non-negative within uint64); otherwise it stays object, so `2**70+1` and `2**70` as a float stay two groups in network and batch grouping. | same (extended and boundary cases) |
+| M7 | Group ordering follows pandas' `safe_sort`: mutually comparable values sort; otherwise the non-string values are argsorted as numpy sorts an object array (quicksort comparison by comparison), so a Timestamp beside a number, or an aware beside a naive Timestamp, raises the TypeError of the first comparison made, then the strings follow. Network, batches, the sequence filters' and the case filters' groupby share it. Both numpy object argsorts (quicksort, and the stable timsort of `np.unique`) are emulated comparison for comparison, including quicksort's partitioning above 16 items, which the wider fuzz exposed. | same (key-neighbors, extended and wide-key fuzz cases; numpy comparison logs) |
+| M8 | Timestamp case keys with different offsets group as Timestamp objects with an `object` key dtype; one offset keeps its `datetime64[unit, UTC+HH:MM]` dtype. | same (key-neighbors cases) |
+| M9 | A present empty selector is the column named `""`: calendar distribution (core, CLI, HTTP, frontend API) and all seven network selectors (core, CLI, HTTP). | same (selector cases); `api.test.ts` |
+| M10 | Every numeric option and cell parser reads a subnormal or underflowing value (`5e-324`, `-1e-308`, `1e-400` as 0) as Python's `float()` does: only an overflow is out of range (`src/backend/full_double.hpp` replaces `std::stod`, and the ERANGE checks are overflow-only). | same (parser cases); `minera_recheck_c8ee22d_zeta_cli` |
+
+Smaller differences closed: calendar year labels pad to two digits (`01`);
+batch and network datetime labels are `str(Timestamp)`
+(`2033-03-01 12:15:00+00:00`); Woflan's `dead_tasks` includes the dead
+short-circuit transition.
+
+Declared (not equivalent, kept on purpose):
+
+- **Set-order messages.** When a batch's event tuples cannot be sorted, which
+  pair the reference compares first depends on the iteration order of a
+  Python set: random across hash seeds when the tuples hold strings, and
+  otherwise fixed by CPython's hash-table layout, which native does not
+  model. Both raise a TypeError; native's message names a pair the inputs
+  hold, and the test accepts either operand order.
+- **NaN object identity.** An object column holding the same NaN object
+  (`np.nan` written into several cells) dedupes those event ids in the
+  reference; native reads cells from files, where every NaN is its own value,
+  as the reference treats float64 columns and separately created NaNs.
+- **None event id label.** A None event id is listed as the text `None` in the
+  native batch event, where the reference tuple holds None.
+- **Equal mixed-type case ids in one batch.** When `0` and `0.0` are case ids
+  of events merged into one batch, which of the two equal values the
+  reference reports is deterministic but not modeled; membership and counts
+  agree.
+- Two Woflan inputs fail inside the reference runtime (`nx_utils.topological_sort`
+  is missing); they are reference failures, not expectations. The weighted
+  Woflan analysis, the 65572296 and 61ebeee0 declarations and the earlier DC4,
+  C3, streaming and Windows declarations stay in force.

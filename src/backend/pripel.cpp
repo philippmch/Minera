@@ -15,6 +15,7 @@
 
 #include "minera/timestamp.hpp"
 #include "minera/secure_random.hpp"
+#include "full_double.hpp"
 
 namespace minera {
 namespace {
@@ -273,7 +274,7 @@ PripelResult anonymize_pripel(const EventLog& source,
         if (attr.is_null || blocked(attr.key, deny)) continue;
         if (attr.kind == AttributeKind::kInt || attr.kind == AttributeKind::kFloat) {
           try {
-            const double value = std::stod(attr.value);
+            const double value = ::minera::detail::stod(attr.value);
             auto& b = numeric[attr.key];
             if (!b.valid) b = {value, value, true};
             else { b.lo = std::min(b.lo, value); b.hi = std::max(b.hi, value); }
@@ -319,7 +320,7 @@ PripelResult anonymize_pripel(const EventLog& source,
     if (it == numeric.end() || !it->second.valid) return text;
     try {
       const auto b = it->second;
-      double v = std::stod(text);
+      double v = ::minera::detail::stod(text);
       const double span = b.hi - b.lo;
       if (span > 0.0) {
         const double noise = (unit(random_value(salt, text)) - .5) *
@@ -397,7 +398,7 @@ PripelResult anonymize_pripel(const EventLog& source,
           // Integer inputs can acquire fractional noise. Preserve the sampled
           // value when exporting typed XES instead of rounding it as an int.
           if (attr.kind == AttributeKind::kInt && attr.value != original_value) {
-            const double value = std::stod(attr.value);
+            const double value = ::minera::detail::stod(attr.value);
             if (std::isfinite(value) && std::trunc(value) != value)
               attr.kind = AttributeKind::kFloat;
           }

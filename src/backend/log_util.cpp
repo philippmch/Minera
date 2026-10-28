@@ -10,6 +10,7 @@
 #include <stdexcept>
 
 #include "minera/timestamp.hpp"
+#include "full_double.hpp"
 
 namespace minera {
 namespace {
@@ -37,7 +38,7 @@ double parse_elapsed(const Event& previous, const Event& target,
     if (const auto parsed = parse_timestamp(value)) return parsed;
     try {
       std::size_t consumed = 0;
-      const double number = std::stod(value, &consumed);
+      const double number = ::minera::detail::stod(value, &consumed);
       if (consumed == value.size() && std::isfinite(number)) return number;
     } catch (const std::exception&) {
     }

@@ -11,6 +11,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <optional>
@@ -24,6 +25,7 @@
 #include "minera/event_log.hpp"
 #include "minera/filtering_common.hpp"
 #include "minera/timestamp.hpp"
+#include "numpy_object_sort.hpp"
 
 namespace minera::python {
 
@@ -183,6 +185,47 @@ inline std::string integral_digits(double value) {
   return std::string(buffer, r.ptr);
 }
 
+// str() of a pandas Timestamp: its wall time at its own offset, six
+// fractional digits when it has microseconds and nine when it has
+// nanoseconds, and the offset when it is aware.
+inline std::string timestamp_str(const ParsedExactTimestamp& date) {
+  const std::int64_t local = date.seconds + (date.timezone_aware ? std::int64_t(date.offset_minutes) * 60 : 0);
+  std::int64_t days = local / 86400, rest = local % 86400;
+  if (rest < 0) {
+    rest += 86400;
+    --days;
+  }
+  // Howard Hinnant's civil_from_days.
+  days += 719468;
+  const std::int64_t era = (days >= 0 ? days : days - 146096) / 146097;
+  const std::int64_t doe = days - era * 146097;
+  const std::int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const std::int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const std::int64_t mp = (5 * doy + 2) / 153;
+  const std::int64_t day = doy - (153 * mp + 2) / 5 + 1;
+  const std::int64_t month = mp < 10 ? mp + 3 : mp - 9;
+  const std::int64_t year = yoe + era * 400 + (month <= 2 ? 1 : 0);
+  char buffer[96];
+  int n = std::snprintf(buffer, sizeof(buffer), "%04lld-%02lld-%02lld %02lld:%02lld:%02lld", static_cast<long long>(year),
+                        static_cast<long long>(month), static_cast<long long>(day),
+                        static_cast<long long>(rest / 3600), static_cast<long long>(rest / 60 % 60),
+                        static_cast<long long>(rest % 60));
+  std::string out(buffer, static_cast<std::size_t>(n));
+  if (date.nanoseconds % 1000 != 0) {
+    n = std::snprintf(buffer, sizeof(buffer), ".%09u", static_cast<unsigned>(date.nanoseconds));
+    out.append(buffer, static_cast<std::size_t>(n));
+  } else if (date.nanoseconds != 0) {
+    n = std::snprintf(buffer, sizeof(buffer), ".%06u", static_cast<unsigned>(date.nanoseconds / 1000));
+    out.append(buffer, static_cast<std::size_t>(n));
+  }
+  if (date.timezone_aware) {
+    const int offset = date.offset_minutes < 0 ? -date.offset_minutes : date.offset_minutes;
+    n = std::snprintf(buffer, sizeof(buffer), "%c%02d:%02d", date.offset_minutes < 0 ? '-' : '+', offset / 60, offset % 60);
+    out.append(buffer, static_cast<std::size_t>(n));
+  }
+  return out;
+}
+
 // str() of the value.
 inline std::string str(const Scalar& s) {
   switch (s.kind) {
@@ -192,7 +235,7 @@ inline std::string str(const Scalar& s) {
     case Scalar::Kind::kInt: return (s.negative ? "-" : "") + s.digits;
     case Scalar::Kind::kFloat: return float_repr(s.real);
     case Scalar::Kind::kText: return s.text;
-    case Scalar::Kind::kDate: return s.text;
+    case Scalar::Kind::kDate: return timestamp_str(s.date);
   }
   return {};
 }
@@ -286,8 +329,12 @@ inline int compare_numbers(const Scalar& a, const Scalar& b) {
 // Python's three-way ordering (a < b, a > b); raises TypeError where Python
 // does.
 inline int compare(const Scalar& a, const Scalar& b) {
-  if (a.kind == Scalar::Kind::kNA || b.kind == Scalar::Kind::kNA)
+  if (a.kind == Scalar::Kind::kNA || b.kind == Scalar::Kind::kNA) {
+    // pd.NA answers every comparison with NA, whose truth raises, except
+    // with None, which neither orders.
+    if (a.kind == Scalar::Kind::kNone || b.kind == Scalar::Kind::kNone) unorderable(a, b);
     throw TypeError("boolean value of NA is ambiguous");
+  }
   if (is_number(a) && is_number(b)) return compare_numbers(a, b);
   if (a.kind == Scalar::Kind::kText && b.kind == Scalar::Kind::kText) {
     const int c = a.text.compare(b.text);
@@ -295,7 +342,7 @@ inline int compare(const Scalar& a, const Scalar& b) {
   }
   if (a.kind == Scalar::Kind::kDate && b.kind == Scalar::Kind::kDate) {
     if (a.date.timezone_aware != b.date.timezone_aware)
-      throw TypeError("can't compare offset-naive and offset-aware datetimes");
+      throw TypeError("Cannot compare tz-naive and tz-aware timestamps");
     const auto x = std::pair(a.date.seconds, a.date.nanoseconds);
     const auto y = std::pair(b.date.seconds, b.date.nanoseconds);
     return x < y ? -1 : y < x ? 1 : 0;
@@ -348,85 +395,138 @@ struct Group {
   std::vector<std::size_t> rows;   // member rows in input order
 };
 
+// The order pandas' safe_sort gives one level's distinct values: sorted when
+// they are mutually comparable; otherwise every non-string value (numbers and
+// Timestamps), sorted, then the strings, sorted. Sorting the non-string
+// values is numpy's argsort, so a Timestamp beside a number, or an aware
+// beside a naive Timestamp, raises the TypeError of the first comparison
+// numpy makes between them.
+inline std::vector<std::size_t> safe_sort_order(const std::vector<Scalar>& uniques) {
+  const auto category = [](const Scalar& s) {
+    if (is_number(s)) return 0;
+    if (s.kind == Scalar::Kind::kText) return 1;
+    if (s.kind == Scalar::Kind::kDate) return s.date.timezone_aware ? 2 : 3;
+    return 4;
+  };
+  std::vector<std::size_t> order(uniques.size());
+  for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+  bool comparable = true;
+  for (const auto& value : uniques) comparable = comparable && category(value) == category(uniques.front());
+  const auto by_value = [&](std::size_t a, std::size_t b) { return compare(uniques[a], uniques[b]) < 0; };
+  if (comparable) {
+    std::stable_sort(order.begin(), order.end(), by_value);
+    return order;
+  }
+  std::vector<std::size_t> others, strings;
+  for (std::size_t i = 0; i < uniques.size(); ++i)
+    (uniques[i].kind == Scalar::Kind::kText ? strings : others).push_back(i);
+  const auto sorted_others = detail::numpy_object_quick_argsort(
+      others.size(), [&](std::size_t a, std::size_t b) { return compare(uniques[others[a]], uniques[others[b]]); });
+  std::stable_sort(strings.begin(), strings.end(), by_value);
+  order.clear();
+  for (const auto i : sorted_others) order.push_back(others[i]);
+  order.insert(order.end(), strings.begin(), strings.end());
+  return order;
+}
+
+// Whether a level of int and float labels becomes a float64 index: it needs
+// a float, no bool, and integers numpy can hold beside it (all within int64,
+// or all non-negative within uint64); otherwise it stays object.
+inline bool float_level(const std::vector<Scalar>& labels) {
+  bool floats = false, negative = false, above_int64 = false;
+  for (const auto& label : labels) {
+    if (label.kind == Scalar::Kind::kFloat) {
+      floats = true;
+      continue;
+    }
+    if (label.kind != Scalar::Kind::kInt) return false;
+    if (label.digits == "0") continue;
+    if (label.negative) {
+      if (compare_digits(label.digits, "9223372036854775808") > 0) return false;
+      negative = true;
+    } else {
+      if (compare_digits(label.digits, "18446744073709551615") > 0) return false;
+      above_int64 = above_int64 || compare_digits(label.digits, "9223372036854775807") > 0;
+    }
+  }
+  return floats && !(negative && above_int64);
+}
+
 // pandas groupby(keys) (sort=True, dropna=True) over object columns, as the
-// reference iterates it: rows with a None/NaN/NA key are dropped; a level's
-// label is the first value equal to it in that column; groups are ordered by
-// their key tuples with numbers before text (and null keys, kept only when
-// asked, last); a level whose labels are all int or float with at least one
-// float becomes float64, which rounds wide integers, and two groups whose
-// rounded tuples collide are one dictionary entry with the first key and the
-// last group's rows.
+// reference iterates it. Each level is factorized over every row: its
+// distinct values (None/NaN/NA excluded) are labelled by the first equal
+// value, ordered by safe_sort_order (which may raise, also for values only
+// rows dropped for another level's null carry) and typed by float_level
+// (ints beside floats become floats, which can give two groups one label).
+// Rows with a null key are dropped unless asked to keep them as their own
+// last key; groups are ordered by their levels' value order.
 inline std::vector<Group> groupby(const std::vector<std::vector<Scalar>>& keys, bool keep_nulls = false) {
   std::vector<Group> result;
   if (keys.empty()) return result;
   const std::size_t levels = keys.front().size();
-  std::vector<std::map<std::string, Scalar>> first_seen(levels);
-  std::map<std::vector<std::string>, std::size_t> index;
-  std::vector<Group> groups;
-  for (std::size_t row = 0; row < keys.size(); ++row) {
-    bool drop = false;
-    std::vector<std::string> identities;
-    std::vector<Scalar> labels;
-    for (std::size_t level = 0; level < levels; ++level) {
+  // Per level: distinct values in first-seen order, and each row's code.
+  std::vector<std::vector<Scalar>> uniques(levels);
+  std::vector<std::vector<std::size_t>> codes(levels, std::vector<std::size_t>(keys.size()));
+  constexpr auto kNull = static_cast<std::size_t>(-1);
+  for (std::size_t level = 0; level < levels; ++level) {
+    std::map<std::string, std::size_t> seen;
+    for (std::size_t row = 0; row < keys.size(); ++row) {
       const auto& value = keys[row][level];
-      drop = drop || (is_missing(value) && !keep_nulls);
-      auto id = identity(value);
-      const auto [it, added] = first_seen[level].emplace(id, value);
-      labels.push_back(it->second);
-      identities.push_back(std::move(id));
+      if (is_missing(value)) {
+        codes[level][row] = kNull;
+        continue;
+      }
+      const auto [it, added] = seen.emplace(identity(value), uniques[level].size());
+      if (added) uniques[level].push_back(value);
+      codes[level][row] = it->second;
+    }
+  }
+  // Ranks in each level's sorted order; a kept null ranks last.
+  std::vector<std::vector<std::size_t>> rank(levels);
+  for (std::size_t level = 0; level < levels; ++level) {
+    const auto order = safe_sort_order(uniques[level]);
+    rank[level].resize(order.size());
+    for (std::size_t i = 0; i < order.size(); ++i) rank[level][order[i]] = i;
+    if (float_level(uniques[level]))
+      for (auto& label : uniques[level])
+        if (label.kind == Scalar::Kind::kInt) label = real(std::strtod(str(label).c_str(), nullptr));
+  }
+  std::map<std::vector<std::size_t>, std::size_t> index;
+  for (std::size_t row = 0; row < keys.size(); ++row) {
+    std::vector<std::size_t> key(levels);
+    bool drop = false;
+    for (std::size_t level = 0; level < levels; ++level) {
+      const auto code = codes[level][row];
+      drop = drop || (code == kNull && !keep_nulls);
+      key[level] = code == kNull ? uniques[level].size() : rank[level][code];
     }
     if (drop) continue;
-    const auto [it, added] = index.emplace(identities, groups.size());
-    if (added) groups.push_back({std::move(labels), {}});
-    groups[it->second].rows.push_back(row);
+    const auto [it, added] = index.emplace(key, result.size());
+    if (added) {
+      Group group;
+      for (std::size_t level = 0; level < levels; ++level) {
+        const auto code = codes[level][row];
+        group.labels.push_back(code == kNull ? keys[row][level] : uniques[level][code]);
+      }
+      result.push_back(std::move(group));
+    }
+    result[it->second].rows.push_back(row);
   }
-  // Ordered by key tuple: safe_sort puts every number before every string.
-  const auto category = [](const Scalar& s) {
-    if (is_number(s)) return 0;
-    if (s.kind == Scalar::Kind::kText) return 1;
-    if (s.kind == Scalar::Kind::kDate) return 2;
-    return 3;
-  };
-  const auto less_scalar = [&](const Scalar& a, const Scalar& b) {
-    const int ca = category(a), cb = category(b);
-    if (ca != cb) return ca < cb;
-    if (ca == 3) return false;
-    try {
-      return compare(a, b) < 0;
-    } catch (const TypeError&) {
-      return identity(a) < identity(b);
-    }
-  };
-  std::stable_sort(groups.begin(), groups.end(), [&](const Group& a, const Group& b) {
-    for (std::size_t level = 0; level < levels; ++level) {
-      if (less_scalar(a.labels[level], b.labels[level])) return true;
-      if (less_scalar(b.labels[level], a.labels[level])) return false;
-    }
-    return false;
-  });
-  // Index inference per level: ints alongside floats become float64.
-  for (std::size_t level = 0; level < levels; ++level) {
-    bool numbers = true, floats = false;
-    for (const auto& group : groups) {
-      const auto& label = group.labels[level];
-      if (label.kind == Scalar::Kind::kFloat) floats = true;
-      else if (label.kind != Scalar::Kind::kInt) numbers = false;
-    }
-    if (!numbers || !floats) continue;
-    for (auto& group : groups) {
-      auto& label = group.labels[level];
-      if (label.kind == Scalar::Kind::kInt) label = real(std::strtod(str(label).c_str(), nullptr));
-    }
-  }
+  // std::map orders the keys like the level codes: lexicographically. The
+  // reference collects the groups by label, so two groups that float labels
+  // made equal are one entry with the first key and the last group's rows.
+  std::vector<Group> ordered;
+  ordered.reserve(result.size());
   std::map<std::vector<std::string>, std::size_t> merged;
-  for (auto& group : groups) {
-    std::vector<std::string> key;
-    for (const auto& label : group.labels) key.push_back(identity(label));
-    const auto [it, added] = merged.emplace(std::move(key), result.size());
-    if (added) result.push_back(std::move(group));
-    else result[it->second].rows = std::move(group.rows);
+  for (const auto& [key, position] : index) {
+    auto& group = result[position];
+    std::vector<std::string> labels;
+    for (const auto& label : group.labels) labels.push_back(identity(label));
+    const auto [it, added] = merged.emplace(std::move(labels), ordered.size());
+    if (added) ordered.push_back(std::move(group));
+    else ordered[it->second].rows = std::move(group.rows);
   }
-  return result;
+  return ordered;
 }
 
 }  // namespace minera::python

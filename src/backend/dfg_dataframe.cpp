@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "minera/timestamp.hpp"
+#include "full_double.hpp"
 
 namespace minera {
 namespace {
@@ -287,7 +288,7 @@ std::optional<double> parse_number(const std::optional<std::string>& value) {
   if (!value || value->empty()) return std::nullopt;
   try {
     std::size_t consumed = 0;
-    const double result = std::stod(*value, &consumed);
+    const double result = ::minera::detail::stod(*value, &consumed);
     if (consumed != value->size() || !std::isfinite(result)) {
       throw std::invalid_argument(
           "DFG table discovery: cost values must be finite numbers");
@@ -561,7 +562,7 @@ std::optional<double> numeric_index(const TableRow& row) {
   if (!row.index_text || row.index_text->empty()) return std::nullopt;
   try {
     std::size_t used = 0;
-    const auto result = std::stod(*row.index_text, &used);
+    const auto result = ::minera::detail::stod(*row.index_text, &used);
     if (used != row.index_text->size()) return std::nullopt;
     if (!std::isfinite(result)) return std::nullopt;
     return result;
@@ -609,7 +610,7 @@ std::optional<ComparableNumber> comparable_number(
   }
   try {
     std::size_t consumed = 0;
-    const auto value = std::stod(attribute.value, &consumed);
+    const auto value = ::minera::detail::stod(attribute.value, &consumed);
     if (consumed == attribute.value.size() && std::isfinite(value)) return value;
   } catch (const std::exception&) {
   }

@@ -12,6 +12,7 @@
 #include "minera/token_integer.hpp"
 #include "business_hours.hpp"
 #include "root_cause_trace_key.hpp"
+#include "python_scalar.hpp"
 #include "root_cause_unicode.hpp"
 namespace minera {
 namespace {
@@ -156,6 +157,15 @@ Groups groups(const EventTable& s,std::size_t c,std::optional<std::size_t> times
  }
  return result;
 }
+// groupby(case) sorts its distinct keys first (python::safe_sort_order):
+// numbers and strings order as pandas mixes them, while a Timestamp beside a
+// number, or an aware beside a naive one, raises. Returns the group order.
+std::vector<std::size_t> sorted_groups(const EventTable& s,std::size_t c,const Groups& grouped){
+ std::vector<python::Scalar> keys(grouped.values.size());std::vector<bool> seen(grouped.values.size());
+ for(std::size_t i=0;i<s.size();++i)if(grouped.rows[i]&&!seen[*grouped.rows[i]]){seen[*grouped.rows[i]]=true;keys[*grouped.rows[i]]=python::from_attribute(*s.rows[i][c]);}
+ try{return python::safe_sort_order(keys);}
+ catch(const python::TypeError& e){error("TypeError",e.what());}
+}
 bool arithmetic_index(const std::vector<EventTableIndexLabel>& labels){
  std::vector<TokenInteger> values;
  for(const auto& label:labels){const auto* v=std::get_if<EventAttribute>(&label.value);if(!v||v->is_null)return false;
@@ -273,7 +283,7 @@ PandasCaseFilterOptions::PandasCaseFilterOptions(){
  }
 }
 EventTable filter_pandas_case_size(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const PandasCaseFilterOptions& o){
- s.validate();const auto c=size_column(s,o.case_id_key);const auto grouped=groups(s,c);
+ s.validate();const auto c=size_column(s,o.case_id_key);const auto grouped=groups(s,c);(void)sorted_groups(s,c,grouped);
  if(s.size()&&grouped.values.empty())error("IndexError","cannot do a non-empty take from an empty axes.");
  // Each row carries its case size. A list or tuple bound compares with the
  // rows item by item (a list needs one item per row; a tuple broadcasts).
@@ -376,14 +386,8 @@ EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribu
  if(!business&&!s.dtypes.empty()&&!s.dtypes[t].starts_with("datetime64"))error("AttributeError","Can only use .dt accessor with datetimelike values");
  // Durations are a Series over the cases in sorted case order. The maximum
  // is applied first, then the minimum to the cases that remain.
- std::vector<std::size_t> order(grouped.values.size());std::iota(order.begin(),order.end(),0);
  std::vector<const EventAttribute*> ids(grouped.values.size());for(std::size_t i=0;i<s.size();++i)if(grouped.rows[i]&&!ids[*grouped.rows[i]])ids[*grouped.rows[i]]=&*s.rows[i][c];
- {// pandas sorts group keys; keys that cannot be compared (such as 1 and
-  // 'a') fall back to its mixed order: numbers, then strings.
-  std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){
-   try{return native_scalar_key_compare(*ids[a],*ids[b])<0;}
-   catch(const std::invalid_argument&){return !text_value(*ids[a])&&text_value(*ids[b]);}
-  });}
+ const auto order=sorted_groups(s,c,grouped);
  std::vector<bool> accepted(grouped.values.size());
  std::vector<std::size_t> remaining;
  const auto upper=duration_mask(durations,order,maximum,false);

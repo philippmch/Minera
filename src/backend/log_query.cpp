@@ -18,6 +18,7 @@
 #include <sqlite3.h>
 #endif
 #endif
+#include "full_double.hpp"
 
 namespace minera {
 namespace {
@@ -44,7 +45,7 @@ QueryValue scalar(const std::optional<EventAttribute>& cell) {
   if(auto p=std::get_if<NativeDate>(&cell->typed_value))return p->value;
   if(cell->kind==AttributeKind::kInt){std::int64_t value=0;auto parsed=std::from_chars(cell->value.data(),cell->value.data()+cell->value.size(),value);if(parsed.ec==std::errc{}&&parsed.ptr==cell->value.data()+cell->value.size())return value;}
   if(cell->kind==AttributeKind::kBoolean){const auto text=lower(cell->value);if(text=="true"||text=="1")return std::int64_t{1};if(text=="false"||text=="0")return std::int64_t{0};throw std::invalid_argument("invalid boolean query cell");}
-  if(cell->kind==AttributeKind::kFloat){std::size_t used=0;const auto value=std::stod(cell->value,&used);if(used==cell->value.size())return value;}
+  if(cell->kind==AttributeKind::kFloat){std::size_t used=0;const auto value=::minera::detail::stod(cell->value,&used);if(used==cell->value.size())return value;}
   return cell->value;
 }
 void write_value(std::ostream& output,const QueryValue& value){

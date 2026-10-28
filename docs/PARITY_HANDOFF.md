@@ -4114,3 +4114,21 @@ filters lives in `src/backend/python_scalar.hpp`; when a pandas grouping or
 ordering rule is in doubt, fuzz a Python model of the public call against the
 reference first (the approach that pinned these rules) and then port it.
 
+## Recheck of c8ee22d (2026-10-28, cloud container)
+
+M1-M10 and the three smaller differences from the reviewer's recheck are
+fixed; set-order batch messages, NaN object identity, the None event-id label
+and the representative of equal mixed-type case ids are declared. See
+"Recheck of c8ee22d" in the parity doc. The reviewer's cases, fuzz cases and
+numpy comparison logs are bound by `minera_recheck_c8ee22d_tests` (fixtures
+in `src/backend/tests/fixtures/recheck_c8ee22d/`). Regenerate them with the
+pinned reference environment:
+`python scripts/capture-recheck-c8ee22d-reference.py fuzz-filters|fuzz-filter-keys|fuzz-batches|fuzz-batch-keys ...`
+then `filters`/`batches` for the public results, `sort-logs` for the numpy
+logs, and `python scripts/generate-recheck-c8ee22d-fixture.py <evidence> src/backend/tests/fixtures/recheck_c8ee22d --filters CASES RESULTS ... --batches CASES RESULTS ...`.
+Lessons: fuzz with more than 16 distinct keys (numpy changes sort strategy
+there), parse numbers with `src/backend/full_double.hpp` rather than
+`std::stod` (glibc reports subnormals as ERANGE), and check a message
+difference against several `PYTHONHASHSEED` values before treating it as a
+bug.
+

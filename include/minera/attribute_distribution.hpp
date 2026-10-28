@@ -27,7 +27,9 @@ enum class EventDistributionType {
 
 struct AttributeDistributionOptions {
   EventDistributionType distribution = EventDistributionType::kDaysMonth;
-  std::string timestamp_key = "timestamp";
+  // The reference default; any other value, the empty string included, is an
+  // explicit field name.
+  std::string timestamp_key = "time:timestamp";
 };
 
 struct AttributeDistributionResult {
@@ -47,7 +49,7 @@ struct AttributeDistributionResult {
 
 [[nodiscard]] inline AttributeDistributionResult get_events_distribution(
     const EventLog& log, EventDistributionType distribution,
-    std::string timestamp_key = "timestamp") {
+    std::string timestamp_key = "time:timestamp") {
   AttributeDistributionOptions options;
   options.distribution = distribution;
   options.timestamp_key = std::move(timestamp_key);

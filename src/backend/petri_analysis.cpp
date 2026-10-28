@@ -1979,17 +1979,28 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     // ordinary soundness contract.  Extended-arc nets and capped searches do
     // not expose a complete coverability graph, so use the exact graph as a
     // conservative fallback once it has finished.
-    std::vector<bool> coverability_fired(net.transitions().size(), false);
+    // The synthetic short-circuit transition (index transitions().size()) is
+    // a task of the short-circuited net too: when it never fires, the
+    // reference lists it among the dead tasks with the visible ones.
+    std::vector<bool> coverability_fired(coverability_net->transitions().size(), false);
     if (!coverability.exhausted && !coverability.unbounded) {
       for (const auto& edge : coverability.edges) {
         if (edge.size() == 3 && edge[2] < coverability_fired.size())
           coverability_fired[edge[2]] = true;
       }
     } else {
-      coverability_fired = fired;
+      std::copy(fired.begin(), fired.end(), coverability_fired.begin());
+      // Without the short-circuited graph, the short circuit fires once a
+      // reachable marking covers the final one.
+      if (short_circuited && result.short_circuit_transition &&
+          *result.short_circuit_transition < coverability_fired.size())
+        coverability_fired[*result.short_circuit_transition] =
+            result.final_reachable || !result.improper_markings.empty();
     }
     for (std::size_t t = 0; t < coverability_fired.size(); ++t) {
-      if (coverability_fired[t] || net.transitions()[t].silent()) continue;
+      if (coverability_fired[t]) continue;
+      const bool short_circuit = short_circuited && result.short_circuit_transition == t;
+      if (!short_circuit && (t >= net.transitions().size() || net.transitions()[t].silent())) continue;
       result.dead_tasks.push_back(t);
     }
   } else {

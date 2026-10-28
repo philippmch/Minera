@@ -650,6 +650,22 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_recheck_65572296_tests
            COMMAND minera_recheck_65572296_tests
                    "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_65572296")
+  add_executable(minera_recheck_c8ee22d_tests src/backend/tests/test_recheck_c8ee22d.cpp)
+  target_link_libraries(minera_recheck_c8ee22d_tests PRIVATE minera::core)
+  target_compile_features(minera_recheck_c8ee22d_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_recheck_c8ee22d_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_recheck_c8ee22d_tests
+           COMMAND minera_recheck_c8ee22d_tests
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_c8ee22d")
+  # A subnormal zeta is a finite threshold, not an out-of-range value.
+  add_test(NAME minera_recheck_c8ee22d_zeta_cli
+           COMMAND minera_streaming_temporal
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_c8ee22d/finite-zeta-5e-324.csv"
+                   --profile "RegisterC8->CompleteC8:5:1" --zeta 5e-324
+                   --case-id-column case:concept:name --activity-column concept:name
+                   --timestamp-column time:timestamp)
+  set_tests_properties(minera_recheck_c8ee22d_zeta_cli PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"elapsed_seconds\":3,\"standard_deviation_distance\":2")
   add_executable(minera_root_cause_tests src/backend/tests/test_root_cause.cpp)
   target_link_libraries(minera_root_cause_tests PRIVATE minera::core)
   target_compile_features(minera_root_cause_tests PRIVATE cxx_std_20)

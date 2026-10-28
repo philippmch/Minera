@@ -7,6 +7,7 @@
 #include <variant>
 
 #include "minera/event_log.hpp"
+#include "full_double.hpp"
 
 namespace minera::detail {
 
@@ -41,7 +42,7 @@ inline std::string date_text(const EventAttribute& v) {
 }
 inline double float_of(const EventAttribute& v) {
   if (const auto* d = std::get_if<double>(&v.typed_value)) return *d;
-  return std::stod(v.value);
+  return ::minera::detail::stod(v.value);
 }
 // The AnyValue display of an item in the construction error.
 inline std::string display(const EventAttribute& v) {

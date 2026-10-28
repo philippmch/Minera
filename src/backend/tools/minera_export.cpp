@@ -2229,7 +2229,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     char* end = nullptr;
     errno = 0;
     const double parsed = std::strtod(value, &end);
-    if (end == value || end != value + std::strlen(value) || errno == ERANGE ||
+    if (end == value || end != value + std::strlen(value) ||
         !std::isfinite(parsed)) {
       throw std::invalid_argument(std::string(option) +
                                   " expects a finite number");

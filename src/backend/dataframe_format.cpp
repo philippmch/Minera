@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "minera/timestamp.hpp"
+#include "full_double.hpp"
 
 namespace minera {
 namespace {
@@ -611,7 +612,7 @@ FormatNumber format_number(const EventAttribute& cell) {
   if (const auto* value = std::get_if<std::uint64_t>(&cell.typed_value)) return {false, *value, {}};
   if (const auto* value = std::get_if<std::int64_t>(&cell.typed_value))
     return {*value < 0, *value < 0 ? static_cast<std::uint64_t>(-(*value + 1)) + 1 : static_cast<std::uint64_t>(*value), {}};
-  if (cell.kind == AttributeKind::kFloat) return {false, 0, std::stod(cell.value)};
+  if (cell.kind == AttributeKind::kFloat) return {false, 0, ::minera::detail::stod(cell.value)};
   if (cell.kind == AttributeKind::kBoolean) return {false, cell.value == "true" || cell.value == "True" || cell.value == "1" ? 1U : 0U, {}};
   const bool negative = cell.value.starts_with('-');
   return {negative, std::stoull(negative ? cell.value.substr(1) : cell.value), {}};

@@ -12,6 +12,7 @@
 #include <variant>
 
 #include "minera/timestamp.hpp"
+#include "numpy_object_sort.hpp"
 #include "python_scalar.hpp"
 #include "reference_activity_selector.hpp"
 
@@ -117,11 +118,24 @@ bool has_column(const Event& e, const Trace* trace, std::string_view selector) {
   return false;
 }
 
+// The typed cell an adapter kept for the projection a selector names (the
+// XES value an int, float or boolean concept:name was read from), if any.
+const EventAttribute* projection_cell(const Event& e, const Trace* trace, std::string_view selector) {
+  using detail::projection_names;
+  const auto kept = [](const std::optional<EventAttribute>& cell) { return cell ? &*cell : nullptr; };
+  if (projection_names(e.activity_source_key, e.activity_attribute, "concept:name", selector)) return kept(e.activity_attribute);
+  if (projection_names(e.timestamp_source_key, e.timestamp_attribute, "time:timestamp", selector)) return kept(e.timestamp_attribute);
+  if (projection_names(e.resource_source_key, e.resource_attribute, "org:resource", selector)) return kept(e.resource_attribute);
+  if (projection_names(e.lifecycle_source_key, e.lifecycle_attribute, "lifecycle:transition", selector)) return kept(e.lifecycle_attribute);
+  if (case_selector(e, trace, selector) && trace) return kept(trace->case_id_attribute);
+  return nullptr;
+}
+
 // The Python object the selector names on this event: a literal cell as it
-// is typed, else the projection's text (a timestamp projection is a
-// Timestamp). nullopt when the value is missing (None, NaN, pd.NA, absent).
+// is typed, else the projection's typed cell, else its text (a timestamp
+// projection is a Timestamp). An empty selector is a column name like any
+// other. nullopt when the value is missing (None, NaN, pd.NA, absent).
 std::optional<python::Scalar> typed_value(const Event& e, const Trace* trace, std::string_view selector) {
-  if (selector.empty()) return std::nullopt;
   if (const auto* cell = literal_cell(e, trace, selector)) {
     auto scalar = python::from_attribute(*cell);
     if (python::is_missing(scalar)) return std::nullopt;
@@ -129,14 +143,22 @@ std::optional<python::Scalar> typed_value(const Event& e, const Trace* trace, st
   }
   const auto* text = projection(e, trace, selector);
   if (!text) return std::nullopt;
+  if (const auto* cell = projection_cell(e, trace, selector)) {
+    auto scalar = python::from_attribute(*cell);
+    if (python::is_missing(scalar)) return std::nullopt;
+    if (scalar.kind != python::Scalar::Kind::kText) return scalar;
+  }
   if (detail::projection_names(e.timestamp_source_key, e.timestamp_attribute, "time:timestamp", selector))
     if (auto date = python::date_literal(*text)) return date;
   return python::text(*text);
 }
 
+// The selected value as timestamp text: a Timestamp keeps the spelling it
+// was read from.
 std::optional<std::string> value(const Event& e, const Trace* trace, std::string_view selector) {
   const auto typed = typed_value(e, trace, selector);
   if (!typed) return std::nullopt;
+  if (typed->kind == python::Scalar::Kind::kDate) return typed->text;
   return python::str(*typed);
 }
 
@@ -272,8 +294,21 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
     dates |= key.kind == SortKey::Kind::kDate;
     refs.push_back({&e, &tr, input++, std::move(key)});
   }
-  if (static_cast<int>(numbers) + static_cast<int>(texts) + static_cast<int>(dates) > 1)
+  if (static_cast<int>(numbers) + static_cast<int>(texts) + static_cast<int>(dates) > 1) {
+    // sort_values argsorts the non-missing values; the first pair numpy's
+    // quicksort cannot compare is the error.
+    std::vector<const python::Scalar*> present_values;
+    for (const auto& ref : refs)
+      if (ref.sort.kind != SortKey::Kind::kMissing) present_values.push_back(&ref.sort.value);
+    try {
+      (void)detail::numpy_object_quick_argsort(present_values.size(), [&](std::size_t a, std::size_t b) {
+        return python::compare(*present_values[a], *present_values[b]);
+      });
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument(std::string("network analysis: ") + error.what());
+    }
     throw std::invalid_argument("network analysis: '<' not supported between mixed sorting values");
+  }
   std::stable_sort(refs.begin(), refs.end(), [](const Ref& a, const Ref& b) {
     const bool a_missing = a.sort.kind == SortKey::Kind::kMissing;
     const bool b_missing = b.sort.kind == SortKey::Kind::kMissing;
@@ -324,7 +359,13 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
     }
     links.push_back(link);
   }
-  for (const auto& group : python::groupby(keys)) {
+  std::vector<python::Group> groups;
+  try {
+    groups = python::groupby(keys);
+  } catch (const python::TypeError& error) {
+    throw std::invalid_argument(std::string("network analysis: ") + error.what());
+  }
+  for (const auto& group : groups) {
     if (result.edges.size() >= o.max_rows) { result.diagnostics.output_truncated = true; break; }
     NetworkAnalysisEdge edge{python::str(group.labels[0]), python::str(group.labels[1]), python::str(group.labels[2]), 0, {}};
     for (const auto row : group.rows) {

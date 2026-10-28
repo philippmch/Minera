@@ -1544,6 +1544,8 @@ describe("attribute distribution API", () => {
       attribute_distribution_timestamp_key: "occurred_at",
     })).toBe("attribute_distribution_type=days_week&attribute_distribution_timestamp_key=occurred_at");
     expect(() => attributeDistributionQuery({ attribute_distribution_type: "bad" as never })).toThrow(/not supported/);
+    expect(attributeDistributionQuery({ attribute_distribution_timestamp_key: "" }))
+      .toBe("attribute_distribution_timestamp_key=");
   });
 
   it("posts and validates calendar bins", async () => {

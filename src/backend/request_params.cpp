@@ -453,8 +453,9 @@ double parse_finite_double(std::string_view value, std::string_view name) {
   char* end = nullptr;
   errno = 0;
   const double parsed = std::strtod(owned.c_str(), &end);
+  // Underflow (ERANGE with a subnormal or zero result) is a finite value, as
+  // Python's float() reads it; overflow is caught as non-finite.
   if (end == owned.c_str() || end != owned.c_str() + owned.size() ||
-      errno == ERANGE ||
       !std::isfinite(parsed)) {
     throw std::invalid_argument(std::string(name) +
                                 ": expected a finite number, got '" +
@@ -469,7 +470,7 @@ double parse_ieee_double(std::string_view value, std::string_view name) {
   errno = 0;
   const double parsed = std::strtod(owned.c_str(), &end);
   if (end == owned.c_str() || end != owned.c_str() + owned.size() ||
-      errno == ERANGE) {
+      (errno == ERANGE && std::isinf(parsed))) {
     throw std::invalid_argument(std::string(name) + ": expected a number, got '" +
                                 owned + "'");
   }
@@ -482,7 +483,7 @@ double parse_temporal_zeta(std::string_view value, std::string_view name) {
   errno = 0;
   const double parsed = std::strtod(owned.c_str(), &end);
   if (end == owned.c_str() || end != owned.c_str() + owned.size() ||
-      errno == ERANGE || std::isnan(parsed)) {
+      (errno == ERANGE && std::isinf(parsed)) || std::isnan(parsed)) {
     throw std::invalid_argument(std::string(name) +
                                 ": expected a number other than NaN, got '" +
                                 owned + "'");
@@ -6157,19 +6158,20 @@ NetworkAnalysisOptions parse_network_analysis_params(const FieldLookup& field,
       throw std::invalid_argument("network_analysis_variant: expected dataframe");
     options.variant = NetworkAnalysisVariant::kDataframe;
   }
-  if (supplied("network_analysis_sorting_attribute")) options.sorting_attribute = require("network_analysis_sorting_attribute");
-  if (supplied("network_analysis_timestamp_attribute")) options.timestamp_attribute = require("network_analysis_timestamp_attribute");
-  if (supplied("network_analysis_source_node_attribute")) options.source_node_attribute = require("network_analysis_source_node_attribute");
-  if (supplied("network_analysis_target_node_attribute")) options.target_node_attribute = require("network_analysis_target_node_attribute");
-  if (supplied("network_analysis_edge_attribute")) options.edge_attribute = require("network_analysis_edge_attribute");
+  // Column selectors: a present empty value is the column named "".
+  if (supplied("network_analysis_sorting_attribute")) options.sorting_attribute = field("network_analysis_sorting_attribute");
+  if (supplied("network_analysis_timestamp_attribute")) options.timestamp_attribute = field("network_analysis_timestamp_attribute");
+  if (supplied("network_analysis_source_node_attribute")) options.source_node_attribute = field("network_analysis_source_node_attribute");
+  if (supplied("network_analysis_target_node_attribute")) options.target_node_attribute = field("network_analysis_target_node_attribute");
+  if (supplied("network_analysis_edge_attribute")) options.edge_attribute = field("network_analysis_edge_attribute");
   if (supplied("network_analysis_edge_reference")) {
     const auto v = require("network_analysis_edge_reference");
     if (v == "_out") options.edge_reference = NetworkAnalysisEdgeReference::kOut;
     else if (v == "_in") options.edge_reference = NetworkAnalysisEdgeReference::kIn;
     else throw std::invalid_argument("network_analysis_edge_reference: expected _out or _in");
   }
-  if (supplied("network_analysis_out_relation_attribute")) options.out_relation_attribute = require("network_analysis_out_relation_attribute");
-  if (supplied("network_analysis_in_relation_attribute")) options.in_relation_attribute = require("network_analysis_in_relation_attribute");
+  if (supplied("network_analysis_out_relation_attribute")) options.out_relation_attribute = field("network_analysis_out_relation_attribute");
+  if (supplied("network_analysis_in_relation_attribute")) options.in_relation_attribute = field("network_analysis_in_relation_attribute");
   if (supplied("network_analysis_include_performance")) options.include_performance = parse_boolean(require("network_analysis_include_performance"), "network_analysis_include_performance");
   if (supplied("network_analysis_business_hours")) options.business_hours = parse_boolean(require("network_analysis_business_hours"), "network_analysis_business_hours");
   if (supplied("network_analysis_business_hour_slots")) options.business_hour_slots = parse_business_hour_slots(require("network_analysis_business_hour_slots"), "network_analysis_business_hour_slots");
@@ -6778,8 +6780,9 @@ AttributeDistributionOptions parse_attribute_distribution_params(
       throw std::invalid_argument(std::string(name) + ": expected a value");
     return value;
   };
+  // A present empty key is the field named "", not the omitted default.
   if (supplied("attribute_distribution_timestamp_key"))
-    options.timestamp_key = require("attribute_distribution_timestamp_key");
+    options.timestamp_key = field("attribute_distribution_timestamp_key");
   if (supplied("attribute_distribution_type")) {
     const auto value = require("attribute_distribution_type");
     if (value == "days_month" || value == "DAYS_MONTH")

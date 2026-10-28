@@ -9,6 +9,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/python_csv_stream.hpp"
 #include "minera/streaming_temporal.hpp"
+#include "../full_double.hpp"
 
 namespace {
 
@@ -28,13 +29,11 @@ std::vector<std::string> split(std::string_view value, char separator) {
   return result;
 }
 
+// One complete number token; subnormal values such as 5e-324 are numbers.
 double parse_number(std::string_view value, const char* name) {
-  std::size_t used = 0;
-  const std::string text(value);
-  const double parsed = std::stod(text, &used);
-  if (used != text.size())
-    throw std::invalid_argument(std::string(name) + " must be numeric");
-  return parsed;
+  const auto parsed = minera::detail::parse_full_double(value);
+  if (!parsed) throw std::invalid_argument(std::string(name) + " must be numeric");
+  return *parsed;
 }
 
 void parse_profile(minera::TemporalProfile& profile, std::string_view value) {

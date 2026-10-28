@@ -42,11 +42,10 @@ UtcParts utc_parts(double seconds) {
           value.tm_hour, (value.tm_wday + 6) % 7, value.tm_yday};
 }
 
-// The selected timestamp: the omitted default reads the timestamp
-// projection; an explicit key names a literal attribute or the projection
-// read from exactly that field (J1), never another field.
+// The selected timestamp: the key (default "time:timestamp") names a literal
+// attribute or the projection read from exactly that field (J1), never
+// another field. The empty string is a field name like any other.
 const std::string* timestamp_value(const Event& event, std::string_view key) {
-  if (key.empty()) return &event.timestamp;
   return reference_selected_field(event, key);
 }
 
@@ -199,10 +198,8 @@ AttributeDistributionResult discover_event_distribution(
     std::string label;
     if (options.distribution == EventDistributionType::kDaysWeek)
       label = kWeekdays[bucket];
-    else if (options.distribution == EventDistributionType::kYears)
-      label = std::to_string(bucket);
     else
-      label = padded(bucket);
+      label = padded(bucket);  // years too: year 7 is "07"
     result.labels.push_back(std::move(label));
     result.counts.push_back(count);
   }

@@ -360,8 +360,7 @@ std::optional<double> numeric_attribute_value(const Event& event,
   char* end = nullptr;
   errno = 0;
   const double value = std::strtod(text->c_str(), &end);
-  if (end != text->c_str() + text->size() || errno == ERANGE ||
-      !std::isfinite(value)) {
+  if (end != text->c_str() + text->size() || !std::isfinite(value)) {
     return std::nullopt;
   }
   return value;

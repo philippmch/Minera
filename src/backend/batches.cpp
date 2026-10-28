@@ -481,18 +481,22 @@ BatchType classify(const std::vector<BatchEvent>& events) {
   return sequential ? BatchType::kSequential : BatchType::kConcurrent;
 }
 
-std::string number_text(double value) {
-  char buffer[64];
-  const auto r = std::to_chars(buffer, buffer + sizeof(buffer), value == 0 ? 0.0 : value);
-  return std::string(buffer, r.ptr);
+// One tuple member's identity, length-prefixed so that no member's text can
+// run into the next. A NaN is a float object of its own row, equal to no
+// other row's NaN (the reference boxes each float64 cell separately).
+std::string tuple_member(const ScalarValue& value, std::size_t row) {
+  const auto id = value.kind == ScalarValue::Kind::kFloat && std::isnan(value.real)
+                      ? "Fnan#" + std::to_string(row)
+                      : python::identity(value);
+  return std::to_string(id.size()) + ":" + id;
 }
 
 // The identity of an event's (start, complete, case[, id]) tuple: equal
 // tuples are one set member.
-std::string event_identity(const IndexedEvent& value, bool include_event_id) {
-  std::string key = number_text(value.event.start) + "|" + number_text(value.event.complete) + "|" +
-                    python::identity(value.case_value);
-  if (include_event_id) key += "|" + (value.event_id ? python::identity(*value.event_id) : std::string("N"));
+std::string event_identity(const IndexedEvent& value, std::size_t row, bool include_event_id) {
+  std::string key = tuple_member(python::real(value.event.start), row) +
+                    tuple_member(python::real(value.event.complete), row) + tuple_member(value.case_value, row);
+  if (include_event_id) key += tuple_member(value.event_id.value_or(python::none()), row);
   return key;
 }
 
@@ -514,10 +518,9 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
                               bool include_event_id) {
   validate_options(options);
 
-  // Group by (activity, resource) as pandas does: labels are the first equal
-  // value in each column, groups are ordered by key, and int labels in a
-  // level with floats become floats (a collision keeps the last group's
-  // rows under the first label).
+  // Group by (activity, resource) as pandas does (python::groupby): labels
+  // are the first equal value in each column, groups are ordered by key, and
+  // int labels in a level with floats can become floats.
   std::vector<std::vector<ScalarValue>> keys;
   keys.reserve(values.size());
   bool nulls = false;
@@ -525,11 +528,17 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
     keys.push_back({value.activity_value, value.resource_is_null ? python::none() : value.resource_value});
     nulls = nulls || value.resource_is_null;
   }
-  const auto groups = python::groupby(keys, nulls);
+  std::vector<python::Group> groups;
+  try {
+    groups = python::groupby(keys, nulls);
+  } catch (const python::TypeError& error) {
+    throw std::invalid_argument(std::string("batches: ") + error.what());
+  }
 
   std::vector<std::string> identities;
   identities.reserve(values.size());
-  for (const auto& value : values) identities.push_back(event_identity(value, include_event_id));
+  for (std::size_t row = 0; row < values.size(); ++row)
+    identities.push_back(event_identity(values[row], row, include_event_id));
 
   struct KeyedGroup {
     BatchGroup group;
@@ -747,7 +756,15 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
     constexpr double kNaT =
         static_cast<double>(std::numeric_limits<std::int64_t>::min()) / 1e9;
     if (pandas && (missing(activity_cell) || missing(resource_cell))) continue;
-    const bool pandas_case_nan = pandas && missing(case_cell);
+    // A pd.NA case id stays pd.NA (str "<NA>"; comparing it raises).
+    const bool case_na = case_cell && std::holds_alternative<NativeNA>(case_cell->typed_value);
+    const bool pandas_case_nan = pandas && !case_na && missing(case_cell);
+    // In an object column a missing case is None, not NaN: it orders against
+    // nothing but None, so comparing it with another case id raises. Its
+    // label stays the declared "nan".
+    const bool case_none = pandas_case_nan && !case_cell && case_selector.column &&
+                           (*case_selector.column >= table.dtypes.size() ||
+                            table.dtypes[*case_selector.column] == "object");
     // Polars groups a null resource as its own key.
     const bool null_resource = polars && !resource_cell;
     if (!activity_cell || (!resource_cell && !null_resource) ||
@@ -806,8 +823,9 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
     }
     BatchEvent batch_event{start_time, completion, case_id, 0, row_index,
                            event_id ? python::str(*event_id) : std::string{}};
-    auto case_value = pandas_case_nan ? python::real(std::numeric_limits<double>::quiet_NaN())
-                                      : scalar_value(*case_cell);
+    auto case_value = case_none         ? python::none()
+                      : pandas_case_nan ? python::real(std::numeric_limits<double>::quiet_NaN())
+                                        : scalar_value(*case_cell);
     auto activity_value = scalar_value(*activity_cell);
     auto resource_value = null_resource ? python::none() : scalar_value(*resource_cell);
     values.push_back(IndexedEvent{std::move(batch_event), activity, resource, std::move(event_id), pandas_case_nan,

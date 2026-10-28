@@ -16,6 +16,7 @@
 #include "minera/log_conversion.hpp"
 #include "minera/dataframe_validation.hpp"
 #include "minera/timestamp.hpp"
+#include "full_double.hpp"
 
 namespace minera {
 namespace {
@@ -43,7 +44,7 @@ ReplayNumber replay_number(const EventAttribute& field) {
       return unsigned_value;
     throw std::invalid_argument("token replay: invalid integer case-id value");
   }
-  return std::stod(field.value);
+  return ::minera::detail::stod(field.value);
 }
 
 struct ReplayDateDtype {

@@ -24,6 +24,7 @@
 #include "minera/knowledge_exact_json.hpp"
 #include "minera/literal_controls_json.hpp"
 #include "llm_runtime.hpp"
+#include "../full_double.hpp"
 
 namespace {
 
@@ -119,7 +120,7 @@ int run(int argc, char** argv) {
       else if (option == "--extra-payload-file") completion.extra_payload = minera::llm_runtime::bounded_file(std::filesystem::u8path(value));
       else if (option == "--temperature") {
         std::size_t used = 0;
-        const auto parsed = std::stod(value, &used);
+        const auto parsed = ::minera::detail::stod(value, &used);
         if (used != value.size() || !std::isfinite(parsed) || parsed < 0 || parsed > 2)
           throw std::invalid_argument("temperature must be from 0 through 2, with an Anthropic maximum of 1");
         completion.temperature = parsed;

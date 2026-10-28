@@ -290,6 +290,131 @@ bool is_text(const Cell& cell) { return cell && !null_cell(cell) && cell->kind =
 // Python str() of a non-null case id.
 std::string py_str(const EventAttribute& cell) { return cell.value; }
 
+// The Python object a cell holds: None for an absent or null cell, else the
+// typed value (python_scalar.hpp).
+python::Scalar scalar_of(const Cell& cell) {
+  if (!cell) return python::none();
+  return python::from_attribute(*cell);
+}
+// A scalar filter argument as a Python object; containers have none.
+std::optional<python::Scalar> scalar_of(const Value& v) {
+  switch (v.kind) {
+    case Kind::kNone: return python::none();
+    case Kind::kBool: return python::boolean(v.boolean);
+    case Kind::kInt: return python::integer(v.integer);
+    case Kind::kFloat: return python::real(v.real);
+    case Kind::kString: return python::text(v.text);
+    default: return std::nullopt;
+  }
+}
+// A Python object back as a filter value (a key of a returned dict).
+Value value_of(const python::Scalar& s) {
+  using K = python::Scalar::Kind;
+  switch (s.kind) {
+    case K::kNone: return Value::none();
+    case K::kBool: return Value::of(s.boolean);
+    case K::kFloat: return Value::of(s.real);
+    case K::kInt: {
+      std::int64_t v = 0;
+      const auto text = python::str(s);
+      const auto r = std::from_chars(text.data(), text.data() + text.size(), v);
+      if (r.ec == std::errc{} && r.ptr == text.data() + text.size()) return Value::of(v);
+      return Value::of(text);
+    }
+    default: return Value::of(python::str(s));
+  }
+}
+bool is_nan(const python::Scalar& s) { return s.kind == python::Scalar::Kind::kFloat && std::isnan(s.real); }
+// Python's bool(a == b) as `in` and dict lookups use it for two distinct
+// objects: numbers by value (1, 1.0 and True), text exactly, None only to
+// None, a NaN to nothing; pd.NA's answer has no truth value.
+bool py_equal(const python::Scalar& a, const python::Scalar& b) {
+  using K = python::Scalar::Kind;
+  if (a.kind == K::kNA || b.kind == K::kNA) {
+    if (a.kind == K::kNone || b.kind == K::kNone) return false;
+    fail("TypeError", "boolean value of NA is ambiguous");
+  }
+  if (is_nan(a) || is_nan(b)) return false;
+  return python::equal(a, b);
+}
+// pandas' column == scalar on an object column: a missing cell (None, NaN,
+// pd.NA) and a None or NaN scalar compare False, anything else like Python.
+bool column_equals(const Cell& cell, const Value& v) {
+  if (null_cell(cell)) return false;
+  const auto scalar = scalar_of(v);
+  if (!scalar || scalar->kind == python::Scalar::Kind::kNone || is_nan(*scalar)) return false;
+  return py_equal(scalar_of(cell), *scalar);
+}
+
+// Python's a + b for the values a dataframe holds: str + str concatenates,
+// numbers add (bool as int; exact for integers that fit 64 bits), anything
+// else raises the TypeError Python (or pandas' Timestamp) raises.
+python::Scalar python_add(const python::Scalar& a, const python::Scalar& b) {
+  using K = python::Scalar::Kind;
+  if (a.kind == K::kText && b.kind == K::kText) return python::text(a.text + b.text);
+  if (a.kind == K::kText)
+    fail("TypeError", "can only concatenate str (not \"" + python::type_name(b) + "\") to str");
+  if (python::is_number(a) && python::is_number(b)) {
+    const auto as_double = [](const python::Scalar& s) {
+      if (s.kind == K::kBool) return s.boolean ? 1.0 : 0.0;
+      if (s.kind == K::kFloat) return s.real;
+      return std::strtod(python::str(s).c_str(), nullptr);
+    };
+    if (a.kind != K::kFloat && b.kind != K::kFloat) {
+      const auto as_int = [](const python::Scalar& s) -> std::optional<__int128> {
+        if (s.kind == K::kBool) return s.boolean ? 1 : 0;
+        if (s.digits.size() > 30) return std::nullopt;
+        __int128 v = 0;
+        for (const char d : s.digits) v = v * 10 + (d - '0');
+        return s.negative ? -v : v;
+      };
+      const auto x = as_int(a), y = as_int(b);
+      if (x && y) {
+        __int128 sum = *x + *y;
+        const bool negative = sum < 0;
+        unsigned __int128 magnitude = negative ? -static_cast<unsigned __int128>(sum) : static_cast<unsigned __int128>(sum);
+        std::string digits;
+        do {
+          digits.insert(digits.begin(), static_cast<char>('0' + static_cast<int>(magnitude % 10)));
+          magnitude /= 10;
+        } while (magnitude);
+        return *python::integer_literal((negative ? "-" : "") + digits);
+      }
+    }
+    return python::real(as_double(a) + as_double(b));
+  }
+  // Timestamp + int raises pandas' own message; bool is not an int to it.
+  if (a.kind == K::kDate && b.kind == K::kInt)
+    fail("TypeError", "Addition/subtraction of integers and integer-arrays with Timestamp is no longer supported.  "
+                      "Instead of adding/subtracting `n`, use `n * obj.freq`");
+  if (b.kind == K::kDate && a.kind == K::kInt)
+    fail("TypeError", "Addition/subtraction of integers and integer-arrays with Timestamp is no longer supported.  "
+                      "Instead of adding/subtracting `n`, use `n * obj.freq`");
+  fail("TypeError", "unsupported operand type(s) for +: '" + python::type_name(a) + "' and '" + python::type_name(b) + "'");
+}
+
+// groupby(case) with sort=True factorizes the case column first: its
+// distinct non-null values must order (python::safe_sort_order), or the
+// reference raises before grouping, whatever the groups are used for.
+// `rows`, when given, limits the check to the rows the reference groups.
+void require_sorted_groupby(const EventTable& df, std::size_t case_column,
+                            const std::vector<bool>* rows = nullptr) {
+  std::vector<python::Scalar> uniques;
+  std::set<std::string> seen;
+  for (std::size_t i = 0; i < df.rows.size(); ++i) {
+    const auto& row = df.rows[i];
+    if ((rows && !(*rows)[i]) || null_cell(row[case_column])) continue;
+    auto value = scalar_of(row[case_column]);
+    if (python::is_missing(value)) continue;
+    if (seen.insert(python::identity(value)).second) uniques.push_back(std::move(value));
+  }
+  try {
+    (void)python::safe_sort_order(uniques);
+  } catch (const python::TypeError& error) {
+    fail("TypeError", error.what());
+  }
+}
+
 std::optional<std::size_t> find_column(const EventTable& df, const std::string& name) {
   for (std::size_t i = 0; i < df.columns.size(); ++i)
     if (df.columns[i] == name) return i;
@@ -398,8 +523,13 @@ Cases cases_of(const EventTable& df, std::size_t case_column) {
   return out;
 }
 
-// An activity value as the boundary filters see it: absent for null.
-using Activity = std::optional<std::string>;
+// An activity value as the boundary filters see it, typed (1, 1.0 and True
+// are one activity, '1' another): absent for null.
+using Activity = std::optional<python::Scalar>;
+bool same_activity(const Activity& a, const Activity& b) {
+  if (!a || !b) return !a && !b;
+  return python::identity(*a) == python::identity(*b);
+}
 
 // The first (or last) non-null activity of each case.
 std::map<Key, Activity> boundary_activities(const EventTable& df, const Cases& cases, std::size_t act, bool end) {
@@ -410,7 +540,7 @@ std::map<Key, Activity> boundary_activities(const EventTable& df, const Cases& c
     for (std::size_t j = 0; j < rows.size(); ++j) {
       const auto& cell = df.rows[end ? rows[rows.size() - 1 - j] : rows[j]][act];
       if (!null_cell(cell)) {
-        found = cell->value;
+        found = scalar_of(cell);
         break;
       }
     }
@@ -421,9 +551,12 @@ std::map<Key, Activity> boundary_activities(const EventTable& df, const Cases& c
 
 bool value_is_null(const Value& v) { return v.kind == Kind::kNone || (v.kind == Kind::kFloat && std::isnan(v.real)); }
 
+// isin: a boundary activity equals a listed value like Python's ==; a case
+// without any activity has the boundary None, which only None matches.
 bool matches_value(const Activity& a, const Value& v) {
-  if (!a) return value_is_null(v);
-  return v.kind == Kind::kString && v.text == *a;
+  if (!a) return v.kind == Kind::kNone;
+  const auto scalar = scalar_of(v);
+  return scalar && !value_is_null(v) && py_equal(*a, *scalar);
 }
 
 EventTable boundary_filter(const EventTable& df, const Value& values, const std::string& case_glue,
@@ -450,7 +583,7 @@ Counts count_boundaries(const std::vector<Key>& order, const std::map<Key, Activ
     const auto& a = boundary.at(key);
     bool found = false;
     for (auto& [k, v] : out)
-      if (k == a) {
+      if (same_activity(k, a)) {
         ++v.integer;
         found = true;
         break;
@@ -462,7 +595,7 @@ Counts count_boundaries(const std::vector<Key>& order, const std::map<Key, Activ
 Counts counts_argument(const Value& dict) {
   Counts out;
   for (const auto& [k, v] : dict.entries)
-    out.emplace_back(value_is_null(k) ? Activity{} : Activity{k.text}, v);
+    out.emplace_back(value_is_null(k) ? Activity{} : scalar_of(k), v);
   return out;
 }
 
@@ -488,15 +621,15 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
                                                                      : count->real >= threshold->real));
     // The last activity of the most common variant is always kept.
     const bool protected_end = most_common_variant && !most_common_variant->items.empty() && entry.first &&
-                               most_common_variant->items.back().kind == Kind::kString &&
-                               *entry.first == most_common_variant->items.back().text;
+                               scalar_of(most_common_variant->items.back()) &&
+                               same_activity(entry.first, scalar_of(most_common_variant->items.back()));
     if (ok || protected_end) kept.push_back(entry);
   }
   if (kept.size() == counts.size()) return {df, kept};
   std::set<Key> keep;
   for (const auto& [key, a] : boundary)
     for (const auto& entry : kept)
-      if (entry.first == a) {
+      if (same_activity(entry.first, a)) {
         keep.insert(key);
         break;
       }
@@ -505,7 +638,7 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
 
 Value counts_value(const Counts& counts) {
   std::vector<std::pair<Value, Value>> entries;
-  for (const auto& [k, v] : counts) entries.emplace_back(k ? Value::of(*k) : Value::of(std::nan("")), v);
+  for (const auto& [k, v] : counts) entries.emplace_back(k ? value_of(*k) : Value::of(std::nan("")), v);
   return Value::dict(std::move(entries));
 }
 
@@ -674,6 +807,7 @@ EventTable position_filter(const EventTable& df, const Value& activity, const Pa
   const bool strict = truthy(parameter_or(parameters, "STRICT", "strict", Value::of(true)));
   const auto case_column = require_column(df, case_name);
   const auto act = require_column(df, act_name);
+  require_sorted_groupby(df, case_column);
   const auto index = positions(df, case_column);
   const bool first = first_or_last.kind == Kind::kString && first_or_last.text == "first";
   const bool last = first_or_last.kind == Kind::kString && first_or_last.text == "last";
@@ -682,7 +816,7 @@ EventTable position_filter(const EventTable& df, const Value& activity, const Pa
   for (std::size_t i = 0; i < df.size(); ++i) {
     const auto& c = df.rows[i][case_column];
     const auto& a = df.rows[i][act];
-    if (!index[i] || null_cell(a) || activity.kind != Kind::kString || a->value != activity.text) continue;
+    if (!index[i] || !column_equals(a, activity)) continue;
     const auto key = key_of(*c);
     if (first) occurrence.emplace(key, *index[i]);
     else occurrence[key] = *index[i];
@@ -749,6 +883,13 @@ EventTable merge_groups(const EventTable& df, const std::vector<std::vector<std:
           chosen = cell;
           break;
         }
+      }
+      // first()/last() of an object column with no present value is None,
+      // whichever missing values (None, NaN, pd.NA) the group held.
+      if (null_cell(chosen) && c < df.dtypes.size() && df.dtypes[c] == "object") {
+        EventAttribute none{df.columns[c], "", AttributeKind::kString};
+        none.is_null = true;
+        chosen = std::move(none);
       }
       row.push_back(chosen);
     }
@@ -835,12 +976,15 @@ EventTable pandas_rework_filter_apply(const EventTable& df, const PandasFilterVa
   const Number threshold = bound->integral ? Number{true, bound->integer - 1, 0.0} : Number{false, 0, bound->real - 1};
   const auto case_column = *find_column(df, case_name);
   const auto act = *find_column(df, act_name);
+  // The occurrences are counted by a sorted groupby over the matching rows.
+  std::vector<bool> matching(df.size());
+  for (std::size_t i = 0; i < df.size(); ++i) matching[i] = column_equals(df.rows[i][act], activity);
+  require_sorted_groupby(df, case_column, &matching);
   std::map<Key, std::int64_t> seen;
   std::set<Key> kept;
   for (std::size_t i = 0; i < df.size(); ++i) {
     const auto& c = df.rows[i][case_column];
-    const auto& a = df.rows[i][act];
-    if (null_cell(c) || null_cell(a) || activity.kind != Kind::kString || a->value != activity.text) continue;
+    if (null_cell(c) || !matching[i]) continue;
     const auto key = key_of(*c);
     const auto occurrence = seen[key]++;
     if (int_at_least(occurrence, threshold)) kept.insert(key);
@@ -861,13 +1005,16 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
   const auto case_column = require_column(df, case_key(parameters));
   const auto act = require_column(df, activity_key(parameters));
   const auto filter_type = parameter_or(parameters, "FILTER_TYPE", "filter_type", Value::of("first"));
-  // The run key concatenates case id and activity; an int case id and a str
-  // activity do not add.
-  bool text_activity = false;
-  for (const auto& row : df.rows) text_activity = text_activity || is_text(row[act]);
-  for (const auto& row : df.rows)
-    if (!null_cell(row[case_column]) && !is_text(row[case_column]) && text_activity)
-      fail("TypeError", "unsupported operand type(s) for +: 'int' and 'str'");
+  // The run key is case id + activity, row by row over the rows where both
+  // are present: two str concatenate, two numbers add, and the first pair
+  // that does not add raises Python's TypeError.
+  std::vector<std::optional<python::Scalar>> run_keys(df.size());
+  for (std::size_t i = 0; i < df.size(); ++i) {
+    const auto& c = df.rows[i][case_column];
+    const auto& a = df.rows[i][act];
+    if (null_cell(c) || null_cell(a)) continue;
+    run_keys[i] = python_add(scalar_of(c), scalar_of(a));
+  }
   const bool first = filter_type.kind == Kind::kString && filter_type.text == "first";
   const bool last = filter_type.kind == Kind::kString && filter_type.text == "last";
   if (!first && !last) {
@@ -876,30 +1023,13 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
     return out;
   }
   std::vector<std::vector<std::size_t>> runs;
-  std::optional<std::string> previous;
   for (std::size_t i = 0; i < df.size(); ++i) {
-    const auto& c = df.rows[i][case_column];
-    const auto& a = df.rows[i][act];
-    std::optional<std::string> key;
-    if (!null_cell(c) && !null_cell(a)) key = py_str(*c) + a->value;
-    if (key && previous && *key == *previous) runs.back().push_back(i);
+    const auto& key = run_keys[i];
+    const auto& previous = i ? run_keys[i - 1] : std::nullopt;
+    if (key && previous && py_equal(*key, *previous)) runs.back().push_back(i);
     else runs.push_back({i});
-    previous = key;
   }
-  auto out = merge_groups(df, runs, first, identity_order(df.columns.size()));
-  // In an object column a missing case id (None, NaN or pd.NA) comes back as
-  // None, as the reference groups it; typed columns keep their own missing.
-  bool missing_case = false;
-  const bool object_case = case_column < df.dtypes.size() && df.dtypes[case_column] == "object";
-  if (object_case) for (auto& row : out.rows)
-    if (null_cell(row[case_column])) {
-      EventAttribute none{df.columns[case_column], "", AttributeKind::kString};
-      none.is_null = true;
-      row[case_column] = std::move(none);
-      missing_case = true;
-    }
-  if (missing_case && !out.dtypes.empty()) out.dtypes[case_column] = "object";
-  return out;
+  return merge_groups(df, runs, first, identity_order(df.columns.size()));
 }
 
 EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const PandasFilterParameters& parameters) {
@@ -984,7 +1114,7 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
     bool booleans = false, integers = false, reals = false, strings = false, other = false;
     bool negative = false, above_int64 = false, beyond_uint64 = false;
     // Datetime keys: all aware or all naive, microsecond unless one needs
-    // nanoseconds, and a UTC frame when the offsets differ.
+    // nanoseconds, in their one offset (Timestamp objects when they differ).
     bool dates = false, naive = false, aware = false, nanoseconds = false, mixed_offsets = false;
     std::optional<std::int32_t> offset;
     for (const auto& cell : unique_cases) {
@@ -1014,10 +1144,11 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
     std::string dtype = "object";
     if (other) dtype = "object";
     else if (dates) {
-      if (!(booleans || numbers || strings) && naive != aware) {
+      // Different offsets leave the keys as Timestamp objects.
+      if (!(booleans || numbers || strings) && naive != aware && !mixed_offsets) {
         dtype = std::string("datetime64[") + (nanoseconds ? "ns" : "us");
         if (aware) {
-          const auto minutes = mixed_offsets ? 0 : *offset;
+          const auto minutes = *offset;
           if (minutes == 0) dtype += ", UTC";
           else {
             char zone[16];
@@ -1048,33 +1179,6 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   return out;
 }
 
-namespace {
-
-// The reference sorts the case column as an object array (numpy's stable
-// argsort, see numpy_object_sort.hpp). A str id
-// compared with a null (NaN) one raises the TypeError of Python's "<", named
-// by the operand order of the first such comparison.
-void require_sortable_case_ids(const EventTable& df, std::size_t column) {
-  bool any_null = false;
-  bool any_text = false;
-  for (const auto& row : df.rows) (null_cell(row[column]) ? any_null : any_text) = true;
-  if (!any_null || !any_text) return;
-  auto cmp = [&](std::size_t a, std::size_t b) {
-    const auto& x = df.rows[a][column];
-    const auto& y = df.rows[b][column];
-    if (null_cell(x) != null_cell(y)) {
-      throw PandasSequenceFilterError(
-          "TypeError", std::string("'<' not supported between instances of '") +
-                           (null_cell(x) ? "float" : "str") + "' and '" + (null_cell(x) ? "str" : "float") + "'");
-    }
-    if (null_cell(x)) return 0;
-    return x->value < y->value ? -1 : y->value < x->value ? 1 : 0;
-  };
-  detail::numpy_object_stable_argsort(df.size(), cmp);
-}
-
-}  // namespace
-
 EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterValue& activity,
                                        const PandasFilterParameters& parameters) {
   const auto case_column = require_column(df, case_key(parameters));
@@ -1082,25 +1186,69 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
   const auto mode = parameter_or(parameters, "CUT_MODE", "cut_mode", Value::of("this"));
   const auto separator = text_parameter(parameters, "SUBCASE_CONCAT_STR", "subcase_concat_str", "##@@");
   const bool this_row = mode.kind == Kind::kString && mode.text == "this";
-  require_sortable_case_ids(df, case_column);
-  std::set<std::string> cuts;
-  if (activity.kind == Kind::kString) cuts.insert(activity.text);
-  for (const auto& item : activity.items) cuts.insert(item.text);
   EventTable out = df;
   if (!out.dtypes.empty()) out.dtypes[case_column] = df.empty() ? "float64" : "str";
-  std::map<Key, std::int64_t> count;
+  // The reference takes np.unique(cases, return_index, return_counts): a
+  // stable sort of the case column (which raises on unorderable ids), runs
+  // of equal neighbours (a NaN equals nothing), each run's first position
+  // and size. For every run in sorted order it then walks `size` rows from
+  // that first position, as if each case's rows were contiguous, counts the
+  // walked activities that are `in` the argument, and writes the labels in
+  // that order over the case column. Rows of interleaved cases are thereby
+  // labelled from other rows, exactly as the reference does.
+  std::vector<python::Scalar> cases;
+  cases.reserve(df.size());
+  for (const auto& row : df.rows) cases.push_back(scalar_of(row[case_column]));
+  std::vector<std::size_t> order;
+  try {
+    order = detail::numpy_object_stable_argsort(cases.size(), [&](std::size_t a, std::size_t b) {
+      return python::compare(cases[a], cases[b]);
+    });
+  } catch (const python::TypeError& error) {
+    fail("TypeError", error.what());
+  }
+  // A str argument is one activity; a list, tuple or dict holds them; any
+  // other value is not a container.
+  std::vector<python::Scalar> cuts;
+  bool container = true;
+  if (activity.kind == Kind::kString) cuts.push_back(python::text(activity.text));
+  else if (activity.kind == Kind::kList || activity.kind == Kind::kTuple)
+    for (const auto& item : activity.items) {
+      if (const auto s = scalar_of(item)) cuts.push_back(*s);
+    }
+  else if (activity.kind == Kind::kDict)
+    for (const auto& [key, value] : activity.entries) {
+      if (const auto s = scalar_of(key)) cuts.push_back(*s);
+    }
+  else container = false;
+  const auto is_cut = [&](const Cell& cell) {
+    if (!container)
+      fail("TypeError", "argument of type '" + type_name(activity) + "' is not a container or iterable");
+    const auto value = scalar_of(cell);
+    for (const auto& cut : cuts) {
+      // `in` matches an element that is the same object or ==: None is
+      // None, a NaN cell is never the argument's NaN.
+      if (value.kind == python::Scalar::Kind::kNone && cut.kind == python::Scalar::Kind::kNone) return true;
+      if (py_equal(value, cut)) return true;
+    }
+    return false;
+  };
   const auto& name = df.columns[case_column];
-  for (std::size_t i = 0; i < df.size(); ++i) {
-    const auto& c = df.rows[i][case_column];
-    const auto& a = df.rows[i][act];
-    const int hit = !null_cell(a) && cuts.count(a->value) ? 1 : 0;
-    // A null case id (str "nan") is a group of its own row.
-    std::int64_t single = 0;
-    auto& n = null_cell(c) ? single : count[key_of(*c)];
-    const auto before = n;
-    n += hit;
-    const auto id = null_cell(c) ? std::string("nan") : py_str(*c);
-    out.rows[i][case_column] = string_cell(name, id + separator + std::to_string(this_row ? n : before));
+  std::size_t written = 0;
+  for (std::size_t start = 0; start < order.size();) {
+    std::size_t end = start + 1;
+    while (end < order.size() && !(is_nan(cases[order[end]]) || is_nan(cases[order[end - 1]])) &&
+           py_equal(cases[order[end]], cases[order[end - 1]]))
+      ++end;
+    const auto first = order[start];
+    const auto label = python::str(cases[first]) + separator;
+    std::int64_t count = 0;
+    for (std::size_t j = first; j < first + (end - start); ++j) {
+      const auto before = count;
+      if (is_cut(df.rows[j][act])) ++count;
+      out.rows[written++][case_column] = string_cell(name, label + std::to_string(this_row ? count : before));
+    }
+    start = end;
   }
   return out;
 }

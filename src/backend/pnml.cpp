@@ -20,6 +20,7 @@
 #include "xml_pull_parser.hpp"
 #include "pnml_arc_weight.hpp"
 #include "root_cause_unicode.hpp"
+#include "full_double.hpp"
 
 namespace minera {
 namespace {
@@ -831,7 +832,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       else if (stochastic_property_key == "priority")
         transition.priority = std::stoi(value);
       else if (stochastic_property_key == "weight")
-        transition.weight = std::stod(value);
+        transition.weight = ::minera::detail::stod(value);
       else if (stochastic_property_key == "invisible" && value == "true")
         transition.invisible = true;
     } else if (stack_ends_with(stack, {"marking", "place", "text"}) &&

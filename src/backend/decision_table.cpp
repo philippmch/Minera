@@ -32,8 +32,7 @@ std::optional<double> parse_number(std::string_view text) {
   char* end = nullptr;
   errno = 0;
   const double value = std::strtod(copy.c_str(), &end);
-  if (end != copy.c_str() + copy.size() || errno == ERANGE ||
-      !std::isfinite(value)) {
+  if (end != copy.c_str() + copy.size() || !std::isfinite(value)) {
     return std::nullopt;
   }
   return value;

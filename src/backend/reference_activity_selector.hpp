@@ -34,7 +34,10 @@ inline bool projection_names(const std::string& source_key,
   const std::string_view source =
       !source_key.empty() ? std::string_view(source_key)
                           : selected_cell ? std::string_view(selected_cell->key) : std::string_view();
-  if (source.empty()) return selector == canonical || selector == native_field_name(canonical);
+  if (source.empty()) {
+    const auto native = native_field_name(canonical);
+    return selector == canonical || (!native.empty() && selector == native);
+  }
   if (source == selector) return true;
   return !selected_cell && selector == canonical;
 }
