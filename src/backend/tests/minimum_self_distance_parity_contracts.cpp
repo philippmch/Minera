@@ -365,6 +365,32 @@ void minimum_self_distance_selector_contract() {
 
 }  // namespace
 
+void minimum_self_distance_polars_null_contract() {
+  // Polars keeps a null activity as its own label and groups null case ids
+  // into one sequence whose repeats wrap the unsigned 32-bit distance.
+  auto table = make_table();
+  table.rows = {{std::nullopt, cell("activity_key", "A")},
+                {cell("case_key", "c1"), cell("activity_key", "B")},
+                {std::nullopt, cell("activity_key", "A")},
+                {cell("case_key", "c1"), std::nullopt},
+                {cell("case_key", "c1"), cell("activity_key", "B")},
+                {cell("case_key", "c1"), std::nullopt}};
+  const auto distances = MinimumSelfDistancePolarsDiscovery::apply(
+      LazyEventTable::from_table(table), custom_options());
+  assert(distances.size() == 3);
+  assert(distances[0].activity_is_null && distances[0].distance == 1);
+  assert(distances[1].activity == "A" && distances[1].distance == 4294967295u);
+  assert(distances[2].activity == "B" && distances[2].distance == 1);
+
+  bool pandas_rejected = false;
+  try {
+    (void)MinimumSelfDistancePandasDiscovery::apply(table, custom_options());
+  } catch (const std::invalid_argument&) {
+    pandas_rejected = true;
+  }
+  assert(pandas_rejected);
+}
+
 int main() {
   minimum_self_distance_log_boundary_contract();
   minimum_self_distance_flat_adapter_contract();
@@ -375,5 +401,6 @@ int main() {
   minimum_self_distance_witness_utility_contract();
   minimum_self_distance_nullable_and_supplied_witness_contract();
   minimum_self_distance_selector_contract();
+  minimum_self_distance_polars_null_contract();
   return 0;
 }

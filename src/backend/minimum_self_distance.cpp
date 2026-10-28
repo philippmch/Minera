@@ -514,22 +514,38 @@ std::vector<ActivitySequence> polars_table_sequences(
   table.validate();
   const auto activity_key = effective_activity_key(options);
   const auto case_id_key = effective_case_id_key(options);
-  const auto has_column = [&](const std::string& key) {
-    return std::find(table.columns.begin(), table.columns.end(), key) !=
-           table.columns.end();
+  const auto column_of = [&](const std::string& key) {
+    return static_cast<std::size_t>(std::distance(
+        table.columns.begin(),
+        std::find(table.columns.begin(), table.columns.end(), key)));
   };
-  if (!has_column(activity_key) || !has_column(case_id_key))
+  const auto activity_column = column_of(activity_key);
+  const auto case_column = column_of(case_id_key);
+  if (activity_column == table.columns.size() ||
+      case_column == table.columns.size())
     return table_sequences(table, options);
+  // Only a null cell is a null value; a cell of another first-class role
+  // still fails as it does for the other adapters.
+  const auto null_cell = [](const EventTable::Row& row, std::size_t column) {
+    return !row[column] || is_null_cell(&*row[column]);
+  };
   std::vector<ActivitySequence> sequences;
   std::map<std::optional<std::string>, std::size_t> groups;
   for (const auto& row : table.rows) {
-    const auto* activity = find_activity_table_field(table, row, activity_key);
-    const auto* case_id = find_table_field(
-        table, row, case_id_key, FirstClassAttributeRole::kCaseId,
-        {"case_id", "case:id", "case:concept:name"});
-    const auto key = is_null_cell(case_id)
-                         ? std::optional<std::string>{}
-                         : std::optional<std::string>{case_id->value};
+    std::optional<std::string> key;
+    if (!null_cell(row, case_column))
+      key = required_flat_field(
+                find_table_field(table, row, case_id_key,
+                                 FirstClassAttributeRole::kCaseId,
+                                 {"case_id", "case:id", "case:concept:name"}),
+                "case-id", case_id_key)
+                .value;
+    MinimumSelfDistanceActivity activity;
+    if (!null_cell(row, activity_column))
+      activity = required_flat_field(
+                     find_activity_table_field(table, row, activity_key),
+                     "activity", activity_key)
+                     .value;
     const auto [found, inserted] = groups.emplace(key, sequences.size());
     if (inserted) {
       ActivitySequence sequence;
@@ -537,9 +553,7 @@ std::vector<ActivitySequence> polars_table_sequences(
       sequence.null_case = !key;
       sequences.push_back(std::move(sequence));
     }
-    sequences[found->second].activities.push_back(
-        is_null_cell(activity) ? MinimumSelfDistanceActivity{}
-                               : MinimumSelfDistanceActivity{activity->value});
+    sequences[found->second].activities.push_back(std::move(activity));
   }
   return sequences;
 }
