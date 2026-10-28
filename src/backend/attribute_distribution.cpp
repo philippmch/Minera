@@ -145,7 +145,12 @@ AttributeDistributionResult discover_event_distribution(
     for (int i = 0; i < 7; ++i) bins.try_emplace(i, 0);
   } else if (options.distribution == EventDistributionType::kWeeks) {
     for (int i = 0; i <= 52; ++i) bins.try_emplace(i, 0);
-  } else if (options.distribution == EventDistributionType::kYears && have_year) {
+  } else if (options.distribution == EventDistributionType::kYears) {
+    // The reference spans min..max of the observed years and so raises on a
+    // log without timed events.
+    if (!have_year)
+      throw std::invalid_argument(
+          "attribute distribution: min() iterable argument is empty");
     for (int i = minimum_year; i <= maximum_year; ++i) bins.try_emplace(i, 0);
   }
 

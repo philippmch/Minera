@@ -64,5 +64,21 @@ int main() {
     rejected = true;
   }
   assert(rejected);
+
+  // Reference: YEARS spans min..max of the observed years, so a log without
+  // timed events raises; the fixed-range buckets stay all zero.
+  const minera::EventLog untimed{.traces = {minera::Trace{}}};
+  rejected = false;
+  try {
+    options.timestamp_key = "time:timestamp";
+    options.distribution = minera::EventDistributionType::kYears;
+    (void)minera::discover_event_distribution(untimed, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+  options.distribution = minera::EventDistributionType::kHours;
+  const auto empty_hours = minera::discover_event_distribution(untimed, options);
+  assert(empty_hours.labels.size() == 24 && empty_hours.timed_events == 0);
   std::cout << "Attribute-distribution tests passed\n";
 }
