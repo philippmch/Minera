@@ -4159,3 +4159,42 @@ model batch merging as remove-pair, append, sort and restart, treat a "str"
 column's missing cells as one `np.nan` object, and capture any result that
 may depend on set order over many hash seeds (40 here) before calling a
 difference a bug: two seeds missed several.
+
+## Recheck of 7270a1f (2026-10-28, cloud container)
+
+O1-O4 from the reviewer's recheck are fixed. The reviewer's handoff was on a
+machine that was offline during this round, so each target was found from its
+title by fuzzing public PM4Py 2.7.22 calls. The O1 fix covers numeric dtype run
+keys in consecutive activity/case grouping, following numpy and pandas
+promotion (wrapping narrow integers, float16/float32 rounding, masked
+Int/UInt/Float/boolean columns with pd.NA and their stored values under the
+mask). The O2 fix covers a NaN, None, pd.NA or NaT next to an int too large
+for a float, which raises OverflowError unless a TypeError comes first. The O3
+fix reads PNML transition toolspecifics as PM4Py does (any tag ending in
+"toolspecific", tool substrings "ProM" and "StochasticPetriNet", one record
+per stochastic toolspecific, other tools ignored with their properties). The
+O4 fix converts and validates distribution parameters per type with PM4Py's
+messages. The same dtype rules were then carried to the other pandas sequence
+and case filters: float16 grouping and first/last aggregation errors, numpy
+unique order and str labels in the activity split, int64 case ids that wrap as
+a RangeIndex, float16/float32 width comparisons, masked NA matching, variant
+and pattern join errors, and NaN boundary counting.
+
+Declared: native maps hold only finite numbers, finite non-negative weights
+and int priorities (`POLICY` in the fixture). See "Recheck of 7270a1f" in the
+parity doc. `minera_recheck_7270a1f_tests` binds 13,824 filter and 4,000 PNML
+reference cases (fixtures in `src/backend/tests/fixtures/recheck_7270a1f/`).
+Regenerate them with the pinned reference environment:
+`python scripts/capture-recheck-7270a1f-reference.py fuzz-pnml pnmlS.json S 2000`
+and `pnml` (seeds 1, 2), `fuzz-run-keys rkS.json S 600` and
+`fuzz-dtypes dtS.json S 1000` with `filters` (seeds 1, 2),
+`fuzz-typed ty1.json 21 3000 case`, `ty2.json 22 3000 activity`,
+`ty3.json 23 4000 mixed` and `typed-probes typ.json` with `typed`, then
+`python scripts/generate-recheck-7270a1f-fixture.py src/backend/tests/fixtures/recheck_7270a1f --filters CASES RESULTS ... --pnml CASES RESULTS ...`.
+Lessons: a numeric run key follows numpy's result type, not Python's; pandas
+retries an object addition only after a TypeError, so missing cells still meet
+large ints first; a masked column takes part in object arithmetic with the
+value stored under its mask; set_index on an evenly stepping int64 column
+builds a range whose step test wraps but whose length does not; numpy names
+uint64 scalars `uint64` or `ulonglong` depending on what the process converted
+earlier, so capture those results in a fresh process.

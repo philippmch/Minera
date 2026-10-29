@@ -673,6 +673,13 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_recheck_d5b33ef_tests
            COMMAND minera_recheck_d5b33ef_tests
                    "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_d5b33ef")
+  add_executable(minera_recheck_7270a1f_tests src/backend/tests/test_recheck_7270a1f.cpp)
+  target_link_libraries(minera_recheck_7270a1f_tests PRIVATE minera::core)
+  target_compile_features(minera_recheck_7270a1f_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_recheck_7270a1f_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_recheck_7270a1f_tests
+           COMMAND minera_recheck_7270a1f_tests
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/recheck_7270a1f")
   # MSVC has no 128-bit integer type or GCC builtins; core code stays portable.
   add_test(NAME minera_portable_integers
            COMMAND ${CMAKE_COMMAND} -DMINERA_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}

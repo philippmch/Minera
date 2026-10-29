@@ -1,6 +1,7 @@
 #include "minera/pnml.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -13,6 +14,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -182,8 +184,12 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
       std::any_of(final_marking.begin(), final_marking.end(),
                   [](const TokenInteger& value) { return value < 0; }))
     throw std::invalid_argument("PNML markings must be non-negative");
-  if (stochastic_map)
-    validate_stochastic_map(*stochastic_map, net.transitions().size());
+  if (stochastic_map) {
+    validate_stochastic_map_structure(*stochastic_map, net.transitions().size());
+    if (stochastic_map->transitions.size() != net.transitions().size())
+      throw std::invalid_argument(
+          "stochastic map: transition record count does not match the net");
+  }
   std::unordered_set<std::string> used_ids;
   const auto resolve_ids = [&](const std::vector<std::string>& configured,
                                 std::size_t count, const char* prefix) {
@@ -302,13 +308,15 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
       out << "        <toolspecific tool=\"StochasticPetriNet\" version=\"0.2\">\n"
           << "          <property key=\"distributionType\">" << type
           << "</property>\n";
+      // PM4Py reads two parameters for NORMAL and UNIFORM and three for
+      // LOGNORMAL and GAMMA, so those are always written in full.
       if (type != "IMMEDIATE") {
         out << "          <property key=\"distributionParameters\">"
             << record.parameter;
-        if (record.secondary_parameter != 0.0 || record.tertiary_parameter != 0.0)
-          out << ';' << record.secondary_parameter;
-        if (record.tertiary_parameter != 0.0)
-          out << ';' << record.tertiary_parameter;
+        const bool pair = type == "NORMAL" || type == "UNIFORM";
+        const bool triple = type == "LOGNORMAL" || type == "GAMMA";
+        if (pair || triple) out << ';' << record.secondary_parameter;
+        if (triple) out << ';' << record.tertiary_parameter;
         out << "</property>\n";
       }
       out << "          <property key=\"priority\">" << record.priority
@@ -543,15 +551,26 @@ struct ParsedPlace {
   bool has_initial_marking = false;
 };
 
+// The properties of one StochasticPetriNet toolspecific as PM4Py reads them:
+// an absent or empty property is None.
+struct ParsedStochasticProperties {
+  std::optional<std::string> type;
+  std::optional<std::string> parameters;
+  std::optional<double> weight;
+  std::optional<TokenInteger> priority;
+};
+
 struct ParsedTransition {
   std::string id;
   std::string label;
   bool invisible = false;
-  std::string distribution_type;
-  std::string distribution_parameters;
-  int priority = 0;
-  double weight = 1.0;
-  bool has_stochastic_data = false;
+  // Each StochasticPetriNet toolspecific replaces the transition's record.
+  // A record with an unrecognized or absent type is PM4Py's undefined random
+  // variable (no native record); `policy` holds the native policy error of a
+  // record that a native stochastic map cannot represent.
+  std::optional<ParsedStochasticProperties> stochastic;
+  std::optional<StochasticMapTransition> record;
+  std::string policy;
   bool has_named_label = false;
 };
 
@@ -638,14 +657,12 @@ TokenInteger parse_token_count(const std::string& text, bool public_markings) {
 }
 
 // A stochastic priority property read as int(text): the int() grammar and
-// messages of public markings, then the native int range.
-int parse_stochastic_priority(const std::string& text) {
+// messages of public markings. The native int range is checked only when a
+// stochastic map is built.
+TokenInteger parse_stochastic_priority(const std::string& text) {
   if (text.empty())
     throw std::runtime_error("int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
-  const auto value = parse_token_count(text, true);
-  if (value < TokenInteger(std::numeric_limits<int>::min()) || value > TokenInteger(std::numeric_limits<int>::max()))
-    throw std::runtime_error("PNML stochastic priority is outside the native integer range");
-  return static_cast<int>(value);
+  return parse_token_count(text, true);
 }
 
 // A stochastic activation weight read as float(text). Non-finite and negative
@@ -658,6 +675,116 @@ double parse_stochastic_weight(const std::string& text) {
     throw std::runtime_error("could not convert string to float: " +
                              pnml_integer_literal(text, std::numeric_limits<std::size_t>::max()));
   return *value;
+}
+
+// float(text) over a present string: an empty one raises too.
+double python_float(const std::string& text) {
+  const auto value = detail::parse_python_float_text(text);
+  if (!value)
+    throw std::runtime_error("could not convert string to float: " +
+                             pnml_integer_literal(text, std::numeric_limits<std::size_t>::max()));
+  return *value;
+}
+
+std::vector<std::string> split_semicolons(const std::string& text) {
+  std::vector<std::string> parts(1);
+  for (const char ch : text) {
+    if (ch == ';') parts.emplace_back();
+    else parts.back() += ch;
+  }
+  return parts;
+}
+
+constexpr const char* kStochasticParameterPolicy =
+    "PNML stochastic parameters must be finite numbers for a native stochastic map";
+
+// The record of one StochasticPetriNet toolspecific, finished at its end tag
+// as PM4Py finishes it: only the exact type names IMMEDIATE, DETERMINISTIC,
+// NORMAL, UNIFORM, LOGNORMAL, GAMMA and EXPONENTIAL define a random variable,
+// and each reads distributionParameters its own way. IMMEDIATE ignores them;
+// DETERMINISTIC keeps the text; NORMAL and UNIFORM keep the first two of its
+// ';'-separated parts (None has no split(), fewer than two parts raise
+// IndexError); LOGNORMAL and GAMMA convert the first three parts with
+// float() in order; EXPONENTIAL converts the whole text, divides 1 by it
+// (zero raises ZeroDivisionError) and keeps 1 / rate for a positive rate,
+// else 'UNDEFINED'. Text that PM4Py keeps but a native map cannot hold as
+// finite numbers (and an undefined rate) is a native policy error, raised
+// only when a stochastic map is imported.
+void finish_stochastic_record(ParsedTransition& transition) {
+  if (!transition.stochastic) return;
+  const auto& properties = *transition.stochastic;
+  transition.record.reset();
+  transition.policy.clear();
+  if (!properties.type) return;
+  const auto& type = *properties.type;
+  StochasticMapTransition record;
+  const auto& parameters = properties.parameters;
+  const auto numeric = [&](const std::string& text, double& target) {
+    const auto value = detail::parse_python_float_text(text);
+    if (!value || !std::isfinite(*value)) transition.policy = kStochasticParameterPolicy;
+    else target = *value;
+  };
+  const auto parts = [&](std::size_t count) {
+    if (!parameters) throw std::runtime_error("'NoneType' object has no attribute 'split'");
+    auto result = split_semicolons(*parameters);
+    if (result.size() < count) throw std::runtime_error("list index out of range");
+    return result;
+  };
+  if (type == "IMMEDIATE") {
+    record.timing = StochasticMapTiming::kImmediate;
+    record.distribution = StochasticMapDistribution::kImmediate;
+    record.parameter = 0.0;
+  } else if (type == "DETERMINISTIC") {
+    record.distribution = StochasticMapDistribution::kDeterministic;
+    if (!parameters) transition.policy = kStochasticParameterPolicy;
+    else numeric(*parameters, record.parameter);
+  } else if (type == "NORMAL" || type == "UNIFORM") {
+    record.distribution = type == "NORMAL" ? StochasticMapDistribution::kNormal
+                                           : StochasticMapDistribution::kUniform;
+    const auto values = parts(2);
+    numeric(values[0], record.parameter);
+    numeric(values[1], record.secondary_parameter);
+  } else if (type == "LOGNORMAL" || type == "GAMMA") {
+    record.distribution = type == "GAMMA" ? StochasticMapDistribution::kGamma
+                                          : StochasticMapDistribution::kLogNormal;
+    if (!parameters) throw std::runtime_error("'NoneType' object has no attribute 'split'");
+    const auto values = split_semicolons(*parameters);
+    double* targets[] = {&record.parameter, &record.secondary_parameter, &record.tertiary_parameter};
+    for (std::size_t index = 0; index < 3; ++index) {
+      if (index >= values.size()) throw std::runtime_error("list index out of range");
+      *targets[index] = python_float(values[index]);
+    }
+    if (!std::isfinite(record.parameter) || !std::isfinite(record.secondary_parameter) ||
+        !std::isfinite(record.tertiary_parameter))
+      transition.policy = kStochasticParameterPolicy;
+  } else if (type == "EXPONENTIAL") {
+    record.distribution = StochasticMapDistribution::kExponential;
+    if (!parameters)
+      throw std::runtime_error("float() argument must be a string or a real number, not 'NoneType'");
+    const double value = python_float(*parameters);
+    if (value == 0.0) throw std::runtime_error("division by zero");
+    const double rate = 1.0 / value;
+    if (rate > 0.0 && std::isfinite(1.0 / rate)) record.parameter = 1.0 / rate;
+    else transition.policy = kStochasticParameterPolicy;
+  } else {
+    return;
+  }
+  if (properties.weight) record.activation_weight = *properties.weight;
+  if (properties.priority) {
+    if (*properties.priority < TokenInteger(std::numeric_limits<int>::min()) ||
+        *properties.priority > TokenInteger(std::numeric_limits<int>::max())) {
+      if (transition.policy.empty())
+        transition.policy = "PNML stochastic priority is outside the native integer range";
+    } else {
+      record.priority = static_cast<int>(*properties.priority);
+    }
+  }
+  transition.record = record;
+}
+
+bool name_ends_with(const std::string& name, std::string_view suffix) {
+  return name.size() >= suffix.size() &&
+         name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 std::string ascii_lower(std::string text) {
@@ -740,6 +867,8 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   const bool require_boundaries = options.require_workflow_boundaries && !public_markings;
 
   std::vector<std::string> stack;
+  // The stack depth of an open StochasticPetriNet toolspecific.
+  std::optional<std::size_t> stochastic_depth;
   bool in_net = false;
   bool nets_seen = false;
   std::string final_place_ref;  // idref of the <place> open under <marking>
@@ -789,17 +918,25 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       }
       arcs.push_back({*source, *target, PetriArcType::kNormal});
       if (const auto* id = detail::attribute(token.attributes, "id")) arcs.back().id = *id;
-    } else if (token.name == "toolspecific" &&
+    } else if (name_ends_with(token.name, "toolspecific") &&
                stack_ends_with(stack, {"transition"})) {
+      // As PM4Py reads a transition's toolspecific children (any tag ending
+      // in "toolspecific"): a tool containing "ProM" may mark the transition
+      // invisible; otherwise one containing "StochasticPetriNet" starts a new
+      // stochastic record; other tools are ignored with their properties.
       const auto* tool = detail::attribute(token.attributes, "tool");
       if (!tool)
-        throw std::runtime_error("PNML toolspecific is missing its tool attribute");
+        throw std::runtime_error("argument of type 'NoneType' is not a container or iterable");
       const auto* activity = detail::attribute(token.attributes, "activity");
       if (tool->find("ProM") != std::string::npos) {
         if (!activity)
-          throw std::runtime_error("PNML ProM toolspecific is missing its activity attribute");
+          throw std::runtime_error("argument of type 'NoneType' is not a container or iterable");
         if (activity->find("$invisible$") != std::string::npos && !transitions.empty())
           transitions.back().invisible = true;
+      } else if (tool->find("StochasticPetriNet") != std::string::npos && !transitions.empty()) {
+        transitions.back().stochastic = ParsedStochasticProperties{};
+        if (token.self_closing) finish_stochastic_record(transitions.back());
+        else stochastic_depth = stack.size() + 1;
       }
     } else if (token.name == "finalmarkings") {
       final_markings_present = true;
@@ -810,10 +947,12 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     return true;
   };
 
-  // A stochastic <property> reads its element text (the text before any
+  // A stochastic property is any child element of a StochasticPetriNet
+  // toolspecific with a key. It reads its element text (the text before any
   // child), as the public importer does: an empty element is a missing
   // value, and weight/priority/invisible convert like float(), int() and
-  // .lower() == "true".
+  // .lower() == "true" in document order; a later property of the same key
+  // replaces an earlier one.
   struct PropertyText { std::string key; std::size_t depth; std::string value; bool first_segment = true; };
   std::optional<PropertyText> property_text;
   struct ArcText { bool inscription; std::size_t depth; std::string value; bool first_segment = true; };
@@ -836,13 +975,18 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   };
   const auto finish_property_text = [&] {
     auto& transition = transitions.back();
+    if (!transition.stochastic) {
+      property_text.reset();
+      return;
+    }
+    auto& properties = *transition.stochastic;
     const auto& key = property_text->key;
     const auto& value = property_text->value;
-    if (!value.empty()) transition.has_stochastic_data = true;
-    if (key == "distributionType") transition.distribution_type = value;
-    else if (key == "distributionParameters") transition.distribution_parameters = value;
-    else if (key == "priority") transition.priority = parse_stochastic_priority(value);
-    else if (key == "weight") transition.weight = parse_stochastic_weight(value);
+    const auto text = value.empty() ? std::nullopt : std::optional<std::string>(value);
+    if (key == "distributionType") properties.type = text;
+    else if (key == "distributionParameters") properties.parameters = text;
+    else if (key == "priority") properties.priority = parse_stochastic_priority(value);
+    else if (key == "weight") properties.weight = parse_stochastic_weight(value);
     else if (key == "invisible") {
       if (value.empty()) throw std::runtime_error("'NoneType' object has no attribute 'lower'");
       if (ascii_lower(value) == "true") transition.invisible = true;
@@ -938,8 +1082,8 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         if (token.self_closing) finish_arc_text();
       }
       if (property_text) property_text->first_segment = false;
-      if (in_net && !transitions.empty() && token.name == "property" &&
-          stack_ends_with(stack, {"transition", "toolspecific"})) {
+      if (in_net && !transitions.empty() && stochastic_depth &&
+          stack.size() == *stochastic_depth) {
         const auto* key = detail::attribute(token.attributes, "key");
         if (key && !key->empty()) {
           property_text = PropertyText{*key, stack.size() + 1, {}};
@@ -972,8 +1116,12 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       finish_arc_text();
     if (label_text && token.name == "text" && stack.size() == label_text->depth)
       finish_label_text();
-    if (property_text && token.name == "property" && stack.size() == property_text->depth)
+    if (property_text && stack.size() == property_text->depth && stack.back() == token.name)
       finish_property_text();
+    if (stochastic_depth && stack.size() == *stochastic_depth && stack.back() == token.name) {
+      finish_stochastic_record(transitions.back());
+      stochastic_depth.reset();
+    }
     while (!stack.empty() && stack.back() != token.name) stack.pop_back();
     if (!stack.empty()) stack.pop_back();
     if (token.name == "net") in_net = false;
@@ -1184,51 +1332,20 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     StochasticMap map;
     map.transitions.reserve(transitions.size());
     bool any = false;
+    // Transitions without a defined record keep the native defaults.
     for (std::size_t index = 0; index < transitions.size(); ++index) {
       const auto& parsed = transitions[index];
+      if (!parsed.policy.empty()) throw std::runtime_error(parsed.policy);
       StochasticMapTransition record;
+      if (parsed.record) {
+        any = true;
+        record = *parsed.record;
+      }
       record.transition = index;
-      record.activation_weight = parsed.weight;
-      record.priority = parsed.priority;
-      if (parsed.has_stochastic_data) any = true;
-      const auto type = parsed.distribution_type;
-      if (type == "IMMEDIATE") {
-        record.timing = StochasticMapTiming::kImmediate;
-        record.distribution = StochasticMapDistribution::kImmediate;
-        record.parameter = 0.0;
-      } else if (type == "DETERMINISTIC") {
-        record.distribution = StochasticMapDistribution::kDeterministic;
-      } else if (type == "NORMAL") {
-        record.distribution = StochasticMapDistribution::kNormal;
-      } else if (type == "UNIFORM") {
-        record.distribution = StochasticMapDistribution::kUniform;
-      } else if (type == "LOGNORMAL") {
-        record.distribution = StochasticMapDistribution::kLogNormal;
-      } else if (type == "GAMMA") {
-        record.distribution = StochasticMapDistribution::kGamma;
-      } else {
-        record.distribution = StochasticMapDistribution::kExponential;
-      }
-      if (!parsed.distribution_parameters.empty()) {
-        std::string normalized = parsed.distribution_parameters;
-        std::replace(normalized.begin(), normalized.end(), ';', ' ');
-        std::replace(normalized.begin(), normalized.end(), ',', ' ');
-        std::istringstream parameters(normalized);
-        if (!(parameters >> record.parameter) || !std::isfinite(record.parameter))
-          throw std::runtime_error("PNML stochastic parameters are invalid");
-        if (parameters >> record.secondary_parameter) {
-          if (!std::isfinite(record.secondary_parameter))
-            throw std::runtime_error("PNML stochastic parameters are invalid");
-          if (parameters >> record.tertiary_parameter) {
-            if (!std::isfinite(record.tertiary_parameter))
-              throw std::runtime_error("PNML stochastic parameters are invalid");
-          }
-        }
-      }
       map.transitions.push_back(record);
     }
     if (any) {
-      validate_stochastic_map(map, transitions.size());
+      validate_stochastic_map_structure(map, transitions.size());
       document.stochastic_map = std::move(map);
     }
   }

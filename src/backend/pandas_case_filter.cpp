@@ -12,6 +12,7 @@
 #include "minera/token_integer.hpp"
 #include "business_hours.hpp"
 #include "root_cause_trace_key.hpp"
+#include "pandas_range_index.hpp"
 #include "python_scalar.hpp"
 #include "root_cause_unicode.hpp"
 namespace minera {
@@ -283,7 +284,10 @@ PandasCaseFilterOptions::PandasCaseFilterOptions(){
  }
 }
 EventTable filter_pandas_case_size(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const PandasCaseFilterOptions& o){
- s.validate();const auto c=size_column(s,o.case_id_key);const auto grouped=groups(s,c);(void)sorted_groups(s,c,grouped);
+ s.validate();const auto c=size_column(s,o.case_id_key);
+ // pandas cannot index by float16, so grouping by such a column raises.
+ if(c<s.dtypes.size()&&s.dtypes[c]=="float16")error("NotImplementedError","float16 indexes are not supported");
+ const auto grouped=groups(s,c);(void)sorted_groups(s,c,grouped);
  if(s.size()&&grouped.values.empty())error("IndexError","cannot do a non-empty take from an empty axes.");
  // Each row carries its case size. A list or tuple bound compares with the
  // rows item by item (a list needs one item per row; a tuple broadcasts).
@@ -377,7 +381,10 @@ bool double_holds(const EventAttribute& v){
 }
 } // namespace
 EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const PandasCaseFilterOptions& o){
- s.validate();const auto [c,t]=performance_columns(s,o);const auto grouped=groups(s,c,t);const bool business=truth(o.business_hours);
+ s.validate();const auto [c,t]=performance_columns(s,o);
+ // Grouping by a float16 column fails the first aggregation of the timestamps.
+ if(c<s.dtypes.size()&&s.dtypes[c]=="float16")error("NotImplementedError","agg function failed [how->first,dtype->"+s.dtypes[t]+"]");
+ const auto grouped=groups(s,c,t);const bool business=truth(o.business_hours);
  if(business&&grouped.values.empty())error("ValueError","Cannot set a DataFrame with multiple columns to the single column caseDuration");
  const auto slots=business?business_slots(o.business_hour_slots):std::vector<BusinessHourSlot>{};
  // The datetime column's resolution (ns by default) sets the Timedelta unit.
@@ -401,6 +408,9 @@ EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribu
  // key and its rows drop out.
  if(!s.dtypes.empty()&&s.dtypes[c]=="object"&&float_key_index(ids))
   for(std::size_t i=0;i<s.size();++i)if(keep[i]&&!double_holds(*s.rows[i][c]))keep[i]=false;
+ // Indexing the frame by its case ids fails for a wrapping int64 progression.
+ if(const auto length=detail::wrapped_range_length(s,c))
+  error("ValueError","Length mismatch: Expected axis has "+std::to_string(s.size())+" elements, new values have "+std::to_string(*length)+" elements");
  return subset(s,keep);
 }
 EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const EventAttribute& parameters){

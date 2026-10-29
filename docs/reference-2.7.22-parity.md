@@ -16100,3 +16100,56 @@ Declared (not equivalent, kept on purpose):
 - MSVC is not available in the cloud container; the Windows CI job is the
   build check. Earlier declarations (c8ee22d, 65572296, 61ebeee0, DC4, C3,
   streaming, Windows) stay in force.
+
+## Recheck of 7270a1f: fixes and declarations (2026-10-28)
+
+The recheck of 7270a1f reported four targets (O1-O4). The reviewer's handoff
+was on a machine that was offline during this round, so each target was found
+from its title against public PM4Py 2.7.22 calls (pandas 3.0.5, numpy 2.4.6)
+and fuzzed until native and reference agreed. The fuzz covered 1,200 grouping
+tables with NaN, None, pd.NA, NaT, infinities and huge integers in object and
+float64 key columns next to typed columns, and 2,000 grouping tables over two
+typed key columns of every numpy and masked numeric dtype. It also covered
+10,000 tables for the other pandas sequence and case filters over typed case
+and activity columns (numpy, masked and mixed object), 624 fixed probes, and
+4,000 PNML models with toolspecifics of many tools, tags and namespaces.
+`minera_recheck_7270a1f_tests` binds all of them with their saved reference
+results (`src/backend/tests/fixtures/recheck_7270a1f/`, written by
+`scripts/generate-recheck-7270a1f-fixture.py` from
+`scripts/capture-recheck-7270a1f-reference.py` output).
+
+| ID | Fix | Test |
+| --- | --- | --- |
+| O1 | Consecutive activity/case grouping adds two numeric key columns in numpy's result type. bool joins the other side (bool + bool stays bool). Integers of one signedness take the wider width and wrap in it. A signed and an unsigned integer take the next signed width that holds both (float64 past 64 bits). A float side takes the narrowest float that holds both (an 8-bit integer fits float16, a 16-bit one float32), rounding to that width. A masked side makes the key masked, and an NA cell makes the key NA. Runs compare the key with its shifted copy: integer keys as float64, float keys in their own width (NaN never equal), bool keys exactly, and an NA comparison starts no run. Next to an object column, a masked column adds the value stored under its mask (an int of IntN/UIntN, NaN of FloatN, a bool of boolean). The retry after a TypeError uses those values too, and the key is NA where either side is missing. | same (`fuzz-dtypes`, 2,000 tables) |
+| O2 | Object run keys add over every row, missing cells included, and retry the present rows only after a TypeError. A NaN, None, pd.NA or NaT that meets an int too large for a float therefore raises `OverflowError: int too large to convert to float`, unless a TypeError comes first. | same (`fuzz-run-keys`, 1,200 tables) |
+| O3 | PNML transitions read toolspecifics as PM4Py does: any tag ending in `toolspecific` (namespaced or not, case-sensitive). A tool containing `ProM` may mark the transition invisible (activity containing `$invisible$`). Otherwise a tool containing `StochasticPetriNet` starts a new stochastic record that replaces the previous one, and any keyed child element is a property, where a later key replaces an earlier one. Other tools are ignored together with their properties. A missing tool or ProM activity attribute raises PM4Py's `argument of type 'NoneType' is not a container or iterable`. | same (`pnml-cases.tsv.gz`, 4,000 models, with and without the map) |
+| O4 | Only the exact type names IMMEDIATE, DETERMINISTIC, NORMAL, UNIFORM, LOGNORMAL, GAMMA and EXPONENTIAL define a random variable. Any other type, or none, is an undefined variable and keeps the native default record. IMMEDIATE ignores parameters. DETERMINISTIC keeps the text. NORMAL and UNIFORM take the first two `;` parts (None raises `'NoneType' object has no attribute 'split'`; one part raises `list index out of range`). LOGNORMAL and GAMMA convert three parts with `float()` in order, with its message. EXPONENTIAL converts the whole text: 0 raises `division by zero` and a non-positive rate is undefined. The writer emits two parameters for NORMAL/UNIFORM and three for LOGNORMAL/GAMMA. A PNML map is checked structurally on import and export; distribution domains are checked where the map is used. | same |
+| O1+ | The same dtype rules in the other pandas filters. Grouping by a float16 column raises `NotImplementedError: float16 indexes are not supported` (rework, prefix/suffix, case size, variants, start/end/nocc, timestamp grouping). first/last aggregations raise `agg function failed [how->first|last,dtype->D]` with pandas' D. A wrapping int64 progression of case ids makes set_index raise `Length mismatch`. The activity split orders case ids as np.unique does (NaN last, all NaNs one run) and labels them with numpy's str of the scalar (shortest round-trip digits in float16/float32/float64 width). `==` filters cast a number to a float16/float32 column's width, while isin compares exactly. A missing start/end activity is None, NaN or pd.NA by dtype (matched by None, NaN or nothing). nocc counts the missing boundaries of float and masked columns separately. Variant joins raise `sequence item j: expected str instance, T found` with Python or numpy type names, and admitted patterns are read only when a case exists. | same (`fuzz-typed` case/activity/mixed, 10,000 tables; `typed-probes`, 624) |
+
+Declared (not equivalent, kept on purpose):
+
+- **Finite stochastic values.** A native stochastic map holds finite numbers,
+  finite non-negative activation weights and priorities that fit an int.
+  PM4Py keeps DETERMINISTIC, NORMAL and UNIFORM parameter text it never
+  converts, infinite and NaN values, an `UNDEFINED` exponential mean, any float
+  weight and any Python int priority. Native imports those models without
+  the map unchanged, and with the map raises a policy error. The fixture marks
+  these 289 models `POLICY`.
+- **Undefined random variables and absent weight/priority** keep the native
+  default record (exponential timing, weight 1, priority 0). PM4Py holds an
+  undefined variable with no parameters.
+- **GAMMA and LOGNORMAL parameters** are kept by position (first, second and
+  third value), as PM4Py reads them. Their meaning in native sampling is the
+  native one.
+- **PNML text quirks** that the public importer shows only through lxml
+  (processing instructions inside property text, tag suffix matching across
+  namespaces) are covered as far as the 4,000 fuzz models reach and not
+  modelled beyond that.
+- **uint64 type names.** numpy names a UInt64 activity `numpy.uint64` or
+  `numpy.ulonglong` depending on which values the process converted before.
+  Native names `ulonglong` when every value lies past the int64 range, which
+  is what a fresh process reports, and the capture reruns such cases in a
+  fresh process.
+- The reviewer's exact O1-O4 fixtures are not yet bound (their handoff was
+  unreachable). Earlier declarations (d5b33ef, c8ee22d, 65572296, 61ebeee0,
+  DC4, C3, streaming, Windows) stay in force.

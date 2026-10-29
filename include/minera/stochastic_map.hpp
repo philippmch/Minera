@@ -130,6 +130,13 @@ void validate_stochastic_map(const StochasticMap& map,
 void validate_sparse_stochastic_map(const StochasticMap& map,
                                     std::size_t expected_transition_count);
 
+// The record checks without the distribution domains: index-ordered records
+// below the count, finite parameters, finite non-negative activation weights
+// and known enums. Maps imported from PNML keep any finite parameters, as
+// PM4Py keeps them; the domains are checked where a map is used.
+void validate_stochastic_map_structure(const StochasticMap& map,
+                                       std::size_t expected_transition_count);
+
 // Fits timing metadata; the returned transition ID and activation weight are zero.
 [[nodiscard]] StochasticMapTransition fit_stochastic_distribution(
     const std::vector<double>& samples,

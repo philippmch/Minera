@@ -1,20 +1,26 @@
 #include "minera/pandas_sequence_filters.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <set>
+#include <string_view>
 #include <variant>
 
 #include "minera/filtering_common.hpp"
 #include "minera/timestamp.hpp"
 #include "python_scalar.hpp"
 #include "numpy_object_sort.hpp"
+#include "pandas_range_index.hpp"
 
 namespace minera {
 
@@ -287,6 +293,77 @@ ScalarNumber scalar_number(const EventAttribute& cell) {
 }
 bool is_text(const Cell& cell) { return cell && !null_cell(cell) && cell->kind == AttributeKind::kString; }
 
+// The dtype pandas infers for datetime cells: all aware or all naive,
+// microsecond unless one needs nanoseconds, in their one offset; nullopt
+// (Timestamp objects) when awareness or offsets differ.
+std::optional<std::string> datetime_dtype(const std::vector<Cell>& dates) {
+  bool naive = false, aware = false, nanoseconds = false, mixed_offsets = false;
+  std::optional<std::int32_t> offset;
+  for (const auto& cell : dates) {
+    const auto* date = std::get_if<NativeDate>(&cell->typed_value);
+    const auto exact = *parse_timestamp_exact(date ? date->value : cell->value);
+    (exact.timezone_aware ? aware : naive) = true;
+    nanoseconds = nanoseconds || exact.nanoseconds % 1000 != 0;
+    if (exact.timezone_aware) {
+      if (offset && *offset != exact.offset_minutes) mixed_offsets = true;
+      offset = exact.offset_minutes;
+    }
+  }
+  if (naive == aware || mixed_offsets) return std::nullopt;
+  std::string dtype = std::string("datetime64[") + (nanoseconds ? "ns" : "us");
+  if (aware) {
+    const auto minutes = *offset;
+    if (minutes == 0) dtype += ", UTC";
+    else {
+      char zone[16];
+      std::snprintf(zone, sizeof(zone), ", UTC%c%02d:%02d", minutes < 0 ? '-' : '+', std::abs(minutes) / 60, std::abs(minutes) % 60);
+      dtype += zone;
+    }
+  }
+  return dtype + "]";
+}
+
+std::string column_dtype(const EventTable& df, std::size_t column) {
+  return column < df.dtypes.size() ? df.dtypes[column] : std::string("object");
+}
+
+// pandas cannot index by float16: grouping by a float16 column raises before
+// any group forms, empty frames included. A first/last aggregation reports
+// it as its own failure on the column it aggregates.
+void reject_float16_groupby(const EventTable& df, std::size_t key) {
+  if (column_dtype(df, key) == "float16") fail("NotImplementedError", "float16 indexes are not supported");
+}
+// The frame's set_index(case), which a wrapping int64 progression of case
+// ids turns into a range of another length (pandas_range_index.hpp).
+void require_case_index(const EventTable& df, std::size_t case_column) {
+  if (const auto length = detail::wrapped_range_length(df, case_column))
+    fail("ValueError", "Length mismatch: Expected axis has " + std::to_string(df.size()) + " elements, new values have " +
+                           std::to_string(*length) + " elements");
+}
+void reject_float16_aggregation(const EventTable& df, std::size_t key, bool first, const std::string& dtype) {
+  if (column_dtype(df, key) == "float16")
+    fail("NotImplementedError", std::string("agg function failed [how->") + (first ? "first" : "last") + ",dtype->" + dtype + "]");
+}
+
+// The dtype a copied object column takes: str cells (nulls aside) infer str,
+// datetime cells datetime64; any other mix stays object.
+std::string inferred_dtype(const EventTable& df, std::size_t column) {
+  const auto dtype = column_dtype(df, column);
+  if (dtype != "object") return dtype;
+  std::vector<Cell> dates;
+  bool strings = false;
+  for (const auto& row : df.rows) {
+    const auto& cell = row[column];
+    if (null_cell(cell)) continue;
+    if (is_text(cell)) strings = true;
+    else if (date_key(*cell)) dates.push_back(cell);
+    else return dtype;
+  }
+  if (strings) return dates.empty() ? "str" : dtype;
+  if (dates.empty()) return dtype;
+  return datetime_dtype(dates).value_or(dtype);
+}
+
 // Python str() of a non-null case id.
 std::string py_str(const EventAttribute& cell) { return cell.value; }
 
@@ -339,11 +416,95 @@ bool py_equal(const python::Scalar& a, const python::Scalar& b) {
 }
 // pandas' column == scalar on an object column: a missing cell (None, NaN,
 // pd.NA) and a None or NaN scalar compare False, anything else like Python.
-bool column_equals(const Cell& cell, const Value& v) {
+// IEEE binary16 conversions (round to nearest even), as numpy's float16.
+std::uint16_t float_to_half(float value) {
+  std::uint32_t f;
+  std::memcpy(&f, &value, sizeof f);
+  const std::uint16_t sign = static_cast<std::uint16_t>((f >> 16) & 0x8000u);
+  const std::uint32_t magnitude = f & 0x7fffffffu;
+  if (magnitude >= 0x7f800000u)
+    return sign | (magnitude > 0x7f800000u ? 0x7e00u : 0x7c00u);
+  if (magnitude >= 0x477ff000u) return sign | 0x7c00u;  // rounds past 65504
+  if (magnitude < 0x38800000u) {  // a subnormal half or zero
+    if (magnitude < 0x33000000u) return sign;
+    const std::uint32_t exponent = magnitude >> 23;
+    const std::uint32_t mantissa = (magnitude & 0x7fffffu) | 0x800000u;
+    const std::uint32_t shift = 126 - exponent;  // 14 + 23 - 10 - (exponent - 127) + 1
+    std::uint32_t half = mantissa >> shift;
+    const std::uint32_t rest = mantissa & ((1u << shift) - 1);
+    const std::uint32_t midpoint = 1u << (shift - 1);
+    if (rest > midpoint || (rest == midpoint && (half & 1u))) ++half;
+    return sign | static_cast<std::uint16_t>(half);
+  }
+  std::uint32_t half = ((magnitude >> 13) - (112u << 10));
+  const std::uint32_t rest = magnitude & 0x1fffu;
+  if (rest > 0x1000u || (rest == 0x1000u && (half & 1u))) ++half;
+  return sign | static_cast<std::uint16_t>(half);
+}
+float half_to_float(std::uint16_t half) {
+  const std::uint32_t sign = static_cast<std::uint32_t>(half & 0x8000u) << 16;
+  const std::uint32_t exponent = (half >> 10) & 0x1fu;
+  std::uint32_t mantissa = half & 0x3ffu;
+  std::uint32_t f;
+  if (exponent == 0x1fu) f = sign | 0x7f800000u | (mantissa << 13);
+  else if (exponent) f = sign | ((exponent + 112u) << 23) | (mantissa << 13);
+  else if (!mantissa) f = sign;
+  else {
+    int shift = 0;
+    while (!(mantissa & 0x400u)) { mantissa <<= 1; ++shift; }
+    f = sign | ((113u - shift) << 23) | ((mantissa & 0x3ffu) << 13);
+  }
+  float value;
+  std::memcpy(&value, &f, sizeof value);
+  return value;
+}
+
+// A double rounded to float16 or float32 (round to nearest even), as numpy
+// casts a Python float to a column's width. Rounding through float32 first
+// can land on a float16 tie, so the nearest neighbour is checked.
+double narrow_float(double value, int bits) {
+  if (bits == 32) return static_cast<float>(value);
+  if (bits != 16 || std::isnan(value)) return value;
+  const auto half = float_to_half(static_cast<float>(value));
+  double best = half_to_float(half);
+  if (std::isinf(best) || best == value) return best;
+  for (const std::uint16_t neighbour : {static_cast<std::uint16_t>(half - 1), static_cast<std::uint16_t>(half + 1)}) {
+    if ((neighbour & 0x7fffu) >= 0x7c00u || (neighbour ^ half) & 0x8000u) continue;
+    const double candidate = half_to_float(neighbour);
+    if (std::fabs(candidate - value) < std::fabs(best - value) ||
+        (std::fabs(candidate - value) == std::fabs(best - value) && !(neighbour & 1u)))
+      best = candidate;
+  }
+  return best;
+}
+
+// pandas' masked dtypes, which hold pd.NA.
+bool masked_dtype(const std::string& dtype) {
+  return dtype == "boolean" || dtype.starts_with("Int") || dtype.starts_with("UInt") || dtype.starts_with("Float");
+}
+
+// The float width of a numpy or masked float column (0 for other dtypes).
+int float_bits(const std::string& dtype) {
+  if (dtype == "float16") return 16;
+  if (dtype == "float32" || dtype == "Float32") return 32;
+  if (dtype == "float64" || dtype == "Float64") return 64;
+  return 0;
+}
+
+// df[column] == v: a float16 or float32 column compares with a Python
+// number in its own width (numpy casts the number to the column's dtype).
+bool column_equals(const Cell& cell, const Value& v, const std::string& dtype) {
   if (null_cell(cell)) return false;
   const auto scalar = scalar_of(v);
   if (!scalar || scalar->kind == python::Scalar::Kind::kNone || is_nan(*scalar)) return false;
-  return py_equal(scalar_of(cell), *scalar);
+  const auto value = scalar_of(cell);
+  if (const int bits = float_bits(dtype); bits && bits < 64 && python::is_number(*scalar) && value.kind == python::Scalar::Kind::kFloat) {
+    const double number = scalar->kind == python::Scalar::Kind::kFloat ? scalar->real
+                          : scalar->kind == python::Scalar::Kind::kBool ? (scalar->boolean ? 1.0 : 0.0)
+                                                                         : std::strtod(python::str(*scalar).c_str(), nullptr);
+    return narrow_float(number, bits) == value.real;
+  }
+  return py_equal(value, *scalar);
 }
 
 // Python's a + b for the values a dataframe holds: str + str concatenates,
@@ -383,12 +544,42 @@ python::Scalar python_add(const python::Scalar& a, const python::Scalar& b) {
   fail("TypeError", "unsupported operand type(s) for +: '" + python::type_name(a) + "' and '" + python::type_name(b) + "'");
 }
 
+// pandas adds two object columns element by element over every row, missing
+// cells included, and only after a TypeError retries the rows where both
+// cells are present. A missing cell (None, NaN, pd.NA, NaT) therefore still
+// raises OverflowError when its float meets an int too large for a float,
+// unless a TypeError comes first. Returns whether the pair raises, and
+// which error: 0 none, 1 TypeError, 2 OverflowError.
+int missing_add_outcome(const Cell& left, const Cell& right) {
+  using K = python::Scalar::Kind;
+  const auto nat = [](const Cell& cell) {
+    return cell && !cell->is_null && cell->kind == AttributeKind::kDate && cell->value == "NaT";
+  };
+  const auto a = scalar_of(left), b = scalar_of(right);
+  const bool a_nat = nat(left), b_nat = nat(right);
+  const auto date = [](const python::Scalar& s, bool is_nat) { return is_nat || s.kind == K::kDate; };
+  const auto huge = [](const python::Scalar& s) {
+    return s.kind == K::kInt && std::isinf(std::strtod(python::str(s).c_str(), nullptr));
+  };
+  if (a.kind == K::kNone || b.kind == K::kNone) return 1;
+  if (a.kind == K::kNA) return date(b, b_nat) ? 1 : 0;
+  if (b.kind == K::kNA) return date(a, a_nat) ? 1 : 0;
+  // NaT adds to an int (not a bool) or a timestamp.
+  if (a_nat) return (b.kind == K::kInt || date(b, b_nat)) ? 0 : 1;
+  if (b_nat) return (a.kind == K::kInt || a.kind == K::kDate) ? 0 : 1;
+  // A NaN float adds to numbers, converting an int to a float.
+  const auto& other = is_nan(a) ? b : a;
+  if (other.kind == K::kText || other.kind == K::kDate) return 1;
+  return huge(other) ? 2 : 0;
+}
+
 // groupby(case) with sort=True factorizes the case column first: its
 // distinct non-null values must order (python::safe_sort_order), or the
 // reference raises before grouping, whatever the groups are used for.
 // `rows`, when given, limits the check to the rows the reference groups.
 void require_sorted_groupby(const EventTable& df, std::size_t case_column,
                             const std::vector<bool>* rows = nullptr) {
+  reject_float16_groupby(df, case_column);
   std::vector<python::Scalar> uniques;
   std::set<std::string> seen;
   for (std::size_t i = 0; i < df.rows.size(); ++i) {
@@ -541,10 +732,16 @@ std::map<Key, Activity> boundary_activities(const EventTable& df, const Cases& c
 
 bool value_is_null(const Value& v) { return v.kind == Kind::kNone || (v.kind == Kind::kFloat && std::isnan(v.real)); }
 
-// isin: a boundary activity equals a listed value like Python's ==; a case
-// without any activity has the boundary None, which only None matches.
-bool matches_value(const Activity& a, const Value& v) {
-  if (!a) return v.kind == Kind::kNone;
+// isin: a boundary activity equals a listed value like Python's ==. A case
+// without any activity has a missing boundary: None in an object column,
+// which only None matches; NaN in a numpy float column, which only NaN
+// matches; pd.NA in a masked column, which neither matches.
+bool matches_value(const Activity& a, const Value& v, const std::string& dtype) {
+  if (!a) {
+    if (masked_dtype(dtype)) return false;
+    if (float_bits(dtype)) return v.kind == Kind::kFloat && std::isnan(v.real);
+    return v.kind == Kind::kNone;
+  }
   const auto scalar = scalar_of(v);
   return scalar && !value_is_null(v) && py_equal(*a, *scalar);
 }
@@ -553,24 +750,32 @@ EventTable boundary_filter(const EventTable& df, const Value& values, const std:
                            const std::string& act_key, const Value& positive, bool end) {
   const auto case_column = require_column(df, case_glue);
   const auto act = require_column(df, act_key, true);
+  reject_float16_aggregation(df, case_column, !end, inferred_dtype(df, act));
   const auto cases = cases_of(df, case_column);
   const auto boundary = boundary_activities(df, cases, act, end);
   std::set<Key> kept;
   for (const auto& [key, a] : boundary)
     for (const auto& v : values.items)
-      if (matches_value(a, v)) {
+      if (matches_value(a, v, column_dtype(df, act))) {
         kept.insert(key);
         break;
       }
+  require_case_index(df, case_column);
   return keep_cases(df, case_column, kept, truthy(positive));
 }
 
 // Counted boundary activities: (activity or null, count) in insertion order.
+// The missing boundaries of an object or str column count as one key; in a
+// float or masked column each is a NaN object of its own, counted once.
 using Counts = std::vector<std::pair<Activity, Value>>;
-Counts count_boundaries(const std::vector<Key>& order, const std::map<Key, Activity>& boundary) {
+Counts count_boundaries(const std::vector<Key>& order, const std::map<Key, Activity>& boundary, bool shared_missing) {
   Counts out;
   for (const auto& key : order) {
     const auto& a = boundary.at(key);
+    if (!a && !shared_missing) {
+      out.emplace_back(a, Value::of(std::int64_t{1}));
+      continue;
+    }
     bool found = false;
     for (auto& [k, v] : out)
       if (same_activity(k, a)) {
@@ -598,9 +803,13 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
                         const std::optional<Value>& most_common_variant = std::nullopt) {
   const auto case_column = require_column(df, case_glue);
   const auto act = require_column(df, act_key, true);
+  // The end activities of an empty frame are counted without a groupby.
+  if (!end || !df.empty()) reject_float16_aggregation(df, case_column, !end, column_dtype(df, act));
   const auto cases = cases_of(df, case_column);
   const auto boundary = boundary_activities(df, cases, act, end);
-  const Counts counts = count0 ? counts_argument(*count0) : count_boundaries(cases.order, boundary);
+  const auto dtype = column_dtype(df, act);
+  const Counts counts =
+      count0 ? counts_argument(*count0) : count_boundaries(cases.order, boundary, !masked_dtype(dtype) && !float_bits(dtype));
   const auto threshold = number_of(nocc);
   if (!threshold) fail("TypeError", "'>=' not supported between instances of 'int' and '" + type_name(nocc) + "'");
   Counts kept;
@@ -623,6 +832,7 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
         keep.insert(key);
         break;
       }
+  require_case_index(df, case_column);
   return {keep_cases(df, case_column, keep, true), kept};
 }
 
@@ -635,7 +845,12 @@ Value counts_value(const Counts& counts) {
 // ------------------------------------------------------------------ variants
 
 // ",".join(item) of an admitted trace, prefix or suffix.
-std::string join_pattern(const Value& item) {
+enum class VariantMode { kTrace, kStartsWith, kEndsWith };
+
+// An admitted pattern as a variant string. The trace filter reads str items
+// and None (as "None") and raises on any other item; starts_with and
+// ends_with join the items with str.join, which takes str items only.
+std::string join_pattern(const Value& item, VariantMode mode) {
   std::string out;
   if (item.kind == Kind::kString) {
     // A str iterates over its characters (UTF-8 sequences).
@@ -654,23 +869,52 @@ std::string join_pattern(const Value& item) {
     return out;
   }
   for (std::size_t i = 0; i < item.items.size(); ++i) {
+    const auto& part = item.items[i];
+    if (part.kind != Kind::kString && (mode != VariantMode::kTrace || part.kind != Kind::kNone))
+      fail("TypeError", mode == VariantMode::kTrace
+                            ? "decoding to str: need a bytes-like object, " + type_name(part) + " found"
+                            : "sequence item " + std::to_string(i) + ": expected str instance, " + type_name(part) + " found");
     if (i) out += ",";
-    out += item.items[i].text;
+    out += part.kind == Kind::kNone ? "None" : part.text;
   }
   return out;
+}
+
+// The Python type of an activity as a case's activity list holds it: a
+// numpy column's values are Python scalars, a masked column's are numpy
+// scalars (or pd.NA). A UInt64 column whose values all lie past the int64
+// range holds numpy's ulonglong instead of uint64.
+std::string activity_type_name(const Cell& cell, const std::string& dtype, bool ulonglong) {
+  if (masked_dtype(dtype)) {
+    if (null_cell(cell)) return "NAType";
+    if (dtype == "boolean") return "numpy.bool";
+    if (ulonglong) return "numpy.ulonglong";
+    std::string name = dtype;
+    for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return "numpy." + name;
+  }
+  return python::type_name(scalar_of(cell));
 }
 
 // Each case's variant string, by first appearance of the case.
 std::vector<std::pair<Key, std::string>> variants(const EventTable& df, std::size_t case_column, std::size_t act) {
   const auto cases = cases_of(df, case_column);
+  const auto dtype = column_dtype(df, act);
+  const bool ulonglong = dtype == "UInt64" && std::all_of(df.rows.begin(), df.rows.end(), [&](const auto& row) {
+    if (null_cell(row[act])) return false;
+    const auto digits = scalar_of(row[act]).digits;
+    return digits.size() > 19 || (digits.size() == 19 && digits > "9223372036854775807");
+  });
   std::vector<std::pair<Key, std::string>> out;
   for (const auto& key : cases.order) {
     const auto& rows = cases.rows.at(key);
     std::string joined;
     for (std::size_t j = 0; j < rows.size(); ++j) {
       const auto& cell = df.rows[rows[j]][act];
-      if (null_cell(cell))
-        fail("TypeError", "sequence item " + std::to_string(j) + ": expected str instance, float found");
+      // The activities join with str.join, which takes str items only.
+      if (!is_text(cell))
+        fail("TypeError", "sequence item " + std::to_string(j) + ": expected str instance, " +
+                              activity_type_name(cell, dtype, ulonglong) + " found");
       if (j) joined += ",";
       joined += cell->value;
     }
@@ -728,17 +972,20 @@ bool trace_match(const std::string& variant, const std::string& pattern) {
   return true;
 }
 
-enum class VariantMode { kTrace, kStartsWith, kEndsWith };
-
 EventTable variant_filter(const EventTable& df, const Value& admitted, const PandasFilterParameters& parameters,
                           VariantMode mode) {
   const auto case_column = require_column(df, case_key(parameters));
   const auto act = require_column(df, activity_key(parameters), true);
+  reject_float16_groupby(df, case_column);
   const bool positive = truthy(parameter_or(parameters, "POSITIVE", "positive", Value::of(true)));
+  // The case variants are joined before the admitted patterns, which are
+  // not read at all without a case.
+  const auto case_variants = variants(df, case_column, act);
   std::vector<std::string> patterns;
-  for (const auto& item : admitted.items) patterns.push_back(join_pattern(item));
+  if (!case_variants.empty())
+    for (const auto& item : admitted.items) patterns.push_back(join_pattern(item, mode));
   std::set<Key> kept;
-  for (const auto& [key, variant] : variants(df, case_column, act)) {
+  for (const auto& [key, variant] : case_variants) {
     // An empty list of admitted traces admits every case.
     bool ok = mode == VariantMode::kTrace && patterns.empty();
     for (const auto& p : patterns) {
@@ -750,6 +997,7 @@ EventTable variant_filter(const EventTable& df, const Value& admitted, const Pan
     }
     if (ok) kept.insert(key);
   }
+  require_case_index(df, case_column);
   return keep_cases(df, case_column, kept, positive);
 }
 
@@ -806,16 +1054,45 @@ EventTable position_filter(const EventTable& df, const Value& activity, const Pa
   for (std::size_t i = 0; i < df.size(); ++i) {
     const auto& c = df.rows[i][case_column];
     const auto& a = df.rows[i][act];
-    if (!index[i] || !column_equals(a, activity)) continue;
+    if (!index[i] || !column_equals(a, activity, column_dtype(df, act))) continue;
     const auto key = key_of(*c);
     if (first) occurrence.emplace(key, *index[i]);
     else occurrence[key] = *index[i];
   }
+  // Each row looks its case up in the occurrences. A masked integer case
+  // column holding NA is read as float64 for the lookup, so ids one double
+  // holds share an entry: the largest id with an occurrence supplies it.
+  const auto dtype = column_dtype(df, case_column);
+  const bool by_double = masked_dtype(dtype) && (dtype.starts_with("Int") || dtype.starts_with("UInt")) &&
+                         std::any_of(df.rows.begin(), df.rows.end(),
+                                     [&](const auto& row) { return null_cell(row[case_column]); });
+  const auto as_double = [](const python::Scalar& id) {
+    const auto magnitude = static_cast<double>(std::strtoull(id.digits.c_str(), nullptr, 10));
+    return id.negative ? -magnitude : magnitude;
+  };
+  std::map<double, std::pair<python::Scalar, std::int64_t>> by_value;
+  if (by_double)
+    for (std::size_t i = 0; i < df.size(); ++i) {
+      if (!index[i]) continue;
+      const auto found = occurrence.find(key_of(*df.rows[i][case_column]));
+      if (found == occurrence.end()) continue;
+      const auto id = scalar_of(df.rows[i][case_column]);
+      auto [entry, added] = by_value.emplace(as_double(id), std::make_pair(id, found->second));
+      const auto& kept = entry->second.first;
+      if (!added && python::compare_integers(id.negative, id.digits, kept.negative, kept.digits) > 0)
+        entry->second = {id, found->second};
+    }
   std::vector<std::optional<std::int64_t>> temp(df.size());
   bool index_null = false, temp_null = df.empty();
   for (std::size_t i = 0; i < df.size(); ++i) {
     if (!index[i]) {
       index_null = temp_null = true;
+      continue;
+    }
+    if (by_double) {
+      const auto found = by_value.find(as_double(scalar_of(df.rows[i][case_column])));
+      if (found == by_value.end()) temp_null = true;
+      else temp[i] = found->second.second;
       continue;
     }
     const auto found = occurrence.find(key_of(*df.rows[i][case_column]));
@@ -968,7 +1245,8 @@ EventTable pandas_rework_filter_apply(const EventTable& df, const PandasFilterVa
   const auto act = *find_column(df, act_name);
   // The occurrences are counted by a sorted groupby over the matching rows.
   std::vector<bool> matching(df.size());
-  for (std::size_t i = 0; i < df.size(); ++i) matching[i] = column_equals(df.rows[i][act], activity);
+  reject_float16_groupby(df, act);
+  for (std::size_t i = 0; i < df.size(); ++i) matching[i] = column_equals(df.rows[i][act], activity, column_dtype(df, act));
   require_sorted_groupby(df, case_column, &matching);
   std::map<Key, std::int64_t> seen;
   std::set<Key> kept;
@@ -991,69 +1269,198 @@ EventTable pandas_suffix_filter_apply(const EventTable& df, const PandasFilterVa
   return position_filter(df, activity, parameters, false);
 }
 
-// numpy's add for two numeric columns (pandas adds column to column): int64
-// and uint64 wrap around modulo 2**64, bool + bool is logical or, bool joins
-// the other side's integer type, and int64 + uint64 or a float64 side adds as
-// float64. nullopt when either column is not one of those dtypes, so the
-// cells add as Python objects.
-std::optional<python::Scalar> numpy_column_add(const std::string& left, const std::string& right,
-                                               const python::Scalar& a, const python::Scalar& b) {
-  using K = python::Scalar::Kind;
-  const auto numeric = [](const std::string& dtype) {
-    return dtype == "int64" || dtype == "uint64" || dtype == "bool" || dtype == "float64";
-  };
-  if (!numeric(left) || !numeric(right)) return std::nullopt;
-  if (!python::is_number(a) || !python::is_number(b)) return std::nullopt;
-  const auto to_double = [](const python::Scalar& s) {
-    if (s.kind == K::kBool) return s.boolean ? 1.0 : 0.0;
-    if (s.kind == K::kFloat) return s.real;
-    return std::strtod(python::str(s).c_str(), nullptr);
-  };
-  // Two's-complement bits of an integer cell (it fits its column's type).
-  const auto bits = [](const python::Scalar& s) -> std::uint64_t {
-    if (s.kind == K::kBool) return s.boolean ? 1 : 0;
+// A numeric column dtype: numpy's bool, intN, uintN and floatN, or pandas'
+// masked boolean, IntN, UIntN and FloatN (which hold pd.NA).
+struct NumericDtype {
+  enum class Kind { kBool, kSigned, kUnsigned, kFloat };
+  Kind kind = Kind::kBool;
+  int bits = 8;
+  bool masked = false;
+};
+
+std::optional<NumericDtype> numeric_dtype(const std::string& name) {
+  using K = NumericDtype::Kind;
+  if (name == "bool") return NumericDtype{K::kBool, 8, false};
+  if (name == "boolean") return NumericDtype{K::kBool, 8, true};
+  const std::string_view text = name;
+  K kind;
+  std::string_view width;
+  bool masked = false;
+  if (text.starts_with("uint")) { kind = K::kUnsigned; width = text.substr(4); }
+  else if (text.starts_with("int")) { kind = K::kSigned; width = text.substr(3); }
+  else if (text.starts_with("float")) { kind = K::kFloat; width = text.substr(5); }
+  else if (text.starts_with("UInt")) { kind = K::kUnsigned; width = text.substr(4); masked = true; }
+  else if (text.starts_with("Int")) { kind = K::kSigned; width = text.substr(3); masked = true; }
+  else if (text.starts_with("Float")) { kind = K::kFloat; width = text.substr(5); masked = true; }
+  else return std::nullopt;
+  const int bits = width == "8" ? 8 : width == "16" ? 16 : width == "32" ? 32 : width == "64" ? 64 : 0;
+  if (!bits || (kind == K::kFloat && bits == 8) || (masked && kind == K::kFloat && bits == 16)) return std::nullopt;
+  return NumericDtype{kind, bits, masked};
+}
+
+// numpy's result type of a + b (a masked side makes the result masked):
+// bool joins the other side (bool + bool stays bool), integers of one
+// signedness take the wider width, a signed and an unsigned integer take the
+// next signed width that holds both (float64 past 64 bits), and a float side
+// takes the narrowest float that holds both (an 8-bit integer fits float16,
+// a 16-bit one float32, wider ones float64).
+NumericDtype promote(const NumericDtype& a, const NumericDtype& b) {
+  using K = NumericDtype::Kind;
+  NumericDtype result = a;
+  result.masked = a.masked || b.masked;
+  if (a.kind == K::kBool) { result.kind = b.kind; result.bits = b.bits; return result; }
+  if (b.kind == K::kBool) return result;
+  if (a.kind == K::kFloat || b.kind == K::kFloat) {
+    result.kind = K::kFloat;
+    result.bits = 16;
+    for (const auto* side : {&a, &b})
+      result.bits = std::max(result.bits, side->kind == K::kFloat ? side->bits
+                                          : side->bits <= 8 ? 16 : side->bits <= 16 ? 32 : 64);
+  } else if (a.kind == b.kind) {
+    result.bits = std::max(a.bits, b.bits);
+  } else {
+    const auto& signed_side = a.kind == K::kSigned ? a : b;
+    const auto& unsigned_side = a.kind == K::kSigned ? b : a;
+    result.kind = K::kSigned;
+    if (signed_side.bits > unsigned_side.bits) result.bits = signed_side.bits;
+    else if (unsigned_side.bits < 64) result.bits = unsigned_side.bits * 2;
+    else { result.kind = K::kFloat; result.bits = 64; }
+  }
+  return result;
+}
+
+// One run key of two numeric columns: pd.NA, or the sum in the result dtype
+// (integers as two's-complement bits sign- or zero-extended to 64 bits,
+// floats and bools as doubles).
+struct NumericKey {
+  bool na = false;
+  std::uint64_t bits = 0;
+  double real = 0.0;
+};
+
+NumericKey numeric_key(const Cell& left, const NumericDtype& left_dtype, const Cell& right,
+                       const NumericDtype& right_dtype, const NumericDtype& result) {
+  using K = NumericDtype::Kind;
+  NumericKey key;
+  // A missing cell of a masked column is pd.NA (pandas reads NaN into a
+  // masked column as NA); in a numpy column only a float can be missing.
+  const auto value = [&](const Cell& cell, const NumericDtype& dtype, std::uint64_t& bits, double& real) {
+    if (null_cell(cell)) {
+      if (dtype.masked || dtype.kind != K::kFloat) key.na = true;
+      real = std::numeric_limits<double>::quiet_NaN();
+      return;
+    }
+    const auto s = scalar_of(cell);
+    if (s.kind == python::Scalar::Kind::kBool) { bits = s.boolean; real = s.boolean; return; }
+    if (s.kind == python::Scalar::Kind::kFloat) { real = s.real; return; }
     const std::uint64_t magnitude = std::strtoull(s.digits.c_str(), nullptr, 10);
-    return s.negative ? std::uint64_t(0) - magnitude : magnitude;
+    bits = s.negative ? std::uint64_t(0) - magnitude : magnitude;
+    real = s.negative ? static_cast<double>(static_cast<std::int64_t>(bits)) : static_cast<double>(magnitude);
   };
-  if (left == "bool" && right == "bool") return python::boolean(bits(a) | bits(b));
-  if (left == "float64" || right == "float64" || (left == "int64" && right == "uint64") ||
-      (left == "uint64" && right == "int64"))
-    return python::real(to_double(a) + to_double(b));
-  const std::uint64_t sum = bits(a) + bits(b);
-  if (left == "uint64" || right == "uint64") return python::unsigned_integer(sum);
-  return python::integer(static_cast<std::int64_t>(sum));
+  std::uint64_t a_bits = 0, b_bits = 0;
+  double a_real = 0, b_real = 0;
+  value(left, left_dtype, a_bits, a_real);
+  value(right, right_dtype, b_bits, b_real);
+  if (key.na) return key;
+  if (result.kind == K::kBool) {
+    key.bits = (a_bits | b_bits) & 1u;
+    key.real = static_cast<double>(key.bits);
+  } else if (result.kind == K::kFloat) {
+    if (result.bits == 64) key.real = a_real + b_real;
+    else if (result.bits == 32) key.real = static_cast<float>(a_real) + static_cast<float>(b_real);
+    else key.real = half_to_float(float_to_half(half_to_float(float_to_half(static_cast<float>(a_real))) +
+                                                half_to_float(float_to_half(static_cast<float>(b_real)))));
+    if (result.masked && std::isnan(key.real)) key.na = true;
+  } else {
+    std::uint64_t sum = a_bits + b_bits;
+    if (result.bits < 64) {
+      sum &= (std::uint64_t(1) << result.bits) - 1;
+      if (result.kind == K::kSigned && (sum >> (result.bits - 1)) & 1u) sum |= ~((std::uint64_t(1) << result.bits) - 1);
+    }
+    key.bits = sum;
+    key.real = result.kind == K::kSigned ? static_cast<double>(static_cast<std::int64_t>(sum)) : static_cast<double>(sum);
+  }
+  return key;
+}
+
+// Whether row i continues row i - 1's run: pandas compares the key column
+// with its shifted copy. A numpy integer key shifts to float64, so
+// neighbouring keys are equal when their doubles are; float keys compare in
+// their own width (NaN never equal); a bool key shifts to object and compares
+// exactly. A masked key keeps its dtype and an NA comparison starts no run.
+bool same_run(const NumericKey& key, const NumericKey& previous, const NumericDtype& result) {
+  using K = NumericDtype::Kind;
+  if (result.masked) {
+    if (key.na || previous.na) return true;
+    return result.kind == K::kFloat ? key.real == previous.real : key.bits == previous.bits;
+  }
+  if (key.na || previous.na) return false;
+  return result.kind == K::kBool ? key.bits == previous.bits : key.real == previous.real;
 }
 
 EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, const PandasFilterParameters& parameters) {
   const auto case_column = require_column(df, case_key(parameters));
   const auto act = require_column(df, activity_key(parameters));
   const auto filter_type = parameter_or(parameters, "FILTER_TYPE", "filter_type", Value::of("first"));
-  // The run key is case id + activity, row by row over the rows where both
-  // are present: two numeric columns add as numpy does, otherwise two str
-  // concatenate, two numbers add, and the first pair that does not add raises
-  // Python's TypeError.
+  // The run key is case id + activity. Two numeric columns add as numpy or
+  // pandas' masked arrays do; otherwise the cells add as Python objects (two
+  // str concatenate, two numbers add) over the rows where both are present,
+  // and the first pair that does not add raises Python's TypeError.
   const auto dtype = [&](std::size_t c) { return c < df.dtypes.size() ? df.dtypes[c] : std::string("object"); };
-  std::vector<std::optional<python::Scalar>> run_keys(df.size());
-  // A numeric key column is compared with its shifted copy, which pandas
-  // holds as float64: neighbouring int64 or uint64 keys are equal when their
-  // doubles are (a bool key shifts to object and compares exactly).
-  bool float_keys = false;
-  for (std::size_t i = 0; i < df.size(); ++i) {
-    const auto& c = df.rows[i][case_column];
-    const auto& a = df.rows[i][act];
-    if (null_cell(c) || null_cell(a)) continue;
-    const auto x = scalar_of(c), y = scalar_of(a);
-    if (auto sum = numpy_column_add(dtype(case_column), dtype(act), x, y)) {
-      float_keys = float_keys || sum->kind != python::Scalar::Kind::kBool;
-      run_keys[i] = std::move(*sum);
-    } else {
-      run_keys[i] = python_add(x, y);
+  // continues[i]: row i joins row i - 1's run.
+  std::vector<bool> continues(df.size(), false);
+  const auto case_dtype = numeric_dtype(dtype(case_column));
+  const auto act_dtype = numeric_dtype(dtype(act));
+  if (case_dtype && act_dtype) {
+    const auto result = promote(*case_dtype, *act_dtype);
+    if (result.masked && result.kind == NumericDtype::Kind::kFloat && result.bits == 16)
+      fail("TypeError", "FloatingArray does not support np.float16 dtype.");
+    std::vector<NumericKey> keys;
+    keys.reserve(df.size());
+    for (const auto& row : df.rows)
+      keys.push_back(numeric_key(row[case_column], *case_dtype, row[act], *act_dtype, result));
+    for (std::size_t i = 1; i < df.size(); ++i) continues[i] = same_run(keys[i], keys[i - 1], result);
+  } else {
+    // A masked column (the other one is not numeric) adds its stored values
+    // elementwise, so an NA cell takes part as the value stored under the
+    // mask: an int of an IntN/UIntN column, NaN of a FloatN column, a bool of
+    // a boolean column. Its key is NA either way.
+    const auto stored = [&](const Cell& cell, const std::optional<NumericDtype>& dtype) -> Cell {
+      if (!dtype || !dtype->masked || !null_cell(cell)) return cell;
+      const auto& name = cell ? cell->key : std::string();
+      if (dtype->kind == NumericDtype::Kind::kFloat) return float_cell(name, std::numeric_limits<double>::quiet_NaN());
+      if (dtype->kind != NumericDtype::Kind::kBool) return int_cell(name, 1);
+      auto out = make_cell(name, "False", AttributeKind::kBoolean);
+      out.typed_value = false;
+      return out;
+    };
+    for (std::size_t i = 0; i < df.size(); ++i) {
+      const auto c = stored(df.rows[i][case_column], case_dtype);
+      const auto a = stored(df.rows[i][act], act_dtype);
+      if (null_cell(c) || null_cell(a)) {
+        const auto outcome = missing_add_outcome(c, a);
+        if (outcome == 1) break;
+        if (outcome == 2) fail("OverflowError", "int too large to convert to float");
+        continue;
+      }
+      // The first present pair that raises raises the same way below.
+      try {
+        (void)python_add(scalar_of(c), scalar_of(a));
+      } catch (...) {
+        break;
+      }
     }
+    std::vector<std::optional<python::Scalar>> run_keys(df.size());
+    for (std::size_t i = 0; i < df.size(); ++i) {
+      const auto c = stored(df.rows[i][case_column], case_dtype);
+      const auto a = stored(df.rows[i][act], act_dtype);
+      if (null_cell(c) || null_cell(a)) continue;
+      auto key = python_add(scalar_of(c), scalar_of(a));
+      if (!null_cell(df.rows[i][case_column]) && !null_cell(df.rows[i][act])) run_keys[i] = std::move(key);
+    }
+    for (std::size_t i = 1; i < df.size(); ++i)
+      continues[i] = run_keys[i] && run_keys[i - 1] && py_equal(*run_keys[i], *run_keys[i - 1]);
   }
-  if (float_keys)
-    for (auto& key : run_keys)
-      if (key && key->kind != python::Scalar::Kind::kFloat)
-        key = python::real(std::strtod(python::str(*key).c_str(), nullptr));
   const bool first = filter_type.kind == Kind::kString && filter_type.text == "first";
   const bool last = filter_type.kind == Kind::kString && filter_type.text == "last";
   if (!first && !last) {
@@ -1063,9 +1470,7 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
   }
   std::vector<std::vector<std::size_t>> runs;
   for (std::size_t i = 0; i < df.size(); ++i) {
-    const auto& key = run_keys[i];
-    const auto& previous = i ? run_keys[i - 1] : std::nullopt;
-    if (key && previous && py_equal(*key, *previous)) runs.back().push_back(i);
+    if (continues[i]) runs.back().push_back(i);
     else runs.push_back({i});
   }
   return merge_groups(df, runs, first, identity_order(df.columns.size()));
@@ -1102,6 +1507,10 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   const auto case_column = require_column(df, case_name);
   const auto timestamp = require_column(df, timestamp_name);
   if (!first && !last) fail("AttributeError", "'NoneType' object has no attribute 'reset_index'");
+  // The first other column is the first one aggregated.
+  for (std::size_t c = 0; c < df.columns.size(); ++c)
+    if (c != case_column && c != timestamp) reject_float16_aggregation(df, case_column, first, column_dtype(df, c));
+  reject_float16_groupby(df, case_column);
   std::vector<std::vector<std::size_t>> groups;
   // Datetime cells group by their exact instant, so equal instants spelled
   // with Z or +00:00, or with different fractional digits, are one group.
@@ -1152,10 +1561,7 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   if (!out.dtypes.empty() && out.dtypes[0] == "object" && !unique_cases.empty()) {
     bool booleans = false, integers = false, reals = false, strings = false, other = false;
     bool negative = false, above_int64 = false, beyond_uint64 = false;
-    // Datetime keys: all aware or all naive, microsecond unless one needs
-    // nanoseconds, in their one offset (Timestamp objects when they differ).
-    bool dates = false, naive = false, aware = false, nanoseconds = false, mixed_offsets = false;
-    std::optional<std::int32_t> offset;
+    std::vector<Cell> dates;
     for (const auto& cell : unique_cases) {
       const auto n = scalar_number(*cell);
       if (n.kind == ScalarNumber::kBool) booleans = true;
@@ -1166,37 +1572,16 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
         beyond_uint64 = beyond_uint64 || n.beyond_uint64;
       } else if (n.kind == ScalarNumber::kReal) reals = true;
       else if (is_text(cell)) strings = true;
-      else if (date_key(*cell)) {
-        dates = true;
-        const auto* date = std::get_if<NativeDate>(&cell->typed_value);
-        const auto exact = *parse_timestamp_exact(date ? date->value : cell->value);
-        (exact.timezone_aware ? aware : naive) = true;
-        nanoseconds = nanoseconds || exact.nanoseconds % 1000 != 0;
-        if (exact.timezone_aware) {
-          if (offset && *offset != exact.offset_minutes) mixed_offsets = true;
-          offset = exact.offset_minutes;
-        }
-      } else other = true;
+      else if (date_key(*cell)) dates.push_back(cell);
+      else other = true;
     }
     const bool numbers = integers || reals;
     const bool exact_integers = !beyond_uint64 && !(negative && above_int64);
     std::string dtype = "object";
     if (other) dtype = "object";
-    else if (dates) {
-      // Different offsets leave the keys as Timestamp objects.
-      if (!(booleans || numbers || strings) && naive != aware && !mixed_offsets) {
-        dtype = std::string("datetime64[") + (nanoseconds ? "ns" : "us");
-        if (aware) {
-          const auto minutes = *offset;
-          if (minutes == 0) dtype += ", UTC";
-          else {
-            char zone[16];
-            std::snprintf(zone, sizeof(zone), ", UTC%c%02d:%02d", minutes < 0 ? '-' : '+', std::abs(minutes) / 60, std::abs(minutes) % 60);
-            dtype += zone;
-          }
-        }
-        dtype += "]";
-      }
+    else if (!dates.empty()) {
+      if (!(booleans || numbers || strings))
+        if (auto inferred = datetime_dtype(dates)) dtype = std::move(*inferred);
     }
     else if (strings) dtype = booleans || numbers ? "object" : "str";
     else if (booleans) dtype = numbers ? "object" : "bool";
@@ -1218,6 +1603,145 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   return out;
 }
 
+// numpy's str of a float16, float32 or float64 scalar: the shortest digits
+// that read back to the same value in that width, positional from 1e-4 up
+// to 1e3 (float16), 1e6 (float32) or 1e16 (float64), else scientific with a
+// two-digit exponent at least.
+std::string numpy_float_str(double value, int bits) {
+  if (std::isnan(value)) return "nan";
+  if (std::isinf(value)) return value < 0 ? "-inf" : "inf";
+  const double magnitude = std::fabs(value);
+  // digits: the significant digits (no trailing zeros); exponent: the power
+  // of ten of the first one.
+  std::string digits;
+  int exponent = 0;
+  if (bits == 16) {
+    // The shortest digits that read back to the same half; at a power of
+    // two the two neighbours are not equally far, so the digits rounded
+    // either way are tried and the closest one that reads back is taken.
+    const auto half = float_to_half(static_cast<float>(magnitude));
+    for (int count = 1; count <= 5 && digits.empty(); ++count) {
+      char buffer[32];
+      std::snprintf(buffer, sizeof(buffer), "%.*e", count - 1, magnitude);
+      const auto e = std::strchr(buffer, 'e');
+      std::string mantissa(buffer, e);
+      mantissa.erase(std::remove(mantissa.begin(), mantissa.end(), '.'), mantissa.end());
+      const long long rounded = std::stoll(mantissa);
+      const int power = std::atoi(e + 1) - (count - 1);
+      double best = 0;
+      for (long long candidate = rounded - 1; candidate <= rounded + 1; ++candidate) {
+        if (candidate <= 0) continue;
+        const auto text = std::to_string(candidate) + "e" + std::to_string(power);
+        const double read = std::strtod(text.c_str(), nullptr);
+        if (float_to_half(static_cast<float>(read)) != half) continue;
+        // A tie goes to the even last digit.
+        const double distance = std::fabs(read - magnitude);
+        if (!digits.empty() && (distance > best || (distance == best && candidate % 2))) continue;
+        best = distance;
+        digits = std::to_string(candidate);
+        exponent = power + static_cast<int>(digits.size()) - 1;
+      }
+    }
+    if (digits.empty()) digits = "0";
+  } else {
+    char buffer[64];
+    const auto written =
+        bits == 64 ? std::to_chars(buffer, buffer + sizeof(buffer), magnitude, std::chars_format::scientific)
+                   : std::to_chars(buffer, buffer + sizeof(buffer), static_cast<float>(magnitude), std::chars_format::scientific);
+    const std::string_view text(buffer, static_cast<std::size_t>(written.ptr - buffer));
+    const auto e = text.find('e');
+    for (const char c : text.substr(0, e))
+      if (c != '.') digits += c;
+    exponent = std::stoi(std::string(text.substr(e + 1)));
+  }
+  while (digits.size() > 1 && digits.back() == '0') digits.pop_back();
+  const double cutoff = bits == 16 ? 1e3 : bits == 32 ? 1e6 : 1e16;
+  std::string out = std::signbit(value) ? "-" : "";
+  if (magnitude == 0 || (magnitude >= 1e-4 && magnitude < cutoff)) {
+    if (exponent < 0) return out + "0." + std::string(static_cast<std::size_t>(-exponent - 1), '0') + digits;
+    const auto whole = static_cast<std::size_t>(exponent) + 1;
+    if (digits.size() <= whole) return out + digits + std::string(whole - digits.size(), '0') + ".0";
+    return out + digits.substr(0, whole) + "." + digits.substr(whole);
+  }
+  out += digits.substr(0, 1);
+  if (digits.size() > 1) out += "." + digits.substr(1);
+  const auto power = std::to_string(std::abs(exponent));
+  return out + (exponent < 0 ? "e-" : "e+") + (power.size() < 2 ? "0" : "") + power;
+}
+
+// The array np.unique sorts for a numeric case column: the column's own
+// dtype, except that a masked IntN/UIntN column holding NA reads as float64
+// (NA as NaN), a masked FloatN one keeps its width (NA as NaN), and a masked
+// boolean one holding NA is an object array (nullopt here).
+struct NumpyCase {
+  bool nan = false;
+  std::uint64_t bits = 0;
+  double real = 0.0;
+};
+std::optional<NumericDtype> numpy_case_view(const EventTable& df, std::size_t column) {
+  using K = NumericDtype::Kind;
+  auto dtype = numeric_dtype(column_dtype(df, column));
+  if (!dtype) return std::nullopt;
+  const bool na = dtype->masked && std::any_of(df.rows.begin(), df.rows.end(),
+                                                [&](const auto& row) { return null_cell(row[column]); });
+  if (na && dtype->kind == K::kBool) return std::nullopt;
+  if (na && dtype->kind != K::kFloat) return NumericDtype{K::kFloat, 64, false};
+  dtype->masked = false;
+  return dtype;
+}
+NumpyCase numpy_case(const Cell& cell) {
+  NumpyCase out;
+  if (null_cell(cell)) {
+    out.nan = true;
+    out.real = std::numeric_limits<double>::quiet_NaN();
+    return out;
+  }
+  const auto s = scalar_of(cell);
+  if (s.kind == python::Scalar::Kind::kBool) out.bits = s.boolean;
+  else if (s.kind == python::Scalar::Kind::kFloat) {
+    out.real = s.real;
+    out.nan = std::isnan(s.real);
+    return out;
+  } else {
+    const std::uint64_t magnitude = std::strtoull(s.digits.c_str(), nullptr, 10);
+    out.bits = s.negative ? std::uint64_t(0) - magnitude : magnitude;
+    out.real = s.negative ? -static_cast<double>(magnitude) : static_cast<double>(magnitude);
+    return out;
+  }
+  out.real = static_cast<double>(out.bits);
+  return out;
+}
+
+// numpy_value == item for a numpy scalar and a Python item: a number is
+// cast to a float scalar's width, or compared exactly with an integer
+// (an integer against a float as float64); NaN equals nothing.
+bool numpy_equals(const NumpyCase& value, const NumericDtype& view, const python::Scalar& item) {
+  using K = python::Scalar::Kind;
+  if (!python::is_number(item) || value.nan) return false;
+  const bool integral = item.kind != K::kFloat;
+  if (view.kind == NumericDtype::Kind::kFloat || !integral) {
+    const double number = item.kind == K::kFloat  ? item.real
+                          : item.kind == K::kBool ? (item.boolean ? 1.0 : 0.0)
+                                                  : std::strtod(python::str(item).c_str(), nullptr);
+    if (view.kind == NumericDtype::Kind::kFloat) return narrow_float(number, view.bits) == value.real;
+    const double own = view.kind == NumericDtype::Kind::kSigned ? static_cast<double>(static_cast<std::int64_t>(value.bits))
+                                                                : static_cast<double>(value.bits);
+    return own == number;
+  }
+  // Both integers as a sign and a magnitude, which fit in uint64.
+  std::uint64_t magnitude = item.kind == K::kBool && item.boolean ? 1 : 0;
+  if (item.kind == K::kInt) {
+    if (item.digits.size() > 20) return false;
+    if (item.digits.size() == 20 && item.digits > "18446744073709551615") return false;
+    magnitude = std::strtoull(item.digits.c_str(), nullptr, 10);
+  }
+  const bool negative = item.kind == K::kInt && item.negative && magnitude != 0;
+  const bool own_negative =
+      view.kind == NumericDtype::Kind::kSigned && static_cast<std::int64_t>(value.bits) < 0;
+  const std::uint64_t own_magnitude = own_negative ? std::uint64_t(0) - value.bits : value.bits;
+  return own_negative == negative && own_magnitude == magnitude;
+}
+
 EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterValue& activity,
                                        const PandasFilterParameters& parameters) {
   const auto case_column = require_column(df, case_key(parameters));
@@ -1235,16 +1759,61 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
   // walked activities that are `in` the argument, and writes the labels in
   // that order over the case column. Rows of interleaved cases are thereby
   // labelled from other rows, exactly as the reference does.
-  std::vector<python::Scalar> cases;
-  cases.reserve(df.size());
-  for (const auto& row : df.rows) cases.push_back(scalar_of(row[case_column]));
-  std::vector<std::size_t> order;
-  try {
-    order = detail::numpy_object_stable_argsort(cases.size(), [&](std::size_t a, std::size_t b) {
-      return python::compare(cases[a], cases[b]);
-    });
-  } catch (const python::TypeError& error) {
-    fail("TypeError", error.what());
+  // runs: (first position, size, label) of each distinct case in sorted order.
+  struct Run {
+    std::size_t first = 0, size = 0;
+    std::string label;
+  };
+  std::vector<Run> runs;
+  if (const auto view = numpy_case_view(df, case_column)) {
+    // A numeric array sorts by value with NaN last; equal neighbours form a
+    // run and every NaN joins one run (np.unique's equal_nan).
+    using K = NumericDtype::Kind;
+    std::vector<NumpyCase> cases;
+    cases.reserve(df.size());
+    for (const auto& row : df.rows) cases.push_back(numpy_case(row[case_column]));
+    const auto less = [&](const NumpyCase& a, const NumpyCase& b) {
+      if (view->kind == K::kFloat) return !a.nan && (b.nan || a.real < b.real);
+      if (view->kind == K::kSigned) return static_cast<std::int64_t>(a.bits) < static_cast<std::int64_t>(b.bits);
+      return a.bits < b.bits;
+    };
+    std::vector<std::size_t> order(df.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return less(cases[a], cases[b]); });
+    for (std::size_t start = 0; start < order.size();) {
+      std::size_t end = start + 1;
+      while (end < order.size() && !less(cases[order[end - 1]], cases[order[end]]) &&
+             !(cases[order[end]].nan != cases[order[end - 1]].nan))
+        ++end;
+      const auto& value = cases[order[start]];
+      std::string label;
+      if (view->kind == K::kFloat) label = numpy_float_str(value.real, view->bits);
+      else if (view->kind == K::kBool) label = value.bits ? "True" : "False";
+      else if (view->kind == K::kSigned) label = std::to_string(static_cast<std::int64_t>(value.bits));
+      else label = std::to_string(value.bits);
+      runs.push_back({order[start], end - start, std::move(label)});
+      start = end;
+    }
+  } else {
+    std::vector<python::Scalar> cases;
+    cases.reserve(df.size());
+    for (const auto& row : df.rows) cases.push_back(scalar_of(row[case_column]));
+    std::vector<std::size_t> order;
+    try {
+      order = detail::numpy_object_stable_argsort(cases.size(), [&](std::size_t a, std::size_t b) {
+        return python::compare(cases[a], cases[b]);
+      });
+    } catch (const python::TypeError& error) {
+      fail("TypeError", error.what());
+    }
+    for (std::size_t start = 0; start < order.size();) {
+      std::size_t end = start + 1;
+      while (end < order.size() && !(is_nan(cases[order[end]]) || is_nan(cases[order[end - 1]])) &&
+             py_equal(cases[order[end]], cases[order[end - 1]]))
+        ++end;
+      runs.push_back({order[start], end - start, python::str(cases[order[start]])});
+      start = end;
+    }
   }
   // A str argument is one activity; a list, tuple or dict holds them; any
   // other value is not a container.
@@ -1260,9 +1829,16 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
       if (const auto s = scalar_of(key)) cuts.push_back(*s);
     }
   else container = false;
+  // A numeric activity column is read as numpy reads the case column.
+  const auto activity_view = numpy_case_view(df, act);
   const auto is_cut = [&](const Cell& cell) {
     if (!container)
       fail("TypeError", "argument of type '" + type_name(activity) + "' is not a container or iterable");
+    if (activity_view) {
+      const auto value = numpy_case(cell);
+      return std::any_of(cuts.begin(), cuts.end(),
+                         [&](const python::Scalar& cut) { return numpy_equals(value, *activity_view, cut); });
+    }
     const auto value = scalar_of(cell);
     for (const auto& cut : cuts) {
       // `in` matches an element that is the same object or ==: None is
@@ -1274,20 +1850,14 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
   };
   const auto& name = df.columns[case_column];
   std::size_t written = 0;
-  for (std::size_t start = 0; start < order.size();) {
-    std::size_t end = start + 1;
-    while (end < order.size() && !(is_nan(cases[order[end]]) || is_nan(cases[order[end - 1]])) &&
-           py_equal(cases[order[end]], cases[order[end - 1]]))
-      ++end;
-    const auto first = order[start];
-    const auto label = python::str(cases[first]) + separator;
+  for (const auto& run : runs) {
+    const auto label = run.label + separator;
     std::int64_t count = 0;
-    for (std::size_t j = first; j < first + (end - start); ++j) {
+    for (std::size_t j = run.first; j < run.first + run.size; ++j) {
       const auto before = count;
       if (is_cut(df.rows[j][act])) ++count;
       out.rows[written++][case_column] = string_cell(name, label + std::to_string(this_row ? count : before));
     }
-    start = end;
   }
   return out;
 }

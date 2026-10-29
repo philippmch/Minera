@@ -324,8 +324,8 @@ const char* stochastic_map_distribution_name(
   return distribution_name(distribution);
 }
 
-void validate_sparse_stochastic_map(const StochasticMap& map,
-                             std::size_t expected_transition_count) {
+void validate_stochastic_map_structure(const StochasticMap& map,
+                                       std::size_t expected_transition_count) {
   for (std::size_t index = 0; index < map.transitions.size(); ++index) {
     const auto& transition = map.transitions[index];
     if (transition.transition >= expected_transition_count ||
@@ -339,13 +339,20 @@ void validate_sparse_stochastic_map(const StochasticMap& map,
         !std::isfinite(transition.secondary_parameter) ||
         !std::isfinite(transition.tertiary_parameter))
       throw std::invalid_argument("stochastic map: parameters must be finite");
+    (void)timing_name(transition.timing);
+    (void)distribution_name(transition.distribution);
+  }
+}
+
+void validate_sparse_stochastic_map(const StochasticMap& map,
+                             std::size_t expected_transition_count) {
+  validate_stochastic_map_structure(map, expected_transition_count);
+  for (const auto& transition : map.transitions) {
     if ((transition.secondary_parameter < 0.0 &&
          transition.distribution != StochasticMapDistribution::kUniform) ||
         transition.tertiary_parameter < 0.0)
       throw std::invalid_argument(
         "stochastic map: parameters must be non-negative");
-    (void)timing_name(transition.timing);
-    (void)distribution_name(transition.distribution);
     switch (transition.distribution) {
       case StochasticMapDistribution::kExponential:
         if (transition.parameter < 0.0)
@@ -709,7 +716,7 @@ StochasticPetriOptions stochastic_map_to_options(
 }
 
 std::string serialize_stochastic_map_json(const StochasticMap& map) {
-  validate_sparse_stochastic_map(map, std::numeric_limits<std::size_t>::max());
+  validate_stochastic_map_structure(map, std::numeric_limits<std::size_t>::max());
   std::ostringstream out;
   out << "{\"family\":\"STOCHASTIC_MAP\",\"transitions\":[";
   for (std::size_t index = 0; index < map.transitions.size(); ++index) {
