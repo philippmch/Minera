@@ -22,7 +22,7 @@ export type OriginalDiscoveryOperation = keyof typeof ORIGINAL_DISCOVERY_SPECS;
 export const ORIGINAL_DISCOVERY_OPERATIONS = Object.keys(ORIGINAL_DISCOVERY_SPECS) as OriginalDiscoveryOperation[];
 export const ORIGINAL_DISCOVERY_OPTION_MEMBERS = {
  ILPMinerOptions: [["activity_key", '""'], ["artificial_start_activity", '"▶"'], ["artificial_end_activity", '"■"'], ["alpha", "1.0"], ["noise_threshold", "0.0"], ["causal_relation", "[]"], ["max_nodes", "100000"]],
- GeneticMinerOptions: [["activity_key", '""'], ["timestamp_key", '""'], ["case_id_key", '""'], ["seed", "0"], ["population_size", "32"], ["generations", "20"], ["elitism_rate", "0.10"], ["crossover_rate", "0.80"], ["mutation_rate", "0.10"], ["elitism_min_sample", "3"], ["max_activities", "12"], ["max_states", "10000"]],
+ GeneticMinerOptions: [["activity_key", '""'], ["timestamp_key", '""'], ["case_id_key", '""'], ["seed", "0"], ["population_size", "32"], ["generations", "20"], ["elitism_rate", "0.10"], ["crossover_rate", "0.80"], ["mutation_rate", "0.10"], ["elitism_min_sample", "3"], ["max_activities", "64"], ["max_states", "10000"]],
 } as const;
 export interface OriginalDiscoveryForm {operation: OriginalDiscoveryOperation; options: OriginalDiscoveryControl; source: OriginalEditDistanceSource;}
 export const defaultOriginalDiscoveryForm = (operation: OriginalDiscoveryOperation = "mine_ilp"): OriginalDiscoveryForm => ({operation, options: defaultOriginalEditDistanceControl("{}", true), source: {format: "raw_log", shape: "original", controls: {import_options_json: defaultOriginalEditDistanceControl(), selectors_json: defaultOriginalEditDistanceControl(), preparation_options_json: defaultOriginalEditDistanceControl()}}});

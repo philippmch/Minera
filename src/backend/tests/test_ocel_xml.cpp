@@ -31,8 +31,14 @@ int main() {
   assert(xml2.find("time=\"1970-01-01T00:00:00Z\"") !=
          std::string::npos);
   const auto parsed2 = minera::parse_ocel_xml(xml2);
+  // o1 has no base "status": like PM4Py 2.7.22 write_ocel2_xml no null base
+  // entry is written, so the single change reads back as o1's base value.
   assert(parsed2.events.size() == 2 && parsed2.relations.size() == 1 &&
-         parsed2.object_changes.size() == log.object_changes.size());
+         parsed2.object_changes.empty());
+  for (const auto& object : parsed2.objects)
+    if (object.id == "o1")
+      assert(object.attributes.size() == 1 && object.attributes[0].key == "status" &&
+             object.attributes[0].value == minera::OcelValue(std::string("paid")));
 
   std::istringstream input(classic);
   assert(minera::import_ocel_xml(input).objects.size() == 2);

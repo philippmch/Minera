@@ -40,12 +40,17 @@ std::string attr_or(const Node& n, std::string_view key, std::string fallback = 
 }
 
 Node parse_tree(std::string_view xml) {
-  detail::XmlPullParser parser(xml, true);
+  // Coalesced character data keeps whitespace-only and CDATA text: OCEL 2.0
+  // carries attribute values as element text, and the reference keeps a value
+  // such as "  " as is. Only leaf value nodes read their text, so the
+  // indentation this adds to container nodes is never used.
+  detail::XmlPullParser parser(xml, true, true);
   Node root;
   std::vector<Node*> stack;
   while (true) {
     auto token = parser.next();
     if (token.kind == detail::XmlPullParser::Kind::EndOfInput) break;
+    if (token.kind == detail::XmlPullParser::Kind::ProcessingInstruction) continue;
     if (token.kind == detail::XmlPullParser::Kind::CharacterData) {
       if (!stack.empty()) stack.back()->text += token.text;
       continue;
@@ -92,8 +97,8 @@ OcelValue value_node(const Node& n, bool reject_lists) {
   }
   if (name == "null") return nullptr;
   if (name == "boolean" || name == "bool") {
-    if (value == "true" || value == "1" || value == "TRUE") return true;
-    if (value == "false" || value == "0" || value == "FALSE") return false;
+    if (value == "true" || value == "1" || value == "TRUE" || value == "True") return true;
+    if (value == "false" || value == "0" || value == "FALSE" || value == "False") return false;
     throw std::invalid_argument("invalid OCEL XML boolean value");
   }
   if (name == "int" || name == "integer" || name == "long") {
@@ -471,18 +476,21 @@ void collect_standard_types(const Ocel& log, StandardXmlTypeTable& object_types,
     auto& attributes = object_types[object.type];
     for (const auto& attribute : object.attributes) {
       auto& declared = attributes[attribute.key];
-      if (declared.empty()) merge_standard_type(declared, attribute.value);
+      if (declared.empty() && !std::holds_alternative<std::nullptr_t>(attribute.value))
+        merge_standard_type(declared, attribute.value);
     }
   }
   for (const auto& change : log.object_changes) {
     auto& declared = object_types[change.object_type][change.field];
-    if (declared.empty()) merge_standard_type(declared, change.value);
+    if (declared.empty() && !std::holds_alternative<std::nullptr_t>(change.value))
+      merge_standard_type(declared, change.value);
   }
   for (const auto& event : log.events) {
     auto& attributes = event_types[event.activity];
     for (const auto& attribute : event.attributes) {
       auto& declared = attributes[attribute.key];
-      if (declared.empty()) merge_standard_type(declared, attribute.value);
+      if (declared.empty() && !std::holds_alternative<std::nullptr_t>(attribute.value))
+        merge_standard_type(declared, attribute.value);
     }
   }
 }
@@ -501,10 +509,19 @@ void write_standard_type_table(std::ostream& out, std::string_view container,
   }
   out << "  </" << container << ">\n";
 }
-void write_value(std::ostream& out, const OcelValue& v, std::string_view key, std::string_view indent, bool standard = false, std::string_view time = {}) { const auto tag = standard ? "attribute" : value_tag(v); out << indent << '<' << tag << " name=\"" << esc(key) << "\""; if (standard) out << " type=\"" << value_tag(v) << "\""; else out << " key=\"" << esc(key) << "\""; if (!time.empty()) out << " time=\"" << esc(time) << "\"";
+void write_value(std::ostream& out, const OcelValue& v, std::string_view key, std::string_view indent, bool standard = false, std::string_view time = {}) {
+  // PM4Py 2.7.22 write_ocel2_xml leaves null values out; its reader calls
+  // float(None) on an empty float element, so OCEL 2.0 never writes one.
+  if (standard && std::holds_alternative<std::nullptr_t>(v)) return;
+  const auto tag = standard ? "attribute" : value_tag(v); out << indent << '<' << tag << " name=\"" << esc(key) << "\""; if (standard) out << " type=\"" << value_tag(v) << "\""; else out << " key=\"" << esc(key) << "\""; if (!time.empty()) out << " time=\"" << esc(time) << "\"";
   // OCEL 2.0 carries the value as element text, which the reference reads;
   // the legacy format keeps it in the value attribute.
-  if (standard) out << '>' << esc(value_text(v)) << "</attribute>\n";
+  // Booleans as Python's str(True)/str(False), the text the reference writes
+  // and reads back.
+  if (standard) {
+    const auto* flag = std::get_if<bool>(&v);
+    out << '>' << esc(flag ? (*flag ? "True" : "False") : value_text(v)) << "</attribute>\n";
+  }
   else out << " value=\"" << esc(value_text(v)) << "\"/>\n"; }
 
 }  // namespace
@@ -599,9 +616,7 @@ void write_ocel_xml(std::ostream& out, const Ocel& log,
     out << "    <object id=\"" << esc(object->id) << "\" type=\""
         << esc(object->type) << "\">\n      <attributes>\n";
     const auto static_attributes = sorted_attrs(object->attributes);
-    std::set<std::string> static_fields;
     for (const auto* attribute : static_attributes) {
-      static_fields.insert(attribute->key);
       write_value(out, attribute->value, attribute->key, "        ", true,
                   "1970-01-01T00:00:00Z");
     }
@@ -613,17 +628,12 @@ void write_ocel_xml(std::ostream& out, const Ocel& log,
       return std::tie(left->timestamp, left->field, left->object_type) <
              std::tie(right->timestamp, right->field, right->object_type);
     });
-    std::set<std::string> seeded_fields;
-    for (const auto* change : changes) {
-      if (!static_fields.count(change->field) &&
-          seeded_fields.insert(change->field).second) {
-        OcelValue missing = nullptr;
-        write_value(out, missing, change->field, "        ", true,
-                    "1970-01-01T00:00:00Z");
-      }
+    // Like the reference, a field without a base value gets no null base
+    // entry: its first change reads back as the base, as PM4Py reads its own
+    // export.
+    for (const auto* change : changes)
       write_value(out, change->value, change->field, "        ", true,
                   change->timestamp);
-    }
     out << "      </attributes>\n";
     std::vector<const OcelO2oRelation*> relations;
     for (const auto& relation : log.o2o)

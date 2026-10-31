@@ -383,6 +383,41 @@ void ocel_wall_clock_order(){
  for(const auto& a:xml_back.events.at(0).attributes)cost|=a.key=="cost"&&a.value==OcelValue(std::int64_t{5});
  for(const auto& a:xml_back.objects.at(0).attributes)status|=a.key=="status"&&a.value==OcelValue(std::string("a<b&c"));
  check(cost&&status&&xml_back.object_changes.size()==2,"OCEL 2.0 XML element-text values read back");
+ // Whitespace-only and CDATA text are values too: PM4Py 2.7.22 read_ocel2_xml
+ // keeps "  " and "\n", and so must our reader of our own export.
+ auto spaced=changed;
+ spaced.events[0].attributes.push_back({"blank",std::string("  ")});
+ spaced.events[0].attributes.push_back({"line",std::string("\n")});
+ const auto spaced_back=parse_ocel_xml(serialize_ocel_xml(spaced,standard_xml));
+ bool blank=false,line=false;
+ for(const auto& a:spaced_back.events.at(0).attributes){blank|=a.key=="blank"&&a.value==OcelValue(std::string("  "));line|=a.key=="line"&&a.value==OcelValue(std::string("\n"));}
+ check(blank&&line,"OCEL 2.0 XML keeps whitespace-only values");
+ const auto cdata=parse_ocel_xml(R"(<?xml version="1.0"?><log><object-types/><event-types><event-type name="A"><attributes><attribute name="s" type="string"/></attributes></event-type></event-types><objects/><events><event id="e1" type="A" time="2020-01-01T00:00:00Z"><attributes><attribute name="s"><![CDATA[a<b]]> c</attribute></attributes><objects/></event></events></log>)");
+ check(cdata.events.at(0).attributes.size()==1&&cdata.events[0].attributes[0].value==OcelValue(std::string("a<b c")),"OCEL 2.0 XML reads CDATA text");
+ // Nulls are left out and booleans written as Python text, as PM4Py's writer
+ // does: read_ocel2_xml of this export gives f [1.5, nan] and flag ['True',
+ // 'False'], the same as for PM4Py's own export of the log (it raised
+ // float(None) on the empty null element before).
+ Ocel nulls=changed;
+ nulls.events.push_back(nulls.events[0]);nulls.events[1].id="e2";
+ nulls.events[0].attributes={{"f",1.5},{"flag",true}};
+ nulls.events[1].attributes={{"f",nullptr},{"flag",false}};
+ nulls.objects[0].attributes.push_back({"gone",nullptr});
+ const auto null_xml=serialize_ocel_xml(nulls,standard_xml);
+ check(null_xml.find(R"(type="null")")==std::string::npos&&null_xml.find(R"(name="gone" type="string" time)")==std::string::npos&&
+       null_xml.find(R"(<attribute name="f" type="float"/>)")!=std::string::npos&&
+       null_xml.find(R"(<attribute name="flag" type="boolean">True</attribute>)")!=std::string::npos&&
+       null_xml.find(R"(<attribute name="flag" type="boolean">False</attribute>)")!=std::string::npos,"OCEL 2.0 XML omits nulls and writes Python booleans");
+ const auto null_back=parse_ocel_xml(null_xml);
+ bool flags=false;
+ for(const auto& e:null_back.events)for(const auto& a:e.attributes)if(a.key=="flag")flags|=e.id=="e2"&&a.value==OcelValue(false);
+ check(flags&&null_back.events.size()==2,"OCEL 2.0 XML Python booleans read back");
+ // A field with changes but no base value: no null base entry, so the first
+ // change reads back as the base (PM4Py reads its own export the same way).
+ Ocel unseeded=changed;
+ unseeded.objects[0].attributes.clear();
+ const auto unseeded_back=parse_ocel_xml(serialize_ocel_xml(unseeded,standard_xml));
+ check(unseeded_back.objects.at(0).attributes.size()==1&&unseeded_back.object_changes.size()==1,"OCEL 2.0 XML seeds no null base entry");
 }
 
 // K1: a nanosecond duration beyond int64 overflows as in the reference; a
