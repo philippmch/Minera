@@ -19,6 +19,16 @@ export function initialTab(data: MineraExport): Tab {
 }
 
 /**
+ * The view to render for the selected tab. A re-mine keeps the selected tab,
+ * but the new analysis may no longer offer it (no traces, no timestamps, no
+ * conformance); the first available view is shown instead, falling back to
+ * the directly-follows graph.
+ */
+export function displayedTab(tab: Tab, available: readonly Tab[]): Tab {
+  return available.includes(tab) ? tab : available[0] ?? "dfg";
+}
+
+/**
  * Whether any miner setting deviates from the backend defaults; drives the
  * same "active" badge as the filters. Zero is a meaningful threshold for the
  * heuristic settings, so for those only absence means default.

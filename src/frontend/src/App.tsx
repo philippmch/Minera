@@ -145,6 +145,7 @@ import {
   delimiterForFile,
   hasActiveFilters,
   hasActiveMinerOptions,
+  displayedTab,
   initialTab,
   isJsonExport,
   logLifecycles,
@@ -682,6 +683,7 @@ export default function App() {
         return true;
       })
     : [];
+  const shownTab = displayedTab(tab, views.map((item) => item.id));
   const datasetCard: SidebarDataset | null = data
     ? { kind: "Event log", name: data.dataset, detail: `${numberFormat.format(data.trace_count)} cases · ${numberFormat.format(data.event_count)} events` }
     : ocelResult
@@ -718,7 +720,7 @@ export default function App() {
       <Sidebar
         dataset={datasetCard}
         views={views}
-        activeView={tab}
+        activeView={shownTab}
         onSelectView={selectView}
         workspace={workspace}
         activeTool={tool}
@@ -853,8 +855,10 @@ export default function App() {
     );
   }
   const maxEdge = maxEdgeCount(data);
-  const view = viewById(views.some((item) => item.id === tab) ? tab : views[0]?.id ?? "dfg");
-  const exportable = tab!=="llm"&&tab!=="query"&&tab!=="embeddings"&&tab!=="anonymization";
+  // The body, header and sidebar all follow the view actually shown: a re-mine
+  // (applyFilters keeps the tab) can remove the view that was selected.
+  const view = viewById(shownTab);
+  const exportable = shownTab!=="llm"&&shownTab!=="query"&&shownTab!=="embeddings"&&shownTab!=="anonymization";
   return shell(
     <>
       <PageHeader
@@ -864,8 +868,8 @@ export default function App() {
         actions={exportable ? exportToggle : undefined}
       />
       {error && <div className="error-banner">{error}</div>}
-      {exportable && exportOpen && <VisualizationExplain key={cacheGeneration.current+":"+tab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");setExportOpen(false);}} />}
-      {(tab === "log" || tab === "dotted" || tab === "dfg") && <Kpis data={data} />}
+      {exportable && exportOpen && <VisualizationExplain key={cacheGeneration.current+":"+shownTab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");setExportOpen(false);}} />}
+      {(shownTab === "log" || shownTab === "dotted" || shownTab === "dfg") && <Kpis data={data} />}
       {exactInspection&&<details className="exact-result"><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}
       {source && (
         <Filters
@@ -883,12 +887,12 @@ export default function App() {
       )}
     </>,
     <>
-      {tab === "log" && (
+      {shownTab === "log" && (
         <main className="layout-log">
           <EventLogView data={data} />
         </main>
       )}
-      {tab === "model" && (
+      {shownTab === "model" && (
         <main className="layout-log">
           <ProcessModel
             onOpenPlayout={loadFile}
@@ -906,16 +910,16 @@ export default function App() {
           />
         </main>
       )}
-      {tab === "dotted" && (
+      {shownTab === "dotted" && (
         <main className="layout-log">
           <DottedChartView data={data} />
           <PerformanceSpectrumView data={data} />
           <Batches data={data} />
         </main>
       )}
-      {tab === "timing" && <TimingDiscovery key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/>}
-      {tab === "behavior" && <BehaviorAnalysis key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/>}
-      {tab === "conformance" && (
+      {shownTab === "timing" && <TimingDiscovery key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/>}
+      {shownTab === "behavior" && <BehaviorAnalysis key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/>}
+      {shownTab === "conformance" && (
         <main className="layout-log">
           <Conformance
             onOpenSimulation={loadFile}
@@ -940,22 +944,22 @@ export default function App() {
           />
         </main>
       )}
-      {tab === "resources" && (
+      {shownTab === "resources" && (
         <main className="layout-log">
           <Resources key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} />
         </main>
       )}
-      {tab === "embeddings" && (
+      {shownTab === "embeddings" && (
         <main className="layout-log">
           <EmbeddingSearch key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} />
         </main>
       )}
-      {tab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} data={data} mining={mining} available={sourceAvailable} onOpenFiltered={loadFile} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></main>}
-      {tab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} sourceId={source?.source_id} sourceOptions={source ? {miningInputShape:source.shape,miningSelectors:source.selectors} : undefined} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)} /></main>}
-      {tab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} onOpenReleased={loadFile} /></main>}
-      {tab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} onOpenCluster={loadFile} /></main>}
-      {tab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={sourceAvailable} file={source?.file??null} sourceFormat={source?.format} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey,inferLegacyBoundaries)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries});setTab("conformance");}} /></main>}
-      {tab === "dfg" && (
+      {shownTab === "llm" && <main className="layout-log"><AskModel key={cacheGeneration.current+":"+(visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft.id:"")} data={data} mining={mining} available={sourceAvailable} onOpenFiltered={loadFile} visualization={visualizationDraft?.generation===cacheGeneration.current?visualizationDraft.draft:null} /></main>}
+      {shownTab === "query" && <main className="layout-log"><QueryWorkspace key={cacheGeneration.current} data={data} sourceId={source?.source_id} sourceOptions={source ? {miningInputShape:source.shape,miningSelectors:source.selectors} : undefined} available={sourceAvailable} mining={mining} onOpenFiltered={(file,options)=>loadFile(file,undefined,undefined,options)} /></main>}
+      {shownTab === "anonymization" && <main className="layout-log"><AnonymizationWorkspace key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} onOpenReleased={loadFile} /></main>}
+      {shownTab === "clustering" && <main className="layout-log"><ClusteringWorkspace key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining} onOpenCluster={loadFile} /></main>}
+      {shownTab === "transformation" && <main className="layout-log"><TransformationHub key={cacheGeneration.current} data={data} available={sourceAvailable} file={source?.file??null} sourceFormat={source?.format} mining={mining} onOpenTransformed={loadFile} onUseModel={(file,sourceId,activityKey,inferLegacyBoundaries)=>{setDiscoveryModelDraft({generation:cacheGeneration.current,file,sourceId,activityKey,inferLegacyBoundaries});setTab("conformance");}} /></main>}
+      {shownTab === "dfg" && (
         <main className="layout">
           <Advanced className="dfg-discovery-section" title="Configure DFG discovery" hint="Statistical and causal DFG variants on the current source"><DfgDiscovery key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/></Advanced>
           <ProcessMap
