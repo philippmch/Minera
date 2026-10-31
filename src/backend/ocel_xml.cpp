@@ -85,12 +85,27 @@ std::vector<const Node*> children(const Node& n, std::string_view name) {
   return out;
 }
 
+// Python's float()/int() and the reference's date parser accept text with
+// surrounding whitespace (a pretty-printed "<attribute>\n  4.5\n</attribute>"),
+// so typed values are read without it; strings keep theirs.
+std::string strip_xml_space(std::string value) {
+  constexpr std::string_view space = " \t\n\r\v\f";
+  const auto first = value.find_first_not_of(space);
+  if (first == std::string::npos) return {};
+  return value.substr(first, value.find_last_not_of(space) - first + 1);
+}
+
 OcelValue value_node(const Node& n, bool reject_lists) {
   const auto name = local(n.name);
   std::string value = attr_or(n, "value", n.text);
+  if (name == "boolean" || name == "bool" || name == "int" || name == "integer" ||
+      name == "long" || name == "float" || name == "double" || name == "number" ||
+      name == "date" || name == "timestamp")
+    value = strip_xml_space(std::move(value));
   if (name == "attribute") {
     const auto type = attr_or(n, "type", "string");
-    if (type == "string" || type == "date" || type == "timestamp") return value;
+    if (type == "date" || type == "timestamp") return strip_xml_space(std::move(value));
+    if (type == "string") return value;
     Node typed = n;
     typed.name = type;
     return value_node(typed, reject_lists);

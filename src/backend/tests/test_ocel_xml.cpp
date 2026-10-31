@@ -1,7 +1,9 @@
 #include "minera/ocel_xml.hpp"
 
 #include <cassert>
+#include <cstdint>
 #include <sstream>
+#include <variant>
 
 int main() {
   minera::Ocel log;
@@ -184,5 +186,39 @@ int main() {
     missing_change_time = true;
   }
   assert(missing_change_time);
+
+  // Typed values with surrounding whitespace read like PM4Py's float()/int()
+  // and date parser; string values keep their whitespace.
+  const auto spaced = minera::parse_ocel_xml(R"xml(
+<log><object-types><object-type name="Order"><attributes>
+  <attribute name="w" type="float"/><attribute name="n" type="integer"/>
+  <attribute name="ok" type="boolean"/><attribute name="due" type="date"/>
+  <attribute name="s" type="string"/>
+</attributes></object-type></object-types>
+<event-types><event-type name="A"/></event-types>
+<objects><object id="o1" type="Order"><attributes>
+  <attribute name="w" time="0">
+    4.5
+  </attribute>
+  <attribute name="n" time="0"> 3
+</attribute>
+  <attribute name="ok" time="0">	True </attribute>
+  <attribute name="due" time="0">
+    2024-01-02T00:00:00Z
+  </attribute>
+  <attribute name="s" time="0"> x </attribute>
+</attributes></object></objects>
+<events><event id="e1" type="A" time="2024-01-01T00:00:00Z"><objects>
+  <relationship object-id="o1" qualifier=""/></objects></event></events></log>
+)xml");
+  assert(spaced.objects.size() == 1);
+  for (const auto& attribute : spaced.objects[0].attributes) {
+    if (attribute.key == "w") assert(std::get<double>(attribute.value) == 4.5);
+    if (attribute.key == "n") assert(std::get<std::int64_t>(attribute.value) == 3);
+    if (attribute.key == "ok") assert(std::get<bool>(attribute.value));
+    if (attribute.key == "due")
+      assert(std::get<std::string>(attribute.value) == "2024-01-02T00:00:00Z");
+    if (attribute.key == "s") assert(std::get<std::string>(attribute.value) == " x ");
+  }
   return 0;
 }
