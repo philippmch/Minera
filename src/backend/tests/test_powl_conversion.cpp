@@ -3,6 +3,7 @@
 #include "minera/pnml.hpp"
 
 #include <cassert>
+#include <chrono>
 #include <iostream>
 #include <map>
 #include <set>
@@ -701,6 +702,44 @@ void workflow_net_to_powl_matches_reference() {
 
 }  // namespace
 
+// A wide partial order of loop and choice nodes chained in N shapes is not
+// series-parallel, so every node is a reduced region of one partial order.
+// The region search must stay polynomial of low degree: this net once took
+// about 25 seconds to convert.
+void workflow_net_partial_order_regions_convert_quickly() {
+  constexpr std::size_t kNodes = 40;
+  std::vector<PowlNode> nodes;
+  for (std::size_t index = 0; index < kNodes; ++index) {
+    const auto label = "a" + std::to_string(index);
+    if (index % 2)
+      nodes.push_back(PowlNode::xor_node(
+          {PowlNode::transition(label), PowlNode::silent()}));
+    else
+      nodes.push_back(PowlNode::loop(PowlNode::transition(label),
+                                     PowlNode::transition("r" + std::to_string(index))));
+  }
+  std::vector<std::pair<std::size_t, std::size_t>> order;
+  for (std::size_t index = 0; index + 3 < kNodes; index += 2) {
+    order.emplace_back(index, index + 2);
+    order.emplace_back(index, index + 3);
+    order.emplace_back(index + 1, index + 3);
+  }
+  const auto net =
+      minera::to_petri_net(PowlNode::strict_partial_order(std::move(nodes), order));
+  const auto started = std::chrono::steady_clock::now();
+  const auto model = minera::to_powl(net);
+  assert(model.kind() == minera::PowlNodeKind::kStrictPartialOrder);
+  bool rejected = false;
+  try {
+    (void)minera::to_process_tree(net);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+  const auto elapsed = std::chrono::steady_clock::now() - started;
+  assert(elapsed < std::chrono::seconds(5));
+}
+
 int main() {
   process_tree_to_powl_variations();
   powl_to_process_tree_preserves_blocks_and_frequencies();
@@ -711,5 +750,6 @@ int main() {
   workflow_boundaries_are_inferred_and_normalized();
   workflow_net_to_process_tree_matches_reference();
   workflow_net_to_powl_matches_reference();
+  workflow_net_partial_order_regions_convert_quickly();
   std::cout << "POWL conversion tests passed\n";
 }

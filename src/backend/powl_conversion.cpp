@@ -1156,36 +1156,56 @@ class PetriToPowlBuilder {
   // transitions may return to the entry or consume the exit to repeat, as a
   // loop does. A reduced net between the two places then behaves as one node
   // of the surrounding partial order.
-  std::optional<IdSet> region(const Fragment& fragment, std::size_t entry,
-                              std::size_t exit) const {
+  // Place-indexed views of a fragment, built once per partial order so the
+  // region search does not rescan every transition for every place.
+  struct FragmentIndex {
+    std::map<std::size_t, IdSet> producing;
+    std::map<std::size_t, IdSet> consuming;
+    std::map<std::size_t, IdSet> touching;
+    std::map<std::size_t, IdSet> after;   // transitions reachable from a place
+    std::map<std::size_t, IdSet> before;  // transitions reaching a place
+  };
+
+  static const IdSet& lookup(const std::map<std::size_t, IdSet>& index,
+                             std::size_t place) {
+    static const IdSet empty;
+    const auto it = index.find(place);
+    return it == index.end() ? empty : it->second;
+  }
+
+  IdSet reach(const FragmentIndex& index, std::size_t from, bool forward) const {
+    IdSet found;
+    IdSet seen{from};
+    std::queue<std::size_t> places;
+    places.push(from);
+    while (!places.empty()) {
+      const auto place = places.front();
+      places.pop();
+      for (const auto transition :
+           lookup(forward ? index.consuming : index.producing, place)) {
+        if (!found.insert(transition).second) continue;
+        const auto& far = forward ? transition_outputs_[transition]
+                                  : transition_inputs_[transition];
+        for (const auto next : far)
+          if (seen.insert(next).second) places.push(next);
+      }
+    }
+    return found;
+  }
+
+  // The single-entry single-exit region of the fragment between `entry` and
+  // `exit`: the transitions that follow the entry and precede the exit,
+  // provided every other place they touch is internal to them. Its
+  // transitions may return to the entry or consume the exit to repeat, as a
+  // loop does. A reduced net between the two places then behaves as one node
+  // of the surrounding partial order. `result` is the candidate set, the
+  // intersection of the entry's forward and the exit's backward reach.
+  std::optional<IdSet> region(const Fragment& fragment,
+                              const FragmentIndex& index, std::size_t entry,
+                              std::size_t exit, IdSet result) const {
     if (entry == exit || fragment.ends.contains(entry) ||
         fragment.starts.contains(exit))
       return std::nullopt;
-    const auto reach = [&](std::size_t from, bool forward) {
-      IdSet found;
-      IdSet seen{from};
-      std::queue<std::size_t> places;
-      places.push(from);
-      while (!places.empty()) {
-        const auto place = places.front();
-        places.pop();
-        for (const auto transition : fragment.transitions) {
-          const auto& near = forward ? transition_inputs_[transition]
-                                     : transition_outputs_[transition];
-          if (!near.contains(place) || !found.insert(transition).second) continue;
-          const auto& far = forward ? transition_outputs_[transition]
-                                    : transition_inputs_[transition];
-          for (const auto next : far)
-            if (seen.insert(next).second) places.push(next);
-        }
-      }
-      return found;
-    };
-    const auto after = reach(entry, true);
-    const auto before = reach(exit, false);
-    IdSet result;
-    std::set_intersection(after.begin(), after.end(), before.begin(),
-                          before.end(), std::inserter(result, result.end()));
     if (result.empty() || result == fragment.transitions) return std::nullopt;
     const auto result_places = places_of(result);
     if (!result_places.contains(entry) || !result_places.contains(exit))
@@ -1197,12 +1217,11 @@ class PetriToPowlBuilder {
       produces_exit |= transition_outputs_[transition].contains(exit);
     }
     if (!consumes_entry || !produces_exit) return std::nullopt;
-    for (const auto transition : fragment.transitions) {
-      if (result.contains(transition)) continue;
-      for (const auto place : transition_inputs_[transition])
-        if (place != exit && result_places.contains(place)) return std::nullopt;
-      for (const auto place : transition_outputs_[transition])
-        if (place != entry && result_places.contains(place)) return std::nullopt;
+    for (const auto place : result_places) {
+      if (place != exit && !subset(lookup(index.consuming, place), result))
+        return std::nullopt;
+      if (place != entry && !subset(lookup(index.producing, place), result))
+        return std::nullopt;
     }
     for (const auto place : result_places) {
       if (place == entry || place == exit) continue;
@@ -1215,9 +1234,10 @@ class PetriToPowlBuilder {
   std::vector<OrderNode> order_nodes(const Fragment& fragment) const {
     std::map<std::size_t, std::size_t> producers;
     std::map<std::size_t, std::size_t> consumers;
-    std::map<std::size_t, IdSet> producing;
-    std::map<std::size_t, IdSet> consuming;
-    std::map<std::size_t, IdSet> touching;
+    FragmentIndex index;
+    auto& producing = index.producing;
+    auto& consuming = index.consuming;
+    auto& touching = index.touching;
     for (const auto transition : fragment.transitions) {
       for (const auto place : transition_outputs_[transition]) {
         ++producers[place];
@@ -1266,13 +1286,50 @@ class PetriToPowlBuilder {
             return resolves(known.transitions);
           }))
         continue;
+      // Candidates are tried in the same (entry, exit) order as an
+      // exhaustive scan, and only the strictly smaller one replaces the
+      // best, so the cheap necessary conditions below skip pairs without
+      // changing the region chosen: a resolving region lies inside the
+      // entry's forward and the exit's backward reach, so each reach must
+      // already hold all but the allowed outside producers and consumers
+      // of the place, and a candidate no smaller than the best never wins.
+      const auto reach_resolves = [&](const IdSet& reached) {
+        if (!intersects(touching[place], reached)) return false;
+        std::size_t outside_producers = 0;
+        std::size_t outside_consumers = 0;
+        for (const auto transition : producing[place])
+          outside_producers += reached.contains(transition) ? 0 : 1;
+        for (const auto transition : consuming[place])
+          outside_consumers += reached.contains(transition) ? 0 : 1;
+        return outside_producers <= (start ? 0u : 1u) &&
+               outside_consumers <= (end ? 0u : 1u);
+      };
+      const auto reach_of = [&](std::map<std::size_t, IdSet>& cache,
+                                std::size_t from, bool forward) -> const IdSet& {
+        auto it = cache.find(from);
+        if (it == cache.end())
+          it = cache.emplace(from, reach(index, from, forward)).first;
+        return it->second;
+      };
+      std::vector<std::size_t> exits;
+      for (const auto exit : places)
+        if (reach_resolves(reach_of(index.before, exit, false))) exits.push_back(exit);
       std::optional<Region> best;
       for (const auto entry : places) {
-        for (const auto exit : places) {
-          auto candidate = region(fragment, entry, exit);
-          if (!candidate || !resolves(*candidate)) continue;
-          if (!best || candidate->size() < best->transitions.size())
-            best = Region{std::move(*candidate), entry, exit};
+        const auto& after = reach_of(index.after, entry, true);
+        if (exits.empty() || !reach_resolves(after)) continue;
+        for (const auto exit : exits) {
+          const auto& before = index.before.at(exit);
+          IdSet candidate_set;
+          std::set_intersection(after.begin(), after.end(), before.begin(),
+                                before.end(),
+                                std::inserter(candidate_set, candidate_set.end()));
+          if (best && candidate_set.size() >= best->transitions.size()) continue;
+          if (!resolves(candidate_set)) continue;
+          auto candidate =
+              region(fragment, index, entry, exit, std::move(candidate_set));
+          if (!candidate) continue;
+          best = Region{std::move(*candidate), entry, exit};
         }
       }
       if (!best) not_block_structured();
