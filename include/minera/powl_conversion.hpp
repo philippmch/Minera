@@ -37,6 +37,9 @@ namespace minera {
 // deterministic labels and recognizes exclusive, loop, sequence, and
 // partial-order fragments. Extended arcs and nets whose structure cannot be
 // proven to fit those fragments are rejected.
+// Like the reference convert_to_powl, a loop whose redo part leaves from a
+// place the net continues from, or whose do part repeats through the loop's
+// end place, is rejected, although to_process_tree converts it.
 [[nodiscard]] PowlNode to_powl(const PetriNet& net);
 
 }  // namespace minera

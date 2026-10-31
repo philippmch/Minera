@@ -9,6 +9,11 @@ orders over choice and loop nodes that are not series-parallel. Each net is
 recorded with its complete language up to four visible events, checked to equal
 the language of the reference's converted POWL model.
 
+It also keeps heuristics nets of the tree capture's seeded playouts that
+`convert_to_process_tree` converts but `convert_to_powl` rejects (a loop whose
+redo part leaves from a place the sequence continues from), each with its
+language up to four visible events, which the reference tree shares.
+
     python -I -B scripts/capture-workflow-net-powl-reference.py \\
         --output src/backend/tests/workflow_net_powl_reference_cases.inc
 """
@@ -40,6 +45,9 @@ language = _tree_capture.language
 MAX_LENGTH = 4
 SEEDS = range(0, 400)
 CASE_COUNT = 5
+TREE_ONLY_SEEDS = range(1000, 1400)
+TREE_ONLY_COUNT = 4
+TREE_ONLY_MAX_TRANSITIONS = 12
 
 
 def seeded_log(seed):
@@ -60,6 +68,14 @@ def seeded_log(seed):
             trace.append(Event({"concept:name": activity}))
         log.append(trace)
     return log
+
+
+def converts_to_powl(net, initial, final):
+    try:
+        pm4py.convert_to_powl(net, initial, final)
+    except Exception:  # noqa: BLE001 - the reference raises plain exceptions
+        return False
+    return True
 
 
 def converts_to_tree(net, initial, final):
@@ -103,6 +119,34 @@ def main():
             break
     if count != CASE_COUNT:
         raise RuntimeError("not enough POWL-only nets")
+    lines.append("};")
+
+    lines.append("// Workflow nets the reference converts to a process tree (with this")
+    lines.append("// language) but not to POWL.")
+    lines.append("const std::vector<ReferenceWorkflowCase> kReferencePowlRejectedTreeCases{")
+    count = 0
+    for seed in TREE_ONLY_SEEDS:
+        net, initial, final = pm4py.discover_petri_net_heuristics(
+            _tree_capture.seeded_log(seed))
+        if (len(net.transitions) > TREE_ONLY_MAX_TRANSITIONS or
+                not _tree_capture.is_workflow_shape(net) or
+                not converts_to_tree(net, initial, final) or
+                converts_to_powl(net, initial, final)):
+            continue
+        tree = pm4py.convert_to_process_tree(net, initial, final)
+        traces = language(net, initial, final, MAX_LENGTH)
+        if traces != language(*pm4py.convert_to_petri_net(tree), MAX_LENGTH):
+            raise RuntimeError(f"reference tree language differs for seed {seed}")
+        rows = ",\n      ".join(
+            "{" + ", ".join(cpp_string(activity) for activity in trace) + "}"
+            for trace in sorted(traces))
+        lines.append(f"  {{{cpp_string(f'heuristics net of seed {seed}')},\n   "
+                     f"{cpp_string(compact_pnml(net, initial, final))},\n   {{{rows}}}}},")
+        count += 1
+        if count == TREE_ONLY_COUNT:
+            break
+    if count != TREE_ONLY_COUNT:
+        raise RuntimeError("not enough tree-only nets")
     lines.append("};")
     arguments.output.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

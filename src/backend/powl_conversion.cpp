@@ -580,7 +580,8 @@ class PetriToPowlBuilder {
   };
 
  public:
-  explicit PetriToPowlBuilder(const PetriNet& net) : net_(net) {}
+  PetriToPowlBuilder(const PetriNet& net, bool reference_powl_loops)
+      : net_(net), reference_powl_loops_(reference_powl_loops) {}
 
   PowlNode run() {
     if (net_.has_extended_arcs()) {
@@ -611,6 +612,12 @@ class PetriToPowlBuilder {
 
  private:
   const PetriNet& net_;
+  // The reference's net-to-POWL conversion, unlike its net-to-tree
+  // conversion, rejects a loop whose redo part leaves from a place the
+  // fragment continues from (a sequence place consumed by its own prefix)
+  // and a loop whose do part repeats through the loop's end place. to_powl
+  // rejects them too; to_process_tree keeps converting them.
+  bool reference_powl_loops_ = false;
   std::vector<IdSet> transition_inputs_;
   std::vector<IdSet> transition_outputs_;
   std::vector<std::vector<std::size_t>> place_out_;
@@ -1031,6 +1038,8 @@ class PetriToPowlBuilder {
         }
         if (!prefix_produces || !suffix_consumes) continue;
         if (prefix_consumes && suffix_produces) continue;
+        if (reference_powl_loops_ && prefix_consumes)
+          continue;
         return SequenceSplit{place, prefix, suffix};
       }
     }
@@ -1505,6 +1514,11 @@ class PetriToPowlBuilder {
         do_part.insert(part.begin(), part.end());
     }
     if (do_part.empty() || redo_part.empty()) return std::nullopt;
+    if (reference_powl_loops_) {
+      for (const auto transition : do_part)
+        if (intersects(transition_inputs_[transition], fragment.ends))
+          return std::nullopt;
+    }
     if (!exact_loop(fragment, do_part, redo_part)) return std::nullopt;
     return std::make_pair(std::move(do_part), std::move(redo_part));
   }
@@ -1603,11 +1617,11 @@ ProcessTree to_process_tree(const PowlNode& node) {
 }
 
 ProcessTree to_process_tree(const PetriNet& net) {
-  return ProcessTreeBuilder(true).run(to_powl(net));
+  return ProcessTreeBuilder(true).run(PetriToPowlBuilder(net, false).run());
 }
 
 PetriNet to_petri_net(const PowlNode& node) { return PowlBuilder(node).run(); }
 
-PowlNode to_powl(const PetriNet& net) { return PetriToPowlBuilder(net).run(); }
+PowlNode to_powl(const PetriNet& net) { return PetriToPowlBuilder(net, true).run(); }
 
 }  // namespace minera

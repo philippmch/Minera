@@ -674,6 +674,29 @@ void workflow_net_to_powl_matches_reference() {
     }
     assert(rejected);
   }
+  // The reference converts these nets to a process tree but not to POWL: a
+  // loop's redo part leaves from the place the sequence continues from, or a
+  // loop's do part repeats through its end place.
+  for (const auto& reference : kReferencePowlRejectedTreeCases) {
+    const auto document = minera::parse_pnml_document(reference.pnml);
+    bool rejected = false;
+    try {
+      (void)minera::to_powl(document.net);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    if (!rejected) {
+      std::cerr << "POWL conversion accepted " << reference.name << "\n";
+      assert(false);
+    }
+    const auto tree = minera::to_process_tree(document.net);
+    const auto traces =
+        enumerate_language(minera::to_petri_net(tree), 4, 400).traces;
+    if (traces != reference.traces) {
+      std::cerr << "tree language mismatch for " << reference.name << "\n";
+      assert(false);
+    }
+  }
 }
 
 }  // namespace
