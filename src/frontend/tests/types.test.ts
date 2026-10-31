@@ -970,6 +970,11 @@ describe("isOrganizationalSnaResult", () => {
   it("accepts dataframe-backed variant names", () => expect(isOrganizationalSnaResult({ ...valid, variant: "handover_pandas" })).toBe(true));
   it("rejects out-of-range edges", () => expect(isOrganizationalSnaResult({ ...valid, edges: [{ source: 2, target: 0, weight: 1 }] })).toBe(false));
   it("requires the directedness contract", () => expect(isOrganizationalSnaResult({ ...valid, directed: undefined })).toBe(false));
+  it("accepts a null (reference NaN) joint-activities weight", () => expect(isOrganizationalSnaResult({ ...valid, variant: "jointactivities", directed: false, edges: [{ source: 0, target: 1, weight: null }] })).toBe(true));
+  it("rejects a missing or string weight", () => {
+    expect(isOrganizationalSnaResult({ ...valid, edges: [{ source: 0, target: 1 }] })).toBe(false);
+    expect(isOrganizationalSnaResult({ ...valid, edges: [{ source: 0, target: 1, weight: "NaN" }] })).toBe(false);
+  });
 });
 describe("isRoleDiscoveryResult", () => {
   it("accepts deterministic roles and rejects malformed counts", () => {

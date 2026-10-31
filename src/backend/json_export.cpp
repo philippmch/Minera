@@ -7450,7 +7450,7 @@ std::string organizational_sna_json(const OrganizationalSnaResult& result) {
     throw std::invalid_argument("organizational SNA resources must be unique");
   for (const auto& edge : result.edges)
     if (edge.source >= result.resources.size() || edge.target >= result.resources.size() ||
-        !std::isfinite(edge.weight))
+        std::isinf(edge.weight))
       throw std::invalid_argument("organizational SNA edge is invalid");
   std::ostringstream out;
   out << "{\"family\":\"ORGANIZATIONAL_SNA\",\"variant\":";
@@ -7466,8 +7466,12 @@ std::string organizational_sna_json(const OrganizationalSnaResult& result) {
     if (i) out << ',';
     const auto& edge = result.edges[i];
     out << "{\"source\":" << edge.source << ",\"target\":"
-        << edge.target << ",\"weight\":" << std::setprecision(17)
-        << edge.weight << '}';
+        << edge.target << ",\"weight\":";
+    // A degenerate joint-activities correlation is NaN in the reference;
+    // JSON has no NaN, so it is written as null.
+    if (std::isnan(edge.weight)) out << "null";
+    else out << std::setprecision(17) << edge.weight;
+    out << '}';
   }
   const auto& d = result.diagnostics;
   out << "],\"diagnostics\":{\"computed\":"

@@ -235,7 +235,10 @@ void roles_common_contract() {
   assert(role.activities.size() == 2);
   assert(role.resources.size() == 2);
   assert(role.resources.front().name == "r1");
-  assert(role.resources.front().count == 2);
+  // pm4py 2.7.22 (roles_threshold_parameter=0.49, LOG and PANDAS) returns
+  // {r1:4, r2:1}: Counter(set_res1 + set_res2) sums the merged counts.
+  assert(role.resources.front().count == 4);
+  assert(role.resources.back().name == "r2" && role.resources.back().count == 1);
 }
 
 void network_analysis_dataframe_contract() {

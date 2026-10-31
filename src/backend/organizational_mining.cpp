@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <optional>
@@ -103,7 +104,7 @@ void emit_edges(const std::map<Pair, double>& weights,
       result.diagnostics.output_truncated = true;
       break;
     }
-    if (!std::isfinite(weight)) continue;
+    if (std::isinf(weight)) continue;
     result.edges.push_back({pair.first, pair.second, weight});
   }
 }
@@ -184,7 +185,13 @@ OrganizationalSnaResult discover_organizational_sna(
     case OrganizationalSnaVariant::kWorkingTogether:
     case OrganizationalSnaVariant::kWorkingTogetherPandas: {
       if (!traces.empty()) {
-        const double normalizer = 1.0 / static_cast<double>(traces.size());
+        // The log variant divides by len(EventLog) (cases); the pandas variant
+        // divides by len(DataFrame), i.e. the number of event rows.
+        const double denominator =
+            options.variant == OrganizationalSnaVariant::kWorkingTogetherPandas
+                ? static_cast<double>(log.event_count())
+                : static_cast<double>(traces.size());
+        const double normalizer = 1.0 / denominator;
         for (const auto& trace : traces) {
           auto events = resource_ids(trace, ids, options.resource_attribute);
           std::sort(events.begin(), events.end());
@@ -201,18 +208,39 @@ OrganizationalSnaResult discover_organizational_sna(
     }
     case OrganizationalSnaVariant::kSubcontracting:
     case OrganizationalSnaVariant::kSubcontractingPandas: {
+      // The reference iterates resource variants (first appearance for the
+      // log variant; descending (count, variant) for the pandas variant) and
+      // only records the intermediaries of a source resource the first time
+      // that source closes an n-window anywhere in the log: later windows of
+      // an already-seen source add nothing. The divisor is the case count.
+      std::vector<std::pair<std::vector<std::string>, std::size_t>> variants;
+      std::map<std::vector<std::string>, std::size_t> positions;
       for (const auto& trace : traces) {
-        std::vector<std::string> events;
+        std::vector<std::string> sequence;
         for (const auto& event : trace.events)
-          events.push_back(selected_value(event, options.resource_attribute, true));
+          sequence.push_back(selected_value(event, options.resource_attribute, true));
+        const auto [it, inserted] = positions.emplace(sequence, variants.size());
+        if (inserted) variants.push_back({std::move(sequence), 0});
+        ++variants[it->second].second;
+      }
+      if (options.variant == OrganizationalSnaVariant::kSubcontractingPandas)
+        std::sort(variants.begin(), variants.end(),
+                  [](const auto& left, const auto& right) {
+                    if (left.second != right.second) return left.second > right.second;
+                    return left.first > right.first;
+                  });
+      std::set<std::size_t> seen_sources;
+      for (const auto& [events, occurrence] : variants) {
         for (std::size_t i = 0; i + options.n < events.size(); ++i) {
           if (events[i].empty() || events[i] != events[i + options.n]) continue;
           const auto source = ids.find(events[i]);
           if (source == ids.end()) continue;
+          if (!seen_sources.insert(source->second).second) continue;
           for (std::size_t j = i + 1; j < i + options.n; ++j) {
             const auto intermediary = ids.find(events[j]);
             if (intermediary != ids.end())
-              weights[{source->second, intermediary->second}] += 1.0;
+              weights[{source->second, intermediary->second}] +=
+                  static_cast<double>(occurrence);
           }
         }
       }
@@ -242,11 +270,15 @@ OrganizationalSnaResult discover_organizational_sna(
           const auto ai = activity_ids.find(activity);
           if (ri != ids.end() && ai != activity_ids.end()) vectors[ri->second][ai->second] += 1.0;
         }
+      // pearsonr rejects vectors shorter than two activities.
+      if (vectors.size() > 1 && activities.size() < 2)
+        throw std::invalid_argument(
+            "organizational SNA joint activities needs at least two activities");
       for (std::size_t a = 0; a < vectors.size(); ++a) {
         for (std::size_t b = a + 1; b < vectors.size(); ++b) {
           const auto& x = vectors[a];
           const auto& y = vectors[b];
-          if (x.empty()) { weights[{a, b}] = 0.0; continue; }
+
           const double mean_x = std::accumulate(x.begin(), x.end(), 0.0) / x.size();
           const double mean_y = std::accumulate(y.begin(), y.end(), 0.0) / y.size();
           double numerator = 0.0, xx = 0.0, yy = 0.0;
@@ -257,7 +289,11 @@ OrganizationalSnaResult discover_organizational_sna(
             yy += dy * dy;
           }
           const double denominator = std::sqrt(xx * yy);
-          const double correlation = denominator == 0.0 ? 0.0 : numerator / denominator;
+          // scipy.stats.pearsonr returns NaN for a constant input vector;
+          // the NaN entry is kept, as the reference keeps it.
+          const double correlation = denominator == 0.0
+                                         ? std::numeric_limits<double>::quiet_NaN()
+                                         : numerator / denominator;
           weights[{a, b}] = correlation;
           weights[{b, a}] = correlation;
         }
@@ -266,9 +302,12 @@ OrganizationalSnaResult discover_organizational_sna(
     }
   }
   if (options.metric_normalization) {
+    // np.max over the absolute weights is NaN when any weight is NaN, and
+    // the reference then skips normalization (NaN > 0 is false).
     double maximum = 0.0;
     for (const auto& [pair, weight] : weights) {
       (void)pair;
+      if (std::isnan(weight)) { maximum = 0.0; break; }
       maximum = std::max(maximum, std::abs(weight));
     }
     if (maximum > 0.0)

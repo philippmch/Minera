@@ -288,7 +288,8 @@ export type OrganizationalSnaVariant =
   | "handover" | "working_together" | "subcontracting" | "jointactivities"
   | "handover_pandas" | "working_together_pandas"
   | "subcontracting_pandas" | "jointactivities_pandas";
-export interface OrganizationalSnaEdge { source: number; target: number; weight: number; }
+// weight is null where the reference correlation is NaN (degenerate joint activities).
+export interface OrganizationalSnaEdge { source: number; target: number; weight: number | null; }
 export interface OrganizationalSnaDiagnostics {
   computed: boolean; output_truncated: boolean; trace_count: number;
   event_count: number; resource_count: number; edge_count: number; message: string;
@@ -340,7 +341,7 @@ export function isOrganizationalSnaResult(value: unknown): value is Organization
       !Array.isArray(c.edges) || !c.diagnostics || typeof c.diagnostics !== "object") return false;
   const resourceCount = (c.resources as string[]).length;
   if (!c.edges.every((e) => !!e && typeof e === "object" && Number.isInteger(e.source) &&
-      Number.isInteger(e.target) && typeof e.weight === "number" && Number.isFinite(e.weight) &&
+      Number.isInteger(e.target) && (e.weight === null || (typeof e.weight === "number" && Number.isFinite(e.weight))) &&
       (e.source as number) >= 0 && (e.target as number) >= 0 &&
        (e.source as number) < resourceCount && (e.target as number) < resourceCount)) return false;
   const d = c.diagnostics as Partial<OrganizationalSnaDiagnostics>;

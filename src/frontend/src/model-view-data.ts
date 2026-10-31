@@ -14,7 +14,7 @@ export function transitionSystemGraph(model: TransitionSystemExport, activities:
   };
 }
 export function socialNetworkGraph(result: OrganizationalSnaResult): ModelGraph {
-  return {nodes:result.resources.map((name,i)=>({id:`r${i}`,label:name,detail:`resource ${i}`})),edges:result.edges.map((edge,i)=>({id:`e${i}`,source:`r${edge.source}`,target:`r${edge.target}`,label:edge.weight.toFixed(4),value:edge.weight,directed:result.directed}))};
+  return {nodes:result.resources.map((name,i)=>({id:`r${i}`,label:name,detail:`resource ${i}`})),edges:result.edges.map((edge,i)=>({id:`e${i}`,source:`r${edge.source}`,target:`r${edge.target}`,label:edge.weight===null?"NaN":edge.weight.toFixed(4),value:edge.weight??0,directed:result.directed}))};
 }
 export function downloadModelJson(value: unknown, filename: string) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:"application/json"}));

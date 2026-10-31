@@ -4,6 +4,9 @@
 #include <cassert>
 #include <cmath>
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 minera::EventLog sample() {
@@ -169,5 +172,93 @@ int main() {
   ++malformed_result.diagnostics.edge_count;
   try { (void)minera::organizational_sna_json(malformed_result); assert(false); }
   catch (const std::invalid_argument&) {}
+
+  // Expectations below were captured from pm4py 2.7.22
+  // (algo.organizational_mining.sna.algorithm.apply, LOG on the converted
+  // EventLog and PANDAS on the formatted DataFrame).
+  const auto weight_of = [](const minera::OrganizationalSnaResult& r,
+                            const std::string& a, const std::string& b) {
+    for (const auto& edge : r.edges)
+      if (r.resources[edge.source] == a && r.resources[edge.target] == b)
+        return edge.weight;
+    return -100.0;
+  };
+  const auto make = [](std::vector<std::vector<std::pair<std::string, std::string>>> cases) {
+    minera::EventLog out;
+    double t = 0;
+    for (std::size_t c = 0; c < cases.size(); ++c) {
+      const auto id = std::to_string(c + 1);
+      minera::Trace trace{id, {}, {}};
+      for (const auto& [activity, resource] : cases[c])
+        trace.events.push_back({id, activity, "", resource, t++, {}, ""});
+      out.traces.push_back(std::move(trace));
+    }
+    return out;
+  };
+  // Case 1 Ann,Bob,Ann,Bob,Ann; case 2 Ann.
+  const auto alternating = make({{{"A","Ann"},{"B","Bob"},{"C","Ann"},{"D","Bob"},{"E","Ann"}}, {{"A","Ann"}}});
+  for (const auto variant : {minera::OrganizationalSnaVariant::kSubcontracting,
+                             minera::OrganizationalSnaVariant::kSubcontractingPandas}) {
+    minera::OrganizationalSnaOptions sub; sub.variant = variant; sub.n = 2;
+    const auto r = minera::discover_organizational_sna(alternating, sub);
+    // Only the first n-window closed by each source counts: {Ann->Bob 0.5, Bob->Ann 0.5}.
+    assert(r.edges.size() == 2);
+    assert(std::abs(weight_of(r, "Ann", "Bob") - 0.5) < 1e-12);
+    assert(std::abs(weight_of(r, "Bob", "Ann") - 0.5) < 1e-12);
+  }
+  {
+    // Variant order decides which window is first: LOG uses first appearance
+    // ({Ann->Bob 1/3}), PANDAS uses descending (count, variant) ({Ann->Carl 2/3}).
+    const auto ordered = make({{{"A","Ann"},{"B","Bob"},{"C","Ann"}},
+                               {{"A","Ann"},{"B","Carl"},{"C","Ann"}},
+                               {{"A","Ann"},{"B","Carl"},{"C","Ann"}}});
+    minera::OrganizationalSnaOptions sub; sub.variant = minera::OrganizationalSnaVariant::kSubcontracting;
+    const auto log_result = minera::discover_organizational_sna(ordered, sub);
+    assert(log_result.edges.size() == 1);
+    assert(std::abs(weight_of(log_result, "Ann", "Bob") - 1.0 / 3.0) < 1e-12);
+    sub.variant = minera::OrganizationalSnaVariant::kSubcontractingPandas;
+    const auto pandas_result = minera::discover_organizational_sna(ordered, sub);
+    assert(pandas_result.edges.size() == 1);
+    assert(std::abs(weight_of(pandas_result, "Ann", "Carl") - 2.0 / 3.0) < 1e-12);
+  }
+  {
+    // Working together: LOG divides by cases (0.5), PANDAS by event rows (1/6).
+    minera::OrganizationalSnaOptions together_options;
+    together_options.variant = minera::OrganizationalSnaVariant::kWorkingTogether;
+    const auto log_result = minera::discover_organizational_sna(alternating, together_options);
+    assert(std::abs(weight_of(log_result, "Ann", "Bob") - 0.5) < 1e-12);
+    assert(std::abs(weight_of(log_result, "Bob", "Ann") - 0.5) < 1e-12);
+    together_options.variant = minera::OrganizationalSnaVariant::kWorkingTogetherPandas;
+    const auto pandas_result = minera::discover_organizational_sna(alternating, together_options);
+    assert(std::abs(weight_of(pandas_result, "Ann", "Bob") - 1.0 / 6.0) < 1e-12);
+    assert(std::abs(weight_of(pandas_result, "Bob", "Ann") - 1.0 / 6.0) < 1e-12);
+  }
+  for (const auto variant : {minera::OrganizationalSnaVariant::kJointActivities,
+                             minera::OrganizationalSnaVariant::kJointActivitiesPandas}) {
+    // Ann [2,1,0], Bob [1,1,1] (constant), Carl [1,1,2] over A,B,C: pearsonr
+    // gives NaN for every Bob pair and -0.8660254037844386 for Ann/Carl.
+    // With normalization the NaN makes the maximum NaN, so nothing is scaled.
+    const auto joint_log = make({{{"A","Ann"},{"A","Ann"},{"B","Ann"},{"A","Bob"},{"B","Bob"},
+                                  {"C","Bob"},{"B","Carl"},{"C","Carl"},{"C","Carl"},{"A","Carl"}}});
+    for (const bool normalize : {false, true}) {
+      minera::OrganizationalSnaOptions joint_options;
+      joint_options.variant = variant;
+      joint_options.metric_normalization = normalize;
+      const auto r = minera::discover_organizational_sna(joint_log, joint_options);
+      assert(r.edges.size() == 6);
+      assert(std::isnan(weight_of(r, "Ann", "Bob")) && std::isnan(weight_of(r, "Bob", "Ann")));
+      assert(std::isnan(weight_of(r, "Bob", "Carl")) && std::isnan(weight_of(r, "Carl", "Bob")));
+      assert(std::abs(weight_of(r, "Ann", "Carl") + 0.8660254037844386) < 1e-12);
+      assert(std::abs(weight_of(r, "Carl", "Ann") + 0.8660254037844386) < 1e-12);
+      const auto json = minera::organizational_sna_json(r);
+      assert(json.find("\"weight\":null") != std::string::npos);
+    }
+    // One activity: pearsonr raises "`x` and `y` must have length at least 2".
+    minera::OrganizationalSnaOptions joint_options; joint_options.variant = variant;
+    bool raised = false;
+    try { (void)minera::discover_organizational_sna(make({{{"A","Ann"},{"A","Bob"}}}), joint_options); }
+    catch (const std::invalid_argument&) { raised = true; }
+    assert(raised);
+  }
   return 0;
 }

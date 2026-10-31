@@ -3683,8 +3683,16 @@ The organizational SNA vertical exposes the four log variants as a separate
 deterministic contract: normalized directed handover and subcontracting
 weights, symmetric per-trace working-together weights, and symmetric Pearson
 joint-activities weights. Each variant is available through both the native
-log path and explicit `_pandas` adapter selectors, with the same validated
-semantics and deterministic output. Resource names and edge records are sorted
+log path and explicit `_pandas` adapter selectors. The adapters follow the
+reference where it differs: subcontracting records the intermediaries of a
+source resource only for the first n-window that source closes in the whole
+log (resource variants in first-appearance order for LOG, descending
+(count, variant) order for PANDAS), divided by the case count; pandas
+working-together divides by the number of event rows (`len(DataFrame)`),
+the log variant by the case count. Joint activities keeps
+`scipy.stats.pearsonr` semantics: a constant resource vector gives NaN
+(written as JSON `null`), fewer than two activities with two or more
+resources raises, and a NaN weight makes metric normalization a no-op. Resource names and edge records are sorted
 for stable JSON; blank resources are excluded from the resource alphabet while
 empty or resource-less traces remain part of trace-count denominators. Handover
 beta, subcontracting distance, optional metric normalization, custom
@@ -6517,9 +6525,10 @@ segment counts.
 The bounded role endpoint (`--roles` and `POST /api/roles`) starts with one
 role per activity and counts only events having both a non-empty activity and
 resource. Role similarity is the overlap of normalized resource-count vectors
-(sum of component-wise minima divided by sum of maxima). After a merge, each
-source role contributes one presence count per resource rather than carrying
-raw event totals. The highest-scoring
+(sum of component-wise minima divided by sum of maxima). A merge sums the
+resource event counts of both source roles (the reference's
+`Counter(set_res1 + set_res2)`), and those summed counts drive the
+similarities of later merges. The highest-scoring
 pair is merged only when its score is strictly greater than
 `roles_threshold` (default `0.65`); `roles_activity_attribute` and
 `roles_resource_attribute` select standard or custom event fields; ties and

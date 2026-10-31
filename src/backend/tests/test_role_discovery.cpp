@@ -16,7 +16,9 @@ int main() {
   assert(result.variant == RoleDiscoveryVariant::kLog);
   assert(result.diagnostics.computed && result.roles.size() == 1);
   assert(result.roles[0].activities.size() == 2);
-  assert(result.roles[0].resources[0].count == 2);
+  // pm4py 2.7.22 roles.apply (LOG and PANDAS, roles_threshold_parameter=0.49)
+  // returns [A,B]{r1:4,r2:1}: a merge sums the source counts.
+  assert(result.roles[0].resources[0].count == 4);
   assert(result.roles[0].resources[1].count == 1);
   RoleDiscoveryOptions strict; strict.threshold = 1.0;
   assert(discover_roles(log, strict).roles.size() == 2);
@@ -74,4 +76,24 @@ int main() {
   EventLog blank{{Trace{"x", {Event{"x","A","","",0}}}}};
   const auto blank_result = discover_roles(blank);
   assert(blank_result.roles.empty());
+
+  // Summed merge counts feed the next similarity. Captured from pm4py 2.7.22
+  // discover_organizational_roles / roles.apply (LOG and PANDAS, default 0.65):
+  // [A,B]{Ann:6,Bob:2} and [C]{Ann:1,Bob:1}; presence counts would also pull C in.
+  EventLog summed{{Trace{"1", {
+      Event{"1","A","","Ann",0}, Event{"1","A","","Ann",1}, Event{"1","A","","Ann",2},
+      Event{"1","A","","Bob",3}, Event{"1","B","","Ann",4}, Event{"1","B","","Ann",5},
+      Event{"1","B","","Ann",6}, Event{"1","B","","Bob",7}, Event{"1","C","","Ann",8},
+      Event{"1","C","","Bob",9}}}}};
+  for (const auto variant : {RoleDiscoveryVariant::kLog, RoleDiscoveryVariant::kPandas}) {
+    RoleDiscoveryOptions summed_options; summed_options.variant = variant;
+    const auto summed_result = discover_roles(summed, summed_options);
+    assert(summed_result.roles.size() == 2);
+    assert((summed_result.roles[0].activities == std::vector<std::string>{"A", "B"}));
+    assert(summed_result.roles[0].resources.size() == 2);
+    assert(summed_result.roles[0].resources[0].name == "Ann" && summed_result.roles[0].resources[0].count == 6);
+    assert(summed_result.roles[0].resources[1].name == "Bob" && summed_result.roles[0].resources[1].count == 2);
+    assert((summed_result.roles[1].activities == std::vector<std::string>{"C"}));
+    assert(summed_result.roles[1].resources[0].count == 1 && summed_result.roles[1].resources[1].count == 1);
+  }
 }
