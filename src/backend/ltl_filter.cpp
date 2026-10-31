@@ -12,12 +12,35 @@
 namespace minera {
 namespace {
 
+// A non-empty key names the event attribute as the reference dictionary sees
+// it: generic attributes first, then first-class fields under their source
+// (or canonical XES) key, so `concept:name`/`org:resource` select the fields
+// the importer promoted out of the generic attribute list.
+const std::string* keyed_value(const Event& event, std::string_view key) {
+  for (const auto& entry : event.attributes)
+    if (entry.key == key) return entry.is_null ? nullptr : &entry.value;
+  const auto first_class = [&](std::string_view canonical, const std::string& source,
+                               FirstClassAttributeState state, bool present,
+                               const std::string& value) -> std::optional<const std::string*> {
+    if ((source.empty() ? canonical : std::string_view(source)) != key || !present)
+      return std::nullopt;
+    return state == FirstClassAttributeState::kNull ? nullptr : &value;
+  };
+  for (const auto& found : {
+           first_class("concept:name", event.activity_source_key, event.activity_state, event.has_activity(), event.activity),
+           first_class("org:resource", event.resource_source_key, event.resource_state, event.has_resource(), event.resource),
+           first_class("time:timestamp", event.timestamp_source_key, event.timestamp_state, event.has_timestamp(), event.timestamp),
+           first_class("lifecycle:transition", event.lifecycle_source_key, event.lifecycle_state, event.has_lifecycle(), event.lifecycle)})
+    if (found) return *found;
+  return nullptr;
+}
+
 const std::string* event_value(const Event& event, std::string_view attribute) {
-  return attribute.empty() ? &event.activity : event.attribute(attribute);
+  return attribute.empty() ? &event.activity : keyed_value(event, attribute);
 }
 
 const std::string* resource_value(const Event& event, std::string_view key) {
-  return key.empty() ? &event.resource : event.attribute(key);
+  return key.empty() ? &event.resource : keyed_value(event, key);
 }
 
 void validate_options(const LtlFilterOptions& options) {
@@ -91,34 +114,31 @@ void validate_options(const LtlFilterOptions& options) {
   }
 }
 
+// Reference parity (ltl_checker.eventually_follows, also log_ltl_filter.cpp):
+// an ordered occurrence of the pattern must exist, and when bounds are enabled
+// the i-th bound is checked against the timestamps of trace positions i and
+// i + 1, not against the matched events.
 bool eventually_matches(const Trace& trace, const LtlFilterOptions& options) {
   const auto& values = options.attribute_values;
-  const auto search = [&](auto&& self, std::size_t previous,
-                          std::size_t value_index) -> bool {
-    if (value_index == values.size()) return true;
-    for (std::size_t current = previous + 1; current < trace.events.size(); ++current) {
-      const auto* candidate = event_value(trace.events[current], options.attribute_key);
-      if (candidate == nullptr || *candidate != values[value_index]) continue;
-      if (options.enable_timestamp) {
-        const auto start = parse_timestamp(trace.events[previous].timestamp);
-        const auto end = parse_timestamp(trace.events[current].timestamp);
-        if (!start || !end) continue;
-        const double elapsed = *end - *start;
-        const auto bound = options.timestamp_diff_boundaries[value_index - 1];
-        if (!std::isfinite(elapsed) || elapsed < bound.first || elapsed > bound.second) continue;
-      }
-      if (self(self, current, value_index + 1)) return true;
+  std::size_t begin = 0;
+  for (const auto& target : values) {
+    bool found = false;
+    for (std::size_t i = begin; i < trace.events.size(); ++i) {
+      const auto* value = event_value(trace.events[i], options.attribute_key);
+      if (value != nullptr && *value == target) {begin = i + 1; found = true; break;}
     }
-    return false;
-  };
-  for (std::size_t first = 0; first < trace.events.size(); ++first) {
-    const auto* value = event_value(trace.events[first], options.attribute_key);
-    if (value != nullptr && *value == values.front() &&
-        search(search, first, 1)) {
-      return true;
-    }
+    if (!found) return false;
   }
-  return false;
+  if (!options.enable_timestamp) return true;
+  for (std::size_t i = 0; i + 1 < values.size(); ++i) {
+    const auto start = parse_timestamp(trace.events[i].timestamp);
+    const auto end = parse_timestamp(trace.events[i + 1].timestamp);
+    if (!start || !end) return false;
+    const double elapsed = *end - *start;
+    const auto bound = options.timestamp_diff_boundaries[i];
+    if (!std::isfinite(elapsed) || elapsed < bound.first || elapsed > bound.second) return false;
+  }
+  return true;
 }
 
 bool next_matches(const Trace& trace, const LtlFilterOptions& options) {

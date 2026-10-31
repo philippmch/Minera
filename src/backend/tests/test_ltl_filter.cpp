@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <stdexcept>
+#include <string>
 
 using minera::AttributeKind;
 using minera::Event;
@@ -82,6 +83,51 @@ int main() {
   eyes.positive = false;
   result = minera::filter_ltl_event_log(missing_side, eyes);
   assert(result.traces.size() == 1 && result.traces[0].case_id == "both_shared");
+
+  // Captured from pm4py 2.7.22 ltl_checker on the first two traces of a
+  // random XES fixture (timestamps, activities and resources verbatim).
+  {
+    EventLog captured;
+    captured.traces = {
+        {"c0", {event("c0", "b", "2024-01-01T09:00:15+00:00", "r3"),
+                event("c0", "\u00e9", "2024-01-01T09:00:29+00:00", "r2"),
+                event("c0", "\u00e9", "2024-01-02T09:00:57+00:00", "r3"),
+                event("c0", "a", "2024-01-02T09:06:27+00:00", "r2"),
+                event("c0", "\u00e9", "2024-01-02T10:06:27+00:00", "r3"),
+                event("c0", "\u00e9", "2024-01-02T10:07:55+00:00", "r1")}, {}},
+        {"c1", {event("c1", "c", "2024-01-03T10:08:01+00:00", "r3"),
+                event("c1", "b", "2024-01-03T10:13:01+00:00", "r3"),
+                event("c1", "a", "2024-01-03T10:15:14+00:00", "r3"),
+                event("c1", "a", "2024-01-03T10:17:38+00:00", "r1"),
+                event("c1", "a", "2024-01-03T10:17:56+00:00", "r1")}, {}}};
+    const auto ids = [](const EventLog& filtered) {
+      std::string joined;
+      for (const auto& trace : filtered.traces) joined += trace.case_id + ";";
+      return joined;
+    };
+    // Bounds apply to trace positions i and i + 1 (reference quirk), not to
+    // the matched b/a events: c0's first gap is 14 s, c1's is 300 s.
+    LtlFilterOptions bounded;
+    bounded.attribute_values = {"b", "a"};
+    bounded.enable_timestamp = true;
+    bounded.timestamp_diff_boundaries = {{60.0, 100000.0}};
+    assert(ids(minera::filter_ltl_event_log(captured, bounded)) == "c1;");
+    bounded.positive = false;
+    assert(ids(minera::filter_ltl_event_log(captured, bounded)) == "c0;");
+    // Standard XES keys select the importer's first-class fields.
+    LtlFilterOptions named{LtlFilterVariant::kEventuallyFollows, "concept:name", {"b", "a"}};
+    assert(ids(minera::filter_ltl_event_log(captured, named)) == "c0;c1;");
+    LtlFilterOptions by_resource{LtlFilterVariant::kEventuallyFollows, "org:resource", {"r3", "r2"}};
+    assert(ids(minera::filter_ltl_event_log(captured, by_resource)) == "c0;");
+    LtlFilterOptions persons{LtlFilterVariant::kAttributeValueDifferentPersons, "", {"\u00e9"}};
+    persons.resource_key = "org:resource";
+    assert(ids(minera::filter_ltl_event_log(captured, persons)) == "c0;");
+    LtlFilterOptions swapped{LtlFilterVariant::kFourEyes, "org:resource", {"r3", "r2"}};
+    swapped.resource_key = "concept:name";
+    assert(ids(minera::filter_ltl_event_log(captured, swapped)).empty());
+    swapped.positive = false;
+    assert(ids(minera::filter_ltl_event_log(captured, swapped)) == "c0;");
+  }
 
   bool rejected = false;
   try {
