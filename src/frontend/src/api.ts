@@ -3094,6 +3094,23 @@ export async function requestPripel(queryLog: File, options: PripelOptions = {})
   return postChecked(`/api/pripel${query ? `?${query}` : ""}`, isPripelResult, "PRIPEL anonymization", form);
 }
 export const anonymizePripel = requestPripel;
+/**
+ * Rejects a non-2xx response with the server's own `{"error": ...}` message
+ * when the body carries one, falling back to the HTTP status otherwise.
+ * Returns without touching the body when the response is ok.
+ */
+export async function throwIfBackendError(response: Response): Promise<void> {
+  if (response.ok) return;
+  // On failure the caller never reads the body, so test doubles without clone() are fine.
+  const source = typeof response.clone === "function" ? response.clone() : response;
+  const payload: unknown = typeof source.json === "function" ? await source.json().catch(() => null) : null;
+  if (payload !== null && typeof payload === "object" && "error" in payload) {
+    const error = (payload as { error: unknown }).error;
+    if (typeof error === "string" && error.length > 0) throw new Error(error);
+    if (error !== undefined && error !== null) throw new Error(String(typeof error === "object" ? JSON.stringify(error) : error));
+  }
+  throw new Error(`the Minera backend answered with status ${response.status}`);
+}
 async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string, body?: BodyInit, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try { response = await fetch(path, { method: "POST", ...(body === undefined ? {} : { body }), ...(signal ? {signal} : {}) }); }
@@ -5449,7 +5466,7 @@ export function conceptDriftQuery(options: ConceptDriftOptions = {}): string {
 export async function requestConceptDrift(options: ConceptDriftOptions = {}): Promise<ConceptDriftResult> {
   const query = conceptDriftQuery(options);
   const response = await fetch(`/api/concept-drift${query ? `?${query}` : ""}`, { method: "POST" });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isConceptDriftResult(payload)) {
     throw new Error("the backend returned an invalid concept-drift response");
@@ -5484,7 +5501,7 @@ export function logToTargetQuery(options: LogToTargetOptions = {}): string {
 export async function requestLogToTarget(options: LogToTargetOptions = {}): Promise<LogToTargetResult> {
   const query = logToTargetQuery(options);
   const response = await fetch(`/api/transform-target${query ? `?${query}` : ""}`, { method: "POST" });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isLogToTargetResult(payload)) {
     throw new Error("the Minera backend returned an invalid target transformation");
@@ -5540,7 +5557,7 @@ export function logUtilityQuery(options: LogUtilityOptions = {}): string {
 export async function requestLogUtility(options: LogUtilityOptions = {}): Promise<LogUtilityResult> {
   const query = logUtilityQuery(options);
   const response = await fetch(`/api/log-util${query ? `?${query}` : ""}`, { method: "POST" });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isLogUtilityResult(payload)) throw new Error("the Minera backend returned an invalid log utility result");
   return payload;
@@ -5960,7 +5977,7 @@ export function trieQuery(options: TrieOptions = {}): string {
 export async function requestTrie(options: TrieOptions = {}): Promise<TrieResult> {
   const query = trieQuery(options);
   const response = await fetch(`/api/trie${query ? `?${query}` : ""}`);
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isTrieResult(payload)) throw new Error("the Minera backend returned an invalid trie");
   return payload;
@@ -5969,7 +5986,7 @@ export async function requestTrie(options: TrieOptions = {}): Promise<TrieResult
 export async function requestTriePetriNet(options: TrieOptions = {}): Promise<TriePetriConversionResult> {
   const query = trieQuery(options);
   const response = await fetch(`/api/trie-to-petri${query ? `?${query}` : ""}`);
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isTriePetriConversionResult(payload))
     throw new Error("the Minera backend returned an invalid trie conversion");
@@ -6020,7 +6037,7 @@ export function intervalTreeQuery(options: IntervalTreeOptions = {}): string {
 export async function requestIntervalTree(options: IntervalTreeOptions = {}): Promise<IntervalTreeResult> {
   const query = intervalTreeQuery(options);
   const response = await fetch(`/api/interval-tree${query ? `?${query}` : ""}`);
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isIntervalTreeResult(payload)) throw new Error("the Minera backend returned an invalid interval tree");
   return payload;
@@ -6069,7 +6086,7 @@ export async function requestCaseRelations(
   form.append("case_relations", relations, relations.name);
   const query = caseRelationsQuery(options);
   const response = await fetch(`/api/merge-case-relations${query ? `?${query}` : ""}`, { method: "POST", body: form });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isCaseRelationsResult(payload)) throw new Error("the Minera backend returned an invalid case-relations merge");
   return payload;
@@ -6109,7 +6126,7 @@ export async function requestLinkAnalysis(
   const response = await fetch(`/api/link-analysis${query ? `?${query}` : ""}`, {
     method: "POST",
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isLinkAnalysisResult(payload)) throw new Error("the Minera backend returned an invalid link analysis");
   return payload;
@@ -6149,7 +6166,7 @@ export async function requestTimestampInterleavings(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isTimestampInterleavingsResult(payload)) throw new Error("the Minera backend returned an invalid timestamp interleavings result");
   return payload;
@@ -6205,7 +6222,7 @@ export function randomTreeQuery(options: RandomTreeOptions = {}): string {
 export async function requestRandomTree(options: RandomTreeOptions = {}): Promise<RandomTreeResult> {
   const query = randomTreeQuery(options);
   const response = await fetch(`/api/random-tree${query ? `?${query}` : ""}`);
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isRandomTreeResult(payload)) throw new Error("the Minera backend returned an invalid random tree");
   return payload;
@@ -6316,7 +6333,7 @@ export async function requestOcelSqlite(log: Blob): Promise<OcelSqliteResult> {
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.sqlite";
   form.append("log", log, logName);
   const response = await fetch("/api/ocel/sqlite", { method: "POST", body: form });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelSqliteResult(payload)) throw new Error("the Minera backend returned an invalid OCEL SQLite import");
   return payload;
@@ -6331,7 +6348,7 @@ export async function requestOcelSqliteExport(
     headers: { "Content-Type": "application/json" },
     body: log instanceof Blob ? log : nativeJson(log),
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload = await response.blob();
   const signature = new TextDecoder().decode(
     await payload.slice(0, 16).arrayBuffer(),
@@ -6436,7 +6453,7 @@ export async function requestOcelExchangeImport(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelExchangeResult(payload))
     throw new Error("the Minera backend returned an invalid OCEL exchange import");
@@ -6454,7 +6471,7 @@ export async function requestOcelExchangeExport(
     headers: { "Content-Type": "application/json" },
     body: log instanceof Blob ? log : nativeJson(log),
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload = await response.blob();
   const text = await payload.text();
   if (format.startsWith("json")) {
@@ -6518,7 +6535,7 @@ export async function requestOcelFlatten(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   return response.blob();
 }
 
@@ -6638,7 +6655,7 @@ export async function requestOcelFilter(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const raw = typeof response.text === "function" ? await response.text() : undefined;
   const payload: unknown = raw !== undefined ? parseNativeJson(raw) : await response.json();
   if (!isOcelFilterResult(payload)) throw new Error("the Minera backend returned an invalid OCEL filter result");
@@ -6675,7 +6692,7 @@ export async function requestOcelSplit(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelSplitResult(payload)) throw new Error("the Minera backend returned an invalid OCEL split");
   return payload;
@@ -6714,7 +6731,7 @@ export async function requestOcelEnrichment(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelEnrichmentResult(payload))
     throw new Error("the Minera backend returned an invalid OCEL enrichment");
@@ -6750,7 +6767,7 @@ export async function requestOcelObjectGraph(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelObjectGraphResult(payload))
     throw new Error("the Minera backend returned an invalid OCEL object graph");
@@ -6792,7 +6809,7 @@ export async function requestOcelEventObjectGraph(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelHeterogeneousGraphResult(payload))
     throw new Error("the Minera backend returned an invalid OCEL event/object graph");
@@ -6815,7 +6832,7 @@ export interface OcelPlayoutOptions extends OcpnDiscoveryFlags {
   initial_marking?: Record<string, number[]>;
   final_marking?: Record<string, number[]>;
   objects_unique_per_trace?: boolean;
-  event_binding?: "independent" | "shared_activity" | "synchronized";
+  event_binding?: "independent" | "shared_activity" | "synchronized" | "reference";
   exists_trace?: boolean;
   return_sequences?: boolean;
   return_traces?: boolean;
@@ -6894,7 +6911,8 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
   if (options.event_binding !== undefined &&
       options.event_binding !== "independent" &&
       options.event_binding !== "shared_activity" &&
-      options.event_binding !== "synchronized") {
+      options.event_binding !== "synchronized" &&
+      options.event_binding !== "reference") {
     throw new Error("OCEL playout event_binding is invalid");
   }
   if (options.event_binding !== undefined)
@@ -6938,7 +6956,7 @@ export async function requestOcelPlayout(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelPlayoutResult(payload)) throw new Error("the Minera backend returned an invalid OCEL playout");
   return payload;
@@ -7148,7 +7166,7 @@ export async function requestOcelFeatures(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelFeatureResult(payload)) throw new Error("the Minera backend returned an invalid OCEL feature table");
   return payload;
@@ -7200,7 +7218,7 @@ export async function requestOcelStatistics(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelStatisticsResult(payload)) throw new Error("the Minera backend returned an invalid OCEL statistics result");
   return payload;
@@ -7231,7 +7249,7 @@ export async function requestOcelDescription(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelDescriptionResult(payload)) throw new Error("the Minera backend returned an invalid OCEL description result");
   return payload;
@@ -7336,7 +7354,7 @@ export async function requestOcelConformance(
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const raw = exactThresholds !== undefined ? await response.text() : undefined;
   const payload: unknown = raw !== undefined ? parseNativeJson(raw) : await response.json();
   if (!isOcelConformanceResult(payload)) throw new Error("the Minera backend returned an invalid OCEL conformance result");
@@ -7372,7 +7390,7 @@ export async function requestKnowledgeInjection(
   if (hasExactKnowledge(options)) return requestExactKnowledge(options);
   const query = knowledgeInjectionQuery(options);
   const response = await fetch(`/api/knowledge-injection${query ? `?${query}` : ""}`, { method: "POST" });
-  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  await throwIfBackendError(response);
   const payload: unknown = await response.json();
   const { isKnowledgeInjectionResult } = await import("./types");
   if (!isKnowledgeInjectionResult(payload)) throw new Error("the Minera backend returned an invalid knowledge injection result");

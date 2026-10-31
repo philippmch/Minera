@@ -1845,7 +1845,7 @@ export interface OcelPlayoutTraceEvent {
 export interface OcelPetriPlayoutResult {
   family: "OCEL_PLAYOUT";
   variant: OcelPlayoutVariant;
-  event_binding?: "independent" | "shared_activity" | "synchronized";
+  event_binding?: "independent" | "shared_activity" | "synchronized" | "reference";
   exists_trace?: boolean;
   sequences?: OcelPlayoutBinding[][];
   traces?: OcelPlayoutTraceEvent[][];
@@ -1856,7 +1856,7 @@ export interface OcelPetriPlayoutResult {
 export interface OcelCausalNetPlayoutResult {
   family: "OC_CAUSAL_NET_PLAYOUT";
   variant: OcelPlayoutVariant;
-  event_binding?: "independent" | "shared_activity" | "synchronized";
+  event_binding?: "independent" | "shared_activity" | "synchronized" | "reference";
   exists_trace?: boolean;
   sequences?: OcelPlayoutBinding[][];
   traces?: OcelPlayoutTraceEvent[][];
@@ -2036,7 +2036,8 @@ export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult 
   if (value.event_binding !== undefined &&
       value.event_binding !== "independent" &&
       value.event_binding !== "shared_activity" &&
-      value.event_binding !== "synchronized") return false;
+      value.event_binding !== "synchronized" &&
+      value.event_binding !== "reference") return false;
   if (value.exists_trace !== undefined && typeof value.exists_trace !== "boolean") return false;
   if (value.sequences !== undefined) {
     if (!Array.isArray(value.sequences) || !value.sequences.every((sequence) =>
