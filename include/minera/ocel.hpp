@@ -100,10 +100,29 @@ struct OcelJsonLimits {
 
 enum class OcelJsonFormat { kClassic, kStandard };
 
+// How an importer reads event timestamps for its timestamp order.
+enum class OcelTimestampReader {
+  // OCEL 2.0 JSON and classic XML: ISO 8601 as Python 3.11 reads it. The UTC offset is validated and then dropped (the wall-clock fields
+  // are kept as UTC), and microseconds compare.
+  kIsoFormat,
+  // Classic OCEL JSON: the ISO reading, but a timestamp it cannot read keeps
+  // the file order of the whole log instead of raising, because native
+  // adapters use the classic format as transport (empty or NaT timestamps).
+  kIsoFormatOrFileOrder,
+  // OCEL 2.0 XML: the ISO reading above, or else any shape the native timestamp
+  // parser reads, again comparing wall-clock fields with the offset dropped.
+  kDateutil,
+  // SQLite: the UTC instant (offsets convert), compared at nanoseconds.
+  kInstantNanoseconds,
+};
+
 // The reference importers order events by timestamp (ties keep file order)
-// and relations by their event's new position (ties keep file order). Events
-// whose timestamp does not parse keep the file order of the whole log.
-// Instants compare at microseconds unless `nanoseconds` (the SQLite importer).
+// and relations by their event's new position (ties keep file order). The
+// kIsoFormat and kDateutil readers throw std::invalid_argument on a timestamp
+// they cannot read, as the reference importers raise; the others keep the
+// file order of the whole log instead.
+void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader);
+// `nanoseconds` selects kInstantNanoseconds, otherwise kIsoFormat.
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
 
 Ocel parse_ocel_json(std::string_view json,

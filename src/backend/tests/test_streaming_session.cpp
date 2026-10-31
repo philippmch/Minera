@@ -1,5 +1,6 @@
 #include "minera/streaming_session.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/xes_event_log_importer.hpp"
 #include <atomic>
 #include <cassert>
 #include <chrono>
@@ -73,4 +74,38 @@ void crlf_records_do_not_change_untrimmed_native_columns_or_quoted_values() {
   std::istringstream lf("case:concept:name;activity\nc; A \nquoted;\"B\r\"\n");
   const auto other=minera::import_csv_event_log(lf,options);assert(other.traces[1].events[0].activity=="B\r");
 }
-int main(){drain_waits_for_inflight_observers_and_keeps_stream_active();dfg_persists_between_batches_and_revisions_guard_mutations();deregistration_and_reset_keep_delivery_history_and_boundaries();footprint_prefixes_terminate_after_finish_and_allow_a_new_case_generation();both_replay_variants_keep_markings_across_appends_and_final_diagnostics();temporal_pairs_cross_batch_boundaries_and_invalid_times_remain_skipped();crlf_records_do_not_change_untrimmed_native_columns_or_quoted_values();}
+// The reference DFG, footprints, temporal and TBR stream monitors skip an
+// event without a case id. Expected values from PM4Py 2.7.22 on the XES
+// event stream of this log (traces 2 and 3 have no concept:name): DFG
+// {(A,D):1}, activities {A:1,D:1}; footprints and TBR keep case c only;
+// temporal reports one deviation, (c, A, D, 100.0, 90.0).
+std::vector<minera::Event> unnamed_trace_events() {
+  std::istringstream xes(R"(<log xes.version="1.0">
+<trace><string key="concept:name" value="c"/>
+<event><string key="concept:name" value="A"/><date key="time:timestamp" value="2024-01-01T00:00:00"/></event>
+<event><string key="concept:name" value="D"/><date key="time:timestamp" value="2024-01-01T00:01:40"/></event></trace>
+<trace><event><string key="concept:name" value="B"/><date key="time:timestamp" value="2024-01-01T00:00:00"/></event>
+<event><string key="concept:name" value="C"/><date key="time:timestamp" value="2024-01-01T00:01:40"/></event></trace>
+<trace><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2024-01-01T00:00:00"/></event>
+<event><string key="concept:name" value="D"/><date key="time:timestamp" value="2024-01-01T00:01:40"/></event></trace></log>)");
+  const auto log=minera::import_xes_event_log(xes);std::vector<minera::Event> events;std::size_t order=0;
+  for(const auto& trace:log.traces)for(auto event:trace.events){event.input_order=order++;events.push_back(std::move(event));}
+  assert(events.size()==6&&!events[2].has_case_id()&&events[0].case_id=="c");
+  return events;
+}
+void events_without_case_ids_are_skipped() {
+  const auto run=[](minera::StreamingSessionOptions options){
+    options.dfg.activity_attribute=options.footprints.activity_attribute=options.tbr.activity_attribute="concept:name";
+    minera::StreamingSession session(options);session.action(Action::kStart,0);session.append(unnamed_trace_events(),"one",1);return session.snapshot_json();};
+  {auto s=run({});
+   assert(s.find("\"activities\":{\"A\":1,\"D\":1}")!=std::string::npos);
+   assert(s.find("\"source\":\"A\",\"target\":\"D\",\"count\":1")!=std::string::npos);
+   assert(s.find("\"source\":\"B\"")==std::string::npos);}
+  {minera::StreamingSessionOptions options;options.method=Method::kFootprints;minera::Footprint model;model.activities={"A","B","C","D"};model.sequence={{"A","D"}};model.start_activities={"A"};model.end_activities={"D"};options.footprint_model=model;
+   auto s=run(options);assert(s.find("\"total_events_processed\":2")!=std::string::npos);assert(s.find("\"total_deviations\":0")!=std::string::npos);assert(s.find("\"\":{")==std::string::npos);}
+  {minera::StreamingSessionOptions options;options.method=Method::kTemporal;minera::TemporalProfile profile;profile.entries.push_back({"A","D",2,10,1});profile.entries.push_back({"B","C",2,10,1});options.temporal_profile=profile;
+   auto s=run(options);assert(s.find("\"total_events_processed\":2")!=std::string::npos);assert(s.find("\"total_deviations\":1")!=std::string::npos);assert(s.find("\"\":{")==std::string::npos);}
+  {minera::StreamingSessionOptions options;options.method=Method::kTbr;minera::PetriNet n;auto a=n.add_place(),b=n.add_place(),c=n.add_place();n.set_source(a);n.set_sink(c);n.set_activities({"A","D"});n.add_transition(0,{a},{b});n.add_transition(1,{b},{c});options.net=n;
+   auto s=run(options);assert(s.find("\"\":{")==std::string::npos);assert(s.find("\"c\":{")!=std::string::npos);}
+}
+int main(){drain_waits_for_inflight_observers_and_keeps_stream_active();dfg_persists_between_batches_and_revisions_guard_mutations();deregistration_and_reset_keep_delivery_history_and_boundaries();footprint_prefixes_terminate_after_finish_and_allow_a_new_case_generation();both_replay_variants_keep_markings_across_appends_and_final_diagnostics();temporal_pairs_cross_batch_boundaries_and_invalid_times_remain_skipped();crlf_records_do_not_change_untrimmed_native_columns_or_quoted_values();events_without_case_ids_are_skipped();}

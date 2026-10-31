@@ -64,7 +64,12 @@ struct StreamingSession::Impl {
       Delivery delivery;
       { std::lock_guard lock(data_mutex); delivery = inputs.at(event.input_order); }
       try {
-        if (dfg) { delivery.accepted = dfg->receive(event, event.case_id); delivery.event_index = dfg->snapshot().events; }
+        // The reference DFG, footprints, temporal and TBR monitors skip an
+        // event without a case id (a None one is a value); Declare files it
+        // under "undefined_case" itself. The monitors' own Event overloads
+        // take the caller's case id, which may be a present empty one.
+        if (!declare && !event.has_case_id()) {}
+        else if (dfg) { delivery.accepted = dfg->receive(event, event.case_id); delivery.event_index = dfg->snapshot().events; }
         else if (footprints) { const auto r = footprints->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }
         else if (temporal) { const auto r = temporal->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }
         else if (declare) { const auto r = declare->receive(event); delivery.accepted = true; delivery.event_index = r.event_index; delivery.native_event = serialize_declare_stream_event_json(r); }

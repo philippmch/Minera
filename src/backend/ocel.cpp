@@ -1039,7 +1039,8 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     result.relations.assign(std::make_move_iterator(kept.rbegin()),
                             std::make_move_iterator(kept.rend()));
   }
-  sort_ocel_events_by_timestamp(result);
+  sort_ocel_events_by_timestamp(result, standard ? OcelTimestampReader::kIsoFormat
+                                                 : OcelTimestampReader::kIsoFormatOrFileOrder);
   if (const auto* raw = optional(r, "minera:tableColumns")) {
     const auto& columns = obj(*raw, "minera:tableColumns");
     const auto read = [&](const char* name,
@@ -1054,20 +1055,227 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   return result;
 }
 
+namespace {
+
+bool iso_digits(std::string_view text, std::size_t position, std::size_t count, int& value) {
+  if (position + count > text.size()) return false;
+  value = 0;
+  for (std::size_t index = position; index < position + count; ++index) {
+    if (std::isdigit(static_cast<unsigned char>(text[index])) == 0) return false;
+    value = value * 10 + (text[index] - '0');
+  }
+  return true;
+}
+
+// Clock fields HH[:MM[:SS]] (or HHMMSS) with an optional .f/,f fraction, as
+// the reference reads them (observed black-box): -1 is malformed, 0 read the
+// whole text, 1 left one stray character after the last field, which the
+// reference accepts only in front of a UTC offset.
+int iso_clock(std::string_view text, int (&fields)[3], std::int64_t& micro) {
+  fields[0] = fields[1] = fields[2] = 0;
+  micro = 0;
+  std::size_t position = 0;
+  bool separated = false;
+  bool fraction = false;
+  for (int field = 0; field < 3 && !fraction; ++field) {
+    if (!iso_digits(text, position, 2, fields[field])) return -1;
+    position += 2;
+    if (position >= text.size()) return 0;
+    const char next = text[position++];
+    if (field == 0) separated = next == ':';
+    if (position >= text.size()) return 1;
+    if (separated && next == ':') continue;
+    if (next == '.' || next == ',') fraction = true;
+    else if (!separated) --position;
+    else return -1;
+  }
+  const std::size_t remaining = text.size() - position;
+  const std::size_t count = std::min<std::size_t>(remaining, 6);
+  int digit = 0;
+  for (std::size_t index = 0; index < count; ++index) {
+    if (!iso_digits(text, position + index, 1, digit)) return -1;
+    micro = micro * 10 + digit;
+  }
+  for (std::size_t index = count; index < 6; ++index) micro *= 10;
+  position += count;
+  while (position < text.size() &&
+         std::isdigit(static_cast<unsigned char>(text[position])) != 0) ++position;
+  // Text after six fraction digits is stray too.
+  return position < text.size() ? 1 : 0;
+}
+
+std::int64_t iso_days_from_civil(int year, int month, int day) {
+  year -= month <= 2;
+  const int era = (year >= 0 ? year : year - 399) / 400;
+  const int year_of_era = year - era * 400;
+  const int day_of_year = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+  const int day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+  return static_cast<std::int64_t>(era) * 146097 + day_of_era - 719468;
+}
+
+int iso_monday_index(std::int64_t days) {  // Monday 0 .. Sunday 6
+  return static_cast<int>(((days % 7) + 7 + 3) % 7);
+}
+
+bool iso_leap(int year) { return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0); }
+
+// Wall-clock microseconds since 1970 of an ISO 8601 text as the reference
+// OCEL JSON importers read it: extended or basic calendar and week dates, any
+// single separator character, then clock fields and an optional Z or +/-
+// offset that is validated and dropped. Throws with the reference message.
+// The fixtures in minera_recheck_regression_tests and about 7,800 generated
+// strings (shapes, separators, fractions, offsets) were checked against the
+// pinned reference: every acceptance, value and message agrees.
+std::int64_t iso_wall_microseconds(std::string_view original) {
+  // A trailing Z reads as "+00:00" (so "2024-01-01Z" is midnight and a stray
+  // character may precede it), also in the message, as observed.
+  std::string spelled(original);
+  if (!spelled.empty() && spelled.back() == 'Z') spelled.replace(spelled.size() - 1, 1, "+00:00");
+  const auto invalid = [&](const std::string& reason = {}) {
+    throw std::invalid_argument(reason.empty()
+        ? "Invalid isoformat string: '" + spelled + "'" : reason);
+  };
+  const std::string_view text = spelled;
+  if (text.size() < 7) invalid();
+  // Where the date ends, from the shapes YYYY-MM-DD, YYYYMMDD, YYYY-Www[-D]
+  // and YYYYWww[D].
+  std::size_t date_end = 0;
+  if (text.size() == 7) date_end = 7;
+  else if (text[4] == '-') {
+    if (text[5] == 'W') {
+      if (text.size() < 8) invalid();
+      if (text.size() > 8 && text[8] == '-') {
+        if (text.size() == 9) invalid();
+        date_end = text.size() > 10 && std::isdigit(static_cast<unsigned char>(text[10])) != 0 ? 8 : 10;
+      } else date_end = 8;
+    } else date_end = 10;
+  } else if (text[4] == 'W') {
+    std::size_t index = 7;
+    while (index < text.size() && std::isdigit(static_cast<unsigned char>(text[index])) != 0) ++index;
+    date_end = index < 9 ? index : (index % 2 == 0 ? 7 : 8);
+  } else date_end = 8;
+  if (date_end > text.size()) invalid();
+  const auto date = text.substr(0, date_end);
+  int year = 0, month = 1, day = 1, week = 0, weekday = 1;
+  bool week_date = false;
+  if (!iso_digits(date, 0, 4, year)) invalid();
+  if (date.size() > 5 && date[4] == '-' && date[5] == 'W') {
+    week_date = true;
+    if (!iso_digits(date, 6, 2, week)) invalid();
+    if (date.size() == 10) {
+      if (date[8] != '-' || !iso_digits(date, 9, 1, weekday)) invalid();
+    } else if (date.size() != 8) invalid();
+  } else if (date.size() > 4 && date[4] == '-') {
+    if (date.size() != 10 || date[7] != '-' || !iso_digits(date, 5, 2, month) ||
+        !iso_digits(date, 8, 2, day)) invalid();
+  } else if (date.size() > 4 && date[4] == 'W') {
+    week_date = true;
+    if (!iso_digits(date, 5, 2, week)) invalid();
+    if (date.size() == 8) {
+      if (!iso_digits(date, 7, 1, weekday)) invalid();
+    } else if (date.size() != 7) invalid();
+  } else if (date.size() != 8 || !iso_digits(date, 4, 2, month) ||
+             !iso_digits(date, 6, 2, day)) invalid();
+  // A week date is checked with its shape, before the clock and offset.
+  if (week_date) {
+    const auto january_first = iso_monday_index(iso_days_from_civil(year, 1, 1));
+    const int weeks = january_first == 3 || (january_first == 2 && iso_leap(year)) ? 53 : 52;
+    if (week < 1 || week > weeks || weekday < 1 || weekday > 7) invalid();
+  }
+  int clock[3] = {0, 0, 0};
+  std::int64_t micro = 0;
+  if (date_end < text.size()) {
+    const auto time = text.substr(date_end + 1);  // any one separator character
+    const auto zone = time.find_first_of("Z+-");
+    const int read = iso_clock(time.substr(0, zone), clock, micro);
+    if (read < 0 || (zone == std::string_view::npos && read != 0)) invalid();
+    if (zone != std::string_view::npos) {
+      if (time[zone] == 'Z') {
+        if (zone + 1 != time.size()) invalid();
+      } else {
+        int offset[3] = {0, 0, 0};
+        std::int64_t offset_micro = 0;
+        if (iso_clock(time.substr(zone + 1), offset, offset_micro) != 0) invalid();
+        if (offset[0] * 3600 + offset[1] * 60 + offset[2] >= 86400) {
+          // The message ends with the offset's timedelta repr.
+          const std::int64_t sign = time[zone] == '-' ? -1 : 1;
+          const std::int64_t total = sign * ((offset[0] * 3600LL + offset[1] * 60LL + offset[2]) * 1000000 + offset_micro);
+          const std::int64_t unit = 86400LL * 1000000;
+          const std::int64_t days = total >= 0 ? total / unit : -((-total + unit - 1) / unit);
+          const std::int64_t rest = total - days * unit;
+          std::string repr = "datetime.timedelta(days=" + std::to_string(days);
+          if (rest / 1000000 != 0) repr += ", seconds=" + std::to_string(rest / 1000000);
+          if (rest % 1000000 != 0) repr += ", microseconds=" + std::to_string(rest % 1000000);
+          invalid("offset must be a timedelta strictly between -timedelta(hours=24) and timedelta(hours=24), not " + repr + ").");
+        }
+      }
+    }
+  }
+  // Calendar ranges are checked after the whole shape, as observed.
+  // Year 0 fails as a calendar date; as a week date it fails converting to one.
+  if (year < 1) invalid(week_date ? "month must be in 1..12" : "year " + std::to_string(year) + " is out of range");
+  std::int64_t days = 0;
+  if (week_date) {
+    const auto january_fourth = iso_days_from_civil(year, 1, 4);
+    days = january_fourth - iso_monday_index(january_fourth) + (week - 1) * 7 + (weekday - 1);
+  } else {
+    if (month < 1 || month > 12) invalid("month must be in 1..12");
+    static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    const int last = month == 2 && iso_leap(year) ? 29 : kDays[month - 1];
+    if (day < 1 || day > last) invalid("day is out of range for month");
+    days = iso_days_from_civil(year, month, day);
+  }
+  if (clock[0] > 23) invalid("hour must be in 0..23");
+  if (clock[1] > 59) invalid("minute must be in 0..59");
+  if (clock[2] > 59) invalid("second must be in 0..59");
+  return (days * 86400 + clock[0] * 3600 + clock[1] * 60 + clock[2]) * 1000000 + micro;
+}
+
+// XML: the ISO reading, else the native parser on the wall-clock fields (the
+// offset dropped as the reference does).
+std::int64_t lenient_wall_microseconds(std::string_view text) {
+  try {
+    return iso_wall_microseconds(text);
+  } catch (const std::invalid_argument&) {
+  }
+  if (parse_timestamp(text)) {
+    std::size_t end = text.size();
+    while (end > 0 && std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) --end;
+    if (const auto zone = text.substr(0, end).find_first_of("Zz+-", 10); zone != std::string_view::npos) end = zone;
+    if (const auto wall = parse_timestamp_microseconds(text.substr(0, end))) return *wall;
+  }
+  throw std::invalid_argument("String does not contain a date: " + std::string(text));
+}
+
+}  // namespace
+
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds) {
-  // The key is the instant at the importer's precision: SQLite keeps
-  // nanoseconds, the JSON and XML importers microseconds.
+  sort_ocel_events_by_timestamp(log, nanoseconds ? OcelTimestampReader::kInstantNanoseconds
+                                                 : OcelTimestampReader::kIsoFormat);
+}
+
+void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
+  // The key is the timestamp at the importer's precision: SQLite keeps
+  // nanoseconds of the instant, the JSON and XML importers microseconds of
+  // the wall-clock fields.
   std::vector<std::tuple<std::int64_t, std::int64_t, std::size_t>> keys;
   keys.reserve(log.events.size());
   for (std::size_t index = 0; index < log.events.size(); ++index) {
-    if (nanoseconds) {
-      const auto instant = parse_timestamp_exact(log.events[index].timestamp);
+    const auto& text = log.events[index].timestamp;
+    if (reader == OcelTimestampReader::kInstantNanoseconds) {
+      const auto instant = parse_timestamp_exact(text);
       if (!instant) return;
       keys.emplace_back(instant->seconds, instant->nanoseconds, index);
+    } else if (reader == OcelTimestampReader::kIsoFormatOrFileOrder) {
+      try {
+        keys.emplace_back(iso_wall_microseconds(text), 0, index);
+      } catch (const std::invalid_argument&) {
+        return;
+      }
     } else {
-      const auto instant = parse_timestamp_microseconds(log.events[index].timestamp);
-      if (!instant) return;
-      keys.emplace_back(*instant, 0, index);
+      keys.emplace_back(reader == OcelTimestampReader::kIsoFormat ? iso_wall_microseconds(text)
+                                                                  : lenient_wall_microseconds(text),
+                        0, index);
     }
   }
   // Relations follow their events' order even when the events already are

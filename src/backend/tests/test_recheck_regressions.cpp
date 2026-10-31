@@ -7,6 +7,7 @@
 #include "minera/dfg_dataframe_json.hpp"
 #include "minera/footprints.hpp"
 #include "minera/ocel.hpp"
+#include "minera/ocel_xml.hpp"
 #include "minera/pandas_case_filter.hpp"
 #include "minera/pandas_sequence_filters.hpp"
 #include "minera/streaming_dfg.hpp"
@@ -17,6 +18,7 @@
 #include <limits>
 #include <optional>
 #include <set>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -264,6 +266,42 @@ void ocel_import_order(){
  check(event_ids(microseconds)=="zeta,alpha,middle,","J33 JSON/XML precision keeps tied input order");
 }
 
+// OCEL JSON and XML order events by their wall-clock fields: the reference
+// keeps the clock and attaches UTC, dropping the offset. It reads JSON (and
+// classic XML) as ISO 8601 the way Python 3.11 does, raising on anything else.
+// Expected orders and messages from PM4Py 2.7.22 read_ocel2_json/xml.
+std::string ocel2_json(const std::vector<std::string>& times){
+ std::string out=R"({"objectTypes":[{"name":"item","attributes":[]}],"eventTypes":[{"name":"A","attributes":[]}],"objects":[{"id":"o1","type":"item"}],"events":[)";
+ for(std::size_t i=0;i<times.size();++i)out+=std::string(i?",":"")+R"({"id":"e)"+std::to_string(i)+R"(","type":"A","time":")"+times[i]+R"(","relationships":[{"objectId":"o1","qualifier":""}]})";
+ return out+"]}";}
+std::string ocel2_xml(const std::vector<std::string>& times){
+ std::string out=R"(<?xml version="1.0" encoding="UTF-8"?><log><object-types><object-type name="item"><attributes/></object-type></object-types><event-types><event-type name="A"><attributes/></event-type></event-types><objects><object id="o1" type="item"><attributes/></object></objects><events>)";
+ for(std::size_t i=0;i<times.size();++i)out+=R"(<event id="e)"+std::to_string(i)+R"(" type="A" time=")"+times[i]+R"("><objects><relationship object-id="o1" qualifier=""/></objects></event>)";
+ return out+"</events></log>";}
+std::string import_error(const std::function<void()>& run){try{run();}catch(const std::invalid_argument& e){return e.what();}return "";}
+void ocel_wall_clock_order(){
+ const auto offsets=parse_ocel_json(ocel2_json({"2024-01-01T05:00:00+08:00","2024-01-01T01:00:00Z","2024-01-01T03:00:00-05:00","2024-01-01T04",
+  "20240101T020000","2024-01-01x03:30:00","2024-W01-1T00:30:00,5","2024-01-01T02 +01:00"}));
+ check(event_ids(offsets)=="e6,e1,e4,e7,e2,e5,e3,e0,"&&relation_ids(offsets)=="e6,e1,e4,e7,e2,e5,e3,e0,","OCEL JSON wall-clock order and ISO shapes");
+ const auto equivalent=parse_ocel_json(ocel2_json({"2020-01-01T01:00:00+01:00","2020-01-01T00:00:00Z","2020-01-01T00:30:00+00:30"}));
+ check(event_ids(equivalent)=="e1,e2,e0,","OCEL JSON offset-equivalent instants order by wall clock");
+ for(const auto& [bad,message]:std::vector<std::pair<std::string,std::string>>{
+   {"garbage","Invalid isoformat string: 'garbage'"},{"","Invalid isoformat string: ''"},
+   {"2024-01-01T05:00:00z","Invalid isoformat string: '2024-01-01T05:00:00z'"},{"2024-W53-1","Invalid isoformat string: '2024-W53-1'"},
+   {"2024-01-01T24:00:00","hour must be in 0..23"},{"2024-01-01T05:00:00 ","Invalid isoformat string: '2024-01-01T05:00:00 '"},
+   {"2024-01-01T05:00:00+08:00x","Invalid isoformat string: '2024-01-01T05:00:00+08:00x'"},{"2024-02-30","day is out of range for month"}})
+  check(import_error([&]{(void)parse_ocel_json(ocel2_json({"2024-01-01T00:00:00",bad}));})==message,"OCEL JSON rejects timestamp '"+bad+"'");
+ // Classic JSON is native transport: an unreadable timestamp keeps file order.
+ const std::string classic_nat=R"({"ocel:objects":{"o1":{"ocel:type":"T","ocel:ovmap":{}}},"ocel:events":{
+  "late":{"ocel:activity":"A","ocel:timestamp":"2020-01-02T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}},
+  "nat":{"ocel:activity":"A","ocel:timestamp":"NaT","ocel:omap":["o1"],"ocel:vmap":{}},
+  "early":{"ocel:activity":"A","ocel:timestamp":"2020-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}}}})";
+ check(event_ids(parse_ocel_json(classic_nat))=="late,nat,early,","classic OCEL JSON transport keeps NaT logs in file order");
+ const auto xml=parse_ocel_xml(ocel2_xml({"2024-01-01T05:00:00+08:00","2024-01-01T01:00:00Z","2024-01-01 03:00:00"}));
+ check(event_ids(xml)=="e1,e2,e0,","OCEL XML wall-clock order");
+ check(!import_error([&]{(void)parse_ocel_xml(ocel2_xml({"2024-01-01T00:00:00","garbage"}));}).empty(),"OCEL XML rejects an unreadable timestamp");
+}
+
 // K1: a nanosecond duration beyond int64 overflows as in the reference; a
 // microsecond column holds it. K2: ints mixed with floats key a float64
 // index, so an int case id no double holds drops out.
@@ -409,6 +447,7 @@ int main(){
  batch_scalar_identity();
  polars_batch_boundaries();
  ocel_import_order();
+ ocel_wall_clock_order();
  case_performance_contracts();
  polars_dataframe_contracts();
  streaming_and_storage_contracts();

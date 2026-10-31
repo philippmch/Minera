@@ -15914,9 +15914,32 @@ analysis and 3 physical-usage cases plus 13 organizational repros);
 
 Declared (not equivalent, kept on purpose):
 
-- **K5.** Standard OCEL JSON and XML ties between offset-equivalent instants
-  keep their file order (alpha, zeta, middle); the reference orders them
-  alpha, middle, zeta. SQLite agrees with native.
+- **K5 (fixed 2026-10-31, no longer declared).** The reference JSON and XML
+  importers keep each timestamp's clock fields and attach UTC, dropping the
+  offset, so events order by wall-clock time, not by instant: "05:00+08:00"
+  follows "01:00Z". Native ordered by instant, which reordered any log with
+  offsets, not only offset-equivalent ties. Native now orders OCEL JSON
+  (classic and 2.0) and classic XML by ISO 8601 wall-clock fields read like
+  Python 3.11 `fromisoformat` (basic and week dates, any separator, hour-only
+  and `,` fractions). OCEL 2.0 JSON and classic XML raise the reference
+  message on an unreadable timestamp; OCEL 2.0 XML falls back to the native
+  parser before raising ("String does not contain a date"). Still declared:
+  classic OCEL JSON keeps the file order of the whole log on an unreadable
+  timestamp instead of raising, because native adapters carry empty and NaT
+  timestamps through it as transport. SQLite still compares UTC instants at
+  nanoseconds, which the reference SQLite importer also converts. Non-ISO
+  shapes that only a lenient date parser reads may still raise in native XML.
+  Tests: `minera_recheck_regression_tests` (`ocel_wall_clock_order`).
+- **Stream events without a case id (live sessions fixed 2026-10-31).** The
+  reference DFG, footprints, temporal and token-replay stream monitors skip
+  an event with no case id (a None case id stays a value); Declare files it
+  under "undefined_case". The live session now skips such events (for
+  example from an XES trace without `concept:name`) instead of filing them
+  under the empty case. Still declared: the one-shot streaming server routes
+  pass `event->case_id` to the monitors and keep the empty case. The
+  monitors' `receive(const Event&, case_id)` overloads keep taking the
+  caller's case id, because the CSV stream passes a present empty one. Test:
+  `minera_streaming_session_tests` (`events_without_case_ids_are_skipped`).
 - **Pandas batch None case.** A None case id in a pandas batch is written as
   the text `"nan"`.
 - **PNML zero marking key.** An explicit zero initial-marking annotation stays
