@@ -841,132 +841,6 @@ class PetriToPowlBuilder {
     }
   }
 
-  bool all_inputs_available(std::size_t transition,
-                            const IdSet& available) const {
-    return subset(transition_inputs_[transition], available);
-  }
-
-  IdSet viable_transitions(const IdSet& ends,
-                           const IdSet& allowed) const {
-    IdSet viable_places = ends;
-    IdSet viable;
-    bool changed = true;
-    while (changed) {
-      changed = false;
-      for (const auto transition : allowed) {
-        if (viable.contains(transition)) continue;
-        if (!intersects(transition_outputs_[transition], viable_places))
-          continue;
-        viable.insert(transition);
-        for (const auto place : transition_inputs_[transition])
-          changed = viable_places.insert(place).second || changed;
-      }
-    }
-    return viable;
-  }
-
-  IdSet collect_to(const IdSet& starts, const IdSet& ends,
-                   const IdSet& allowed) const {
-    const auto viable = viable_transitions(ends, allowed);
-    IdSet available = starts;
-    IdSet result;
-    std::queue<std::size_t> places;
-    for (const auto place : starts) places.push(place);
-
-    while (!places.empty()) {
-      const auto place = places.front();
-      places.pop();
-      if (place >= place_out_.size()) continue;
-      for (const auto transition : place_out_[place]) {
-        if (!allowed.contains(transition) || !viable.contains(transition) ||
-            result.contains(transition) ||
-            !all_inputs_available(transition, available)) {
-          continue;
-        }
-        result.insert(transition);
-        for (const auto output : transition_outputs_[transition]) {
-          if (ends.contains(output) || starts.contains(output)) continue;
-          if (available.insert(output).second) places.push(output);
-        }
-      }
-    }
-    return result;
-  }
-
-  IdSet collect_seed(std::size_t seed, const IdSet& starts,
-                     const IdSet& ends, const IdSet& allowed) const {
-    if (!allowed.contains(seed) ||
-        !all_inputs_available(seed, starts)) {
-      return {};
-    }
-    const auto viable = viable_transitions(ends, allowed);
-    if (!viable.contains(seed)) return {};
-
-    IdSet available = starts;
-    IdSet result{seed};
-    std::queue<std::size_t> places;
-    for (const auto output : transition_outputs_[seed]) {
-      if (ends.contains(output) || starts.contains(output)) continue;
-      if (available.insert(output).second) places.push(output);
-    }
-
-    while (!places.empty()) {
-      const auto place = places.front();
-      places.pop();
-      if (place >= place_out_.size()) continue;
-      for (const auto transition : place_out_[place]) {
-        if (!allowed.contains(transition) || !viable.contains(transition) ||
-            result.contains(transition) ||
-            !all_inputs_available(transition, available)) {
-          continue;
-        }
-        result.insert(transition);
-        for (const auto output : transition_outputs_[transition]) {
-          if (ends.contains(output) || starts.contains(output)) continue;
-          if (available.insert(output).second) places.push(output);
-        }
-      }
-    }
-    return result;
-  }
-
-  bool reaches(const IdSet& starts, const IdSet& ends,
-               const IdSet& allowed,
-               std::optional<std::size_t> blocked_place = std::nullopt) const {
-    if (intersects(starts, ends)) return true;
-    IdSet available = starts;
-    IdSet seen_transitions;
-    std::queue<std::size_t> places;
-    for (const auto place : starts) {
-      if (blocked_place && *blocked_place == place) return false;
-      places.push(place);
-    }
-    while (!places.empty()) {
-      const auto place = places.front();
-      places.pop();
-      if (place >= place_out_.size()) continue;
-      for (const auto transition : place_out_[place]) {
-        if (!allowed.contains(transition) || seen_transitions.contains(transition) ||
-            !all_inputs_available(transition, available)) {
-          continue;
-        }
-        if (blocked_place &&
-            (transition_inputs_[transition].contains(*blocked_place) ||
-             transition_outputs_[transition].contains(*blocked_place))) {
-          continue;
-        }
-        seen_transitions.insert(transition);
-        for (const auto output : transition_outputs_[transition]) {
-          if (blocked_place && output == *blocked_place) continue;
-          if (ends.contains(output)) return true;
-          if (starts.contains(output)) continue;
-          if (available.insert(output).second) places.push(output);
-        }
-      }
-    }
-    return false;
-  }
-
   bool transition_reaches(std::size_t source, std::size_t target,
                           const IdSet& allowed) const {
     if (source == target) return false;
@@ -1028,7 +902,7 @@ class PetriToPowlBuilder {
       }
       std::size_t boundary_entry_count = 0;
       for (const auto transition : fragment.transitions) {
-        if (subset(transition_inputs_[transition], fragment.starts))
+        if (intersects(transition_inputs_[transition], fragment.starts))
           ++boundary_entry_count;
       }
       if (!has_return_to_start && entry_count == 1 &&
@@ -1053,7 +927,7 @@ class PetriToPowlBuilder {
       }
       std::size_t boundary_exit_count = 0;
       for (const auto transition : fragment.transitions) {
-        if (subset(transition_outputs_[transition], fragment.ends))
+        if (intersects(transition_outputs_[transition], fragment.ends))
           ++boundary_exit_count;
       }
       if (!has_continuation_from_end && exit_count == 1 &&
@@ -1072,51 +946,198 @@ class PetriToPowlBuilder {
     return PowlNode::sequence({std::move(first), std::move(second)});
   }
 
-  std::optional<std::size_t> sequence_cut(const Fragment& fragment) const {
-    for (std::size_t place = 0; place < net_.place_count(); ++place) {
+  IdSet places_of(const IdSet& transitions) const {
+    IdSet places;
+    for (const auto transition : transitions) {
+      places.insert(transition_inputs_[transition].begin(),
+                    transition_inputs_[transition].end());
+      places.insert(transition_outputs_[transition].begin(),
+                    transition_outputs_[transition].end());
+    }
+    return places;
+  }
+
+  // Connected components of the fragment's transitions, joined through every
+  // shared place except `blocked`. Components are ordered by their smallest
+  // transition so the decomposition is deterministic.
+  std::vector<IdSet> components(const IdSet& transitions,
+                                const IdSet& blocked = {}) const {
+    std::map<std::size_t, std::vector<std::size_t>> by_place;
+    for (const auto transition : transitions) {
+      for (const auto place : places_of(IdSet{transition})) {
+        if (blocked.contains(place)) continue;
+        by_place[place].push_back(transition);
+      }
+    }
+    std::map<std::size_t, std::size_t> parent;
+    for (const auto transition : transitions) parent[transition] = transition;
+    const std::function<std::size_t(std::size_t)> find =
+        [&](std::size_t value) {
+          while (parent[value] != value) {
+            parent[value] = parent[parent[value]];
+            value = parent[value];
+          }
+          return value;
+        };
+    for (const auto& [place, members] : by_place) {
+      (void)place;
+      for (std::size_t index = 1; index < members.size(); ++index) {
+        const auto left = find(members.front());
+        const auto right = find(members[index]);
+        if (left != right) parent[std::max(left, right)] = std::min(left, right);
+      }
+    }
+    std::map<std::size_t, IdSet> grouped;
+    for (const auto transition : transitions)
+      grouped[find(transition)].insert(transition);
+    std::vector<IdSet> result;
+    result.reserve(grouped.size());
+    for (auto& [root, members] : grouped) {
+      (void)root;
+      result.push_back(std::move(members));
+    }
+    return result;
+  }
+
+  // A parallel block: the fragment falls apart into place-disjoint
+  // components, each of which owns some of the start and end places.
+  std::optional<std::vector<Fragment>> parallel_cut(
+      const Fragment& fragment) const {
+    const auto parts = components(fragment.transitions);
+    if (parts.size() < 2) return std::nullopt;
+    std::vector<Fragment> result;
+    IdSet covered_starts;
+    IdSet covered_ends;
+    for (const auto& part : parts) {
+      const auto places = places_of(part);
+      Fragment child{{}, {}, part};
+      for (const auto place : fragment.starts)
+        if (places.contains(place)) child.starts.insert(place);
+      for (const auto place : fragment.ends)
+        if (places.contains(place)) child.ends.insert(place);
+      if (child.starts.empty() || child.ends.empty()) {
+        throw std::invalid_argument(
+            "workflow-net conversion found a concurrent fragment without "
+            "workflow boundaries");
+      }
+      covered_starts.insert(child.starts.begin(), child.starts.end());
+      covered_ends.insert(child.ends.begin(), child.ends.end());
+      result.push_back(std::move(child));
+    }
+    if (covered_starts != fragment.starts || covered_ends != fragment.ends) {
+      throw std::invalid_argument(
+          "workflow-net conversion found an unused fragment boundary place");
+    }
+    return result;
+  }
+
+  struct SequenceSplit {
+    std::size_t place = 0;
+    IdSet prefix;
+    IdSet suffix;
+  };
+
+  // A sequence block: removing one inner place separates the fragment into a
+  // prefix that owns every start place and a suffix that owns every end
+  // place. The prefix may loop back through the cut place, or the suffix may,
+  // but not both, since that would let the suffix return into the prefix.
+  std::optional<SequenceSplit> sequence_cut(const Fragment& fragment) const {
+    for (const auto place : places_of(fragment.transitions)) {
       if (fragment.starts.contains(place) || fragment.ends.contains(place))
         continue;
-      const IdSet singleton{place};
-      if (!reaches(fragment.starts, singleton, fragment.transitions) ||
-          !reaches(singleton, fragment.ends, fragment.transitions) ||
-          reaches(fragment.starts, fragment.ends, fragment.transitions, place)) {
-        continue;
+      const auto parts = components(fragment.transitions, IdSet{place});
+      if (parts.size() != 2) continue;
+      for (std::size_t order = 0; order < 2; ++order) {
+        const auto& prefix = parts[order];
+        const auto& suffix = parts[1 - order];
+        const auto prefix_places = places_of(prefix);
+        const auto suffix_places = places_of(suffix);
+        if (!subset(fragment.starts, prefix_places) ||
+            intersects(fragment.starts, suffix_places) ||
+            !subset(fragment.ends, suffix_places) ||
+            intersects(fragment.ends, prefix_places)) {
+          continue;
+        }
+        bool prefix_produces = false;
+        bool prefix_consumes = false;
+        bool suffix_produces = false;
+        bool suffix_consumes = false;
+        for (const auto transition : prefix) {
+          prefix_produces |= transition_outputs_[transition].contains(place);
+          prefix_consumes |= transition_inputs_[transition].contains(place);
+        }
+        for (const auto transition : suffix) {
+          suffix_produces |= transition_outputs_[transition].contains(place);
+          suffix_consumes |= transition_inputs_[transition].contains(place);
+        }
+        if (!prefix_produces || !suffix_consumes) continue;
+        if (prefix_consumes && suffix_produces) continue;
+        return SequenceSplit{place, prefix, suffix};
       }
-      const auto prefix = collect_to(fragment.starts, singleton,
-                                     fragment.transitions);
-      const auto suffix = collect_to(singleton, fragment.ends,
-                                     fragment.transitions);
-      if (prefix.empty() || suffix.empty() || intersects(prefix, suffix))
-        continue;
-      IdSet union_set = prefix;
-      union_set.insert(suffix.begin(), suffix.end());
-      if (union_set == fragment.transitions) return place;
     }
     return std::nullopt;
   }
 
+  struct TransitionSplit {
+    std::size_t transition = 0;
+    IdSet prefix;
+    IdSet suffix;
+  };
+
+  // A sequence block through one transition, such as a merged join and
+  // split: without it, the fragment separates into a prefix that owns the
+  // start places and the transition's inputs and a suffix that owns its
+  // outputs and the end places.
+  std::optional<TransitionSplit> transition_cut(const Fragment& fragment) const {
+    for (const auto transition : fragment.transitions) {
+      const auto& inputs = transition_inputs_[transition];
+      const auto& outputs = transition_outputs_[transition];
+      if (intersects(inputs, outputs)) continue;
+      IdSet rest = fragment.transitions;
+      rest.erase(transition);
+      IdSet before = fragment.starts;
+      before.insert(inputs.begin(), inputs.end());
+      IdSet after = fragment.ends;
+      after.insert(outputs.begin(), outputs.end());
+      if (intersects(before, after)) continue;
+      TransitionSplit split{transition, {}, {}};
+      bool valid = true;
+      for (const auto& part : components(rest)) {
+        const auto places = places_of(part);
+        const bool left = intersects(places, before);
+        const bool right = intersects(places, after);
+        if (left == right) {
+          valid = false;
+          break;
+        }
+        (left ? split.prefix : split.suffix).insert(part.begin(), part.end());
+      }
+      if (!valid || split.prefix.empty() || split.suffix.empty()) continue;
+      return split;
+    }
+    return std::nullopt;
+  }
+
+  // An exclusive block: without the shared start and end places, the
+  // fragment separates into branches that each span the whole boundary.
   std::optional<std::vector<IdSet>> xor_cut(const Fragment& fragment) const {
     if (fragment.starts.size() != 1) return std::nullopt;
-    std::vector<std::size_t> entries;
+    // A branch that returns into the shared start, or continues from the
+    // shared end, could hand control to another branch.
     for (const auto transition : fragment.transitions) {
-      if (transition_inputs_[transition] == fragment.starts)
-        entries.push_back(transition);
+      if (intersects(transition_outputs_[transition], fragment.starts) ||
+          intersects(transition_inputs_[transition], fragment.ends)) {
+        return std::nullopt;
+      }
     }
-    std::sort(entries.begin(), entries.end());
-    if (entries.size() < 2) return std::nullopt;
-
-    std::vector<IdSet> branches;
-    IdSet union_set;
-    for (const auto entry : entries) {
-      auto branch = collect_seed(entry, fragment.starts, fragment.ends,
-                                 fragment.transitions);
-      if (branch.empty()) return std::nullopt;
-      for (const auto& other : branches)
-        if (intersects(branch, other)) return std::nullopt;
-      union_set.insert(branch.begin(), branch.end());
-      branches.push_back(std::move(branch));
+    IdSet boundary = fragment.starts;
+    boundary.insert(fragment.ends.begin(), fragment.ends.end());
+    auto branches = components(fragment.transitions, boundary);
+    if (branches.size() < 2) return std::nullopt;
+    for (const auto& branch : branches) {
+      const auto places = places_of(branch);
+      if (!subset(boundary, places)) return std::nullopt;
     }
-    if (union_set != fragment.transitions) return std::nullopt;
     return branches;
   }
 
@@ -1131,17 +1152,56 @@ class PetriToPowlBuilder {
     return PowlNode::transition(net_.activities()[*model_transition.activity]);
   }
 
+  // A residual fragment is exact as a partial order only when it is an
+  // acyclic marked graph between its boundaries: every inner place has one
+  // producer and one consumer, start places only a consumer and end places
+  // only a producer. Then every transition fires exactly once and the
+  // language is the set of linear extensions of the causal order. Anything
+  // else (a choice, a skip or a repetition) cannot be expressed this way.
+  void require_marked_graph(const Fragment& fragment) const {
+    std::map<std::size_t, std::size_t> producers;
+    std::map<std::size_t, std::size_t> consumers;
+    for (const auto transition : fragment.transitions) {
+      for (const auto place : transition_outputs_[transition]) ++producers[place];
+      for (const auto place : transition_inputs_[transition]) ++consumers[place];
+    }
+    const auto fail = [] {
+      throw std::invalid_argument(
+          "workflow-net conversion found a fragment that is not "
+          "block-structured");
+    };
+    for (const auto place : places_of(fragment.transitions)) {
+      const auto produced = producers[place];
+      const auto consumed = consumers[place];
+      const bool start = fragment.starts.contains(place);
+      const bool end = fragment.ends.contains(place);
+      if (start && end) fail();
+      if (start) {
+        if (produced != 0 || consumed != 1) fail();
+      } else if (end) {
+        if (produced != 1 || consumed != 0) fail();
+      } else if (produced != 1 || consumed != 1) {
+        fail();
+      }
+    }
+    if (!subset(fragment.starts, places_of(fragment.transitions)) ||
+        !subset(fragment.ends, places_of(fragment.transitions))) {
+      fail();
+    }
+  }
+
   PowlNode partial_order(const Fragment& fragment) const {
-    std::vector<std::size_t> visible;
-    for (const auto transition : fragment.transitions)
-      if (!net_.transitions()[transition].silent()) visible.push_back(transition);
-    if (visible.empty()) return PowlNode::silent();
-    for (const auto transition : visible) {
+    for (const auto transition : fragment.transitions) {
       if (transition_has_cycle(transition, fragment.transitions)) {
         throw std::invalid_argument(
             "workflow-net conversion found an unresolved transition cycle");
       }
     }
+    require_marked_graph(fragment);
+    std::vector<std::size_t> visible;
+    for (const auto transition : fragment.transitions)
+      if (!net_.transitions()[transition].silent()) visible.push_back(transition);
+    if (visible.empty()) return PowlNode::silent();
     std::vector<PowlNode> children;
     children.reserve(visible.size());
     for (const auto transition : visible)
@@ -1168,38 +1228,231 @@ class PetriToPowlBuilder {
     return PowlNode::strict_partial_order(std::move(children), order);
   }
 
-  PowlNode convert(Fragment fragment) const {
-    normalize(fragment);
-    if (fragment.transitions.empty()) return PowlNode::silent();
+  // A loop needs its do part to start only once every start place is marked
+  // and its redo part only once every end place is marked; otherwise the two
+  // parts could overlap, which a loop operator does not allow.
+  bool exact_loop(const Fragment& fragment, const IdSet& do_part,
+                  const IdSet& redo_part) const {
+    IdSet boundary = fragment.starts;
+    boundary.insert(fragment.ends.begin(), fragment.ends.end());
+    IdSet do_inner;
+    for (const auto place : places_of(do_part))
+      if (!boundary.contains(place)) do_inner.insert(place);
+    for (const auto place : places_of(redo_part))
+      if (do_inner.contains(place)) return false;
+    for (const auto transition : do_part) {
+      const auto& inputs = transition_inputs_[transition];
+      if (intersects(inputs, fragment.starts) &&
+          !subset(fragment.starts, inputs)) {
+        return false;
+      }
+    }
+    for (const auto transition : redo_part) {
+      const auto& inputs = transition_inputs_[transition];
+      if (intersects(inputs, fragment.ends) && !subset(fragment.ends, inputs))
+        return false;
+    }
+    return true;
+  }
 
-    if (fragment.transitions.size() == 1) {
-      return transition_node(*fragment.transitions.begin());
+  // A place that is both a start and an end and that no transition of the
+  // fragment touches only holds an idle token (a reduced silent branch), so
+  // it does not change the fragment's language.
+  bool prune_idle_boundaries(Fragment& fragment) const {
+    const auto touched = places_of(fragment.transitions);
+    bool changed = false;
+    for (auto it = fragment.starts.begin(); it != fragment.starts.end();) {
+      if (fragment.ends.contains(*it) && !touched.contains(*it) &&
+          !fragment.transitions.empty()) {
+        fragment.ends.erase(*it);
+        it = fragment.starts.erase(it);
+        changed = true;
+      } else {
+        ++it;
+      }
+    }
+    return changed;
+  }
+
+  // The unique transition leaving every start place (or entering every end
+  // place) is a sequence boundary even when it is visible, for example a
+  // visible join of concurrent branches.
+  std::optional<std::size_t> boundary_transition(const Fragment& fragment,
+                                                 bool entry) const {
+    const auto& boundary = entry ? fragment.starts : fragment.ends;
+    std::optional<std::size_t> found;
+    for (const auto transition : fragment.transitions) {
+      const auto& near = entry ? transition_inputs_[transition]
+                               : transition_outputs_[transition];
+      const auto& far = entry ? transition_outputs_[transition]
+                              : transition_inputs_[transition];
+      if (intersects(far, boundary)) return std::nullopt;
+      if (!intersects(near, boundary)) continue;
+      if (found || near != boundary) return std::nullopt;
+      found = transition;
+    }
+    return found;
+  }
+
+  // A fragment whose single start place is also its end place repeats zero
+  // or more cycles through that place. Each place-disjoint cycle must leave
+  // or re-enter the place through one transition, which separates it into an
+  // ordinary fragment between distinct places.
+  PowlNode convert_cycles(const Fragment& fragment) const {
+    if (fragment.starts.size() != 1) {
+      throw std::invalid_argument(
+          "workflow-net conversion found a fragment that is not "
+          "block-structured");
+    }
+    const auto place = *fragment.starts.begin();
+    std::vector<PowlNode> cycles;
+    for (const auto& part : components(fragment.transitions, IdSet{place})) {
+      std::vector<std::size_t> entries;
+      std::vector<std::size_t> exits;
+      for (const auto transition : part) {
+        if (transition_inputs_[transition].contains(place))
+          entries.push_back(transition);
+        if (transition_outputs_[transition].contains(place))
+          exits.push_back(transition);
+      }
+      if (part.size() == 1 && entries.size() == 1 && exits.size() == 1 &&
+          transition_inputs_[entries.front()] == fragment.starts &&
+          transition_outputs_[entries.front()] == fragment.starts) {
+        cycles.push_back(transition_node(entries.front()));
+        continue;
+      }
+      if (entries.size() == 1 &&
+          transition_inputs_[entries.front()] == fragment.starts &&
+          !transition_outputs_[entries.front()].contains(place)) {
+        const auto entry = entries.front();
+        IdSet rest = part;
+        rest.erase(entry);
+        cycles.push_back(sequence_nodes(
+            transition_node(entry),
+            convert(Fragment{transition_outputs_[entry], fragment.starts,
+                             std::move(rest)})));
+        continue;
+      }
+      if (exits.size() == 1 &&
+          transition_outputs_[exits.front()] == fragment.starts &&
+          !transition_inputs_[exits.front()].contains(place)) {
+        const auto exit = exits.front();
+        IdSet rest = part;
+        rest.erase(exit);
+        cycles.push_back(sequence_nodes(
+            convert(Fragment{fragment.starts, transition_inputs_[exit],
+                             std::move(rest)}),
+            transition_node(exit)));
+        continue;
+      }
+      throw std::invalid_argument(
+          "workflow-net conversion found a fragment that is not "
+          "block-structured");
+    }
+    auto body = cycles.size() == 1 ? std::move(cycles.front())
+                                   : PowlNode::xor_node(std::move(cycles));
+    return PowlNode::loop(PowlNode::silent(), std::move(body));
+  }
+
+  // A loop block: without the start and end places, the fragment separates
+  // into parts that run forward from the start places (the do part, which
+  // may repeat internally through the end places) and parts that only lead
+  // from the end places back to the start places (the redo part).
+  std::optional<std::pair<IdSet, IdSet>> loop_cut(
+      const Fragment& fragment) const {
+    if (intersects(fragment.starts, fragment.ends)) return std::nullopt;
+    IdSet boundary = fragment.starts;
+    boundary.insert(fragment.ends.begin(), fragment.ends.end());
+    IdSet do_part;
+    IdSet redo_part;
+    for (const auto& part : components(fragment.transitions, boundary)) {
+      bool consumes_start = false;
+      bool consumes_end = false;
+      bool produces_start = false;
+      bool produces_end = false;
+      for (const auto transition : part) {
+        consumes_start |= intersects(transition_inputs_[transition], fragment.starts);
+        consumes_end |= intersects(transition_inputs_[transition], fragment.ends);
+        produces_start |= intersects(transition_outputs_[transition], fragment.starts);
+        produces_end |= intersects(transition_outputs_[transition], fragment.ends);
+      }
+      if (!consumes_start && !produces_end && consumes_end && produces_start)
+        redo_part.insert(part.begin(), part.end());
+      else
+        do_part.insert(part.begin(), part.end());
+    }
+    if (do_part.empty() || redo_part.empty()) return std::nullopt;
+    if (!exact_loop(fragment, do_part, redo_part)) return std::nullopt;
+    return std::make_pair(std::move(do_part), std::move(redo_part));
+  }
+
+  PowlNode convert(Fragment fragment) const {
+    do {
+      normalize(fragment);
+    } while (prune_idle_boundaries(fragment));
+    if (!fragment.transitions.empty() && fragment.starts == fragment.ends)
+      return convert_cycles(fragment);
+    if (fragment.transitions.size() > 1) {
+      if (const auto entry = boundary_transition(fragment, true)) {
+        Fragment rest{transition_outputs_[*entry], fragment.ends,
+                      fragment.transitions};
+        rest.transitions.erase(*entry);
+        return sequence_nodes(transition_node(*entry), convert(rest));
+      }
+      if (const auto exit = boundary_transition(fragment, false)) {
+        Fragment rest{fragment.starts, transition_inputs_[*exit],
+                      fragment.transitions};
+        rest.transitions.erase(*exit);
+        return sequence_nodes(convert(rest), transition_node(*exit));
+      }
+    }
+    if (fragment.transitions.empty()) {
+      if (fragment.starts == fragment.ends) return PowlNode::silent();
+      throw std::invalid_argument(
+          "workflow-net conversion found an empty fragment between distinct "
+          "places");
     }
 
-    const auto do_part = collect_to(fragment.starts, fragment.ends,
-                                    fragment.transitions);
-    const auto redo_part = collect_to(fragment.ends, fragment.starts,
-                                      fragment.transitions);
-    if (!do_part.empty() && !redo_part.empty() &&
-        !intersects(do_part, redo_part)) {
-      IdSet union_set = do_part;
-      union_set.insert(redo_part.begin(), redo_part.end());
-      if (union_set == fragment.transitions) {
-        return PowlNode::loop(
-            convert(Fragment{fragment.starts, fragment.ends, do_part}),
-            convert(Fragment{fragment.ends, fragment.starts, redo_part}));
+    if (fragment.transitions.size() == 1) {
+      const auto transition = *fragment.transitions.begin();
+      if (transition_inputs_[transition] != fragment.starts ||
+          transition_outputs_[transition] != fragment.ends) {
+        throw std::invalid_argument(
+            "workflow-net conversion found a transition that does not span "
+            "its fragment");
       }
+      return transition_node(transition);
+    }
+
+    if (const auto parts = parallel_cut(fragment)) {
+      std::vector<PowlNode> children;
+      children.reserve(parts->size());
+      for (const auto& part : *parts) children.push_back(convert(part));
+      return PowlNode::strict_partial_order(std::move(children), {});
+    }
+
+    if (const auto loop = loop_cut(fragment)) {
+      return PowlNode::loop(
+          convert(Fragment{fragment.starts, fragment.ends, loop->first}),
+          convert(Fragment{fragment.ends, fragment.starts, loop->second}));
     }
 
     if (const auto cut = sequence_cut(fragment)) {
-      const IdSet cut_set{*cut};
-      const auto prefix = collect_to(fragment.starts, cut_set,
-                                     fragment.transitions);
-      const auto suffix = collect_to(cut_set, fragment.ends,
-                                     fragment.transitions);
+      const IdSet cut_set{cut->place};
       return sequence_nodes(
-          convert(Fragment{fragment.starts, cut_set, prefix}),
-          convert(Fragment{cut_set, fragment.ends, suffix}));
+          convert(Fragment{fragment.starts, cut_set, cut->prefix}),
+          convert(Fragment{cut_set, fragment.ends, cut->suffix}));
+    }
+
+    if (const auto cut = transition_cut(fragment)) {
+      return sequence_nodes(
+          sequence_nodes(
+              convert(Fragment{fragment.starts,
+                               transition_inputs_[cut->transition],
+                               cut->prefix}),
+              transition_node(cut->transition)),
+          convert(Fragment{transition_outputs_[cut->transition],
+                           fragment.ends, cut->suffix}));
     }
 
     if (const auto branches = xor_cut(fragment)) {

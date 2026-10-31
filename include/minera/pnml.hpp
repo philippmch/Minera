@@ -59,7 +59,9 @@ struct PnmlImportOptions {
   // final alternatives with later positive entries replacing earlier ones,
   // and infer one token on every structural sink only when finalmarkings is
   // absent. This overrides marking inference and workflow-boundary checks.
-  // The default preserves native document keys and the first final marking.
+  // The default preserves native document keys and, like the reference,
+  // merges every final marking alternative (a later alternative replaces an
+  // earlier count for the same place).
   bool public_marking_semantics = false;
 };
 
@@ -135,8 +137,8 @@ void write_pnml(std::ostream& out, const PnmlDocument& document,
 // toolspecific activity="$invisible$" annotation or carries no name; visible
 // transitions with the same label share one activity. The initial marking must
 // put a single token on one place (inferred as the only place with no incoming
-// arc when the file records no marking); the final marking — the first
-// <finalmarkings> entry, or the only place with no outgoing arc — must be a
+// arc when the file records no marking); the final marking — every
+// <finalmarkings> entry merged, or the only place with no outgoing arc — must be a
 // single token likewise, since conformance replays source-to-sink workflow
 // nets. Malformed input, dangling arc references, and markings outside that
 // shape throw std::runtime_error.

@@ -1,5 +1,6 @@
 #include "minera/powl_conversion.hpp"
 #include "minera/conformance.hpp"
+#include "minera/pnml.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -19,6 +20,14 @@ using Op = minera::ProcessTreeOperator;
 
 using Marking = std::vector<std::size_t>;
 using Trace = std::vector<std::string>;
+
+struct ReferenceWorkflowCase {
+  std::string name;
+  std::string pnml;
+  std::set<Trace> traces;
+};
+
+#include "workflow_net_tree_reference_cases.inc"
 
 struct LanguageEnumeration {
   std::set<Trace> traces;
@@ -609,6 +618,36 @@ void workflow_boundaries_are_inferred_and_normalized() {
   assert(rejected_partial_metadata);
 }
 
+// Reference workflow nets (captured by
+// scripts/capture-workflow-net-tree-reference.py: tree-to-net and BPMN
+// conversions, a net with two loops sharing an exit place, and seeded
+// heuristics nets) must convert to a tree with the reference
+// language; nets the reference cannot convert must be rejected, never
+// approximated. Concurrent choices, skips and loops used to be flattened into
+// a plain parallel block, and a loop after a sequence prefix was rejected.
+void workflow_net_to_process_tree_matches_reference() {
+  for (const auto& reference : kReferenceWorkflowCases) {
+    const auto document = minera::parse_pnml_document(reference.pnml);
+    const auto tree = minera::to_process_tree(document.net);
+    const auto traces =
+        enumerate_language(minera::to_petri_net(tree), 6, 400).traces;
+    if (traces != reference.traces) {
+      std::cerr << "language mismatch for " << reference.name << "\n";
+      assert(false);
+    }
+  }
+  for (const auto& pnml : kReferenceRejectedWorkflowNets) {
+    const auto document = minera::parse_pnml_document(pnml);
+    bool rejected = false;
+    try {
+      (void)minera::to_process_tree(document.net);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -619,5 +658,6 @@ int main() {
   powl_ptml_uses_strict_workflow_semantics();
   petri_to_powl_round_trips_structured_nets();
   workflow_boundaries_are_inferred_and_normalized();
+  workflow_net_to_process_tree_matches_reference();
   std::cout << "POWL conversion tests passed\n";
 }

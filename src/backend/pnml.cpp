@@ -858,9 +858,13 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   std::unordered_map<std::string, std::size_t> place_index;
   std::unordered_map<std::string, std::size_t> transition_index;
 
-  // Native document mode takes the first marking. Public marking mode visits
-  // every alternative and replaces each place's last positive count.
+  // Both modes visit every <marking> under <finalmarkings> and merge them, as
+  // the reference importer does: a later marking replaces an earlier count
+  // for the same place. Native document mode still adds repeated entries of
+  // one place within a single marking; public marking mode keeps only each
+  // place's last positive count.
   std::vector<std::pair<std::string, TokenInteger>> final_marking;
+  std::vector<std::size_t> final_marking_source;  // marking index per entry
   std::size_t markings_seen = 0;
   bool final_markings_present = false;
   const bool public_markings = options.public_marking_semantics;
@@ -891,12 +895,13 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       places.push_back({*id, 0});
     } else if (token.name == "place") {
       // A <place idref=…> inside <finalmarkings><marking>.
-      if (markings_seen == 1 || public_markings) {
+      if (markings_seen >= 1) {
         const auto* idref = detail::attribute(token.attributes, "idref");
         if (idref) {
           final_place_ref = *idref;
           // A marking entry with no nested <text> means one token.
           final_marking.emplace_back(*idref, public_markings ? 0 : 1);
+          final_marking_source.push_back(markings_seen);
         }
       }
     } else if (token.name == "initialMarking" &&
@@ -1017,7 +1022,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         !places.empty()) {
       places.back().initial_tokens = parse_token_count(value, public_markings);
     } else if (stack_ends_with(stack, {"marking", "place", "text"}) &&
-               (markings_seen == 1 || public_markings) && !final_marking.empty() &&
+               markings_seen >= 1 && !final_marking.empty() &&
                final_marking.back().first == final_place_ref) {
       final_marking.back().second = parse_token_count(value, public_markings);
     }
@@ -1064,7 +1069,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
       if (in_net && token.name == "text" &&
           ((stack_ends_with(stack, {"place", "initialMarking"}) && !places.empty()) ||
            (stack_ends_with(stack, {"marking", "place"}) &&
-            (markings_seen == 1 || public_markings) && !final_marking.empty() &&
+            markings_seen >= 1 && !final_marking.empty() &&
             final_marking.back().first == final_place_ref))) {
         marking_text = MarkingText{stack.back() == "initialMarking", stack.size() + 1, {}};
         if (token.self_closing) finish_marking_text();
@@ -1278,15 +1283,21 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   }
 
   if (!final_marking.empty()) {
-    for (const auto& [id, tokens] : final_marking) {
+    std::vector<std::size_t> place_source(places.size(), 0);
+    for (std::size_t entry = 0; entry < final_marking.size(); ++entry) {
+      const auto& [id, tokens] = final_marking[entry];
       const auto it = place_index.find(id);
       if (it == place_index.end()) {
         throw std::runtime_error("PNML final marking references unknown place '" +
                                  id + "'");
       }
       if (public_markings && tokens <= 0) continue;
-      if (public_markings) document.final_marking[it->second] = tokens;
-      else document.final_marking[it->second] += tokens;
+      const auto source = final_marking_source[entry];
+      if (public_markings || place_source[it->second] != source)
+        document.final_marking[it->second] = tokens;
+      else
+        document.final_marking[it->second] += tokens;
+      place_source[it->second] = source;
       document.final_marking_keys[it->second] = true;
     }
     const auto first = std::find_if(

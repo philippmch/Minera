@@ -341,15 +341,46 @@ void pnml_marking_key_presence() {
     </finalmarkings>
   </net></pnml>)", options);
   assert(document.initial_marking == std::vector<std::int64_t>({0, 0, 2, 0}));
-  assert(document.final_marking == std::vector<std::int64_t>({0, 0, 3, 0}));
+  // Every final marking alternative is merged, as the reference importer
+  // does; native keys still record explicit zero counts.
+  assert(document.final_marking == std::vector<std::int64_t>({0, 4, 3, 0}));
   assert(document.initial_marking_keys == std::vector<bool>({true, false, true, true}));
-  assert(document.final_marking_keys == std::vector<bool>({true, false, true, false}));
+  assert(document.final_marking_keys == std::vector<bool>({true, true, true, true}));
   const auto empty_first = parse_pnml_document(R"(<pnml><net id="first">
     <place id="p"/><finalmarkings><marking/>
       <marking><place idref="p"><text>2</text></place></marking>
     </finalmarkings></net></pnml>)", options);
-  assert(empty_first.final_marking == std::vector<std::int64_t>({0}));
-  assert(empty_first.final_marking_keys == std::vector<bool>({false}));
+  assert(empty_first.final_marking == std::vector<std::int64_t>({2}));
+  assert(empty_first.final_marking_keys == std::vector<bool>({true}));
+  // A later alternative replaces an earlier count for the same place, while
+  // repeated entries inside one marking still add up.
+  const auto replaced = parse_pnml_document(R"(<pnml><net id="replace">
+    <place id="p"/><place id="q"/><finalmarkings>
+      <marking><place idref="p"><text>1</text></place>
+        <place idref="p"><text>1</text></place></marking>
+      <marking><place idref="p"><text>3</text></place>
+        <place idref="q"><text>1</text></place></marking>
+    </finalmarkings></net></pnml>)", options);
+  assert(replaced.final_marking == std::vector<std::int64_t>({3, 1}));
+
+  // Reference pm4py 2.7.22 reads {p2: 1, p3: 1} from this document, so the
+  // trace <a, b> replays with fitness 1; reading only the first marking left
+  // a token on p3.
+  const auto workflow = parse_pnml_document(R"(<pnml><net id="split-final"><page id="g">
+    <place id="p0"><initialMarking><text>1</text></initialMarking></place>
+    <place id="p1"/><place id="p2"/><place id="p3"/>
+    <transition id="ta"><name><text>a</text></name></transition>
+    <transition id="tb"><name><text>b</text></name></transition>
+    <arc id="1" source="p0" target="ta"/><arc id="2" source="ta" target="p1"/>
+    <arc id="3" source="ta" target="p3"/><arc id="4" source="p1" target="tb"/>
+    <arc id="5" source="tb" target="p2"/></page>
+    <finalmarkings><marking><place idref="p2"><text>1</text></place></marking>
+      <marking><place idref="p3"><text>1</text></place></marking></finalmarkings>
+  </net></pnml>)");
+  assert(workflow.final_marking == TokenMarking({0, 0, 1, 1}));
+  const auto fitness = evaluate_replay_fitness(
+      log_of({{"a", "b"}}), workflow, ReplayFitnessVariant::TOKEN_BASED);
+  assert(fitness.computed && fitness.log_fitness == 1.0);
 }
 
 void pnml_document_export_contract() {
