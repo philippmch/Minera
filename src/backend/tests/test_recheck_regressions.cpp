@@ -7,14 +7,19 @@
 #include "minera/dfg_dataframe_json.hpp"
 #include "minera/footprints.hpp"
 #include "minera/ocel.hpp"
+#include "minera/ocel_features.hpp"
+#include "minera/ocel_filter.hpp"
+#include "minera/ocel_sqlite.hpp"
 #include "minera/ocel_xml.hpp"
 #include "minera/pandas_case_filter.hpp"
 #include "minera/pandas_sequence_filters.hpp"
 #include "minera/streaming_dfg.hpp"
 #include "minera/streaming_footprints.hpp"
+#include "minera/timestamp.hpp"
 #include "minera/timing_workbench_json.hpp"
 #include <cassert>
 #include <cstdint>
+#include <filesystem>
 #include <limits>
 #include <optional>
 #include <set>
@@ -311,6 +316,30 @@ void ocel_wall_clock_order(){
  check(xml_order({"2020-01-01T07:00:00","13/01/2020 00:00 Z","2020.01.05 12:00 GMT"})=="e0,e2,e1,","OCEL XML dateutil day first above 12, Z and GMT");
  check(import_error([&]{(void)parse_ocel_xml(ocel2_xml({"2020/01/01 10:00:00","2020-01-01T07:00:00"}));})==
    "'values' is not ordered, please explicitly specify the categories order by passing in a categories argument.","OCEL XML naive dateutil next to aware raises");
+ // Stored timestamps are what the reference stores: the wall clock stamped
+ // UTC for ISO readings, the instant for an aware dateutil value. Expected
+ // values from PM4Py 2.7.22 (read_ocel2_json, filter_ocel_events_timestamp,
+ // the OCEL events/objects feature extractors).
+ const auto mixed=parse_ocel_json(ocel2_json({"2020-01-01T05:00:00+08:00","2020-01-01T10:00:00Z"}));
+ check(mixed.events[0].timestamp=="2020-01-01T05:00:00+00:00"&&mixed.events[1].timestamp=="2020-01-01T10:00:00Z","OCEL JSON stores the wall clock as UTC");
+ check(event_ids(filter_ocel_events_timestamp(mixed,"2020-01-01 04:00:00","2020-01-01 06:00:00"))=="e0,","OCEL timestamp filter sees the stored wall clock");
+ const auto feature=[](const OcelFeatureTable& table,const std::string& name){
+  for(std::size_t i=0;i<table.feature_names.size();++i)if(table.feature_names[i]==name)return table.values.at(0).at(i);
+  return -1.0;};
+ const auto objects=extract_ocel_features(mixed,OcelFeatureVariant::kObjects);
+ check(feature(objects,"@@object_lifecycle_duration")==18000.0&&feature(objects,"@@object_lifecycle_start_timestamp")==1577854800.0,"OCEL object lifecycle features use the stored wall clock");
+ check(feature(extract_ocel_features(mixed,OcelFeatureVariant::kEvents),"@@event_timestamp")==1577854800.0,"OCEL event timestamp feature uses the stored wall clock");
+ check(serialize_ocel_json(mixed,OcelJsonFormat::kStandard).find(R"("time":"2020-01-01T05:00:00+00:00")")!=std::string::npos,"OCEL JSON export writes the stored UTC value");
+ const auto week=parse_ocel_json(ocel2_json({"2024-W01-1T00:30:00,5"}));
+ check(week.events[0].timestamp=="2024-01-01T00:30:00.500000+00:00","OCEL JSON stores an ISO week date natively readable");
+ const auto aware=parse_ocel_xml(ocel2_xml({"2020-01-01T07:00:00","Jan 1 2020 10:00 +0500"}));
+ check(aware.events[0].timestamp=="2020-01-01T05:00:00+00:00"&&aware.events[1].timestamp=="2020-01-01T07:00:00","OCEL XML stores an aware dateutil value as its UTC instant");
+ const auto database=std::filesystem::temp_directory_path()/"minera_recheck_mixed_offsets.sqlite";
+ std::filesystem::remove(database);
+ export_ocel_sqlite(mixed,database);
+ const auto reread=import_ocel_sqlite(database);
+ std::filesystem::remove(database);
+ check(event_ids(reread)=="e0,e1,"&&parse_timestamp_microseconds(reread.events[0].timestamp)==parse_timestamp_microseconds("2020-01-01T05:00:00Z"),"OCEL SQLite round trip keeps the stored UTC value");
 }
 
 // K1: a nanosecond duration beyond int64 overflows as in the reference; a

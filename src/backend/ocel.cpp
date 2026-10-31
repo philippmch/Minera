@@ -11,6 +11,7 @@
 #include <charconv>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <iomanip>
 #include <limits>
@@ -1405,6 +1406,54 @@ bool certainly_not_a_date(std::string_view text) {
   return true;
 }
 
+// "YYYY-MM-DDTHH:MM:SS[.ffffff|.fffffffff]+00:00" for a UTC value, the
+// isoformat of what the reference stores; native readers take it as is.
+std::string utc_timestamp_text(std::int64_t seconds, std::uint32_t nanoseconds) {
+  std::int64_t days = seconds >= 0 ? seconds / 86400 : -((-seconds + 86399) / 86400);
+  const std::int64_t clock = seconds - days * 86400;
+  // civil_from_days (Howard Hinnant).
+  days += 719468;
+  const std::int64_t era = (days >= 0 ? days : days - 146096) / 146097;
+  const std::int64_t day_of_era = days - era * 146097;
+  const std::int64_t year_of_era = (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146096) / 365;
+  const std::int64_t day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+  const std::int64_t mp = (5 * day_of_year + 2) / 153;
+  const std::int64_t day = day_of_year - (153 * mp + 2) / 5 + 1;
+  const std::int64_t month = mp < 10 ? mp + 3 : mp - 9;
+  const std::int64_t year = year_of_era + era * 400 + (month <= 2);
+  char buffer[64];
+  int length = std::snprintf(buffer, sizeof buffer, "%04lld-%02lld-%02lldT%02lld:%02lld:%02lld",
+                             static_cast<long long>(year), static_cast<long long>(month),
+                             static_cast<long long>(day), static_cast<long long>(clock / 3600),
+                             static_cast<long long>(clock / 60 % 60), static_cast<long long>(clock % 60));
+  std::string out(buffer, static_cast<std::size_t>(length));
+  if (nanoseconds % 1000 != 0) {
+    length = std::snprintf(buffer, sizeof buffer, ".%09u", nanoseconds);
+    out.append(buffer, static_cast<std::size_t>(length));
+  } else if (nanoseconds != 0) {
+    length = std::snprintf(buffer, sizeof buffer, ".%06u", nanoseconds / 1000);
+    out.append(buffer, static_cast<std::size_t>(length));
+  }
+  return out + "+00:00";
+}
+
+std::string utc_timestamp_text(std::int64_t microseconds) {
+  const std::int64_t seconds =
+      microseconds >= 0 ? microseconds / 1000000 : -((-microseconds + 999999) / 1000000);
+  return utc_timestamp_text(seconds, static_cast<std::uint32_t>((microseconds - seconds * 1000000) * 1000));
+}
+
+// Whether the native readers take `text` as the UTC value `microseconds`
+// with no non-zero offset of its own; otherwise the stored text is replaced
+// by utc_timestamp_text so filters, features, statistics and exporters see
+// the value the reference stores.
+bool natively_utc(std::string_view text, std::int64_t microseconds) {
+  const auto exact = parse_timestamp_exact(text);
+  if (!exact || (exact->timezone_aware && exact->offset_minutes != 0)) return false;
+  const auto native = parse_timestamp_microseconds(text);
+  return native && *native == microseconds;
+}
+
 }  // namespace
 
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds) {
@@ -1420,27 +1469,43 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
   std::vector<std::tuple<std::int64_t, std::int64_t, std::size_t>> keys;
   keys.reserve(log.events.size());
   bool aware = false, naive = false, unknown = false;  // kDateutil readings
+  // Each stored text becomes the value the reference stores: the wall clock
+  // stamped UTC for an ISO reading, the UTC instant for SQLite and for an
+  // aware dateutil value, the wall clock for a naive one.
+  std::vector<std::pair<std::size_t, std::string>> rewrites;
+  const auto store = [&](std::size_t index, std::int64_t microseconds) {
+    if (!natively_utc(log.events[index].timestamp, microseconds))
+      rewrites.emplace_back(index, utc_timestamp_text(microseconds));
+  };
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& text = log.events[index].timestamp;
     if (reader == OcelTimestampReader::kInstantNanoseconds) {
       const auto instant = parse_timestamp_exact(text);
-      if (!instant) return;
+      if (!instant) { unknown = true; continue; }
+      if (instant->timezone_aware && instant->offset_minutes != 0)
+        rewrites.emplace_back(index, utc_timestamp_text(instant->seconds, instant->nanoseconds));
       keys.emplace_back(instant->seconds, instant->nanoseconds, index);
     } else if (reader == OcelTimestampReader::kIsoFormatOrFileOrder) {
       try {
-        keys.emplace_back(iso_wall_microseconds(text), 0, index);
+        const auto wall = iso_wall_microseconds(text);
+        store(index, wall);
+        keys.emplace_back(wall, 0, index);
       } catch (const std::invalid_argument&) {
-        return;
+        unknown = true;
       }
     } else if (reader == OcelTimestampReader::kDateutil) {
+      std::optional<std::int64_t> wall;
       try {
-        keys.emplace_back(iso_wall_microseconds(text), 0, index);
-        aware = true;
-        continue;
+        wall = iso_wall_microseconds(text);
       } catch (const std::invalid_argument&) {
       }
-      if (const auto lenient = dateutil_subset(text)) {
+      if (wall) {
+        store(index, *wall);
+        keys.emplace_back(*wall, 0, index);
+        aware = true;
+      } else if (const auto lenient = dateutil_subset(text)) {
         (lenient->aware ? aware : naive) = true;
+        store(index, lenient->microseconds);
         keys.emplace_back(lenient->microseconds, 0, index);
       } else if (certainly_not_a_date(text)) {
         throw std::invalid_argument("String does not contain a date: " + text);
@@ -1448,9 +1513,12 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
         unknown = true;  // a shape native does not read: keep file order
       }
     } else {
-      keys.emplace_back(iso_wall_microseconds(text), 0, index);
+      const auto wall = iso_wall_microseconds(text);
+      store(index, wall);
+      keys.emplace_back(wall, 0, index);
     }
   }
+  for (auto& [index, text] : rewrites) log.events[index].timestamp = std::move(text);
   if (unknown) return;
   // pandas cannot order tz-naive values next to tz-aware ones (the message
   // the reference raises from sort_values).

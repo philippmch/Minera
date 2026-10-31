@@ -15931,7 +15931,17 @@ Declared (not equivalent, kept on purpose):
   `January 2, 2020` with a clock and a Z/UTC/GMT/`+HHMM` offset; a text
   with no digit and no month or weekday word raises "String does not
   contain a date". Still declared: other dateutil shapes keep the file
-  order of the whole log. Also still declared:
+  order of the whole log. The importers also store each event timestamp as
+  the reference stores it (2026-10-31): a text with a non-zero offset, or
+  one the native parser reads differently (week and basic dates, `,`
+  fractions, dateutil shapes), becomes `YYYY-MM-DDTHH:MM:SS[.ffffff]+00:00`
+  holding the wall clock (ISO readings) or the UTC instant (SQLite, aware
+  dateutil values). Timestamp filters, OCEL features, statistics and the
+  JSON/XML/SQLite exporters therefore see the reference's values on
+  mixed-offset logs (`"05:00+08:00"` falls in a 04:00-06:00 filter window
+  and an object living from it to `"10:00Z"` lasts 18000 s). The exporters
+  still write that text, not the reference writers' own spellings
+  (`...Z` without fraction in JSON). Also still declared:
   classic OCEL JSON keeps the file order of the whole log on an unreadable
   timestamp instead of raising, because native adapters carry empty and NaT
   timestamps through it as transport. SQLite still compares UTC instants at
