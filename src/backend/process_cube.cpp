@@ -503,6 +503,13 @@ ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeO
   const auto ycolumns = dimension_columns(options, false);
   Axis x = make_axis(xcolumns, data, options.x_bins, options.max_divisions_x);
   Axis y = make_axis(ycolumns, data, options.y_bins, options.max_divisions_y);
+  // Safety limit: the grid is materialised cell by cell (value, case-id set
+  // and sample list), so a tiny request with large division counts could
+  // otherwise allocate gigabytes before anything is serialised.
+  constexpr std::size_t kMaxProcessCubeCells = 1000000;
+  if (!x.bins.empty() && y.bins.size() > kMaxProcessCubeCells / x.bins.size())
+    throw std::invalid_argument(
+        "process cube grid exceeds the safety limit of 1000000 cells");
   const std::string xname = x.name;
   const std::string yname = y.name;
   const std::string value_name = choose(options.aggregation_column, options.value_column);

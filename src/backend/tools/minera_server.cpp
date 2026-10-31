@@ -10565,7 +10565,27 @@ int main(int argc, char** argv) {
   // same-origin POSTs; only the app's own origins (this port, the Vite dev and
   // preview ports, and any --allow-origin) may call the API, so a page open
   // elsewhere in the browser can neither read responses nor trigger routes.
-  server.set_pre_routing_handler([](const httplib::Request& request, httplib::Response& response) {
+  // Same-origin GETs carry no Origin, so a DNS-rebinding page would otherwise
+  // read the API as if it were the app. The Host header must name this server
+  // (or an allowed origin's host), which a rebound attacker host cannot.
+  std::set<std::string> allowed_hosts;
+  for (const auto& origin : g_allowed_origins) {
+    const auto scheme = origin.find("://");
+    allowed_hosts.insert(scheme == std::string::npos ? origin : origin.substr(scheme + 3));
+  }
+  allowed_hosts.insert("[::1]:" + std::to_string(port));
+  if (port == 80) allowed_hosts.insert({"127.0.0.1", "localhost", "[::1]"});
+  server.set_pre_routing_handler([allowed_hosts](const httplib::Request& request, httplib::Response& response) {
+    if (request.path.starts_with("/api/") && request.has_header("Host")) {
+      auto host = request.get_header_value("Host");
+      std::transform(host.begin(), host.end(), host.begin(),
+                     [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      if (!allowed_hosts.contains(host)) {
+        response.status = 421;
+        response.set_content(error_json("Host " + host + " is not served by this Minera server"), "application/json");
+        return httplib::Server::HandlerResponse::Handled;
+      }
+    }
     if (!request.has_header("Origin")) return httplib::Server::HandlerResponse::Unhandled;
     const auto origin = request.get_header_value("Origin");
     response.set_header("Vary", "Origin");

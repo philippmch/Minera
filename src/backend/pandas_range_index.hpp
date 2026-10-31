@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 #include "python_scalar.hpp"
 

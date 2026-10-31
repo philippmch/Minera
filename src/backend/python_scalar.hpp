@@ -26,6 +26,7 @@
 #include "minera/filtering_common.hpp"
 #include "minera/timestamp.hpp"
 #include "numpy_object_sort.hpp"
+#include "python_float_text.hpp"
 
 namespace minera::python {
 
@@ -133,11 +134,8 @@ inline Scalar from_attribute(const EventAttribute& cell) {
       if (auto parsed = integer_literal(cell.value)) return *parsed;
       break;
     case AttributeKind::kFloat: {
-      if (!cell.value.empty()) {
-        char* end = nullptr;
-        const double d = std::strtod(cell.value.c_str(), &end);
-        if (end && *end == '\0') return real(d);
-      }
+      // Python's float() grammar: strtod would also accept hexadecimal.
+      if (auto parsed = detail::parse_python_float_text(cell.value)) return real(*parsed);
       break;
     }
     case AttributeKind::kDate:
