@@ -28,6 +28,7 @@ struct ReferenceWorkflowCase {
 };
 
 #include "workflow_net_tree_reference_cases.inc"
+#include "workflow_net_powl_reference_cases.inc"
 
 struct LanguageEnumeration {
   std::set<Trace> traces;
@@ -648,6 +649,33 @@ void workflow_net_to_process_tree_matches_reference() {
   }
 }
 
+// Reference workflow nets of discovered POWL models (captured by
+// scripts/capture-workflow-net-powl-reference.py) whose partial orders over
+// choice and loop nodes are not series-parallel: the reference converts them
+// to POWL but not to a process tree. The POWL conversion must keep their
+// language and the process-tree conversion must still reject them. They used
+// to be rejected because partial orders were only built over single
+// transitions.
+void workflow_net_to_powl_matches_reference() {
+  for (const auto& reference : kReferencePowlWorkflowCases) {
+    const auto document = minera::parse_pnml_document(reference.pnml);
+    const auto powl = minera::to_powl(document.net);
+    const auto traces =
+        enumerate_language(minera::to_petri_net(powl), 4, 400).traces;
+    if (traces != reference.traces) {
+      std::cerr << "POWL language mismatch for " << reference.name << "\n";
+      assert(false);
+    }
+    bool rejected = false;
+    try {
+      (void)minera::to_process_tree(document.net);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -659,5 +687,6 @@ int main() {
   petri_to_powl_round_trips_structured_nets();
   workflow_boundaries_are_inferred_and_normalized();
   workflow_net_to_process_tree_matches_reference();
+  workflow_net_to_powl_matches_reference();
   std::cout << "POWL conversion tests passed\n";
 }

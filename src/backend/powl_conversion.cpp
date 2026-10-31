@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <numeric>
 #include <optional>
@@ -841,48 +842,6 @@ class PetriToPowlBuilder {
     }
   }
 
-  bool transition_reaches(std::size_t source, std::size_t target,
-                          const IdSet& allowed) const {
-    if (source == target) return false;
-    IdSet visited_places;
-    std::queue<std::size_t> places;
-    for (const auto place : transition_outputs_[source]) {
-      if (visited_places.insert(place).second) places.push(place);
-    }
-    while (!places.empty()) {
-      const auto place = places.front();
-      places.pop();
-      if (place >= place_out_.size()) continue;
-      for (const auto transition : place_out_[place]) {
-        if (!allowed.contains(transition)) continue;
-        if (transition == target) return true;
-        for (const auto output : transition_outputs_[transition])
-          if (visited_places.insert(output).second) places.push(output);
-      }
-    }
-    return false;
-  }
-
-  bool transition_has_cycle(std::size_t source, const IdSet& allowed) const {
-    IdSet visited_places;
-    std::queue<std::size_t> places;
-    for (const auto place : transition_outputs_[source]) {
-      if (visited_places.insert(place).second) places.push(place);
-    }
-    while (!places.empty()) {
-      const auto place = places.front();
-      places.pop();
-      if (place >= place_out_.size()) continue;
-      for (const auto transition : place_out_[place]) {
-        if (!allowed.contains(transition)) continue;
-        if (transition == source) return true;
-        for (const auto output : transition_outputs_[transition])
-          if (visited_places.insert(output).second) places.push(output);
-      }
-    }
-    return false;
-  }
-
   void normalize(Fragment& fragment) const {
     for (;;) {
       if (fragment.transitions.size() <= 1) return;
@@ -1153,78 +1112,242 @@ class PetriToPowlBuilder {
   }
 
   // A residual fragment is exact as a partial order only when it is an
-  // acyclic marked graph between its boundaries: every inner place has one
-  // producer and one consumer, start places only a consumer and end places
-  // only a producer. Then every transition fires exactly once and the
-  // language is the set of linear extensions of the causal order. Anything
-  // else (a choice, a skip or a repetition) cannot be expressed this way.
-  void require_marked_graph(const Fragment& fragment) const {
+  // acyclic marked graph between its boundaries once its choice, skip and
+  // loop regions are contracted: every inner place has one producer and one
+  // consumer, start places only a consumer and end places only a producer.
+  // Then every node fires exactly once and the language is the set of
+  // linear extensions of the causal order. A region is a group of
+  // transitions joined through places that break this shape; it must have a
+  // single entry place and a single exit place and is converted as its own
+  // block, like the reference's partial orders over choice and loop nodes.
+  // Anything else cannot be expressed this way.
+  struct OrderNode {
+    PowlNode node;
+    IdSet inputs;
+    IdSet outputs;
+  };
+
+  [[noreturn]] static void not_block_structured() {
+    throw std::invalid_argument(
+        "workflow-net conversion found a fragment that is not "
+        "block-structured");
+  }
+
+  static bool marked_graph_place(std::size_t produced, std::size_t consumed,
+                                 bool start, bool end) {
+    if (start && end) return false;
+    if (start) return produced == 0 && consumed == 1;
+    if (end) return produced == 1 && consumed == 0;
+    return produced == 1 && consumed == 1;
+  }
+
+  // The single-entry single-exit region of the fragment between `entry` and
+  // `exit`: the transitions that follow the entry and precede the exit,
+  // provided every other place they touch is internal to them. Its
+  // transitions may return to the entry or consume the exit to repeat, as a
+  // loop does. A reduced net between the two places then behaves as one node
+  // of the surrounding partial order.
+  std::optional<IdSet> region(const Fragment& fragment, std::size_t entry,
+                              std::size_t exit) const {
+    if (entry == exit || fragment.ends.contains(entry) ||
+        fragment.starts.contains(exit))
+      return std::nullopt;
+    const auto reach = [&](std::size_t from, bool forward) {
+      IdSet found;
+      IdSet seen{from};
+      std::queue<std::size_t> places;
+      places.push(from);
+      while (!places.empty()) {
+        const auto place = places.front();
+        places.pop();
+        for (const auto transition : fragment.transitions) {
+          const auto& near = forward ? transition_inputs_[transition]
+                                     : transition_outputs_[transition];
+          if (!near.contains(place) || !found.insert(transition).second) continue;
+          const auto& far = forward ? transition_outputs_[transition]
+                                    : transition_inputs_[transition];
+          for (const auto next : far)
+            if (seen.insert(next).second) places.push(next);
+        }
+      }
+      return found;
+    };
+    const auto after = reach(entry, true);
+    const auto before = reach(exit, false);
+    IdSet result;
+    std::set_intersection(after.begin(), after.end(), before.begin(),
+                          before.end(), std::inserter(result, result.end()));
+    if (result.empty() || result == fragment.transitions) return std::nullopt;
+    const auto result_places = places_of(result);
+    if (!result_places.contains(entry) || !result_places.contains(exit))
+      return std::nullopt;
+    bool consumes_entry = false;
+    bool produces_exit = false;
+    for (const auto transition : result) {
+      consumes_entry |= transition_inputs_[transition].contains(entry);
+      produces_exit |= transition_outputs_[transition].contains(exit);
+    }
+    if (!consumes_entry || !produces_exit) return std::nullopt;
+    for (const auto transition : fragment.transitions) {
+      if (result.contains(transition)) continue;
+      for (const auto place : transition_inputs_[transition])
+        if (place != exit && result_places.contains(place)) return std::nullopt;
+      for (const auto place : transition_outputs_[transition])
+        if (place != entry && result_places.contains(place)) return std::nullopt;
+    }
+    for (const auto place : result_places) {
+      if (place == entry || place == exit) continue;
+      if (fragment.starts.contains(place) || fragment.ends.contains(place))
+        return std::nullopt;
+    }
+    return result;
+  }
+
+  std::vector<OrderNode> order_nodes(const Fragment& fragment) const {
     std::map<std::size_t, std::size_t> producers;
     std::map<std::size_t, std::size_t> consumers;
+    std::map<std::size_t, IdSet> producing;
+    std::map<std::size_t, IdSet> consuming;
+    std::map<std::size_t, IdSet> touching;
     for (const auto transition : fragment.transitions) {
-      for (const auto place : transition_outputs_[transition]) ++producers[place];
-      for (const auto place : transition_inputs_[transition]) ++consumers[place];
-    }
-    const auto fail = [] {
-      throw std::invalid_argument(
-          "workflow-net conversion found a fragment that is not "
-          "block-structured");
-    };
-    for (const auto place : places_of(fragment.transitions)) {
-      const auto produced = producers[place];
-      const auto consumed = consumers[place];
-      const bool start = fragment.starts.contains(place);
-      const bool end = fragment.ends.contains(place);
-      if (start && end) fail();
-      if (start) {
-        if (produced != 0 || consumed != 1) fail();
-      } else if (end) {
-        if (produced != 1 || consumed != 0) fail();
-      } else if (produced != 1 || consumed != 1) {
-        fail();
+      for (const auto place : transition_outputs_[transition]) {
+        ++producers[place];
+        producing[place].insert(transition);
+        touching[place].insert(transition);
+      }
+      for (const auto place : transition_inputs_[transition]) {
+        ++consumers[place];
+        consuming[place].insert(transition);
+        touching[place].insert(transition);
       }
     }
-    if (!subset(fragment.starts, places_of(fragment.transitions)) ||
-        !subset(fragment.ends, places_of(fragment.transitions))) {
-      fail();
+    const auto places = places_of(fragment.transitions);
+    if (!subset(fragment.starts, places) || !subset(fragment.ends, places))
+      not_block_structured();
+    // Every place that breaks the marked-graph shape must lie inside the
+    // smallest region that holds all of its transitions.
+    struct Region {
+      IdSet transitions;
+      std::size_t entry = 0;
+      std::size_t exit = 0;
+    };
+    std::vector<Region> regions;
+    for (const auto place : places) {
+      if (marked_graph_place(producers[place], consumers[place],
+                             fragment.starts.contains(place),
+                             fragment.ends.contains(place)))
+        continue;
+      // A region resolves the place when, apart from at most the one
+      // producer and one consumer the marked graph allows, every transition
+      // on the place lies inside it.
+      const bool start = fragment.starts.contains(place);
+      const bool end = fragment.ends.contains(place);
+      const auto resolves = [&](const IdSet& transitions) {
+        if (!intersects(touching[place], transitions)) return false;
+        std::size_t outside_producers = 0;
+        std::size_t outside_consumers = 0;
+        for (const auto transition : producing[place])
+          outside_producers += transitions.contains(transition) ? 0 : 1;
+        for (const auto transition : consuming[place])
+          outside_consumers += transitions.contains(transition) ? 0 : 1;
+        return outside_producers <= (start ? 0u : 1u) &&
+               outside_consumers <= (end ? 0u : 1u);
+      };
+      if (std::any_of(regions.begin(), regions.end(), [&](const Region& known) {
+            return resolves(known.transitions);
+          }))
+        continue;
+      std::optional<Region> best;
+      for (const auto entry : places) {
+        for (const auto exit : places) {
+          auto candidate = region(fragment, entry, exit);
+          if (!candidate || !resolves(*candidate)) continue;
+          if (!best || candidate->size() < best->transitions.size())
+            best = Region{std::move(*candidate), entry, exit};
+        }
+      }
+      if (!best) not_block_structured();
+      std::vector<Region> kept;
+      for (auto& known : regions) {
+        if (subset(known.transitions, best->transitions)) continue;
+        if (intersects(known.transitions, best->transitions)) not_block_structured();
+        kept.push_back(std::move(known));
+      }
+      kept.push_back(std::move(*best));
+      regions = std::move(kept);
     }
+    IdSet in_region;
+    for (const auto& known : regions)
+      in_region.insert(known.transitions.begin(), known.transitions.end());
+    std::vector<OrderNode> nodes;
+    for (const auto transition : fragment.transitions) {
+      if (in_region.contains(transition)) continue;
+      nodes.push_back({transition_node(transition), transition_inputs_[transition],
+                       transition_outputs_[transition]});
+    }
+    for (const auto& known : regions) {
+      const IdSet entry{known.entry};
+      const IdSet exit{known.exit};
+      nodes.push_back({convert(Fragment{entry, exit, known.transitions}), entry, exit});
+    }
+
+    // The contracted fragment must itself be a marked graph.
+    std::map<std::size_t, std::size_t> node_producers;
+    std::map<std::size_t, std::size_t> node_consumers;
+    IdSet node_places;
+    for (const auto& node : nodes) {
+      for (const auto place : node.outputs) {
+        ++node_producers[place];
+        node_places.insert(place);
+      }
+      for (const auto place : node.inputs) {
+        ++node_consumers[place];
+        node_places.insert(place);
+      }
+    }
+    for (const auto place : node_places) {
+      if (!marked_graph_place(node_producers[place], node_consumers[place],
+                              fragment.starts.contains(place),
+                              fragment.ends.contains(place)))
+        not_block_structured();
+    }
+    if (!subset(fragment.starts, node_places) || !subset(fragment.ends, node_places))
+      not_block_structured();
+    return nodes;
   }
 
   PowlNode partial_order(const Fragment& fragment) const {
-    for (const auto transition : fragment.transitions) {
-      if (transition_has_cycle(transition, fragment.transitions)) {
+    auto nodes = order_nodes(fragment);
+    const auto count = nodes.size();
+    std::vector<std::vector<bool>> reaches(count, std::vector<bool>(count, false));
+    for (std::size_t source = 0; source < count; ++source)
+      for (std::size_t target = 0; target < count; ++target)
+        if (source != target && intersects(nodes[source].outputs, nodes[target].inputs))
+          reaches[source][target] = true;
+    for (std::size_t middle = 0; middle < count; ++middle)
+      for (std::size_t source = 0; source < count; ++source)
+        if (reaches[source][middle])
+          for (std::size_t target = 0; target < count; ++target)
+            if (reaches[middle][target]) reaches[source][target] = true;
+    for (std::size_t node = 0; node < count; ++node) {
+      if (reaches[node][node]) {
         throw std::invalid_argument(
             "workflow-net conversion found an unresolved transition cycle");
       }
     }
-    require_marked_graph(fragment);
     std::vector<std::size_t> visible;
-    for (const auto transition : fragment.transitions)
-      if (!net_.transitions()[transition].silent()) visible.push_back(transition);
+    for (std::size_t node = 0; node < count; ++node)
+      if (nodes[node].node.kind() != PowlNodeKind::kSilent) visible.push_back(node);
     if (visible.empty()) return PowlNode::silent();
+    if (visible.size() == 1) return std::move(nodes[visible.front()].node);
     std::vector<PowlNode> children;
     children.reserve(visible.size());
-    for (const auto transition : visible)
-      children.push_back(transition_node(transition));
-    if (children.size() == 1) return std::move(children.front());
-
+    for (const auto node : visible) children.push_back(std::move(nodes[node].node));
     std::vector<std::pair<std::size_t, std::size_t>> order;
-    for (std::size_t source = 0; source < visible.size(); ++source) {
-      for (std::size_t target = 0; target < visible.size(); ++target) {
-        if (source == target) continue;
-        const bool forward =
-            transition_reaches(visible[source], visible[target],
-                               fragment.transitions);
-        const bool backward =
-            transition_reaches(visible[target], visible[source],
-                               fragment.transitions);
-        if (forward && backward) {
-          throw std::invalid_argument(
-              "workflow-net conversion found an unresolved transition cycle");
-        }
-        if (forward) order.emplace_back(source, target);
-      }
-    }
+    for (std::size_t source = 0; source < visible.size(); ++source)
+      for (std::size_t target = 0; target < visible.size(); ++target)
+        if (source != target && reaches[visible[source]][visible[target]])
+          order.emplace_back(source, target);
     return PowlNode::strict_partial_order(std::move(children), order);
   }
 

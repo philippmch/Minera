@@ -60,8 +60,9 @@ struct PnmlImportOptions {
   // and infer one token on every structural sink only when finalmarkings is
   // absent. This overrides marking inference and workflow-boundary checks.
   // The default preserves native document keys and, like the reference,
-  // merges every final marking alternative (a later alternative replaces an
-  // earlier count for the same place).
+  // merges every final marking alternative (a later positive count replaces
+  // an earlier count for the same place; an entry without <text> adds
+  // nothing).
   bool public_marking_semantics = false;
 };
 

@@ -362,6 +362,26 @@ void pnml_marking_key_presence() {
         <place idref="q"><text>1</text></place></marking>
     </finalmarkings></net></pnml>)", options);
   assert(replaced.final_marking == std::vector<std::int64_t>({3, 1}));
+  // Reference pm4py 2.7.22 stores only positive counts and ignores an entry
+  // without <text>: it reads {p: 1} from this document, where a later zero
+  // alternative used to wipe the count and an empty entry used to add a token.
+  const auto positive_only = parse_pnml_document(R"(<pnml><net id="zero-later">
+    <place id="p"/><place id="q"/><place id="r"/><finalmarkings>
+      <marking><place idref="p"><text>1</text></place></marking>
+      <marking><place idref="p"><text>0</text></place>
+        <place idref="q"><text>0</text></place><place idref="r"/></marking>
+    </finalmarkings></net></pnml>)", options);
+  assert(positive_only.final_marking == std::vector<std::int64_t>({1, 0, 0}));
+  assert(positive_only.final_marking_keys == std::vector<bool>({true, true, false}));
+  const auto zero_later = parse_pnml_document(R"(<pnml><net id="zero-later-wf"><page id="g">
+    <place id="p0"><initialMarking><text>1</text></initialMarking></place><place id="p1"/>
+    <transition id="t"><name><text>a</text></name></transition>
+    <arc id="1" source="p0" target="t"/><arc id="2" source="t" target="p1"/></page>
+    <finalmarkings><marking><place idref="p1"><text>1</text></place></marking>
+      <marking><place idref="p1"><text>0</text></place>
+        <place idref="p0"><text>0</text></place></marking></finalmarkings>
+  </net></pnml>)");
+  assert(zero_later.final_marking == TokenMarking({0, 1}));
 
   // Reference pm4py 2.7.22 reads {p2: 1, p3: 1} from this document, so the
   // trace <a, b> replays with fitness 1; reading only the first marking left

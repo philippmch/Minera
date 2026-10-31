@@ -865,6 +865,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
   // place's last positive count.
   std::vector<std::pair<std::string, TokenInteger>> final_marking;
   std::vector<std::size_t> final_marking_source;  // marking index per entry
+  std::vector<bool> final_marking_text;  // whether the entry carried a count
   std::size_t markings_seen = 0;
   bool final_markings_present = false;
   const bool public_markings = options.public_marking_semantics;
@@ -899,9 +900,11 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         const auto* idref = detail::attribute(token.attributes, "idref");
         if (idref) {
           final_place_ref = *idref;
-          // A marking entry with no nested <text> means one token.
-          final_marking.emplace_back(*idref, public_markings ? 0 : 1);
+          // A marking entry with no nested <text> carries no count; the
+          // reference importer ignores it.
+          final_marking.emplace_back(*idref, 0);
           final_marking_source.push_back(markings_seen);
+          final_marking_text.push_back(false);
         }
       }
     } else if (token.name == "initialMarking" &&
@@ -970,12 +973,21 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (marking_text->value.empty()) {
       if (public_markings)
         throw std::runtime_error("int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
+      // Native mode reads an empty final-marking <text/> as one token (the
+      // reference cannot read it at all).
+      if (!marking_text->initial) {
+        final_marking.back().second = 1;
+        final_marking_text.back() = true;
+      }
       marking_text.reset();
       return;
     }
     const auto count = parse_token_count(marking_text->value, public_markings);
     if (marking_text->initial) places.back().initial_tokens = count;
-    else final_marking.back().second = count;
+    else {
+      final_marking.back().second = count;
+      final_marking_text.back() = true;
+    }
     marking_text.reset();
   };
   const auto finish_property_text = [&] {
@@ -1025,6 +1037,7 @@ PnmlDocument parse_pnml_document(std::string_view xml,
                markings_seen >= 1 && !final_marking.empty() &&
                final_marking.back().first == final_place_ref) {
       final_marking.back().second = parse_token_count(value, public_markings);
+      final_marking_text.back() = true;
     }
   };
 
@@ -1292,7 +1305,15 @@ PnmlDocument parse_pnml_document(std::string_view xml,
                                  id + "'");
       }
       if (public_markings && tokens <= 0) continue;
+      // Like the reference, an entry without a count adds nothing, and a
+      // non-positive count from a later alternative never replaces an
+      // earlier positive one (the reference stores only counts above zero).
+      if (!final_marking_text[entry]) continue;
       const auto source = final_marking_source[entry];
+      if (!public_markings && tokens <= 0 && place_source[it->second] != 0 &&
+          place_source[it->second] != source &&
+          document.final_marking[it->second] > 0)
+        continue;
       if (public_markings || place_source[it->second] != source)
         document.final_marking[it->second] = tokens;
       else
