@@ -54,6 +54,19 @@ struct OcCausalNet {
 [[nodiscard]] OcCausalNet discover_oc_causal_net(
     const Ocel& log, const OcpnDiscoveryOptions& options = {});
 
+// Converts an object-centric Petri net into the causal net the reference
+// builds with pm4py.objects.ocpn.factory.create followed by the
+// ocpn converter (TO_OC_CAUSAL_NET), the net its causal-net playout runs on:
+// every place becomes an activity ("<type>_<place>"), every transition an
+// activity (labelled ones by label where the reference uses a random uuid,
+// silent ones "<type>_<name>"), a transition with several places of one type
+// on one side goes through "_silent_aux_in_/out_<transition>_<type>", and
+// START_<type>/END_<type> feed the source and drain the sink places.
+// Variable (double) arcs carry cardinality 0..inf, other transition arcs
+// 1..1 and place arcs 1..inf. Throws std::invalid_argument when a label
+// collides with a generated activity name.
+[[nodiscard]] OcCausalNet oc_causal_net_from_ocpn(const OcpnGraph& graph);
+
 [[nodiscard]] std::string serialize_oc_causal_net_json(
     const OcCausalNet& net);
 

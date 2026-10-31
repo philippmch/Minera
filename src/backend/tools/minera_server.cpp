@@ -2678,7 +2678,13 @@ void handle_ocel_playout(const httplib::Request& request,
       response.set_content(payload, "application/json");
     };
     if (model == "causal_net") {
-      const auto causal = minera::discover_oc_causal_net(log, discovery);
+      // The reference binding plays out the causal net the reference converts
+      // from the mined OCPN (START_/END_<type> included); the native bindings
+      // keep the log-context marker model.
+      const auto causal =
+          options.event_binding == minera::OcpnEventBinding::kReference
+              ? minera::oc_causal_net_from_ocpn(minera::discover_ocpn(log, discovery))
+              : minera::discover_oc_causal_net(log, discovery);
       const auto result = minera::oc_causal_net_extensive_playout_result(causal,
                                                                            options);
       publish(minera::serialize_oc_causal_net_playout_json(result, options.event_binding),

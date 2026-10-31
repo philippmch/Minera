@@ -1525,7 +1525,10 @@ int run_ocel(int argc, char** argv) {
     }
     if (oc_causal_net_playout) {
       ocpn_playout_options.objects_unique_per_trace = ocpn_unique_objects;
-      const auto model = minera::discover_oc_causal_net(log, ocpn_options);
+      const auto model =
+          ocpn_playout_options.event_binding == minera::OcpnEventBinding::kReference
+              ? minera::oc_causal_net_from_ocpn(minera::discover_ocpn(log, ocpn_options))
+              : minera::discover_oc_causal_net(log, ocpn_options);
       const auto result = minera::oc_causal_net_extensive_playout_result(
           model, ocpn_playout_options);
       std::cout << minera::serialize_oc_causal_net_playout_json(

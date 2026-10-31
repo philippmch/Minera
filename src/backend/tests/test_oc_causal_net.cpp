@@ -6,6 +6,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <string>
 #include <stdexcept>
 #include <vector>
@@ -441,6 +442,123 @@ void test_discovery_and_fallback() {
   assert(fallback.trace_exists);
 }
 
+// The bundled sample OCEL (Order/Item) on the default reference binding: the
+// reference converts the mined OCPN into a causal net with START_/END_<type>
+// and plays that out, while the log-context marker model has no START_<type>
+// activity and raises KeyError 'START_<type>'.
+minera::Ocel sample_order_item_log() {
+  minera::Ocel log;
+  const std::vector<std::pair<std::string, std::string>> events = {
+      {"e1", "Create order"}, {"e2", "Add item"}, {"e3", "Pack item"}, {"e4", "Ship order"},
+      {"e5", "Create order"}, {"e6", "Add item"}, {"e7", "Pack item"}, {"e8", "Ship order"}};
+  const std::vector<std::string> times = {
+      "2026-01-05T09:00:00Z", "2026-01-05T09:10:00Z", "2026-01-05T10:00:00Z",
+      "2026-01-05T11:00:00Z", "2026-01-06T09:00:00Z", "2026-01-06T09:10:00Z",
+      "2026-01-06T10:00:00Z", "2026-01-06T11:00:00Z"};
+  for (std::size_t i = 0; i < events.size(); ++i)
+    log.events.push_back({events[i].first, events[i].second, times[i], {}});
+  log.objects = {{"order-1", "Order", {}}, {"order-2", "Order", {}}, {"item-1", "Item", {}},
+                 {"item-2", "Item", {}}, {"item-3", "Item", {}}};
+  log.relations = {{"e1", "order-1", ""}, {"e2", "order-1", ""}, {"e2", "item-1", ""},
+                   {"e2", "item-2", ""}, {"e3", "item-1", ""}, {"e3", "item-2", ""},
+                   {"e4", "order-1", ""}, {"e4", "item-1", ""}, {"e4", "item-2", ""},
+                   {"e5", "order-2", ""}, {"e6", "order-2", ""}, {"e6", "item-3", ""},
+                   {"e7", "item-3", ""}, {"e8", "order-2", ""}, {"e8", "item-3", ""}};
+  return log;
+}
+
+const minera::OcCausalActivity& find_activity(const minera::OcCausalNet& net,
+                                              const std::string& name) {
+  const auto found = std::find_if(net.activities.begin(), net.activities.end(),
+                                  [&](const auto& entry) { return entry.activity == name; });
+  assert(found != net.activities.end());
+  return *found;
+}
+
+void test_reference_flow_converts_the_mined_ocpn() {
+  const auto log = sample_order_item_log();
+  minera::OcpnPlayoutOptions options;
+  options.event_binding = minera::OcpnEventBinding::kReference;
+  options.max_bindings_per_activity = 1;
+
+  bool key_error = false;
+  try {
+    (void)minera::oc_causal_net_extensive_playout_result(minera::discover_oc_causal_net(log),
+                                                         options);
+  } catch (const std::exception& error) {
+    key_error = std::string(error.what()).rfind("'START_", 0) == 0;
+  }
+  assert(key_error);
+
+  const auto net = minera::oc_causal_net_from_ocpn(minera::discover_ocpn(log));
+  // Shape the reference converter gives this OCPN: 4 transitions, 8 places,
+  // START/END per type, no auxiliaries (one place per type per side).
+  assert(net.activities.size() == 16);
+  const auto& start = find_activity(net, "START_Item");
+  assert(start.input_marker_groups.empty() && start.output_marker_groups.size() == 1);
+  assert(start.output_marker_groups[0].markers[0].related_activity == "Item_source");
+  const auto& end = find_activity(net, "END_Order");
+  assert(end.output_marker_groups.empty());
+  assert(end.input_marker_groups[0].markers[0].related_activity == "Order_sink");
+  const auto& add = find_activity(net, "Add item");
+  assert(add.input_marker_groups.size() == 1 && add.input_marker_groups[0].markers.size() == 2);
+  for (const auto& marker : add.input_marker_groups[0].markers) {
+    if (marker.object_type == "Item") {  // variable arc: 0..inf from the Item source place
+      assert(marker.related_activity == "Item_source");
+      assert(marker.min_cardinality == 0 &&
+             marker.max_cardinality == minera::kOcCausalInfiniteCardinality);
+    } else {
+      assert(marker.min_cardinality == 1 && marker.max_cardinality == 1);
+    }
+  }
+  const auto& source = find_activity(net, "Item_source");
+  assert(source.input_marker_groups.size() == 1 && source.output_marker_groups.size() == 1);
+  assert(source.output_marker_groups[0].markers[0].min_cardinality == 1 &&
+         source.output_marker_groups[0].markers[0].max_cardinality ==
+             minera::kOcCausalInfiniteCardinality);
+
+  // Reference: 360 sequences of 12 bindings (every non-START/END activity
+  // once), 4,320 events over Order_0 and Item_0.
+  const auto result = minera::oc_causal_net_extensive_playout_result(net, options);
+  assert(result.log.events.size() == 4320);
+  assert(result.log.objects.size() == 2);
+  std::map<std::string, std::size_t> counts;
+  for (const auto& event : result.log.events) ++counts[event.activity];
+  assert(counts.size() == 12);
+  for (const auto& [activity, count] : counts) {
+    assert(activity.rfind("START_", 0) != 0 && activity.rfind("END_", 0) != 0);
+    assert(count == 360);
+  }
+}
+
+void test_ocpn_conversion_adds_auxiliaries_for_and_splits() {
+  minera::Ocel log;
+  log.events = {{"e1", "A", "2026-01-01T00:00:00Z", {}}, {"e2", "B", "2026-01-01T00:01:00Z", {}},
+                {"e3", "C", "2026-01-01T00:02:00Z", {}}, {"e4", "D", "2026-01-01T00:03:00Z", {}},
+                {"f1", "A", "2026-01-02T00:00:00Z", {}}, {"f2", "C", "2026-01-02T00:01:00Z", {}},
+                {"f3", "B", "2026-01-02T00:02:00Z", {}}, {"f4", "D", "2026-01-02T00:03:00Z", {}}};
+  log.objects = {{"o1", "o", {}}, {"o2", "o", {}}};
+  for (const char* id : {"e1", "e2", "e3", "e4"}) log.relations.push_back({id, "o1", ""});
+  for (const char* id : {"f1", "f2", "f3", "f4"}) log.relations.push_back({id, "o2", ""});
+  const auto net = minera::oc_causal_net_from_ocpn(minera::discover_ocpn(log));
+  std::size_t auxiliaries = 0;
+  for (const auto& activity : net.activities) {
+    if (activity.activity.rfind("_silent_aux_", 0) != 0) continue;
+    ++auxiliaries;
+    const bool in = activity.activity.rfind("_silent_aux_in_", 0) == 0;
+    const auto& spread = in ? activity.input_marker_groups : activity.output_marker_groups;
+    assert(spread.size() == 1 && spread[0].markers.size() == 2);
+    for (const auto& marker : spread[0].markers)
+      assert(marker.min_cardinality == 1 && marker.max_cardinality == 1);
+  }
+  assert(auxiliaries >= 2);
+  minera::OcpnPlayoutOptions options;
+  options.event_binding = minera::OcpnEventBinding::kReference;
+  options.max_bindings_per_activity = 1;
+  const auto result = minera::oc_causal_net_extensive_playout_result(net, options);
+  assert(!result.log.events.empty());
+}
+
 }  // namespace
 
 int main() {
@@ -450,5 +568,7 @@ int main() {
   test_empty_and_deadlocked_states();
   test_activity_branching_cap();
   test_discovery_and_fallback();
+  test_reference_flow_converts_the_mined_ocpn();
+  test_ocpn_conversion_adds_auxiliaries_for_and_splits();
   std::cout << "OC causal-net tests passed\n";
 }

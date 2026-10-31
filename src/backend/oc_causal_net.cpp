@@ -903,6 +903,163 @@ OcCausalNet discover_oc_causal_net(const Ocel& log,
   return discover_marker_model(log, options);
 }
 
+OcCausalNet oc_causal_net_from_ocpn(const OcpnGraph& graph) {
+  constexpr std::size_t kInf = kOcCausalInfiniteCardinality;
+  // One causal activity per OC transition: labelled transitions are shared by
+  // label across the type nets, silent ones belong to their type.
+  struct Side {
+    std::vector<std::pair<std::string, std::vector<std::string>>> places;  // type -> places
+    std::map<std::string, bool> variable;
+  };
+  struct Transition {
+    std::string name;
+    bool labelled = false;
+    Side inputs, outputs;
+  };
+  std::vector<Transition> transitions;
+  std::map<std::string, std::size_t> transition_index;
+  struct Place {
+    std::string name, type;
+    std::vector<std::string> producers, consumers;
+  };
+  std::vector<Place> places;
+  std::map<std::string, std::size_t> place_index;
+  std::set<std::string> generated;
+  const auto add_unique = [](std::vector<std::string>& values, const std::string& value) {
+    if (std::find(values.begin(), values.end(), value) == values.end()) values.push_back(value);
+  };
+  const auto side_places = [](Side& side, const std::string& type) -> std::vector<std::string>& {
+    for (auto& [owner, values] : side.places)
+      if (owner == type) return values;
+    side.places.push_back({type, {}});
+    return side.places.back().second;
+  };
+  std::map<std::string, std::pair<std::string, std::string>> boundaries;  // type -> source, sink
+  for (const auto& [type, net] : graph.petri_nets) {
+    if (net.place_count() == 0 || net.source() >= net.place_count() ||
+        net.sink() >= net.place_count())
+      throw std::invalid_argument("OCPN net for type " + type + " has no workflow places");
+    std::vector<std::string> names(net.place_count());
+    for (std::size_t place = 0; place < net.place_count(); ++place) {
+      names[place] = type + "_" +
+                     (place == net.source() ? std::string("source")
+                      : place == net.sink() ? std::string("sink")
+                                            : "p_" + std::to_string(place));
+      place_index[names[place]] = places.size();
+      places.push_back({names[place], type, {}, {}});
+      generated.insert(names[place]);
+    }
+    boundaries[type] = {names[net.source()], names[net.sink()]};
+    const auto& transition_names = net.transition_names();
+    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+      const auto& transition = net.transitions()[index];
+      std::string name;
+      bool variable = false;
+      if (transition.activity) {
+        name = net.activities().at(*transition.activity);
+        const auto arcs = graph.double_arcs_on_activity.find(type);
+        if (arcs != graph.double_arcs_on_activity.end()) {
+          const auto found = arcs->second.find(name);
+          variable = found != arcs->second.end() && found->second;
+        }
+      } else {
+        const bool named = transition_names && index < transition_names->size() &&
+                           (*transition_names)[index] && !(*transition_names)[index]->empty();
+        name = type + "_" + (named ? *(*transition_names)[index] : "tau_" + std::to_string(index));
+        if (!generated.insert(name).second) name += "_" + std::to_string(index);
+        generated.insert(name);
+      }
+      auto found = transition_index.find(name);
+      if (found == transition_index.end()) {
+        found = transition_index.emplace(name, transitions.size()).first;
+        transitions.push_back({name, transition.activity.has_value(), {}, {}});
+      }
+      auto& target = transitions[found->second];
+      for (const auto place : transition.inputs) add_unique(side_places(target.inputs, type), names.at(place));
+      for (const auto place : transition.outputs) add_unique(side_places(target.outputs, type), names.at(place));
+      target.inputs.variable[type] = target.inputs.variable[type] || variable;
+      target.outputs.variable[type] = target.outputs.variable[type] || variable;
+    }
+  }
+
+  OcCausalNet net;
+  net.workflow_projection = graph;
+  net.object_types = graph.object_types;
+  if (net.object_types.empty())
+    for (const auto& [type, petri] : graph.petri_nets) net.object_types.push_back(type);
+  std::int64_t next_key = 0;
+  const auto marker = [&](const std::string& related, const std::string& type, std::size_t low,
+                          std::size_t high) {
+    return OcCausalMarker{related, type, low, high, next_key++};
+  };
+  std::vector<OcCausalActivity> auxiliaries;
+  for (auto& transition : transitions) {
+    OcCausalActivity activity;
+    activity.activity = transition.name;
+    for (const bool input : {true, false}) {
+      const auto& side = input ? transition.inputs : transition.outputs;
+      OcCausalMarkerGroup group;
+      for (const auto& [type, linked] : side.places) {
+        if (linked.empty()) continue;
+        const bool variable = side.variable.at(type);
+        std::string related = linked.front();
+        if (linked.size() > 1) {
+          related = std::string(input ? "_silent_aux_in_" : "_silent_aux_out_") +
+                    transition.name + "_" + type;
+          generated.insert(related);
+          OcCausalActivity aux;
+          aux.activity = related;
+          OcCausalMarkerGroup towards{{marker(transition.name, type, 1, 1)}};
+          OcCausalMarkerGroup spread;
+          for (const auto& place : linked) {
+            spread.markers.push_back(marker(place, type, 1, 1));
+            auto& entry = places[place_index.at(place)];
+            add_unique(input ? entry.consumers : entry.producers, related);
+          }
+          aux.input_marker_groups.push_back(input ? std::move(spread) : std::move(towards));
+          aux.output_marker_groups.push_back(input ? std::move(towards) : std::move(spread));
+          auxiliaries.push_back(std::move(aux));
+        } else {
+          auto& entry = places[place_index.at(related)];
+          add_unique(input ? entry.consumers : entry.producers, transition.name);
+        }
+        group.markers.push_back(marker(related, type, variable ? 0 : 1, variable ? kInf : 1));
+      }
+      if (group.markers.empty()) continue;
+      (input ? activity.input_marker_groups : activity.output_marker_groups)
+          .push_back(std::move(group));
+    }
+    net.activities.push_back(std::move(activity));
+  }
+  for (auto& aux : auxiliaries) net.activities.push_back(std::move(aux));
+  for (const auto& [type, boundary] : boundaries) {
+    const auto start = "START_" + type, end = "END_" + type;
+    generated.insert(start);
+    generated.insert(end);
+    places[place_index.at(boundary.first)].producers.push_back(start);
+    places[place_index.at(boundary.second)].consumers.push_back(end);
+    OcCausalActivity start_activity{start, {}, {{{marker(boundary.first, type, 1, kInf)}}}};
+    OcCausalActivity end_activity{end, {{{marker(boundary.second, type, 1, kInf)}}}, {}};
+    net.activities.push_back(std::move(start_activity));
+    net.activities.push_back(std::move(end_activity));
+  }
+  for (const auto& place : places) {
+    OcCausalActivity activity;
+    activity.activity = place.name;
+    for (const auto& producer : place.producers)
+      activity.input_marker_groups.push_back({{marker(producer, place.type, 1, kInf)}});
+    for (const auto& consumer : place.consumers)
+      activity.output_marker_groups.push_back({{marker(consumer, place.type, 1, kInf)}});
+    net.activities.push_back(std::move(activity));
+  }
+  for (const auto& transition : transitions)
+    if (transition.labelled && generated.contains(transition.name))
+      throw std::invalid_argument("activity " + transition.name +
+                                  " collides with a place, auxiliary, START_ or END_ "
+                                  "activity of the converted causal net");
+  return net;
+}
+
 std::string serialize_oc_causal_net_json(const OcCausalNet& net) {
   std::ostringstream out;
   out << "{\"family\":\"OC_CAUSAL_NET\",\"variant\":\"MARKER_GROUPS\",\"model\":"
