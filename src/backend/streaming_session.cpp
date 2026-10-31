@@ -65,10 +65,15 @@ struct StreamingSession::Impl {
       { std::lock_guard lock(data_mutex); delivery = inputs.at(event.input_order); }
       try {
         // The reference DFG, footprints, temporal and TBR monitors skip an
-        // event without a case id (a None one is a value); Declare files it
-        // under "undefined_case" itself. The monitors' own Event overloads
-        // take the caller's case id, which may be a present empty one.
-        if (!declare && !streaming_monitor_takes_event(event)) {}
+        // event without a case id (footprints and TBR a None one too);
+        // Declare files it under "undefined_case" itself. The monitors' own
+        // Event overloads take the caller's case id, which may be a present
+        // empty one.
+        const auto kind = dfg ? StreamingMonitorKind::kDfg
+                        : footprints ? StreamingMonitorKind::kFootprints
+                        : temporal ? StreamingMonitorKind::kTemporal
+                                   : StreamingMonitorKind::kTbr;
+        if (!declare && !streaming_monitor_takes_event(event, kind)) {}
         else if (dfg) { delivery.accepted = dfg->receive(event, event.case_id); delivery.event_index = dfg->snapshot().events; }
         else if (footprints) { const auto r = footprints->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }
         else if (temporal) { const auto r = temporal->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }

@@ -38,13 +38,19 @@ struct StreamingDfgSnapshot {
 // event whose key is missing or whose value is None: nullopt in both cases.
 [[nodiscard]] std::optional<std::string> streaming_event_present_value(
     const Event& event, std::string_view selector);
-// Whether the DFG, footprints, temporal and TBR stream monitors take an event
-// whose case comes from its first-class case id: the reference monitors skip
-// an event without one (an XES trace without the case attribute). A present
-// id is a value even when empty, as an empty CSV cell is, and so is a null
-// one. The monitors' own Event overloads take the caller's case id instead.
-[[nodiscard]] inline bool streaming_monitor_takes_event(const Event& event) noexcept {
-  return event.has_case_id();
+// Whether a stream monitor takes an event whose case comes from its
+// first-class case id. Every reference monitor skips an event without one
+// (an XES trace without the case attribute); a present id is a value even
+// when empty, as an empty CSV cell is. A null (None) id is a value for the
+// DFG and temporal monitors but skipped by the footprints and TBR ones. The
+// monitors' own Event overloads take the caller's case id instead.
+enum class StreamingMonitorKind { kDfg, kFootprints, kTemporal, kTbr };
+[[nodiscard]] inline bool streaming_monitor_takes_event(
+    const Event& event, StreamingMonitorKind monitor) noexcept {
+  if (!event.has_case_id()) return false;
+  if (event.case_id_state != FirstClassAttributeState::kNull) return true;
+  return monitor == StreamingMonitorKind::kDfg ||
+         monitor == StreamingMonitorKind::kTemporal;
 }
 
 // Every accepted event updates its activity count and either starts a case or

@@ -24,7 +24,7 @@ void events_without_case_ids_are_not_taken() {
   std::size_t taken = 0;
   for (const auto& trace : log.traces)
     for (const auto& event : trace.events)
-      if (minera::streaming_monitor_takes_event(event)) ++taken, stream.receive(event, event.case_id);
+      if (minera::streaming_monitor_takes_event(event, minera::StreamingMonitorKind::kDfg)) ++taken, stream.receive(event, event.case_id);
   assert(taken == 2);
   const auto shot = stream.snapshot();
   assert(shot.events == 2 && shot.activities.size() == 2 && shot.activities.at("A") == 1);
@@ -32,20 +32,39 @@ void events_without_case_ids_are_not_taken() {
 
   std::istringstream csv("case_id,activity\nc,A\n");
   const auto csv_log = minera::import_csv_event_log(csv);
-  assert(minera::streaming_monitor_takes_event(csv_log.traces.at(0).events.at(0)));
+  assert(minera::streaming_monitor_takes_event(csv_log.traces.at(0).events.at(0), minera::StreamingMonitorKind::kDfg));
   minera::Event empty_present;
   empty_present.case_id_state = minera::FirstClassAttributeState::kPresent;
-  assert(minera::streaming_monitor_takes_event(empty_present));
+  assert(minera::streaming_monitor_takes_event(empty_present, minera::StreamingMonitorKind::kDfg));
+  assert(!minera::streaming_monitor_takes_event(minera::Event{}, minera::StreamingMonitorKind::kDfg));
+}
+
+// A null (None) case id, from PM4Py 2.7.22 live monitors fed c:A, None:A,
+// c:D, None:D (D 100 s after A): the DFG counts {(A,D):2} and temporal
+// reports a deviation for "None" as for c, while footprints and TBR keep only
+// case c. An event without a case id is skipped by all four.
+void null_case_ids_follow_each_monitor() {
+  using Kind = minera::StreamingMonitorKind;
   minera::Event null_id;
   null_id.case_id_state = minera::FirstClassAttributeState::kNull;
-  assert(minera::streaming_monitor_takes_event(null_id));
-  assert(!minera::streaming_monitor_takes_event(minera::Event{}));
+  minera::Event present;
+  present.case_id = "c";
+  present.case_id_state = minera::FirstClassAttributeState::kPresent;
+  const struct { Kind kind; bool null_taken; } expected[] = {
+      {Kind::kDfg, true}, {Kind::kTemporal, true}, {Kind::kFootprints, false}, {Kind::kTbr, false}};
+  for (const auto& [kind, null_taken] : expected) {
+    assert(minera::streaming_monitor_takes_event(null_id, kind) == null_taken);
+    assert(minera::streaming_monitor_takes_event(present, kind));
+    assert(!minera::streaming_monitor_takes_event(minera::Event{}, kind));
+  }
+  assert(minera::streaming_monitor_takes_event(null_id, minera::StreamingMonitorKind::kDfg));
 }
 
 }  // namespace
 
 int main() {
   events_without_case_ids_are_not_taken();
+  null_case_ids_follow_each_monitor();
   // Reference streaming DFG: empty labels and case ids are ordinary values.
   // Arrival -> "" -> Review gives Arrival->"" and ""->Review, never an
   // invented Arrival->Review shortcut.

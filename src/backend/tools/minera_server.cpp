@@ -9996,7 +9996,7 @@ void handle_streaming_dfg(const httplib::Request& request,
         {import_options.activity_column, import_options.case_id_column});
     const auto events = streaming_events(log, request);
     for (const auto* event : events)
-      if (minera::streaming_monitor_takes_event(*event)) stream.receive(*event, event->case_id);
+      if (minera::streaming_monitor_takes_event(*event, minera::StreamingMonitorKind::kDfg)) stream.receive(*event, event->case_id);
     response.set_content(
         streaming_diagnostics_json(
             minera::serialize_streaming_dfg_json(stream.snapshot()), request,
@@ -10098,7 +10098,7 @@ void handle_streaming_footprints(const httplib::Request& request,
         {import_options.activity_column, import_options.case_id_column});
     const auto events = streaming_events(log, request);
     for (const auto* event : events)
-      if (minera::streaming_monitor_takes_event(*event)) (void)monitor.receive(*event, event->case_id);
+      if (minera::streaming_monitor_takes_event(*event, minera::StreamingMonitorKind::kFootprints)) (void)monitor.receive(*event, event->case_id);
     std::string extra;
     if (ocel_query_bool(request, "streaming_footprints_terminate_all", false)) {
       const auto prefix = monitor.snapshot();
@@ -10311,7 +10311,7 @@ void handle_streaming_temporal(const httplib::Request& request,
     minera::StreamingTemporalConformance monitor(std::move(profile), options);
     const auto events = streaming_events(log, request);
     for (const auto* event : events)
-      if (minera::streaming_monitor_takes_event(*event)) (void)monitor.receive(*event, event->case_id);
+      if (minera::streaming_monitor_takes_event(*event, minera::StreamingMonitorKind::kTemporal)) (void)monitor.receive(*event, event->case_id);
     response.set_content(
         streaming_diagnostics_json(
             minera::serialize_streaming_temporal_json(monitor.snapshot()),
@@ -10380,7 +10380,7 @@ void handle_streaming_tbr(const httplib::Request& request,
     minera::StreamingTokenReplay replay(std::move(net), options);
     const auto events = streaming_events(log, request);
     for (const auto* event : events)
-      if (minera::streaming_monitor_takes_event(*event)) (void)replay.receive(*event, event->case_id);
+      if (minera::streaming_monitor_takes_event(*event, minera::StreamingMonitorKind::kTbr)) (void)replay.receive(*event, event->case_id);
     std::string extra;
     if (ocel_query_bool(request, "streaming_tbr_terminate_all", false)) {
       const auto prefix = replay.snapshot();
@@ -10535,6 +10535,14 @@ int main(int argc, char** argv) {
       if (!value || !*value || std::string_view(value) == "*") return usage(argv[0]);
       std::string origin = value;
       while (origin.ends_with('/')) origin.pop_back();
+      // Browsers send Origin (and Host) lowercased and without the scheme's
+      // default port, so store the origin in that form to match both.
+      std::transform(origin.begin(), origin.end(), origin.begin(),
+                     [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      if (origin.starts_with("http://") && origin.ends_with(":80"))
+        origin.resize(origin.size() - 3);
+      else if (origin.starts_with("https://") && origin.ends_with(":443"))
+        origin.resize(origin.size() - 4);
       g_allowed_origins.insert(origin);
     } else {
       return usage(argv[0]);

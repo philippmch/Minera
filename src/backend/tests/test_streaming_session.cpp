@@ -108,4 +108,22 @@ void events_without_case_ids_are_skipped() {
   {minera::StreamingSessionOptions options;options.method=Method::kTbr;minera::PetriNet n;auto a=n.add_place(),b=n.add_place(),c=n.add_place();n.set_source(a);n.set_sink(c);n.set_activities({"A","D"});n.add_transition(0,{a},{b});n.add_transition(1,{b},{c});options.net=n;
    auto s=run(options);assert(s.find("\"\":{")==std::string::npos);assert(s.find("\"c\":{")!=std::string::npos);}
 }
-int main(){drain_waits_for_inflight_observers_and_keeps_stream_active();dfg_persists_between_batches_and_revisions_guard_mutations();deregistration_and_reset_keep_delivery_history_and_boundaries();footprint_prefixes_terminate_after_finish_and_allow_a_new_case_generation();both_replay_variants_keep_markings_across_appends_and_final_diagnostics();temporal_pairs_cross_batch_boundaries_and_invalid_times_remain_skipped();crlf_records_do_not_change_untrimmed_native_columns_or_quoted_values();events_without_case_ids_are_skipped();}
+// A null (None) case id. PM4Py 2.7.22 live monitors fed c:A, c:D, then
+// None:B, None:C, None:A, None:D: the DFG keeps the None case, giving
+// {(A,D):2,(B,C):1,(C,A):1}; footprints and TBR keep only case c.
+void null_case_ids_follow_each_monitor() {
+  auto events=unnamed_trace_events();
+  for(std::size_t i=2;i<events.size();++i)events[i].case_id_state=minera::FirstClassAttributeState::kNull;
+  const auto run=[&](minera::StreamingSessionOptions options){
+    options.dfg.activity_attribute=options.footprints.activity_attribute=options.tbr.activity_attribute="concept:name";
+    minera::StreamingSession session(options);session.action(Action::kStart,0);session.append(events,"one",1);return session.snapshot_json();};
+  {auto s=run({});
+   assert(s.find("\"source\":\"A\",\"target\":\"D\",\"count\":2")!=std::string::npos);
+   assert(s.find("\"source\":\"B\",\"target\":\"C\",\"count\":1")!=std::string::npos);
+   assert(s.find("\"source\":\"C\",\"target\":\"A\",\"count\":1")!=std::string::npos);}
+  {minera::StreamingSessionOptions options;options.method=Method::kFootprints;minera::Footprint model;model.activities={"A","B","C","D"};model.sequence={{"A","D"}};model.start_activities={"A"};model.end_activities={"D"};options.footprint_model=model;
+   auto s=run(options);assert(s.find("\"total_events_processed\":2")!=std::string::npos);assert(s.find("\"\":{")==std::string::npos);}
+  {minera::StreamingSessionOptions options;options.method=Method::kTbr;minera::PetriNet n;auto a=n.add_place(),b=n.add_place(),c=n.add_place();n.set_source(a);n.set_sink(c);n.set_activities({"A","D"});n.add_transition(0,{a},{b});n.add_transition(1,{b},{c});options.net=n;
+   auto s=run(options);assert(s.find("\"\":{")==std::string::npos);assert(s.find("\"c\":{")!=std::string::npos);}
+}
+int main(){null_case_ids_follow_each_monitor();drain_waits_for_inflight_observers_and_keeps_stream_active();dfg_persists_between_batches_and_revisions_guard_mutations();deregistration_and_reset_keep_delivery_history_and_boundaries();footprint_prefixes_terminate_after_finish_and_allow_a_new_case_generation();both_replay_variants_keep_markings_across_appends_and_final_diagnostics();temporal_pairs_cross_batch_boundaries_and_invalid_times_remain_skipped();crlf_records_do_not_change_untrimmed_native_columns_or_quoted_values();events_without_case_ids_are_skipped();}
