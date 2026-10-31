@@ -1,11 +1,51 @@
 #include "minera/streaming_dfg.hpp"
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 #include <cassert>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
+namespace {
+
+// One-shot streaming routes feed every parsed event whose case id the
+// monitors take. PM4Py 2.7.22 on the XES event stream of this log (the
+// second trace has no concept:name) discovers {(A,D):1} with activities
+// {A:1,D:1}; CSV ids are always present, an empty one included.
+void events_without_case_ids_are_not_taken() {
+  std::istringstream xes(R"(<log xes.version="1.0">
+<trace><string key="concept:name" value="c"/>
+<event><string key="concept:name" value="A"/></event><event><string key="concept:name" value="D"/></event></trace>
+<trace><event><string key="concept:name" value="B"/></event><event><string key="concept:name" value="C"/></event></trace></log>)");
+  const auto log = minera::import_xes_event_log(xes);
+  minera::StreamingDfgDiscovery stream({"concept:name", "case:concept:name"});
+  std::size_t taken = 0;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events)
+      if (minera::streaming_monitor_takes_event(event)) ++taken, stream.receive(event, event.case_id);
+  assert(taken == 2);
+  const auto shot = stream.snapshot();
+  assert(shot.events == 2 && shot.activities.size() == 2 && shot.activities.at("A") == 1);
+  assert(shot.graph.size() == 1 && shot.graph.begin()->second == 1);
+
+  std::istringstream csv("case_id,activity\nc,A\n");
+  const auto csv_log = minera::import_csv_event_log(csv);
+  assert(minera::streaming_monitor_takes_event(csv_log.traces.at(0).events.at(0)));
+  minera::Event empty_present;
+  empty_present.case_id_state = minera::FirstClassAttributeState::kPresent;
+  assert(minera::streaming_monitor_takes_event(empty_present));
+  minera::Event null_id;
+  null_id.case_id_state = minera::FirstClassAttributeState::kNull;
+  assert(minera::streaming_monitor_takes_event(null_id));
+  assert(!minera::streaming_monitor_takes_event(minera::Event{}));
+}
+
+}  // namespace
+
 int main() {
+  events_without_case_ids_are_not_taken();
   // Reference streaming DFG: empty labels and case ids are ordinary values.
   // Arrival -> "" -> Review gives Arrival->"" and ""->Review, never an
   // invented Arrival->Review shortcut.

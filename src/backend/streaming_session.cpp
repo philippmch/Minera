@@ -68,7 +68,7 @@ struct StreamingSession::Impl {
         // event without a case id (a None one is a value); Declare files it
         // under "undefined_case" itself. The monitors' own Event overloads
         // take the caller's case id, which may be a present empty one.
-        if (!declare && !event.has_case_id()) {}
+        if (!declare && !streaming_monitor_takes_event(event)) {}
         else if (dfg) { delivery.accepted = dfg->receive(event, event.case_id); delivery.event_index = dfg->snapshot().events; }
         else if (footprints) { const auto r = footprints->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }
         else if (temporal) { const auto r = temporal->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }

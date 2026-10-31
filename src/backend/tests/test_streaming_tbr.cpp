@@ -1,9 +1,12 @@
 #include "minera/streaming_tbr.hpp"
 
 #include <cassert>
+#include <cstdio>
+#include <stdexcept>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -203,7 +206,135 @@ void forward_invisible_iteration_limit() {
     for (std::size_t i = 0; i < 5; ++i) assert(limited_missing(c.chain, c.parallel, limits[i]) == c.expected[i]);
 }
 
+
+// Weighted, zero-weight and parallel arcs. Each case runs on a net with
+// explicit occurrence weights and, when no arc is parallel, zero or large,
+// again with the repeated-unit endpoints the PNML importer stores small
+// weights as. Expected markings and per-case missing counts after every
+// event, and whether termination reaches the final marking, are from PM4Py
+// 2.7.22 streaming TBR (captured with PetriNet.Arc weights; a parallel arc
+// raises a TypeError inside receive, which the reference logs and swallows).
+struct WeightedTransition {
+  int label;
+  std::vector<std::pair<std::size_t, int>> in, out;
+};
+struct WeightedStep {
+  const char* case_id;
+  const char* activity;
+  std::vector<int> marking;
+  std::uint64_t missing;
+};
+void check_weighted(const char* name, std::size_t places, const std::vector<WeightedTransition>& spec,
+                    std::vector<int> initial, std::vector<int> final_marking, std::size_t limit,
+                    const std::vector<WeightedStep>& steps,
+                    const std::vector<std::pair<const char*, bool>>& fits) {
+  bool repeatable = true;
+  for (const auto& t : spec)
+    for (const auto* side : {&t.in, &t.out})
+      for (std::size_t i = 0; i < side->size(); ++i) {
+        repeatable = repeatable && (*side)[i].second >= 1 && (*side)[i].second <= 50;
+        for (std::size_t j = 0; j < i; ++j) repeatable = repeatable && (*side)[j].first != (*side)[i].first;
+      }
+  for (const bool compact : {true, false}) {
+    if (!compact && !repeatable) continue;
+    minera::PetriNet net;
+    for (std::size_t i = 0; i < places; ++i) (void)net.add_place();
+    net.set_activities({"A", "B", "C"});
+    for (const auto& t : spec) {
+      std::vector<std::size_t> in, out;
+      std::vector<minera::PetriArcWeight> in_weights, out_weights;
+      const auto expand = [&](const auto& arcs, auto& endpoints, auto& weights) {
+        for (const auto& [place, weight] : arcs) {
+          if (compact) endpoints.push_back(place), weights.push_back({weight});
+          else endpoints.insert(endpoints.end(), static_cast<std::size_t>(weight), place);
+        }
+      };
+      expand(t.in, in, in_weights);
+      expand(t.out, out, out_weights);
+      const auto id = net.add_transition(
+          t.label < 0 ? std::nullopt : std::optional<std::size_t>(t.label), in, out);
+      if (compact) net.set_ordinary_arc_weights(id, in_weights, out_weights);
+    }
+    minera::StreamingTbrOptions options;
+    options.initial_marking = initial;
+    options.final_marking = final_marking;
+    options.maximum_iterations_invisibles = limit;
+    minera::StreamingTokenReplay replay(net, options);
+    for (const auto& step : steps) {
+      (void)replay.receive(step.case_id, step.activity);
+      const auto snapshot = replay.snapshot();
+      const auto& state = snapshot.cases.at(step.case_id);
+      if (state.marking != step.marking || state.missing != step.missing) {
+        std::fprintf(stderr, "%s (%s): %s %s missing %llu marking", name,
+                     compact ? "weights" : "repeated", step.case_id, step.activity,
+                     static_cast<unsigned long long>(state.missing));
+        for (const auto tokens : state.marking) std::fprintf(stderr, " %d", tokens);
+        std::fprintf(stderr, "\n");
+        assert(false);
+      }
+    }
+    for (const auto& [case_id, fit] : fits) {
+      const auto result = replay.terminate_case(case_id);
+      if (!result || result->is_fit != fit) {
+        std::fprintf(stderr, "%s (%s): terminate %s\n", name, compact ? "weights" : "repeated", case_id);
+        assert(false);
+      }
+    }
+  }
+}
+void weighted_and_parallel_arcs_follow_reference() {
+  check_weighted("in0_outA1", 3, {{0,{{0,1}},{{1,1}}},{1,{{1,0}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,1},0},{"c2","A",{0,1,0},0},{"c2","B",{0,1,1},0},{"c3","A",{0,1,0},0},{"c3","A",{0,2,0},1},{"c3","B",{0,2,1},1},{"c4","A",{0,1,0},0},{"c4","B",{0,1,1},0},{"c4","B",{0,1,2},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("in2_outA2", 3, {{0,{{0,1}},{{1,2}}},{1,{{1,2}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,1},2},{"c2","A",{0,2,0},0},{"c2","B",{0,0,1},0},{"c3","A",{0,2,0},0},{"c3","A",{0,4,0},1},{"c3","B",{0,2,1},1},{"c4","A",{0,2,0},0},{"c4","B",{0,0,1},0},{"c4","B",{0,0,2},2}}, {{"c1",false},{"c2",true},{"c3",false},{"c4",false}});
+  check_weighted("in3_outA2", 3, {{0,{{0,1}},{{1,2}}},{1,{{1,3}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,1},3},{"c2","A",{0,2,0},0},{"c2","B",{0,2,0},0},{"c3","A",{0,2,0},0},{"c3","A",{0,4,0},1},{"c3","B",{0,1,1},1},{"c4","A",{0,2,0},0},{"c4","B",{0,2,0},0},{"c4","B",{0,2,0},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("in1000_outA1", 3, {{0,{{0,1}},{{1,1}}},{1,{{1,1000}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,1},1000},{"c2","A",{0,1,0},0},{"c2","B",{0,1,0},0},{"c3","A",{0,1,0},0},{"c3","A",{0,2,0},1},{"c3","B",{0,2,0},1},{"c4","A",{0,1,0},0},{"c4","B",{0,1,0},0},{"c4","B",{0,1,0},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("in1_outA0", 3, {{0,{{0,1}},{{1,0}}},{1,{{1,1}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,1},1},{"c2","A",{0,0,0},0},{"c2","B",{0,0,0},0},{"c3","A",{0,0,0},0},{"c3","A",{0,0,0},1},{"c3","B",{0,0,0},1},{"c4","A",{0,0,0},0},{"c4","B",{0,0,0},0},{"c4","B",{0,0,0},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("in2_outA1_bout0", 3, {{0,{{0,1}},{{1,1}}},{1,{{1,2}},{{2,0}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,0},2},{"c2","A",{0,1,0},0},{"c2","B",{0,1,0},0},{"c3","A",{0,1,0},0},{"c3","A",{0,2,0},1},{"c3","B",{0,0,0},1},{"c4","A",{0,1,0},0},{"c4","B",{0,1,0},0},{"c4","B",{0,1,0},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("par_in_1_1", 3, {{0,{{0,1}},{{1,1}}},{1,{{1,1},{1,1}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,0},1},{"c2","A",{0,1,0},0},{"c2","B",{0,0,1},0},{"c3","A",{0,1,0},0},{"c3","A",{0,2,0},1},{"c3","B",{0,0,1},1},{"c4","A",{0,1,0},0},{"c4","B",{0,0,1},0},{"c4","B",{0,0,1},1}}, {{"c1",false},{"c2",true},{"c3",false},{"c4",false}});
+  check_weighted("par_in_1_2", 3, {{0,{{0,1}},{{1,1}}},{1,{{1,1},{1,2}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,0},1},{"c2","A",{0,1,0},0},{"c2","B",{0,1,0},0},{"c3","A",{0,1,0},0},{"c3","A",{0,2,0},1},{"c3","B",{0,0,1},1},{"c4","A",{0,1,0},0},{"c4","B",{0,1,0},0},{"c4","B",{0,1,0},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("par_in_0_1", 3, {{0,{{0,1}},{{1,1}}},{1,{{1,0},{1,1}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,0},0},{"c2","A",{0,1,0},0},{"c2","B",{0,0,1},0},{"c3","A",{0,1,0},0},{"c3","A",{0,2,0},1},{"c3","B",{0,1,1},1},{"c4","A",{0,1,0},0},{"c4","B",{0,0,1},0},{"c4","B",{0,0,1},0}}, {{"c1",false},{"c2",true},{"c3",false},{"c4",true}});
+  check_weighted("par_in_0_0", 3, {{0,{{0,1}},{{1,1}}},{1,{{1,0},{1,0}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,1},0},{"c2","A",{0,1,0},0},{"c2","B",{0,1,1},0},{"c3","A",{0,1,0},0},{"c3","A",{0,2,0},1},{"c3","B",{0,2,1},1},{"c4","A",{0,1,0},0},{"c4","B",{0,1,1},0},{"c4","B",{0,1,2},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("par_out_1_2", 3, {{0,{{0,1}},{{1,1},{1,2}}},{1,{{1,2}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","B",{1,0,1},2},{"c2","A",{0,3,0},0},{"c2","B",{0,1,1},0},{"c3","A",{0,3,0},0},{"c3","A",{0,6,0},1},{"c3","B",{0,4,1},1},{"c4","A",{0,3,0},0},{"c4","B",{0,1,1},0},{"c4","B",{0,1,1},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("join_3_2", 4, {{0,{{0,1}},{{1,1},{2,1}}},{2,{{1,1}},{{1,1}}},{1,{{1,3},{2,2}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c1","B",{1,0,0,1},5},{"c2","A",{0,1,1,0},0},{"c2","B",{0,1,1,0},0},{"c3","A",{0,1,1,0},0},{"c3","C",{0,1,1,0},0},{"c3","B",{0,1,1,0},0},{"c5","B",{1,0,0,1},5},{"c5","B",{1,0,0,2},10}}, {{"c1",false},{"c2",false},{"c3",false},{"c5",false}});
+  check_weighted("join_2_0", 4, {{0,{{0,1}},{{1,1},{2,1}}},{2,{{1,1}},{{1,1}}},{1,{{1,2},{2,0}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c1","B",{1,0,0,1},2},{"c2","A",{0,1,1,0},0},{"c2","B",{0,1,1,0},0},{"c3","A",{0,1,1,0},0},{"c3","C",{0,1,1,0},0},{"c3","B",{0,1,1,0},0},{"c5","B",{1,0,0,1},2},{"c5","B",{1,0,0,2},4}}, {{"c1",false},{"c2",false},{"c3",false},{"c5",false}});
+  check_weighted("tau_1_2_2", 4, {{0,{{0,1}},{{1,1}}},{-1,{{1,1}},{{2,2}}},{1,{{2,2}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c1","A",{0,1,0,0},0},{"c1","B",{0,0,0,1},0},{"c2","B",{1,0,0,1},2},{"c3","A",{0,1,0,0},0},{"c3","A",{0,2,0,0},1},{"c3","B",{0,1,0,1},1},{"c4","A",{0,1,0,0},0},{"c4","B",{0,0,0,1},0},{"c4","B",{0,0,0,2},2}}, {{"c1",true},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("tau_1_1_2", 4, {{0,{{0,1}},{{1,1}}},{-1,{{1,1}},{{2,1}}},{1,{{2,2}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c1","A",{0,1,0,0},0},{"c1","B",{0,1,0,1},2},{"c2","B",{1,0,0,1},2},{"c3","A",{0,1,0,0},0},{"c3","A",{0,2,0,0},1},{"c3","B",{0,0,0,1},1},{"c4","A",{0,1,0,0},0},{"c4","B",{0,1,0,1},2},{"c4","B",{0,1,0,2},4}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("tau_0_1_1", 4, {{0,{{0,1}},{{1,1}}},{-1,{{1,0}},{{2,1}}},{1,{{2,1}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c1","A",{0,1,0,0},0},{"c1","B",{0,1,0,1},0},{"c2","B",{1,0,0,1},1},{"c3","A",{0,1,0,0},0},{"c3","A",{0,2,0,0},1},{"c3","B",{0,2,0,1},1},{"c4","A",{0,1,0,0},0},{"c4","B",{0,1,0,1},0},{"c4","B",{0,1,0,2},0}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("tau_1_0_1", 4, {{0,{{0,1}},{{1,1}}},{-1,{{1,1}},{{2,0}}},{1,{{2,1}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c1","A",{0,1,0,0},0},{"c1","B",{0,1,0,1},1},{"c2","B",{1,0,0,1},1},{"c3","A",{0,1,0,0},0},{"c3","A",{0,2,0,0},1},{"c3","B",{0,2,0,1},2},{"c4","A",{0,1,0,0},0},{"c4","B",{0,1,0,1},1},{"c4","B",{0,1,0,2},2}}, {{"c1",false},{"c2",false},{"c3",false},{"c4",false}});
+  check_weighted("dup_label", 3, {{0,{{0,2}},{{1,1}}},{0,{{0,1}},{{1,2}}},{1,{{1,2}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c1","A",{0,2,0},0},{"c1","B",{0,0,1},0},{"c2","B",{1,0,1},2},{"c3","A",{0,2,0},0},{"c3","A",{0,3,0},2},{"c3","B",{0,1,1},2}}, {{"c1",true},{"c2",false},{"c3",false}});
+  check_weighted("im3_w2", 2, {{0,{{0,2}},{{1,1}}}}, {3,0}, {0,1}, 10, {{"c1","A",{1,1},0},{"c2","A",{1,1},0},{"c2","A",{1,1},0},{"c3","A",{1,1},0},{"c3","A",{1,1},0},{"c3","A",{1,1},0}}, {{"c1",false},{"c2",false},{"c3",false}});
+  check_weighted("parcons_1_1_n3", 2, {{1,{{0,1},{0,1}},{{1,1}}}}, {3,0}, {0,1}, 10, {{"c","B",{1,1},0},{"c","B",{0,2},0}}, {{"c",false}});
+  check_weighted("parcons_1_2_n2", 2, {{1,{{0,1},{0,2}},{{1,1}}}}, {2,0}, {0,1}, 10, {{"c","B",{0,1},0},{"c","B",{0,1},1}}, {{"c",false}});
+  check_weighted("parcons_3_1_n4", 2, {{1,{{0,3},{0,1}},{{1,1}}}}, {4,0}, {0,1}, 10, {{"c","B",{0,1},0},{"c","B",{0,1},3}}, {{"c",false}});
+  check_weighted("zero_key_final", 3, {{0,{{0,1}},{{1,1},{2,0}}}}, {1,0,0}, {0,1,0}, 10, {{"c","A",{0,1,0},0}}, {{"c",false}});
+  check_weighted("zero_key_consume0", 4, {{0,{{0,1}},{{1,1},{2,0}}},{1,{{2,0},{1,1}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c","A",{0,1,0,0},0},{"c","B",{0,0,0,1},0},{"d","A",{0,1,0,0},0},{"d","B",{0,0,0,1},0},{"d","B",{0,0,0,2},1}}, {{"c",true},{"d",false}});
+  check_weighted("zero_key_insert", 4, {{0,{{0,1}},{{2,0}}},{1,{{1,1},{2,1}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c","A",{0,0,0,0},0},{"c","B",{0,0,0,0},1},{"d","B",{1,0,0,1},2}}, {{"c",false},{"d",false}});
+  check_weighted("zero_key_silent_src", 4, {{0,{{0,1}},{{1,0}}},{-1,{{1,0}},{{2,1}}},{1,{{2,1}},{{3,1}}}}, {1,0,0,0}, {0,0,0,1}, 10, {{"c","A",{0,0,0,0},0},{"c","B",{0,0,0,1},0},{"d","B",{1,0,0,1},1}}, {{"c",true},{"d",false}});
+  check_weighted("preset_w0_src", 3, {{-1,{{0,1}},{{1,1}}},{1,{{0,0},{1,1}},{{2,1}}}}, {1,0,0}, {0,0,1}, 10, {{"c","B",{1,0,0},0}}, {{"c",false}});
+  check_weighted("multi_k2_n1_t12", 3, {{-1,{{0,1}},{{1,2}}},{1,{{1,2}},{{2,1}}}}, {1,0,0}, {0,0,1}, 2, {{"c","B",{0,0,1},0}}, {});
+  check_weighted("multi_k2_n1_t12", 3, {{-1,{{0,1}},{{1,2}}},{1,{{1,2}},{{2,1}}}}, {1,0,0}, {0,0,1}, 3, {{"c","B",{0,0,1},0}}, {});
+  check_weighted("multi_k2_n1_t12", 3, {{-1,{{0,1}},{{1,2}}},{1,{{1,2}},{{2,1}}}}, {1,0,0}, {0,0,1}, 4, {{"c","B",{0,0,1},0}}, {});
+  check_weighted("multi_k2_n2_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,2}},{{2,1}}}}, {2,0,0}, {0,0,1}, 2, {{"c","B",{2,0,1},2}}, {});
+  check_weighted("multi_k2_n2_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,2}},{{2,1}}}}, {2,0,0}, {0,0,1}, 3, {{"c","B",{0,0,1},0}}, {});
+  check_weighted("multi_k2_n2_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,2}},{{2,1}}}}, {2,0,0}, {0,0,1}, 4, {{"c","B",{0,0,1},0}}, {});
+  check_weighted("multi_k2_n3_t21", 3, {{-1,{{0,2}},{{1,1}}},{1,{{1,2}},{{2,1}}}}, {3,0,0}, {0,0,1}, 2, {{"c","B",{3,0,1},2}}, {});
+  check_weighted("multi_k2_n3_t21", 3, {{-1,{{0,2}},{{1,1}}},{1,{{1,2}},{{2,1}}}}, {3,0,0}, {0,0,1}, 3, {{"c","B",{3,0,1},2}}, {});
+  check_weighted("multi_k2_n3_t21", 3, {{-1,{{0,2}},{{1,1}}},{1,{{1,2}},{{2,1}}}}, {3,0,0}, {0,0,1}, 4, {{"c","B",{3,0,1},2}}, {});
+  check_weighted("multi_k3_n4_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,3}},{{2,1}}}}, {4,0,0}, {0,0,1}, 2, {{"c","B",{4,0,1},3}}, {});
+  check_weighted("multi_k3_n4_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,3}},{{2,1}}}}, {4,0,0}, {0,0,1}, 3, {{"c","B",{4,0,1},3}}, {});
+  check_weighted("multi_k3_n4_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,3}},{{2,1}}}}, {4,0,0}, {0,0,1}, 4, {{"c","B",{1,0,1},0}}, {});
+}
+
+void negative_arc_weights_are_rejected() {
+  minera::PetriNet net = linear_net();
+  net.set_ordinary_arc_weights(1, {{1, true}}, {});
+  bool threw = false;
+  try { minera::StreamingTokenReplay replay(net); } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 int main() {
+  weighted_and_parallel_arcs_follow_reference();
+  negative_arc_weights_are_rejected();
   forward_invisible_iteration_limit();
   reference_contract();
   forward_replay_and_termination();

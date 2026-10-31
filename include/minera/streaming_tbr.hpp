@@ -69,9 +69,11 @@ struct StreamingTbrSnapshot {
 
 // Stateful token replay over open cases. The forward variant follows the
 // reference streaming replay: an enabled transition of the label fires;
-// otherwise silent shortest paths, each from a distinct marked place outside
-// the transition's preset, may enable it; otherwise missing tokens are
-// inserted for the first transition of the label. Termination compares the
+// otherwise silent shortest paths, each marked place outside the
+// transition's preset serving one input place, may enable it; otherwise
+// missing tokens are inserted for the first transition of the label.
+// Ordinary arcs act by weight, each arc on its own (zero-weight and parallel
+// arcs included); negative weights are rejected. Termination compares the
 // marking with the final marking exactly. BACKWARDS keeps a bounded
 // breadth-first silent closure.
 class StreamingTokenReplay {
@@ -113,6 +115,12 @@ class StreamingTokenReplay {
     Marking marking;
     std::vector<std::size_t> silent_transitions;
   };
+  // One ordinary arc with its weight. Repeated-unit endpoints of a place form
+  // one arc; explicit occurrence weights keep parallel arcs apart.
+  struct Arc {
+    std::size_t place = 0;
+    int weight = 1;
+  };
 
   [[nodiscard]] bool enabled(const Marking& marking,
                              std::size_t transition) const;
@@ -133,6 +141,8 @@ class StreamingTokenReplay {
   StreamingTbrOptions options_;
   std::map<std::string, std::vector<std::size_t>> transitions_by_activity_;
   std::vector<std::size_t> silent_transitions_;
+  std::vector<std::vector<Arc>> input_arcs_;
+  std::vector<std::vector<Arc>> output_arcs_;
   Marking initial_;
   std::vector<std::size_t> initial_order_;
   Marking final_;

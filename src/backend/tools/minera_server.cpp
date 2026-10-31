@@ -9933,6 +9933,9 @@ void handle_dfg_conversion(const httplib::Request& request,
 
 // Streaming uploads use a fresh monitor per request. Keep the historical
 // importer order by default; callers can replay parser-assigned CSV input order.
+// The DFG, footprints, temporal and TBR routes skip an event without a case
+// id, as live sessions do (the CSV importer marks every id present, so a CSV
+// upload keeps all its events); parsed_events still counts every event.
 std::vector<const minera::Event*> streaming_events(
     const minera::EventLog& log, const httplib::Request& request) {
   const auto order = request.has_param("streaming_event_order")
@@ -9992,7 +9995,8 @@ void handle_streaming_dfg(const httplib::Request& request,
     minera::StreamingDfgDiscovery stream(
         {import_options.activity_column, import_options.case_id_column});
     const auto events = streaming_events(log, request);
-    for (const auto* event : events) stream.receive(*event, event->case_id);
+    for (const auto* event : events)
+      if (minera::streaming_monitor_takes_event(*event)) stream.receive(*event, event->case_id);
     response.set_content(
         streaming_diagnostics_json(
             minera::serialize_streaming_dfg_json(stream.snapshot()), request,
@@ -10093,7 +10097,8 @@ void handle_streaming_footprints(const httplib::Request& request,
         std::move(model),
         {import_options.activity_column, import_options.case_id_column});
     const auto events = streaming_events(log, request);
-    for (const auto* event : events) (void)monitor.receive(*event, event->case_id);
+    for (const auto* event : events)
+      if (minera::streaming_monitor_takes_event(*event)) (void)monitor.receive(*event, event->case_id);
     std::string extra;
     if (ocel_query_bool(request, "streaming_footprints_terminate_all", false)) {
       const auto prefix = monitor.snapshot();
@@ -10305,7 +10310,8 @@ void handle_streaming_temporal(const httplib::Request& request,
     const auto log = minera::import_csv_event_log(input, import_options);
     minera::StreamingTemporalConformance monitor(std::move(profile), options);
     const auto events = streaming_events(log, request);
-    for (const auto* event : events) (void)monitor.receive(*event, event->case_id);
+    for (const auto* event : events)
+      if (minera::streaming_monitor_takes_event(*event)) (void)monitor.receive(*event, event->case_id);
     response.set_content(
         streaming_diagnostics_json(
             minera::serialize_streaming_temporal_json(monitor.snapshot()),
@@ -10373,7 +10379,8 @@ void handle_streaming_tbr(const httplib::Request& request,
     const auto log = minera::import_csv_event_log(input, import_options);
     minera::StreamingTokenReplay replay(std::move(net), options);
     const auto events = streaming_events(log, request);
-    for (const auto* event : events) (void)replay.receive(*event, event->case_id);
+    for (const auto* event : events)
+      if (minera::streaming_monitor_takes_event(*event)) (void)replay.receive(*event, event->case_id);
     std::string extra;
     if (ocel_query_bool(request, "streaming_tbr_terminate_all", false)) {
       const auto prefix = replay.snapshot();
