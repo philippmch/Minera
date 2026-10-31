@@ -15631,6 +15631,17 @@ Reference behaviour found (black box):
   consumed obligation (an object consumed from two activities is related
   twice), renamed `<id>_<sequence>` when unique.
 
+Safety limits (native, not in the reference): the reference-binding playout of
+a causal net converted from a mined OCPN (`--oc-causal-net` CLI and
+`model=causal_net` server requests with `event_binding=reference`) stops with
+an error after 120 seconds of search, sequence expansion and log building,
+and when its complete sequences would hold more than 2,000,000 events. The
+event count is summed per memoized search state during the search, so the
+limit fails fast, before any sequence is expanded. Both are
+`OcCausalReferencePlayoutOptions` fields (`time_limit_seconds`, `max_events`;
+zero is unlimited, the default for direct calls). Under the limits the output
+is unchanged.
+
 ## Process-tree DP alignment bank (2026-10-25)
 
 `scripts/capture-process-tree-dp-alignment-bank.py` (seed 20261025, four

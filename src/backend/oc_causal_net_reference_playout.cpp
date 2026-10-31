@@ -5,13 +5,14 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <unordered_map>
+#include <cstdint>
 #include <ctime>
 #include <iterator>
 #include <limits>
 #include <set>
 #include <stdexcept>
 #include <tuple>
+#include <unordered_map>
 
 namespace minera {
 namespace {
@@ -114,6 +115,14 @@ struct Search {
   std::optional<std::chrono::steady_clock::time_point> deadline;
   double time_limit_seconds = 0;
   std::size_t steps = 0;
+  std::size_t max_events = 0;  // zero is unlimited
+
+  void check_deadline() {
+    if (deadline && (++steps & 255) == 0 && std::chrono::steady_clock::now() > *deadline)
+      throw std::runtime_error("OC causal net playout exceeded its " +
+                               std::to_string(static_cast<long long>(time_limit_seconds)) +
+                               "-second limit; lower max_bindings_per_activity or the objects");
+  }
 
   std::string state_key() const {
     std::string key;
@@ -260,7 +269,14 @@ struct Search {
   struct Node {
     bool complete = false;
     std::vector<std::pair<std::size_t, std::int64_t>> edges;  // binding, child
+    // Complete sequences from this state and their events (bindings other
+    // than START_/END_ ones), saturating.
+    std::uint64_t sequences = 0, events = 0;
   };
+  static std::uint64_t saturating_add(std::uint64_t a, std::uint64_t b) {
+    return a > std::numeric_limits<std::uint64_t>::max() - b ? std::numeric_limits<std::uint64_t>::max()
+                                                             : a + b;
+  }
   std::vector<Node> nodes;
   std::vector<OcCausalReferenceBinding> pool;
   std::unordered_map<std::string, std::int64_t> memo;
@@ -269,13 +285,10 @@ struct Search {
     bool empty = state.empty();
     for (const auto& [type, objects] : start) empty = empty && objects.empty();
     if (empty) {
-      nodes.push_back({true, {}});
+      nodes.push_back({true, {}, 1, 0});
       return static_cast<std::int64_t>(nodes.size() - 1);
     }
-    if (deadline && (++steps & 255) == 0 && std::chrono::steady_clock::now() > *deadline)
-      throw std::runtime_error("OC causal net playout exceeded its " +
-                               std::to_string(static_cast<long long>(time_limit_seconds)) +
-                               "-second limit; lower max_bindings_per_activity or the objects");
+    check_deadline();
     auto key = state_key();
     if (const auto found = memo.find(key); found != memo.end()) return found->second;
     // An activity other than START_<type> without input marker groups raises
@@ -306,11 +319,23 @@ struct Search {
         apply(binding, false);
         for (const auto& object : started) start[name.substr(6)].insert(object);
         if (child >= 0) {
+          const auto& next = nodes[static_cast<std::size_t>(child)];
+          const bool event = name.rfind("START_", 0) != 0 && name.rfind("END_", 0) != 0;
+          node.sequences = saturating_add(node.sequences, next.sequences);
+          node.events = saturating_add(saturating_add(node.events, next.events),
+                                       event ? next.sequences : 0);
           pool.push_back(std::move(binding));
           node.edges.push_back({pool.size() - 1, child});
         }
       }
     }
+    // Every sequence from this state extends to a distinct sequence from the
+    // initial state, so the initial state has at least as many events: stop
+    // as soon as any state exceeds the limit.
+    if (max_events && node.events > max_events)
+      throw std::runtime_error("OC causal net playout would produce more than " +
+                               std::to_string(max_events) +
+                               " events; lower max_bindings_per_activity or the objects");
     std::int64_t id = -1;
     if (!node.edges.empty()) {
       nodes.push_back(std::move(node));
@@ -326,6 +351,7 @@ struct Search {
     if (root < 0) return;
     const auto walk = [&](auto&& self, std::int64_t id) -> void {
       const auto& node = nodes[static_cast<std::size_t>(id)];
+      check_deadline();
       if (node.complete) sequences.push_back(current);
       for (const auto& [binding, child] : node.edges) {
         current.push_back(pool[binding]);
@@ -344,6 +370,12 @@ std::string timestamp(long long seconds) {
   char buffer[32];
   std::strftime(buffer, sizeof buffer, "%Y-%m-%d %H:%M:%S", &parts);
   return buffer;
+}
+
+std::chrono::steady_clock::time_point deadline_after(double seconds) {
+  return std::chrono::steady_clock::now() +
+         std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+             std::chrono::duration<double>(seconds));
 }
 
 }  // namespace
@@ -370,11 +402,10 @@ std::vector<OcCausalReferenceSequence> reference_oc_causal_net_sequences(
     search.start[type] = std::set<std::string>(ids.begin(), ids.end());
   }
   search.fired.assign(net.activities.size(), 0);
+  search.max_events = options.max_events;
   if (options.time_limit_seconds > 0) {
     search.time_limit_seconds = options.time_limit_seconds;
-    search.deadline = std::chrono::steady_clock::now() +
-                      std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                          std::chrono::duration<double>(options.time_limit_seconds));
+    search.deadline = deadline_after(options.time_limit_seconds);
   }
   search.run();
   return std::move(search.sequences);
@@ -383,11 +414,20 @@ std::vector<OcCausalReferenceSequence> reference_oc_causal_net_sequences(
 Ocel reference_oc_causal_net_playout(const OcCausalNet& net,
                                      const std::map<std::string, std::vector<std::string>>& objects,
                                      const OcCausalReferencePlayoutOptions& options) {
+  const auto started = std::chrono::steady_clock::now();
   const auto sequences = reference_oc_causal_net_sequences(net, objects, options);
+  const auto deadline = started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                      std::chrono::duration<double>(options.time_limit_seconds));
+  std::size_t steps = 0;
   Ocel log;
   std::set<std::string> seen;
   long long clock = 10000001;
   for (std::size_t index = 0; index < sequences.size(); ++index) {
+    if (options.time_limit_seconds > 0 && (++steps & 255) == 0 &&
+        std::chrono::steady_clock::now() > deadline)
+      throw std::runtime_error("OC causal net playout exceeded its " +
+                               std::to_string(static_cast<long long>(options.time_limit_seconds)) +
+                               "-second limit; lower max_bindings_per_activity or the objects");
     for (const auto& binding : sequences[index]) {
       if (binding.activity.rfind("START_", 0) == 0 || binding.activity.rfind("END_", 0) == 0) continue;
       // One relation per consumed obligation: an object consumed from two

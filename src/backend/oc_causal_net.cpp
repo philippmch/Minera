@@ -906,6 +906,9 @@ OcCausalNet discover_oc_causal_net(const Ocel& log,
 // Wall-clock cap on one reference-binding playout, so that a request cannot
 // run unbounded.
 constexpr double kReferenceCausalPlayoutSeconds = 120.0;
+// Cap on the events of one reference-binding playout, checked before any
+// sequence is expanded, so that a request cannot exhaust memory.
+constexpr std::size_t kReferenceCausalPlayoutEvents = 2'000'000;
 
 OcCausalNet oc_causal_net_from_ocpn(const OcpnGraph& graph) {
   constexpr std::size_t kInf = kOcCausalInfiniteCardinality;
@@ -1162,6 +1165,7 @@ OcpnPlayoutResult oc_causal_net_extensive_playout_result(
     reference.objects_unique_per_sequence = options.objects_unique_per_trace;
     OcpnPlayoutResult result;
     reference.time_limit_seconds = kReferenceCausalPlayoutSeconds;
+    reference.max_events = kReferenceCausalPlayoutEvents;
     result.log = reference_oc_causal_net_playout(net, objects, reference);
     for (auto& event : result.log.events) {
       const auto label = net.activity_labels.find(event.activity);

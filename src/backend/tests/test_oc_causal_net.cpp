@@ -641,6 +641,23 @@ void test_reference_flow_prunes_dead_states() {
   assert(std::chrono::steady_clock::now() - started < std::chrono::seconds(30));
 }
 
+void test_reference_flow_event_limit() {
+  // Five events, three object types: the complete sequences would hold far
+  // more than the event cap, which stops the search before any sequence is
+  // expanded instead of exhausting memory.
+  const auto started = std::chrono::steady_clock::now();
+  bool limited = false;
+  try {
+    (void)reference_flow("A:p1,o1,i1;C:i2,o1;B:o1;A:o1,i1;A:p1,i1,o1");
+  } catch (const std::runtime_error& error) {
+    limited = std::string(error.what()).find("more than 2000000 events") != std::string::npos;
+  }
+  assert(limited);
+  assert(std::chrono::steady_clock::now() - started < std::chrono::seconds(30));
+  // Under the cap the log is complete (the reference also gives 139,972).
+  assert(reference_flow("C:o1;C:o1;B:i1;A:o2").events.size() == 139972);
+}
+
 }  // namespace
 
 int main() {
@@ -654,5 +671,6 @@ int main() {
   test_ocpn_conversion_adds_auxiliaries_for_and_splits();
   test_reference_flow_labels_are_not_special();
   test_reference_flow_prunes_dead_states();
+  test_reference_flow_event_limit();
   std::cout << "OC causal-net tests passed\n";
 }
