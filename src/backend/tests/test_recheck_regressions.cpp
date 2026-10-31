@@ -340,6 +340,49 @@ void ocel_wall_clock_order(){
  const auto reread=import_ocel_sqlite(database);
  std::filesystem::remove(database);
  check(event_ids(reread)=="e0,e1,"&&parse_timestamp_microseconds(reread.events[0].timestamp)==parse_timestamp_microseconds("2020-01-01T05:00:00Z"),"OCEL SQLite round trip keeps the stored UTC value");
+ // Object changes are read like events: PM4Py 2.7.22 read_ocel2_json/xml
+ // store "09:00+05:00" as 09:00 UTC, read_ocel2_sqlite as its instant 04:00.
+ const std::string changes_json=R"({"objectTypes":[{"name":"item","attributes":[{"name":"p","type":"string"}]}],"eventTypes":[{"name":"A","attributes":[]}],
+  "objects":[{"id":"o1","type":"item","attributes":[{"name":"p","time":"1970-01-01T00:00:00Z","value":"x"},{"name":"p","time":"2020-01-01T09:00:00+05:00","value":"y"},{"name":"p","time":"2020-01-01T06:00:00Z","value":"z"}]}],
+  "events":[{"id":"e1","type":"A","time":"2020-01-01T05:00:00Z","relationships":[{"objectId":"o1","qualifier":"q"}]}]})";
+ const auto changed=parse_ocel_json(changes_json);
+ check(changed.object_changes.size()==2&&changed.object_changes[0].timestamp=="2020-01-01T09:00:00+00:00"&&changed.object_changes[1].timestamp=="2020-01-01T06:00:00Z","OCEL JSON stores object-change wall clocks as UTC");
+ const auto changes_db=std::filesystem::temp_directory_path()/"minera_recheck_change_offsets.sqlite";
+ std::filesystem::remove(changes_db);
+ export_ocel_sqlite(changed,changes_db);
+ const auto changes_reread=import_ocel_sqlite(changes_db);
+ std::filesystem::remove(changes_db);
+ bool kept_nine=false;
+ for(const auto& change:changes_reread.object_changes)
+  kept_nine|=change.field=="p"&&change.value==OcelValue(std::string("y"))&&parse_timestamp_microseconds(change.timestamp)==parse_timestamp_microseconds("2020-01-01T09:00:00Z");
+ check(changes_reread.object_changes.size()==2&&kept_nine,"OCEL JSON to SQLite keeps an object change at the reference's 09:00");
+ auto offset_change=changed;
+ offset_change.object_changes[0].timestamp="2020-01-01T09:00:00+05:00";
+ std::filesystem::remove(changes_db);
+ export_ocel_sqlite(offset_change,changes_db);
+ const auto instant_reread=import_ocel_sqlite(changes_db);
+ std::filesystem::remove(changes_db);
+ bool instant_four=false;
+ for(const auto& change:instant_reread.object_changes)
+  instant_four|=change.value==OcelValue(std::string("y"))&&change.timestamp=="2020-01-01T04:00:00+00:00";
+ check(instant_four,"OCEL SQLite stores an object change with an offset as its UTC instant");
+ const auto changes_xml=parse_ocel_xml(R"(<?xml version="1.0"?><log><object-types><object-type name="item"><attributes><attribute name="p" type="string"/></attributes></object-type></object-types><event-types><event-type name="A"><attributes/></event-type></event-types><objects><object id="o1" type="item"><attributes><attribute name="p" time="1970-01-01T00:00:00Z">x</attribute><attribute name="p" time="2020-01-01T09:00:00+05:00">y</attribute><attribute name="p" time="Jan 1 2020 10:00 +0500">w</attribute></attributes></object></objects><events><event id="e1" type="A" time="2020-01-01T05:00:00Z"><objects><relationship object-id="o1" qualifier="q"/></objects></event></events></log>)");
+ check(changes_xml.object_changes.size()==2&&changes_xml.object_changes[0].timestamp=="2020-01-01T09:00:00+00:00"&&changes_xml.object_changes[1].timestamp=="2020-01-01T05:00:00+00:00","OCEL XML stores object changes like events");
+ // OCEL 2.0 XML carries attribute values as element text: PM4Py 2.7.22
+ // read_ocel2_xml reads cost 5, p x/y/z and status "a<b&c" back.
+ auto valued=changed;
+ valued.events[0].attributes.push_back({"cost",std::int64_t{5}});
+ valued.objects[0].attributes.push_back({"status",std::string("a<b&c")});
+ OcelXmlExportOptions standard_xml; standard_xml.format=OcelXmlFormat::kStandard;
+ const auto written=serialize_ocel_xml(valued,standard_xml);
+ check(written.find(R"(<attribute name="cost" type="int">5</attribute>)")!=std::string::npos&&
+       written.find(R"(<attribute name="p" type="string" time="2020-01-01T09:00:00+00:00">y</attribute>)")!=std::string::npos&&
+       written.find(R"(>a&lt;b&amp;c</attribute>)")!=std::string::npos&&written.find(" value=\"")==std::string::npos,"OCEL 2.0 XML writes values as element text");
+ const auto xml_back=parse_ocel_xml(written);
+ bool cost=false,status=false;
+ for(const auto& a:xml_back.events.at(0).attributes)cost|=a.key=="cost"&&a.value==OcelValue(std::int64_t{5});
+ for(const auto& a:xml_back.objects.at(0).attributes)status|=a.key=="status"&&a.value==OcelValue(std::string("a<b&c"));
+ check(cost&&status&&xml_back.object_changes.size()==2,"OCEL 2.0 XML element-text values read back");
 }
 
 // K1: a nanosecond duration beyond int64 overflows as in the reference; a

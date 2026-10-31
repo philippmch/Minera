@@ -501,7 +501,11 @@ void write_standard_type_table(std::ostream& out, std::string_view container,
   }
   out << "  </" << container << ">\n";
 }
-void write_value(std::ostream& out, const OcelValue& v, std::string_view key, std::string_view indent, bool standard = false, std::string_view time = {}) { const auto tag = standard ? "attribute" : value_tag(v); out << indent << '<' << tag << " name=\"" << esc(key) << "\""; if (standard) out << " type=\"" << value_tag(v) << "\""; else out << " key=\"" << esc(key) << "\""; if (!time.empty()) out << " time=\"" << esc(time) << "\""; out << " value=\"" << esc(value_text(v)) << "\"/>\n"; }
+void write_value(std::ostream& out, const OcelValue& v, std::string_view key, std::string_view indent, bool standard = false, std::string_view time = {}) { const auto tag = standard ? "attribute" : value_tag(v); out << indent << '<' << tag << " name=\"" << esc(key) << "\""; if (standard) out << " type=\"" << value_tag(v) << "\""; else out << " key=\"" << esc(key) << "\""; if (!time.empty()) out << " time=\"" << esc(time) << "\"";
+  // OCEL 2.0 carries the value as element text, which the reference reads;
+  // the legacy format keeps it in the value attribute.
+  if (standard) out << '>' << esc(value_text(v)) << "</attribute>\n";
+  else out << " value=\"" << esc(value_text(v)) << "\"/>\n"; }
 
 }  // namespace
 

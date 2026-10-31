@@ -1519,6 +1519,28 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
     }
   }
   for (auto& [index, text] : rewrites) log.events[index].timestamp = std::move(text);
+  // Object changes take the same reading as events, so a change keeps its
+  // value through every export format. A text the reader cannot take, and a
+  // 1970-01-01T00:00:00 base entry (kept raw by the reference), stays as is.
+  for (auto& change : log.object_changes) {
+    const auto& text = change.timestamp;
+    if (text.starts_with("1970-01-01T00:00:00")) continue;
+    if (reader == OcelTimestampReader::kInstantNanoseconds) {
+      const auto instant = parse_timestamp_exact(text);
+      if (instant && instant->timezone_aware && instant->offset_minutes != 0)
+        change.timestamp = utc_timestamp_text(instant->seconds, instant->nanoseconds);
+      continue;
+    }
+    std::optional<std::int64_t> microseconds;
+    try {
+      microseconds = iso_wall_microseconds(text);
+    } catch (const std::invalid_argument&) {
+      if (reader == OcelTimestampReader::kDateutil)
+        if (const auto lenient = dateutil_subset(text)) microseconds = lenient->microseconds;
+    }
+    if (microseconds && !natively_utc(text, *microseconds))
+      change.timestamp = utc_timestamp_text(*microseconds);
+  }
   if (unknown) return;
   // pandas cannot order tz-naive values next to tz-aware ones (the message
   // the reference raises from sort_values).
