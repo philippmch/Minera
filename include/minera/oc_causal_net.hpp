@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -49,6 +50,10 @@ struct OcCausalNet {
   OcpnGraph workflow_projection;
   std::vector<std::string> object_types;
   std::vector<OcCausalActivity> activities;
+  // Internal activity name -> event label, for activities whose label could
+  // not be used as their name (see oc_causal_net_from_ocpn). The reference
+  // binding playout reports these activities by label.
+  std::map<std::string, std::string> activity_labels;
 };
 
 [[nodiscard]] OcCausalNet discover_oc_causal_net(
@@ -63,8 +68,9 @@ struct OcCausalNet {
 // on one side goes through "_silent_aux_in_/out_<transition>_<type>", and
 // START_<type>/END_<type> feed the source and drain the sink places.
 // Variable (double) arcs carry cardinality 0..inf, other transition arcs
-// 1..1 and place arcs 1..inf. Throws std::invalid_argument when a label
-// collides with a generated activity name.
+// 1..1 and place arcs 1..inf. A label that collides with a generated name or
+// starts with START_/END_ gets an internal "_label_<n>_<label>" name, listed in
+// activity_labels.
 [[nodiscard]] OcCausalNet oc_causal_net_from_ocpn(const OcpnGraph& graph);
 
 [[nodiscard]] std::string serialize_oc_causal_net_json(

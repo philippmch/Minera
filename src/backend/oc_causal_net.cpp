@@ -903,6 +903,10 @@ OcCausalNet discover_oc_causal_net(const Ocel& log,
   return discover_marker_model(log, options);
 }
 
+// Wall-clock cap on one reference-binding playout, so that a request cannot
+// run unbounded.
+constexpr double kReferenceCausalPlayoutSeconds = 120.0;
+
 OcCausalNet oc_causal_net_from_ocpn(const OcpnGraph& graph) {
   constexpr std::size_t kInf = kOcCausalInfiniteCardinality;
   // One causal activity per OC transition: labelled transitions are shared by
@@ -935,39 +939,77 @@ OcCausalNet oc_causal_net_from_ocpn(const OcpnGraph& graph) {
     return side.places.back().second;
   };
   std::map<std::string, std::pair<std::string, std::string>> boundaries;  // type -> source, sink
+  // Names of places, silent transitions and START_/END_ first; labelled
+  // transitions (a uuid in the reference) then take their label unless it
+  // collides with one of these or carries a prefix the playout treats as
+  // special, in which case they get a "_label_<n>_<label>" internal name that
+  // the playout maps back to the label.
+  std::map<std::string, std::vector<std::string>> place_names, silent_names;
   for (const auto& [type, net] : graph.petri_nets) {
     if (net.place_count() == 0 || net.source() >= net.place_count() ||
         net.sink() >= net.place_count())
       throw std::invalid_argument("OCPN net for type " + type + " has no workflow places");
-    std::vector<std::string> names(net.place_count());
+    auto& names = place_names[type];
+    names.resize(net.place_count());
     for (std::size_t place = 0; place < net.place_count(); ++place) {
       names[place] = type + "_" +
                      (place == net.source() ? std::string("source")
                       : place == net.sink() ? std::string("sink")
                                             : "p_" + std::to_string(place));
-      place_index[names[place]] = places.size();
-      places.push_back({names[place], type, {}, {}});
       generated.insert(names[place]);
     }
-    boundaries[type] = {names[net.source()], names[net.sink()]};
+    generated.insert("START_" + type);
+    generated.insert("END_" + type);
+  }
+  for (const auto& [type, net] : graph.petri_nets) {
+    auto& names = silent_names[type];
+    names.resize(net.transitions().size());
     const auto& transition_names = net.transition_names();
+    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+      if (net.transitions()[index].activity) continue;
+      const bool named = transition_names && index < transition_names->size() &&
+                         (*transition_names)[index] && !(*transition_names)[index]->empty();
+      auto name = type + "_" + (named ? *(*transition_names)[index] : "tau_" + std::to_string(index));
+      if (generated.contains(name)) name += "_" + std::to_string(index);
+      generated.insert(name);
+      names[index] = std::move(name);
+    }
+  }
+  std::map<std::string, std::string> internal;  // label -> activity name
+  std::size_t mangled = 0;
+  const auto label_name = [&](const std::string& label) -> const std::string& {
+    auto found = internal.find(label);
+    if (found != internal.end()) return found->second;
+    const auto prefixed = [&](const char* prefix) { return label.rfind(prefix, 0) == 0; };
+    std::string name = label;
+    if (prefixed("START_") || prefixed("END_") || prefixed("_silent_aux_") || prefixed("_label_") ||
+        generated.contains(label)) {
+      do name = "_label_" + std::to_string(mangled++) + "_" + label;
+      while (generated.contains(name));
+    }
+    return internal.emplace(label, std::move(name)).first->second;
+  };
+  for (const auto& [type, net] : graph.petri_nets) {
+    const auto& names = place_names.at(type);
+    for (std::size_t place = 0; place < net.place_count(); ++place) {
+      place_index[names[place]] = places.size();
+      places.push_back({names[place], type, {}, {}});
+    }
+    boundaries[type] = {names[net.source()], names[net.sink()]};
     for (std::size_t index = 0; index < net.transitions().size(); ++index) {
       const auto& transition = net.transitions()[index];
       std::string name;
       bool variable = false;
       if (transition.activity) {
-        name = net.activities().at(*transition.activity);
+        const auto& label = net.activities().at(*transition.activity);
+        name = label_name(label);
         const auto arcs = graph.double_arcs_on_activity.find(type);
         if (arcs != graph.double_arcs_on_activity.end()) {
-          const auto found = arcs->second.find(name);
+          const auto found = arcs->second.find(label);
           variable = found != arcs->second.end() && found->second;
         }
       } else {
-        const bool named = transition_names && index < transition_names->size() &&
-                           (*transition_names)[index] && !(*transition_names)[index]->empty();
-        name = type + "_" + (named ? *(*transition_names)[index] : "tau_" + std::to_string(index));
-        if (!generated.insert(name).second) name += "_" + std::to_string(index);
-        generated.insert(name);
+        name = silent_names.at(type)[index];
       }
       auto found = transition_index.find(name);
       if (found == transition_index.end()) {
@@ -1052,11 +1094,8 @@ OcCausalNet oc_causal_net_from_ocpn(const OcpnGraph& graph) {
       activity.output_marker_groups.push_back({{marker(consumer, place.type, 1, kInf)}});
     net.activities.push_back(std::move(activity));
   }
-  for (const auto& transition : transitions)
-    if (transition.labelled && generated.contains(transition.name))
-      throw std::invalid_argument("activity " + transition.name +
-                                  " collides with a place, auxiliary, START_ or END_ "
-                                  "activity of the converted causal net");
+  for (const auto& [label, name] : internal)
+    if (name != label) net.activity_labels[name] = label;
   return net;
 }
 
@@ -1072,8 +1111,11 @@ std::string serialize_oc_causal_net_json(const OcCausalNet& net) {
   for (std::size_t index = 0; index < net.activities.size(); ++index) {
     if (index) out << ',';
     const auto& activity = net.activities[index];
-    out << "{\"activity\":" << quote_json(activity.activity) <<
-        ",\"input_marker_groups\":[";
+    out << "{\"activity\":" << quote_json(activity.activity);
+    if (const auto label = net.activity_labels.find(activity.activity);
+        label != net.activity_labels.end())
+      out << ",\"label\":" << quote_json(label->second);
+    out << ",\"input_marker_groups\":[";
     auto write_groups = [&](const std::vector<OcCausalMarkerGroup>& groups) {
       for (std::size_t group_index = 0; group_index < groups.size(); ++group_index) {
         if (group_index) out << ',';
@@ -1119,7 +1161,12 @@ OcpnPlayoutResult oc_causal_net_extensive_playout_result(
     reference.max_bindings_per_activity = options.max_bindings_per_activity;
     reference.objects_unique_per_sequence = options.objects_unique_per_trace;
     OcpnPlayoutResult result;
+    reference.time_limit_seconds = kReferenceCausalPlayoutSeconds;
     result.log = reference_oc_causal_net_playout(net, objects, reference);
+    for (auto& event : result.log.events) {
+      const auto label = net.activity_labels.find(event.activity);
+      if (label != net.activity_labels.end()) event.activity = label->second;
+    }
     result.trace_exists = !result.log.events.empty();
     return result;
   }

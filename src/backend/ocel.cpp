@@ -7,6 +7,7 @@
 #include "reference_tree_net.hpp"
 
 #include <algorithm>
+#include <string_view>
 #include <bit>
 #include <charconv>
 #include <cctype>
@@ -1612,11 +1613,17 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     return left->id < right->id;
   });
 
+  // Relations and O2O links indexed once by their event / source id, in log
+  // order, so serialising stays linear in the log size.
+  std::unordered_map<std::string_view, std::vector<const OcelRelation*>> relations_by_event;
+  for (const auto& relation : log.relations)
+    relations_by_event[relation.event_id].push_back(&relation);
+  std::unordered_map<std::string_view, std::vector<const OcelO2oRelation*>> o2o_by_source;
+  for (const auto& relation : log.o2o) o2o_by_source[relation.source_id].push_back(&relation);
   auto event_relations = [&](const OcelEvent& event) {
     std::vector<const OcelRelation*> relations;
-    for (const auto& relation : log.relations) {
-      if (relation.event_id == event.id) relations.push_back(&relation);
-    }
+    if (const auto found = relations_by_event.find(event.id); found != relations_by_event.end())
+      relations = found->second;
     std::sort(relations.begin(), relations.end(), [](const auto* left,
                                                      const auto* right) {
       return std::tie(left->object_id, left->qualifier) <
@@ -1645,9 +1652,8 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
   };
   auto write_standard_o2o = [&](std::string_view source) {
     std::vector<const OcelO2oRelation*> relations;
-    for (const auto& relation : log.o2o) {
-      if (relation.source_id == source) relations.push_back(&relation);
-    }
+    if (const auto found = o2o_by_source.find(source); found != o2o_by_source.end())
+      relations = found->second;
     std::sort(relations.begin(), relations.end(), [](const auto* left,
                                                      const auto* right) {
       return std::tie(left->target_id, left->qualifier) <

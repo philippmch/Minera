@@ -62,6 +62,9 @@ using OcCausalReferenceSequence = std::vector<OcCausalReferenceBinding>;
 struct OcCausalReferencePlayoutOptions {
   std::size_t max_bindings_per_activity = 1;
   bool objects_unique_per_sequence = false;
+  // Wall-clock limit on the search; zero is unlimited. Exceeding it throws
+  // std::runtime_error.
+  double time_limit_seconds = 0;
 };
 
 // RETURN_SEQUENCES: every complete binding sequence, in search order.

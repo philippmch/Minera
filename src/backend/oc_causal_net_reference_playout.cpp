@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <unordered_map>
 #include <ctime>
 #include <iterator>
 #include <limits>
@@ -106,6 +108,41 @@ struct Search {
   std::vector<std::size_t> fired;
   OcCausalReferenceSequence current;
   std::vector<OcCausalReferenceSequence> sequences;
+  // Like the reference, a search state (obligations, remaining start
+  // obligations and per-activity binding counts) is explored once: its
+  // completing suffixes are shared and a dead state is not entered again.
+  std::optional<std::chrono::steady_clock::time_point> deadline;
+  double time_limit_seconds = 0;
+  std::size_t steps = 0;
+
+  std::string state_key() const {
+    std::string key;
+    for (const auto& [obligation, count] : state) {
+      const auto& [from, to, type, object] = obligation;
+      for (const auto* part : {&from, &to, &type, &object}) {
+        key += *part;
+        key += '\0';
+      }
+      key += std::to_string(count);
+      key += '\1';
+    }
+    key += '\2';
+    for (const auto& [type, objects] : start) {
+      key += type;
+      key += '\0';
+      for (const auto& object : objects) {
+        key += object;
+        key += '\0';
+      }
+      key += '\1';
+    }
+    key += '\2';
+    for (const auto count : fired) {
+      key += std::to_string(count);
+      key += ',';
+    }
+    return key;
+  }
 
   ObjectSet obligated(const std::string& from, const std::string& to, const std::string& type) const {
     ObjectSet out;
@@ -217,22 +254,40 @@ struct Search {
     }
   }
 
-  void run() {
+  // Search graph: a node is a search state that completes at least one
+  // sequence; its edges are the bindings leading to such states, in search
+  // order. Returns the node, or -1 for a dead state.
+  struct Node {
+    bool complete = false;
+    std::vector<std::pair<std::size_t, std::int64_t>> edges;  // binding, child
+  };
+  std::vector<Node> nodes;
+  std::vector<OcCausalReferenceBinding> pool;
+  std::unordered_map<std::string, std::int64_t> memo;
+
+  std::int64_t explore() {
     bool empty = state.empty();
     for (const auto& [type, objects] : start) empty = empty && objects.empty();
     if (empty) {
-      sequences.push_back(current);
-      return;
+      nodes.push_back({true, {}});
+      return static_cast<std::int64_t>(nodes.size() - 1);
     }
+    if (deadline && (++steps & 255) == 0 && std::chrono::steady_clock::now() > *deadline)
+      throw std::runtime_error("OC causal net playout exceeded its " +
+                               std::to_string(static_cast<long long>(time_limit_seconds)) +
+                               "-second limit; lower max_bindings_per_activity or the objects");
+    auto key = state_key();
+    if (const auto found = memo.find(key); found != memo.end()) return found->second;
     // An activity other than START_<type> without input marker groups raises
     // as soon as the search looks for enabled bindings.
     for (const auto& activity : net->activities)
       if (activity.input_marker_groups.empty() && activity.activity.rfind("START_", 0) != 0)
         throw OcCausalReferenceError("KeyError", "'" + activity.activity + "'");
+    Node node;
     for (std::size_t index = 0; index < net->activities.size(); ++index) {
       if (fired[index] >= bound) continue;
       const auto& name = net->activities[index].activity;
-      for (const auto& binding : bindings(index)) {
+      for (auto& binding : bindings(index)) {
         // A START binding consumes the start obligations of its objects.
         ObjectSet started;
         if (!binding.consumed && name.rfind("START_", 0) == 0) {
@@ -246,14 +301,39 @@ struct Search {
         }
         apply(binding, true);
         ++fired[index];
-        current.push_back(binding);
-        run();
-        current.pop_back();
+        const auto child = explore();
         --fired[index];
         apply(binding, false);
         for (const auto& object : started) start[name.substr(6)].insert(object);
+        if (child >= 0) {
+          pool.push_back(std::move(binding));
+          node.edges.push_back({pool.size() - 1, child});
+        }
       }
     }
+    std::int64_t id = -1;
+    if (!node.edges.empty()) {
+      nodes.push_back(std::move(node));
+      id = static_cast<std::int64_t>(nodes.size() - 1);
+    }
+    memo.emplace(std::move(key), id);
+    return id;
+  }
+
+  // Every complete sequence, in search order.
+  void run() {
+    const auto root = explore();
+    if (root < 0) return;
+    const auto walk = [&](auto&& self, std::int64_t id) -> void {
+      const auto& node = nodes[static_cast<std::size_t>(id)];
+      if (node.complete) sequences.push_back(current);
+      for (const auto& [binding, child] : node.edges) {
+        current.push_back(pool[binding]);
+        self(self, child);
+        current.pop_back();
+      }
+    };
+    walk(walk, root);
   }
 };
 
@@ -290,6 +370,12 @@ std::vector<OcCausalReferenceSequence> reference_oc_causal_net_sequences(
     search.start[type] = std::set<std::string>(ids.begin(), ids.end());
   }
   search.fired.assign(net.activities.size(), 0);
+  if (options.time_limit_seconds > 0) {
+    search.time_limit_seconds = options.time_limit_seconds;
+    search.deadline = std::chrono::steady_clock::now() +
+                      std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                          std::chrono::duration<double>(options.time_limit_seconds));
+  }
   search.run();
   return std::move(search.sequences);
 }

@@ -1,6 +1,9 @@
 #include "minera/oc_causal_net.hpp"
 
 #include <algorithm>
+#include <set>
+#include <cstdio>
+#include <chrono>
 #include <cassert>
 #include <cmath>
 #include <initializer_list>
@@ -559,6 +562,85 @@ void test_ocpn_conversion_adds_auxiliaries_for_and_splits() {
   assert(!result.log.events.empty());
 }
 
+// "act:obj1,obj2;..." with object types given by the id without its digits,
+// one second apart.
+minera::Ocel spec_log(const std::string& spec) {
+  minera::Ocel log;
+  std::set<std::string> seen;
+  std::size_t index = 0, begin = 0;
+  while (begin <= spec.size()) {
+    auto end = spec.find(';', begin);
+    if (end == std::string::npos) end = spec.size();
+    const auto entry = spec.substr(begin, end - begin);
+    const auto colon = entry.find(':');
+    const auto id = "e" + std::to_string(index);
+    char time[32];
+    std::snprintf(time, sizeof time, "2024-01-01T00:00:%02zuZ", index);
+    log.events.push_back({id, entry.substr(0, colon), time, {}});
+    std::size_t from = colon + 1;
+    while (from <= entry.size()) {
+      auto comma = entry.find(',', from);
+      if (comma == std::string::npos) comma = entry.size();
+      const auto object = entry.substr(from, comma - from);
+      if (seen.insert(object).second)
+        log.objects.push_back({object, object.substr(0, object.find_first_of("0123456789")), {}});
+      log.relations.push_back({id, object, ""});
+      from = comma + 1;
+    }
+    ++index;
+    begin = end + 1;
+  }
+  return log;
+}
+
+minera::Ocel reference_flow(const std::string& spec, std::size_t bound = 1) {
+  minera::OcpnPlayoutOptions options;
+  options.event_binding = minera::OcpnEventBinding::kReference;
+  options.max_bindings_per_activity = bound;
+  return minera::oc_causal_net_extensive_playout_result(
+             minera::oc_causal_net_from_ocpn(minera::discover_ocpn(spec_log(spec))), options)
+      .log;
+}
+
+std::size_t count_activity(const minera::Ocel& log, const std::string& activity) {
+  return static_cast<std::size_t>(std::count_if(log.events.begin(), log.events.end(),
+                                                [&](const auto& e) { return e.activity == activity; }));
+}
+
+// Expected values are the reference's (discover_oc_petri_net, ocpn factory,
+// TO_OC_CAUSAL_NET, extensive playout with one object per type).
+void test_reference_flow_labels_are_not_special() {
+  // Labels starting START_/END_ are ordinary transitions in the reference.
+  auto log = reference_flow("START_x:o1;B:o1;A:o2;B:o2");
+  assert(log.events.size() == 10 && log.relations.size() == 10 && log.objects.size() == 1);
+  assert(count_activity(log, "START_x") == 1 && count_activity(log, "A") == 1 &&
+         count_activity(log, "B") == 2);
+  log = reference_flow("A:o1;END_q:o1;B:o1");
+  assert(log.events.size() == 7 && count_activity(log, "END_q") == 1);
+  // Labels equal to generated place or silent-transition names.
+  log = reference_flow("o_source:o1;o_p_2:o1;B:o1");
+  assert(log.events.size() == 7 && count_activity(log, "B") == 1);
+  log = reference_flow("A:o1;o_tau_1:o1;A:o1;B:o1");
+  // (The reference's 7 events include its own silent transition o_tau_1;
+  // the loop through the o_tau_1 label needs A twice.)
+  assert(log.events.size() == 7 && count_activity(log, "A") == 1 &&
+         count_activity(log, "B") == 1);
+  const auto net = minera::oc_causal_net_from_ocpn(
+      minera::discover_ocpn(spec_log("START_x:o1;o_source:o1")));
+  std::set<std::string> names;
+  for (const auto& activity : net.activities) assert(names.insert(activity.activity).second);
+  assert(net.activity_labels.size() == 2);
+}
+
+void test_reference_flow_prunes_dead_states() {
+  // The reference memoises dead search states and returns no sequence here
+  // in about a second and a half; a plain search runs for minutes.
+  const auto started = std::chrono::steady_clock::now();
+  const auto log = reference_flow("B:o1;A:o1;B:i1,o1;A:o1;B:o1,i1;A:o2,i1");
+  assert(log.events.empty());
+  assert(std::chrono::steady_clock::now() - started < std::chrono::seconds(30));
+}
+
 }  // namespace
 
 int main() {
@@ -570,5 +652,7 @@ int main() {
   test_discovery_and_fallback();
   test_reference_flow_converts_the_mined_ocpn();
   test_ocpn_conversion_adds_auxiliaries_for_and_splits();
+  test_reference_flow_labels_are_not_special();
+  test_reference_flow_prunes_dead_states();
   std::cout << "OC causal-net tests passed\n";
 }
