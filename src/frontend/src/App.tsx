@@ -974,7 +974,7 @@ export default function App() {
           <VariantList data={data} selected={selectedVariant} onSelect={setSelectedVariant} />
           <ActivityTable data={data} />
           <DfgVariants data={data} />
-          <DfgDataframe />
+          <DfgDataframe key={cacheGeneration.current} available={sourceAvailable} mining={mining} />
           <CorrelationMining data={data} />
           <EventuallyFollows data={data} />
         </main>

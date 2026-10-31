@@ -10,8 +10,11 @@ import {
   type DfgDataframeEvent,
 } from "../src/types";
 import {
+  DFG_DATAFRAME_UNAVAILABLE_HINT,
+  DfgDataframe,
   DfgDataframeResultView,
   dfgDataframeActiveOptions,
+  dfgDataframeRunnable,
 } from "../src/components/DfgDataframe";
 
 const event = (activity: string, inputOrder: number): DfgDataframeEvent => ({
@@ -185,5 +188,31 @@ describe("table-backed DFG controls and rendering", () => {
     const costMarkup = renderToStaticMarkup(createElement(DfgDataframeResultView, { result: cost }));
     expect(costMarkup).toContain("Cost edges");
     expect(costMarkup).not.toContain("2s");
+  });
+});
+
+describe("dataframe DFG source gating", () => {
+  it("runs only on a live mined source that is not busy", () => {
+    expect(dfgDataframeRunnable(true, false, false)).toBe(true);
+    expect(dfgDataframeRunnable(false, false, false)).toBe(false);
+    expect(dfgDataframeRunnable(true, true, false)).toBe(false);
+    expect(dfgDataframeRunnable(true, false, true)).toBe(false);
+  });
+
+  it("disables the run button and explains why without a live source", async () => {
+    const cases: { available?: boolean }[] = [{}, { available: false }];
+    for (const props of cases) {
+      const html = renderToStaticMarkup(createElement(DfgDataframe, props));
+      expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Run dataframe DFG<\/button>/);
+      expect(html).toContain(DFG_DATAFRAME_UNAVAILABLE_HINT.replace(/'/g, "&#x27;"));
+    }
+  });
+
+  it("enables the run button without the hint on a live source", async () => {
+    const html = renderToStaticMarkup(createElement(DfgDataframe, { available: true }));
+    expect(html).toMatch(/<button type="button" class="button">Run dataframe DFG<\/button>/);
+    expect(html).not.toContain(DFG_DATAFRAME_UNAVAILABLE_HINT);
+    const mining = renderToStaticMarkup(createElement(DfgDataframe, { available: true, mining: true }));
+    expect(mining).toMatch(/<button[^>]*disabled=""[^>]*>Run dataframe DFG<\/button>/);
   });
 });

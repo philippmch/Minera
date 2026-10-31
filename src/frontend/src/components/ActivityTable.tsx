@@ -22,6 +22,7 @@ export function ActivityTable({ data }: { data: MineraExport }) {
           {numberFormat.format(data.activities.length)} distinct
         </span>
       </div>
+      <div className="activity-table-scroll">
       <table className="activity-table">
         <thead>
           <tr>
@@ -83,6 +84,7 @@ export function ActivityTable({ data }: { data: MineraExport }) {
           ))}
         </tbody>
       </table>
+      </div>
     </section>
   );
 }

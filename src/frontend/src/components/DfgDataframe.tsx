@@ -197,7 +197,15 @@ export function DfgDataframeResultView({ result }: { result: DfgDataframeResult 
   return <Result result={result} />;
 }
 
-export function DfgDataframe() {
+/** Whether the dataframe DFG can run. The route reads the server's live mined
+ *  source, so it may only run while that source is the one this view shows. */
+export function dfgDataframeRunnable(available: boolean, mining: boolean, busy: boolean): boolean {
+  return available && !mining && !busy;
+}
+
+export const DFG_DATAFRAME_UNAVAILABLE_HINT = "Open a CSV or XES source to run the dataframe DFG; it runs on the live mined source, not on a saved analysis.";
+
+export function DfgDataframe({ available = false, mining = false }: { available?: boolean; mining?: boolean }) {
   const [operation, setOperation] = useState<DfgDataframeOperation>("graph");
   const [measure, setMeasure] = useState<DfgDataframeMeasure>("frequency");
   const [backend, setBackend] = useState<DfgDataframeBackend>("pandas");
@@ -229,6 +237,7 @@ export function DfgDataframe() {
   const active = dfgDataframeActiveOptions(operation, measure);
 
   const run = async () => {
+    if (!dfgDataframeRunnable(available, mining, busy)) return;
     setError(null);
     setBusy(true);
     try {
@@ -342,7 +351,8 @@ export function DfgDataframe() {
         <label className="filters-field"><span>Pair options</span>{active.partial && <label className="checkbox-field"><input type="checkbox" checked={keepFirstFollowing} onChange={(event) => setKeepFirstFollowing(event.target.checked)} /> keep first following pair</label>}{active.concurrent && <label className="checkbox-field"><input type="checkbox" checked={strict} onChange={(event) => setStrict(event.target.checked)} /> strict overlap</label>}</label>
       </div>
       <div className="dfg-dataframe-actions">
-        <button type="button" className="button" disabled={busy} onClick={() => void run()}>{busy ? "Running…" : "Run dataframe DFG"}</button>
+        <button type="button" className="button" disabled={!dfgDataframeRunnable(available, mining, busy)} onClick={() => void run()}>{busy ? "Running…" : "Run dataframe DFG"}</button>
+        {!available && <p className="panel-meta dfg-dataframe-hint">{DFG_DATAFRAME_UNAVAILABLE_HINT}</p>}
         {error && <p className="error-banner" role="alert">{error}</p>}
       </div>
       {result && <Result result={result} />}
