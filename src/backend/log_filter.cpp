@@ -139,19 +139,17 @@ double parse_time_bound(const std::string& text, double unbounded) {
 
 // The smallest and largest parsed instant in a trace, or nullopt when no event
 // carries a recognizable timestamp.
-std::optional<std::pair<double, double>> trace_time_span(const Trace& trace) {
-  std::optional<std::pair<double, double>> span;
-  for (const auto& event : trace.events) {
-    const auto instant = parse_timestamp(event.timestamp);
-    if (!instant) continue;
-    if (!span) {
-      span = {*instant, *instant};
-    } else {
-      span->first = std::min(span->first, *instant);
-      span->second = std::max(span->second, *instant);
-    }
-  }
-  return span;
+// The timestamps of a trace's first and last events by position, as the
+// reference's is_contained/is_intersecting read trace[0] and trace[-1]; a trace
+// out of time order is therefore not re-spanned by its minimum and maximum.
+// An empty trace, or one whose endpoint events are untimed, has no endpoints.
+std::optional<std::pair<double, double>> trace_endpoint_times(
+    const Trace& trace) {
+  if (trace.events.empty()) return std::nullopt;
+  const auto first = parse_timestamp(trace.events.front().timestamp);
+  const auto last = parse_timestamp(trace.events.back().timestamp);
+  if (!first || !last) return std::nullopt;
+  return std::pair<double, double>{*first, *last};
 }
 
 // The subtraces of `trace` that run from an occurrence of `start` to the next
@@ -960,6 +958,13 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       attribute.active() && options.attribute_mode == AttributeFilterMode::events
           ? &attribute
           : nullptr;
+  // Event projections drop the traces they leave empty, as the reference's
+  // projections do (`len(trace) > 0`); a trace that was empty on input is kept
+  // when no projection is active, so case-size and variant filters see it.
+  const bool event_projection_active =
+      !keep.empty() || !remove.empty() || !keep_res.empty() ||
+      !remove_res.empty() || !keep_life.empty() || !remove_life.empty() ||
+      event_attribute != nullptr;
 
   if (options.numeric_attribute)
     validate_numeric_attribute_options(*options.numeric_attribute);
@@ -1086,15 +1091,21 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
           break;
         }
         case TimeFilterMode::traces_contained: {
-          const auto span = trace_time_span(trace);
+          const auto span = trace_endpoint_times(trace);
           if (!span || span->first < time_from || span->second > time_to) {
             continue;
           }
           break;
         }
         case TimeFilterMode::traces_intersecting: {
-          const auto span = trace_time_span(trace);
-          if (!span || span->second < time_from || span->first > time_to) {
+          const auto span = trace_endpoint_times(trace);
+          const auto within = [&](double instant) {
+            return time_from <= instant && instant <= time_to;
+          };
+          if (!span ||
+              !(within(span->first) || within(span->second) ||
+                (span->first <= time_from && time_from <= span->second) ||
+                (span->first <= time_to && time_to <= span->second))) {
             continue;
           }
           break;
@@ -1153,7 +1164,9 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     Trace projected = project_events(*source, keep, remove, keep_res,
                                      remove_res, keep_life, remove_life,
                                      event_attribute);
-    if (projected.events.empty() && options.admitted_variants.empty()) continue;
+    if (projected.events.empty() && options.admitted_variants.empty() &&
+        (event_projection_active || !trace.events.empty()))
+      continue;
 
     if (!options.admitted_variants.empty()) {
       const bool found = trace_matches_admitted_variant(
@@ -1234,11 +1247,15 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       if (options.min_length != 0 && length < options.min_length) continue;
       if (options.max_length != 0 && length > options.max_length) continue;
 
+      // Either polarity of an endpoint filter drops an empty trace, as the
+      // reference's `if trace and ...` does.
       if (!starts.empty()) {
+        if (piece.events.empty()) continue;
         const bool found = starts.find(piece.events.front().activity) != starts.end();
         if (found != options.start_activities_positive) continue;
       }
       if (!ends.empty()) {
+        if (piece.events.empty()) continue;
         const bool found = ends.find(piece.events.back().activity) != ends.end();
         if (found != options.end_activities_positive) continue;
       }
@@ -1304,18 +1321,28 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   // are allowed. A variant must satisfy every active constraint: frequency,
   // rank, and membership in the cumulative-coverage prefix.
   std::unordered_map<std::string, std::uint64_t> counts;
-  std::vector<std::string> order;  // first-seen order, for deterministic ranking
+  std::unordered_map<std::string, std::vector<std::string>> sequences;
+  std::vector<std::string> order;  // first-seen order
   for (const auto& trace : kept) {
     auto key = variant_key(trace);
-    if (counts.emplace(key, 0).second) order.push_back(key);
+    if (counts.emplace(key, 0).second) {
+      order.push_back(key);
+      auto& sequence = sequences[key];
+      for (const auto& event : trace.events) sequence.push_back(event.activity);
+    }
     ++counts[key];
   }
 
   if (by_rank || by_coverage || by_percentage) {
-    std::stable_sort(order.begin(), order.end(),
-                     [&](const std::string& a, const std::string& b) {
-                       return counts[a] > counts[b];
-                     });
+    // The reference ranks by (count, activity tuple) descending
+    // (get_variants_sorted_by_count), so equal counts go to the
+    // lexicographically greater variant; UTF-8 byte order is code-point order.
+    std::sort(order.begin(), order.end(),
+              [&](const std::string& a, const std::string& b) {
+                const auto count_a = counts[a], count_b = counts[b];
+                if (count_a != count_b) return count_a > count_b;
+                return sequences[b] < sequences[a];
+              });
   }
 
   // Coverage prefix: the most frequent variants until together they reach the

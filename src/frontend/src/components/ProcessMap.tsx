@@ -261,6 +261,11 @@ export function ProcessMap({
 
 export function variantHighlight(steps: number[]): Highlight {
   const edges = new Set<string>();
+  // The empty variant (cases without events) runs straight from start to end.
+  if (steps.length === 0) {
+    edges.add(edgeKey(START, END));
+    return { edges, nodes: new Set<number>() };
+  }
   edges.add(edgeKey(START, steps[0]));
   for (let i = 1; i < steps.length; ++i) {
     edges.add(edgeKey(steps[i - 1], steps[i]));

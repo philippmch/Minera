@@ -2277,10 +2277,32 @@ void write_decisions(std::ostream& out, const DecisionMiningResult& decisions) {
   out << "]}";
 }
 
+// Shortest round-trip seconds: the stream default of six significant digits
+// would round any duration above about 11.6 days (1e6 seconds). The plain
+// to_chars form picks the shorter of fixed and scientific, so whole seconds
+// stay integers (5184007, not 5.184007e+06).
+void write_duration_seconds(std::ostream& out, double value) {
+  if (!std::isfinite(value)) { out << "null"; return; }
+  if (value == 0) value = 0;  // no "-0" for a zero-length span
+  char text[64];
+  const auto converted = std::to_chars(text, text + sizeof(text), value);
+  if (converted.ec != std::errc{})
+    throw std::runtime_error("cannot format duration JSON number");
+  out.write(text, converted.ptr - text);
+}
+
 void write_duration_stats(std::ostream& out, const DurationStats& stats) {
-  out << "{\"count\": " << stats.count << ", \"total\": " << stats.total
-      << ", \"mean\": " << stats.mean << ", \"median\": " << stats.median
-      << ", \"min\": " << stats.min << ", \"max\": " << stats.max << '}';
+  out << "{\"count\": " << stats.count << ", \"total\": ";
+  write_duration_seconds(out, stats.total);
+  out << ", \"mean\": ";
+  write_duration_seconds(out, stats.mean);
+  out << ", \"median\": ";
+  write_duration_seconds(out, stats.median);
+  out << ", \"min\": ";
+  write_duration_seconds(out, stats.min);
+  out << ", \"max\": ";
+  write_duration_seconds(out, stats.max);
+  out << '}';
 }
 
 // The replay decoration of the embedded Petri net: transition and place
@@ -4524,26 +4546,44 @@ void write_analysis_json(std::ostream& out,
 
   // Sort an index permutation so any aligned per-variant data (durations) stays
   // matched to its variant after the most-frequent-first reordering.
+  // The graph skips empty traces, but they form a variant of their own (the
+  // reference's get_variants lists the empty tuple); it takes the index just
+  // past the graph's variants.
   const auto& variants = graph.variants();
-  std::vector<std::size_t> variant_order(variants.size());
+  const std::uint64_t empty_trace_count = static_cast<std::uint64_t>(
+      std::count_if(log.traces.begin(), log.traces.end(),
+                    [](const Trace& trace) { return trace.events.empty(); }));
+  const std::size_t empty_variant_index = variants.size();
+  const auto variant_count = [&](std::size_t idx) {
+    return idx == empty_variant_index ? empty_trace_count : variants[idx].count;
+  };
+  std::vector<std::size_t> variant_order(variants.size() +
+                                         (empty_trace_count > 0 ? 1 : 0));
   std::iota(variant_order.begin(), variant_order.end(), std::size_t{0});
   std::stable_sort(variant_order.begin(), variant_order.end(),
                    [&](std::size_t a, std::size_t b) {
-                     return variants[a].count > variants[b].count;
+                     return variant_count(a) > variant_count(b);
                    });
   out << "  \"variants\": [\n";
   for (std::size_t i = 0; i < variant_order.size(); ++i) {
     const auto idx = variant_order[i];
-    const auto& variant = variants[idx];
     out << "    {\"activities\": [";
-    for (std::size_t j = 0; j < variant.activities.size(); ++j) {
-      out << *graph.activity_id(variant.activities[j])
-          << (j + 1 < variant.activities.size() ? ", " : "");
+    if (idx != empty_variant_index) {
+      const auto& activities = variants[idx].activities;
+      for (std::size_t j = 0; j < activities.size(); ++j) {
+        out << *graph.activity_id(activities[j])
+            << (j + 1 < activities.size() ? ", " : "");
+      }
     }
-    out << "], \"count\": " << variant.count;
-    if (variant_durations != nullptr && idx < variant_durations->size()) {
-      out << ", \"duration\": ";
-      write_duration_stats(out, (*variant_durations)[idx]);
+    out << "], \"count\": " << variant_count(idx);
+    if (variant_durations != nullptr) {
+      if (idx == empty_variant_index) {
+        out << ", \"duration\": ";
+        write_duration_stats(out, DurationStats{});
+      } else if (idx < variant_durations->size()) {
+        out << ", \"duration\": ";
+        write_duration_stats(out, (*variant_durations)[idx]);
+      }
     }
     out << '}' << (i + 1 < variant_order.size() ? "," : "") << '\n';
   }
@@ -7227,9 +7267,10 @@ std::string case_statistics_json(const CaseStatisticsResult& result) {
   (void)case_statistics_sort_name(result.options.sort_by);
   for (const auto& entry : result.cases) {
     if (!std::isfinite(entry.start_time) || !std::isfinite(entry.end_time) ||
-        !std::isfinite(entry.case_duration) || entry.case_duration < 0.0) {
-      throw std::invalid_argument(
-          "case statistics values must be finite and non-negative");
+        !std::isfinite(entry.case_duration)) {
+      // A trace whose last event precedes its first has a negative duration,
+      // which the reference reports as is.
+      throw std::invalid_argument("case statistics values must be finite");
     }
   }
   std::ostringstream out;

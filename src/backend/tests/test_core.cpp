@@ -3441,6 +3441,154 @@ void filter_keeps_only_the_top_variant() {
           std::vector<std::string>{"a", "b"}));
 }
 
+// Regression tests whose expectations were captured from the reference
+// (pm4py 2.7.22) on the same inputs.
+minera::EventLog clock_log(
+    const std::vector<std::pair<std::string,
+                                std::vector<std::pair<std::string, std::string>>>>&
+        cases) {
+  minera::EventLog log;
+  for (const auto& [case_id, events] : cases) {
+    minera::Trace trace;
+    trace.case_id = case_id;
+    for (const auto& [activity, timestamp] : events) {
+      minera::Event event;
+      event.case_id = case_id;
+      event.activity = activity;
+      event.timestamp = timestamp;
+      trace.events.push_back(event);
+    }
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+std::vector<std::string> case_ids(const minera::EventLog& log) {
+  std::vector<std::string> ids;
+  for (const auto& trace : log.traces) ids.push_back(trace.case_id);
+  return ids;
+}
+
+// Three empty cases and four singleton variants (filter_variants_top_k,
+// filter_variants_by_coverage_percentage, filter_case_size and
+// filter_start_activities on this log).
+minera::EventLog empty_and_singleton_variants_log() {
+  return clock_log({{"e1", {}},
+                    {"e2", {}},
+                    {"e3", {}},
+                    {"f", {{"F", "2024-01-01T09:00:00Z"}}},
+                    {"ae", {{"A", "2024-01-01T09:00:00Z"},
+                            {"E", "2024-01-01T09:01:00Z"}}},
+                    {"d", {{"D", "2024-01-01T09:00:00Z"}}},
+                    {"ad", {{"A", "2024-01-01T09:00:00Z"},
+                            {"D", "2024-01-01T09:01:00Z"}}}});
+}
+
+void filter_top_variants_break_count_ties_by_descending_variant() {
+  // Reference: get_variants_sorted_by_count sorts (count, tuple) descending.
+  const auto tie = log_from_variants({{"A"}, {"B"}});
+  minera::LogFilterOptions options;
+  options.top_variants = 1;
+  assert((case_ids(minera::filter_event_log(tie, options)) ==
+          std::vector<std::string>{"1"}));
+
+  options.top_variants = 2;
+  assert((case_ids(minera::filter_event_log(empty_and_singleton_variants_log(),
+                                            options)) ==
+          std::vector<std::string>{"e1", "e2", "e3", "f"}));
+}
+
+void filters_keep_empty_traces_like_the_reference() {
+  const auto log = empty_and_singleton_variants_log();
+
+  minera::LogFilterOptions size;
+  size.max_length = 1;
+  assert((case_ids(minera::filter_event_log(log, size)) ==
+          std::vector<std::string>{"e1", "e2", "e3", "f", "d"}));
+
+  // The empty variant counts in the denominator and as a variant: 3/7 cases.
+  minera::LogFilterOptions coverage;
+  coverage.variant_min_coverage = 0.21;
+  assert((case_ids(minera::filter_event_log(log, coverage)) ==
+          std::vector<std::string>{"e1", "e2", "e3"}));
+
+  // Either endpoint polarity drops an empty case (`if trace and ...`).
+  minera::LogFilterOptions starts;
+  starts.start_activities = {"F"};
+  starts.start_activities_positive = false;
+  assert((case_ids(minera::filter_event_log(log, starts)) ==
+          std::vector<std::string>{"ae", "d", "ad"}));
+
+  // Event projections still drop the traces they leave (or find) empty.
+  minera::LogFilterOptions projection;
+  projection.keep_activities = {"A"};
+  assert((case_ids(minera::filter_event_log(log, projection)) ==
+          std::vector<std::string>{"ae", "ad"}));
+}
+
+void filter_time_range_trace_modes_read_endpoints_by_position() {
+  // "back" runs backwards in time (10:00 then 09:00).
+  const auto log = clock_log({{"back", {{"a", "2024-01-01T10:00:00Z"},
+                                        {"b", "2024-01-01T09:00:00Z"}}},
+                              {"fwd", {{"a", "2024-01-01T09:00:00Z"},
+                                       {"b", "2024-01-01T10:00:00Z"}}}});
+  minera::LogFilterOptions options;
+  options.time_from = "2024-01-01T09:30:00Z";
+  options.time_to = "2024-01-01T10:30:00Z";
+  options.time_mode = minera::TimeFilterMode::traces_contained;
+  assert((case_ids(minera::filter_event_log(log, options)) ==
+          std::vector<std::string>{"back"}));
+
+  options.time_to = "2024-01-01T09:45:00Z";
+  options.time_mode = minera::TimeFilterMode::traces_intersecting;
+  assert((case_ids(minera::filter_event_log(log, options)) ==
+          std::vector<std::string>{"fwd"}));
+}
+
+void performance_clamps_backwards_steps_and_keeps_precision() {
+  // Reference discover_performance_dfg: A->A {mean 1800, min 0, max 3600}.
+  const auto backwards = clock_log({{"1", {{"A", "2024-01-01T10:00:00Z"},
+                                           {"A", "2024-01-01T09:00:00Z"}}},
+                                    {"2", {{"A", "2024-01-01T10:00:00Z"},
+                                           {"A", "2024-01-01T11:00:00Z"}}}});
+  const auto graph = minera::discover_directly_follows_graph(backwards);
+  const auto perf = minera::compute_performance_metrics(backwards, graph);
+  assert(perf.edges.size() == 1);
+  assert(perf.edges[0].stats.count == 2);
+  assert(perf.edges[0].stats.mean == 1800.0);
+  assert(perf.edges[0].stats.min == 0.0);
+  assert(perf.case_duration.min == -3600.0);
+
+  // Durations above 1e6 seconds keep every digit in the export JSON.
+  const auto long_cases = clock_log({{"1", {{"A", "2024-01-01T00:00:00Z"},
+                                            {"B", "2024-03-01T00:00:07Z"}}},
+                                     {"2", {{"A", "2024-01-01T00:00:00Z"},
+                                            {"B", "2024-01-20T00:00:01Z"}}}});
+  const auto long_graph = minera::discover_directly_follows_graph(long_cases);
+  const auto long_perf =
+      minera::compute_performance_metrics(long_cases, long_graph);
+  const auto json = minera::analysis_json("t", long_cases, long_graph, nullptr,
+                                          nullptr, nullptr, nullptr, &long_perf);
+  assert(json.find("\"max\": 5184007") != std::string::npos);
+  assert(json.find("\"min\": 1641601") != std::string::npos);
+  assert(json.find("\"mean\": 3412804") != std::string::npos);
+}
+
+void export_variants_include_the_empty_variant() {
+  // Reference get_variants lists the empty tuple with its three cases first.
+  const auto log = empty_and_singleton_variants_log();
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto durations = minera::compute_variant_durations(log, graph);
+  const auto json = minera::analysis_json("t", log, graph, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          &durations);
+  const auto variants = json.find("\"variants\": [");
+  assert(variants != std::string::npos);
+  assert(json.find("{\"activities\": [], \"count\": 3, \"duration\": "
+                   "{\"count\": 0",
+                   variants) == json.find("{", variants));
+}
+
 void filter_keeps_variants_covering_a_share_of_cases() {
   // Variant counts 5 / 3 / 2 over 10 cases: half the cases are covered by the
   // top variant alone, 80% needs the second, and full coverage needs all.
@@ -4188,9 +4336,11 @@ void importer_rejects_malformed_rows() {
     const auto path = write_temp_log("case_id,activity\n1\n");
     (void)minera::import_csv_event_log(path);
   }));
-  // Empty activity value.
+  // A timestamp the reference conversion cannot read leaves its column
+  // untyped there, and every reference consumer rejects it.
   assert(throws([] {
-    const auto path = write_temp_log("case_id,activity\n1,\n");
+    const auto path = write_temp_log(
+        "case_id,activity,timestamp\n1,A,01/02/2024 10:00\n1,B,garbage\n");
     (void)minera::import_csv_event_log(path);
   }));
   // Unterminated quoted field.
@@ -7051,7 +7201,111 @@ void csv_case_aliases_are_opt_in_and_exact_columns_win() {
   assert(rejected);
 }
 
+
+// Reference flow: pandas.read_csv + pm4py.format_dataframe (PM4Py 2.7.22,
+// pandas 3.0.5). Rows with an NA case id or activity are dropped; textual
+// timestamps are parsed per cell like to_datetime(format="mixed", utc=True).
+void csv_import_matches_reference_dataframe_flow() {
+  const auto import = [](const std::string& text,
+                         minera::CsvImportOptions options = {}) {
+    std::istringstream input(text);
+    return minera::import_csv_event_data(input, options);
+  };
+  const auto activities = [](const minera::EventLog& log) {
+    std::vector<std::string> out;
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events) out.push_back(event.activity);
+    return out;
+  };
+  {
+    const auto data = import(
+        "case_id,activity,timestamp\n"
+        "1,A,2024-01-01 10:00\n1,,2024-01-01 11:00\n,X,2024-01-01 11:10\n"
+        "1,NA,2024-01-01 11:20\n1,null,2024-01-01 11:30\n"
+        "1,\"\",2024-01-01 11:40\nNone,Y,2024-01-01 11:50\n"
+        "1,B,2024-01-01 12:00\n");
+    assert((activities(data.log) == std::vector<std::string>{"A", "B"}));
+    assert(data.table.rows.size() == 2);
+    assert(data.log.traces[0].events[1].input_order == 1);
+  }
+  {
+    // Untrimmed whitespace is a value, as in pandas.
+    minera::CsvImportOptions options;
+    options.trim_fields = false;
+    const auto data = import("case_id,activity\n1,A\n1, \n", options);
+    assert((activities(data.log) == std::vector<std::string>{"A", " "}));
+  }
+  const auto stamps = [&](const std::string& rows) {
+    const auto data = import("case_id,activity,timestamp\n" + rows);
+    std::vector<std::string> out;
+    for (const auto& trace : data.log.traces)
+      for (const auto& event : trace.events) {
+        assert(minera::parse_timestamp(event.timestamp).has_value());
+        out.push_back(event.activity + "=" + event.timestamp);
+      }
+    return out;
+  };
+  using V = std::vector<std::string>;
+  // ISO cells keep their spelling.
+  assert((stamps("1,A,2024-01-02T10:00:00\n1,B,2024-01-02 11:00\n") ==
+          V{"A=2024-01-02T10:00:00", "B=2024-01-02 11:00"}));
+  // Month-first when ambiguous, day-first when the first number exceeds 12,
+  // decided per cell rather than from the first value.
+  assert((stamps("1,A,01/02/2024 10:00\n1,B,13/01/2024 11:00\n") ==
+          V{"A=2024-01-02 10:00:00", "B=2024-01-13 11:00:00"}));
+  assert((stamps("1,A,13/01/2024 10:00\n1,B,01/02/2024 11:00\n") ==
+          V{"B=2024-01-02 11:00:00", "A=2024-01-13 10:00:00"}));
+  assert((stamps("1,A,01.02.2024 10:00\n1,B,13.02.2024 11:00:05\n") ==
+          V{"A=2024-01-02 10:00:00", "B=2024-02-13 11:00:05"}));
+  assert((stamps("1,A,02-01-2024 10:00\n1,B,13-01-2024 11:00\n") ==
+          V{"B=2024-01-13 11:00:00", "A=2024-02-01 10:00:00"}));
+  assert((stamps("1,A,1/2/2024 10:00:00 PM\n1,B,1/3/2024 12:30 AM\n") ==
+          V{"A=2024-01-02 22:00:00", "B=2024-01-03 00:30:00"}));
+  assert((stamps("1,A,2024-01-02 10:00\n1,B,01/03/2024 11:00\n") ==
+          V{"A=2024-01-02 10:00", "B=2024-01-03 11:00:00"}));
+  assert((stamps("1,A,01/02/2024\n1,B,2024/01/03 11:00:00.25\n") ==
+          V{"A=2024-01-02 00:00:00", "B=2024-01-03 11:00:00.25"}));
+  assert((stamps("1,A,\"Jan 2, 2024 10:00 AM\"\n1,B,03-Jan-2024 10:00\n"
+                 "1,C,Thu 04 January 2024 10:00\n") ==
+          V{"A=2024-01-02 10:00:00", "B=2024-01-03 10:00:00",
+            "C=2024-01-04 10:00:00"}));
+  assert((stamps("1,A,01/02/2024 10:00 +02:00\n1,B,01/02/2024 09:00 UTC\n") ==
+          V{"A=2024-01-02 10:00:00+02:00", "B=2024-01-02 09:00:00+00:00"}));
+  {
+    // Durations follow from the parsed instants.
+    const auto data = import(
+        "case_id,activity,timestamp\n1,A,01/02/2024 10:00\n1,B,01/02/2024 11:30\n");
+    const auto& events = data.log.traces[0].events;
+    assert(*minera::parse_timestamp(events[1].timestamp) -
+               *minera::parse_timestamp(events[0].timestamp) == 5400.0);
+    assert(data.table.rows[0][2]->value == "2024-01-02 10:00:00");
+  }
+  // Blank/NA timestamps remain explicit missing values.
+  {
+    const auto data = import("case_id,activity,timestamp\n1,A,\n1,B,NaN\n");
+    for (const auto& event : data.log.traces[0].events) {
+      assert(event.timestamp.empty());
+      assert(event.timestamp_state == minera::FirstClassAttributeState::kMissing);
+    }
+  }
+  // Values the reference cannot convert (or that native parsing cannot
+  // reproduce exactly) fail loudly instead of yielding zero durations.
+  for (const std::string bad :
+       {"garbage", "01/02/2024 13:00 PM", "01/02/2024 24:00", "13/13/2024 10:00",
+        "02/30/2024 10:00", "2024/13/01 10:00", "01/02/2024 10.30",
+        "01/02/2024 10:00 EST", "1704103200", "10:00"}) {
+    bool rejected = false;
+    try {
+      (void)import("case_id,activity,timestamp\n1,A,2024-01-01 10:00\n1,B," + bad + "\n");
+    } catch (const std::runtime_error& error) {
+      rejected = std::string(error.what()).find("cannot be parsed") != std::string::npos;
+    }
+    assert(rejected);
+  }
+}
+
 int main() {
+  csv_import_matches_reference_dataframe_flow();
   exact_mean_matches_python_statistics_goldens();
   exact_stdev_matches_python_statistics_goldens();
   csv_case_aliases_are_opt_in_and_exact_columns_win();
@@ -7183,6 +7437,11 @@ int main() {
   filter_keeps_frequent_variants();
   filter_keeps_only_the_top_variant();
   filter_keeps_variants_covering_a_share_of_cases();
+  filter_top_variants_break_count_ties_by_descending_variant();
+  filters_keep_empty_traces_like_the_reference();
+  filter_time_range_trace_modes_read_endpoints_by_position();
+  performance_clamps_backwards_steps_and_keeps_precision();
+  export_variants_include_the_empty_variant();
   filter_supports_variant_percentage_and_endpoint_polarity();
   filter_selects_cases_by_succession();
   filter_matches_trace_patterns();

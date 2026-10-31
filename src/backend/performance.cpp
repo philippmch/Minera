@@ -87,11 +87,11 @@ PerformanceMetrics compute_performance_metrics(
         last = *instant;
 
         if (previous) {
-          const double duration = *instant - *previous;
-          if (duration >= 0.0) {
-            edge_durations[edge_key(previous_activity, *activity)].push_back(
-                duration);
-          }
+          // Like the reference performance DFG, a backwards step (the trace is
+          // not sorted by time) counts as a zero-second gap, max(0, delta).
+          const double duration = std::max(0.0, *instant - *previous);
+          edge_durations[edge_key(previous_activity, *activity)].push_back(
+              duration);
         }
         previous = *instant;
         previous_activity = *activity;
