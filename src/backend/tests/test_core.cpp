@@ -7280,13 +7280,25 @@ void csv_import_matches_reference_dataframe_flow() {
                *minera::parse_timestamp(events[0].timestamp) == 5400.0);
     assert(data.table.rows[0][2]->value == "2024-01-02 10:00:00");
   }
-  // Blank/NA timestamps remain explicit missing values.
+  // Blank/NA timestamps in a date column remain explicit missing values.
   {
-    const auto data = import("case_id,activity,timestamp\n1,A,\n1,B,NaN\n");
+    const auto data = import(
+        "case_id,activity,timestamp\n1,A,\n1,B,NaN\n1,C,01/02/2024 10:00\n");
+    std::size_t missing = 0;
     for (const auto& event : data.log.traces[0].events) {
+      if (event.activity == "C") continue;
       assert(event.timestamp.empty());
       assert(event.timestamp_state == minera::FirstClassAttributeState::kMissing);
+      ++missing;
     }
+    assert(missing == 2);
+    assert(data.table.rows[1][2]->value.empty());
+  }
+  // A column without any date keeps its opaque text (native contract).
+  {
+    const auto data = import("case_id,activity,timestamp\n1,A,t1\n1,B,NaN\n");
+    for (const auto& event : data.log.traces[0].events)
+      assert(event.timestamp == (event.activity == "A" ? "t1" : "NaN"));
   }
   // Values the reference cannot convert (or that native parsing cannot
   // reproduce exactly) fail loudly instead of yielding zero durations.

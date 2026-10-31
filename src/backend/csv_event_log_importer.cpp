@@ -1,6 +1,9 @@
 #include "minera/csv_event_log_importer.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <cstdio>
 #include <fstream>
 #include <optional>
 #include <stdexcept>
@@ -9,6 +12,8 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
@@ -147,6 +152,285 @@ std::string field_at(
   return fields[index];
 }
 
+// pandas.read_csv's default NA spellings. The reference flow (read_csv, then
+// format_dataframe) drops every row whose case id, activity or timestamp is
+// NA, so these exact cell texts mark a missing first-class value. Whitespace
+// is not NA in pandas.
+bool is_reference_na_token(std::string_view value) {
+  static constexpr std::string_view kTokens[] = {
+      "",     "#N/A", "#N/A N/A", "#NA",  "-1.#IND", "-1.#QNAN", "-NaN",
+      "-nan", "1.#IND", "1.#QNAN", "<NA>", "N/A",     "NA",       "NULL",
+      "NaN",  "None", "n/a",      "nan",  "null"};
+  return std::find(std::begin(kTokens), std::end(kTokens), value) !=
+         std::end(kTokens);
+}
+
+// --- Reference timestamp inference -----------------------------------------
+// PM4Py 2.7.22's format_dataframe converts a textual timestamp column the way
+// pandas' to_datetime(format="mixed", utc=True) does: every cell is parsed on
+// its own (no format is inferred from the first value), month-first when the
+// leading two date numbers are ambiguous and day-first when the first exceeds
+// 12, naive values read as UTC. If any cell cannot be parsed the column stays
+// textual and every reference consumer then rejects the frame, so the native
+// importer rejects a column that mixes dates with unconvertible cells instead
+// of keeping uninterpretable text (see the column rule after the row scan).
+// ISO-8601 cells the native parser already reads keep their spelling; other
+// recognized shapes are rewritten to ISO. Shapes outside the grammar below
+// (time-only cells, partial dates, named zones other than UTC/GMT, epoch
+// numbers) count as unconvertible.
+
+struct TimestampTokens {
+  std::string_view text;
+  std::size_t pos = 0;
+  void skip_spaces() {
+    while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t')) ++pos;
+  }
+  bool done() const { return pos >= text.size(); }
+  char peek() const { return done() ? '\0' : text[pos]; }
+  // Reads 1..max_digits ASCII digits; returns the count read (0 if none).
+  std::size_t digits(unsigned& value, std::size_t max_digits) {
+    std::size_t count = 0;
+    value = 0;
+    while (!done() && count < max_digits && text[pos] >= '0' && text[pos] <= '9') {
+      value = value * 10 + static_cast<unsigned>(text[pos] - '0');
+      ++pos;
+      ++count;
+    }
+    // A longer digit run than allowed is not this field.
+    if (count == max_digits && !done() && text[pos] >= '0' && text[pos] <= '9')
+      return 0;
+    return count;
+  }
+  std::string word() {
+    std::string out;
+    while (!done() && std::isalpha(static_cast<unsigned char>(text[pos]))) {
+      out.push_back(static_cast<char>(
+          std::tolower(static_cast<unsigned char>(text[pos]))));
+      ++pos;
+    }
+    return out;
+  }
+};
+
+int month_from_name(const std::string& word) {
+  static constexpr std::string_view kMonths[] = {
+      "january", "february", "march",     "april",   "may",      "june",
+      "july",    "august",   "september", "october", "november", "december"};
+  if (word.size() < 3) return 0;
+  for (int i = 0; i < 12; ++i) {
+    const auto name = kMonths[i];
+    if (word == name || (word == name.substr(0, 3)) ||
+        (i == 8 && word == "sept"))
+      return i + 1;
+  }
+  return 0;
+}
+
+bool is_weekday_name(const std::string& word) {
+  static constexpr std::string_view kDays[] = {
+      "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+      "sunday"};
+  if (word.size() < 3) return false;
+  for (const auto day : kDays)
+    if (word == day || word == day.substr(0, 3)) return true;
+  return false;
+}
+
+bool leap_year(int year) {
+  return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+}
+
+int month_days(int year, int month) {
+  static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  return month == 2 && leap_year(year) ? 29 : kDays[month - 1];
+}
+
+// dateutil maps a two-digit year into the century window centred on the
+// current year.
+int expand_two_digit_year(unsigned year) {
+  const auto now = std::chrono::system_clock::now();
+  const auto today = std::chrono::year_month_day(
+      std::chrono::floor<std::chrono::days>(now));
+  const int current = static_cast<int>(today.year());
+  int expanded = static_cast<int>(year) + current / 100 * 100;
+  if (expanded >= current + 50) expanded -= 100;
+  else if (expanded < current - 50) expanded += 100;
+  return expanded;
+}
+
+std::optional<std::string> normalize_reference_timestamp(std::string_view text) {
+  TimestampTokens in{text};
+  in.skip_spaces();
+  int year = 0, month = 0, day = 0;
+
+  // Optional leading weekday name ("Tue 01/02/2024", "Tuesday, Jan 2 2024").
+  if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
+    const auto saved = in.pos;
+    const auto name = in.word();
+    if (is_weekday_name(name)) {
+      if (in.peek() == ',') ++in.pos;
+      in.skip_spaces();
+    } else {
+      in.pos = saved;
+    }
+  }
+
+  const auto date_separator = [](char ch) {
+    return ch == '/' || ch == '-' || ch == '.' || ch == ' ';
+  };
+  if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
+    // Mon D[,] YYYY
+    month = month_from_name(in.word());
+    if (month == 0) return std::nullopt;
+    if (!date_separator(in.peek())) return std::nullopt;
+    ++in.pos;
+    in.skip_spaces();
+    unsigned d = 0, y = 0;
+    if (in.digits(d, 2) == 0) return std::nullopt;
+    if (in.peek() == ',') ++in.pos;
+    if (!date_separator(in.peek())) return std::nullopt;
+    ++in.pos;
+    in.skip_spaces();
+    const auto year_digits = in.digits(y, 4);
+    if (year_digits == 4) year = static_cast<int>(y);
+    else if (year_digits == 2) year = expand_two_digit_year(y);
+    else return std::nullopt;
+    day = static_cast<int>(d);
+  } else {
+    unsigned first = 0;
+    const auto first_digits = in.digits(first, 4);
+    if (first_digits == 0 || first_digits == 3) return std::nullopt;
+    const char sep = in.peek();
+    if (!date_separator(sep)) return std::nullopt;
+    ++in.pos;
+    if (first_digits == 4) {
+      // YYYY-M-D in any of the separators.
+      unsigned m = 0, d = 0;
+      if (in.digits(m, 2) == 0 || in.peek() != sep) return std::nullopt;
+      ++in.pos;
+      if (in.digits(d, 2) == 0) return std::nullopt;
+      year = static_cast<int>(first);
+      month = static_cast<int>(m);
+      day = static_cast<int>(d);
+    } else if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
+      // D Mon YYYY / D-Mon-YYYY
+      month = month_from_name(in.word());
+      if (month == 0 || in.peek() != sep) return std::nullopt;
+      ++in.pos;
+      unsigned y = 0;
+      const auto year_digits = in.digits(y, 4);
+      if (year_digits == 4) year = static_cast<int>(y);
+      else if (year_digits == 2) year = expand_two_digit_year(y);
+      else return std::nullopt;
+      day = static_cast<int>(first);
+    } else {
+      // A/B/YYYY: month-first unless the first number cannot be a month.
+      unsigned second = 0, y = 0;
+      if (in.digits(second, 2) == 0 || in.peek() != sep) return std::nullopt;
+      ++in.pos;
+      const auto year_digits = in.digits(y, 4);
+      if (year_digits == 4) year = static_cast<int>(y);
+      else if (year_digits == 2) year = expand_two_digit_year(y);
+      else return std::nullopt;
+      if (first > 12 && second <= 12) {
+        day = static_cast<int>(first);
+        month = static_cast<int>(second);
+      } else {
+        month = static_cast<int>(first);
+        day = static_cast<int>(second);
+      }
+    }
+  }
+  if (year < 1 || month < 1 || month > 12 || day < 1 ||
+      day > month_days(year, month))
+    return std::nullopt;
+
+  int hour = 0, minute = 0, second = 0;
+  std::string fraction;
+  std::string offset;
+  if (!in.done()) {
+    if (in.peek() != ' ' && in.peek() != 'T' && in.peek() != 't')
+      return std::nullopt;
+    ++in.pos;
+    in.skip_spaces();
+    unsigned h = 0, m = 0, s = 0;
+    if (in.digits(h, 2) == 0) return std::nullopt;
+    if (in.peek() == ':') {
+      ++in.pos;
+      if (in.digits(m, 2) != 2) return std::nullopt;
+      if (in.peek() == ':') {
+        ++in.pos;
+        if (in.digits(s, 2) != 2) return std::nullopt;
+        if (in.peek() == '.' || in.peek() == ',') {
+          ++in.pos;
+          while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) {
+            if (fraction.size() < 9) fraction.push_back(in.peek());
+            ++in.pos;
+          }
+          if (fraction.empty()) return std::nullopt;
+        }
+      }
+    }
+    in.skip_spaces();
+    if (in.peek() == 'a' || in.peek() == 'A' || in.peek() == 'p' ||
+        in.peek() == 'P') {
+      const auto saved = in.pos;
+      const auto meridiem = in.word();
+      if (meridiem == "am" || meridiem == "pm") {
+        if (h < 1 || h > 12) return std::nullopt;
+        if (meridiem == "am" && h == 12) h = 0;
+        else if (meridiem == "pm" && h != 12) h += 12;
+      } else {
+        in.pos = saved;
+      }
+      in.skip_spaces();
+    }
+    if (h > 23 || m > 59 || s > 59) return std::nullopt;
+    hour = static_cast<int>(h);
+    minute = static_cast<int>(m);
+    second = static_cast<int>(s);
+    if (!in.done()) {
+      const char ch = in.peek();
+      if (ch == 'Z' || ch == 'z') {
+        ++in.pos;
+        offset = "+00:00";
+      } else if (ch == '+' || ch == '-') {
+        ++in.pos;
+        unsigned oh = 0, om = 0;
+        if (in.digits(oh, 2) != 2) return std::nullopt;
+        if (in.peek() == ':') ++in.pos;
+        if (!in.done() && in.digits(om, 2) != 2) return std::nullopt;
+        if (oh > 23 || om > 59) return std::nullopt;
+        char buffer[8];
+        std::snprintf(buffer, sizeof(buffer), "%c%02u:%02u", ch, oh, om);
+        offset = buffer;
+      } else {
+        const auto zone = in.word();
+        if (zone != "utc" && zone != "gmt") return std::nullopt;
+        offset = "+00:00";
+      }
+      in.skip_spaces();
+    }
+  }
+  if (!in.done()) return std::nullopt;
+
+  char buffer[40];
+  std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d", year,
+                month, day, hour, minute, second);
+  std::string out = buffer;
+  if (!fraction.empty()) out += "." + fraction;
+  return out + offset;
+}
+
+// Returns the timestamp text to store for a present CSV cell, or nullopt when
+// the reference conversion would fail for it.
+std::optional<std::string> reference_timestamp_text(const std::string& value) {
+  if (parse_timestamp_exact(value)) return value;
+  auto normalized = normalize_reference_timestamp(value);
+  if (normalized && parse_timestamp_exact(*normalized)) return normalized;
+  return std::nullopt;
+}
+
 }  // namespace
 
 namespace {
@@ -236,6 +520,11 @@ CsvEventData import_csv_event_data_impl(
 
   std::size_t line_number = 1;
   std::size_t input_order = 0;
+  // Reference-converted timestamp text per kept row (input_order): an empty
+  // string for an NA cell, nullopt for a cell the conversion rejects.
+  std::vector<std::optional<std::string>> timestamp_texts;
+  std::size_t parsed_timestamps = 0;
+  std::optional<std::pair<std::size_t, std::string>> first_bad_timestamp;
   while (read_csv_record(input, line)) {
     ++line_number;
     if (line.empty()) {
@@ -252,13 +541,24 @@ CsvEventData import_csv_event_data_impl(
                         ? field_at(fields, *resource_index, line_number)
                         : std::string{};
 
-    if (case_id.empty()) {
-      throw std::runtime_error(
-          "CSV row " + std::to_string(line_number) + " has an empty case id");
+    // The reference flow drops rows whose case id or activity is NA (an
+    // empty cell or a pandas NA spelling); whitespace-only text is a value
+    // there, but the default trim_fields option has already blanked it here.
+    if (is_reference_na_token(case_id) || is_reference_na_token(activity)) {
+      continue;
     }
-    if (activity.empty()) {
-      throw std::runtime_error(
-          "CSV row " + std::to_string(line_number) + " has an empty activity");
+    if (timestamp_index) {
+      // Decided per column after the scan; see apply below.
+      if (is_reference_na_token(timestamp)) {
+        timestamp_texts.emplace_back(std::string{});
+      } else if (auto parsed = reference_timestamp_text(timestamp)) {
+        timestamp_texts.push_back(std::move(parsed));
+        ++parsed_timestamps;
+      } else {
+        timestamp_texts.emplace_back(std::nullopt);
+        if (!first_bad_timestamp)
+          first_bad_timestamp = std::make_pair(line_number, timestamp);
+      }
     }
 
     auto [it, inserted] = trace_ids.emplace(case_id, log.traces.size());
@@ -353,6 +653,38 @@ CsvEventData import_csv_event_data_impl(
       table.rows.push_back(std::move(table_row));
     }
     log.traces[it->second].events.push_back(std::move(event));
+  }
+
+  // A column the reference converts (every non-NA cell parses) is stored in
+  // its converted spelling. A column mixing dates with unconvertible text is
+  // rejected: the reference leaves it textual and its consumers then reject
+  // the frame, and keeping it would silently yield untimed events. A column
+  // with no date at all keeps its opaque text, the established native
+  // contract for non-temporal timestamp selectors.
+  if (timestamp_index && parsed_timestamps > 0) {
+    if (first_bad_timestamp) {
+      throw std::runtime_error(
+          "CSV row " + std::to_string(first_bad_timestamp->first) +
+          " has a timestamp '" + first_bad_timestamp->second +
+          "' in column '" + header[*timestamp_index] +
+          "' that cannot be parsed as a date/time");
+    }
+    for (auto& trace : log.traces) {
+      for (auto& event : trace.events) {
+        const auto& text = *timestamp_texts[event.input_order];
+        event.timestamp = text;
+        if (text.empty())
+          event.timestamp_state = FirstClassAttributeState::kMissing;
+        if (preserve_table) {
+          auto& cell = table.rows[event.input_order][*timestamp_index];
+          if (cell) {
+            cell->value = text;
+            if (text.empty())
+              cell->first_class_state = FirstClassAttributeState::kMissing;
+          }
+        }
+      }
+    }
   }
 
   if (timestamp_index) {

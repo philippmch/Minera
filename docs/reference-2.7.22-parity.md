@@ -3035,6 +3035,27 @@ extension dtype, timestamp parser format, non-string label, or Python exception
 identity. The generated rejection checks require native rejection, not Python
 runtime exception classes. CSV and mixed XES adapters remain separate work.
 
+The native CSV event importer follows the reference `pandas.read_csv` +
+`pm4py.format_dataframe` flow for the first-class columns. Rows whose case id
+or activity is an empty cell or a pandas default NA spelling (`NA`, `null`,
+`None`, `NaN`, `n/a`, ...) are dropped rather than rejected; whitespace is a
+value only with `trim_fields=false`. Textual timestamps are converted per cell
+as `to_datetime(format="mixed", utc=True)` does in 2.7.22: no format is
+inferred from the first value, ambiguous `A/B/YYYY`, `A.B.YYYY` and
+`A-B-YYYY` dates are month-first and day-first only when the first number
+exceeds 12; `YYYY/M/D`, English month names, leading weekdays, two-digit years
+(dateutil's current-century window), optional seconds/fractions (`.` or `,`),
+12-hour `AM/PM`, `T` separators and `Z`/`UTC`/`GMT`/numeric offsets are
+accepted. ISO cells keep their spelling; other accepted cells are rewritten to
+ISO in both the log and the preserved table. When a column has dates, a cell
+the reference leaves unconverted (one bad cell keeps the whole column textual,
+which every reference consumer then rejects) or a shape outside that grammar
+(time-only, partial dates, named zones, epoch numbers) is a native import error
+instead of a zero-duration timestamp. Retained native deviations: a column with
+no convertible cell keeps its opaque text (non-temporal timestamp selectors),
+and blank/NA timestamp cells stay explicit missing values where the reference
+drops those rows.
+
 The checkpoint additionally covers sequential cross-canonical selector aliases,
 categorical source aliases, numeric sorting, and mixed microsecond/nanosecond
 string columns. Object-typed numeric timestamps within the observed signed
