@@ -16,7 +16,14 @@
 //   pnml-cases.tsv.gz    PNML transitions with toolspecific elements of many
 //                        tools, tags and namespaces and stochastic properties
 //                        of every key, distribution type and parameter text,
-//                        imported with and without the stochastic map (O3, O4)
+//                        imported with and without the stochastic map (O3, O4),
+//                        and the reviewer's models whose saved captures their
+//                        harness made ambiguous, captured again
+//   reviewer-pnml.tsv.gz the reviewer's PNML captures with their saved public
+//                        results, read as their CLI comparison reads an
+//                        import: transition labels in order and [weight,
+//                        priority] per map record (O3, O4); the reviewer's
+//                        100 grouping tables are in filter-cases.tsv.gz
 //
 // The harness for filter cases is the one of test_recheck_d5b33ef.cpp.
 
@@ -54,6 +61,7 @@ using namespace minera;
 namespace {
 constexpr std::size_t FILTER_CASES = 13000;
 constexpr std::size_t PNML_CASES = 3000;
+constexpr std::size_t REVIEWER_PNML_CASES = 75;
 int failures = 0;
 std::filesystem::path root;
 void check(bool ok, const std::string& name) {
@@ -469,6 +477,57 @@ void pnml_cases() {
   check(count >= PNML_CASES, "PNML case table read " + std::to_string(count));
 }
 
+// An import as the reviewer's comparison reads it: the labels in transition
+// order and [weight, priority] per map record, [] when a requested map was
+// not built and null without the map.
+std::string reviewer_import(const PnmlDocument& document, bool stochastic) {
+  std::vector<std::string> labels;
+  for (const auto& transition : document.net.transitions())
+    labels.push_back(transition.activity ? json_string(document.net.activities()[*transition.activity]) : "null");
+  std::string properties = "null";
+  if (stochastic) {
+    std::vector<std::string> records;
+    if (document.stochastic_map)
+      for (const auto& record : document.stochastic_map->transitions)
+        records.push_back("[" + filtering_float_repr(record.activation_weight) + "," + std::to_string(record.priority) + "]");
+    properties = json_list(records);
+  }
+  return "OK " + json_list(labels) + " " + properties;
+}
+
+// Declared: priorities outside the native int range are a native policy
+// error, and digits Unicode added after version 14 (the native tables) do
+// not convert natively.
+bool declared(const std::string& qualification, const std::string& message) {
+  if (qualification == "priority-range") return policy_error(message);
+  if (qualification == "unicode14")
+    return message.starts_with("could not convert string to float: ") ||
+           message.starts_with("invalid literal for int() with base 10: ");
+  return false;
+}
+
+void reviewer_pnml_cases() {
+  std::size_t count = 0;
+  for (const auto& line : gz_lines("reviewer-pnml.tsv.gz")) {
+    const auto fields = split_tabs(line);
+    const auto name = "reviewer pnml " + fields.at(0);
+    const bool stochastic = fields.at(2) == "1";
+    const auto& expected = fields.at(3);
+    PnmlImportOptions options;
+    options.import_stochastic_map = stochastic;
+    try {
+      const auto actual = reviewer_import(parse_pnml_document(unhex(fields.at(1)), options), stochastic);
+      same(actual, expected, name);
+    } catch (const std::exception& error) {
+      const std::string message = error.what();
+      if (expected.starts_with("DECLARED ")) check(declared(expected.substr(9), message), name + ": " + message);
+      else same("ERR " + message, expected, name);
+    }
+    ++count;
+  }
+  check(count >= REVIEWER_PNML_CASES, "reviewer PNML case table read " + std::to_string(count));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -479,6 +538,7 @@ int main(int argc, char** argv) {
   root = argv[1];
   filter_cases();
   pnml_cases();
+  reviewer_pnml_cases();
   if (failures) {
     std::cerr << failures << " recheck 7270a1f cases failed\n";
     return 1;

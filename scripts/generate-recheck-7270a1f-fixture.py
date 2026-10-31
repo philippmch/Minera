@@ -3,9 +3,18 @@
 
 Usage: generate-recheck-7270a1f-fixture.py OUT_DIR
            [--filters CASES RESULTS]... [--pnml CASES RESULTS]...
+           [--reviewer EVIDENCE_DIR]
 
 Case sets and their public PM4Py 2.7.22 results come from
-scripts/capture-recheck-7270a1f-reference.py. Writes:
+scripts/capture-recheck-7270a1f-reference.py. --reviewer adds the reviewer's
+cases from the evidence directory of the recheck (minera-recheck-7270a1f/)
+with their saved public results: the 100 grouping tables of
+filtering-statistics/a7270-cases.json to filter-cases.tsv.gz, and the PNML
+captures of discovery-conformance/p7*-pnml-properties-reference.jsonl to
+reviewer-pnml.tsv.gz, except the captures that
+excluded-coercion-captures.json lists (the reviewer's harness converted a
+None getter result itself; capture those models with the `pnml` command and
+pass them with --pnml instead). Writes:
 
   filter-cases.tsv.gz  filter cases (consecutive activity/case grouping, then
                        the typed-column cases) in the token format of
@@ -21,6 +30,13 @@ scripts/capture-recheck-7270a1f-reference.py. Writes:
                        [id, distribution, timing, p1, p2, p3, weight,
                        priority] per transition sorted by id, numbers as
                        Python repr text
+
+  reviewer-pnml.tsv.gz the reviewer's PNML captures: id, the model (hex), 1 or
+                       0 for the stochastic map, and "ERR <message>", "OK
+                       <labels> <properties>" (labels in transition order,
+                       properties [weight, priority] per map record, [] with
+                       the map requested but none built, null without it) or
+                       "DECLARED <qualification>"
 
 POLICY marks the declared native policy: a native stochastic map holds finite
 numbers, finite non-negative activation weights and int priorities, where
@@ -45,7 +61,8 @@ def write_gz(path, lines):
 
 
 def read_jsonl(path):
-    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    # Split on newlines only: str.splitlines() also splits on Unicode line breaks inside JSON strings.
+    return [json.loads(line) for line in Path(path).read_text(encoding='utf-8').split('\n') if line.strip()]
 
 
 # ---------------------------------------------------------------- PNML
@@ -109,14 +126,46 @@ def pnml_expected(result, stochastic):
     return text + ' [' + ','.join(records) + ']'
 
 
+# The reviewer's cases name the key dtypes case_dtype and activity_dtype.
+def reviewer_filter_cases(evidence):
+    cases = json.loads((evidence / 'filtering-statistics/a7270-cases.json').read_text())
+    for case in cases:
+        case['cdtype'] = case.pop('case_dtype')
+        case['adtype'] = case.pop('activity_dtype')
+    return cases
+
+
+def reviewer_pnml_lines(evidence):
+    folder = evidence / 'discovery-conformance'
+    excluded = {c['case'] for c in json.loads((folder / 'excluded-coercion-captures.json').read_text())}
+    lines = []
+    for name in ['p7', 'p7b', 'p7c', 'p7d']:
+        for record in read_jsonl(folder / f'{name}-pnml-properties-reference.jsonl'):
+            if record['case'] in excluded: continue
+            model = (folder / Path(record['model']).name).read_text(encoding='utf-8')
+            stochastic = record.get('return_map', True)
+            reference = record['reference']
+            if record.get('qualification'): expected = 'DECLARED ' + record['qualification']
+            elif not reference['ok']: expected = 'ERR ' + reference['error']
+            else:
+                properties = reference['properties']
+                rendered = 'null' if properties is None else \
+                    '[' + ','.join(f'[{float(w)!r},{int(p)}]' for w, p in properties) + ']'
+                expected = 'OK ' + dumps(reference['labels']) + ' ' + rendered
+            lines.append('\t'.join([f'{name}:{record["case"]}', model.encode().hex(), '1' if stochastic else '0',
+                                    expected]))
+    return lines
+
+
 def main():
     out_dir = Path(sys.argv[1])
-    extra = {'--filters': [], '--pnml': []}
+    extra = {'--filters': [], '--pnml': [], '--reviewer': []}
     args = sys.argv[2:]
     while args:
         flag = args.pop(0)
-        extra[flag].append(args[:2])
-        args = args[2:]
+        count = 1 if flag == '--reviewer' else 2
+        extra[flag].append(args[:count])
+        args = args[count:]
     out_dir.mkdir(parents=True, exist_ok=True)
 
     sys.path.insert(0, str(Path(__file__).parent))
@@ -125,7 +174,14 @@ def main():
     for cases_path, results_path in extra['--filters']:
         results = {r['id']: r for r in read_jsonl(results_path)}
         filter_lines += [d5.filter_line(c, results[c['id']]) for c in json.loads(Path(cases_path).read_text())]
+    reviewer_lines = []
+    for (evidence,) in extra['--reviewer']:
+        evidence = Path(evidence)
+        results = {r['id']: r for r in read_jsonl(evidence / 'filtering-statistics/a7270-oracle-results.jsonl')}
+        filter_lines += [d5.filter_line(c, results[c['id']]) for c in reviewer_filter_cases(evidence)]
+        reviewer_lines += reviewer_pnml_lines(evidence)
     write_gz(out_dir / 'filter-cases.tsv.gz', filter_lines)
+    write_gz(out_dir / 'reviewer-pnml.tsv.gz', reviewer_lines)
 
     pnml_lines = []
     for cases_path, results_path in extra['--pnml']:
@@ -136,7 +192,7 @@ def main():
                                          pnml_expected(result['plain'], False),
                                          pnml_expected(result['stochastic'], True)]))
     write_gz(out_dir / 'pnml-cases.tsv.gz', pnml_lines)
-    print(len(filter_lines), 'filter cases,', len(pnml_lines), 'PNML models')
+    print(len(filter_lines), 'filter cases,', len(pnml_lines), 'PNML models,', len(reviewer_lines), 'reviewer PNML captures')
 
 
 if __name__ == '__main__':

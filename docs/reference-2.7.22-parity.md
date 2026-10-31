@@ -16118,6 +16118,22 @@ results (`src/backend/tests/fixtures/recheck_7270a1f/`, written by
 `scripts/generate-recheck-7270a1f-fixture.py` from
 `scripts/capture-recheck-7270a1f-reference.py` output).
 
+Once the handoff could be read (2026-10-31), the reviewer's cases were
+replayed against 46d14cd and bound into the same test with their saved public
+results. These are the 100 grouping tables of
+`filtering-statistics/a7270-cases.json` (every focused O1/O2 fixture among
+them, the two qualified Float32/null tables included), all of which match.
+They also include the 75 eligible PNML captures of
+`discovery-conformance/p7*-pnml-properties-reference.jsonl` (the six O3/O4
+manifestations and their controls), read the way the reviewer's CLI comparison
+reads them. Of those, 71 match and four are the declared priority-range and
+Unicode 14 cases. The reviewer excluded eight captures because their harness
+converted a None getter result itself. Those models were captured again
+without that conversion and match too: an omitted weight or priority and an
+empty or untyped block import cleanly, while an empty priority, a nested-before
+weight, an omitted exponential parameter and an empty weight raise
+TypeError inside the importer.
+
 | ID | Fix | Test |
 | --- | --- | --- |
 | O1 | Consecutive activity/case grouping adds two numeric key columns in numpy's result type. bool joins the other side (bool + bool stays bool). Integers of one signedness take the wider width and wrap in it. A signed and an unsigned integer take the next signed width that holds both (float64 past 64 bits). A float side takes the narrowest float that holds both (an 8-bit integer fits float16, a 16-bit one float32), rounding to that width. A masked side makes the key masked, and an NA cell makes the key NA. Runs compare the key with its shifted copy: integer keys as float64, float keys in their own width (NaN never equal), bool keys exactly, and an NA comparison starts no run. Next to an object column, a masked column adds the value stored under its mask (an int of IntN/UIntN, NaN of FloatN, a bool of boolean). The retry after a TypeError uses those values too, and the key is NA where either side is missing. | same (`fuzz-dtypes`, 2,000 tables) |
@@ -16150,6 +16166,9 @@ Declared (not equivalent, kept on purpose):
   Native names `ulonglong` when every value lies past the int64 range, which
   is what a fresh process reports, and the capture reruns such cases in a
   fresh process.
-- The reviewer's exact O1-O4 fixtures are not yet bound (their handoff was
-  unreachable). Earlier declarations (d5b33ef, c8ee22d, 65572296, 61ebeee0,
-  DC4, C3, streaming, Windows) stay in force.
+- **Unicode 14 digits.** Native number parsing uses Unicode 14 tables, so
+  digits added later (Kawi) do not convert natively, while the reviewer's
+  Python 3.14 (Unicode 16) accepts them. These are two of the reviewer's PNML
+  captures.
+- Earlier declarations (d5b33ef, c8ee22d, 65572296, 61ebeee0, DC4, C3,
+  streaming, Windows) stay in force.

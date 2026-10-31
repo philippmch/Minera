@@ -10,6 +10,9 @@ numpy 2.4.6). Only public calls are made.
                              parameter text (O3, O4)
   pnml CASES OUT             public PNML imports of those models, with and
                              without the stochastic map (.jsonl)
+  excluded-pnml EVIDENCE OUT the models of the reviewer's PNML captures that
+                             excluded-coercion-captures.json lists (in
+                             EVIDENCE/discovery-conformance), as cases for pnml
   fuzz-run-keys OUT SEED N   consecutive activity/case grouping whose object
                              or float64 key columns hold NaN, None, pd.NA,
                              NaT, infinities and integers too large for a
@@ -154,6 +157,13 @@ def import_pnml(xml, stochastic):
                                    'weight': v.get_weight(), 'priority': v.get_priority(),
                                    'ttype': v.get_transition_type()} for t, v in result[3].items()}
     return record
+
+
+def excluded_pnml(evidence, out):
+    folder = Path(evidence) / 'discovery-conformance'
+    cases = [{'id': 'reviewer:' + c['case'], 'model': (folder / Path(c['model']).name).read_text(encoding='utf-8')}
+             for c in json.loads((folder / 'excluded-coercion-captures.json').read_text())]
+    Path(out).write_text(json.dumps(cases, ensure_ascii=False))
 
 
 def pnml(cases_path, out):
@@ -433,6 +443,7 @@ def main():
     command, args = sys.argv[1], sys.argv[2:]
     if command == 'fuzz-pnml': fuzz_pnml(args[0], int(args[1]), int(args[2]))
     elif command == 'pnml': pnml(*args)
+    elif command == 'excluded-pnml': excluded_pnml(*args)
     elif command == 'fuzz-run-keys': fuzz_run_keys(args[0], int(args[1]), int(args[2]))
     elif command == 'fuzz-dtypes': fuzz_dtypes(args[0], int(args[1]), int(args[2]))
     elif command == 'filters': filters(*args)

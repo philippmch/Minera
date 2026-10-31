@@ -4184,13 +4184,20 @@ Declared: native maps hold only finite numbers, finite non-negative weights
 and int priorities (`POLICY` in the fixture). See "Recheck of 7270a1f" in the
 parity doc. `minera_recheck_7270a1f_tests` binds 13,824 filter and 4,000 PNML
 reference cases (fixtures in `src/backend/tests/fixtures/recheck_7270a1f/`).
+The reviewer's handoff was read on 2026-10-31. Their 100 grouping tables and
+75 eligible PNML captures were bound with their saved public results, and all
+of them match (four are declared). The eight captures they excluded were
+captured again, matched, and were bound too.
 Regenerate them with the pinned reference environment:
 `python scripts/capture-recheck-7270a1f-reference.py fuzz-pnml pnmlS.json S 2000`
 and `pnml` (seeds 1, 2), `fuzz-run-keys rkS.json S 600` and
 `fuzz-dtypes dtS.json S 1000` with `filters` (seeds 1, 2),
 `fuzz-typed ty1.json 21 3000 case`, `ty2.json 22 3000 activity`,
 `ty3.json 23 4000 mixed` and `typed-probes typ.json` with `typed`, then
-`python scripts/generate-recheck-7270a1f-fixture.py src/backend/tests/fixtures/recheck_7270a1f --filters CASES RESULTS ... --pnml CASES RESULTS ...`.
+`excluded-pnml EVIDENCE excluded.json` with `pnml` for the reviewer's
+excluded models, then
+`python scripts/generate-recheck-7270a1f-fixture.py src/backend/tests/fixtures/recheck_7270a1f --filters CASES RESULTS ... --pnml CASES RESULTS ... --reviewer EVIDENCE`
+(EVIDENCE is the reviewer's `minera-recheck-7270a1f/` folder).
 Lessons: a numeric run key follows numpy's result type, not Python's; pandas
 retries an object addition only after a TypeError, so missing cells still meet
 large ints first; a masked column takes part in object arithmetic with the
