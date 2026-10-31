@@ -397,9 +397,20 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
       } else if (ch == '+' || ch == '-') {
         ++in.pos;
         unsigned oh = 0, om = 0;
-        if (in.digits(oh, 2) != 2) return std::nullopt;
+        // Offsets are +HH, +HH:MM or +HHMM; read the hour and minute pairs
+        // exactly, since the minutes may follow the hours without a colon.
+        const auto two_digits = [&in](unsigned& value) {
+          if (in.pos + 2 > in.text.size() || in.text[in.pos] < '0' || in.text[in.pos] > '9' ||
+              in.text[in.pos + 1] < '0' || in.text[in.pos + 1] > '9')
+            return false;
+          value = static_cast<unsigned>((in.text[in.pos] - '0') * 10 + (in.text[in.pos + 1] - '0'));
+          in.pos += 2;
+          return true;
+        };
+        if (!two_digits(oh)) return std::nullopt;
         if (in.peek() == ':') ++in.pos;
-        if (!in.done() && in.digits(om, 2) != 2) return std::nullopt;
+        if (!in.done() && in.peek() != ' ' && in.peek() != '\t' && !two_digits(om))
+          return std::nullopt;
         if (oh > 23 || om > 59) return std::nullopt;
         char buffer[8];
         std::snprintf(buffer, sizeof(buffer), "%c%02u:%02u", ch, oh, om);

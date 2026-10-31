@@ -7271,6 +7271,11 @@ void csv_import_matches_reference_dataframe_flow() {
             "C=2024-01-04 10:00:00"}));
   assert((stamps("1,A,01/02/2024 10:00 +02:00\n1,B,01/02/2024 09:00 UTC\n") ==
           V{"A=2024-01-02 10:00:00+02:00", "B=2024-01-02 09:00:00+00:00"}));
+  // Compact +HHMM offsets after a space, in non-ISO shapes too.
+  assert((stamps("1,A,01/02/2024 10:00 +0200\n1,B,2024-01-02 10:30:00 +0200\n"
+                 "1,C,\"Jan 2, 2024 10:00 -0500\"\n") ==
+          V{"A=2024-01-02 10:00:00+02:00", "B=2024-01-02 10:30:00+02:00",
+            "C=2024-01-02 10:00:00-05:00"}));
   {
     // Durations follow from the parsed instants.
     const auto data = import(
