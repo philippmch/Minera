@@ -187,9 +187,10 @@ void all_public_calls_and_native_paths() {
     const auto value = successful(execute_petri_analysis_workbench(parts));
     assert(fields(fields(value.at("result")).at("value")).at("computed") == "false");
     if (std::string(operation) == "solve_extended_marking_equation") {
-      assert(fields(value.at("artifact_bytes")).at("legacy_json") == "null");
-      assert(value.at("artifact_errors").find("extended marking equation splits are inconsistent") != std::string::npos);
-      assert(value.at("native_calls").find("\"stage\":\"export\"") != std::string::npos);
+      // An uncomputed (unsupported reset-arc) result has no blocks and
+      // still exports its legacy JSON.
+      assert(fields(value.at("artifact_bytes")).at("legacy_json") != "null");
+      assert(value.at("artifact_errors").find("extended marking equation splits are inconsistent") == std::string::npos);
     }
   }
   auto invalid_marking = request("solve_marking_equation", net); invalid_marking.push_back({"options_json", "", "{\"initial_marking\":[-1]}", false});

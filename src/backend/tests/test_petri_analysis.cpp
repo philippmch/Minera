@@ -173,6 +173,38 @@ void extended_equation() {
   }
   assert(malformed_rejected);
 
+  // Every trace length serializes: the solver uses max(2, split points)
+  // blocks, and given split points keep their order and repeats.
+  const auto serializes = [](const ExtendedMarkingEquationResult& result) {
+    const auto json = petri_analysis_json(result);
+    return json.find("\"segment_count\":" +
+                     std::to_string(std::max<std::size_t>(
+                         2, result.retained_splits.size()))) != std::string::npos;
+  };
+  for (const auto& trace : std::vector<std::vector<std::string>>{
+           {}, {"A"}, {"A", "B", "C"}, {"B", "A", "B", "A", "B"}}) {
+    const auto result = solve_extended_marking_equation(trace, net);
+    assert(result.computed && serializes(result));
+  }
+  for (const auto& splits : std::vector<std::vector<std::size_t>>{
+           {1, 1}, {2, 1}, {0}, {2, 0, 2}}) {
+    ExtendedMarkingEquationOptions given;
+    given.split_indices = splits;
+    const auto result =
+        solve_extended_marking_equation({"A", "B", "A"}, net, given);
+    assert(result.retained_splits == splits && serializes(result));
+  }
+  auto missing_block = matching;
+  missing_block.retained_splits = {1, 1, 1};
+  missing_block.segment_count = 2;
+  malformed_rejected = false;
+  try {
+    (void)petri_analysis_json(missing_block);
+  } catch (const std::invalid_argument&) {
+    malformed_rejected = true;
+  }
+  assert(malformed_rejected);
+
   const auto deviation = solve_extended_marking_equation({"A", "X", "B"}, net);
   assert(deviation.feasible && std::abs(deviation.objective - 10000.0) < 1e-7);
 

@@ -134,12 +134,13 @@ void validate_equation_result(const ExtendedMarkingEquationResult& result) {
     throw std::invalid_argument("extended marking equation objective is invalid");
   validate_finite(result.transition_counts,
                   "extended marking equation transition counts");
-  if (result.segment_count != result.retained_splits.size() + 1 ||
-      !std::is_sorted(result.retained_splits.begin(),
-                      result.retained_splits.end()) ||
-      std::adjacent_find(result.retained_splits.begin(),
-                         result.retained_splits.end()) !=
-          result.retained_splits.end())
+  // The solver uses max(2, split points) blocks; split points keep the
+  // caller's order and repeats, so only the block count is checked. An
+  // uncomputed result (for example an unsupported net) has no blocks.
+  if (result.computed
+          ? result.segment_count !=
+                std::max<std::size_t>(2, result.retained_splits.size())
+          : result.segment_count != 0 || !result.retained_splits.empty())
     throw std::invalid_argument("extended marking equation splits are inconsistent");
   if (std::any_of(result.firing_sequence.begin(), result.firing_sequence.end(),
                   [&](std::size_t index) {
