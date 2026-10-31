@@ -1231,20 +1231,178 @@ std::int64_t iso_wall_microseconds(std::string_view original) {
   return (days * 86400 + clock[0] * 3600 + clock[1] * 60 + clock[2]) * 1000000 + micro;
 }
 
-// XML: the ISO reading, else the native parser on the wall-clock fields (the
-// offset dropped as the reference does).
-std::int64_t lenient_wall_microseconds(std::string_view text) {
-  try {
-    return iso_wall_microseconds(text);
-  } catch (const std::invalid_argument&) {
+// OCEL 2.0 XML falls back to dateutil when fromisoformat fails. That value
+// keeps its own offset (it is not made naive and stamped UTC like the ISO
+// reading), so pandas compares an offset value by its instant, and a value
+// without one is naive, which the reference cannot sort next to aware ones.
+struct LenientTimestamp {
+  std::int64_t microseconds;
+  bool aware;
+};
+
+constexpr std::string_view kMonthAbbreviations[] = {"jan", "feb", "mar", "apr", "may", "jun",
+                                                     "jul", "aug", "sep", "oct", "nov", "dec"};
+constexpr std::string_view kMonthNames[] = {"january", "february", "march",     "april",
+                                            "may",     "june",     "july",      "august",
+                                            "september", "october", "november", "december"};
+constexpr std::string_view kWeekdayNames[] = {"mon", "tue", "wed", "thu", "fri", "sat", "sun",
+                                              "monday", "tuesday", "wednesday", "thursday",
+                                              "friday", "saturday", "sunday"};
+
+std::string lower_ascii(std::string_view text) {
+  std::string out(text);
+  for (auto& ch : out) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  return out;
+}
+
+int month_from_word(std::string_view word) {
+  const auto lowered = lower_ascii(word);
+  for (int month = 0; month < 12; ++month)
+    if (lowered == kMonthAbbreviations[month] || lowered == kMonthNames[month]) return month + 1;
+  return lowered == "sept" ? 9 : 0;
+}
+
+// A subset of dateutil.parser.parse (default dayfirst/yearfirst) observed
+// black-box against the pinned reference: YYYY/MM/DD and MM/DD/YYYY with
+// '/', '.' or '-' (a first field above 12 reads day-first), "Jan 2 2020",
+// "2 Jan 2020" and "January 2, 2020" (month names in any case), then a clock
+// H:MM[:SS[.f]] after 'T' or spaces, then an optional Z, UTC, GMT, +HH,
+// +HHMM or +HH:MM offset. Anything else is nullopt (unknown to native).
+std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
+  std::size_t p = 0, n = text.size();
+  const auto space = [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; };
+  const auto digit = [](char ch) { return std::isdigit(static_cast<unsigned char>(ch)) != 0; };
+  const auto alpha = [](char ch) { return std::isalpha(static_cast<unsigned char>(ch)) != 0; };
+  while (p < n && space(text[p])) ++p;
+  while (n > p && space(text[n - 1])) --n;
+  const auto number = [&](std::size_t low, std::size_t high, int& value) {
+    const std::size_t begin = p;
+    value = 0;
+    while (p < n && digit(text[p])) {
+      if (p - begin == high) return false;
+      value = value * 10 + (text[p++] - '0');
+    }
+    return p - begin >= low;
+  };
+  const auto word = [&]() {
+    const std::size_t begin = p;
+    while (p < n && alpha(text[p])) ++p;
+    return text.substr(begin, p - begin);
+  };
+  const auto skip_spaces = [&]() { while (p < n && space(text[p])) ++p; };
+  int year = 0, month = 0, day = 0;
+  if (p < n && alpha(text[p])) {  // Jan 2[,] 2020
+    month = month_from_word(word());
+    skip_spaces();
+    if (!month || !number(1, 2, day)) return std::nullopt;
+    if (p < n && text[p] == ',') ++p;
+    skip_spaces();
+    if (!number(4, 4, year)) return std::nullopt;
+  } else {
+    const std::size_t begin = p;
+    int first = 0;
+    if (!number(1, 4, first)) return std::nullopt;
+    const std::size_t length = p - begin;
+    if (length == 4) {  // YYYY/MM/DD
+      if (p >= n || (text[p] != '/' && text[p] != '.' && text[p] != '-')) return std::nullopt;
+      const char separator = text[p++];
+      year = first;
+      if (!number(1, 2, month) || p >= n || text[p++] != separator || !number(1, 2, day))
+        return std::nullopt;
+    } else if (length <= 2 && p < n && space(text[p])) {  // 2 Jan[,] 2020
+      skip_spaces();
+      day = first;
+      month = month_from_word(word());
+      if (!month) return std::nullopt;
+      if (p < n && text[p] == ',') ++p;
+      skip_spaces();
+      if (!number(4, 4, year)) return std::nullopt;
+    } else if (length <= 2 && p < n && (text[p] == '/' || text[p] == '.' || text[p] == '-')) {
+      const char separator = text[p++];  // MM/DD/YYYY
+      int second = 0;
+      if (!number(1, 2, second) || p >= n || text[p++] != separator || !number(4, 4, year))
+        return std::nullopt;
+      month = first;
+      day = second;
+      if (month > 12 && day <= 12) std::swap(month, day);
+    } else {
+      return std::nullopt;
+    }
   }
-  if (parse_timestamp(text)) {
-    std::size_t end = text.size();
-    while (end > 0 && std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) --end;
-    if (const auto zone = text.substr(0, end).find_first_of("Zz+-", 10); zone != std::string_view::npos) end = zone;
-    if (const auto wall = parse_timestamp_microseconds(text.substr(0, end))) return *wall;
+  int hour = 0, minute = 0, second = 0;
+  std::int64_t micro = 0;
+  if (p < n) {
+    if (text[p] == 'T') ++p;
+    else if (space(text[p])) skip_spaces();
+    else return std::nullopt;
+    if (!number(1, 2, hour) || p >= n || text[p++] != ':' || !number(2, 2, minute)) return std::nullopt;
+    if (p < n && text[p] == ':') {
+      ++p;
+      if (!number(2, 2, second)) return std::nullopt;
+      if (p < n && (text[p] == '.' || text[p] == ',')) {
+        ++p;
+        std::size_t count = 0;
+        while (p < n && digit(text[p])) {
+          if (count < 6) micro = micro * 10 + (text[p] - '0');
+          ++count;
+          ++p;
+        }
+        if (!count) return std::nullopt;
+        for (std::size_t index = count; index < 6; ++index) micro *= 10;
+      }
+    }
   }
-  throw std::invalid_argument("String does not contain a date: " + std::string(text));
+  skip_spaces();
+  bool aware = false;
+  std::int64_t offset_seconds = 0;
+  if (p < n) {
+    aware = true;
+    if (text[p] == 'Z') {
+      ++p;
+    } else if (text[p] == '+' || text[p] == '-') {
+      const std::int64_t sign = text[p++] == '-' ? -1 : 1;
+      const auto pair = [&](int& value) {  // exactly two digits, more may follow
+        if (p + 2 > n || !digit(text[p]) || !digit(text[p + 1])) return false;
+        value = (text[p] - '0') * 10 + (text[p + 1] - '0');
+        p += 2;
+        return true;
+      };
+      int hours = 0, minutes = 0;
+      if (!pair(hours)) return std::nullopt;
+      if (p < n && text[p] == ':') ++p;
+      if (p < n && digit(text[p]) && !pair(minutes)) return std::nullopt;
+      if (hours > 23 || minutes > 59) return std::nullopt;
+      offset_seconds = sign * (hours * 3600 + minutes * 60);
+    } else {
+      const auto zone = lower_ascii(word());
+      if (zone != "utc" && zone != "gmt") return std::nullopt;
+    }
+    if (p != n) return std::nullopt;
+  }
+  if (year < 1 || month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59)
+    return std::nullopt;
+  static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  if (day < 1 || day > (month == 2 && iso_leap(year) ? 29 : kDays[month - 1])) return std::nullopt;
+  const std::int64_t wall =
+      (iso_days_from_civil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second) * 1000000 + micro;
+  return LenientTimestamp{wall - offset_seconds * 1000000, aware};
+}
+
+// Whether dateutil's fuzzy reading certainly finds no date: no digit and no
+// month or weekday word.
+bool certainly_not_a_date(std::string_view text) {
+  if (std::any_of(text.begin(), text.end(), [](char ch) { return std::isdigit(static_cast<unsigned char>(ch)) != 0; }))
+    return false;
+  for (std::size_t p = 0; p < text.size();) {
+    if (std::isalpha(static_cast<unsigned char>(text[p])) == 0) { ++p; continue; }
+    const std::size_t begin = p;
+    while (p < text.size() && std::isalpha(static_cast<unsigned char>(text[p])) != 0) ++p;
+    const auto token = text.substr(begin, p - begin);
+    if (month_from_word(token)) return false;
+    const auto lowered = lower_ascii(token);
+    for (const auto name : kWeekdayNames) if (lowered == name) return false;
+  }
+  return true;
 }
 
 }  // namespace
@@ -1257,9 +1415,11 @@ void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds) {
 void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
   // The key is the timestamp at the importer's precision: SQLite keeps
   // nanoseconds of the instant, the JSON and XML importers microseconds of
-  // the wall-clock fields.
+  // the ISO wall-clock fields (an OCEL 2.0 XML dateutil fallback with an
+  // offset keys on its instant).
   std::vector<std::tuple<std::int64_t, std::int64_t, std::size_t>> keys;
   keys.reserve(log.events.size());
+  bool aware = false, naive = false, unknown = false;  // kDateutil readings
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& text = log.events[index].timestamp;
     if (reader == OcelTimestampReader::kInstantNanoseconds) {
@@ -1272,12 +1432,31 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
       } catch (const std::invalid_argument&) {
         return;
       }
+    } else if (reader == OcelTimestampReader::kDateutil) {
+      try {
+        keys.emplace_back(iso_wall_microseconds(text), 0, index);
+        aware = true;
+        continue;
+      } catch (const std::invalid_argument&) {
+      }
+      if (const auto lenient = dateutil_subset(text)) {
+        (lenient->aware ? aware : naive) = true;
+        keys.emplace_back(lenient->microseconds, 0, index);
+      } else if (certainly_not_a_date(text)) {
+        throw std::invalid_argument("String does not contain a date: " + text);
+      } else {
+        unknown = true;  // a shape native does not read: keep file order
+      }
     } else {
-      keys.emplace_back(reader == OcelTimestampReader::kIsoFormat ? iso_wall_microseconds(text)
-                                                                  : lenient_wall_microseconds(text),
-                        0, index);
+      keys.emplace_back(iso_wall_microseconds(text), 0, index);
     }
   }
+  if (unknown) return;
+  // pandas cannot order tz-naive values next to tz-aware ones (the message
+  // the reference raises from sort_values).
+  if (aware && naive)
+    throw std::invalid_argument("'values' is not ordered, please explicitly specify the categories "
+                                "order by passing in a categories argument.");
   // Relations follow their events' order even when the events already are
   // in order.
   std::stable_sort(keys.begin(), keys.end());

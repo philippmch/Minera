@@ -15922,13 +15922,20 @@ Declared (not equivalent, kept on purpose):
   (classic and 2.0) and classic XML by ISO 8601 wall-clock fields read like
   Python 3.11 `fromisoformat` (basic and week dates, any separator, hour-only
   and `,` fractions). OCEL 2.0 JSON and classic XML raise the reference
-  message on an unreadable timestamp; OCEL 2.0 XML falls back to the native
-  parser before raising ("String does not contain a date"). Still declared:
+  message on an unreadable timestamp. OCEL 2.0 XML follows the reference's
+  dateutil fallback: a fallback value keeps its offset and so orders by its
+  UTC instant (`"2020-01-01T10:00:00+05:00 "` precedes `"...07:00:00"`), one
+  without an offset is naive and raises next to aware values as pandas'
+  sort does, and native reads the dateutil subset `YYYY/MM/DD`,
+  `MM/DD/YYYY` (`/`, `.`, `-`), `Jan 2 2020`, `2 Jan 2020` and
+  `January 2, 2020` with a clock and a Z/UTC/GMT/`+HHMM` offset; a text
+  with no digit and no month or weekday word raises "String does not
+  contain a date". Still declared: other dateutil shapes keep the file
+  order of the whole log. Also still declared:
   classic OCEL JSON keeps the file order of the whole log on an unreadable
   timestamp instead of raising, because native adapters carry empty and NaT
   timestamps through it as transport. SQLite still compares UTC instants at
-  nanoseconds, which the reference SQLite importer also converts. Non-ISO
-  shapes that only a lenient date parser reads may still raise in native XML.
+  nanoseconds, which the reference SQLite importer also converts.
   Tests: `minera_recheck_regression_tests` (`ocel_wall_clock_order`).
 - **Stream events without a case id (live sessions fixed 2026-10-31).** The
   reference DFG, footprints, temporal and token-replay stream monitors skip

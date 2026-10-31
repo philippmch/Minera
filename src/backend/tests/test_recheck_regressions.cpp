@@ -299,7 +299,18 @@ void ocel_wall_clock_order(){
  check(event_ids(parse_ocel_json(classic_nat))=="late,nat,early,","classic OCEL JSON transport keeps NaT logs in file order");
  const auto xml=parse_ocel_xml(ocel2_xml({"2024-01-01T05:00:00+08:00","2024-01-01T01:00:00Z","2024-01-01 03:00:00"}));
  check(event_ids(xml)=="e1,e2,e0,","OCEL XML wall-clock order");
- check(!import_error([&]{(void)parse_ocel_xml(ocel2_xml({"2024-01-01T00:00:00","garbage"}));}).empty(),"OCEL XML rejects an unreadable timestamp");
+ check(import_error([&]{(void)parse_ocel_xml(ocel2_xml({"2024-01-01T00:00:00","garbage"}));})=="String does not contain a date: garbage","OCEL XML rejects an unreadable timestamp");
+ // OCEL 2.0 XML falls back to dateutil, which keeps the offset: an aware
+ // fallback value orders by its instant next to ISO wall clocks.
+ const auto xml_order=[](const std::vector<std::string>& times){return event_ids(parse_ocel_xml(ocel2_xml(times)));};
+ check(xml_order({"2020-01-01T07:00:00","Jan 1 2020 10:00 +0500"})=="e1,e0,","OCEL XML dateutil +0500 orders by instant");
+ check(xml_order({"2020-01-01T07:00:00","2020-01-01T10:00:00+05:00 "})=="e1,e0,","OCEL XML dateutil trailing space keeps the offset");
+ check(xml_order({"2020/01/01 10:00:00","2020/01/01 07:00:00"})=="e1,e0,","OCEL XML dateutil slashes");
+ check(xml_order({"Jan 2 2020 10:00","2 Jan 2020 09:00","January 1, 2020 11:00:00"})=="e2,e1,e0,","OCEL XML dateutil month names");
+ check(xml_order({"01/02/2020 10:00","01/01/2020 11:00"})=="e1,e0,","OCEL XML dateutil month first");
+ check(xml_order({"2020-01-01T07:00:00","13/01/2020 00:00 Z","2020.01.05 12:00 GMT"})=="e0,e2,e1,","OCEL XML dateutil day first above 12, Z and GMT");
+ check(import_error([&]{(void)parse_ocel_xml(ocel2_xml({"2020/01/01 10:00:00","2020-01-01T07:00:00"}));})==
+   "'values' is not ordered, please explicitly specify the categories order by passing in a categories argument.","OCEL XML naive dateutil next to aware raises");
 }
 
 // K1: a nanosecond duration beyond int64 overflows as in the reference; a

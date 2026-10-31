@@ -109,8 +109,13 @@ enum class OcelTimestampReader {
   // the file order of the whole log instead of raising, because native
   // adapters use the classic format as transport (empty or NaT timestamps).
   kIsoFormatOrFileOrder,
-  // OCEL 2.0 XML: the ISO reading above, or else any shape the native timestamp
-  // parser reads, again comparing wall-clock fields with the offset dropped.
+  // OCEL 2.0 XML: the ISO reading above (wall clock), or else the reference's
+  // dateutil fallback, which keeps its offset: a fallback value with an offset
+  // compares by its UTC instant, one without is naive (wall clock), and naive
+  // next to aware values raises as the reference's sort does. Shapes outside
+  // the native dateutil subset keep the file order of the whole log; a text
+  // with no digit and no month or weekday word raises "String does not
+  // contain a date".
   kDateutil,
   // SQLite: the UTC instant (offsets convert), compared at nanoseconds.
   kInstantNanoseconds,
@@ -118,9 +123,10 @@ enum class OcelTimestampReader {
 
 // The reference importers order events by timestamp (ties keep file order)
 // and relations by their event's new position (ties keep file order). The
-// kIsoFormat and kDateutil readers throw std::invalid_argument on a timestamp
-// they cannot read, as the reference importers raise; the others keep the
-// file order of the whole log instead.
+// kIsoFormat reader throws std::invalid_argument on a timestamp it cannot
+// read, as the reference importers raise, and kDateutil on one that is
+// certainly no date; otherwise an unreadable timestamp keeps the file order
+// of the whole log.
 void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader);
 // `nanoseconds` selects kInstantNanoseconds, otherwise kIsoFormat.
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
