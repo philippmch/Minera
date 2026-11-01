@@ -74,7 +74,7 @@ struct StreamingSession::Impl {
                         : temporal ? StreamingMonitorKind::kTemporal
                                    : StreamingMonitorKind::kTbr;
         if (!declare && !streaming_monitor_takes_event(event, kind)) {}
-        else if (dfg) { delivery.accepted = dfg->receive(event, event.case_id); delivery.event_index = dfg->snapshot().events; }
+        else if (dfg) { delivery.accepted = dfg->receive(event, event.case_id); delivery.event_index = dfg->events(); }
         else if (footprints) { const auto r = footprints->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }
         else if (temporal) { const auto r = temporal->receive(event, event.case_id); delivery.accepted = r.event_index != 0; delivery.event_index = r.event_index; }
         else if (declare) { const auto r = declare->receive(event); delivery.accepted = true; delivery.event_index = r.event_index; delivery.native_event = serialize_declare_stream_event_json(r); }
@@ -136,11 +136,25 @@ std::size_t StreamingSession::append(std::vector<Event> events,const std::string
   for(auto& event:events) if(!s.stream.append(std::move(event)))throw std::logic_error("the live stream closed during append");
   s.batch_ids.emplace(batch_id,s.batches.size());s.batches.push_back({batch_id,first,events.size()});++s.revision;return events.size();
 }
+void StreamingSession::wait_until_drained() {
+  // LiveEventStream::drain synchronizes itself; waiting here holds no session
+  // lock, so snapshots without waiting and other readers are not blocked by a
+  // long queue.
+  auto& s=*impl_;if(s.stream.state()!=StreamingStreamState::kInactive)s.stream.drain();
+}
 void StreamingSession::action(StreamingSessionAction action,std::size_t expected_revision,const std::string& case_id) {
-  auto& s=*impl_;std::lock_guard lock(s.operation_mutex);s.check_revision(expected_revision);
-  if(action==StreamingSessionAction::kDrain) { s.stream.drain();return; }
-  if(action==StreamingSessionAction::kStart) { s.editable();s.stream.start();s.stream.drain(); }
-  else if(action==StreamingSessionAction::kFinish) {
+  auto& s=*impl_;
+  if(action==StreamingSessionAction::kDrain) { {std::lock_guard lock(s.operation_mutex);s.check_revision(expected_revision);} s.stream.drain();return; }
+  if(action==StreamingSessionAction::kStart) {
+    {std::lock_guard lock(s.operation_mutex);s.check_revision(expected_revision);s.editable();s.stream.start();++s.revision;}
+    wait_until_drained();return;
+  }
+  // Every other action applies after the accepted queue: drain it first
+  // without the session lock, then again (normally a no-op) under it.
+  { std::lock_guard lock(s.operation_mutex);s.check_revision(expected_revision); }
+  wait_until_drained();
+  std::lock_guard lock(s.operation_mutex);s.check_revision(expected_revision);
+  if(action==StreamingSessionAction::kFinish) {
     if(s.stream.state()==StreamingStreamState::kInactive)throw std::logic_error("start the live stream before finishing");
     s.stream.stop();
   } else {
@@ -162,14 +176,18 @@ void StreamingSession::action(StreamingSessionAction action,std::size_t expected
   }
   ++s.revision;
 }
-std::string StreamingSession::snapshot_json(bool wait_until_drained) {
-  auto& s=*impl_;std::lock_guard lock(s.operation_mutex);if(wait_until_drained)s.drain_if_active();
+std::string StreamingSession::snapshot_json(bool wait,std::size_t delivery_limit) {
+  if(wait)wait_until_drained();
+  auto& s=*impl_;std::lock_guard lock(s.operation_mutex);
   auto result=s.monitor_json();std::lock_guard data_lock(s.data_mutex);
   result.pop_back();result+=",\"input\":{\"event_order\":"+quote(s.options.event_order)+",\"parsed_events\":"+std::to_string(s.inputs.size())+"}}";
   const auto state=s.stream.state();std::ostringstream out;
-  out<<"{\"family\":\"LIVE_STREAM_SESSION\",\"method\":"<<quote(method_name(s.options.method))<<",\"state\":"<<quote(state==StreamingStreamState::kInactive?"INACTIVE":state==StreamingStreamState::kActive?"ACTIVE":"FINISHED")<<",\"revision\":"<<s.revision<<",\"pending\":"<<s.stream.pending()<<",\"enqueued\":"<<s.inputs.size()<<",\"delivered\":"<<s.deliveries.size()<<",\"registered\":"<<(s.observer?"true":"false")<<",\"observer_id\":"<<(s.observer?std::to_string(*s.observer):"null")<<",\"result\":"<<result<<",\"batches\":[";
+  // Responses carry the most recent deliveries only; "delivered" stays the
+  // lifetime total and deliveries_offset is the index of the first one shown.
+  const std::size_t offset=s.deliveries.size()>delivery_limit?s.deliveries.size()-delivery_limit:0;
+  out<<"{\"family\":\"LIVE_STREAM_SESSION\",\"method\":"<<quote(method_name(s.options.method))<<",\"state\":"<<quote(state==StreamingStreamState::kInactive?"INACTIVE":state==StreamingStreamState::kActive?"ACTIVE":"FINISHED")<<",\"revision\":"<<s.revision<<",\"pending\":"<<s.stream.pending()<<",\"enqueued\":"<<s.inputs.size()<<",\"delivered\":"<<s.deliveries.size()<<",\"deliveries_offset\":"<<offset<<",\"registered\":"<<(s.observer?"true":"false")<<",\"observer_id\":"<<(s.observer?std::to_string(*s.observer):"null")<<",\"result\":"<<result<<",\"batches\":[";
   for(std::size_t i=0;i<s.batches.size();++i) {const auto& b=s.batches[i];if(i)out<<',';out<<"{\"batch_id\":"<<quote(b.id)<<",\"first_position\":"<<b.first<<",\"events\":"<<b.count<<'}';}out<<"],\"deliveries\":[";
-  for(std::size_t i=0;i<s.deliveries.size();++i) {const auto& d=s.deliveries[i];if(i)out<<',';out<<"{\"position\":"<<d.position<<",\"source_position\":"<<d.source_position<<",\"batch_id\":"<<quote(d.batch)<<",\"case_id\":"<<quote(d.case_id)<<",\"activity\":"<<quote(d.activity)<<",\"accepted\":"<<(d.accepted?"true":"false")<<",\"event_index\":"<<d.event_index<<",\"error\":"<<(d.error.empty()?"null":quote(d.error));if(!d.native_event.empty())out<<",\"native_event\":"<<d.native_event;out<<'}';}out<<"],\"terminations\":[";
+  for(std::size_t i=offset;i<s.deliveries.size();++i) {const auto& d=s.deliveries[i];if(i!=offset)out<<',';out<<"{\"position\":"<<d.position<<",\"source_position\":"<<d.source_position<<",\"batch_id\":"<<quote(d.batch)<<",\"case_id\":"<<quote(d.case_id)<<",\"activity\":"<<quote(d.activity)<<",\"accepted\":"<<(d.accepted?"true":"false")<<",\"event_index\":"<<d.event_index<<",\"error\":"<<(d.error.empty()?"null":quote(d.error));if(!d.native_event.empty())out<<",\"native_event\":"<<d.native_event;out<<'}';}out<<"],\"terminations\":[";
   for(std::size_t i=0;i<s.terminations.size();++i){if(i)out<<',';out<<s.terminations[i];}out<<"]}";return out.str();
 }
 }  // namespace minera

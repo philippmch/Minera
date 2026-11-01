@@ -76,6 +76,8 @@ class StreamingDfgDiscovery {
   bool receive(const Event& event, std::string_view case_id);
 
   [[nodiscard]] StreamingDfgSnapshot snapshot() const;
+  // The accepted event count of snapshot().events, without copying the state.
+  [[nodiscard]] std::uint64_t events() const;
 
   void reset();
 

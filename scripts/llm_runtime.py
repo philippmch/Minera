@@ -1,7 +1,8 @@
 """Minera's optional language-model runtime (Python standard library only).
 
 Credentials and provider base URLs default to the server environment.
-Optional api_key, api_url and openai_token_field apply only to one completion.
+Optional api_key, api_url and openai_token_field apply only to one completion;
+a call-local api_url never receives the configured credential.
 Run with --port 8189, then minera_server --llm-runtime-url http://127.0.0.1:8189.
 Use --complete request.json (or - for stdin) for standalone execution.
 """
@@ -96,10 +97,14 @@ def call_provider_config(startup, request):
     def selected(name, default):
         value = request.get(name)
         return default if value is None else value
+    # The configured credential belongs to the configured endpoint. A call that
+    # names its own endpoint must also bring its own key, or the runtime would
+    # hand its stored secret to whatever host the caller chose.
+    key_default = startup.api_key if request.get("api_url") is None else ""
     try:
         return ProviderConfig(
             selected("api_url", startup.base_url),
-            selected("api_key", startup.api_key),
+            selected("api_key", key_default),
             selected("openai_token_field", startup.openai_token_field),
             request.get("openai_api", startup.openai_api),
         )

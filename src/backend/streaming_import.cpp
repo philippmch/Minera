@@ -42,14 +42,22 @@ void CsvEventStreamReader::reset() {
   events_.clear();
   cursor_ = 0;
   std::istringstream input(source_body_.value_or(""));
-  const auto log = source_body_ ? import_csv_event_log(input, import_options_)
-                                : import_csv_event_log(path_, import_options_);
+  // The reference reader (csv.DictReader) yields every row, in file order,
+  // with empty and NA-spelled cells as literal text.
+  auto import_options = import_options_;
+  import_options.keep_na_first_class_values = true;
+  const auto log = source_body_ ? import_csv_event_log(input, import_options)
+                                : import_csv_event_log(path_, import_options);
   copy_event_log_context(log, context_);
-  for (const auto& trace : log.traces) {
-    for (const auto& event : trace.events) {
-      auto selected = apply_event_options(event, options_);
-      if (selected) events_.push_back(std::move(*selected));
-    }
+  std::vector<const Event*> rows;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) rows.push_back(&event);
+  std::stable_sort(rows.begin(), rows.end(), [](const Event* a, const Event* b) {
+    return a->input_order < b->input_order;
+  });
+  for (const auto* event : rows) {
+    auto selected = apply_event_options(*event, options_);
+    if (selected) events_.push_back(std::move(*selected));
   }
 }
 

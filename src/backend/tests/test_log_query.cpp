@@ -24,6 +24,11 @@ int main(){
  for(const auto* sql:{"DELETE FROM dataframe","DROP TABLE dataframe","ATTACH DATABASE 'unwanted.db' AS other","SELECT load_extension('unwanted')","SELECT 1;SELECT 2"})rejects([&]{minera::query_log_sqlite(table,sql);});
  minera::LogQueryOptions bound;bound.max_vm_steps=1000;rejects([&]{minera::query_log_sqlite(table,"WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<10000000) SELECT SUM(x) FROM n",bound);});
  rejects([&]{minera::filter_query_events(log,{999});});
+ // Output cap: values that would exceed the limit fail with a length_error
+ // naming it, before SQLite allocates them or the rows accumulate.
+ {const auto capped=[&](const char* sql,std::size_t limit){minera::LogQueryOptions o;o.max_output_bytes=limit;try{(void)minera::query_log_sqlite(table,sql,o);}catch(const std::length_error& error){assert(std::string(error.what()).find(std::to_string(limit)+"-byte output limit")!=std::string::npos);return true;}return false;};
+  assert(capped("SELECT zeroblob(1000000000)",1024));assert(capped("SELECT randomblob(600)",1024));assert(capped("SELECT printf('%.*c',2000,'x') FROM dataframe",4096));
+  assert(!capped("SELECT randomblob(100)",1024));minera::LogQueryOptions zero;zero.max_output_bytes=0;rejects([&]{minera::query_log_sqlite(table,"SELECT 1",zero);});}
  auto collision=log;collision.traces[0].events[0].attributes.push_back({"__minera_event_index","user field"});auto collided=minera::log_query_table(collision);assert(collided.event_index_column!="__minera_event_index");
  minera::XesExportOptions options;options.preserve_nulls=true;assert(minera::serialize_xes(cases,options).find("Review α")!=std::string::npos);
 }

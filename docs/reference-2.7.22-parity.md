@@ -15210,6 +15210,17 @@ keeps the log-to-features bank green. Stream key order is `concept:name`,
 attributes in input order, then `case:concept:name` and the trace attributes:
 native events do not record the source order of their first-class fields.
 `abstract_log_skeleton` now uses the same spacing for several or no pairs.
+
+Empty traces have no rows in the reference event table, so the variants
+description lists no empty variant and relative frequencies (variants and DFG)
+divide by the non-empty cases. `/api/llm-context` and `minera_context` now
+return these exact abstractions for `dfg`, `variants`, `event_stream`,
+`log_attributes`, `log_features`, `log_skeleton`, `ocel_ocdfg` and
+`ocel_features` (with lifecycle paths), and `abstract_declare` /
+`abstract_temporal_profile` on the discovered models for `declare` and
+`temporal_profile` (no character budget, as in the reference; `truncated`
+compares with an unbounded call). `case`, `petri_net`, `ocel` and
+`ocel_features` without lifecycle paths remain Minera summaries.
 ## ILP discovery bank (2026-10-25)
 
 `scripts/capture-ilp-discovery-bank.py` (seed 20261025, two hash seeds, no
@@ -16297,3 +16308,31 @@ Declared (not equivalent, kept on purpose):
   captures.
 - Earlier declarations (d5b33ef, c8ee22d, 65572296, 61ebeee0, DC4, C3,
   streaming, Windows) stay in force.
+
+## Stream sessions: CSV rows, TBR termination counts and session limits (2026-11-01)
+
+- **CSV stream rows.** The reference CSV event stream reader (csv.DictReader)
+  keeps every row in file order, so an empty or pandas-NA-spelled case id or
+  activity (`NA`, `null`, `NaN`, ...) is literal text there. The batch
+  importer still drops those rows like read_csv/format_dataframe;
+  `CsvImportOptions::keep_na_first_class_values` keeps them, and the CSV
+  event stream reader (now in file order), live-session batches, reader
+  sessions and the one-shot streaming routes set it. Tests:
+  `minera_streaming_import_tests` (`csv_events_keep_na_spellings_in_file_order`).
+- **Streaming TBR termination counts.** The forward variant now reports the
+  reference's signed sums: missing adds `final - marking` over the final
+  places and remaining is `sum(marking) - sum(final)`, so `[A]` on
+  `p0-A->p1-B->p2` ends with missing 1, remaining 0 and a surplus sink token
+  lowers missing. A marking equal to the final one apart from zero-token keys
+  is fit, as in the reference (the earlier zero-key rule was wrong; the
+  9258a44 bank compared only fitness). All 39 bank cases now also check
+  missing/remaining. Backwards replay has no reference counterpart and keeps
+  per-place counts. Tests: `minera_streaming_tbr_tests`.
+- **Live sessions.** Events are counted without copying the DFG per event,
+  queues drain without holding the session lock (a snapshot with
+  `wait_until_drained=false`, list and release no longer wait for a drain),
+  responses list the latest 1000 deliveries (`deliveries_limit`, at most
+  100000) with `deliveries_offset`, and each registry (live, reader,
+  acquisition) holds at most 32 sessions (429 beyond), with 256 MiB of
+  uploads and 1,000,000 events per live session (413 beyond). Tests:
+  `minera_streaming_session_tests`.

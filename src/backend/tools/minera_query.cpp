@@ -32,7 +32,7 @@ int run_query_legacy(int argc,char** argv){
   std::vector<std::size_t> indices;
   if(engine=="sqlite"){
    const auto result=minera::query_log_sqlite(table,sql,options);std::cout<<minera::log_query_json(result)<<'\n';
-   if(!output.empty()){minera::LogQueryOptions complete;complete.max_rows=1000000;const auto selection=minera::query_log_sqlite(table,sql,complete);if(!selection.can_filter||selection.output_truncated)throw std::invalid_argument("filter requires complete valid event indices");indices=selection.selected_event_indices;}
+   if(!output.empty()){minera::LogQueryOptions complete;complete.max_rows=1000000;complete.max_output_bytes=256u*1024u*1024u;const auto selection=minera::query_log_sqlite(table,sql,complete);if(!selection.can_filter||selection.output_truncated)throw std::invalid_argument("filter requires complete valid event indices");indices=selection.selected_event_indices;}
   }else{
    if(runtime.empty())throw std::invalid_argument("DuckDB requires --runtime-url");
    const auto quote=minera::embedding_runtime::detail::escape_json;

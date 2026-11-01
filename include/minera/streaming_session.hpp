@@ -42,7 +42,13 @@ class StreamingSession {
   std::size_t append(std::vector<Event> events, const std::string& batch_id, std::size_t expected_revision);
   void action(StreamingSessionAction action, std::size_t expected_revision, const std::string& case_id = {});
   [[nodiscard]] std::size_t revision() const;
-  [[nodiscard]] std::string snapshot_json(bool wait_until_drained = true);
+  // Waits (without holding the session lock) for queued events when asked.
+  // At most delivery_limit of the latest deliveries are listed.
+  [[nodiscard]] std::string snapshot_json(bool wait_until_drained = true,
+                                          std::size_t delivery_limit = kDefaultDeliveryLimit);
+  // Blocks until an active stream has delivered its queue; holds no lock.
+  void wait_until_drained();
+  static constexpr std::size_t kDefaultDeliveryLimit = 1000;
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

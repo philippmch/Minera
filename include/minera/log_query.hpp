@@ -12,6 +12,10 @@ struct LogQueryOptions {
   std::string table_name="dataframe";
   std::size_t max_rows=1000;
   std::size_t max_vm_steps=50000000;
+  // Bound on the result values held in memory (text bytes, blob hex digits,
+  // 8 bytes per number or null) and on any single SQLite string or blob.
+  // Exceeding it throws std::length_error naming the limit.
+  std::size_t max_output_bytes=16u*1024u*1024u;
   std::vector<QueryValue> parameters;
 };
 struct LogQueryTable {

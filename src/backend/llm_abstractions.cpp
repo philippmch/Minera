@@ -464,6 +464,13 @@ bool known_aggregation(const std::string& name) {
   return name == "mean" || name == "sum" || name == "max" || name == "min" || name == "median" || name == "stdev";
 }
 
+// The reference describes the event table, which has no rows for an empty
+// trace, so empty traces neither form a variant nor count as cases.
+std::size_t nonempty_cases(const EventLog& log) {
+  return static_cast<std::size_t>(std::count_if(log.traces.begin(), log.traces.end(),
+                                                [](const Trace& trace) { return !trace.events.empty(); }));
+}
+
 std::string frequency_text(std::size_t count, std::size_t total, bool relative) {
   if (!relative) return std::to_string(count);
   return std::to_string(static_cast<long long>(100.0 * static_cast<double>(count) / static_cast<double>(total))) +
@@ -733,7 +740,7 @@ std::string llm_log_dfg_description(const EventLog& log, const LlmAbstractionOpt
   for (const auto& [arc, count] : order) {
     if (code_points(text) > options.max_len) break;
     text += arc.first + " -> " + arc.second + " ( frequency = " +
-            frequency_text(count, log.traces.size(), options.relative_frequency);
+            frequency_text(count, nonempty_cases(log), options.relative_frequency);
     if (options.include_performance) text += performance_text(arcs[arc], options, true);
     text += " )\n";
   }
@@ -743,6 +750,7 @@ std::string llm_log_dfg_description(const EventLog& log, const LlmAbstractionOpt
 std::string llm_log_variants_description(const EventLog& log, const LlmAbstractionOptions& options) {
   std::map<std::vector<std::string>, std::vector<double>> variants;
   for (const auto& trace : log.traces) {
+    if (trace.events.empty()) continue;
     std::vector<std::string> activities;
     std::int64_t first = 0, last = 0;
     for (std::size_t i = 0; i < trace.events.size(); ++i) {
@@ -775,7 +783,7 @@ std::string llm_log_variants_description(const EventLog& log, const LlmAbstracti
     std::string joined;
     for (const auto& activity : *entry.activities) joined += (joined.empty() ? "" : " -> ") + activity;
     text += " " + joined + " ( frequency = " +
-            frequency_text(entry.durations->size(), log.traces.size(), options.relative_frequency);
+            frequency_text(entry.durations->size(), nonempty_cases(log), options.relative_frequency);
     if (options.include_performance) text += performance_text(*entry.durations, options, false);
     text += " )\n";
   }

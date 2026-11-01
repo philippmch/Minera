@@ -422,7 +422,7 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
       for (const auto& arc : arcs) {
         if (contains(state.order, arc.place) || contains(inserted, arc.place)) {
           state.missing += missing_added;
-          total_missing_ += missing_added;
+          total_missing_ += static_cast<std::int64_t>(missing_added);
           return {case_key, std::string(activity), 0, missing_added, false, state.missing == 0};
         }
         missing_added += static_cast<std::uint64_t>(arc.weight);
@@ -438,7 +438,7 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
   ++state.events;
   state.missing += missing_added;
   ++total_events_processed_;
-  total_missing_ += missing_added;
+  total_missing_ += static_cast<std::int64_t>(missing_added);
   return {case_key, std::string(activity), total_events_processed_,
           missing_added, accepted, !state.hard_unfit && state.missing == 0};
 }
@@ -460,19 +460,28 @@ StreamingTokenReplay::terminate_case(const std::string& case_id) {
   if (it == cases_.end()) return std::nullopt;
   auto state = std::move(it->second);
   auto marking = state.marking;
-  // The reference compares the marking with the final one as it stands.
-  if (options_.variant == StreamingTbrVariant::kBackwards)
+  // The reference compares the marking with the final one as it stands (its
+  // silent route to the final marking never fires), then adds
+  // sum(final - marking) over the final places to the case's missing tokens
+  // and reports sum(marking) - sum(final) as remaining. Both are signed and
+  // a zero-token place contributes nothing, so a marking equal to the final
+  // one (zero-weight keys included) is fit. The backwards variant has no
+  // reference counterpart: it routes to the final marking first and counts
+  // per-place shortfalls and surpluses.
+  std::int64_t missing = 0, remaining = 0, added = 0;
+  if (options_.variant == StreamingTbrVariant::kBackwards) {
     if (const auto route = route_to_final(marking)) marking = route->marking;
-  const auto missing = state.missing + final_missing(marking);
-  const auto remaining = final_remaining(marking);
-  total_missing_ += final_missing(marking);
-  // A place listed with zero tokens (left by a zero-weight output arc) keeps
-  // the forward marking from equalling the final one.
-  const bool zero_listed =
-      options_.variant == StreamingTbrVariant::kForward &&
-      std::any_of(state.order.begin(), state.order.end(),
-                  [&](std::size_t place) { return marking[place] == 0 && final_[place] == 0; });
-  const bool fit = !state.hard_unfit && missing == 0 && remaining == 0 && !zero_listed;
+    added = static_cast<std::int64_t>(final_missing(marking));
+    remaining = static_cast<std::int64_t>(final_remaining(marking));
+  } else {
+    for (std::size_t place = 0; place < marking.size(); ++place) {
+      if (final_[place] > 0) added += final_[place] - marking[place];
+      remaining += marking[place] - final_[place];
+    }
+  }
+  missing = static_cast<std::int64_t>(state.missing) + added;
+  total_missing_ += added;
+  const bool fit = !state.hard_unfit && missing == 0 && remaining == 0;
   cases_.erase(it);
   return StreamingTbrTerminationResult{std::move(marking), missing, remaining,
                                        fit};

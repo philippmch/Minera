@@ -15,7 +15,7 @@ export interface LiveDelivery { position: number; source_position: number; batch
 export interface LiveTermination { case_id: string; revision: number; is_fit: boolean; missing?: number; remaining?: number; marking?: number[]; }
 export interface LiveSnapshot {
   family: "LIVE_STREAM_SESSION"; session_id: string; method: StreamingMethod; state: "INACTIVE" | "ACTIVE" | "FINISHED";
-  revision: number; pending: number; enqueued: number; delivered: number; registered: boolean; observer_id: number | null;
+  revision: number; pending: number; enqueued: number; delivered: number; deliveries_offset: number; registered: boolean; observer_id: number | null;
   result: StreamingResult; batches: LiveBatch[]; deliveries: LiveDelivery[]; terminations: LiveTermination[];
   configuration: Record<string,string>; sources: LiveSource[]; released?: boolean;
 }
@@ -33,10 +33,11 @@ export function validLiveSnapshot(value: unknown): value is LiveSnapshot {
   const batches = value.batches as LiveBatch[]; let position = 0;
   for (const batch of batches) { if (batch.first_position !== position) return false; position += batch.events; }
   if (position !== value.enqueued || new Set(batches.map(b => b.batch_id)).size !== batches.length) return false;
-  if (!Array.isArray(value.deliveries) || value.deliveries.length !== value.delivered || value.deliveries.length > (value.enqueued as number) || !value.deliveries.every(d => record(d) && count(d.position) && d.position < (value.enqueued as number) && count(d.source_position) && count(d.event_index) && batches.some(b => b.batch_id === d.batch_id && (d.position as number) >= b.first_position && (d.position as number) < b.first_position+b.events) && typeof d.case_id === "string" && typeof d.activity === "string" && typeof d.accepted === "boolean" && (d.error === null || typeof d.error === "string"))) return false;
+  // Responses list the latest deliveries only: deliveries_offset is the index of the first listed one.
+  if (!count(value.deliveries_offset) || !Array.isArray(value.deliveries) || (value.deliveries_offset as number) + value.deliveries.length !== value.delivered || value.deliveries.length > (value.enqueued as number) || !value.deliveries.every(d => record(d) && count(d.position) && d.position < (value.enqueued as number) && count(d.source_position) && count(d.event_index) && batches.some(b => b.batch_id === d.batch_id && (d.position as number) >= b.first_position && (d.position as number) < b.first_position+b.events) && typeof d.case_id === "string" && typeof d.activity === "string" && typeof d.accepted === "boolean" && (d.error === null || typeof d.error === "string"))) return false;
   if (new Set(value.deliveries.map(d => (d as LiveDelivery).position)).size !== value.deliveries.length) return false;
   if(value.result.family==="STREAMING_DECLARE") {const model=value.result.model; if(!value.deliveries.every(d=>d.error!==null&&d.native_event===undefined||validDeclareStreamEvent(d.native_event,model)&&d.native_event.event_index===d.event_index&&d.native_event.activity===d.activity))return false;}
-  if (!Array.isArray(value.terminations) || !value.terminations.every(t => record(t) && typeof t.case_id === "string" && count(t.revision) && t.revision <= (value.revision as number) && typeof t.is_fit === "boolean" && (value.method !== "tbr" || count(t.missing) && count(t.remaining) && Array.isArray(t.marking) && t.marking.every(count)))) return false;
+  if (!Array.isArray(value.terminations) || !value.terminations.every(t => record(t) && typeof t.case_id === "string" && count(t.revision) && t.revision <= (value.revision as number) && typeof t.is_fit === "boolean" && (value.method !== "tbr" || Number.isSafeInteger(t.missing) && Number.isSafeInteger(t.remaining) && Array.isArray(t.marking) && t.marking.every(count)))) return false;
   if (!Array.isArray(value.sources) || !value.sources.every(s => record(s) && typeof s.source_id === "string" && typeof s.name === "string" && ["csv","xes","pnml","declare_json"].includes(String(s.format)) && count(s.size) && typeof s.provided_sha256 === "string")) return false;
   const sources = value.sources as LiveSource[];
   const modelFormat=value.method==="tbr"?"pnml":value.method==="declare"?"declare_json":null;
@@ -45,7 +46,7 @@ export function validLiveSnapshot(value: unknown): value is LiveSnapshot {
 export function liveTables(snapshot: LiveSnapshot): Record<string,OcelPreparedTable> {
   const tables = streamingTables(snapshot.result);
   const table = (columns: string[], items: object[], rowAt: (item: object) => unknown[]): OcelPreparedTable => ({ columns, count: items.length, rowAt: i => rowAt(items[i]) });
-  const columns = ["session_id","method","state","revision","pending","enqueued","delivered","registered","observer_id","released"];
+  const columns = ["session_id","method","state","revision","pending","enqueued","delivered","deliveries_offset","registered","observer_id","released"];
   tables.session = { columns, count: 1, rowAt: () => columns.map(key => nativeCell(snapshot,key) ?? (key === "released" ? false : null)) };
   tables.batches = table(["batch_id","first_position","events"],snapshot.batches,item => ["batch_id","first_position","events"].map(key => nativeCell(item,key)));
   const deliveryColumns = ["position","source_position","batch_id","case_id","activity","accepted","event_index","error"];

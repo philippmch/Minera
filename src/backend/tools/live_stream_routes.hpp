@@ -10,10 +10,21 @@ struct LiveSessionRecord {
   httplib::Params configuration;
   minera::CsvImportOptions csv;
   minera::XesImportOptions xes;
-  std::unique_ptr<minera::StreamingSession> monitor;
+  // Shared so a request can wait for the queue without the record lock while
+  // a concurrent release drops the record's own reference.
+  std::shared_ptr<minera::StreamingSession> monitor;
+  std::size_t stored_bytes = 0, stored_events = 0;
   std::vector<LiveUpload> sources;
   bool released = false;
 };
+// Sessions live in server memory until released, so the registries are
+// bounded: a full registry refuses new sessions (429) until one is released,
+// and a session refuses uploads beyond its stored-byte budget (413).
+struct LiveCapacityError : std::runtime_error { int status; LiveCapacityError(int code,const std::string& message):std::runtime_error(message),status(code){} };
+constexpr std::size_t kLiveMaxSessions = 32;
+constexpr std::size_t kLiveMaxStoredBytes = 256u * 1024u * 1024u;
+// Each queued event and its delivery record cost a few KB in memory.
+constexpr std::size_t kLiveMaxEvents = 1000000;
 std::mutex g_live_mutex;
 std::map<std::string,std::shared_ptr<LiveSessionRecord>> g_live_sessions;
 
@@ -38,14 +49,21 @@ void live_open(const LiveSessionRecord& session) {
   if(session.released||!session.monitor)throw std::out_of_range("live session was released");
 }
 std::size_t live_revision(const httplib::Request& request) { (void)live_required(request,"expected_revision");return ocel_query_size(request,"expected_revision",0); }
-std::string live_payload(LiveSessionRecord& session,bool wait=true) {
-  live_open(session);auto json=session.monitor->snapshot_json(wait);json.pop_back();const auto quote=minera::embedding_runtime::detail::escape_json;
+std::size_t live_delivery_limit(const httplib::Request& request) {
+  const auto limit=ocel_query_size(request,"deliveries_limit",minera::StreamingSession::kDefaultDeliveryLimit);
+  if(limit>100000)throw std::invalid_argument("deliveries_limit must be at most 100000");return limit;
+}
+// Callers hold session.mutex; the monitor snapshot never waits for the queue
+// here (requests wait first, without the record lock).
+std::string live_payload(LiveSessionRecord& session,std::size_t delivery_limit=minera::StreamingSession::kDefaultDeliveryLimit) {
+  live_open(session);auto json=session.monitor->snapshot_json(false,delivery_limit);json.pop_back();const auto quote=minera::embedding_runtime::detail::escape_json;
   std::ostringstream out;out<<json<<",\"session_id\":"<<quote(session.id)<<",\"configuration\":{";
   bool first=true;for(const auto& [key,value]:session.configuration){if(!first)out<<',';first=false;out<<quote(key)<<':'<<quote(value);}out<<"},\"sources\":[";
   for(std::size_t i=0;i<session.sources.size();++i){const auto& s=session.sources[i];if(i)out<<',';out<<"{\"source_id\":"<<quote(s.id)<<",\"name\":"<<quote(s.name)<<",\"format\":"<<quote(s.format)<<",\"size\":"<<s.bytes.size()<<",\"provided_sha256\":"<<quote(s.provided_sha256)<<'}';}out<<"]}";return out.str();
 }
 template<class F> void live_response(httplib::Response& response,F action) {
   try {action();}
+  catch(const LiveCapacityError& e){response.status=e.status;response.set_content(error_json(e.what()),"application/json");}
   catch(const minera::StreamingSessionConflict& e){response.status=409;response.set_content(error_json(e.what()),"application/json");}
   catch(const std::out_of_range& e){response.status=404;response.set_content(error_json(e.what()),"application/json");}
   catch(const std::exception& e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
@@ -67,6 +85,10 @@ void handle_live_create(const httplib::Request& request,httplib::Response& respo
     if(request.has_param(prefix+"case_id_column"))record->csv.case_id_column=request.get_param_value(prefix+"case_id_column");
     if(request.has_param(prefix+"activity_column"))record->csv.activity_column=request.get_param_value(prefix+"activity_column");
     if(request.has_param(prefix+"timestamp_column"))record->csv.timestamp_column=request.get_param_value(prefix+"timestamp_column");
+    // Batches are uploaded event streams: keep rows the batch importer would
+    // drop for an NA-spelled or empty case id/activity, as the reference CSV
+    // stream reader does.
+    record->csv.keep_na_first_class_values=true;
     if(record->csv.case_id_column.empty()||record->csv.activity_column.empty()||record->csv.timestamp_column.empty())throw std::invalid_argument("live CSV selectors must not be empty");
     if(request.has_param("csv_delimiter")){const auto v=request.get_param_value("csv_delimiter");if(v.size()!=1||v[0]=='\0'||v[0]=='\r'||v[0]=='\n')throw std::invalid_argument("CSV delimiter must be one character");record->csv.delimiter=v[0];}
     record->csv.trim_fields=ocel_query_bool(request,"csv_trim_fields",record->csv.trim_fields);record->csv.has_header=ocel_query_bool(request,"csv_has_header",record->csv.has_header);record->csv.allow_case_id_aliases=ocel_query_bool(request,"csv_case_aliases",record->csv.allow_case_id_aliases);
@@ -98,50 +120,68 @@ void handle_live_create(const httplib::Request& request,httplib::Response& respo
       const auto bytes=form_field(request,"model");if(bytes.empty())throw std::invalid_argument("live replay requires a PNML model");options.net=minera::parse_pnml(bytes);
       record->sources.push_back({"model",request.has_param("source_name")?request.get_param_value("source_name"):"model.pnml","pnml",request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",bytes});
     }
-    record->monitor=std::make_unique<minera::StreamingSession>(std::move(options));
-    {std::lock_guard lock(g_live_mutex);auto [it,inserted]=g_live_sessions.emplace(id,record);if(!inserted){auto existing=it->second;record=std::move(existing);}}
+    record->monitor=std::make_shared<minera::StreamingSession>(std::move(options));
+    for(const auto& source:record->sources)record->stored_bytes+=source.bytes.size();
+    {std::lock_guard lock(g_live_mutex);const auto found=g_live_sessions.find(id);
+      if(found!=g_live_sessions.end())record=found->second;
+      else if(g_live_sessions.size()>=kLiveMaxSessions)throw LiveCapacityError(429,"too many live sessions ("+std::to_string(kLiveMaxSessions)+"); release one before creating another");
+      else g_live_sessions.emplace(id,record);}
     std::lock_guard lock(record->mutex);live_open(*record);
     if(record->configuration!=request.params||((method=="tbr"||method=="declare")&&record->sources.front().bytes!=form_field(request,"model")))throw minera::StreamingSessionConflict("live session ID already has a different configuration");
     response.set_content(live_payload(*record),"application/json");
   });
 }
+std::shared_ptr<minera::StreamingSession> live_monitor(LiveSessionRecord& session) { std::lock_guard lock(session.mutex);live_open(session);return session.monitor; }
 void handle_live_snapshot(const httplib::Request& request,httplib::Response& response) {
-  live_response(response,[&]{live_params(request,{"session_id","wait_until_drained"});auto s=live_find(request);std::lock_guard lock(s->mutex);response.set_content(live_payload(*s,ocel_query_bool(request,"wait_until_drained",true)),"application/json");});
+  live_response(response,[&]{live_params(request,{"session_id","wait_until_drained","deliveries_limit"});const auto limit=live_delivery_limit(request);auto s=live_find(request);
+    if(ocel_query_bool(request,"wait_until_drained",true))live_monitor(*s)->wait_until_drained();
+    std::lock_guard lock(s->mutex);response.set_content(live_payload(*s,limit),"application/json");});
 }
 void handle_live_append(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{
-    live_params(request,{"session_id","expected_revision","batch_id","format","source_name","source_sha256","wait_until_drained"});auto s=live_find(request);std::lock_guard lock(s->mutex);live_open(*s);const auto revision=live_revision(request);
+    live_params(request,{"session_id","expected_revision","batch_id","format","source_name","source_sha256","wait_until_drained","deliveries_limit"});const auto limit=live_delivery_limit(request);auto s=live_find(request);std::shared_ptr<minera::StreamingSession> monitor;
+    {std::unique_lock lock(s->mutex);live_open(*s);const auto revision=live_revision(request);
     if(s->monitor->revision()!=revision)throw minera::StreamingSessionConflict("live session revision changed; refresh before appending");
     const bool wait=ocel_query_bool(request,"wait_until_drained",true);
     const auto batch=live_required(request,"batch_id"),format=live_required(request,"format");live_id(batch);if(batch=="model")throw std::invalid_argument("model is reserved as a source ID");
-    const auto bytes=ocel_request_body(request,"log");if(bytes.empty())throw std::invalid_argument("live event upload is empty");std::istringstream input(bytes);minera::EventLog log;
+    const auto bytes=ocel_request_body(request,"log");if(bytes.empty())throw std::invalid_argument("live event upload is empty");
+    if(s->stored_bytes+bytes.size()>kLiveMaxStoredBytes)throw LiveCapacityError(413,"live session upload budget ("+std::to_string(kLiveMaxStoredBytes)+" bytes) is exhausted; release it and start another");std::istringstream input(bytes);minera::EventLog log;
     if(format=="csv")log=minera::import_csv_event_log(input,s->csv);else if(format=="xes")log=minera::import_xes_event_log(input,s->xes);else throw std::invalid_argument("live batches require CSV or XES format");
     httplib::Request order;order.params.emplace("streaming_event_order",s->configuration.contains("streaming_event_order")?s->configuration.find("streaming_event_order")->second:"input");std::vector<minera::Event> events;for(const auto* event:streaming_events(log,order))events.push_back(*event);
     // The monitors select the session's activity and timestamp fields by its
     // column names; an XES batch exposes its selected XES attributes under
     // them unless the event carries a literal field of that name.
     if(format=="xes")for(auto& event:events){const auto literal=[&](const std::string& key){return std::any_of(event.attributes.begin(),event.attributes.end(),[&](const auto& a){return a.key==key;});};if(!literal(s->csv.activity_column))event.activity_source_key=s->csv.activity_column;if(!literal(s->csv.timestamp_column))event.timestamp_source_key=s->csv.timestamp_column;}
-    s->monitor->append(std::move(events),batch,revision);s->sources.push_back({batch,request.has_param("source_name")?request.get_param_value("source_name"):batch,format,request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",bytes});
-    response.set_content(live_payload(*s,wait),"application/json");
+    if(s->stored_events+events.size()>kLiveMaxEvents)throw LiveCapacityError(413,"live session event budget ("+std::to_string(kLiveMaxEvents)+" events) is exhausted; release it and start another");
+    const auto appended=events.size();s->monitor->append(std::move(events),batch,revision);s->stored_events+=appended;s->sources.push_back({batch,request.has_param("source_name")?request.get_param_value("source_name"):batch,format,request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",bytes});s->stored_bytes+=bytes.size();
+    if(!wait){response.set_content(live_payload(*s,limit),"application/json");return;}
+    monitor=s->monitor;}
+    monitor->wait_until_drained();
+    std::lock_guard lock(s->mutex);response.set_content(live_payload(*s,limit),"application/json");
   });
 }
 void handle_live_action(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{
-    live_params(request,{"session_id","expected_revision","action","case_id"});auto s=live_find(request);std::lock_guard lock(s->mutex);live_open(*s);
+    live_params(request,{"session_id","expected_revision","action","case_id","deliveries_limit"});const auto limit=live_delivery_limit(request);auto s=live_find(request);const auto monitor=live_monitor(*s);
     const std::map<std::string,minera::StreamingSessionAction> actions={{"start",minera::StreamingSessionAction::kStart},{"drain",minera::StreamingSessionAction::kDrain},{"finish",minera::StreamingSessionAction::kFinish},{"register",minera::StreamingSessionAction::kRegister},{"deregister",minera::StreamingSessionAction::kDeregister},{"reset_all",minera::StreamingSessionAction::kResetAll},{"reset_case",minera::StreamingSessionAction::kResetCase},{"terminate_case",minera::StreamingSessionAction::kTerminateCase},{"terminate_all",minera::StreamingSessionAction::kTerminateAll}};
-    const auto action=live_required(request,"action");const auto it=actions.find(action);if(it==actions.end())throw std::invalid_argument("unknown live action");s->monitor->action(it->second,live_revision(request),request.has_param("case_id")?request.get_param_value("case_id"):"");response.set_content(live_payload(*s),"application/json");
+    const auto action=live_required(request,"action");const auto it=actions.find(action);if(it==actions.end())throw std::invalid_argument("unknown live action");
+    // The monitor serializes and revision-checks actions itself and waits for
+    // the queue without a lock, so the record lock is not held meanwhile.
+    monitor->action(it->second,live_revision(request),request.has_param("case_id")?request.get_param_value("case_id"):"");std::lock_guard lock(s->mutex);response.set_content(live_payload(*s,limit),"application/json");
   });
 }
 void handle_live_list(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{live_params(request,{});std::vector<std::shared_ptr<LiveSessionRecord>> sessions;{std::lock_guard lock(g_live_mutex);for(const auto& [id,s]:g_live_sessions){(void)id;sessions.push_back(s);}}
-    std::ostringstream out;out<<"{\"sessions\":[";bool first=true;for(const auto& s:sessions){std::lock_guard lock(s->mutex);if(s->released)continue;if(!first)out<<',';first=false;out<<live_payload(*s,false);}out<<"]}";response.set_content(out.str(),"application/json");});
+    std::ostringstream out;out<<"{\"sessions\":[";bool first=true;for(const auto& s:sessions){std::lock_guard lock(s->mutex);if(s->released)continue;if(!first)out<<',';first=false;out<<live_payload(*s,0);}out<<"]}";response.set_content(out.str(),"application/json");});
 }
 void handle_live_source(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{live_params(request,{"session_id","source_id"});auto s=live_find(request);std::lock_guard lock(s->mutex);live_open(*s);const auto id=live_required(request,"source_id");for(const auto& source:s->sources)if(source.id==id){response.set_content(source.bytes,"application/octet-stream");return;}throw std::out_of_range("live source upload is unavailable");});
 }
 void handle_live_release(const httplib::Request& request,httplib::Response& response) {
-  live_response(response,[&]{live_params(request,{"session_id","expected_revision"});auto s=live_find(request);std::lock_guard lock(s->mutex);live_open(*s);const auto revision=live_revision(request);if(s->monitor->revision()!=revision)throw minera::StreamingSessionConflict("live session revision changed; refresh before releasing");
-    const auto before=s->monitor->snapshot_json();if(before.find("\"state\":\"INACTIVE\"")!=std::string::npos&&before.find("\"pending\":0,")==std::string::npos)throw minera::StreamingSessionConflict("start and finish the queued stream before releasing");
+  live_response(response,[&]{live_params(request,{"session_id","expected_revision"});auto s=live_find(request);const auto revision=live_revision(request);
+    {const auto monitor=live_monitor(*s);if(monitor->revision()!=revision)throw minera::StreamingSessionConflict("live session revision changed; refresh before releasing");monitor->wait_until_drained();}
+    std::lock_guard lock(s->mutex);live_open(*s);if(s->monitor->revision()!=revision)throw minera::StreamingSessionConflict("live session revision changed; refresh before releasing");
+    const auto before=s->monitor->snapshot_json(false,0);if(before.find("\"state\":\"INACTIVE\"")!=std::string::npos&&before.find("\"pending\":0,")==std::string::npos)throw minera::StreamingSessionConflict("start and finish the queued stream before releasing");
     if(before.find("\"state\":\"ACTIVE\"")!=std::string::npos)s->monitor->action(minera::StreamingSessionAction::kFinish,revision);
     auto payload=live_payload(*s);payload.pop_back();payload+=",\"released\":true}";s->released=true;s->monitor.reset();{std::lock_guard registry_lock(g_live_mutex);g_live_sessions.erase(s->id);}response.set_content(payload,"application/json");});
 }

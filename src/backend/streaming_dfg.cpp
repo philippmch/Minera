@@ -141,6 +141,11 @@ std::optional<std::string> streaming_event_activity(const Event& event,
   }
 }
 
+std::uint64_t StreamingDfgDiscovery::events() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return events_;
+}
+
 StreamingDfgSnapshot StreamingDfgDiscovery::snapshot() const {
   std::lock_guard<std::mutex> lock(mutex_);
   StreamingDfgSnapshot result;

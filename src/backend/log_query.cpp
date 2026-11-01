@@ -113,7 +113,8 @@ LogQueryResult query_log_sqlite(const LogQueryTable& input,std::string_view sql,
  (void)input;(void)sql;(void)options;throw std::runtime_error("SQLite query support is unavailable in this build");
 #else
  input.table.validate();if(sql.empty()||sql.find('\0')!=std::string_view::npos)throw std::invalid_argument("query SQL must be nonempty and contain no NUL");
- if(!options.max_rows||options.max_rows>1000000||!options.max_vm_steps)throw std::invalid_argument("invalid SQL query limits");
+ if(!options.max_rows||options.max_rows>1000000||!options.max_vm_steps||!options.max_output_bytes)throw std::invalid_argument("invalid SQL query limits");
+ const auto output_limit=[&]{return std::length_error("SQL query result exceeds the "+std::to_string(options.max_output_bytes)+"-byte output limit; select fewer rows or columns");};
  Database database;std::string create="CREATE TABLE "+identifier(options.table_name)+" (";
  for(std::size_t c=0;c<input.table.columns.size();++c){if(c)create+=',';create+=identifier(input.table.columns[c]);}create+=')';
  require_ok(database.value,sqlite3_exec(database.value,create.c_str(),nullptr,nullptr,nullptr));
@@ -123,6 +124,10 @@ LogQueryResult query_log_sqlite(const LogQueryTable& input,std::string_view sql,
  require_ok(database.value,sqlite3_exec(database.value,"BEGIN",nullptr,nullptr,nullptr));
  for(const auto& row:input.table.rows){for(std::size_t c=0;c<row.size();++c)bind_query_value(write.value,static_cast<int>(c+1),scalar(row[c]));if(sqlite3_step(write.value)!=SQLITE_DONE)throw std::runtime_error(sqlite3_errmsg(database.value));sqlite3_reset(write.value);sqlite3_clear_bindings(write.value);}
  require_ok(database.value,sqlite3_exec(database.value,"COMMIT",nullptr,nullptr,nullptr));
+ // Set after loading the source table: no single string or blob produced by
+ // the query (zeroblob, randomblob, replace, group_concat...) may exceed the
+ // output limit, so SQLite fails before allocating it.
+ sqlite3_limit(database.value,SQLITE_LIMIT_LENGTH,static_cast<int>(std::min<std::size_t>(options.max_output_bytes,0x7fffffff)));
  sqlite3_set_authorizer(database.value,authorize,nullptr);Budget budget{0,options.max_vm_steps};sqlite3_progress_handler(database.value,1000,progress,&budget);
  Statement statement;const char* tail=nullptr;const std::string text(sql);require_ok(database.value,sqlite3_prepare_v2(database.value,text.c_str(),-1,&statement.value,&tail));
  if(!statement.value||!sqlite3_stmt_readonly(statement.value)||sqlite3_column_count(statement.value)==0)throw std::invalid_argument("expected one read-only result query");
@@ -133,13 +138,15 @@ LogQueryResult query_log_sqlite(const LogQueryTable& input,std::string_view sql,
  for(int c=0;c<sqlite3_column_count(statement.value);++c){result.columns.emplace_back(sqlite3_column_name(statement.value,c));if(result.columns.back()==input.event_index_column){index_column=c;++index_columns;}}
  if(index_columns!=1)index_column=-1;
  result.can_filter=index_column>=0;std::set<std::size_t> selected;
- int status=SQLITE_ROW;
+ int status=SQLITE_ROW;std::size_t output_bytes=0;
  while((status=sqlite3_step(statement.value))==SQLITE_ROW){
   if(result.rows.size()>=options.max_rows){result.output_truncated=true;break;}
-  std::vector<QueryValue> row;for(int c=0;c<sqlite3_column_count(statement.value);++c)row.push_back(value(statement.value,c));
+  std::vector<QueryValue> row;for(int c=0;c<sqlite3_column_count(statement.value);++c){row.push_back(value(statement.value,c));if(const auto* text=std::get_if<std::string>(&row.back()))output_bytes+=text->size();else if(const auto* blob=std::get_if<QueryBlob>(&row.back()))output_bytes+=blob->hex.size();else output_bytes+=8;}
+  if(output_bytes>options.max_output_bytes)throw output_limit();
   if(index_column>=0){const auto* index=std::get_if<std::int64_t>(&row[index_column]);if(index&&*index>=0&&static_cast<std::uint64_t>(*index)<input.table.rows.size())selected.insert(static_cast<std::size_t>(*index));else result.can_filter=false;}
   result.rows.push_back(std::move(row));
  }
+ if(status==SQLITE_TOOBIG)throw output_limit();
  if(status!=SQLITE_DONE&&status!=SQLITE_ROW)throw std::runtime_error(sqlite3_errmsg(database.value));
  if(result.can_filter&&!result.output_truncated)result.selected_event_indices.assign(selected.begin(),selected.end());
  return result;

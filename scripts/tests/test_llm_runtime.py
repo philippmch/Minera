@@ -204,6 +204,22 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(self.calls[-1]['headers']['Authorization'],'Bearer fixture-secret')
         self.assertIn('max_completion_tokens',self.calls[-1]['body'])
 
+    def test_call_local_url_never_receives_the_configured_credential(self):
+        # A caller-chosen endpoint without its own key must not get the stored
+        # runtime secret (it previously went out as the bearer token).
+        base=self.configs['openai'].base_url+'/elsewhere'
+        for provider in llm.PROVIDERS:
+            with self.subTest(provider=provider):
+                self.runtime.complete(self.payload(provider,api_url=base))
+                call=self.calls[-1]
+                self.assertTrue(call['path'].startswith('/v1/elsewhere/'))
+                self.assertNotIn('fixture-secret',json.dumps(call['headers']))
+                for header in ('Authorization','X-Api-Key','X-Goog-Api-Key'):self.assertNotIn(header,call['headers'])
+        self.runtime.complete(self.payload(api_url=base,api_key='own-key'))
+        self.assertEqual(self.calls[-1]['headers']['Authorization'],'Bearer own-key')
+        self.runtime.complete(self.payload(api_url=None))
+        self.assertEqual(self.calls[-1]['headers']['Authorization'],'Bearer fixture-secret')
+
     def test_missing_null_and_explicit_empty_are_distinct_per_call(self):
         for provider in llm.PROVIDERS:
             self.runtime.complete(self.payload(provider,api_key=None,api_url=None,openai_token_field=None))

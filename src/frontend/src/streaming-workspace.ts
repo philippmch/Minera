@@ -129,7 +129,8 @@ export function validStreamingResult(value: unknown, form: StreamingForm): value
       new Set(terminated.map(entry => record(entry) ? entry.case_id : undefined)).size !== prefixIds.length ||
       !terminated.every(entry =>
       record(entry) && prefixIds.includes(entry.case_id as string) && typeof entry.is_fit === "boolean" &&
-      (form.method !== "tbr" || (count(entry.missing) && count(entry.remaining) &&
+      // Termination counts are the reference's signed sums.
+      (form.method !== "tbr" || (Number.isSafeInteger(entry.missing) && Number.isSafeInteger(entry.remaining) &&
         Array.isArray(entry.marking) && entry.marking.every(count))))) return false;
     const cases = (value as unknown as { cases: unknown }).cases;
     if (!cases || Object.keys(cases).length) return false;

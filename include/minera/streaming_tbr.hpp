@@ -53,17 +53,21 @@ struct StreamingTbrEventResult {
   bool is_fit = true;
 };
 
+// Forward termination counts as the reference does: missing adds
+// final - marking over the final places and remaining is the token total
+// minus the final total, both signed (a surplus final token lowers missing,
+// a missing final token lowers remaining).
 struct StreamingTbrTerminationResult {
   std::vector<int> marking;
-  std::uint64_t missing = 0;
-  std::uint64_t remaining = 0;
+  std::int64_t missing = 0;
+  std::int64_t remaining = 0;
   bool is_fit = false;
 };
 
 struct StreamingTbrSnapshot {
   std::string variant = "FORWARD";
   std::size_t total_events_processed = 0;
-  std::uint64_t total_missing = 0;
+  std::int64_t total_missing = 0;  // signed: terminations can lower it
   std::map<std::string, StreamingTbrCaseSnapshot> cases;
 };
 
@@ -151,7 +155,7 @@ class StreamingTokenReplay {
   std::vector<std::vector<std::optional<std::vector<std::size_t>>>> silent_paths_;
   std::map<std::string, CaseState> cases_;
   std::size_t total_events_processed_ = 0;
-  std::uint64_t total_missing_ = 0;
+  std::int64_t total_missing_ = 0;
   mutable std::mutex mutex_;
 };
 

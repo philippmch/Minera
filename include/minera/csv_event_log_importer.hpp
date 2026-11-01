@@ -22,6 +22,11 @@ struct CsvImportOptions {
   // Opt-in fallback between case_id and case:concept:name. An exact column
   // match always wins; custom case selectors remain exact.
   bool allow_case_id_aliases = false;
+  // The batch import (read_csv + format_dataframe) drops a row whose case id
+  // or activity is a pandas NA spelling or an empty cell. The reference CSV
+  // event stream reader (csv.DictReader) keeps every row and passes those
+  // cells on as literal text, so stream adapters set this to keep them.
+  bool keep_na_first_class_values = false;
 };
 
 // The CSV adapter keeps both projections of one parse.  `log` retains the

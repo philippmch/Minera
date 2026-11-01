@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -72,6 +73,73 @@ inline void validate_url(std::string_view url) {
   catch (const std::exception&) {
     throw std::invalid_argument("LLM runtime URL must be http://host[:port] without a path or credentials");
   }
+}
+
+// Strict RFC 8259 check that a runtime body is one JSON object, so that a
+// failing or misbehaving runtime never reaches clients as a non-JSON body
+// labelled application/json.
+namespace detail {
+struct JsonChecker {
+  std::string_view text;
+  std::size_t at = 0;
+  void space() { while (at < text.size() && (text[at] == ' ' || text[at] == '\t' || text[at] == '\n' || text[at] == '\r')) ++at; }
+  bool literal(std::string_view word) { if (text.substr(at, word.size()) != word) return false; at += word.size(); return true; }
+  bool digits() { const auto begin = at; while (at < text.size() && text[at] >= '0' && text[at] <= '9') ++at; return at > begin; }
+  bool number() {
+    if (at < text.size() && text[at] == '-') ++at;
+    if (at < text.size() && text[at] == '0') ++at; else if (!digits()) return false;
+    if (at < text.size() && text[at] == '.') { ++at; if (!digits()) return false; }
+    if (at < text.size() && (text[at] == 'e' || text[at] == 'E')) { ++at; if (at < text.size() && (text[at] == '+' || text[at] == '-')) ++at; if (!digits()) return false; }
+    return true;
+  }
+  bool string() {
+    if (at >= text.size() || text[at] != '"') return false;
+    for (++at; at < text.size(); ++at) {
+      const auto c = static_cast<unsigned char>(text[at]);
+      if (c == '"') { ++at; return true; }
+      if (c < 0x20) return false;
+      if (c == '\\') {
+        if (++at >= text.size()) return false;
+        const char e = text[at];
+        if (e == 'u') { for (int i = 0; i < 4; ++i) if (++at >= text.size() || !std::isxdigit(static_cast<unsigned char>(text[at]))) return false; }
+        else if (std::string_view("\"\\/bfnrt").find(e) == std::string_view::npos) return false;
+      }
+    }
+    return false;
+  }
+  bool value(int depth) {
+    if (depth > 512) return false;
+    space();
+    if (at >= text.size()) return false;
+    const char c = text[at];
+    if (c == '{' || c == '[') {
+      const char close = c == '{' ? '}' : ']';
+      ++at; space();
+      if (at < text.size() && text[at] == close) { ++at; return true; }
+      while (true) {
+        if (c == '{') { space(); if (!string()) return false; space(); if (at >= text.size() || text[at] != ':') return false; ++at; }
+        if (!value(depth + 1)) return false;
+        space();
+        if (at < text.size() && text[at] == ',') { ++at; continue; }
+        if (at < text.size() && text[at] == close) { ++at; return true; }
+        return false;
+      }
+    }
+    if (c == '"') return string();
+    if (c == 't') return literal("true");
+    if (c == 'f') return literal("false");
+    if (c == 'n') return literal("null");
+    return number();
+  }
+};
+}  // namespace detail
+
+inline bool is_json_object(std::string_view text) {
+  detail::JsonChecker checker{text};
+  checker.space();
+  if (checker.at >= text.size() || text[checker.at] != '{' || !checker.value(0)) return false;
+  checker.space();
+  return checker.at == text.size();
 }
 
 inline httplib::Result request(std::string_view url, std::string_view route,

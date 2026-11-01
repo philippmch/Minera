@@ -4,7 +4,9 @@
 #include <cassert>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -38,6 +40,27 @@ void csv_events_transform_filter_and_reset() {
   assert(reader.exhausted());
   reader.reset();
   assert(reader.read_event()->activity == "A!");
+  std::filesystem::remove(path);
+}
+
+// The reference CSV event stream reader (csv.DictReader) yields every row in
+// file order, with empty and pandas-NA-spelled cells as literal text; the
+// batch importer drops such rows.
+void csv_events_keep_na_spellings_in_file_order() {
+  const std::string body =
+      "case_id,activity,timestamp\nNA,A,1\nc2,B,2\nNA,NaN,3\n,C,4\nnull,,5\n";
+  const auto path = write_file("na.csv", body);
+  minera::CsvEventStreamReader reader(path);
+  const std::pair<const char*, const char*> expected[] = {
+      {"NA", "A"}, {"c2", "B"}, {"NA", "NaN"}, {"", "C"}, {"null", ""}};
+  for (const auto& [case_id, activity] : expected) {
+    const auto event = reader.read_event();
+    assert(event && event->case_id == case_id && event->activity == activity);
+    assert(event->has_case_id());
+  }
+  assert(!reader.read_event());
+  std::istringstream batch(body);
+  assert(minera::import_csv_event_log(batch).traces.size() == 1);  // only c2
   std::filesystem::remove(path);
 }
 
@@ -113,6 +136,7 @@ void xes_events_carry_trace_attributes() {
 int main() {
   xes_events_carry_trace_attributes();
   csv_events_transform_filter_and_reset();
+  csv_events_keep_na_spellings_in_file_order();
   xes_event_and_trace_streams_deliver();
   return 0;
 }

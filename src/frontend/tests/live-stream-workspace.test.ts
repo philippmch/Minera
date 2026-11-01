@@ -28,9 +28,22 @@ describe("persistent native stream sessions",()=>{
     s=parse(dfgRaw);s.registered=false;expect(validLiveSnapshot(s)).toBe(false);
     s=parse(dfgRaw);s.sources.pop();expect(validLiveSnapshot(s)).toBe(false);
   });
+  it("accepts a bounded tail of deliveries with its offset and rejects inconsistent tails",()=>{
+    let s=parse(largeRaw);const total=s.delivered;s.deliveries=s.deliveries.slice(-10);s.deliveries_offset=total-10;expect(validLiveSnapshot(s)).toBe(true);
+    expect(liveTables(s).deliveries.count).toBe(10);
+    expect(renderToStaticMarkup(createElement(LiveStreamingInspection,{run:{result:s,raw:"{}",report_json:"{}",tables:liveTables(s)},pending:false,onAction:()=>{},onDisconnect:()=>{},onError:()=>{}}))).toContain("the latest 10 are listed");
+    s=parse(largeRaw);s.deliveries=s.deliveries.slice(-10);expect(validLiveSnapshot(s)).toBe(false);
+    s=parse(largeRaw);s.deliveries_offset=1;expect(validLiveSnapshot(s)).toBe(false);
+    s=parse(largeRaw);delete (s as Partial<LiveSnapshot>).deliveries_offset;expect(validLiveSnapshot(s)).toBe(false);
+    s=parse(largeRaw);s.deliveries=[];s.deliveries_offset=s.delivered;expect(validLiveSnapshot(s)).toBe(true);
+  });
+  it("accepts the reference's signed replay termination counts",()=>{
+    const s=parse(tbrRaw);expect(s.terminations.length).toBeGreaterThan(0);s.terminations[0].missing=-1;s.terminations[0].remaining=-2;expect(validLiveSnapshot(s)).toBe(true);
+    s.terminations[0].missing=0.5;expect(validLiveSnapshot(s)).toBe(false);
+  });
   it("retains queue history and native monitor counters as separate table fields",()=>{
     const s=parse(dfgRaw),tables=liveTables(s);
-    expect(tables.session.rowAt(0)).toEqual([s.session_id,"dfg","ACTIVE",4,0,6,6,true,1,false]);
+    expect(tables.session.rowAt(0)).toEqual([s.session_id,"dfg","ACTIVE",4,0,6,6,0,true,1,false]);
     expect(tables.batches.rowAt(1)).toEqual(["owned-dfg-second",2,2]);
     expect(tables.deliveries.rowAt(2).slice(0,6)).toEqual([2,0,"owned-dfg-second","c1","B",true]);
     expect(tables.edges.count).toBe(2);expect(tables.input.rowAt(0)).toEqual(["input",6]);

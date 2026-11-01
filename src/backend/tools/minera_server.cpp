@@ -4703,6 +4703,24 @@ void handle_knowledge_injection(const httplib::Request& request,
 
 #include "knowledge_exact_route.hpp"
 
+// Relays a runtime reply only when it is a JSON object with a client-facing
+// status; anything else (HTML error pages, truncated JSON, redirects) becomes
+// a 502 JSON error that names the runtime and its status.
+void forward_runtime_response(httplib::Response& response, const httplib::Result& result,
+                              std::string_view runtime) {
+  const int status = result->status;
+  const bool usable_status = (status >= 200 && status < 300) || (status >= 400 && status <= 599);
+  if (!usable_status || !minera::llm_runtime::is_json_object(result->body)) {
+    response.status = 502;
+    response.set_content(error_json(std::string(runtime) + " returned an invalid response (HTTP " +
+                                    std::to_string(status) + ", expected a JSON object)"),
+                         "application/json");
+    return;
+  }
+  response.status = status;
+  response.set_content(result->body, "application/json");
+}
+
 bool llm_origin_allowed(const httplib::Request& request, httplib::Response& response) {
   if (!request.has_header("Origin")) return true;
   const auto origin = request.get_header_value("Origin");
@@ -4724,8 +4742,7 @@ void handle_llm_status(const httplib::Request& request, httplib::Response& respo
   try {
     if (!request.params.empty()) throw std::invalid_argument("LLM status does not accept query parameters");
     const auto result = minera::llm_runtime::request(g_llm_runtime_url, "/health");
-    response.status = result->status;
-    response.set_content(result->body, "application/json");
+    forward_runtime_response(response, result, "LLM runtime");
   } catch (const std::exception& error) {
     response.status = 502; response.set_content(error_json(error.what()), "application/json");
   }
@@ -4748,8 +4765,7 @@ void handle_llm_complete(const httplib::Request& request, httplib::Response& res
       response.status = 413; response.set_content(error_json("LLM request exceeds the application input bound"), "application/json"); return;
     }
     const auto result = minera::llm_runtime::request(g_llm_runtime_url, "/complete", &request.body);
-    response.status = result->status;
-    response.set_content(result->body, "application/json");
+    forward_runtime_response(response, result, "LLM runtime");
   } catch (const std::exception& error) {
     response.status = 502; response.set_content(error_json(error.what()), "application/json");
   }
@@ -4793,7 +4809,7 @@ void handle_log_query(const httplib::Request& request,httplib::Response& respons
    minera::LogQueryOptions options;options.max_rows=limit;const auto result=minera::query_log_sqlite(table,request.body,options);auto body=minera::log_query_json(result);body.pop_back();body+=",\"source_id\":\""+source+"\"}";response.set_content(body,"application/json");
   }else{
    if(g_query_runtime_url.empty())throw std::invalid_argument("DuckDB requires --query-runtime-url and scripts/query_runtime.py");
-   const auto body=duckdb_query_body(table,request.body,limit,source);const auto result=minera::query_runtime::request(g_query_runtime_url,"/query",&body);response.status=result->status;response.set_content(result->body,"application/json");
+   const auto body=duckdb_query_body(table,request.body,limit,source);const auto result=minera::query_runtime::request(g_query_runtime_url,"/query",&body);forward_runtime_response(response,result,"query runtime");
   }
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
@@ -4803,10 +4819,10 @@ void handle_log_query_export(const httplib::Request& request,httplib::Response& 
   validate_query_fields(request);if(!request.has_param("source_id"))throw std::invalid_argument("source_id is required for filtered log export");
   const auto session=query_session(request);const auto table=cached_source_query_table(*session);const auto engine=query_engine(request);std::vector<std::size_t> indices;
   if(engine=="sqlite"){
-   minera::LogQueryOptions options;options.max_rows=1000000;const auto result=minera::query_log_sqlite(table,request.body,options);if(!result.can_filter||result.output_truncated)throw std::invalid_argument("filter SQL must return valid event indices for a complete selection");indices=result.selected_event_indices;
+   minera::LogQueryOptions options;options.max_rows=1000000;options.max_output_bytes=256u*1024u*1024u;const auto result=minera::query_log_sqlite(table,request.body,options);if(!result.can_filter||result.output_truncated)throw std::invalid_argument("filter SQL must return valid event indices for a complete selection");indices=result.selected_event_indices;
   }else{
    if(g_query_runtime_url.empty())throw std::invalid_argument("DuckDB requires --query-runtime-url");
-   const auto body=duckdb_query_body(table,request.body,1000000,std::to_string(session->query_source_id));const auto result=minera::query_runtime::request(g_query_runtime_url,"/select",&body);if(result->status!=200){response.status=result->status;response.set_content(result->body,"application/json");return;}indices=minera::query_runtime::parse_indices(result->body,table.table.rows.size());
+   const auto body=duckdb_query_body(table,request.body,1000000,std::to_string(session->query_source_id));const auto result=minera::query_runtime::request(g_query_runtime_url,"/select",&body);if(result->status!=200){forward_runtime_response(response,result,"query runtime");if(response.status<400){response.status=502;response.set_content(error_json("query runtime returned HTTP "+std::to_string(result->status)+" for a filter selection"),"application/json");}return;}indices=minera::query_runtime::parse_indices(result->body,table.table.rows.size());
   }
   const auto mode=request.has_param("mode")?request.get_param_value("mode"):"cases";if(mode!="cases"&&mode!="events")throw std::invalid_argument("filter mode must be cases or events");
   const auto format=request.has_param("format")?request.get_param_value("format"):"xes";
@@ -9983,6 +9999,7 @@ void handle_streaming_dfg(const httplib::Request& request,
       }
     }
     minera::CsvImportOptions import_options;
+    import_options.keep_na_first_class_values = true;  // stream reader rows
     if (request.has_param("streaming_case_id_column"))
       import_options.case_id_column =
           request.get_param_value("streaming_case_id_column");
@@ -10034,6 +10051,7 @@ void handle_streaming_footprints(const httplib::Request& request,
             "unknown streaming footprints parameter: " + key);
     }
     minera::CsvImportOptions import_options;
+    import_options.keep_na_first_class_values = true;  // stream reader rows
     if (request.has_param("streaming_footprints_case_id_column"))
       import_options.case_id_column =
           request.get_param_value("streaming_footprints_case_id_column");
@@ -10286,6 +10304,7 @@ void handle_streaming_temporal(const httplib::Request& request,
         request.get_param_value("streaming_temporal_profile"),
         "streaming_temporal_profile");
     minera::CsvImportOptions import_options;
+    import_options.keep_na_first_class_values = true;  // stream reader rows
     if (request.has_param("streaming_temporal_case_id_column"))
       import_options.case_id_column =
           request.get_param_value("streaming_temporal_case_id_column");
@@ -10359,6 +10378,7 @@ void handle_streaming_tbr(const httplib::Request& request,
             "streaming_tbr_variant must be forward or backwards");
     }
     minera::CsvImportOptions import_options;
+    import_options.keep_na_first_class_values = true;  // stream reader rows
     if (request.has_param("streaming_tbr_case_id_column"))
       import_options.case_id_column =
           request.get_param_value("streaming_tbr_case_id_column");
@@ -10435,7 +10455,7 @@ void handle_streaming_declare(const httplib::Request& request,httplib::Response&
   live_response(response,[&]{
     live_params(request,{"streaming_declare_case_id_column","streaming_declare_activity_column","streaming_declare_timestamp_column","streaming_event_order","streaming_include_diagnostics","format"});
     const auto model_body=form_field(request,"model"),log_body=form_field(request,"log");if(model_body.empty()||log_body.empty())throw std::invalid_argument("Declare replay requires original model and event uploads");
-    const auto model=minera::parse_declare_stream_model_json(model_body);minera::DeclareStreamingConformance monitor(model);minera::CsvImportOptions csv;
+    const auto model=minera::parse_declare_stream_model_json(model_body);minera::DeclareStreamingConformance monitor(model);minera::CsvImportOptions csv;csv.keep_na_first_class_values=true;
     if(request.has_param("streaming_declare_case_id_column"))csv.case_id_column=request.get_param_value("streaming_declare_case_id_column");if(request.has_param("streaming_declare_activity_column"))csv.activity_column=request.get_param_value("streaming_declare_activity_column");if(request.has_param("streaming_declare_timestamp_column"))csv.timestamp_column=request.get_param_value("streaming_declare_timestamp_column");
     const auto format=request.has_param("format")?request.get_param_value("format"):"csv";std::istringstream input(log_body);minera::EventLog log;
     if(format=="csv")log=minera::import_csv_event_log(input,csv);else if(format=="xes")log=minera::import_xes_event_log(input);else throw std::invalid_argument("Declare events require CSV or XES");

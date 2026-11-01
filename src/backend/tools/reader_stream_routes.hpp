@@ -52,7 +52,10 @@ void handle_reader_create(const httplib::Request& request,httplib::Response& res
     auto record=std::make_shared<ReaderSessionRecord>();record->id=id;record->configuration=request.params;
     record->source={"source",request.has_param("source_name")?request.get_param_value("source_name"):"reader-upload",kind=="csv_events"?"csv":"xes",request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",options.source};
     record->reader=std::make_unique<minera::ReaderStreamSession>(std::move(options));
-    {std::lock_guard lock(g_reader_mutex);auto [it,inserted]=g_reader_sessions.emplace(id,record);if(!inserted)record=it->second;}
+    {std::lock_guard lock(g_reader_mutex);const auto found=g_reader_sessions.find(id);
+      if(found!=g_reader_sessions.end())record=found->second;
+      else if(g_reader_sessions.size()>=kLiveMaxSessions)throw LiveCapacityError(429,"too many reader sessions ("+std::to_string(kLiveMaxSessions)+"); release one before creating another");
+      else g_reader_sessions.emplace(id,record);}
     std::lock_guard lock(record->mutex);reader_open(*record);
     if(record->configuration!=request.params||record->source.bytes!=ocel_request_body(request,"log"))throw minera::StreamingSessionConflict("reader session ID already has a different source or configuration");
     response.set_content(reader_payload(*record),"application/json");

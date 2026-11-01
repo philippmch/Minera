@@ -10,6 +10,12 @@ template<class F> void rejects(F&& function) {
 }
 
 int main() {
+  // Runtime bodies are relayed only when they are one JSON object.
+  {using minera::llm_runtime::is_json_object;
+   for(const char* ok:{"{}"," {\"a\":[1,-2.5e3,true,false,null,{\"b\":\"\\u00e9\\n\"}]} \n","{\"text\":\"α\"}"})assert(is_json_object(ok));
+   for(const char* bad:{"","<html>boom</html>","{\"text\": \"unterminated","[]","\"x\"","{} x","{\"a\":01}","{\"a\":1,}","{'a':1}","{\"a\":\"\\x\"}","{\"a\":NaN}"})assert(!is_json_object(bad));
+   std::string deep;for(int i=0;i<600;++i)deep+="{\"a\":";deep+="1";deep+=std::string(600,'}');assert(!is_json_object(deep));
+   std::string shallow;for(int i=0;i<50;++i)shallow+="{\"a\":";shallow+="1";shallow+=std::string(50,'}');assert(is_json_object(shallow));}
   for(const auto* url:{"https://127.0.0.1:8189","http://key@localhost:8189","http://localhost:0","http://localhost:8189/path"})
     rejects([&]{minera::llm_runtime::validate_url(url);});
   httplib::Server server;

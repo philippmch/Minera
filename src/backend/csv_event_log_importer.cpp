@@ -555,7 +555,9 @@ CsvEventData import_csv_event_data_impl(
     // The reference flow drops rows whose case id or activity is NA (an
     // empty cell or a pandas NA spelling); whitespace-only text is a value
     // there, but the default trim_fields option has already blanked it here.
-    if (is_reference_na_token(case_id) || is_reference_na_token(activity)) {
+    // Stream readers keep them as literal values (keep_na_first_class_values).
+    if (!options.keep_na_first_class_values &&
+        (is_reference_na_token(case_id) || is_reference_na_token(activity))) {
       continue;
     }
     if (timestamp_index) {

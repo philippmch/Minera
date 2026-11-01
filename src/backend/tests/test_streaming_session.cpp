@@ -10,6 +10,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 using Action=minera::StreamingSessionAction;
 using Method=minera::StreamingSessionMethod;
@@ -126,4 +127,29 @@ void null_case_ids_follow_each_monitor() {
   {minera::StreamingSessionOptions options;options.method=Method::kTbr;minera::PetriNet n;auto a=n.add_place(),b=n.add_place(),c=n.add_place();n.set_source(a);n.set_sink(c);n.set_activities({"A","D"});n.add_transition(0,{a},{b});n.add_transition(1,{b},{c});options.net=n;
    auto s=run(options);assert(s.find("\"\":{")==std::string::npos);assert(s.find("\"c\":{")!=std::string::npos);}
 }
-int main(){null_case_ids_follow_each_monitor();drain_waits_for_inflight_observers_and_keeps_stream_active();dfg_persists_between_batches_and_revisions_guard_mutations();deregistration_and_reset_keep_delivery_history_and_boundaries();footprint_prefixes_terminate_after_finish_and_allow_a_new_case_generation();both_replay_variants_keep_markings_across_appends_and_final_diagnostics();temporal_pairs_cross_batch_boundaries_and_invalid_times_remain_skipped();crlf_records_do_not_change_untrimmed_native_columns_or_quoted_values();events_without_case_ids_are_skipped();}
+// Responses list the latest deliveries only, with the lifetime total and the
+// index of the first one shown.
+void snapshots_bound_the_delivery_list() {
+  minera::StreamingSession session;std::vector<minera::Event> events;
+  for(std::size_t i=0;i<5;++i)events.push_back(event("c"+std::to_string(i%2),"A",i));
+  session.append(std::move(events),"b",0);session.action(Action::kStart,1);
+  const auto tail=session.snapshot_json(true,2);
+  assert(tail.find("\"delivered\":5,\"deliveries_offset\":3,")!=std::string::npos);
+  assert(tail.find("\"position\":2,")==std::string::npos&&tail.find("\"position\":3,")!=std::string::npos&&tail.find("\"position\":4,")!=std::string::npos);
+  assert(session.snapshot_json(false,0).find("\"deliveries\":[]")!=std::string::npos);
+  assert(session.snapshot_json().find("\"deliveries_offset\":0,")!=std::string::npos);
+}
+// A long drain holds no session lock: a snapshot that does not wait returns
+// while the queue is still being delivered.
+void snapshot_without_waiting_does_not_block_on_a_drain() {
+  minera::StreamingSessionOptions options;options.method=Method::kDfg;minera::StreamingSession session(options);
+  std::vector<minera::Event> events;for(std::size_t i=0;i<200000;++i)events.push_back(event("c"+std::to_string(i%5000),"A"+std::to_string(i%7),i));
+  session.append(std::move(events),"big",0);
+  auto started=std::async(std::launch::async,[&]{session.action(Action::kStart,1);});
+  while(session.revision()!=2)std::this_thread::yield();
+  const auto before=std::chrono::steady_clock::now();auto snapshot=session.snapshot_json(false,0);
+  assert(std::chrono::steady_clock::now()-before<std::chrono::seconds(2));
+  assert(snapshot.find("\"state\":\"ACTIVE\"")!=std::string::npos);
+  started.get();assert(session.snapshot_json(false,0).find("\"events\":200000")!=std::string::npos);
+}
+int main(){snapshots_bound_the_delivery_list();snapshot_without_waiting_does_not_block_on_a_drain();null_case_ids_follow_each_monitor();drain_waits_for_inflight_observers_and_keeps_stream_active();dfg_persists_between_batches_and_revisions_guard_mutations();deregistration_and_reset_keep_delivery_history_and_boundaries();footprint_prefixes_terminate_after_finish_and_allow_a_new_case_generation();both_replay_variants_keep_markings_across_appends_and_final_diagnostics();temporal_pairs_cross_batch_boundaries_and_invalid_times_remain_skipped();crlf_records_do_not_change_untrimmed_native_columns_or_quoted_values();events_without_case_ids_are_skipped();}

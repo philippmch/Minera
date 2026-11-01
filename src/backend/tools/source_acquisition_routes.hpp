@@ -141,9 +141,17 @@ std::string acquired_exact_payload(const AcquiredExactState& state, const Acquir
       ",\"released\":" + (state.released ? "true" : "false") + '}';
   return out;
 }
+// Refuses a new source ID when the registry is full (see kLiveMaxSessions).
+// Callers hold g_acquired_mutex.
+void acquired_capacity_locked(const std::string& id) {
+  if (!g_acquired_sources.contains(id) && g_acquired_sources.size() >= kLiveMaxSessions)
+    throw LiveCapacityError(429, "too many acquired sources (" + std::to_string(kLiveMaxSessions) + "); release one before acquiring another");
+}
+void acquired_capacity(const std::string& id) { std::lock_guard lock(g_acquired_mutex); acquired_capacity_locked(id); }
 void acquired_exact_failure(AcquiredExactState& state, const std::exception& error) {
   state.error = error.what();
-  if (dynamic_cast<const minera::StreamingSessionConflict*>(&error)) state.status = 409;
+  if (const auto* capacity = dynamic_cast<const LiveCapacityError*>(&error)) state.status = capacity->status;
+  else if (dynamic_cast<const minera::StreamingSessionConflict*>(&error)) state.status = 409;
   else if (dynamic_cast<const std::out_of_range*>(&error) && !(state.entered && !state.returned)) state.status = 404;
   else state.status = 400;
 }
@@ -233,12 +241,14 @@ void handle_acquire_source_exact_using(const httplib::Request& provided, httplib
     if (exact.source && exact.source->file) record->uploaded_filename = exact.source->filename;
     state.phase = "native";
     state.entered = true;
+    acquired_capacity(id);
     try { record->acquired = acquire(input); state.returned = true; }
     catch (const std::exception& error) { state.native_error = error.what(); throw; }
     state.phase = "registry";
     std::shared_ptr<AcquiredSourceRecord> existing;
     {
       std::lock_guard lock(g_acquired_mutex);
+      acquired_capacity_locked(id);
       const auto [it, inserted] = g_acquired_sources.emplace(id, record);
       if (!inserted) existing = it->second;
     }
@@ -455,9 +465,9 @@ void handle_acquire_source_using(const httplib::Request& request,httplib::Respon
     record->authenticated=!input.auth_token.empty()||!input.database_connection.empty();
     { const auto original = acquired_collect(request); record->acquisition_parts = original.parts; record->acquisition_query = original.query;
       if (original.source && original.source->file) record->uploaded_filename = original.source->filename; }
-    record->acquired=acquire(input);
+    acquired_capacity(id);record->acquired=acquire(input);
     std::shared_ptr<AcquiredSourceRecord> existing;
-    {std::lock_guard lock(g_acquired_mutex);auto [it,inserted]=g_acquired_sources.emplace(id,record);if(!inserted)existing=it->second;}
+    {std::lock_guard lock(g_acquired_mutex);acquired_capacity_locked(id);auto [it,inserted]=g_acquired_sources.emplace(id,record);if(!inserted)existing=it->second;}
     if(existing){std::lock_guard source_lock(existing->mutex);if(existing->configuration!=record->configuration||existing->acquired.original_bytes!=record->acquired.original_bytes||existing->acquired.database_capture.has_value()!=record->acquired.database_capture.has_value()||(existing->acquired.database_capture&&(existing->acquired.database_capture->raw_table_json!=record->acquired.database_capture->raw_table_json||existing->acquired.database_capture->formatted_table_json!=record->acquired.database_capture->formatted_table_json))||existing->acquired.windows_capture.has_value()!=record->acquired.windows_capture.has_value()||(existing->acquired.windows_capture&&existing->acquired.windows_capture->xml!=record->acquired.windows_capture->xml)||minera::source_acquisition_json(existing->acquired)!=minera::source_acquisition_json(record->acquired))throw minera::StreamingSessionConflict("acquisition source ID already has different inputs or results");record=existing;}
     std::lock_guard lock(record->mutex);response.set_content(acquired_payload(*record),"application/json");
   });
