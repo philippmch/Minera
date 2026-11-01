@@ -2325,8 +2325,9 @@ export function isStreamingTbrResult(value: unknown): value is StreamingTbrResul
       (value.variant !== "FORWARD" && value.variant !== "BACKWARDS") ||
       !Number.isSafeInteger(value.total_events_processed) ||
       (value.total_events_processed as number) < 0 ||
-      !Number.isSafeInteger(value.total_missing) ||
-      (value.total_missing as number) < 0 || !isOcelRecord(value.cases)) return false;
+      // Signed: a termination adds the reference's sum(final - marking), which
+      // a surplus final-place token makes negative.
+      !Number.isSafeInteger(value.total_missing) || !isOcelRecord(value.cases)) return false;
   return Object.values(value.cases).every((item) => isOcelRecord(item) &&
     Number.isSafeInteger(item.events) && (item.events as number) >= 0 &&
     Number.isSafeInteger(item.missing) && (item.missing as number) >= 0 &&

@@ -320,6 +320,12 @@ describe("isStreamingTbrResult", () => {
     expect(isStreamingTbrResult({ ...valid, variant: "unknown" })).toBe(false);
     expect(isStreamingTbrResult({ ...valid, cases: { c1: { ...valid.cases.c1, marking: [-1] } } })).toBe(false);
   });
+  // Native output after terminating a case whose surplus final-place token
+  // makes the reference's sum(final - marking) negative (missing -1).
+  it("accepts a signed total_missing after termination", () => {
+    expect(isStreamingTbrResult({ family: "STREAMING_TBR", variant: "FORWARD", total_events_processed: 1, total_missing: -1, cases: {} })).toBe(true);
+    expect(isStreamingTbrResult({ ...valid, total_missing: 0.5 })).toBe(false);
+  });
 });
 
 describe("isDfgPetriConversionResult", () => {

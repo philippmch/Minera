@@ -173,9 +173,17 @@ void StreamingTokenReplay::ordered_fire(CaseState& state,
   }
 }
 
+namespace {
+std::vector<std::size_t> listed_set(std::vector<std::size_t> order) {
+  std::sort(order.begin(), order.end());
+  return order;
+}
+}  // namespace
+
 std::optional<StreamingTokenReplay::CaseState>
 StreamingTokenReplay::enable_with_invisibles(const CaseState& state,
-                                             std::size_t transition) const {
+                                             std::size_t transition,
+                                             std::optional<CaseState>* stalled) const {
   // A place needs a path while one of its arcs lacks tokens; every place
   // with an input arc, even a zero-weight one, is in the preset.
   std::vector<int> required(net_.place_count(), 0);
@@ -212,13 +220,38 @@ StreamingTokenReplay::enable_with_invisibles(const CaseState& state,
       if (path && (!best || path->size() < best->size())) best = &*path, best_source = source;
     }
     if (!best) return std::nullopt;
+    const auto before = copy;
     for (const auto silent : *best) {
       if (!enabled(copy.marking, silent)) return std::nullopt;
       ordered_fire(copy, silent);
     }
     used.emplace(best_source, place);
+    // The reference loop also stops once a fired path leaves the marking
+    // equal to the one before it (same listed places and tokens).
+    if (copy.marking == before.marking && listed_set(copy.order) == listed_set(before.order)) {
+      if (stalled) *stalled = std::move(copy);
+      return std::nullopt;
+    }
   }
+  // The iteration limit stops the loop with the marking reached so far.
+  if (stalled) *stalled = std::move(copy);
   return std::nullopt;
+}
+
+// Input arcs in the order the reference visits them (the document's arc
+// order when known).
+std::vector<StreamingTokenReplay::Arc>
+StreamingTokenReplay::ordered_input_arcs(std::size_t transition) const {
+  if (transition >= options_.input_place_order.size() ||
+      options_.input_place_order[transition].empty())
+    return input_arcs_[transition];
+  std::vector<Arc> arcs;
+  for (const auto place : options_.input_place_order[transition])
+    for (const auto& arc : input_arcs_[transition])
+      if (arc.place == place) arcs.push_back(arc);
+  for (const auto& arc : input_arcs_[transition])
+    if (!contains(options_.input_place_order[transition], arc.place)) arcs.push_back(arc);
+  return arcs;
 }
 
 std::string StreamingTokenReplay::variant_name() const noexcept {
@@ -392,14 +425,38 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
         fired = true;
         break;
       }
-    for (std::size_t i = 0; !fired && i < visible.size(); ++i)
-      if (auto next = enable_with_invisibles(state, visible[i])) {
+    std::optional<CaseState> stalled;
+    for (std::size_t i = 0; !fired && i < visible.size(); ++i) {
+      std::optional<CaseState> stop;
+      if (auto next = enable_with_invisibles(state, visible[i], &stop)) {
         next->events = state.events;
         next->missing = state.missing;
         state = std::move(*next);
         ordered_fire(state, visible[i]);
         fired = true;
+      } else if (stop && !stalled && i == 0) {
+        stalled = std::move(stop);
       }
+    }
+    if (!fired && stalled) {
+      // The reference's silent loop stopped at a marking (not None): for each
+      // input arc of the first transition, a place absent from the original
+      // marking or short in the stopped one is raised to the arc weight in
+      // the original marking, counting weight - original tokens. The silent
+      // firings are discarded and the transition fires from the original.
+      const auto transition = visible.front();
+      std::int64_t added = 0;
+      for (const auto& arc : ordered_input_arcs(transition)) {
+        if (!contains(state.order, arc.place) || stalled->marking[arc.place] < arc.weight) {
+          added += static_cast<std::int64_t>(arc.weight) - state.marking[arc.place];
+          state.marking[arc.place] = arc.weight;
+          if (!contains(state.order, arc.place)) state.order.push_back(arc.place);
+        }
+      }
+      ordered_fire(state, transition);
+      missing_added = static_cast<std::uint64_t>(added);
+      fired = true;
+    }
     if (!fired) {
       // Missing tokens are inserted for the first transition, each input arc
       // adding its weight, in arc order. The reference fails on reaching an
@@ -407,17 +464,7 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
       // tokens, or listed by an earlier parallel arc's insertion): the count
       // so far stays and the marking is left unchanged.
       const auto transition = visible.front();
-      std::vector<Arc> arcs;
-      if (transition < options_.input_place_order.size() &&
-          !options_.input_place_order[transition].empty()) {
-        for (const auto place : options_.input_place_order[transition])
-          for (const auto& arc : input_arcs_[transition])
-            if (arc.place == place) arcs.push_back(arc);
-        for (const auto& arc : input_arcs_[transition])
-          if (!contains(options_.input_place_order[transition], arc.place)) arcs.push_back(arc);
-      } else {
-        arcs = input_arcs_[transition];
-      }
+      const auto arcs = ordered_input_arcs(transition);
       std::vector<std::size_t> inserted;
       for (const auto& arc : arcs) {
         if (contains(state.order, arc.place) || contains(inserted, arc.place)) {

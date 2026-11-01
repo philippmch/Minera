@@ -138,8 +138,14 @@ class StreamingTokenReplay {
   [[nodiscard]] std::uint64_t final_remaining(const Marking& marking) const;
   [[nodiscard]] std::string variant_name() const noexcept;
   void ordered_fire(CaseState& state, std::size_t transition) const;
+  [[nodiscard]] std::vector<Arc> ordered_input_arcs(std::size_t transition) const;
+  // Returns the state that enables the transition. Otherwise *stalled holds
+  // the marking the reference's silent loop stopped at without failing (a
+  // path that left the marking unchanged, or the iteration limit), and stays
+  // empty when the reference's search failed (no path, or a blocked one).
   [[nodiscard]] std::optional<CaseState> enable_with_invisibles(
-      const CaseState& state, std::size_t transition) const;
+      const CaseState& state, std::size_t transition,
+      std::optional<CaseState>* stalled = nullptr) const;
 
   PetriNet net_;
   StreamingTbrOptions options_;

@@ -325,6 +325,15 @@ void weighted_and_parallel_arcs_follow_reference() {
   check_weighted("multi_k3_n4_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,3}},{{2,1}}}}, {4,0,0}, {0,0,1}, 2, {{"c","B",{4,0,1},3}}, {});
   check_weighted("multi_k3_n4_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,3}},{{2,1}}}}, {4,0,0}, {0,0,1}, 3, {{"c","B",{4,0,1},3}}, {});
   check_weighted("multi_k3_n4_t11", 3, {{-1,{{0,1}},{{1,1}}},{1,{{1,3}},{{2,1}}}}, {4,0,0}, {0,0,1}, 4, {{"c","B",{1,0,1},0}}, {});
+  // A silent self-loop (p2,p1 -> p2,p1) leaves the marking unchanged, so the
+  // reference's invisible loop stops at a marking rather than None and C
+  // inserts its missing tokens from the original marking (random net n22).
+  check_weighted("silent_self_loop_stall", 3,
+                 {{0,{{2,1}},{{2,1}}},{1,{{2,1},{1,1}},{{2,1},{1,1}}},{2,{{1,2},{0,2}},{{0,2},{1,2}}},{-1,{{2,1},{1,1}},{{2,1},{1,1}}}},
+                 {1,1,0}, {0,1,1}, 10,
+                 {{"c2","B",{1,1,0},1},{"c2","A",{1,1,1},2},{"c0","C",{1,1,0},0},{"c2","A",{1,1,1},2},{"c1","B",{1,1,0},1},{"c0","B",{1,1,0},1},{"c2","C",{2,2,1},4},{"c1","A",{1,1,1},2},
+                  {"c0","B",{1,1,0},2},{"c1","B",{1,1,1},2},{"c2","C",{2,2,1},4},{"c1","C",{2,2,1},4},{"c4","C",{1,1,0},0},{"c1","C",{2,2,1},4},{"c0","C",{1,1,0},2},{"c4","C",{1,1,0},0}},
+                 {{"c0",false,3,0},{"c1",false,3,3},{"c2",false,3,3},{"c4",false,1,0}});
 }
 
 void negative_arc_weights_are_rejected() {
