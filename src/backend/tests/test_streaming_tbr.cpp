@@ -159,7 +159,7 @@ void reference_contract() {
 // chain of any length before A is one iteration plus the enabling check, so
 // it needs a limit of 2; two parallel branches that each need their own path
 // need 3. Reference missing counts per limit 0, 1, 2, 3, 10.
-std::uint64_t limited_missing(std::size_t silent_chain, bool parallel, std::size_t limit) {
+std::int64_t limited_missing(std::size_t silent_chain, bool parallel, std::size_t limit) {
   minera::PetriNet net;
   net.set_activities({"A", "B"});
   const auto p0 = net.add_place();
@@ -200,7 +200,7 @@ std::uint64_t limited_missing(std::size_t silent_chain, bool parallel, std::size
 }
 void forward_invisible_iteration_limit() {
   const std::size_t limits[] = {0, 1, 2, 3, 10};
-  const struct { std::size_t chain; bool parallel; std::uint64_t expected[5]; } cases[] = {
+  const struct { std::size_t chain; bool parallel; std::int64_t expected[5]; } cases[] = {
       {3, false, {1, 1, 0, 0, 0}}, {12, false, {1, 1, 0, 0, 0}}, {0, false, {0, 0, 0, 0, 0}},
       {0, true, {2, 2, 0, 0, 0}}, {1, true, {2, 2, 2, 0, 0}}, {3, true, {2, 2, 2, 0, 0}}};
   for (const auto& c : cases)
@@ -223,7 +223,7 @@ struct WeightedStep {
   const char* case_id;
   const char* activity;
   std::vector<int> marking;
-  std::uint64_t missing;
+  std::int64_t missing;
 };
 void check_weighted(const char* name, std::size_t places, const std::vector<WeightedTransition>& spec,
                     std::vector<int> initial, std::vector<int> final_marking, std::size_t limit,
@@ -266,9 +266,9 @@ void check_weighted(const char* name, std::size_t places, const std::vector<Weig
       const auto snapshot = replay.snapshot();
       const auto& state = snapshot.cases.at(step.case_id);
       if (state.marking != step.marking || state.missing != step.missing) {
-        std::fprintf(stderr, "%s (%s): %s %s missing %llu marking", name,
+        std::fprintf(stderr, "%s (%s): %s %s missing %lld marking", name,
                      compact ? "weights" : "repeated", step.case_id, step.activity,
-                     static_cast<unsigned long long>(state.missing));
+                     static_cast<long long>(state.missing));
         for (const auto tokens : state.marking) std::fprintf(stderr, " %d", tokens);
         std::fprintf(stderr, "\n");
         assert(false);
@@ -371,7 +371,50 @@ void termination_counts_are_reference_signed_sums() {
   assert(two && !two->is_fit && two->missing == 1 && two->remaining == 2);
 }
 
+// A stalled silent loop (iteration limit 1) inserts missing tokens from the
+// original marking: x held 3 tokens, the silent path drained it, so the
+// reference adds 1 - 3 for x and 1 for y, a per-case count of -1. With the
+// default limit the next search returns None and the reference's TypeError
+// leaves the marking and count unchanged. PM4Py 2.7.22 values for the net
+// p0 -B-> x(3), q; x, y -A-> out; q, x(3) -silent-> y (events B, A).
+void stalled_loop_counts_negative_missing() {
+  for (const std::size_t limit : {std::size_t{1}, std::size_t{10}}) {
+    minera::PetriNet net;
+    const auto p0 = net.add_place(), x = net.add_place(), q = net.add_place(),
+               y = net.add_place(), out = net.add_place();
+    net.set_source(p0);
+    net.set_sink(out);
+    net.set_activities({"A", "B"});
+    const auto b = net.add_transition(1, {p0}, {x, q});
+    net.set_ordinary_arc_weights(b, {{1}}, {{3}, {1}});
+    (void)net.add_transition(0, {x, y}, {out});
+    const auto s = net.add_transition(std::nullopt, {q, x}, {y});
+    net.set_ordinary_arc_weights(s, {{1}, {3}}, {{1}});
+    minera::StreamingTbrOptions options;
+    options.maximum_iterations_invisibles = limit;
+    minera::StreamingTokenReplay replay(net, options);
+    assert(replay.receive("c", "B").missing_added == 0);
+    const auto result = replay.receive("c", "A");
+    const auto snapshot = replay.snapshot();
+    const auto& state = snapshot.cases.at("c");
+    if (limit == 1) {
+      assert(result.missing_added == -1 && state.missing == -1 && snapshot.total_missing == -1);
+      assert(state.marking == (std::vector<int>{0, 0, 1, 0, 1}) && !state.is_fit);
+      const auto json = minera::serialize_streaming_tbr_json(snapshot);
+      assert(json.find("\"missing\":-1,") != std::string::npos);
+      const auto end = replay.terminate_case("c");
+      assert(end && end->missing == -1 && end->remaining == 1 && !end->is_fit);
+    } else {
+      assert(result.missing_added == 0 && state.missing == 0);
+      assert(state.marking == (std::vector<int>{0, 3, 1, 0, 0}));
+      const auto end = replay.terminate_case("c");
+      assert(end && end->missing == 1 && end->remaining == 3 && !end->is_fit);
+    }
+  }
+}
+
 int main() {
+  stalled_loop_counts_negative_missing();
   termination_counts_are_reference_signed_sums();
   weighted_and_parallel_arcs_follow_reference();
   negative_arc_weights_are_rejected();

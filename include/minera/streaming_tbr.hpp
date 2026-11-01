@@ -38,7 +38,10 @@ struct StreamingTbrOptions {
 
 struct StreamingTbrCaseSnapshot {
   std::size_t events = 0;
-  std::uint64_t missing = 0;
+  // Signed: after a stalled silent loop the reference adds weight - original
+  // tokens per short arc, which is negative when the original marking held
+  // more than the weight on a place the silent path drained.
+  std::int64_t missing = 0;
   std::uint64_t remaining = 0;
   bool is_fit = true;
   std::vector<int> marking;
@@ -48,7 +51,7 @@ struct StreamingTbrEventResult {
   std::string case_id;
   std::string activity;
   std::size_t event_index = 0;
-  std::uint64_t missing_added = 0;
+  std::int64_t missing_added = 0;  // signed, as the case's missing count
   bool accepted = false;
   bool is_fit = true;
 };
@@ -112,7 +115,7 @@ class StreamingTokenReplay {
     // marking dictionary iterates them; this order picks silent-path sources.
     std::vector<std::size_t> order;
     std::size_t events = 0;
-    std::uint64_t missing = 0;
+    std::int64_t missing = 0;
     bool hard_unfit = false;
   };
   struct Route {

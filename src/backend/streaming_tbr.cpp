@@ -371,14 +371,14 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
   auto& state = it->second;
   if (options_.stop_immediately_unfit && state.hard_unfit)
     return {case_key, std::string(activity), 0, 0, false, false};
-  std::uint64_t missing_added = 0;
+  std::int64_t missing_added = 0;
   bool accepted = true;
   const auto& visible = transitions_it->second;
   if (options_.variant == StreamingTbrVariant::kBackwards) {
     bool fired = false;
     for (const auto transition : visible) {
       if (enabled(state.marking, transition)) {
-        missing_added += fire(state.marking, transition);
+        missing_added += static_cast<std::int64_t>(fire(state.marking, transition));
         fired = true;
       }
     }
@@ -391,9 +391,9 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
         const auto visible_transition = visible.front();
         for (const auto silent : route->silent_transitions)
           (void)silent;
-        missing_added += fire(state.marking, visible_transition);
+        missing_added += static_cast<std::int64_t>(fire(state.marking, visible_transition));
       } else {
-        missing_added += fire(state.marking, visible.front());
+        missing_added += static_cast<std::int64_t>(fire(state.marking, visible.front()));
         state.hard_unfit = true;
         if (options_.stop_immediately_unfit) accepted = false;
       }
@@ -436,7 +436,7 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
         }
       }
       ordered_fire(state, transition);
-      missing_added = static_cast<std::uint64_t>(added);
+      missing_added = added;
       fired = true;
     }
     if (!fired) {
@@ -452,10 +452,10 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
       for (const auto& arc : arcs) {
         if (contains(state.order, arc.place) || contains(inserted, arc.place)) {
           state.missing += missing_added;
-          total_missing_ += static_cast<std::int64_t>(missing_added);
+          total_missing_ += missing_added;
           return {case_key, std::string(activity), 0, missing_added, false, state.missing == 0};
         }
-        missing_added += static_cast<std::uint64_t>(arc.weight);
+        missing_added += static_cast<std::int64_t>(arc.weight);
         inserted.push_back(arc.place);
       }
       // The inserted tokens are consumed again, so only the outputs change.
@@ -468,7 +468,7 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
   ++state.events;
   state.missing += missing_added;
   ++total_events_processed_;
-  total_missing_ += static_cast<std::int64_t>(missing_added);
+  total_missing_ += missing_added;
   return {case_key, std::string(activity), total_events_processed_,
           missing_added, accepted, !state.hard_unfit && state.missing == 0};
 }
@@ -509,7 +509,7 @@ StreamingTokenReplay::terminate_case(const std::string& case_id) {
       remaining += marking[place] - final_[place];
     }
   }
-  missing = static_cast<std::int64_t>(state.missing) + added;
+  missing = state.missing + added;
   total_missing_ += added;
   const bool fit = !state.hard_unfit && missing == 0 && remaining == 0;
   cases_.erase(it);

@@ -326,6 +326,16 @@ describe("isStreamingTbrResult", () => {
     expect(isStreamingTbrResult({ family: "STREAMING_TBR", variant: "FORWARD", total_events_processed: 1, total_missing: -1, cases: {} })).toBe(true);
     expect(isStreamingTbrResult({ ...valid, total_missing: 0.5 })).toBe(false);
   });
+  // Native snapshot after a stalled silent loop drained a place holding more
+  // tokens than the arc weight (PM4Py 2.7.22 reports missing -1 for the case).
+  it("accepts a signed per-case missing count", () => {
+    const stalled = { family: "STREAMING_TBR", variant: "FORWARD", total_events_processed: 2,
+      total_missing: -1, cases: { c: { events: 2, missing: -1, remaining: 0, is_fit: false,
+        marking: [0, 0, 1, 0, 1] } } };
+    expect(isStreamingTbrResult(stalled)).toBe(true);
+    expect(isStreamingTbrResult({ ...stalled, cases: { c: { ...stalled.cases.c, missing: 2 ** 64 } } })).toBe(false);
+    expect(isStreamingTbrResult({ ...stalled, cases: { c: { ...stalled.cases.c, missing: -0.5 } } })).toBe(false);
+  });
 });
 
 describe("isDfgPetriConversionResult", () => {

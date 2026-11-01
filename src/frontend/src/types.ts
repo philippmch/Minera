@@ -2330,7 +2330,9 @@ export function isStreamingTbrResult(value: unknown): value is StreamingTbrResul
       !Number.isSafeInteger(value.total_missing) || !isOcelRecord(value.cases)) return false;
   return Object.values(value.cases).every((item) => isOcelRecord(item) &&
     Number.isSafeInteger(item.events) && (item.events as number) >= 0 &&
-    Number.isSafeInteger(item.missing) && (item.missing as number) >= 0 &&
+    // Signed: a stalled silent loop adds weight - original tokens, negative
+    // when the silent path drained a place that held more than the weight.
+    Number.isSafeInteger(item.missing) &&
     Number.isSafeInteger(item.remaining) && (item.remaining as number) >= 0 &&
     typeof item.is_fit === "boolean" && Array.isArray(item.marking) &&
     item.marking.every((token) => Number.isSafeInteger(token) && (token as number) >= 0));
