@@ -5157,6 +5157,27 @@ contract. Focused Release tests cover linear
 replay, missing tokens, silent prefixes, backwards selection, reset, and
 termination diagnostics.
 
+Forward silent routing follows the reference's `verify_tbr` loop literally:
+each round, up to `maximum_iterations_invisibles`, fires an enabled transition
+of the activity or the shortest recorded silent path from a listed place (in
+listing order) to one of its transitions, where a place in the transition's
+preset records no path. The loop ends when the search returns None, when a
+fired path leaves the marking unchanged, or when the round limit runs out; in
+the last two cases missing tokens are inserted from the original marking as
+the reference does, and only after None does the reference's TypeError (and
+the native imitation) apply.
+
+Known non-modellable difference: when two silent paths of equal length lead
+to the transition, the reference keeps the first one networkx reaches, which
+depends on the iteration order of `net.transitions` and arc sets. PetriNet
+transitions, places and arcs hash by `id()`, so that order follows object
+addresses: the same net built after a few unrelated allocations can replay
+differently in the reference itself. Native replay breaks such ties by
+transition index. A sweep of 600 random weighted nets with silent
+transitions (2,004 terminated cases against PM4Py 2.7.22) matches on 2,000;
+the four remaining cases (in four nets) are exactly the nets whose reference
+results change when only allocation addresses are shifted.
+
 ## Segment-filter evidence
 
 The native segment surface exposes prefix and suffix cuts with first/last

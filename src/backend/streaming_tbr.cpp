@@ -128,23 +128,34 @@ StreamingTokenReplay::StreamingTokenReplay(PetriNet net,
   final_ = marking_or(options_.final_marking, net_.sink());
   for (std::size_t place = 0; place < places; ++place)
     if (initial_[place] > 0) initial_order_.push_back(place);
-  silent_paths_.assign(places, std::vector<std::optional<std::vector<std::size_t>>>(places));
+  // transition_paths_[place][transition]: the silent transitions on a
+  // shortest path from the place to the transition in the reference's graph
+  // (place -> every transition it feeds, silent transition -> its outputs).
+  // Only non-empty paths are recorded, so a place in the transition's preset
+  // has none.
+  const auto transition_count = net_.transitions().size();
+  transition_paths_.assign(places, std::vector<std::optional<std::vector<std::size_t>>>(transition_count));
   for (std::size_t from = 0; from < places; ++from) {
-    auto& paths = silent_paths_[from];
-    paths[from] = std::vector<std::size_t>{};
+    std::vector<std::optional<std::vector<std::size_t>>> place_paths(places);
+    std::vector<bool> reached(transition_count, false);
+    place_paths[from] = std::vector<std::size_t>{};
     std::queue<std::size_t> pending;
     pending.push(from);
     while (!pending.empty()) {
       const auto place = pending.front();
       pending.pop();
-      for (const auto silent : silent_transitions_) {
-        const auto& inputs = net_.transitions()[silent].inputs;
+      for (std::size_t transition = 0; transition < transition_count; ++transition) {
+        if (reached[transition]) continue;
+        const auto& inputs = net_.transitions()[transition].inputs;
         if (std::find(inputs.begin(), inputs.end(), place) == inputs.end()) continue;
-        for (const auto next : net_.transitions()[silent].outputs) {
-          if (paths[next]) continue;
-          auto path = *paths[place];
-          path.push_back(silent);
-          paths[next] = std::move(path);
+        reached[transition] = true;
+        if (!place_paths[place]->empty()) transition_paths_[from][transition] = *place_paths[place];
+        if (!net_.transitions()[transition].silent()) continue;
+        for (const auto next : net_.transitions()[transition].outputs) {
+          if (place_paths[next]) continue;
+          auto path = *place_paths[place];
+          path.push_back(transition);
+          place_paths[next] = std::move(path);
           pending.push(next);
         }
       }
@@ -180,62 +191,32 @@ std::vector<std::size_t> listed_set(std::vector<std::size_t> order) {
 }
 }  // namespace
 
+// The reference marking equality: the same listed places with the same tokens.
+bool StreamingTokenReplay::same_marking(const CaseState& left, const CaseState& right) {
+  return left.marking == right.marking && listed_set(left.order) == listed_set(right.order);
+}
+
+// One call of the reference's enable_trans_with_invisibles: the shortest
+// recorded silent path from a listed place (in listing order) to one of the
+// activity's transitions, first found winning ties, fired transition by
+// transition; nullopt (the reference's None) when no path is recorded or a
+// silent transition on it is not enabled.
 std::optional<StreamingTokenReplay::CaseState>
-StreamingTokenReplay::enable_with_invisibles(const CaseState& state,
-                                             std::size_t transition,
-                                             std::optional<CaseState>* stalled) const {
-  // A place needs a path while one of its arcs lacks tokens; every place
-  // with an input arc, even a zero-weight one, is in the preset.
-  std::vector<int> required(net_.place_count(), 0);
-  std::vector<bool> preset(net_.place_count(), false);
-  std::vector<std::size_t> inputs;
-  for (const auto& arc : input_arcs_[transition]) {
-    preset[arc.place] = true;
-    required[arc.place] = std::max(required[arc.place], arc.weight);
-    inputs.push_back(arc.place);
-  }
+StreamingTokenReplay::invisible_step(const CaseState& state,
+                                     const std::vector<std::size_t>& visible) const {
+  const std::vector<std::size_t>* best = nullptr;
+  for (const auto place : state.order)
+    for (const auto transition : visible) {
+      const auto& path = transition_paths_[place][transition];
+      if (path && (!best || path->size() < best->size())) best = &*path;
+    }
+  if (!best) return std::nullopt;
   CaseState copy = state;
-  // A source serves one needed place: two places reached from one marked
-  // place fail, while a weighted place may take several paths from it.
-  std::map<std::size_t, std::size_t> used;
-  // MAXIMUM_ITERATIONS_INVISIBLES bounds the reference loop: each iteration
-  // either finds the transition enabled or fires one silent path towards the
-  // first input place still short of its arc weight. A chain of any length is
-  // one iteration, and the enabling check itself takes one, so a single path
-  // needs a limit of 2 and a weight-2 arc fed by a one-token path needs 3.
-  for (std::size_t iteration = 0; iteration < options_.maximum_iterations_invisibles; ++iteration) {
-    if (enabled(copy.marking, transition)) return copy;
-    const auto needed = std::find_if(inputs.begin(), inputs.end(), [&](std::size_t place) {
-      return copy.marking[place] < required[place];
-    });
-    if (needed == inputs.end()) return std::nullopt;
-    const auto place = *needed;
-    const std::vector<std::size_t>* best = nullptr;
-    std::size_t best_source = 0;
-    for (const auto source : copy.order) {
-      if (preset[source]) continue;
-      if (const auto served = used.find(source); served != used.end() && served->second != place)
-        continue;
-      const auto& path = silent_paths_[source][place];
-      if (path && (!best || path->size() < best->size())) best = &*path, best_source = source;
-    }
-    if (!best) return std::nullopt;
-    const auto before = copy;
-    for (const auto silent : *best) {
-      if (!enabled(copy.marking, silent)) return std::nullopt;
-      ordered_fire(copy, silent);
-    }
-    used.emplace(best_source, place);
-    // The reference loop also stops once a fired path leaves the marking
-    // equal to the one before it (same listed places and tokens).
-    if (copy.marking == before.marking && listed_set(copy.order) == listed_set(before.order)) {
-      if (stalled) *stalled = std::move(copy);
-      return std::nullopt;
-    }
+  for (const auto silent : *best) {
+    if (!enabled(copy.marking, silent)) return std::nullopt;
+    ordered_fire(copy, silent);
   }
-  // The iteration limit stops the loop with the marking reached so far.
-  if (stalled) *stalled = std::move(copy);
-  return std::nullopt;
+  return copy;
 }
 
 // Input arcs in the order the reference visits them (the document's arc
@@ -418,36 +399,37 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
       }
     }
   } else {
+    // The reference loop: at most MAXIMUM_ITERATIONS_INVISIBLES rounds, each
+    // firing an enabled transition of the activity or one silent path
+    // towards it, until the path search fails (None) or leaves the marking
+    // unchanged.
     bool fired = false;
-    for (const auto transition : visible)
-      if (enabled(state.marking, transition)) {
-        ordered_fire(state, transition);
+    std::optional<CaseState> current = state, previous;
+    for (std::size_t round = 1; current && !(previous && same_marking(*previous, *current)); ++round) {
+      if (round > options_.maximum_iterations_invisibles) break;
+      const auto found = std::find_if(visible.begin(), visible.end(), [&](std::size_t transition) {
+        return enabled(current->marking, transition);
+      });
+      if (found != visible.end()) {
+        state.marking = std::move(current->marking);
+        state.order = std::move(current->order);
+        ordered_fire(state, *found);
         fired = true;
         break;
       }
-    std::optional<CaseState> stalled;
-    for (std::size_t i = 0; !fired && i < visible.size(); ++i) {
-      std::optional<CaseState> stop;
-      if (auto next = enable_with_invisibles(state, visible[i], &stop)) {
-        next->events = state.events;
-        next->missing = state.missing;
-        state = std::move(*next);
-        ordered_fire(state, visible[i]);
-        fired = true;
-      } else if (stop && !stalled && i == 0) {
-        stalled = std::move(stop);
-      }
+      previous = std::move(current);
+      current = invisible_step(*previous, visible);
     }
-    if (!fired && stalled) {
-      // The reference's silent loop stopped at a marking (not None): for each
-      // input arc of the first transition, a place absent from the original
-      // marking or short in the stopped one is raised to the arc weight in
-      // the original marking, counting weight - original tokens. The silent
-      // firings are discarded and the transition fires from the original.
+    if (!fired && current) {
+      // The loop stopped at a marking (not None): for each input arc of the
+      // first transition, a place absent from the original marking or short
+      // in the stopped one is raised to the arc weight in the original
+      // marking, counting weight - original tokens. The silent firings are
+      // discarded and the transition fires from the original marking.
       const auto transition = visible.front();
       std::int64_t added = 0;
       for (const auto& arc : ordered_input_arcs(transition)) {
-        if (!contains(state.order, arc.place) || stalled->marking[arc.place] < arc.weight) {
+        if (!contains(state.order, arc.place) || current->marking[arc.place] < arc.weight) {
           added += static_cast<std::int64_t>(arc.weight) - state.marking[arc.place];
           state.marking[arc.place] = arc.weight;
           if (!contains(state.order, arc.place)) state.order.push_back(arc.place);
@@ -458,8 +440,9 @@ StreamingTbrEventResult StreamingTokenReplay::receive(
       fired = true;
     }
     if (!fired) {
-      // Missing tokens are inserted for the first transition, each input arc
-      // adding its weight, in arc order. The reference fails on reaching an
+      // The path search returned None. Missing tokens are inserted for the
+      // first transition, each input arc adding its weight, in arc order. The
+      // reference then fails on reaching an
       // arc whose place is already listed in the marking (even with zero
       // tokens, or listed by an earlier parallel arc's insertion): the count
       // so far stays and the marking is left unchanged.

@@ -240,7 +240,7 @@ void check_weighted(const char* name, std::size_t places, const std::vector<Weig
     if (!compact && !repeatable) continue;
     minera::PetriNet net;
     for (std::size_t i = 0; i < places; ++i) (void)net.add_place();
-    net.set_activities({"A", "B", "C"});
+    net.set_activities({"A", "B", "C", "D", "E", "F", "G", "H"});
     for (const auto& t : spec) {
       std::vector<std::size_t> in, out;
       std::vector<minera::PetriArcWeight> in_weights, out_weights;
@@ -334,6 +334,11 @@ void weighted_and_parallel_arcs_follow_reference() {
                  {{"c2","B",{1,1,0},1},{"c2","A",{1,1,1},2},{"c0","C",{1,1,0},0},{"c2","A",{1,1,1},2},{"c1","B",{1,1,0},1},{"c0","B",{1,1,0},1},{"c2","C",{2,2,1},4},{"c1","A",{1,1,1},2},
                   {"c0","B",{1,1,0},2},{"c1","B",{1,1,1},2},{"c2","C",{2,2,1},4},{"c1","C",{2,2,1},4},{"c4","C",{1,1,0},0},{"c1","C",{2,2,1},4},{"c0","C",{1,1,0},2},{"c4","C",{1,1,0},0}},
                  {{"c0",false,3,0},{"c1",false,3,3},{"c2",false,3,3},{"c4",false,1,0}});
+  // The reference searches a shortest silent path from any listed place to
+  // the transition itself, again in every round, and an exhausted round limit
+  // stops at a marking (random nets n274 and n69).
+  check_weighted("silent_path_to_transition_n274", 3, {{0,{{1,1}},{{2,1}}},{1,{{0,2},{2,1}},{{0,2},{1,1}}},{-1,{{1,1}},{{0,1},{1,2}}},{3,{{2,1},{0,1}},{{2,1},{0,2}}},{4,{{1,2},{0,2}},{{2,1}}},{5,{{1,1},{2,1}},{{0,1},{1,1}}}}, {1,1,0}, {0,0,1}, 10, {{"c1","B",{2,2,0},1},{"c0","B",{2,2,0},1},{"c2","B",{2,2,0},1},{"c1","A",{2,1,1},1},{"c3","A",{1,0,1},0},{"c3","A",{1,0,2},1},{"c2","A",{2,1,1},1},{"c0","A",{2,1,1},1},{"c3","B",{1,0,2},1},{"c2","E",{2,1,1},1},{"c2","E",{2,1,1},1},{"c1","A",{2,0,2},1},{"c0","E",{2,1,1},1},{"c3","D",{2,0,2},1},{"c2","F",{3,1,0},1},{"c0","B",{2,2,0},1},{"c1","D",{3,0,2},1},{"c0","F",{2,2,0},1},{"c2","A",{3,0,1},1},{"c3","D",{3,0,2},1}}, {{"c0",false,2,3},{"c1",false,0,4},{"c2",false,1,3},{"c3",false,0,4}});
+  check_weighted("silent_loop_iteration_limit_n69", 3, {{0,{{2,1},{1,1}},{{1,1}}},{-1,{{0,1}},{{1,1},{0,1}}},{-1,{{2,1}},{{1,1}}},{3,{{1,1}},{{1,0},{0,1}}}}, {1,1,0}, {0,1,1}, 10, {{"c0","A",{1,1,0},1},{"c1","A",{1,1,0},1},{"c0","D",{2,0,0},1},{"c0","D",{3,0,0},1},{"c0","A",{3,1,0},2}}, {{"c0",false,3,2},{"c1",false,2,0}});
 }
 
 void negative_arc_weights_are_rejected() {

@@ -139,13 +139,9 @@ class StreamingTokenReplay {
   [[nodiscard]] std::string variant_name() const noexcept;
   void ordered_fire(CaseState& state, std::size_t transition) const;
   [[nodiscard]] std::vector<Arc> ordered_input_arcs(std::size_t transition) const;
-  // Returns the state that enables the transition. Otherwise *stalled holds
-  // the marking the reference's silent loop stopped at without failing (a
-  // path that left the marking unchanged, or the iteration limit), and stays
-  // empty when the reference's search failed (no path, or a blocked one).
-  [[nodiscard]] std::optional<CaseState> enable_with_invisibles(
-      const CaseState& state, std::size_t transition,
-      std::optional<CaseState>* stalled = nullptr) const;
+  [[nodiscard]] static bool same_marking(const CaseState& left, const CaseState& right);
+  [[nodiscard]] std::optional<CaseState> invisible_step(
+      const CaseState& state, const std::vector<std::size_t>& visible) const;
 
   PetriNet net_;
   StreamingTbrOptions options_;
@@ -156,9 +152,7 @@ class StreamingTokenReplay {
   Marking initial_;
   std::vector<std::size_t> initial_order_;
   Marking final_;
-  // silent_paths_[from][to]: a shortest sequence of silent transitions moving
-  // a token from one place to another (breadth first, index order).
-  std::vector<std::vector<std::optional<std::vector<std::size_t>>>> silent_paths_;
+  std::vector<std::vector<std::optional<std::vector<std::size_t>>>> transition_paths_;
   std::map<std::string, CaseState> cases_;
   std::size_t total_events_processed_ = 0;
   std::int64_t total_missing_ = 0;
