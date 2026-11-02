@@ -3042,11 +3042,11 @@ The native CSV event importer follows the reference `pandas.read_csv` +
 activity is an empty cell or a pandas default NA spelling (`NA`, `null`,
 `None`, `NaN`, `n/a`, ...) are dropped rather than rejected; whitespace is a
 value only with `trim_fields=false`. The case-id column is typed the way the
-pandas 3.0.5 C parser infers it from every data row (int64, then float64,
-then bool, then object; `parsers.pyx`/`tokenizer.c` rules) and then printed as
+pandas 3.0.5 reader types it from every data row (int64, then float64,
+then bool, then text, as observed by differential fuzzing) and then printed as
 `astype("string")` does: `007`, `+7` and `7` are one case `7`; an NA cell in
 an integer column makes every id a float (`1.0`); floats use the parser's
-17-digit `precise_xstrtod` value and Python's repr (`1e+31`, `-14.0`, `inf`);
+reader's 17-significant-digit value and Python's repr (`1e+31`, `-14.0`, `inf`);
 `true`/`FALSE` become `True`/`False`; `1_000`, hex and padded text stay
 strings. NA case cells are missing (their rows dropped) except where pandas
 reads the column without NA filtering (unsigned 64-bit ids mixed with NA or

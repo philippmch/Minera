@@ -1,8 +1,13 @@
 #include "minera/csv_event_log_importer.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <charconv>
 #include <chrono>
+#include <climits>
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <optional>
@@ -13,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include "minera/filtering_common.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -442,6 +448,367 @@ std::optional<std::string> reference_timestamp_text(const std::string& value) {
   return std::nullopt;
 }
 
+// --- Reference case-id typing ------------------------------------------------
+// read_csv + format_dataframe identify a case by the text of its case-id cell
+// after pandas has typed the whole column and format_dataframe has converted
+// it to strings. The rules below reproduce that observed behaviour (pandas
+// 3.0.5, checked by differential fuzzing): "007", "+7" and "7" are one case
+// "7"; an NA cell turns an integer column into floats ("1.0"); floats print
+// as Python's repr; true/false spellings print as "True"/"False"; anything
+// else keeps its text. Which cells count as missing also depends on the type.
+
+bool is_space_ascii(char ch) {
+  return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\v' || ch == '\f' ||
+         ch == '\r';
+}
+
+bool is_digit_ascii(char ch) { return ch >= '0' && ch <= '9'; }
+
+bool equals_ascii_ignoring_case(std::string_view text, std::string_view lower) {
+  if (text.size() != lower.size()) return false;
+  for (std::size_t i = 0; i < text.size(); ++i)
+    if (std::tolower(static_cast<unsigned char>(text[i])) != lower[i])
+      return false;
+  return true;
+}
+
+// An integer-shaped cell: optional whitespace, sign and digits, then optional
+// whitespace. A digit run too large for the target range counts as an
+// overflow only when nothing (not even whitespace) follows it.
+enum class IntegerCell { kNotInteger, kFits, kOverflow };
+
+struct IntegerToken {
+  bool negative = false;
+  std::string_view digits;
+  bool trailing = false;  // anything after the digit run
+  bool tail_is_space = true;
+};
+
+std::optional<IntegerToken> integer_token(std::string_view text,
+                                          bool allow_minus) {
+  std::size_t pos = 0;
+  while (pos < text.size() && is_space_ascii(text[pos])) ++pos;
+  IntegerToken token;
+  if (pos < text.size() && (text[pos] == '+' || (allow_minus && text[pos] == '-'))) {
+    token.negative = text[pos] == '-';
+    ++pos;
+  }
+  const auto start = pos;
+  while (pos < text.size() && is_digit_ascii(text[pos])) ++pos;
+  if (pos == start) return std::nullopt;
+  token.digits = text.substr(start, pos - start);
+  token.trailing = pos < text.size();
+  for (auto i = pos; i < text.size(); ++i)
+    if (!is_space_ascii(text[i])) token.tail_is_space = false;
+  return token;
+}
+
+// The digit run's value when it does not exceed `limit`.
+std::optional<std::uint64_t> bounded_value(std::string_view digits,
+                                           std::uint64_t limit) {
+  std::uint64_t value = 0;
+  for (const char ch : digits) {
+    const auto digit = static_cast<std::uint64_t>(ch - '0');
+    if (value > (limit - digit) / 10) return std::nullopt;
+    value = value * 10 + digit;
+  }
+  return value;
+}
+
+IntegerCell signed_cell(std::string_view text, std::int64_t& value) {
+  const auto token = integer_token(text, true);
+  if (!token || !token->tail_is_space) return IntegerCell::kNotInteger;
+  constexpr std::uint64_t kMinMagnitude = std::uint64_t{1} << 63;
+  const auto magnitude = bounded_value(
+      token->digits, token->negative ? kMinMagnitude : kMinMagnitude - 1);
+  if (!magnitude)
+    return token->trailing ? IntegerCell::kNotInteger : IntegerCell::kOverflow;
+  if (!token->negative)
+    value = static_cast<std::int64_t>(*magnitude);
+  else
+    value = *magnitude == kMinMagnitude ? INT64_MIN
+                                        : -static_cast<std::int64_t>(*magnitude);
+  return IntegerCell::kFits;
+}
+
+// Unsigned reading used once a column has a too-large signed integer. A cell
+// beginning with '-' is only noted as signed.
+struct UnsignedScan {
+  bool saw_minus = false;
+  bool saw_above_int64 = false;
+  bool saw_na = false;
+};
+
+IntegerCell unsigned_cell(std::string_view text, UnsignedScan& scan,
+                          std::uint64_t& value) {
+  const auto first = text.find_first_not_of(" \t\n\v\f\r");
+  if (first != std::string_view::npos && text[first] == '-') {
+    scan.saw_minus = true;
+    value = 0;
+    return IntegerCell::kFits;
+  }
+  const auto token = integer_token(text, false);
+  if (!token || !token->tail_is_space) return IntegerCell::kNotInteger;
+  const auto magnitude = bounded_value(token->digits, UINT64_MAX);
+  if (!magnitude)
+    return token->trailing ? IntegerCell::kNotInteger : IntegerCell::kOverflow;
+  value = *magnitude;
+  if (value > static_cast<std::uint64_t>(INT64_MAX)) scan.saw_above_int64 = true;
+  return IntegerCell::kFits;
+}
+
+// Python int() syntax in base 10: whitespace, sign, digits with single
+// underscores between them. Returns the int's decimal text.
+std::optional<std::string> python_int_text(std::string_view text) {
+  const auto first = text.find_first_not_of(" \t\n\v\f\r");
+  if (first == std::string_view::npos) return std::nullopt;
+  const auto last = text.find_last_not_of(" \t\n\v\f\r");
+  auto body = text.substr(first, last - first + 1);
+  bool negative = false;
+  if (body.front() == '+' || body.front() == '-') {
+    negative = body.front() == '-';
+    body.remove_prefix(1);
+  }
+  if (body.empty() || body.front() == '_' || body.back() == '_')
+    return std::nullopt;
+  std::string digits;
+  for (std::size_t i = 0; i < body.size(); ++i) {
+    if (body[i] == '_') {
+      if (body[i - 1] == '_') return std::nullopt;
+    } else if (is_digit_ascii(body[i])) {
+      digits.push_back(body[i]);
+    } else {
+      return std::nullopt;
+    }
+  }
+  if (digits.size() > 4300) return std::nullopt;  // Python's digit limit
+  const auto nonzero = digits.find_first_not_of('0');
+  if (nonzero == std::string::npos) return std::string("0");
+  return (negative ? "-" : "") + digits.substr(nonzero);
+}
+
+const std::array<double, 309>& decimal_powers() {
+  static const std::array<double, 309> powers = [] {
+    std::array<double, 309> values{};
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      const std::string literal = "1e" + std::to_string(i);
+      std::from_chars(literal.data(), literal.data() + literal.size(), values[i]);
+    }
+    return values;
+  }();
+  return powers;
+}
+
+// The double pandas' default float reading gives a cell, or nullopt.
+// Observed rules: at most 17 significant digits are kept, counted from the
+// first written digit (so leading zeros use up the budget); further integer
+// digits only scale the value and further fraction digits are dropped. The
+// kept digits are folded into a double one at a time and then scaled by the
+// remaining power of ten, which is why "0.30000000000000004" reads as 0.3.
+std::optional<double> pandas_float_value(std::string_view text) {
+  struct Lexed {
+    bool negative = false;
+    std::string kept;     // significant digits retained
+    long scale = 0;       // power of ten applied to `kept`
+    bool any_digit = false;
+  } lexed;
+  std::size_t pos = 0;
+  const auto peek = [&] { return pos < text.size() ? text[pos] : '\0'; };
+  while (is_space_ascii(peek())) ++pos;
+  if (peek() == '+' || peek() == '-') {
+    lexed.negative = peek() == '-';
+    ++pos;
+  }
+  constexpr std::size_t kKept = 17;
+  for (; is_digit_ascii(peek()); ++pos) {
+    lexed.any_digit = true;
+    if (lexed.kept.size() < kKept) lexed.kept.push_back(peek());
+    else ++lexed.scale;
+  }
+  if (peek() == '.') {
+    ++pos;
+    for (; is_digit_ascii(peek()); ++pos) {
+      lexed.any_digit = true;
+      if (lexed.kept.size() < kKept) {
+        lexed.kept.push_back(peek());
+        --lexed.scale;
+      }
+    }
+  }
+  if (!lexed.any_digit) return std::nullopt;
+  if (peek() == 'e' || peek() == 'E') {
+    // An exponent may be preceded by whitespace; without digits the 'e' is
+    // left unread (and the cell then fails).
+    auto q = pos + 1;
+    while (q < text.size() && std::isspace(static_cast<unsigned char>(text[q]))) ++q;
+    bool exponent_negative = false;
+    if (q < text.size() && (text[q] == '+' || text[q] == '-')) {
+      exponent_negative = text[q] == '-';
+      ++q;
+    }
+    const auto digits_start = q;
+    long exponent = 0;
+    constexpr long kSaturated = 1000000;  // far beyond any finite result
+    for (; q < text.size() && is_digit_ascii(text[q]); ++q)
+      exponent = std::min(kSaturated, exponent * 10 + (text[q] - '0'));
+    if (q > digits_start) {
+      lexed.scale += exponent_negative ? -exponent : exponent;
+      pos = q;
+    }
+  }
+  while (is_space_ascii(peek())) ++pos;
+  if (pos < text.size()) return std::nullopt;
+
+  double value = 0.;
+  for (const char digit : lexed.kept) value = value * 10. + (digit - '0');
+  if (lexed.negative) value = -value;
+  const auto& powers = decimal_powers();
+  if (lexed.scale > 308) {
+    if (value != 0) value = value < 0 ? -HUGE_VAL : HUGE_VAL;
+    else value = 0.;
+  } else if (lexed.scale >= 0) {
+    if (lexed.scale > 0) value *= powers[static_cast<std::size_t>(lexed.scale)];
+  } else if (lexed.scale >= -308) {
+    value /= powers[static_cast<std::size_t>(-lexed.scale)];
+  } else if (lexed.scale >= -616) {
+    value /= powers[static_cast<std::size_t>(-308 - lexed.scale)];
+    value /= powers[308];
+  } else {
+    value = 0.;
+  }
+  return value;
+}
+
+std::optional<double> pandas_float_cell(std::string_view text) {
+  if (auto value = pandas_float_value(text)) return value;
+  for (const auto spelling : {"inf", "+inf", "infinity", "+infinity"})
+    if (equals_ascii_ignoring_case(text, spelling)) return HUGE_VAL;
+  for (const auto spelling : {"-inf", "-infinity"})
+    if (equals_ascii_ignoring_case(text, spelling)) return -HUGE_VAL;
+  return std::nullopt;
+}
+
+std::string python_float_text(double value) {
+  if (std::isinf(value)) return value > 0 ? "inf" : "-inf";
+  return filtering_float_repr(value);
+}
+
+// The case-id text each cell has after typing and string conversion;
+// nullopt is a missing case id, whose row the reference drops.
+std::vector<std::optional<std::string>> infer_reference_case_ids(
+    const std::vector<std::string>& cells) {
+  const auto count = cells.size();
+  using Column = std::vector<std::optional<std::string>>;
+  const auto na = [&](std::size_t i) { return is_reference_na_token(cells[i]); };
+  // Every cell's text as written, NA spellings included.
+  const auto literal = [&] { return Column(cells.begin(), cells.end()); };
+  // A column read as Python ints (NA cells missing), when every cell is one.
+  const auto python_ints = [&]() -> std::optional<Column> {
+    Column column(count);
+    for (std::size_t i = 0; i < count; ++i) {
+      if (na(i)) continue;
+      auto text = python_int_text(cells[i]);
+      if (!text) return std::nullopt;
+      column[i] = std::move(*text);
+    }
+    return column;
+  };
+
+  // Signed 64-bit integers: the first non-NA cell that is not one decides.
+  bool integer_overflow = false;
+  {
+    std::vector<std::int64_t> values(count);
+    std::size_t missing = 0;
+    std::optional<IntegerCell> first_failure;
+    for (std::size_t i = 0; i < count && !first_failure; ++i) {
+      if (na(i)) {
+        ++missing;
+        continue;
+      }
+      const auto cell = signed_cell(cells[i], values[i]);
+      if (cell != IntegerCell::kFits) first_failure = cell;
+    }
+    if (!first_failure) {
+      Column column(count);
+      for (std::size_t i = 0; i < count; ++i) {
+        if (na(i)) continue;
+        if (missing == 0) {
+          column[i] = std::to_string(values[i]);
+        } else if (values[i] != INT64_MIN) {
+          // NA upcasts the column to float; INT64_MIN reads as NA too.
+          column[i] = python_float_text(static_cast<double>(values[i]));
+        }
+      }
+      return column;
+    }
+    integer_overflow = *first_failure == IntegerCell::kOverflow;
+  }
+
+  // A too-large signed integer: read the column as unsigned 64-bit integers.
+  if (integer_overflow) {
+    UnsignedScan scan;
+    std::vector<std::uint64_t> values(count);
+    std::optional<IntegerCell> first_failure;
+    for (std::size_t i = 0; i < count && !first_failure; ++i) {
+      if (na(i)) {
+        scan.saw_na = true;
+        continue;
+      }
+      const auto cell = unsigned_cell(cells[i], scan, values[i]);
+      if (cell != IntegerCell::kFits) first_failure = cell;
+    }
+    const auto ints_or_literal = [&] {
+      if (auto column = python_ints()) return *column;
+      return literal();
+    };
+    if (first_failure == IntegerCell::kOverflow) return ints_or_literal();
+    if (!first_failure) {
+      // Values above the signed range cannot share a column with NA or
+      // negative cells: the column then keeps its text unfiltered.
+      if (scan.saw_above_int64 && (scan.saw_na || scan.saw_minus))
+        return literal();
+      if (scan.saw_minus) return ints_or_literal();
+      Column column(count);
+      for (std::size_t i = 0; i < count; ++i) column[i] = std::to_string(values[i]);
+      return column;
+    }
+    // Otherwise a non-integer cell: continue with floats.
+  }
+
+  // Floats.
+  {
+    Column column(count);
+    bool all = true;
+    for (std::size_t i = 0; i < count && all; ++i) {
+      if (na(i)) continue;
+      if (const auto value = pandas_float_cell(cells[i]))
+        column[i] = python_float_text(*value);
+      else
+        all = false;
+    }
+    if (all) return column;
+  }
+
+  // Booleans (any letter case).
+  {
+    Column column(count);
+    bool all = true;
+    for (std::size_t i = 0; i < count && all; ++i) {
+      if (na(i)) continue;
+      if (equals_ascii_ignoring_case(cells[i], "true")) column[i] = "True";
+      else if (equals_ascii_ignoring_case(cells[i], "false")) column[i] = "False";
+      else all = false;
+    }
+    if (all) return column;
+  }
+
+  // Text, NA cells missing.
+  Column column(count);
+  for (std::size_t i = 0; i < count; ++i)
+    if (!na(i)) column[i] = cells[i];
+  return column;
+}
+
 }  // namespace
 
 namespace {
@@ -517,7 +884,6 @@ CsvEventData import_csv_event_data_impl(
     }
   }
 
-  std::unordered_map<std::string, std::size_t> trace_ids;
   CsvEventData result;
   EventLog& log = result.log;
   EventTable& table = result.table;
@@ -529,13 +895,23 @@ CsvEventData import_csv_event_data_impl(
     table.dtypes.assign(header.size(), "str");
   }
 
+  // The batch import (read_csv + format_dataframe) infers the case-id
+  // column's type from every data row before any row is dropped, and its
+  // missing-value handling depends on that type; rows are therefore collected
+  // first and placed once the case ids are known. Stream readers
+  // (keep_na_first_class_values) keep the literal cell text in file order.
+  const bool reference_batch = !options.keep_na_first_class_values;
+  struct PendingRow {
+    std::size_t line_number = 0;
+    std::size_t token = 0;
+    Event event;
+    std::vector<EventAttribute> case_attributes;
+    EventTable::Row table_row;
+  };
+  std::vector<std::string> case_tokens;
+  std::vector<PendingRow> pending;
+
   std::size_t line_number = 1;
-  std::size_t input_order = 0;
-  // Reference-converted timestamp text per kept row (input_order): an empty
-  // string for an NA cell, nullopt for a cell the conversion rejects.
-  std::vector<std::optional<std::string>> timestamp_texts;
-  std::size_t parsed_timestamps = 0;
-  std::optional<std::pair<std::size_t, std::string>> first_bad_timestamp;
   while (read_csv_record(input, line)) {
     ++line_number;
     if (line.empty()) {
@@ -552,48 +928,28 @@ CsvEventData import_csv_event_data_impl(
                         ? field_at(fields, *resource_index, line_number)
                         : std::string{};
 
-    // The reference flow drops rows whose case id or activity is NA (an
-    // empty cell or a pandas NA spelling); whitespace-only text is a value
-    // there, but the default trim_fields option has already blanked it here.
+    const std::size_t token = case_tokens.size();
+    case_tokens.push_back(case_id);
+    // The reference flow drops rows whose activity is NA (an empty cell or a
+    // pandas NA spelling); whitespace-only text is a value there, but the
+    // default trim_fields option has already blanked it here. Whether an NA
+    // case id is missing depends on the inferred column type (below).
     // Stream readers keep them as literal values (keep_na_first_class_values).
-    if (!options.keep_na_first_class_values &&
-        (is_reference_na_token(case_id) || is_reference_na_token(activity))) {
+    if (reference_batch && is_reference_na_token(activity)) {
       continue;
     }
-    if (timestamp_index) {
-      // Decided per column after the scan; see apply below.
-      if (is_reference_na_token(timestamp)) {
-        timestamp_texts.emplace_back(std::string{});
-      } else if (auto parsed = reference_timestamp_text(timestamp)) {
-        timestamp_texts.push_back(std::move(parsed));
-        ++parsed_timestamps;
-      } else {
-        timestamp_texts.emplace_back(std::nullopt);
-        if (!first_bad_timestamp)
-          first_bad_timestamp = std::make_pair(line_number, timestamp);
-      }
-    }
 
-    auto [it, inserted] = trace_ids.emplace(case_id, log.traces.size());
-    if (inserted) {
-      log.traces.push_back(Trace{case_id, {}, {}});
-      auto& inserted_trace = log.traces.back();
-      inserted_trace.case_id_state = FirstClassAttributeState::kPresent;
-      inserted_trace.case_id_source_key = header[case_index];
-    }
-
-    auto& trace = log.traces[it->second];
+    PendingRow row;
+    row.line_number = line_number;
+    row.token = token;
     for (const auto index : case_attribute_indices) {
-      // The first row carrying a value sets it; later rows of the same case
-      // repeat it in a flat file, so they are ignored (as is a conflict).
       if (index >= fields.size() || fields[index].empty()) continue;
-      const std::string key = header[index].substr(kCasePrefix.size());
-      if (trace.attribute(key) != nullptr) continue;
-      trace.attributes.push_back(
-          EventAttribute{key, fields[index], AttributeKind::kString});
+      row.case_attributes.push_back(EventAttribute{
+          header[index].substr(kCasePrefix.size()), fields[index],
+          AttributeKind::kString});
     }
 
-    Event event{case_id, activity, timestamp, resource, input_order++};
+    Event event{case_id, activity, timestamp, resource, 0};
     event.case_id_state = FirstClassAttributeState::kPresent;
     event.activity_state = FirstClassAttributeState::kPresent;
     event.case_id_source_key = header[case_index];
@@ -625,7 +981,7 @@ CsvEventData import_csv_event_data_impl(
           EventAttribute{header[index], fields[index], AttributeKind::kString});
     }
     if (preserve_table) {
-      EventTable::Row table_row;
+      EventTable::Row& table_row = row.table_row;
       table_row.reserve(header.size());
       for (std::size_t index = 0; index < header.size(); ++index) {
         if (index >= fields.size()) {
@@ -663,10 +1019,74 @@ CsvEventData import_csv_event_data_impl(
         }
         table_row.push_back(std::move(cell));
       }
-      table.rows.push_back(std::move(table_row));
     }
-    log.traces[it->second].events.push_back(std::move(event));
+    row.event = std::move(event);
+    pending.push_back(std::move(row));
   }
+
+  // The case id each cell carries after read_csv's dtype inference and
+  // format_dataframe's string conversion; nullopt marks a missing case id.
+  std::vector<std::optional<std::string>> case_ids;
+  if (reference_batch) {
+    case_ids = infer_reference_case_ids(case_tokens);
+  } else {
+    case_ids.assign(case_tokens.begin(), case_tokens.end());
+  }
+  case_tokens.clear();
+  case_tokens.shrink_to_fit();
+
+  std::unordered_map<std::string, std::size_t> trace_ids;
+  std::size_t input_order = 0;
+  // Reference-converted timestamp text per kept row (input_order): an empty
+  // string for an NA cell, nullopt for a cell the conversion rejects.
+  std::vector<std::optional<std::string>> timestamp_texts;
+  std::size_t parsed_timestamps = 0;
+  std::optional<std::pair<std::size_t, std::string>> first_bad_timestamp;
+  for (auto& row : pending) {
+    const auto& case_id = case_ids[row.token];
+    if (!case_id) continue;
+    if (timestamp_index) {
+      // Decided per column after the scan; see apply below.
+      const auto& timestamp = row.event.timestamp;
+      if (is_reference_na_token(timestamp)) {
+        timestamp_texts.emplace_back(std::string{});
+      } else if (auto parsed = reference_timestamp_text(timestamp)) {
+        timestamp_texts.push_back(std::move(parsed));
+        ++parsed_timestamps;
+      } else {
+        timestamp_texts.emplace_back(std::nullopt);
+        if (!first_bad_timestamp)
+          first_bad_timestamp = std::make_pair(row.line_number, timestamp);
+      }
+    }
+
+    auto [it, inserted] = trace_ids.emplace(*case_id, log.traces.size());
+    if (inserted) {
+      log.traces.push_back(Trace{*case_id, {}, {}});
+      auto& inserted_trace = log.traces.back();
+      inserted_trace.case_id_state = FirstClassAttributeState::kPresent;
+      inserted_trace.case_id_source_key = header[case_index];
+    }
+
+    auto& trace = log.traces[it->second];
+    for (auto& attribute : row.case_attributes) {
+      // The first row carrying a value sets it; later rows of the same case
+      // repeat it in a flat file, so they are ignored (as is a conflict).
+      if (trace.attribute(attribute.key) != nullptr) continue;
+      trace.attributes.push_back(std::move(attribute));
+    }
+
+    row.event.case_id = *case_id;
+    row.event.input_order = input_order++;
+    if (preserve_table) {
+      if (case_index < row.table_row.size() && row.table_row[case_index])
+        row.table_row[case_index]->value = *case_id;
+      table.rows.push_back(std::move(row.table_row));
+    }
+    trace.events.push_back(std::move(row.event));
+  }
+  pending.clear();
+  pending.shrink_to_fit();
 
   // A column the reference converts (every non-NA cell parses) is stored in
   // its converted spelling. A column mixing dates with unconvertible text is
@@ -704,6 +1124,16 @@ CsvEventData import_csv_event_data_impl(
     for (auto& trace : log.traces) {
       order_events_by_time(trace.events);
     }
+  }
+
+  // format_dataframe sorts the frame by the string case id (then timestamp
+  // and row index), so the converted log lists its cases in code-point order
+  // of their ids. UTF-8 byte order is code-point order.
+  if (reference_batch) {
+    std::stable_sort(log.traces.begin(), log.traces.end(),
+                     [](const Trace& left, const Trace& right) {
+                       return left.case_id < right.case_id;
+                     });
   }
 
   if (preserve_table) table.validate();

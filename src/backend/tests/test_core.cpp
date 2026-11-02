@@ -56,6 +56,8 @@
 #include <fstream>
 #include <initializer_list>
 #include <limits>
+#include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -755,10 +757,12 @@ void preserves_multiline_csv_fields_and_original_table_order() {
   assert(imported.table.rows.size() == 3 && imported.log.event_count() == 3);
   assert(imported.table.rows[0][3]->value == "line 1\r\nline \"2\", tail");
   assert(imported.table.rows[1][3]->value == "first\nsecond");
-  assert(imported.log.traces[0].events[0].activity == "A");
-  assert(imported.log.traces[0].events[0].input_order == 2);
-  assert(*imported.log.traces[0].events[1].attribute("payload") == "line 1\r\nline \"2\", tail");
-  assert(*imported.log.traces[0].attribute("note") == "case\r\nnote");
+  // Cases follow the reference's sorted case ids: "a" then "z".
+  assert(imported.log.traces[0].case_id == "a");
+  assert(imported.log.traces[1].events[0].activity == "A");
+  assert(imported.log.traces[1].events[0].input_order == 2);
+  assert(*imported.log.traces[1].events[1].attribute("payload") == "line 1\r\nline \"2\", tail");
+  assert(*imported.log.traces[1].attribute("note") == "case\r\nnote");
   std::istringstream untrimmed("case_id,activity,payload\r\nz,A,\"  first\nlast  \"\r\n");
   minera::CsvImportOptions options;options.trim_fields = false;
   assert(minera::import_csv_event_data(untrimmed,options).table.rows[0][2]->value == "  first\nlast  ");
@@ -7321,8 +7325,135 @@ void csv_import_matches_reference_dataframe_flow() {
   }
 }
 
+// pandas 3.0.5 read_csv + pm4py 2.7.22 format_dataframe: the case-id column's
+// inferred dtype decides the case text (astype("string") of int64, float64,
+// bool or object cells) and which NA cells are missing; the frame is then
+// sorted by that text. Expected values were captured from the reference.
+void csv_case_ids_follow_reference_dtype_inference_and_order() {
+  struct Case {
+    std::vector<std::string> tokens;
+    std::vector<std::optional<std::string>> expected;
+  };
+  const std::vector<Case> cases = {
+      {{"7", "007", "+7"}, {"7", "7", "7"}},
+      {{"-0", "1"}, {"0", "1"}},
+      {{"1_000", "1"}, {"1_000", "1"}},
+      {{"0x10"}, {"0x10"}},
+      {{"9223372036854775807"}, {"9223372036854775807"}},
+      {{"12345678901234567890", "5"}, {"12345678901234567890", "5"}},
+      {{"18446744073709551616"}, {"18446744073709551616"}},
+      {{"-9223372036854775809", "5"}, {"-9223372036854775809", "5"}},
+      {{"-1", "18446744073709551616"}, {"-1", "18446744073709551616"}},
+      {{"7.0", "8"}, {"7.0", "8.0"}},
+      {{"1e3", "2"}, {"1000.0", "2.0"}},
+      {{"1e16"}, {"1e+16"}},
+      {{"1e15"}, {"1000000000000000.0"}},
+      {{"0.30000000000000004"}, {"0.3"}},
+      {{"0000000000000000000001.5"}, {"0.0"}},
+      {{"123456789.123456789"}, {"123456789.12345678"}},
+      {{"1e400", "2"}, {"inf", "2.0"}},
+      {{"-1e400"}, {"-inf"}},
+      {{"1e-400"}, {"0.0"}},
+      {{"inf", "5"}, {"inf", "5.0"}},
+      {{"-Infinity"}, {"-inf"}},
+      {{"iNf"}, {"inf"}},
+      {{"-0.0"}, {"-0.0"}},
+      {{"1.5e-7"}, {"1.5e-07"}},
+      {{"True", "False"}, {"True", "False"}},
+      {{"true", "FALSE"}, {"True", "False"}},
+      {{"tRuE", "false"}, {"True", "False"}},
+      {{"True", ""}, {"True", std::nullopt}},
+      {{"TRUE", "1"}, {"TRUE", "1"}},
+      {{"1", ""}, {"1.0", std::nullopt}},
+      {{"1", "NA"}, {"1.0", std::nullopt}},
+      {{"x", ""}, {"x", std::nullopt}},
+      {{"1", "x"}, {"1", "x"}},
+      {{"", ""}, {std::nullopt, std::nullopt}},
+      {{"9007199254740993", ""}, {"9007199254740992.0", std::nullopt}},
+      {{"12345678901234567890", ""}, {"12345678901234567890", ""}},
+      {{"5", "", "12345678901234567890"}, {"5", "", "12345678901234567890"}},
+      {{"12345678901234567890", "-1"}, {"12345678901234567890", "-1"}},
+      {{"18446744073709551616", "", "12345678901234567890"}, {"18446744073709551616", std::nullopt, "12345678901234567890"}},
+      {{"18446744073709551616", "1.5"}, {"18446744073709551616", "1.5"}},
+      {{"18446744073709551616", "1.5", ""}, {"18446744073709551616", "1.5", ""}},
+      {{"1.5", "18446744073709551616"}, {"1.5", "1.8446744073709552e+19"}},
+      {{"-9223372036854775809", "12345678901234567890", ""}, {"-9223372036854775809", "12345678901234567890", ""}},
+      {{"12345678901234567890", "1.5"}, {"1.2345678901234567e+19", "1.5"}},
+      {{"12345678901234567890", "", "x"}, {"12345678901234567890", std::nullopt, "x"}},
+      {{"99999999999999999999.5", "1"}, {"1.0000000000000002e+20", "1.0"}},
+      {{"1e", "2"}, {"1e", "2"}},
+      {{"1e+3"}, {"1000.0"}},
+      {{"1.", "2.0e0"}, {"1.0", "2.0"}},
+      {{"-", "5"}, {"-", "5"}},
+      {{"+", "5"}, {"+", "5"}},
+      {{"nan", "7"}, {std::nullopt, "7.0"}},
+      {{"None", "x"}, {std::nullopt, "x"}},
+      {{"#N/A", "3"}, {std::nullopt, "3.0"}},
+  };
+  for (const auto& item : cases) {
+    std::string text = "case_id,activity\n";
+    for (std::size_t i = 0; i < item.tokens.size(); ++i)
+      text += item.tokens[i] + ",A" + std::to_string(i) + "\n";
+    std::istringstream input(text);
+    const auto data = minera::import_csv_event_data(input);
+    std::map<std::string, std::string> case_of_activity;
+    for (const auto& trace : data.log.traces)
+      for (const auto& event : trace.events) {
+        assert(event.case_id == trace.case_id);
+        case_of_activity[event.activity] = trace.case_id;
+      }
+    for (std::size_t i = 0; i < item.tokens.size(); ++i) {
+      const auto found = case_of_activity.find("A" + std::to_string(i));
+      if (!item.expected[i]) {
+        assert(found == case_of_activity.end());
+      } else {
+        assert(found != case_of_activity.end());
+        assert(found->second == *item.expected[i]);
+      }
+    }
+    // The flat table carries the same case text in the case-id cells.
+    for (const auto& row : data.table.rows)
+      assert(case_of_activity.at(row[1]->value) == row[0]->value);
+  }
+  {
+    // Cases follow the sorted string ids, events their timestamps.
+    std::istringstream input(
+        "case_id,activity,timestamp\n"
+        "c2,A,2024-01-01 10:00\nc10,B,2024-01-01 09:00\n"
+        "c1,C,2024-01-01 11:00\nc2,D,2024-01-01 08:00\n");
+    const auto log = minera::import_csv_event_log(input);
+    assert(log.traces.size() == 3);
+    assert(log.traces[0].case_id == "c1");
+    assert(log.traces[1].case_id == "c10");
+    assert(log.traces[2].case_id == "c2");
+    assert(log.traces[2].events[0].activity == "D");
+    // Integer ids sort as their strings ("10" < "7" < "9"); "007" and "7"
+    // are one int64 case.
+    std::istringstream numeric("case_id,activity\n9,A\n10,B\n007,C\n7,D\n");
+    const auto ids = minera::import_csv_event_log(numeric);
+    assert(ids.traces.size() == 3);
+    assert(ids.traces[0].case_id == "10");
+    assert(ids.traces[1].case_id == "7");
+    assert(ids.traces[1].events.size() == 2);
+    assert(ids.traces[2].case_id == "9");
+  }
+  {
+    // Stream readers keep literal ids in file order.
+    minera::CsvImportOptions options;
+    options.keep_na_first_class_values = true;
+    std::istringstream input("case_id,activity\n9,A\n007,B\n7,C\nNA,D\n");
+    const auto log = minera::import_csv_event_log(input, options);
+    assert(log.traces.size() == 4);
+    assert(log.traces[0].case_id == "9");
+    assert(log.traces[1].case_id == "007");
+    assert(log.traces[2].case_id == "7");
+    assert(log.traces[3].case_id == "NA");
+  }
+}
+
 int main() {
   csv_import_matches_reference_dataframe_flow();
+  csv_case_ids_follow_reference_dtype_inference_and_order();
   exact_mean_matches_python_statistics_goldens();
   exact_stdev_matches_python_statistics_goldens();
   csv_case_aliases_are_opt_in_and_exact_columns_win();

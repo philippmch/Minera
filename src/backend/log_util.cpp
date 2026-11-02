@@ -46,11 +46,13 @@ double parse_elapsed(const Event& previous, const Event& target,
   };
   const auto start = parse(previous_text);
   const auto end = parse(target_text);
-  if (!start || !end || *end < *start) {
+  if (!start || !end) {
     throw std::invalid_argument(
-        "until_activity: invalid or reversed timestamps in trace " +
+        "until_activity: invalid timestamps in trace " +
         std::to_string(trace_index));
   }
+  // The reference subtracts the two instants as given, so a target recorded
+  // before its predecessor yields a negative duration.
   return *end - *start;
 }
 

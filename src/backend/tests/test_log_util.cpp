@@ -137,6 +137,23 @@ void until_activity_returns_prefix_and_duration() {
   const auto split_json = log_train_test_json(split_log_train_test(log, 0.5, 1));
   assert(split_json.find("\"training\"") != std::string::npos);
   assert(split_json.find("\"testing\"") != std::string::npos);
+
+  // pm4py 2.7.22 subtracts the instants as recorded: a target logged before
+  // its predecessor gives a negative duration (here -3600 s) rather than an
+  // error, in both until-activity and the per-target sublogs.
+  EventLog reversed;
+  Trace trace;
+  trace.case_id = "r1";
+  trace.events = {event("r1", "A", "2023-01-01T02:00:00+00:00", 0),
+                  event("r1", "B", "2023-01-01T01:00:00+00:00", 1)};
+  reversed.traces.push_back(trace);
+  const auto backwards = get_log_traces_until_activity(reversed, "B", options);
+  assert(backwards.elapsed_seconds.size() == 1);
+  assert(backwards.elapsed_seconds[0] == -3600.0);
+  const auto targets = get_log_traces_to_activities(
+      reversed, std::vector<std::string>{"B"}, options);
+  assert(targets.activities == std::vector<std::string>{"B"});
+  assert(targets.logs.size() == 1 && targets.logs[0].traces.size() == 1);
 }
 
 void activity_targets_exclude_competing_targets() {
