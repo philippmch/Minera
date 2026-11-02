@@ -27,6 +27,17 @@ inline std::string relation_role_column(const EventTable& table,
   return fallback;
 }
 
+// True when `key` names the case-id column of a batch-imported CSV table.
+// Those ids carry the reference's typed text, so relation keys joined with
+// them are typed the same way (type_case_relation_column_like_csv_log).
+inline bool csv_case_id_key(const EventTable& table, const std::string& key) {
+  for (std::size_t column = 0; column < table.columns.size(); ++column)
+    for (const auto& row : table.rows)
+      if (row[column] && row[column]->first_class_role == FirstClassAttributeRole::kCaseId)
+        return table.columns[column] == key;
+  return false;
+}
+
 inline void relation_column_alias(EventTable& table, const std::string& source,
                                   const std::string& destination) {
   if (source == destination) return;

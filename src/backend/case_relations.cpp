@@ -16,6 +16,7 @@
 #include <utility>
 #include <variant>
 
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -1450,6 +1451,38 @@ EventTable parse_case_relations_table_csv(std::istream& input) {
   }
   table.validate();
   return table;
+}
+
+void type_case_relation_column_like_csv_log(EventTable& relations,
+                                            const std::string& column) {
+  const auto found = std::find(relations.columns.begin(),
+                               relations.columns.end(), column);
+  if (found == relations.columns.end()) return;
+  const auto index = static_cast<std::size_t>(found - relations.columns.begin());
+  std::vector<std::string> cells;
+  cells.reserve(relations.rows.size());
+  for (const auto& row : relations.rows)
+    cells.push_back(index < row.size() && row[index] ? row[index]->value
+                                                     : std::string{});
+  const auto typed = reference_csv_column_text(cells);
+  for (std::size_t row = 0; row < relations.rows.size(); ++row) {
+    auto& cell = relations.rows[row][index];
+    if (cell && typed[row]) cell->value = *typed[row];
+  }
+}
+
+void type_case_relations_like_csv_logs(std::vector<CaseRelation>& relations,
+                                       bool left_is_csv, bool right_is_csv) {
+  const auto apply = [&](std::string CaseRelation::*member) {
+    std::vector<std::string> cells;
+    cells.reserve(relations.size());
+    for (const auto& relation : relations) cells.push_back(relation.*member);
+    const auto typed = reference_csv_column_text(cells);
+    for (std::size_t row = 0; row < relations.size(); ++row)
+      if (typed[row]) relations[row].*member = *typed[row];
+  };
+  if (left_is_csv) apply(&CaseRelation::left_case_id);
+  if (right_is_csv) apply(&CaseRelation::right_case_id);
 }
 
 EventLog merge_case_relations(const EventLog& base, const EventLog& incoming,

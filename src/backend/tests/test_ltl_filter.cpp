@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -105,15 +106,24 @@ int main() {
       for (const auto& trace : filtered.traces) joined += trace.case_id + ";";
       return joined;
     };
-    // Bounds apply to trace positions i and i + 1 (reference quirk), not to
-    // the matched b/a events: c0's first gap is 14 s, c1's is 300 s.
+    // Imported logs follow pm4py's DataFrame ltl_checker (captured on the
+    // DataFrame of these rows): bounds hold between the matched b and a
+    // events, so c0's b -> a (about 24 h) and c1's (133 s) both pass.
     LtlFilterOptions bounded;
     bounded.attribute_values = {"b", "a"};
     bounded.enable_timestamp = true;
     bounded.timestamp_diff_boundaries = {{60.0, 100000.0}};
-    assert(ids(minera::filter_ltl_event_log(captured, bounded)) == "c1;");
+    assert(ids(minera::filter_ltl_event_log(captured, bounded)) == "c0;c1;");
     bounded.positive = false;
-    assert(ids(minera::filter_ltl_event_log(captured, bounded)) == "c0;");
+    assert(ids(minera::filter_ltl_event_log(captured, bounded)).empty());
+    // The EventLog checker (a log arriving as an EventLog object) instead
+    // reads the bound at trace positions i and i + 1: c0's first gap is 14 s,
+    // c1's is 300 s.
+    constexpr auto object = minera::LtlInputShape::kEventLogObject;
+    bounded.positive = true;
+    assert(ids(minera::filter_ltl_event_log(captured, bounded, object)) == "c1;");
+    bounded.positive = false;
+    assert(ids(minera::filter_ltl_event_log(captured, bounded, object)) == "c0;");
     // Standard XES keys select the importer's first-class fields.
     LtlFilterOptions named{LtlFilterVariant::kEventuallyFollows, "concept:name", {"b", "a"}};
     assert(ids(minera::filter_ltl_event_log(captured, named)) == "c0;c1;");
@@ -122,11 +132,45 @@ int main() {
     LtlFilterOptions persons{LtlFilterVariant::kAttributeValueDifferentPersons, "", {"\u00e9"}};
     persons.resource_key = "org:resource";
     assert(ids(minera::filter_ltl_event_log(captured, persons)) == "c0;");
+    // Four eyes with the roles swapped: the A (r3) events' "resources" are
+    // b, \u00e9, \u00e9; the DataFrame compares them with the last B (r2)
+    // event's only, a, so c0 satisfies the principle. The EventLog checker
+    // compares with every B (\u00e9 and a) and finds a violation.
     LtlFilterOptions swapped{LtlFilterVariant::kFourEyes, "org:resource", {"r3", "r2"}};
     swapped.resource_key = "concept:name";
-    assert(ids(minera::filter_ltl_event_log(captured, swapped)).empty());
-    swapped.positive = false;
     assert(ids(minera::filter_ltl_event_log(captured, swapped)) == "c0;");
+    assert(ids(minera::filter_ltl_event_log(captured, swapped, object)).empty());
+    swapped.positive = false;
+    assert(ids(minera::filter_ltl_event_log(captured, swapped)).empty());
+    assert(ids(minera::filter_ltl_event_log(captured, swapped, object)) == "c0;");
+
+    // Captured: a case B(r1), A(r1), B(r2) passes the DataFrame four-eyes
+    // check (only the last B's r2 is compared) and fails the EventLog one.
+    EventLog repeated;
+    repeated.traces = {
+        {"1", {event("1", "B", "2023-01-01T00:00:00Z", "r2"),
+               event("1", "A", "2023-01-01T01:00:00Z", "r1")}, {}},
+        {"2", {event("2", "B", "2023-01-01T00:00:00Z", "r1"),
+               event("2", "A", "2023-01-01T01:00:00Z", "r1"),
+               event("2", "B", "2023-01-01T02:00:00Z", "r2")}, {}},
+        {"3", {event("3", "A", "2023-01-01T00:00:00Z", "r1"),
+               event("3", "B", "2023-01-01T00:00:00Z", "r2")}, {}}};
+    LtlFilterOptions eyes{LtlFilterVariant::kFourEyes, "", {"A", "B"}};
+    assert(ids(minera::filter_ltl_event_log(repeated, eyes)) == "1;2;3;");
+    assert(ids(minera::filter_ltl_event_log(repeated, eyes, object)) == "1;3;");
+    eyes.positive = false;
+    assert(ids(minera::filter_ltl_event_log(repeated, eyes)).empty());
+    assert(ids(minera::filter_ltl_event_log(repeated, eyes, object)) == "2;");
+
+    // Captured: A,B,C,A,B,X fails the DataFrame A-next-B-next-C check (its
+    // last B is not followed by its last C) and passes the EventLog one.
+    EventLog later;
+    later.traces = {{"n1", {event("n1", "A", ""), event("n1", "B", ""),
+                            event("n1", "C", ""), event("n1", "A", ""),
+                            event("n1", "B", ""), event("n1", "X", "")}, {}}};
+    LtlFilterOptions abc{LtlFilterVariant::kANextBNextC, "", {"A", "B", "C"}};
+    assert(ids(minera::filter_ltl_event_log(later, abc)).empty());
+    assert(ids(minera::filter_ltl_event_log(later, abc, object)) == "n1;");
   }
 
   bool rejected = false;
@@ -170,5 +214,24 @@ int main() {
     rejected = true;
   }
   assert(rejected);
+
+  // A float NaN resource (XES <float value="nan"/>) is missing, as in the
+  // DataFrame read_xes returns: it is neither a performer of A nor of B.
+  {
+    EventAttribute nan{"org:resource", "nan", AttributeKind::kFloat};
+    nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+    auto unknown = event("n", "A", "", "nan");
+    unknown.resource_state = minera::FirstClassAttributeState::kPresent;
+    unknown.resource_attribute = nan;
+    EventLog nan_log;
+    nan_log.traces = {{"n", {unknown, event("n", "B", "", "r1")}, {}}};
+    LtlFilterOptions eyes{LtlFilterVariant::kFourEyes, "", {"A", "B"}};
+    assert(minera::filter_ltl_event_log(nan_log, eyes).traces.empty());
+    LtlFilterOptions persons{LtlFilterVariant::kAttributeValueDifferentPersons, "", {"A"}};
+    nan_log.traces[0].events.push_back(event("n", "A", "", "r2"));
+    assert(minera::filter_ltl_event_log(nan_log, persons).traces.empty());
+    persons.resource_key = "org:resource";
+    assert(minera::filter_ltl_event_log(nan_log, persons).traces.empty());
+  }
   return 0;
 }

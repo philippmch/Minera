@@ -286,7 +286,7 @@ void handle_active_source_mining(const httplib::Request& request,
   for (const auto& [name, field] : request.params) {if (fields.size() != 1) fields += ','; fields += active_source_quote(name) + ':' + active_source_quote(field);}
   fields += '}';
   const auto body = active_source_safe_json("{\"family\":\"ACTIVE_SOURCE_MINING\",\"source_id\":" + active_source_quote(std::to_string(session->query_source_id)) +
-      ",\"active_source\":" + active_source_snapshot_json(*session) + ",\"analysis\":" + analysis +
+      ",\"active_source\":" + active_source_snapshot_json(*session, false) + ",\"analysis\":" + analysis +
       ",\"family_results\":" + records_json + ",\"submitted_controls\":" + fields +
       ",\"inductive_options\":" + minera::serialize_inductive_options_json(params.inductive) +
       ",\"error\":" + presentation_error + '}');

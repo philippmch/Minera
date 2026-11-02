@@ -142,6 +142,7 @@ import {
   type OcelDiscoveryOptions,
 } from "./api";
 import {
+  LiveSourceHandback,
   delimiterForFile,
   hasActiveFilters,
   hasActiveMinerOptions,
@@ -167,7 +168,9 @@ export default function App() {
   const [sourceOutcome, setSourceOutcome] = useState<ActiveSourceMining | null>(null);
   const [liveSourceId, setLiveSourceId] = useState<string | null>(null);
   const liveSource = useRef<string | null>(null), sourceGate = useRef(new MiningSourceRequestGate());
-  const sourceRequest = useRef<{controller: AbortController; request_id: string; posted: boolean} | null>(null);
+  // previousSource: the live backend source this load replaced, handed back if the load fails or is cancelled.
+  const sourceRequest = useRef<{controller: AbortController; request_id: string; posted: boolean; previousSource: string | null} | null>(null);
+  const liveSourceHandback = useRef(new LiveSourceHandback());
   const ocelRequest = useRef<AbortController | null>(null);
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
@@ -194,6 +197,8 @@ export default function App() {
     caseAttributes: CaseAttributeStat[];
   } | null>(null);
   const [filtersActive, setFiltersActive] = useState(false);
+  // Counts completed fresh loads (not filter re-mines), so the filter panel starts over only for a new source.
+  const [sourceLoadSerial, setSourceLoadSerial] = useState(0);
   // Alignments the backend computed on demand, cached per miner for the current
   // analysis so revisiting a model never refetches. Reset whenever data changes.
   const alignCache = useRef<Record<string, Alignments>>({});
@@ -213,10 +218,20 @@ export default function App() {
   // Any result started under an older backend session may still resolve, but
   // must never repopulate caches cleared for the new session.
   const cacheGeneration = useRef(0);
+  // Counts imported-model checks. A check replaces only the backend's "imported" net, so it must not invalidate
+  // requests in flight for other models (which cacheGeneration would); it scopes every result cache key instead,
+  // so a result for the replaced imported net can never be read back.
+  const importedModelGeneration = useRef(0);
+  const resultCacheScope = () => `${liveSource.current ?? 'offline'}#${importedModelGeneration.current}`;
   const sourceAvailable = source !== null && liveSourceId === source.source_id;
   const clearSourceCaches = () => {cacheGeneration.current += 1; alignCache.current = {}; decideCache.current = {}; dfgCache.current = {}; editCache.current = {}; processTreeCache.current = {}; decomposedCache.current = {}; petriAntiCache.current = {}; petriMultiCache.current = {}; reductionCache.current = {}; evaluationCache.current = {}; petriAnalysisCache.current = {}; emdCache.current = {}; conceptDriftCache.current = {};};
-  const cancelSourceLoad = () => {sourceGate.current.invalidate(); const previous = sourceRequest.current; sourceRequest.current = null; previous?.controller.abort(); if (previous?.posted) cancelMiningRequest(previous.request_id); ocelRequest.current?.abort(); ocelRequest.current = null; setMining(false);};
-  const beginSourceLoad = () => {setOwnedExactInspection(false);cancelSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false}; setMining(true); setError(null); return {ticket, controller};};
+  const abortSourceLoad = () => {sourceGate.current.invalidate(); const previous = sourceRequest.current; sourceRequest.current = null; previous?.controller.abort(); const rollback = previous?.posted ? cancelMiningRequest(previous.request_id) : Promise.resolve(); ocelRequest.current?.abort(); ocelRequest.current = null; setMining(false); return {previous, rollback};};
+  const handBackLiveSource = (previousSource: string | null | undefined, rollback: Promise<unknown>) => void liveSourceHandback.current.handback(previousSource, rollback, sourceId => {if (sourceRequest.current) return; liveSource.current = sourceId; setLiveSourceId(sourceId);});
+  // A cancelled load leaves the previous analysis on screen; the backend restores its session, so it is live again.
+  const cancelSourceLoad = () => {const {previous, rollback} = abortSourceLoad(); handBackLiveSource(previous?.previousSource, rollback);};
+  // A failed load: roll the backend back in case it published the session before the response failed to arrive.
+  const failSourceLoad = (pending: {request_id: string; posted: boolean; previousSource: string | null} | null) => {if (pending) handBackLiveSource(pending.previousSource, pending.posted ? cancelMiningRequest(pending.request_id) : Promise.resolve());};
+  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMining(true); setError(null); return {ticket, controller};};
   useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
 
   useEffect(() => {
@@ -228,7 +243,7 @@ export default function App() {
   const requestAlignment = useCallback(
     async (minerId: string, options: AlignmentOptions = {}): Promise<Alignments> => {
       const effective = { ...DEFAULT_ALIGNMENT_OPTIONS, ...options };
-      const cacheKey = `${liveSource.current ?? 'offline'}|${minerId}|${JSON.stringify(effective)}`;
+      const cacheKey = `${resultCacheScope()}|${minerId}|${JSON.stringify(effective)}`;
       const embedded = data?.conformance?.[minerId]?.alignments;
       const isDefault =
         effective.variant === DEFAULT_ALIGNMENT_OPTIONS.variant &&
@@ -248,7 +263,7 @@ export default function App() {
 
   // Decision mining for a model, fetched on demand and cached like alignments.
   const requestDecisions = useCallback(async (minerId: string, options: DecisionMiningOptions = {}): Promise<Decisions> => {
-    const cacheKey = `${liveSource.current ?? 'offline'}|${minerId}|${JSON.stringify(options)}`;
+    const cacheKey = `${resultCacheScope()}|${minerId}|${JSON.stringify(options)}`;
     const cached = decideCache.current[cacheKey];
     if (cached) return cached;
     const generation = cacheGeneration.current, sourceId = liveSource.current;
@@ -259,7 +274,7 @@ export default function App() {
   }, []);
 
   const requestDfg = useCallback(async (options: DfgAlignmentOptions = {}) => {
-    const key = String(liveSource.current) + '|' + JSON.stringify(options);
+    const key = resultCacheScope() + '|' + JSON.stringify(options);
     if (dfgCache.current[key]) return dfgCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
@@ -268,7 +283,7 @@ export default function App() {
     return result;
   }, []);
   const requestEditDistance = useCallback(async (reference: File, options: EditDistanceOptions = {}) => {
-    const key = `${liveSource.current ?? 'offline'}|${reference.name}|${reference.size}|${reference.lastModified}|${JSON.stringify(options)}`;
+    const key = `${resultCacheScope()}|${reference.name}|${reference.size}|${reference.lastModified}|${JSON.stringify(options)}`;
     if (editCache.current[key]) return editCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
@@ -277,7 +292,7 @@ export default function App() {
     return result;
   }, []);
   const requestEvaluation = useCallback(async (miner: string, options: EvaluationOptions = {}) => {
-    const key = `${liveSource.current ?? 'offline'}|${miner}|${evaluationQuery(options)}`;
+    const key = `${resultCacheScope()}|${miner}|${evaluationQuery(options)}`;
     const cached = evaluationCache.current[key];
     if (cached) return cached;
     const generation = cacheGeneration.current, sourceId = liveSource.current;
@@ -287,7 +302,7 @@ export default function App() {
     return result;
   }, []);
   const requestPetriAnalysis = useCallback(async (options: PetriAnalysisOptions = {}): Promise<PetriAnalysisResult> => {
-    const key = String(liveSource.current) + '|' + petriAnalysisQuery(options);
+    const key = resultCacheScope() + '|' + petriAnalysisQuery(options);
     const cached = petriAnalysisCache.current[key];
     if (cached) return cached;
     const generation = cacheGeneration.current, sourceId = liveSource.current;
@@ -297,7 +312,7 @@ export default function App() {
     return result;
   }, []);
   const requestEmd = useCallback(async (reference: File, options: EmdOptions = {}) => {
-    const key = `${liveSource.current ?? 'offline'}|${reference.name}|${reference.size}|${reference.lastModified}|${emdQuery(options)}`;
+    const key = `${resultCacheScope()}|${reference.name}|${reference.size}|${reference.lastModified}|${emdQuery(options)}`;
     const cached = emdCache.current[key];
     if (cached) return cached;
     const generation = cacheGeneration.current, sourceId = liveSource.current;
@@ -307,7 +322,7 @@ export default function App() {
     return result;
   }, []);
   const requestConceptDriftCached = useCallback(async (options: ConceptDriftOptions = {}): Promise<ConceptDriftResult> => {
-    const key = String(liveSource.current) + '|' + conceptDriftQuery(options);
+    const key = resultCacheScope() + '|' + conceptDriftQuery(options);
     const cached = conceptDriftCache.current[key];
     if (cached) return cached;
     const generation = cacheGeneration.current, sourceId = liveSource.current;
@@ -318,7 +333,7 @@ export default function App() {
     return result;
   }, []);
   const requestProcessTree = useCallback(async (options: ProcessTreeAlignmentOptions = {}) => {
-    const key = String(liveSource.current) + '|' + processTreeAlignmentQuery(options);
+    const key = resultCacheScope() + '|' + processTreeAlignmentQuery(options);
     if (processTreeCache.current[key]) return processTreeCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
@@ -327,28 +342,28 @@ export default function App() {
     return result;
   }, []);
   const requestDecomposed = useCallback(async (miner: string, options: DecomposedAlignmentOptions = {}) => {
-    const key = `${liveSource.current ?? 'offline'}|${miner}|${decomposedAlignmentQuery(options)}`;
+    const key = `${resultCacheScope()}|${miner}|${decomposedAlignmentQuery(options)}`;
     if (decomposedCache.current[key]) return decomposedCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
     const result = await alignDecomposed(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); decomposedCache.current = { ...decomposedCache.current, [key]: result }; return result;
   }, []);
   const requestPetriAnti = useCallback(async (miner: string, options: PetriAntiAlignmentOptions = {}) => {
-    const key = `${liveSource.current ?? 'offline'}|${miner}|${petriAntiAlignmentQuery(options)}`;
+    const key = `${resultCacheScope()}|${miner}|${petriAntiAlignmentQuery(options)}`;
     if (petriAntiCache.current[key]) return petriAntiCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
     const result = await alignPetriAnti(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); petriAntiCache.current = { ...petriAntiCache.current, [key]: result }; return result;
   }, []);
   const requestPetriMulti = useCallback(async (miner: string, options: PetriMultiAlignmentOptions = {}) => {
-    const key = `${liveSource.current ?? 'offline'}|${miner}|${petriMultiAlignmentQuery(options)}`;
+    const key = `${resultCacheScope()}|${miner}|${petriMultiAlignmentQuery(options)}`;
     if (petriMultiCache.current[key]) return petriMultiCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
     const result = await alignPetriMulti(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); petriMultiCache.current = { ...petriMultiCache.current, [key]: result }; return result;
   }, []);
   const requestReduction = useCallback(async (traceIndex: number, options: ProcessTreeReductionOptions = {}) => {
-    const key = `${liveSource.current ?? 'offline'}|${traceIndex}|${processTreeReductionQuery(options)}`;
+    const key = `${resultCacheScope()}|${traceIndex}|${processTreeReductionQuery(options)}`;
     if (reductionCache.current[key]) return reductionCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
@@ -365,7 +380,7 @@ export default function App() {
     assertMiningSourceBinding(expectedSource, liveSource.current, generation, cacheGeneration.current);
     if (generation !== cacheGeneration.current)
       throw new Error("The active analysis changed during model checking; choose the model again.");
-    cacheGeneration.current += 1;
+    importedModelGeneration.current += 1;
     alignCache.current = Object.fromEntries(
       Object.entries(alignCache.current).filter(([key]) => !key.includes("|imported|")),
     );
@@ -438,6 +453,7 @@ export default function App() {
         const classified = classifyMiningJson(activeMiningSourceText(await file.arrayBuffer()));
         if (!accepts()) return;
         if (classified.kind === "offline") {
+          setExactInspection(null);
           setSource(null);
           setSourceOutcome(null);
           setPendingSourceFile(null);
@@ -449,6 +465,7 @@ export default function App() {
           if (!accepts()) return;
           cacheGeneration.current += 1;
           setData(null);
+          setExactInspection(null);
           setOcelResult(result);
           setOcelFile(file);
           setOcelDataset(file.name);
@@ -487,10 +504,11 @@ export default function App() {
         setSourceOutcome(isActiveSourceMining(result) ? result : null);
         setPendingSourceFile(null);
         setFiltersActive(false);
+        setSourceLoadSerial(serial => serial + 1);
         if (analysis) openData(analysis); else {setData(null); setOcelResult(null); setOcelFile(null); setOcelDataset(null); setTool("active-source"); setError(null);}
     })()
       .catch((cause: Error) => {
-        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setTool("active-source");}
+        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} else failSourceLoad(sourceRequest.current); setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setTool("active-source");}
       })
       .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; ocelRequest.current = null; setMining(false);}});
   };
@@ -544,7 +562,7 @@ export default function App() {
         setThreshold(1);
         setError(null);
       })
-      .catch((cause: Error) => {if (sourceGate.current.accepts(ticket, controller.signal)) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} setError(`Could not filter ${original.file.name}: ${cause.message}`);}})
+      .catch((cause: Error) => {if (sourceGate.current.accepts(ticket, controller.signal)) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} else if (sourceRequest.current?.controller === controller) failSourceLoad(sourceRequest.current); setError(`Could not filter ${original.file.name}: ${cause.message}`);}})
       .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; setMining(false);}});
   };
 
@@ -652,7 +670,9 @@ export default function App() {
     setSidebarOpen(false);
     setExportOpen(false);
     setOwnedExactInspection(false);
-    cancelSourceLoad();
+    abortSourceLoad();
+    liveSourceHandback.current.supersede();
+    setExactInspection(null);
     liveSource.current = null; setLiveSourceId(null); setSourceOutcome(null); setPendingSourceFile(null);
     cacheGeneration.current += 1;
     setData(null);
@@ -873,7 +893,7 @@ export default function App() {
       {exactInspection&&<details className="exact-result"><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}
       {source && (
         <Filters
-          key={source.file.name}
+          key={sourceLoadSerial}
           activities={source.activities}
           resources={source.resources}
           lifecycles={source.lifecycles}
@@ -889,7 +909,7 @@ export default function App() {
     <>
       {shownTab === "log" && (
         <main className="layout-log">
-          <EventLogView data={data} />
+          <EventLogView data={data} available={sourceAvailable} />
         </main>
       )}
       {shownTab === "model" && (

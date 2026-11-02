@@ -491,6 +491,20 @@ describe("isOcelFeatureResult", () => {
     expect(isOcelFeatureResult({ ...valid, feature_count: 2 })).toBe(false);
     expect(isOcelFeatureResult({ ...valid, row_ids: [""] })).toBe(false);
   });
+  // Compatibility-style EVENTS tables name both endpoint blocks
+  // "@@event_start_<type>", as the reference does.
+  const events = {
+    family: "OCEL_FEATURES", variant: "EVENTS", row_ids: ["e1"], row_count: 1, feature_count: 5,
+    feature_names: ["@@event_start_item", "@@event_start_order", "@@event_start_item", "@@event_start_order", "@@ev_new_interactions"],
+    values: [[1, 0, 0, 1, 2]],
+  };
+  it("accepts the reference's repeated endpoint names in event tables", () =>
+    expect(isOcelFeatureResult(events)).toBe(true));
+  it("rejects other repeated names", () => {
+    expect(isOcelFeatureResult({ ...events, variant: "OBJECTS" })).toBe(false);
+    expect(isOcelFeatureResult({ ...events, feature_names: ["@@event_start_item", "@@event_start_item", "@@event_start_item", "@@event_start_order", "@@ev_new_interactions"] })).toBe(false);
+    expect(isOcelFeatureResult({ ...events, feature_names: ["@@event_act_a", "@@event_act_a", "@@event_start_item", "@@event_start_order", "@@ev_new_interactions"] })).toBe(false);
+  });
 });
 
 describe("isProcessCubeResult", () => {

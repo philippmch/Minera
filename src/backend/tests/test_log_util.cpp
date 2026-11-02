@@ -1,11 +1,13 @@
 #include "minera/log_util.hpp"
 #include "minera/log_util_json.hpp"
+#include "minera/csv_event_log_importer.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -156,6 +158,25 @@ void until_activity_returns_prefix_and_duration() {
   assert(targets.logs.size() == 1 && targets.logs[0].traces.size() == 1);
 }
 
+// A batch CSV import types activities like format_dataframe, so the
+// reference's until-activity over "010"/"10" sees one activity "10" and its
+// cases in case-id order (captured from pm4py 2.7.22 get_log_traces_until_activity:
+// prefixes [["10"],["10"]], durations [3600, 1800]).
+void until_activity_on_csv_import_uses_typed_activities() {
+  std::istringstream input(
+      "case_id,activity,timestamp\n"
+      "B,10,2024-01-01T09:00:00+00:00\nA,010,2024-01-01T10:00:00+00:00\n"
+      "A,20,2024-01-01T11:00:00+00:00\nB,20,2024-01-01T09:30:00+00:00\n");
+  const auto log = import_csv_event_log(input);
+  LogUtilityOptions options;
+  const auto result = get_log_traces_until_activity(log, "20", options);
+  assert(result.log.traces.size() == 2);
+  assert(result.log.traces[0].case_id == "A" && result.log.traces[1].case_id == "B");
+  for (const auto& trace : result.log.traces)
+    assert(trace.events.size() == 1 && trace.events[0].activity == "10");
+  assert((result.elapsed_seconds == std::vector<double>{3600.0, 1800.0}));
+}
+
 void activity_targets_exclude_competing_targets() {
   auto log = source_log();
   Trace third;
@@ -247,6 +268,7 @@ int main() {
   derived_prefix_logs_preserve_typed_case_context();
   until_activity_returns_prefix_and_duration();
   activity_targets_exclude_competing_targets();
+  until_activity_on_csv_import_uses_typed_activities();
   feature_selection_keeps_useful_typed_attributes();
   std::cout << "Log utility tests passed\n";
 }

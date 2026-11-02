@@ -2084,6 +2084,20 @@ export interface OcelFeatureResult {
   feature_names: string[];
   values: number[][];
 }
+// Feature names are unique, except where the reference repeats them: its
+// compatibility-style EVENTS table names both the start and the end endpoint
+// block "@@event_start_<type>", so such a name may occur twice. Columns are
+// positional, so repeated names stay distinct columns.
+function ocelFeatureNamesRepeatAsReference(variant: string, names: string[]): boolean {
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  for (const [name, count] of counts) {
+    if (count === 1) continue;
+    if (variant !== "EVENTS" || count > 2 || !name.startsWith("@@event_start_")) return false;
+  }
+  return true;
+}
+
 export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_FEATURES" ||
       !["EVENTS", "OBJECTS", "EVENTS_OBJECTS"].includes(String(value.variant)) ||
@@ -2099,7 +2113,7 @@ export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult 
   if (value.row_count !== rowIds.length ||
       value.feature_count !== featureNames.length ||
       new Set(rowIds).size !== rowIds.length || rowIds.some((id) => id.length === 0) ||
-      new Set(featureNames).size !== featureNames.length ||
+      !ocelFeatureNamesRepeatAsReference(String(value.variant), featureNames) ||
       featureNames.some((name) => name.length === 0)) return false;
   if (value.row_types !== undefined &&
       (!Array.isArray(value.row_types) ||

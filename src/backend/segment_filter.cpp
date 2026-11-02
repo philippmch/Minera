@@ -1,9 +1,12 @@
 #include "minera/segment_filter.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
+
+#include "dataframe_cell.hpp"
 
 namespace minera {
 namespace {
@@ -20,6 +23,18 @@ std::unordered_set<std::string> activity_set(
     result.insert(activity);
   }
   return result;
+}
+
+// Whether the event's activity cell holds `activity`; a missing cell (absent,
+// null or NaN) matches nothing, as in a DataFrame column.
+bool activity_is(const Event& event, const std::string& activity) {
+  return !dataframe_cell::activity_missing(event) && event.activity == activity;
+}
+
+bool activity_in(const Event& event,
+                 const std::unordered_set<std::string>& activities) {
+  return !dataframe_cell::activity_missing(event) &&
+         activities.find(event.activity) != activities.end();
 }
 
 EventLog with_trace_attributes(const EventLog& source) {
@@ -41,14 +56,14 @@ EventLog filter_prefix(const EventLog& event_log,
     std::size_t anchor_index = trace.events.size();
     if (options.occurrence == AnchorOccurrence::last) {
       for (std::size_t i = trace.events.size(); i-- > 0;) {
-        if (trace.events[i].activity == options.activity) {
+        if (activity_is(trace.events[i], options.activity)) {
           anchor_index = i;
           break;
         }
       }
     } else {
       for (std::size_t i = 0; i < trace.events.size(); ++i) {
-        if (trace.events[i].activity == options.activity) {
+        if (activity_is(trace.events[i], options.activity)) {
           anchor_index = i;
           break;
         }
@@ -56,6 +71,9 @@ EventLog filter_prefix(const EventLog& event_log,
     }
     if (anchor_index == trace.events.size()) continue;
     const auto count = anchor_index + (options.strict ? 0U : 1U);
+    // A cut with no rows leaves no case behind, as in pm4py's DataFrame
+    // filter_prefixes (the reference for imported CSV/XES logs).
+    if (count == 0) continue;
     Trace cut;
     copy_trace_context(trace, cut);
     cut.events.assign(trace.events.begin(), trace.events.begin() + count);
@@ -81,21 +99,24 @@ EventLog filter_suffix(const EventLog& event_log,
     std::size_t index = trace.events.size();
     if (options.occurrence == AnchorOccurrence::last) {
       for (std::size_t i = trace.events.size(); i-- > 0;) {
-        if (trace.events[i].activity == options.activity) {
+        if (activity_is(trace.events[i], options.activity)) {
           index = i;
           break;
         }
       }
     } else {
       for (std::size_t i = 0; i < trace.events.size(); ++i) {
-        if (trace.events[i].activity == options.activity) {
+        if (activity_is(trace.events[i], options.activity)) {
           index = i;
           break;
         }
       }
     }
     if (index == trace.events.size()) continue;
-    const auto begin = index + (options.strict ? 0U : 1U);
+    // Strict leaves the anchor out, as pm4py's filter_suffixes does.
+    const auto begin = index + (options.strict ? 1U : 0U);
+    // A cut with no rows leaves no case behind, as in the DataFrame filter.
+    if (begin >= trace.events.size()) continue;
     Trace cut;
     copy_trace_context(trace, cut);
     cut.events.assign(trace.events.begin() + begin, trace.events.end());
@@ -126,44 +147,42 @@ EventLog filter_between(const EventLog& event_log,
     throw std::invalid_argument("between filter: case id separator is empty");
   }
 
+  // pm4py's DataFrame filter_between (the reference for imported CSV/XES
+  // logs): each event is tested as a closer before it can open; an open
+  // stretch closes at the next end activity and is labelled
+  // <case><separator><k>, k counted from 0 and always appended. Only when the
+  // start and end lists are equal does the closing event open the next
+  // stretch, and it then belongs to that later stretch only. A stretch still
+  // open at the end of the trace is discarded.
+  const bool reopen = options.start_activities == options.end_activities;
   EventLog result = with_trace_attributes(event_log);
   for (const auto& trace : event_log.traces) {
-    std::vector<Trace> segments;
-    Trace current;
-    bool collecting = false;
-    for (const auto& event : trace.events) {
-      const bool is_start = starts.find(event.activity) != starts.end();
-      const bool is_end = ends.find(event.activity) != ends.end();
-      if (!collecting) {
-        if (!is_start) continue;
-        collecting = true;
-        current = Trace{};
-        current.events.push_back(event);
-        // When the same activity is both a start and an end, the event opens
-        // a segment; closure requires a subsequent occurrence.
-        continue;
+    constexpr std::size_t kUnmarked = static_cast<std::size_t>(-1);
+    std::vector<std::size_t> marks(trace.events.size(), kUnmarked);
+    std::optional<std::size_t> opening;
+    std::size_t subcase = 0;
+    for (std::size_t row = 0; row < trace.events.size(); ++row) {
+      const auto& event = trace.events[row];
+      const bool closing = activity_in(event, ends);
+      if (!opening) {
+        if (activity_in(event, starts)) opening = row;
+      } else if (closing) {
+        for (std::size_t kept = *opening; kept <= row; ++kept)
+          marks[kept] = subcase;
+        ++subcase;
+        opening = reopen ? std::optional<std::size_t>(row) : std::nullopt;
       }
-
-      current.events.push_back(event);
-      if (is_end) {
-        segments.push_back(std::move(current));
-        current = Trace{};
-        collecting = false;
-        if (is_start) {
-          // Reuse a boundary event as the start of the next segment.  This is
-          // important for repeated activities and overlapping endpoint sets.
-          collecting = true;
-          current.events.push_back(event);
-        }
-      }
+    }
+    std::vector<Trace> segments(subcase);
+    for (std::size_t row = 0; row < marks.size(); ++row) {
+      if (marks[row] != kUnmarked)
+        segments[marks[row]].events.push_back(trace.events[row]);
     }
     for (std::size_t i = 0; i < segments.size(); ++i) {
       auto& segment = segments[i];
       copy_trace_context(trace, segment);
-      if (segments.size() != 1) {
-        set_trace_case_id(
-            segment, trace.case_id + separator + std::to_string(i + 1));
-      }
+      set_trace_case_id(segment,
+                        trace.case_id + separator + std::to_string(i));
       result.traces.push_back(std::move(segment));
     }
   }

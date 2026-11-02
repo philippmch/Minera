@@ -2,6 +2,8 @@
 
 #include <filesystem>
 #include <istream>
+#include <optional>
+#include <vector>
 #include <string>
 
 #include "minera/event_data.hpp"
@@ -22,8 +24,10 @@ struct CsvImportOptions {
   // Opt-in fallback between case_id and case:concept:name. An exact column
   // match always wins; custom case selectors remain exact.
   bool allow_case_id_aliases = false;
-  // The batch import (read_csv + format_dataframe) drops a row whose case id
-  // or activity is a pandas NA spelling or an empty cell. The reference CSV
+  // The batch import (read_csv + format_dataframe) types the case-id and
+  // activity columns (reference_csv_column_text), drops a row whose case id
+  // or activity is then missing, orders cases by their case-id text and skips
+  // lines of only spaces/tabs. The reference CSV
   // event stream reader (csv.DictReader) keeps every row and passes those
   // cells on as literal text, so stream adapters set this to keep them.
   bool keep_na_first_class_values = false;
@@ -37,6 +41,15 @@ struct CsvEventData {
   EventLog log;
   EventTable table;
 };
+
+// The text each cell of one CSV column has once read_csv has typed the whole
+// column and it is converted to strings (as format_dataframe does for the
+// case-id and activity columns): "007" and "+7" read "7", an NA cell in an
+// integer column turns the others into floats ("1.0"), true/false spellings
+// read "True"/"False", other text is kept. nullopt marks a missing cell.
+// Cells are compared as given (the importer passes trimmed fields).
+[[nodiscard]] std::vector<std::optional<std::string>> reference_csv_column_text(
+    const std::vector<std::string>& cells);
 
 [[nodiscard]] CsvEventData import_csv_event_data(
     std::istream& input,

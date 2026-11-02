@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { caseRowEntries } from "../app-logic";
 import { type MineraExport, type Trace, numberFormat } from "../types";
 import {
   type DfgExportOptions,
@@ -106,7 +107,7 @@ export function buildXesExportOptions(
   return { variant, compress, inferMetadata, preserveNulls };
 }
 
-export function XesButton({ dataset }: { dataset: string }) {
+export function XesButton({ dataset, available = true }: { dataset: string; available?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [variant, setVariant] = useState<"line_by_line" | "etree">("line_by_line");
@@ -140,7 +141,7 @@ export function XesButton({ dataset }: { dataset: string }) {
       <label><input type="checkbox" checked={compress} onChange={(event) => setCompress(event.target.checked)} /> gzip</label>
       <label><input aria-label="Infer XES metadata" type="checkbox" checked={inferMetadata} onChange={(event) => setInferMetadata(event.target.checked)} /> infer metadata</label>
       <label><input aria-label="Preserve null markers" type="checkbox" checked={preserveNulls} onChange={(event) => setPreserveNulls(event.target.checked)} /> preserve null markers</label>
-      <button className="btn-ghost" onClick={download} disabled={busy}>
+      <button className="btn-ghost" onClick={download} disabled={busy || !available} title={available ? undefined : UNAVAILABLE_EXPORT}>
         {busy ? "Exporting…" : "Download log as XES"}
       </button>
       {error && <span className="pnml-error">{error}</span>}
@@ -148,7 +149,7 @@ export function XesButton({ dataset }: { dataset: string }) {
   );
 }
 
-function DfgButton({ dataset }: { dataset: string }) {
+function DfgButton({ dataset, available = true }: { dataset: string; available?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [options, setOptions] = useState<DfgExportOptions>({});
@@ -160,7 +161,8 @@ function DfgButton({ dataset }: { dataset: string }) {
     }));
   };
   const setText = (name: keyof DfgExportOptions, value: string) => {
-    setOptions((current) => ({ ...current, [name]: value }));
+    // An emptied text field means "not set", as it does for the numeric fields.
+    setOptions((current) => ({ ...current, [name]: value === "" ? undefined : value }));
   };
 
   const download = () => {
@@ -275,7 +277,7 @@ function DfgButton({ dataset }: { dataset: string }) {
           </label>
         </div>
       </details>
-      <button className="btn-ghost" onClick={download} disabled={busy}>
+      <button className="btn-ghost" onClick={download} disabled={busy || !available} title={available ? undefined : UNAVAILABLE_EXPORT}>
         {busy ? "Exporting…" : "Download DFG"}
       </button>
       {error && <span className="pnml-error">{error}</span>}
@@ -283,7 +285,10 @@ function DfgButton({ dataset }: { dataset: string }) {
   );
 }
 
-export function EventLogView({ data }: { data: MineraExport }) {
+// /api/xes and /api/dfg export the backend's cached log, which belongs to this analysis only while its source is live.
+const UNAVAILABLE_EXPORT = "Open the original CSV or XES log to export it: this analysis is not the backend's active log.";
+
+export function EventLogView({ data, available = true }: { data: MineraExport; available?: boolean }) {
   const traces = data.traces ?? [];
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -303,13 +308,7 @@ export function EventLogView({ data }: { data: MineraExport }) {
     [traces],
   );
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return traces;
-    return traces.filter((trace) =>
-      trace.case_id.toLowerCase().includes(needle),
-    );
-  }, [traces, query]);
+  const filtered = useMemo(() => caseRowEntries(traces, query), [traces, query]);
 
   const timeSpan = useMemo(() => {
     let min = "";
@@ -334,8 +333,8 @@ export function EventLogView({ data }: { data: MineraExport }) {
           {timeSpan &&
             ` · ${formatTimestamp(timeSpan.min)} — ${formatTimestamp(timeSpan.max)}`}
         </span>
-        <XesButton dataset={data.dataset} />
-        <DfgButton dataset={data.dataset} />
+        <XesButton dataset={data.dataset} available={available} />
+        <DfgButton dataset={data.dataset} available={available} />
         <input
           className="case-search"
           type="search"
@@ -348,9 +347,9 @@ export function EventLogView({ data }: { data: MineraExport }) {
         />
       </div>
       <ol className="case-list">
-        {filtered.slice(0, limit).map((trace) => (
+        {filtered.slice(0, limit).map(({ key, trace }) => (
           <CaseRow
-            key={trace.case_id}
+            key={key}
             trace={trace}
             data={data}
             showResource={showResource}

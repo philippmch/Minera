@@ -3,25 +3,26 @@
 #include <set>
 #include <stdexcept>
 
+#include "dataframe_cell.hpp"
+
 namespace minera {
 namespace {
 
+// Statistics over an imported log follow pm4py's DataFrame
+// get_event_attribute_values/get_trace_attribute_values: a missing, null or
+// NaN cell is not counted. The short aliases `activity`, `timestamp`,
+// `resource` and `lifecycle` name the first-class fields as well.
 const std::string* event_value(const Event& event, std::string_view key) {
-  if (key.empty()) return nullptr;
-  if (key == "activity" || key == "concept:name") return &event.activity;
-  if (key == "timestamp" || key == "time:timestamp") return &event.timestamp;
-  if (key == "resource" || key == "org:resource") return &event.resource;
-  if (key == "lifecycle" || key == "lifecycle:transition")
-    return &event.lifecycle;
-  return event.attribute(key);
+  if (key == "activity") key = "concept:name";
+  else if (key == "timestamp") key = "time:timestamp";
+  else if (key == "resource") key = "org:resource";
+  else if (key == "lifecycle") key = "lifecycle:transition";
+  return dataframe_cell::event_value(event, key);
 }
 
 const std::string* trace_value(const Trace& trace, std::string_view key) {
-  if (key.empty()) return nullptr;
-  if (key == "case_id" || key == "concept:name" ||
-      key == "case:concept:name")
-    return &trace.case_id;
-  return trace.attribute(key);
+  if (key == "case_id" || key == "concept:name") key = "case:concept:name";
+  return dataframe_cell::trace_value(trace, key);
 }
 
 }  // namespace
@@ -84,9 +85,12 @@ AttributeStatisticsResult discover_attribute_statistics(
     return result;
   }
   if (options.scope == AttributeStatisticsScope::kTraces) {
+    // A DataFrame repeats the case attribute on every event row, and the
+    // reference counts rows: a case contributes one count per event.
     for (const auto& trace : log.traces) {
       const auto* value = trace_value(trace, options.attribute_key);
-      if (value) ++result.values[*value];
+      if (value && !trace.events.empty())
+        result.values[*value] += trace.events.size();
     }
     return result;
   }

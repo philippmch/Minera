@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { WORKFLOW_VARIANTS, defaultWorkflowForm, runWorkflowDiscovery, workflowModelFile, workflowNet, type WorkflowFamily, type WorkflowVariant, type WorkflowForm, type WorkflowRun } from "../workflow-discovery";
+import { WORKFLOW_VARIANTS, defaultWorkflowForm, runWorkflowDiscovery, workflowModelFile, workflowNet, workflowReplayKey, type WorkflowFamily, type WorkflowVariant, type WorkflowForm, type WorkflowRun } from "../workflow-discovery";
 import type { MineraExport } from "../types";
 import { requestLogQuerySchema, downloadQueryBlob, type LogQuerySchema } from "../log-query";
 import { ocelPreparedCsv } from "../ocel-preparation";
@@ -81,7 +81,7 @@ function WorkflowInspection({run,onUseModel,onOpenPlayout}:{run:WorkflowRun;onUs
    {run.value.discovery_source&&<p>Original source: {run.value.source.case_count} cases · {run.value.source.event_count} events. Adapted discovery source: {run.value.discovery_source.case_count} cases · {run.value.discovery_source.event_count} events. Checking the current source uses its existing case/order projection; open the adapted source to use the discovery grouping and ordering.</p>}
    <div className="query-actions"><button className="btn-ghost" onClick={()=>download(run.raw,'minera-workflow-discovery.json')}>Download complete discovery JSON</button><button className="btn-ghost" onClick={()=>download(run.report,'minera-workflow-discovery-report.json')}>Download workflow discovery report</button><button className="btn-ghost" onClick={()=>download(nativeJson(run.value.result),'minera-discovered-analysis.json')}>Download discovered analysis JSON</button>
     {(['pnml','bpmn','ptml']as const).map(format=><button key={format} className="btn-ghost" disabled={!run.value[format]} onClick={()=>downloadQueryBlob(workflowModelFile(run,format),workflowModelFile(run,format).name)}>Download discovered {format.toUpperCase()}</button>)}
-    {onUseModel&&<button className="btn-ghost" disabled={!run.value.pnml} onClick={()=>onUseModel(workflowModelFile(run,'pnml'),run.value.source_id,run.value.activity_key)}>Check this discovered workflow</button>}
+    {onUseModel&&<button className="btn-ghost" disabled={!run.value.pnml} onClick={()=>onUseModel(workflowModelFile(run,'pnml'),run.value.source_id,workflowReplayKey(run))}>Check this discovered workflow</button>}
     {run.value.source_xes&&<><button className="btn-ghost" onClick={()=>download(run.value.source_xes!,'minera-adapted-discovery-source.xes','application/xml')}>Download adapted discovery source XES</button>{onOpenPlayout&&<button className="btn-ghost" onClick={()=>{
       const file=new File([run.value.source_xes!],'minera-adapted-discovery-source.xes',{type:'application/xml'});
       onOpenPlayout(file,run.value.source_xes_options?.xesActivityAttribute,run.value.source_xes_options);

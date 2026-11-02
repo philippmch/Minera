@@ -666,6 +666,32 @@ if(MINERA_BUILD_TESTS)
                    --timestamp-column time:timestamp)
   set_tests_properties(minera_recheck_c8ee22d_zeta_cli PROPERTIES
     PASS_REGULAR_EXPRESSION "\"elapsed_seconds\":3,\"standard_deviation_distance\":2")
+  # CSV batch imports type case ids and activities like read_csv +
+  # format_dataframe; relation keys joining them are typed the same way, and
+  # the live-stream CLI keeps stream rows literally.
+  set(MINERA_CSV_TYPING_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/csv_reference_typing")
+  add_test(NAME minera_csv_relations_merge_typed_cli
+           COMMAND minera_export "${MINERA_CSV_TYPING_FIXTURES}/base.csv"
+                   --merge-case-relations "${MINERA_CSV_TYPING_FIXTURES}/incoming.csv"
+                   --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations.csv")
+  set_tests_properties(minera_csv_relations_merge_typed_cli PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"traces\":\\[\\{\"case_id\":\"7\""
+    FAIL_REGULAR_EXPRESSION "\"case_id\":\"007\"")
+  add_test(NAME minera_csv_relations_interleavings_typed_cli
+           COMMAND minera_export "${MINERA_CSV_TYPING_FIXTURES}/base.csv"
+                   --timestamp-interleavings "${MINERA_CSV_TYPING_FIXTURES}/incoming.csv"
+                   --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations.csv")
+  set_tests_properties(minera_csv_relations_interleavings_typed_cli PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"source_activity\":\"x\",\"target_activity\":\"b\"")
+  add_test(NAME minera_csv_activity_typing_cli
+           COMMAND minera_query "${MINERA_CSV_TYPING_FIXTURES}/activities.csv"
+                   --sql "SELECT activity FROM dataframe")
+  set_tests_properties(minera_csv_activity_typing_cli PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"rows\":\\[\\[\"10\"\\],\\[\"20\"\\],\\[\"10\"\\]\\]")
+  add_test(NAME minera_live_stream_cli_keeps_stream_rows
+           COMMAND minera_live_stream "${MINERA_CSV_TYPING_FIXTURES}/stream.csv")
+  set_tests_properties(minera_live_stream_cli_keeps_stream_rows PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"events\":4")
   add_executable(minera_recheck_d5b33ef_tests src/backend/tests/test_recheck_d5b33ef.cpp)
   target_link_libraries(minera_recheck_d5b33ef_tests PRIVATE minera::core)
   target_compile_features(minera_recheck_d5b33ef_tests PRIVATE cxx_std_20)

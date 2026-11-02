@@ -80,12 +80,17 @@ export function workflowTables(value:WorkflowDiscovery):Record<string,OcelPrepar
  if(structure){const nodes:Array<[string,object]>=[];const visit=(node:object,path:string)=>{nodes.push([path,node]);const children=(node as {children?:object[]}).children;children?.forEach((child,i)=>visit(child,path+'.'+i));};visit(structure,'root');tables.structure_nodes=table(['node_path','native_node_json'],nodes.length,i=>[nodes[i][0],nativeJson(nodes[i][1])]);}
  return tables;
 }
-export interface WorkflowRun {value:WorkflowDiscovery;raw:string;report:string;tables:Record<string,OcelPreparedTable>;}
+export interface WorkflowRun {value:WorkflowDiscovery;raw:string;report:string;tables:Record<string,OcelPreparedTable>;
+ /** The activity selector the user typed for this run, or undefined when discovery used the native default. */
+ replayActivityKey?:string;}
+/** Checking a discovered model sends a replay selector only when the run used an explicit one: the native
+ * default (reported as concept:name) is not an attribute of CSV-sourced logs, so naming it fails the check. */
+export function workflowReplayKey(run:WorkflowRun):string|undefined {return run.replayActivityKey===undefined?undefined:run.value.activity_key;}
 export async function runWorkflowDiscovery(family:WorkflowFamily,form:WorkflowForm,schema:LogQuerySchema,signal?:AbortSignal):Promise<WorkflowRun> {
  const q=workflowQuery(family,form,schema.source_id),response=await fetch('/api/discover-workflow?'+q,{method:'POST',...(signal?{signal}:{})}),raw=await response.text();let value:unknown;
  try{value=parseNativeJson(raw);}catch{throw new Error('The backend returned invalid discovery JSON.');}
  if(record(value)&&'error'in value)throw new Error(String(value.error));if(!response.ok)throw new Error('Workflow discovery returned '+response.status+'.');if(!validWorkflowDiscovery(value))throw new Error('The backend returned an invalid native workflow discovery result.');
  if(value.method!==family||value.variant!==form.variant||value.source_id!==schema.source_id||value.source.case_count!==schema.case_count||value.source.event_count!==schema.event_count)throw new Error('Discovery result does not match the selected source and variant.');
- const tables=workflowTables(value),entries=Array.from(q);tables.configuration=table(['parameter','value'],entries.length,i=>entries[i]);return{value,raw,tables,report:'{"family":"WORKFLOW_DISCOVERY_REPORT","request":'+JSON.stringify({parameters:Object.fromEntries(q)})+',"response":'+raw+'}'};
+ const tables=workflowTables(value),entries=Array.from(q);tables.configuration=table(['parameter','value'],entries.length,i=>entries[i]);return{value,raw,tables,...(form.activity.trim()?{replayActivityKey:form.activity.trim()}:{}),report:'{"family":"WORKFLOW_DISCOVERY_REPORT","request":'+JSON.stringify({parameters:Object.fromEntries(q)})+',"response":'+raw+'}'};
 }
 export function workflowModelFile(run:WorkflowRun,format:'pnml'|'bpmn'|'ptml'):File {const raw=run.value[format];if(!raw)throw new Error(run.value[(format+'_error')as 'pnml_error']??'This discovery result has no '+format+' export.');return new File([raw],`minera-${run.value.method}-${run.value.variant}.${format}`,{type:'application/xml'});}

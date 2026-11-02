@@ -855,7 +855,7 @@ int usage(const char* program) {
                "  --segment-prefix-strict <bool> Exclude the prefix anchor\n"
                "  --segment-prefix-occurrence <first|last> Anchor occurrence\n"
                "  --segment-suffix-activity <name> Native segment tail anchor\n"
-               "  --segment-suffix-strict <bool> Include the suffix anchor\n"
+               "  --segment-suffix-strict <bool> Exclude the suffix anchor\n"
                "  --segment-suffix-occurrence <first|last> Anchor occurrence\n"
                "  --segment-between-starts <a,b,...> Segment start activities\n"
                "  --segment-between-ends <a,b,...> Segment end activities\n"
@@ -1524,10 +1524,10 @@ int usage(const char* program) {
                "                            complete, to make a start/complete\n"
                "                            log atomic for discovery)\n"
                "  --remove-lifecycles <a,b> Drop events with these transitions\n"
-               "  --attribute-key <k>       Filter on this event attribute (an\n"
-               "                            extra CSV column or non-standard\n"
-               "                            XES key); alone it keeps only\n"
-               "                            events carrying the attribute\n"
+               "  --attribute-key <k>       Filter on this event attribute (any\n"
+               "                            CSV column or XES key, including\n"
+               "                            concept:name/org:resource); alone\n"
+               "                            it keeps only events carrying it\n"
                "  --keep-attribute-values <a,b>   Keep only events whose\n"
                "                            attribute has one of these values\n"
                "  --remove-attribute-values <a,b> Drop events with these values\n"
@@ -1536,7 +1536,8 @@ int usage(const char* program) {
                "                            the same attribute match)\n"
                "  --case-attribute-key <k>  Filter cases on this case attribute\n"
                "                            (an XES trace attribute or a\n"
-               "                            `case:` CSV column); alone it keeps\n"
+               "                            `case:` column, with or without\n"
+               "                            the prefix); alone it keeps\n"
                "                            only cases carrying the attribute\n"
                "  --keep-case-attribute-values <a,b>   Keep only cases whose\n"
                "                            attribute has one of these values\n"
@@ -1566,19 +1567,20 @@ int usage(const char* program) {
                 "                            separate activities, [] means empty\n"
                 "  --admitted-variants-positive <bool> Keep (default) or drop\n"
                 "                            admitted variants\n"
-               "  --prefix-activity <a>     Keep each case's head up to (and\n"
-               "                            including) the first <a>; cases\n"
-               "                            without <a> are dropped\n"
-               "  --prefix-strict <bool>   Include the prefix anchor (default true)\n"
+               "  --prefix-activity <a>     Keep each case's head before the\n"
+               "                            first <a>; cases without <a>, or\n"
+               "                            left empty, are dropped\n"
+               "  --prefix-strict <bool>   Exclude the prefix anchor (default true)\n"
                "  --prefix-occurrence <id> first (default) or last anchor\n"
-               "  --suffix-activity <a>     Keep each case's tail from the\n"
-               "                            first <a> on; cases without <a>\n"
-               "                            are dropped\n"
-               "  --suffix-strict <bool>   Include the suffix anchor (default true)\n"
+               "  --suffix-activity <a>     Keep each case's tail after the\n"
+               "                            first <a>; cases without <a>, or\n"
+               "                            left empty, are dropped\n"
+               "  --suffix-strict <bool>   Exclude the suffix anchor (default true)\n"
                "  --suffix-occurrence <id> first (default) or last anchor\n"
                "  --between-start <a>       With --between-end: cut each trace\n"
                "  --between-end <b>         into the subtraces running from <a>\n"
-               "                            to <b>, endpoints included\n"
+               "                            to <b>, endpoints included; each\n"
+               "                            becomes case <id>##@@<k>, k from 0\n"
                "  --min-variant-frequency <n>  Keep variants seen at least n times\n"
                "  --top-variants <n>        Keep only the n most frequent variants\n"
                "  --variant-coverage <f>    Keep the most frequent variants\n"
@@ -6250,8 +6252,11 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto right_column = merge_fields.contains("merge_right_column")
                                     ? merge_fields.at("merge_right_column")
                                     : std::string("case_id_RIGHT");
-      const auto relations = minera::parse_case_relations_csv(
+      auto relations = minera::parse_case_relations_csv(
           relation_input, left_column, right_column);
+      // Keys joining a CSV log carry its typed case-id text.
+      minera::type_case_relations_like_csv_logs(
+          relations, !input_is_xes, !is_xes_path(timestamp_interleavings_right_path));
       const auto lookup = [&](std::string_view name) {
         const auto it = timestamp_interleavings_fields.find(std::string(name));
         return it == timestamp_interleavings_fields.end() ? std::string{} : it->second;
@@ -6304,7 +6309,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
           throw std::logic_error("CSV merge did not retain its source table");
         auto incoming_csv =
             minera::import_csv_event_data(merge_incoming_path, options);
-        const auto relation_table =
+        auto relation_table =
             minera::parse_case_relations_table_csv(relation_input);
         params.relation_left_column = left;
         params.relation_right_column = right;
@@ -6314,6 +6319,11 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         normalize_csv_timestamp_missingness(incoming_table);
         if (!merge_case_key_supplied)
           params.case_id_key = csv_case_column(base_table, options);
+        // Keys joining a CSV case-id column carry its typed text.
+        if (minera::tools::csv_case_id_key(base_table, params.case_id_key))
+          minera::type_case_relation_column_like_csv_log(relation_table, left);
+        if (minera::tools::csv_case_id_key(incoming_table, params.case_id_key))
+          minera::type_case_relation_column_like_csv_log(relation_table, right);
         if (!merge_fields.contains("merge_timestamp_key")) {
           adapt_case_relations_table_timestamp(params, base_table,
                                                 incoming_table, options);
@@ -6346,7 +6356,13 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         if (!incoming_is_xes) { normalize_csv_timestamp_missingness(incoming_table); minera::tools::relation_csv_dates(incoming_table, params.timestamp_key); }
         params.relation_left_column = left;
         params.relation_right_column = right;
-        const auto relation_table = minera::parse_case_relations_table_csv(relation_input);
+        auto relation_table = minera::parse_case_relations_table_csv(relation_input);
+        // Keys joining a CSV case-id column carry its typed text; XES keys
+        // stay literal.
+        if (!input_is_xes && minera::tools::csv_case_id_key(base_table, params.case_id_key))
+          minera::type_case_relation_column_like_csv_log(relation_table, left);
+        if (!incoming_is_xes && minera::tools::csv_case_id_key(incoming_table, params.case_id_key))
+          minera::type_case_relation_column_like_csv_log(relation_table, right);
         body = minera::case_relations_json(
             minera::merge_case_relations(base_table, incoming_table, relation_table, params), params);
       }

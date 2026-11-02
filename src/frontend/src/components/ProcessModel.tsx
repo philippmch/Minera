@@ -207,17 +207,6 @@ function ModelResult({
 }: ModelResultProps) {
   const [asNet, setAsNet] = useState(false);
 
-  if (minerId === "ilp" || minerId === "genetic")
-    return <NativeDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} />;
-  if (minerId === "alpha" || minerId === "heuristic")
-    return <WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} />;
-  if (minerId === "inductive" || minerId === "powl")
-    return <WorkflowDiscovery family={minerId} variant={(variant.id==='basic'?'log':variant.id==='configured'?'maximal':variant.id) as "log"|"imf"|"dfg"|"tree"|"brute_force"|"dynamic_clustering"|"dynamic_clustering_plain"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} />;
-  if (minerId === "declare" || minerId === "log_skeleton")
-    return <ConstraintDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onOpenLog={onOpenPlayout} />;
-  if (minerId === "footprints" || minerId === "transition_system")
-    return <GraphDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} />;
-
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
   // inductive tree or from the net's token semantics (converted server-side),
   // and PTML when the selected workflow net is exactly block structured.
@@ -229,6 +218,25 @@ function ModelResult({
       <PlayoutButton minerId={minerId} dataset={data.dataset} sourceId={playoutSourceId} />
     </>
   ) : null;
+  // The workflow-discovery panels export the model they discover; the model mined with this analysis (the one
+  // conformance checks) stays exportable beside them.
+  const savedNet = ({alpha: petriLayout, heuristic: heuristicPetriLayout, inductive: inductivePetriLayout, powl: powlPetriLayout} as Record<string, PetriLayout | null>)[minerId] ?? null;
+  const saved = actions && savedNet ? (
+    <section className="panel saved-model-exports" aria-label="Analysis model exports">
+      <div className="panel-head"><h2>Model mined with this analysis</h2><span className="panel-meta">{groupName} · analysis settings</span></div>
+      <div className="query-actions">{actions}</div>
+    </section>
+  ) : null;
+  if (minerId === "ilp" || minerId === "genetic")
+    return <NativeDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} />;
+  if (minerId === "alpha" || minerId === "heuristic")
+    return <>{saved}<WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} /></>;
+  if (minerId === "inductive" || minerId === "powl")
+    return <>{saved}<WorkflowDiscovery family={minerId} variant={(variant.id==='basic'?'log':variant.id==='configured'?'maximal':variant.id) as "log"|"imf"|"dfg"|"tree"|"brute_force"|"dynamic_clustering"|"dynamic_clustering_plain"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} /></>;
+  if (minerId === "declare" || minerId === "log_skeleton")
+    return <ConstraintDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onOpenLog={onOpenPlayout} />;
+  if (minerId === "footprints" || minerId === "transition_system")
+    return <GraphDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} />;
 
   // The primary-view ⇄ workflow-net flip, offered when the export carries the
   // net (older exports lack it and simply show no toggle).

@@ -158,6 +158,14 @@ std::string field_at(
   return fields[index];
 }
 
+// read_csv skips a line made only of spaces and tabs (none of them the
+// delimiter) like an empty one; other whitespace (\v, \f, ...) is a value.
+bool is_reference_blank_line(std::string_view line, char delimiter) {
+  return std::all_of(line.begin(), line.end(), [&](char ch) {
+    return (ch == ' ' || ch == '\t') && ch != delimiter;
+  });
+}
+
 // pandas.read_csv's default NA spellings. The reference flow (read_csv, then
 // format_dataframe) drops every row whose case id, activity or timestamp is
 // NA, so these exact cell texts mark a missing first-class value. Whitespace
@@ -693,8 +701,9 @@ std::string python_float_text(double value) {
   return filtering_float_repr(value);
 }
 
-// The case-id text each cell has after typing and string conversion;
-// nullopt is a missing case id, whose row the reference drops.
+// The text each cell of one column has after read_csv's typing and
+// format_dataframe's string conversion (used for the case-id and activity
+// columns); nullopt is a missing cell, whose row the reference drops.
 std::vector<std::optional<std::string>> infer_reference_case_ids(
     const std::vector<std::string>& cells) {
   const auto count = cells.size();
@@ -824,9 +833,22 @@ CsvEventData import_csv_event_data_impl(
     throw std::invalid_argument("CSV delimiter cannot be a quote character");
   }
 
+  // The batch import (read_csv + format_dataframe) infers the case-id and
+  // activity columns' types from every data row before any row is dropped,
+  // and its missing-value handling depends on those types; rows are therefore
+  // collected first and placed once the values are known. Stream readers
+  // (keep_na_first_class_values) keep the literal cell text in file order.
+  const bool reference_batch = !options.keep_na_first_class_values;
+
   std::string line;
+  std::size_t line_number = 1;
   if (!read_csv_record(input, line)) {
     return {};
+  }
+  // read_csv skips blank lines before the header too.
+  while (reference_batch && is_reference_blank_line(line, options.delimiter)) {
+    if (!read_csv_record(input, line)) return {};
+    ++line_number;
   }
 
   // Strip a leading UTF-8 byte-order mark so the first column name still
@@ -895,12 +917,6 @@ CsvEventData import_csv_event_data_impl(
     table.dtypes.assign(header.size(), "str");
   }
 
-  // The batch import (read_csv + format_dataframe) infers the case-id
-  // column's type from every data row before any row is dropped, and its
-  // missing-value handling depends on that type; rows are therefore collected
-  // first and placed once the case ids are known. Stream readers
-  // (keep_na_first_class_values) keep the literal cell text in file order.
-  const bool reference_batch = !options.keep_na_first_class_values;
   struct PendingRow {
     std::size_t line_number = 0;
     std::size_t token = 0;
@@ -909,12 +925,13 @@ CsvEventData import_csv_event_data_impl(
     EventTable::Row table_row;
   };
   std::vector<std::string> case_tokens;
+  std::vector<std::string> activity_tokens;
   std::vector<PendingRow> pending;
 
-  std::size_t line_number = 1;
   while (read_csv_record(input, line)) {
     ++line_number;
-    if (line.empty()) {
+    if (line.empty() ||
+        (reference_batch && is_reference_blank_line(line, options.delimiter))) {
       continue;
     }
 
@@ -930,20 +947,20 @@ CsvEventData import_csv_event_data_impl(
 
     const std::size_t token = case_tokens.size();
     case_tokens.push_back(case_id);
-    // The reference flow drops rows whose activity is NA (an empty cell or a
-    // pandas NA spelling); whitespace-only text is a value there, but the
-    // default trim_fields option has already blanked it here. Whether an NA
-    // case id is missing depends on the inferred column type (below).
-    // Stream readers keep them as literal values (keep_na_first_class_values).
-    if (reference_batch && is_reference_na_token(activity)) {
-      continue;
-    }
-
+    activity_tokens.push_back(activity);
+    // Whether an NA case id or activity is missing (the reference drops the
+    // row) depends on the inferred column type, decided below. Whitespace-only
+    // text is a value there, but the default trim_fields option has already
+    // blanked it here. Stream readers keep NA spellings as literal values
+    // (keep_na_first_class_values).
     PendingRow row;
     row.line_number = line_number;
     row.token = token;
     for (const auto index : case_attribute_indices) {
-      if (index >= fields.size() || fields[index].empty()) continue;
+      // The batch import keeps blank cells too: the reference takes a case
+      // attribute from one row only, which may be blank (missing).
+      if (index >= fields.size() || (!reference_batch && fields[index].empty()))
+        continue;
       row.case_attributes.push_back(EventAttribute{
           header[index].substr(kCasePrefix.size()), fields[index],
           AttributeKind::kString});
@@ -1026,14 +1043,23 @@ CsvEventData import_csv_event_data_impl(
 
   // The case id each cell carries after read_csv's dtype inference and
   // format_dataframe's string conversion; nullopt marks a missing case id.
+  // The activity column is typed and converted the same way.
   std::vector<std::optional<std::string>> case_ids;
+  std::vector<std::optional<std::string>> activities;
   if (reference_batch) {
     case_ids = infer_reference_case_ids(case_tokens);
+    activities = infer_reference_case_ids(activity_tokens);
   } else {
     case_ids.assign(case_tokens.begin(), case_tokens.end());
+    activities.assign(activity_tokens.begin(), activity_tokens.end());
   }
   case_tokens.clear();
   case_tokens.shrink_to_fit();
+  activity_tokens.clear();
+  activity_tokens.shrink_to_fit();
+  // Batch case-attribute cells per kept row (input_order), chosen per case
+  // once the events are known.
+  std::vector<std::vector<EventAttribute>> row_case_attributes;
 
   std::unordered_map<std::string, std::size_t> trace_ids;
   std::size_t input_order = 0;
@@ -1044,7 +1070,8 @@ CsvEventData import_csv_event_data_impl(
   std::optional<std::pair<std::size_t, std::string>> first_bad_timestamp;
   for (auto& row : pending) {
     const auto& case_id = case_ids[row.token];
-    if (!case_id) continue;
+    const auto& activity = activities[row.token];
+    if (!case_id || !activity) continue;
     if (timestamp_index) {
       // Decided per column after the scan; see apply below.
       const auto& timestamp = row.event.timestamp;
@@ -1069,18 +1096,25 @@ CsvEventData import_csv_event_data_impl(
     }
 
     auto& trace = log.traces[it->second];
-    for (auto& attribute : row.case_attributes) {
-      // The first row carrying a value sets it; later rows of the same case
-      // repeat it in a flat file, so they are ignored (as is a conflict).
-      if (trace.attribute(attribute.key) != nullptr) continue;
-      trace.attributes.push_back(std::move(attribute));
+    if (reference_batch) {
+      row_case_attributes.push_back(std::move(row.case_attributes));
+    } else {
+      for (auto& attribute : row.case_attributes) {
+        // The first row carrying a value sets it; later rows of the same case
+        // repeat it in a flat file, so they are ignored (as is a conflict).
+        if (trace.attribute(attribute.key) != nullptr) continue;
+        trace.attributes.push_back(std::move(attribute));
+      }
     }
 
     row.event.case_id = *case_id;
+    row.event.activity = *activity;
     row.event.input_order = input_order++;
     if (preserve_table) {
       if (case_index < row.table_row.size() && row.table_row[case_index])
         row.table_row[case_index]->value = *case_id;
+      if (activity_index < row.table_row.size() && row.table_row[activity_index])
+        row.table_row[activity_index]->value = *activity;
       table.rows.push_back(std::move(row.table_row));
     }
     trace.events.push_back(std::move(row.event));
@@ -1120,6 +1154,33 @@ CsvEventData import_csv_event_data_impl(
     }
   }
 
+  // The reference takes every case attribute from the case's first row
+  // after sorting by timestamp and row (rows without a timestamp are dropped
+  // there, so they count only when no row is timed); a blank or NA cell in
+  // that row leaves the attribute missing.
+  if (reference_batch && !case_attribute_indices.empty()) {
+    for (auto& trace : log.traces) {
+      const Event* chosen = trace.events.empty() ? nullptr : &trace.events.front();
+      std::optional<double> chosen_instant;
+      for (const auto& event : trace.events) {
+        if (!timestamp_index) break;
+        const auto instant = parse_timestamp(event.timestamp);
+        if (!instant) continue;
+        if (!chosen_instant || *instant < *chosen_instant) {
+          chosen = &event;
+          chosen_instant = instant;
+        }
+      }
+      if (!chosen) continue;
+      for (auto& attribute : row_case_attributes[chosen->input_order]) {
+        if (attribute.value.empty() || is_reference_na_token(attribute.value))
+          continue;
+        trace.attributes.push_back(std::move(attribute));
+      }
+    }
+  }
+  row_case_attributes.clear();
+
   if (timestamp_index) {
     for (auto& trace : log.traces) {
       order_events_by_time(trace.events);
@@ -1141,6 +1202,11 @@ CsvEventData import_csv_event_data_impl(
 }
 
 }  // namespace
+
+std::vector<std::optional<std::string>> reference_csv_column_text(
+    const std::vector<std::string>& cells) {
+  return infer_reference_case_ids(cells);
+}
 
 CsvEventData import_csv_event_data(
     std::istream& input,

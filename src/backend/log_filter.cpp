@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "minera/timestamp.hpp"
+#include "dataframe_cell.hpp"
 
 namespace minera {
 namespace {
@@ -35,9 +36,11 @@ struct AttributeMatcher {
 
   // Event-mode survival. Events without the key follow the resource filter's
   // rule — never kept by a keep-set, never dropped by a remove-set — except
-  // that a bare key (no value sets) keeps only the events carrying it.
+  // that a bare key (no value sets) keeps only the events carrying it. The key
+  // names a DataFrame column, so `concept:name`/`org:resource` select the
+  // first-class fields and a NaN cell counts as missing.
   [[nodiscard]] bool keeps_event(const Event& event) const {
-    const auto* value = event.attribute(key);
+    const auto* value = dataframe_cell::event_value(event, key);
     if (value == nullptr) return keep.empty() && !remove.empty();
     if (!keep.empty() && keep.find(*value) == keep.end()) return false;
     if (!remove.empty() && remove.find(*value) != remove.end()) return false;
@@ -48,7 +51,7 @@ struct AttributeMatcher {
   // as keeps_event, so a case without the key is never kept by a keep-set,
   // never dropped by a remove-set, and dropped by a bare key.
   [[nodiscard]] bool keeps_case(const Trace& trace) const {
-    const auto* value = trace.attribute(key);
+    const auto* value = dataframe_cell::trace_value(trace, key);
     if (value == nullptr) return keep.empty() && !remove.empty();
     if (!keep.empty() && keep.find(*value) == keep.end()) return false;
     if (!remove.empty() && remove.find(*value) != remove.end()) return false;
@@ -62,7 +65,7 @@ struct AttributeMatcher {
     bool kept_value_seen = false;
     bool key_seen = false;
     for (const auto& event : trace.events) {
-      const auto* value = event.attribute(key);
+      const auto* value = dataframe_cell::event_value(event, key);
       if (value == nullptr) continue;
       key_seen = true;
       if (!remove.empty() && remove.find(*value) != remove.end()) return false;
@@ -99,21 +102,26 @@ Trace project_events(const Trace& trace,
         remove_activities.find(event.activity) != remove_activities.end()) {
       continue;
     }
+    // A NaN resource/lifecycle cell is missing, as in a DataFrame.
+    const bool no_resource =
+        event.resource.empty() || dataframe_cell::resource_missing(event);
+    const bool no_lifecycle =
+        event.lifecycle.empty() || dataframe_cell::lifecycle_missing(event);
     if (!keep_resources.empty() &&
-        (event.resource.empty() ||
+        (no_resource ||
          keep_resources.find(event.resource) == keep_resources.end())) {
       continue;
     }
-    if (!remove_resources.empty() && !event.resource.empty() &&
+    if (!remove_resources.empty() && !no_resource &&
         remove_resources.find(event.resource) != remove_resources.end()) {
       continue;
     }
     if (!keep_lifecycles.empty() &&
-        (event.lifecycle.empty() ||
+        (no_lifecycle ||
          keep_lifecycles.find(event.lifecycle) == keep_lifecycles.end())) {
       continue;
     }
-    if (!remove_lifecycles.empty() && !event.lifecycle.empty() &&
+    if (!remove_lifecycles.empty() && !no_lifecycle &&
         remove_lifecycles.find(event.lifecycle) != remove_lifecycles.end()) {
       continue;
     }
@@ -138,55 +146,63 @@ double parse_time_bound(const std::string& text, double unbounded) {
 }
 
 // The smallest and largest parsed instant in a trace, or nullopt when no event
-// carries a recognizable timestamp.
-// The timestamps of a trace's first and last events by position, as the
-// reference's is_contained/is_intersecting read trace[0] and trace[-1]; a trace
-// out of time order is therefore not re-spanned by its minimum and maximum.
-// An empty trace, or one whose endpoint events are untimed, has no endpoints.
+// carries a recognizable timestamp. pm4py's DataFrame time filter (the
+// reference for imported CSV/XES logs) spans each case by the minimum and
+// maximum of its timestamp column, so a trace out of time order is spanned by
+// its extremes rather than by its first and last events; untimed rows are
+// skipped as NaT is.
 std::optional<std::pair<double, double>> trace_endpoint_times(
     const Trace& trace) {
-  if (trace.events.empty()) return std::nullopt;
-  const auto first = parse_timestamp(trace.events.front().timestamp);
-  const auto last = parse_timestamp(trace.events.back().timestamp);
-  if (!first || !last) return std::nullopt;
-  return std::pair<double, double>{*first, *last};
-}
-
-// The subtraces of `trace` that run from an occurrence of `start` to the next
-// occurrence of `end`, both included. The scan resumes after each closed
-// segment, and an unclosed segment at the trace's end is discarded rather than
-// emitted half-open. When start == end the closing event also opens the next
-// segment, so a,x,a,y,a yields every a-to-a stretch.
-std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
-                                   const std::string& end) {
-  std::vector<Trace> segments;
-  Trace current;
-  bool collecting = false;
+  std::optional<std::pair<double, double>> span;
   for (const auto& event : trace.events) {
-    if (!collecting) {
-      if (event.activity != start) continue;
-      collecting = true;
-      current.events.clear();
-    }
-    current.events.push_back(event);
-    if (event.activity == end && (current.events.size() > 1 || start != end)) {
-      segments.push_back(std::move(current));
-      current = Trace{};
-      collecting = false;
-      if (start == end) {
-        collecting = true;
-        current.events.push_back(event);
-      }
+    const auto instant = parse_timestamp(event.timestamp);
+    if (!instant) continue;
+    if (!span) {
+      span = std::pair<double, double>{*instant, *instant};
+    } else {
+      span->first = std::min(span->first, *instant);
+      span->second = std::max(span->second, *instant);
     }
   }
-  // A lone segment keeps the original case id; several get a #k suffix so each
-  // subtrace remains a distinct case. All inherit the case's attributes.
+  return span;
+}
+
+// The subtraces of `trace` between an occurrence of `start` and the next
+// occurrence of `end`, both included, following pm4py's DataFrame
+// filter_between (the reference for imported CSV/XES logs). Each event is
+// tested as a closer before it can open: an open stretch closes at the next
+// `end` and is labelled `<case>##@@<k>` with k counted from 0, even when the
+// case yields a single stretch. When start == end the closing event also
+// opens the next stretch and, as in the DataFrame where a row carries one
+// label, belongs to that later stretch only, so a,x,a,y,a yields [a,x] and
+// [a,y,a]. A stretch still open at the end of the trace is discarded, and a
+// missing activity matches neither endpoint.
+std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
+                                   const std::string& end) {
+  constexpr std::size_t kUnmarked = static_cast<std::size_t>(-1);
+  std::vector<std::size_t> marks(trace.events.size(), kUnmarked);
+  std::optional<std::size_t> opening;
+  std::size_t subcase = 0;
+  for (std::size_t row = 0; row < trace.events.size(); ++row) {
+    const auto& event = trace.events[row];
+    const bool present = !dataframe_cell::activity_missing(event);
+    const bool closing = present && event.activity == end;
+    if (!opening) {
+      if (present && event.activity == start) opening = row;
+    } else if (closing) {
+      for (std::size_t kept = *opening; kept <= row; ++kept) marks[kept] = subcase;
+      ++subcase;
+      opening = start == end ? std::optional<std::size_t>(row) : std::nullopt;
+    }
+  }
+  std::vector<Trace> segments(subcase);
+  for (std::size_t row = 0; row < marks.size(); ++row) {
+    if (marks[row] != kUnmarked) segments[marks[row]].events.push_back(trace.events[row]);
+  }
+  // Every subtrace inherits the case's attributes under its labelled id.
   for (std::size_t i = 0; i < segments.size(); ++i) {
     copy_trace_context(trace, segments[i]);
-    if (segments.size() != 1) {
-      set_trace_case_id(segments[i],
-                        trace.case_id + "#" + std::to_string(i + 1));
-    }
+    set_trace_case_id(segments[i], trace.case_id + "##@@" + std::to_string(i));
   }
   return segments;
 }
@@ -571,8 +587,10 @@ std::optional<Trace> cut_trace(const Trace& trace,
   const auto anchor = find_anchor();
   if (!anchor) return std::nullopt;
 
-  const std::size_t begin = prefix ? 0 : *anchor + (options.strict ? 0 : 1);
-  const std::size_t end = prefix ? *anchor + (options.strict ? 1 : 0)
+  // As in pm4py's filter_prefixes/filter_suffixes, a strict cut leaves the
+  // anchor event out and a non-strict cut keeps it.
+  const std::size_t begin = prefix ? 0 : *anchor + (options.strict ? 1 : 0);
+  const std::size_t end = prefix ? *anchor + (options.strict ? 0 : 1)
                                  : trace.events.size();
   if (begin >= end) return std::nullopt;
   Trace result;
@@ -1098,14 +1116,17 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
           break;
         }
         case TimeFilterMode::traces_intersecting: {
+          // pm4py's DataFrame filter (the reference for imported CSV/XES
+          // logs) keeps a case whose start or end lies strictly inside the
+          // range, or which covers the whole range; touching a bound from
+          // outside is not an intersection there, unlike its EventLog filter.
           const auto span = trace_endpoint_times(trace);
-          const auto within = [&](double instant) {
-            return time_from <= instant && instant <= time_to;
+          const auto inside = [&](double instant) {
+            return time_from < instant && instant < time_to;
           };
           if (!span ||
-              !(within(span->first) || within(span->second) ||
-                (span->first <= time_from && time_from <= span->second) ||
-                (span->first <= time_to && time_to <= span->second))) {
+              !(inside(span->first) || inside(span->second) ||
+                (span->first <= time_from && time_to <= span->second))) {
             continue;
           }
           break;

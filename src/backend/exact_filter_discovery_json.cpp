@@ -724,7 +724,10 @@ DiscoveryWorkbenchResponse execute_exact_ltl_filter(const std::vector<DiscoveryW
   if(!supplied("source_file"))invalid("original LTL requires source_file");if(supplied("operation")&&field_value("operation")!="filter_ltl")invalid("operation must be filter_ltl");if(format!="native_log"&&format!="import")invalid("source_format must be native_log or import");for(const auto& key:imports)if(format=="native_log"&&supplied(key))invalid("source import control is inapplicable: "+key);
   const auto parsed=parse_mine_params(field_value,supplied);options=parsed.ltl.value_or(LtlFilterOptions{});options_before=serialize_exact_ltl_options_json(*options);options_after=options_before;
   phase="source_parse_error";source=format=="native_log"?parse_exact_ltl_log_json(original_source):imported_ltl_log(original_source,filename,field_value,supplied,detected);before=serialize_embedding_workbench_raw_log_json(*source);after=before;
-  phase="native_error";entered=true;result=filter_ltl_event_log(*source,*options);returned=true;
+  phase="native_error";entered=true;
+  // A native log JSON arrives as an EventLog object and follows pm4py's EventLog
+  // ltl_checker; an imported CSV/XES file follows its DataFrame checker.
+  result=filter_ltl_event_log(*source,*options,format=="native_log"?LtlInputShape::kEventLogObject:LtlInputShape::kImportedTable);returned=true;
  }catch(const std::exception& e){error=e.what();type=dynamic_cast<const std::invalid_argument*>(&e)?"invalid_argument":dynamic_cast<const std::out_of_range*>(&e)?"out_of_range":dynamic_cast<const std::overflow_error*>(&e)?"overflow_error":"native_error";}
  if(source)after=serialize_embedding_workbench_raw_log_json(*source);if(options)options_after=serialize_exact_ltl_options_json(*options);
  const auto artifact=[&](const std::string& name,const auto& produce){try{artifacts[name]=produce();}catch(const std::exception& e){artifact_errors[name]=e.what();}};

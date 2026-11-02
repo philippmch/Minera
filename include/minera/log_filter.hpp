@@ -20,9 +20,14 @@ enum class TimeFilterMode {
   // Keep only the events whose instant lies in the range; traces left empty
   // are dropped.
   events,
-  // Keep only traces that lie entirely inside the range.
+  // Keep only traces that lie entirely inside the range (bounds inclusive).
+  // Both trace modes span a trace by its earliest and latest timestamp, as
+  // the DataFrame filter does, not by its first and last events.
   traces_contained,
-  // Keep only traces that overlap the range at all.
+  // Keep only traces that overlap the range, as the DataFrame filter decides:
+  // the earliest or latest instant lies strictly inside it, or the trace
+  // spans the whole range (endpoints inclusive). A trace that only touches a
+  // bound from outside is dropped.
   traces_intersecting,
 };
 
@@ -133,9 +138,10 @@ struct AttributeOccurrenceThresholdFilterOptions {
 
 enum class FilterAnchorOccurrence { first, last };
 
-// Prefix/suffix anchor behavior. Strict cuts include the anchor event;
-// non-strict cuts stop immediately before/after it. A missing anchor drops
-// the trace, matching the ordinary prefix/suffix filter contract.
+// Prefix/suffix anchor behavior, as pm4py's filter_prefixes/filter_suffixes:
+// a strict cut stops immediately before/after the anchor event and leaves it
+// out; a non-strict cut keeps it. A missing anchor, or a cut that leaves no
+// events, drops the trace (a DataFrame has no rows for it).
 struct PrefixSuffixFilterOptions {
   std::string activity;
   bool strict = true;
@@ -265,11 +271,12 @@ struct LogFilterOptions {
   std::vector<TracePattern> admitted_variants;
   bool admitted_variants_positive = true;
 
-  // Prefix/suffix cuts: reduce each case to its head up to the first
-  // occurrence of `prefix_activity`, and/or its tail from the first
-  // occurrence of `suffix_activity` — the anchor event included on both
-  // sides. Cases without the anchor are dropped. Both may be set; the prefix
-  // cut applies first, so the suffix anchor is sought inside the kept head.
+  // Prefix/suffix cuts: reduce each case to its head before the first (or
+  // last) occurrence of `prefix_activity`, and/or its tail after the first (or
+  // last) occurrence of `suffix_activity`. Strict cuts leave the anchor out;
+  // non-strict cuts keep it. Cases without the anchor, or left empty, are
+  // dropped. Both may be set; the prefix cut applies first, so the suffix
+  // anchor is sought inside the kept head.
   std::string prefix_activity;
   std::string suffix_activity;
   bool prefix_strict = true;
@@ -279,9 +286,11 @@ struct LogFilterOptions {
 
   // Between-extraction: cut each trace into the subtraces that run from an
   // occurrence of `between_start` to the next occurrence of `between_end`, both
-  // endpoints included. A trace can yield several subtraces (each becomes its
-  // own case, suffixed #1, #2, … when there is more than one) or none, in which
-  // case it is dropped. Both must be set together; setting only one throws.
+  // endpoints included, as pm4py's DataFrame filter_between cuts them. A trace
+  // can yield several subtraces, each its own case suffixed ##@@0, ##@@1, …
+  // (always suffixed, counted from 0), or none, in which case it is dropped.
+  // When the two are equal the closing event opens the next subtrace and
+  // belongs to it only. Both must be set together; setting only one throws.
   std::string between_start;
   std::string between_end;
 

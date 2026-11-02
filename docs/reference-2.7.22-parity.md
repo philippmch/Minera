@@ -2878,7 +2878,9 @@ Both-CSV CLI/server merges use preserved source tables and return an additive
 `table` alongside the compatibility `log` projection. An omitted timestamp selector
 can use a CSV timestamp alias present in either input; explicit selectors are
 exact. CSV relation files retain all columns as string cells, including quoted
-extra fields and explicitly selected relation headers. Configured blank CSV
+extra fields and explicitly selected relation headers; the key column joining
+a CSV case-id column carries that log's typed case-id text (see the CSV
+importer section), so `007` in both files still joins. Configured blank CSV
 timestamps remain missing; empty custom text fields remain present strings.
 The compatibility log uses the selected case and timestamp columns even when
 the source CSV contains other first-class columns. XES and mixed-format inputs
@@ -2961,7 +2963,8 @@ timestamp headers; XES values are projected onto those aliases. Selected CSV
 date cells are parsed to native dates in mixed merges so sorting remains
 chronological. XES tables carry basic scalar dtype declarations, allowing
 missing numeric values to promote during table merging. CSV relation keys
-remain strings, and incompatible numeric XES case keys are rejected.
+remain strings (typed like the CSV side's case ids where they join it), and
+incompatible numeric XES case keys are rejected.
 
 Explicit case selectors use the corresponding XES trace attribute. An alias
 collision preserves the original event field under an `event:` prefix (repeated
@@ -3038,24 +3041,40 @@ identity. The generated rejection checks require native rejection, not Python
 runtime exception classes. CSV and mixed XES adapters remain separate work.
 
 The native CSV event importer follows the reference `pandas.read_csv` +
-`pm4py.format_dataframe` flow for the first-class columns. Rows whose
-activity is an empty cell or a pandas default NA spelling (`NA`, `null`,
-`None`, `NaN`, `n/a`, ...) are dropped rather than rejected; whitespace is a
-value only with `trim_fields=false`. The case-id column is typed the way the
-pandas 3.0.5 reader types it from every data row (int64, then float64,
-then bool, then text, as observed by differential fuzzing) and then printed as
-`astype("string")` does: `007`, `+7` and `7` are one case `7`; an NA cell in
-an integer column makes every id a float (`1.0`); floats use the parser's
-reader's 17-significant-digit value and Python's repr (`1e+31`, `-14.0`, `inf`);
+`pm4py.format_dataframe` flow for the case-id, activity and timestamp
+columns. Lines made only of spaces and tabs (none of them the delimiter) are
+skipped like empty lines, before the header too; whitespace inside a field is
+a value only with `trim_fields=false`. The case-id and activity columns are
+each typed the way the pandas 3.0.5 reader types a column from every data
+row (int64, then float64, then bool, then text, as observed by differential
+fuzzing) and then printed as `astype("string")` does: `007`, `+7` and `7` are
+one case `7` (and `010`/`10` one activity `10`); an NA cell in an integer
+column makes every value a float (`1.0`); floats use the reader's
+17-significant-digit value and Python's repr (`1e+31`, `-14.0`, `inf`);
 `true`/`FALSE` become `True`/`False`; `1_000`, hex and padded text stay
-strings. NA case cells are missing (their rows dropped) except where pandas
-reads the column without NA filtering (unsigned 64-bit ids mixed with NA or
-negative values, or out-of-range integers mixed with non-integers), which
-keeps those spellings as literal ids. Traces are then ordered by the case-id
-string, as `format_dataframe` sorts the frame by case id, timestamp and row
-index; flat table rows keep source order with the converted case text.
-Stream readers (`keep_na_first_class_values`) keep literal ids in file order,
-as `csv.DictReader` does. Textual timestamps are converted per cell
+strings. A row whose case id or activity is then missing (an empty cell or a
+pandas default NA spelling such as `NA`, `null`, `None`, `NaN`, `n/a`) is
+dropped rather than rejected, except where pandas reads the column without NA
+filtering (unsigned 64-bit values mixed with NA or negative values, or
+out-of-range integers mixed with non-integers), which keeps those spellings
+as literal values. Traces are then ordered by the case-id string, as
+`format_dataframe` sorts the frame by case id, timestamp and row index. Each
+`case:` attribute comes from the case's first row in that order (rows
+without a timestamp count only when no row of the case is timed, since the
+reference drops them); a blank or NA cell there leaves the attribute missing.
+Other columns, including resource and lifecycle, keep their text where
+`read_csv` would type them (declared: CSV adapters do not infer pandas column
+dtypes beyond the case-id and activity columns). Declared: the flat table
+keeps source row order (with the converted case-id and activity text) where
+the formatted reference frame is sorted by case id, timestamp and row index.
+Case-relation files joined with a CSV log (case-relations merge and timestamp
+interleavings, CLI and server) are read like the reference reads a relations
+frame: the key column joining a CSV case-id column is typed the same way, so
+`007` in both files still joins the CSV case `7` (a relation key column with
+an NA cell reads as floats, as the reference's does); keys joining an XES log
+and other relation columns stay text. Stream readers
+(`keep_na_first_class_values`), including `minera_live_stream`, keep literal
+ids and activities in file order, as `csv.DictReader` does. Textual timestamps are converted per cell
 as `to_datetime(format="mixed", utc=True)` does in 2.7.22: no format is
 inferred from the first value, ambiguous `A/B/YYYY`, `A.B.YYYY` and
 `A-B-YYYY` dates are month-first and day-first only when the first number
@@ -5002,9 +5021,13 @@ generic event/resource attribute keys, positive and negative selection,
 strict pattern arities, and optional inclusive timestamp-difference bounds for
 eventually-follows. Request parsing, the export CLI, the local mine endpoint,
 and the typed frontend controls all apply the predicate after ordinary log
-filters and preserve event/trace attributes. Focused regressions cover
-timestamp validation, generic attributes, polarity, missing four-eyes sides,
-and malformed request fields.
+filters and preserve event/trace attributes. Imported CSV/XES logs follow
+pm4py's DataFrame `ltl_checker` (bounds between the matched events, the last
+B and C for A-next-B-next-C, the last B's resource for four eyes); a native
+log JSON on the original LTL endpoint follows its EventLog checker (see
+"Mining filters over imported logs"). Focused regressions cover timestamp
+validation, generic attributes, polarity, missing four-eyes sides, both
+checkers on captured cases, and malformed request fields.
 
 ## Trace-pattern filtering evidence
 
@@ -5068,13 +5091,50 @@ and typed frontend controls use fractions on the wire and percentages in the
 UI; focused regressions cover zero targets, ties, reversed bounds, subordinate
 endpoint settings, and combined constraints.
 
-Prefix/suffix evidence now covers the full anchor variation: strict mode
-includes the selected activity, non-strict mode cuts immediately before/after
-it, and first/last occurrence selection is deterministic. Missing anchors drop
-the trace; subordinate options without an activity are rejected. Standalone
+Prefix/suffix evidence now covers the full anchor variation with pm4py's
+meaning of `strict`: strict mode cuts immediately before/after the selected
+activity and leaves it out, non-strict mode keeps it, and first/last
+occurrence selection is deterministic. Missing anchors drop the trace, and so
+does a cut that leaves no events (the DataFrame has no rows for it);
+subordinate options without an activity are rejected. The segment suffix cut
+(`segment_suffix_strict`) uses the same meaning. Standalone
 prefix/suffix APIs, integrated request fields, CLI flags, local mining, and
 frontend controls share this contract, with focused regressions for repeated
 anchors, empty cuts, sequential cuts, and malformed options.
+
+## Mining filters over imported logs: DataFrame vs EventLog paths
+
+pm4py 2.7.22's `read_xes` and `read_csv` + `format_dataframe` both hand users
+a DataFrame, so for CSV/XES inputs the mining filters and statistics
+(`filter_event_log`, `minera_export` filter flags, `/api/mine`,
+`/api/attribute-statistics`) follow pm4py's DataFrame behaviour where its
+DataFrame and EventLog implementations disagree. This covers the generic
+segment filters (`segment_*`) and the generic LTL filter (`ltl_*`) as well.
+Only an input that arrives as an EventLog object keeps EventLog behaviour: the
+module-level `algo.filtering.log.*` contracts (log filter bank) and the
+original LTL filter endpoint with `source_format=native_log` (a native log
+JSON); the same endpoint with `source_format=import` follows the DataFrame.
+Where pm4py's own two paths disagree:
+
+| Behaviour | pm4py DataFrame | pm4py EventLog | Minera follows |
+|---|---|---|---|
+| `filter_time_range(mode="traces_intersecting")` at the bounds | start or end strictly inside, or the case covers the range; touching a bound from outside is excluded | inclusive at both bounds | DataFrame |
+| `filter_time_range` trace modes on out-of-order traces | case minimum/maximum timestamp | first/last event by position | DataFrame: a case spans its earliest to its latest parseable timestamp (`filter_time_range_trace_modes_read_endpoints_by_position`); identical for CSV imports, whose cases are sorted by time |
+| `filter_prefixes`/`filter_suffixes` that leave no events | case dropped | empty trace kept | DataFrame, for both `prefix_*`/`suffix_*` and the `segment_*` variants |
+| `get_event_attribute_values` on missing/NaN cells | not counted | counted as `nan` | DataFrame: blank CSV cells, explicit nulls and XES float NaN are not counted |
+| XES `<float value="nan"/>` in filters (resource, attribute, LTL) | missing: matches no value list, never removed | the float value `nan` | DataFrame |
+| `get_trace_attribute_values` | one count per event row; trace attributes are `case:`-prefixed columns | one count per trace; unprefixed key | DataFrame counts; both `case:x` and `x` select the trace attribute |
+| `filter_trace_attribute_values` key | `case:x` | `x` | both accepted |
+| `filter_between` sub-case ids | `<id>##@@<k>` from 0, always suffixed | the original id on every segment | DataFrame: `<id>##@@<k>` from 0 for `between_*`, `<id><separator><k>` from 0 for `segment_between_*`, always suffixed |
+| `filter_between` with equal endpoints (`A..A`) | `A,X,A,Y,A` gives `[A,X]`, `[A,Y,A]`: the shared `A` opens the next segment and belongs to it only | `[A,X,A]`, `[A,Y,A]` | DataFrame |
+| `filter_between` with overlapping, unequal endpoint lists | a closing event never reopens: `[A,B]->[B]` cuts `A,B,A,B` into `[A,B]`, `[A,B]` | a closing event that is also a start reopens | DataFrame (`segment_between_*`) |
+| `filter_four_eyes_principle` (`ltl_checker.four_eyes_principle`) | the A resources are compared with the resource of the case's last B event only: `B(r1),A(r1),B(r2)` satisfies the principle; missing/NaN resources dropped, an empty string is a resource | the A resources are compared with every B resource: `B(r1),A(r1),B(r2)` violates it | DataFrame (EventLog for `native_log` input) |
+| `ltl_checker.eventually_follows` with timestamp bounds | each bound holds between the two matched events, over every ordered occurrence | the i-th bound is read between trace positions i and i + 1 | DataFrame (EventLog for `native_log` input) |
+| `ltl_checker.A_next_B_next_C` | the case's last B and last C must be adjacent and preceded by an A: `A,B,C,A,B,X` fails | any adjacent A, B, C window: `A,B,C,A,B,X` passes | DataFrame (EventLog for `native_log` input) |
+
+The generic attribute filter (`attribute_key`) names DataFrame columns, so
+`concept:name`, `org:resource`, `time:timestamp` and `lifecycle:transition`
+(and the CSV source column names) select the first-class fields.
 
 ## Numeric attribute filtering evidence
 
@@ -5198,11 +5258,13 @@ results change when only allocation addresses are shifted.
 
 The native segment surface exposes prefix and suffix cuts with first/last
 anchor selection and strict/non-strict boundary behavior, plus between
-extraction over activity sets. Complete subtraces retain event and trace
-attributes, reuse a shared boundary for repeated equal endpoints, and receive
-deterministic subcase identifiers with a configurable separator. Empty cuts
-are preserved when a strict boundary is at the edge; incomplete between
-segments are discarded. Focused tests cover missing anchors, first/last
+extraction over activity sets, following pm4py's DataFrame filters (see
+"Mining filters over imported logs" above). Complete subtraces retain event
+and trace attributes; only equal start and end lists reuse the closing event
+as the next segment's start, and that event then belongs to the later segment
+only. Every segment receives the identifier `<id><separator><k>` with k
+counted from 0 and a configurable separator. A cut that leaves no events
+drops the case; incomplete between segments are discarded. Focused tests cover missing anchors, first/last
 selection, strict boundaries, repeated endpoints, activity lists, attributes,
 custom identifiers, malformed options, strict request parsing, CLI flags,
 local-server application, and frontend controls/serialization.

@@ -50,7 +50,9 @@ export function StreamingWorkspace({ file = null, sourceFormat, busy = false, da
     catch(cause){if(request.current===controller&&!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}
     finally{if(request.current===controller){request.current=null;setPending(false);}}
   };
-  const create=()=>{const id=crypto.randomUUID();remember(id);void liveOperation(signal=>createLiveSession(form,imports,id,model,signal));};
+  // The id is remembered only once the backend created the session (liveOperation does it), so a failed create
+  // never leaves a dead session id to reconnect to.
+  const create=()=>{const id=crypto.randomUUID();void liveOperation(signal=>createLiveSession(form,imports,id,model,signal));};
   const connect=(id:string)=>{if(id)void liveOperation(signal=>getLiveSession(id,signal));};
   const list=async()=>{cancel();const controller=new AbortController();request.current=controller;setPending(true);setError(null);try{const next=await listLiveSessions(controller.signal);if(request.current===controller&&!controller.signal.aborted)setSessions(next);}catch(cause){if(request.current===controller&&!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}finally{if(request.current===controller){request.current=null;setPending(false);}}};
   const append=()=>{if(liveRun&&log){const batchId=crypto.randomUUID();void liveOperation(signal=>appendLiveSession(liveRun,log,batchFormat,batchId,waitForBatch,signal));}};

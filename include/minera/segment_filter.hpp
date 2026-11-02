@@ -19,6 +19,7 @@ using Occurrence = AnchorOccurrence;
 
 // Options for cutting the beginning of a trace at a matching event.
 // In strict mode the matching event is omitted; otherwise it is retained.
+// A trace whose cut keeps no events is dropped, as in the DataFrame filter.
 struct PrefixFilterOptions {
   std::string activity;
   bool strict = true;
@@ -26,8 +27,9 @@ struct PrefixFilterOptions {
 };
 using PrefixOptions = PrefixFilterOptions;
 
-// Options for cutting the end of a trace at its last matching event.  In
-// strict mode the matching event is retained; otherwise it is omitted.
+// Options for cutting the end of a trace at a matching event.  In strict
+// mode the matching event is omitted; otherwise it is retained.  A trace whose
+// cut keeps no events is dropped, as in the DataFrame filter.
 struct SuffixFilterOptions {
   std::string activity;
   bool strict = true;
@@ -36,9 +38,10 @@ struct SuffixFilterOptions {
 using SuffixOptions = SuffixFilterOptions;
 
 // Extract complete subtraces beginning at a listed start activity and ending
-// at the next listed end activity.  A closing event that is also a start may
-// open the next segment.  A separator is inserted between an original case id
-// and a one-based segment number when a trace yields multiple segments.
+// at the next listed end activity, as pm4py's DataFrame filter_between does.
+// Only when the start and end lists are equal does a closing event open the
+// next segment, and it then belongs to that segment only.  Every segment's
+// case id is the original id, the separator and a zero-based segment number.
 struct BetweenFilterOptions {
   std::vector<std::string> start_activities;
   std::vector<std::string> end_activities;

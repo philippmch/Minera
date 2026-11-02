@@ -33,6 +33,11 @@ describe("OCEL analysis workflows",()=>{
   it("supplies association prefilters and business-hour controls only for applicable statistics",()=>{
     expect(statisticsOptions({...DEFAULT_OCEL_STATISTICS,prefilter:"start",businessHours:true,slots:"bad"})).toEqual({variant:"object_type_activities"});expect(statisticsOptions({...DEFAULT_OCEL_STATISTICS,variant:"activity_associations",prefilter:"end"})).toEqual({variant:"activity_associations",prefilter:"end"});const options=statisticsOptions({...DEFAULT_OCEL_STATISTICS,variant:"edge_associations",prefilter:"start",businessHours:true,slots:"0:604800"});expect(new URLSearchParams(ocelStatisticsQuery(options)).get("business_hour_slots")).toBe("0:604800");expect(()=>statisticsOptions({...DEFAULT_OCEL_STATISTICS,variant:"edge_associations",businessHours:false,slots:"0:100"})).toThrow(/require/);
   });
+  it("keeps repeated reference endpoint names as separate positional columns",async()=>{
+    const events:OcelFeatureResult={family:"OCEL_FEATURES",variant:"EVENTS",row_count:1,feature_count:4,row_ids:["e1"],feature_names:["@@event_start_item","@@event_start_order","@@event_start_item","@@event_start_order"],values:[[1,0,0,1]]};
+    const table=analysisTables(events).matrix;expect(table.columns).toEqual(["row_position","row_id","row_type","@@event_start_item","@@event_start_order","@@event_start_item","@@event_start_order"]);expect(table.rowAt(0)).toEqual([0,"e1",null,1,0,0,1]);
+    const csv=await analysisCsv(events,"matrix").text();expect(csv.split("\r\n")[0]).toBe('"row_position","row_id","row_type","@@event_start_item","@@event_start_order","@@event_start_item","@@event_start_order"');expect(csv).toContain('"0","e1","null","1","0","0","1"');
+  });
   it("preserves row positions, native identifiers/types and every matrix dimension in CSV",async()=>{
     const table=analysisTables(matrix).matrix;expect(table.columns).toEqual(["row_position","row_id","row_type","cost","degree"]);expect(table.rowAt(1)).toEqual([1,"orphan","Orphan",0,0]);const csv=await analysisCsv(matrix,"matrix").text();expect(csv.split("\r\n")).toHaveLength(4);expect(csv).toContain('"0","order-東京","Order","12.5","1"');
   });

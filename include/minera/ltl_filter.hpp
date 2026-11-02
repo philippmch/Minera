@@ -44,11 +44,32 @@ struct LtlFilterOptions {
   std::string resource_key;
 };
 
+// Which of pm4py's two ltl_checker implementations a log is judged by. pm4py
+// 2.7.22 loads CSV and XES files as DataFrames, so an imported log follows the
+// DataFrame checker; only a log that arrives as an EventLog object (a native
+// log JSON) follows the EventLog checker. They differ in three rules:
+//  - eventually follows with timestamp bounds: the DataFrame checks each bound
+//    between the matched events (searching every ordered occurrence), the
+//    EventLog between trace positions i and i + 1;
+//  - A-next-B-next-C: the DataFrame requires the last B and last C to be
+//    adjacent and preceded by an A, the EventLog accepts any adjacent window;
+//  - four eyes: the DataFrame compares the A resources with the resource of
+//    the last B only, the EventLog with every B resource.
+// The DataFrame checker also counts an empty-string resource as a value.
+enum class LtlInputShape {
+  kImportedTable,
+  kEventLogObject,
+};
+
 // Returns a copy of the input log containing only traces satisfying (positive)
 // or not satisfying (negative) the selected predicate. Event and trace data,
-// including generic attributes, are preserved verbatim.
+// including generic attributes, are preserved verbatim. The two-argument form
+// judges the log as an imported table.
 [[nodiscard]] EventLog filter_ltl_event_log(const EventLog& event_log,
                                             const LtlFilterOptions& options);
+[[nodiscard]] EventLog filter_ltl_event_log(const EventLog& event_log,
+                                            const LtlFilterOptions& options,
+                                            LtlInputShape shape);
 
 // Short aliases for the native predicate filter.
 [[nodiscard]] EventLog filter_ltl(const EventLog& event_log,

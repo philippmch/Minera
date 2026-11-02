@@ -5,12 +5,13 @@ import { requestLogQuerySchema, downloadQueryBlob, type LogQuerySchema } from ".
 import { ocelPreparedCsv } from "../ocel-preparation";
 import { nativeJson } from "../native-json";
 import { cellText } from "../transformation-workspace";
+import { runSurvivesModelImport } from "../app-logic";
 import { computePetriLayout } from "../petri-layout";
 import { PetriNet } from "./PetriNet";
 
-export function SimulationWorkspace({ models, live, dataset, onOpenLog, onOpenUnderlying }: {
+export function SimulationWorkspace({ models, live, dataset, onOpenLog, onOpenUnderlying, importedGeneration = 0 }: {
   models: string[]; live: boolean; dataset: string; onOpenLog?: (file: File) => void;
-  onOpenUnderlying?: (file: File, sourceId: string) => void;
+  onOpenUnderlying?: (file: File, sourceId: string) => void; importedGeneration?: number;
 }) {
   const [miner, setMiner] = useState(models.includes("inductive") ? "inductive" : models[0] ?? "");
   const [inputs, setInputs] = useState(defaultSimulationInputs);
@@ -26,6 +27,9 @@ export function SimulationWorkspace({ models, live, dataset, onOpenLog, onOpenUn
     catch (cause) { if (source.current === controller && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause)); }
   };
   useEffect(() => { void refresh(); return () => { request.current?.abort(); source.current?.abort(); }; }, [live]);
+  // "Check simulation workflow" imports this run's model; only a run on the replaced imported net becomes stale.
+  const seenImport = useRef(importedGeneration);
+  useEffect(() => { if (seenImport.current === importedGeneration) return; seenImport.current = importedGeneration; setRun(old => old && !runSurvivesModelImport(old.value.miner) ? null : old); }, [importedGeneration]);
   const start = async () => {
     if (!schema || !miner || pending) return;
     const controller = new AbortController(); request.current = controller; setPending(true); setError(null);

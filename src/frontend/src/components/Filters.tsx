@@ -3102,8 +3102,8 @@ export function Filters({
                 disabled={!prefixActivity}
                 onChange={(e) => setPrefixStrict(e.target.value === "strict")}
               >
-                <option value="strict">include anchor</option>
-                <option value="non-strict">exclude anchor</option>
+                <option value="strict">exclude anchor</option>
+                <option value="non-strict">include anchor</option>
               </select>
             </label>
             <label className="filters-field">
@@ -3124,8 +3124,8 @@ export function Filters({
                 disabled={!suffixActivity}
                 onChange={(e) => setSuffixStrict(e.target.value === "strict")}
               >
-                <option value="strict">include anchor</option>
-                <option value="non-strict">exclude anchor</option>
+                <option value="strict">exclude anchor</option>
+                <option value="non-strict">include anchor</option>
               </select>
             </label>
             <label className="filters-field">

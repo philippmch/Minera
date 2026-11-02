@@ -1276,7 +1276,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       throw std::logic_error("mining response is not a JSON object");
     const auto bound_body = body.substr(0, body_end) + ",\"source_id\":" +
         minera::embedding_runtime::detail::escape_json(std::to_string(session->query_source_id)) +
-        ",\"active_source\":" + active_source_snapshot_json(*session) +
+        ",\"active_source\":" + active_source_snapshot_json(*session, false) +
         '}' + body.substr(body_end + 1);
     publish_active_mining(ticket, session);
 
@@ -7227,12 +7227,17 @@ void handle_case_relations(const httplib::Request& request,
     const bool incoming_is_xes =
         looks_like_xes(incoming_file.filename, incoming_file.content);
     if (!base_is_xes && !incoming_is_xes) {
-      const auto relation_table =
+      auto relation_table =
           minera::parse_case_relations_table_csv(relation_input);
       options.relation_left_column = left_column;
       options.relation_right_column = right_column;
       auto base_data = minera::import_csv_event_data(base_input);
       auto incoming_data = minera::import_csv_event_data(incoming_input);
+      // Keys joining a CSV case-id column carry its typed text.
+      if (minera::tools::csv_case_id_key(base_data.table, options.case_id_key))
+        minera::type_case_relation_column_like_csv_log(relation_table, left_column);
+      if (minera::tools::csv_case_id_key(incoming_data.table, options.case_id_key))
+        minera::type_case_relation_column_like_csv_log(relation_table, right_column);
       normalize_csv_timestamp_missingness(base_data.table);
       normalize_csv_timestamp_missingness(incoming_data.table);
       if (!request.has_param("merge_timestamp_key")) {
@@ -7268,7 +7273,13 @@ void handle_case_relations(const httplib::Request& request,
       if (!incoming_is_xes) { normalize_csv_timestamp_missingness(incoming_table); minera::tools::relation_csv_dates(incoming_table, options.timestamp_key); }
       options.relation_left_column = left_column;
       options.relation_right_column = right_column;
-      const auto relation_table = minera::parse_case_relations_table_csv(relation_input);
+      auto relation_table = minera::parse_case_relations_table_csv(relation_input);
+      // Keys joining a CSV case-id column carry its typed text; XES keys
+      // stay literal.
+      if (!base_is_xes && minera::tools::csv_case_id_key(base_table, options.case_id_key))
+        minera::type_case_relation_column_like_csv_log(relation_table, left_column);
+      if (!incoming_is_xes && minera::tools::csv_case_id_key(incoming_table, options.case_id_key))
+        minera::type_case_relation_column_like_csv_log(relation_table, right_column);
       publish_merge(minera::merge_case_relations(
           base_table, incoming_table, relation_table, options));
     }
@@ -7333,8 +7344,12 @@ void handle_timestamp_interleavings(const httplib::Request& request,
         value("interleavings_left_column", "case_id_LEFT");
     const auto right_column =
         value("interleavings_right_column", "case_id_RIGHT");
-    const auto relations = minera::parse_case_relations_csv(
+    auto relations = minera::parse_case_relations_csv(
         relation_input, left_column, right_column);
+    // Keys joining a CSV log carry its typed case-id text.
+    minera::type_case_relations_like_csv_logs(
+        relations, !looks_like_xes(left_file.filename, left_file.content),
+        !looks_like_xes(right_file.filename, right_file.content));
     const auto lookup = [&](std::string_view key) {
       return request.has_param(std::string(key))
                  ? request.get_param_value(std::string(key))

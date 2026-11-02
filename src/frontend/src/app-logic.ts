@@ -342,3 +342,51 @@ export function evaluationModelIds(data: MineraExport, importedAvailable = false
   if (importedAvailable) ids.add("imported");
   return [...ids].sort();
 }
+
+/**
+ * Hands the previous live backend source back after a load that failed or was
+ * cancelled. The backend keeps (or, after cancel-mine, restores) its previous
+ * session in that case, so the still-displayed analysis is live again once the
+ * rollback request has finished. A newer load, or going home, supersedes a
+ * pending handback.
+ */
+export class LiveSourceHandback {
+  private epoch = 0;
+  /** A new load or going home: any pending handback must not apply. */
+  supersede(): void { this.epoch += 1; }
+  async handback(previous: string | null | undefined, rollback: Promise<unknown>, restore: (sourceId: string) => void): Promise<boolean> {
+    if (!previous) return false;
+    const epoch = ++this.epoch;
+    await rollback.catch(() => undefined);
+    if (epoch !== this.epoch) return false;
+    restore(previous);
+    return true;
+  }
+}
+
+/** A workspace run stays valid when another model is imported, unless it ran on the imported model itself. */
+export function runSurvivesModelImport(runMiner: string | null | undefined): boolean {
+  return runMiner !== "imported";
+}
+
+/** Case rows with stable React keys: logs may repeat a case id, so rows are keyed by trace position. */
+export function caseRowEntries<T extends { case_id: string }>(traces: readonly T[], query: string): Array<{ key: number; trace: T }> {
+  const needle = query.trim().toLowerCase(), rows: Array<{ key: number; trace: T }> = [];
+  traces.forEach((trace, key) => { if (!needle || trace.case_id.toLowerCase().includes(needle)) rows.push({ key, trace }); });
+  return rows;
+}
+
+/** A numeric input's value: an emptied field means "not set" rather than 0. */
+export function optionalNumber(text: string): number | undefined {
+  return text.trim() === "" ? undefined : Number(text);
+}
+
+const identityKeys = new WeakMap<object, number>();
+let nextIdentityKey = 0;
+/** A React key for an object's identity, e.g. a File: two uploads with the same name stay distinct. */
+export function identityKey(value: object | null | undefined): string {
+  if (!value) return "none";
+  let key = identityKeys.get(value);
+  if (key === undefined) { key = ++nextIdentityKey; identityKeys.set(value, key); }
+  return `object-${key}`;
+}

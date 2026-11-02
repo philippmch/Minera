@@ -291,12 +291,15 @@ minera::ActiveEventSource prepare_active_event_source(
   return source;
 }
 
-std::string active_source_snapshot_json(const MinedSession& session) {
+// A summary snapshot leaves the seven complete source-state copies (tables, logs, stream) as null and marks
+// itself "detail":"summary"; the source inspector fetches the complete snapshot from /api/active-source.
+// Mining responses embed the summary so their size stays linear in the log with a small constant.
+std::string active_source_snapshot_json(const MinedSession& session, bool complete = true) {
   if (!session.active_source) throw std::invalid_argument("the cached session has no retained original source");
   const auto& source = *session.active_source;
   const auto& s = source.selectors();
-  const auto table = [](const minera::EventTable* value) {return value ? minera::serialize_event_table_input_json(*value) : "null";};
-  const auto log = [](const minera::EventLog* value) {return value ? minera::serialize_active_source_log_json(*value) : "null";};
+  const auto table = [complete](const minera::EventTable* value) {return complete && value ? minera::serialize_event_table_input_json(*value) : "null";};
+  const auto log = [complete](const minera::EventLog* value) {return complete && value ? minera::serialize_active_source_log_json(*value) : "null";};
   std::string body = "{\"format\":" + active_source_quote(source.file().format == "table" ? "table" : "auto") +
       ",\"detected_format\":" + active_source_quote(source.file().format) +
       ",\"shape\":" + active_source_quote(active_source_shape(source.selected_kind())) +
@@ -311,8 +314,9 @@ std::string active_source_snapshot_json(const MinedSession& session) {
       ",\"checked_table\":" + table(source.checked_table_if_available()) +
       ",\"original_log\":" + log(source.original_log_if_available()) +
       ",\"checked_log\":" + log(source.checked_log_if_available()) +
-      ",\"prepared_stream\":" + (source.checked_stream_if_available() ? minera::serialize_active_source_stream_json(*source.checked_stream_if_available()) : "null") +
+      ",\"prepared_stream\":" + (complete && source.checked_stream_if_available() ? minera::serialize_active_source_stream_json(*source.checked_stream_if_available()) : "null") +
       ",\"prepared_lazy_table\":" + (source.checked_lazy_if_available() ? table(source.checked_table_if_available()) : "null") +
+      (complete ? "" : ",\"detail\":\"summary\"") +
       ",\"original_table_origin\":" + active_source_quote(source.original_table_origin()) +
       ",\"paired_csv_import_error\":" + (session.paired_csv_import_error.empty() ? "null" : active_source_quote(session.paired_csv_import_error)) +
       ",\"checked_table_origin\":" + active_source_quote(source.checked_table_origin()) +

@@ -95,7 +95,7 @@ describe("active original native source transport", () => {
   it("rejects late replacement, canceled upload and stale cached results while retaining string source identities", () => {
     const gate = new MiningSourceRequestGate(), first = gate.issue(), signal = new AbortController(); expect(gate.accepts(first)).toBe(true); const second = gate.issue(); expect(gate.accepts(first)).toBe(false); expect(gate.accepts(second)).toBe(true);
     signal.abort(); expect(gate.accepts(second, signal.signal)).toBe(false); gate.invalidate(); expect(gate.accepts(second)).toBe(false);
-    expect(() => assertMiningSourceBinding("18446744073709551615", "18446744073709551615", 4, 4)).not.toThrow(); expect(() => assertMiningSourceBinding("old", "new", 4, 4)).toThrow(/changed/); expect(() => assertMiningSourceBinding(null, null, 4, 4)).toThrow(/changed/); expect(() => assertMiningSourceBinding("same", "same", 4, 5)).toThrow(/changed/);
+    expect(() => assertMiningSourceBinding("18446744073709551615", "18446744073709551615", 4, 4)).not.toThrow(); expect(() => assertMiningSourceBinding("old", "new", 4, 4)).toThrow(/changed/); expect(() => assertMiningSourceBinding(null, null, 4, 4)).toThrow(/No live backend log is loaded/); expect(() => assertMiningSourceBinding("same", "same", 4, 5)).toThrow(/changed/);
   });
   it("rejects an aborted mining response even when a transport completes after cancellation", async () => {
     const abort = new AbortController(), file = new File(["original"], "typed.json"); vi.stubGlobal("fetch", vi.fn(async () => {abort.abort(); return new Response(nativeJson(outcome(file.size)));})); await expect(mineActiveDataset(file, options, abort.signal)).rejects.toThrow();

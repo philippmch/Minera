@@ -1,8 +1,10 @@
+#include <algorithm>
 #include <atomic>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/live_stream.hpp"
@@ -54,14 +56,23 @@ int main(int argc, char** argv) {
       }
     }
 
+    // The rows are a stream like the server's live sessions: every row is
+    // kept with its literal case id and activity, in file order.
+    import_options.keep_na_first_class_values = true;
     const auto log = minera::import_csv_event_log(argv[1], import_options);
+    std::vector<const minera::Event*> events;
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events) events.push_back(&event);
+    std::stable_sort(events.begin(), events.end(),
+                     [](const minera::Event* left, const minera::Event* right) {
+                       return left->input_order < right->input_order;
+                     });
     minera::LiveEventStream stream(thread_pool_size);
     std::atomic<std::size_t> received = 0;
     const auto observer_id =
         stream.register_observer([&received](const minera::Event&) { ++received; });
     stream.start();
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events) stream.append(event);
+    for (const auto* event : events) stream.append(*event);
     stream.stop();
     stream.deregister_observer(observer_id);
 

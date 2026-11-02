@@ -260,7 +260,7 @@ import {
 } from "./types";
 import { nativeJson } from "./native-json";
 import { readAlignmentResponse } from "./alignment-inspection";
-import { readNativeResponse } from "./native-response";
+import { nativeResponseFailure, readNativeResponse } from "./native-response";
 import {isActiveSourceMining, miningSourceFields, type ActiveDatasetResult, type MiningInputOptions} from "./active-mining-source";
 
 export interface CsvOptions {
@@ -348,8 +348,9 @@ export interface FilterOptions extends LtlFilterOptions {
    * semicolon-separated variants; `[]` denotes the empty variant. */
   admittedVariants?: string[];
   admittedVariantsPositive?: boolean;
-  /** Reduce each case to its head up to the first prefixActivity / its tail
-   * from the first suffixActivity (anchor included); cases without it drop. */
+  /** Reduce each case to its head up to prefixActivity / its tail from
+   * suffixActivity. Strict cuts leave the anchor out, non-strict keep it;
+   * cases without the anchor, or whose cut keeps no events, drop. */
   prefixActivity?: string;
   suffixActivity?: string;
   prefixStrict?: boolean;
@@ -1765,9 +1766,12 @@ export async function mineActiveDataset(
     if (exactRun) throw new OwnedExactFilterResult(exactRun);
     throw new Error(String((parsed as { error: unknown }).error));
   }
+  const unreadable = parsed === null && !exactRun ? nativeResponseFailure(response) : undefined;
+  if (response.status === 413) throw new Error("the upload is larger than the Minera backend accepts (HTTP 413)");
   if (!response.ok) {
-    throw new Error(`the Minera backend answered with status ${response.status}`);
+    throw new Error(`the Minera backend answered with status ${response.status}${unreadable ? `, and ${unreadable}` : ""}`);
   }
+  if (unreadable) throw new Error(`the Minera backend finished mining, but the browser could not use its response: ${unreadable}`);
   if (!isMineraExport(parsed)) {
     if (exactRun) throw new OwnedExactFilterResult(exactRun);
     throw new Error("the Minera backend returned an invalid analysis");
@@ -1810,10 +1814,11 @@ export function alignmentQuery(options: AlignmentOptions = {}): string {
 }
 
 export async function alignModel(miner: string, options: AlignmentOptions = {}): Promise<Alignments> {
+  // Build the query before the network try, so a parameter error is reported as itself.
+  const query = alignmentQuery(options);
+  const params = [`miner=${encodeURIComponent(miner)}`, query].filter(Boolean).join("&");
   let response: Response;
   try {
-    const query = alignmentQuery(options);
-    const params = [`miner=${encodeURIComponent(miner)}`, query].filter(Boolean).join("&");
     response = await fetch(`/api/align?${params}`, {
       method: "POST",
     });
@@ -3512,9 +3517,9 @@ export function xesExportQuery(options: XesExportOptions = {}): string {
 }
 
 export async function fetchXes(options: XesExportOptions = {}): Promise<Blob> {
+  const query = xesExportQuery(options);
   let response: Response;
   try {
-    const query = xesExportQuery(options);
     response = await fetch(`/api/xes${query ? `?${query}` : ""}`);
   } catch {
     throw new Error(
@@ -3658,9 +3663,9 @@ export function dfgExportQuery(options: DfgExportOptions = {}): string {
 }
 
 export async function fetchDfg(options: DfgExportOptions = {}): Promise<string> {
+  const query = dfgExportQuery(options);
   let response: Response;
   try {
-    const query = dfgExportQuery(options);
     response = await fetch(`/api/dfg${query ? `?${query}` : ""}`);
   } catch {
     throw new Error(

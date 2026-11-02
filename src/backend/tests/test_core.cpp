@@ -53,6 +53,7 @@
 #include <cmath>
 #include <exception>
 #include <filesystem>
+#include "minera/case_relations.hpp"
 #include <fstream>
 #include <initializer_list>
 #include <limits>
@@ -762,7 +763,9 @@ void preserves_multiline_csv_fields_and_original_table_order() {
   assert(imported.log.traces[1].events[0].activity == "A");
   assert(imported.log.traces[1].events[0].input_order == 2);
   assert(*imported.log.traces[1].events[1].attribute("payload") == "line 1\r\nline \"2\", tail");
-  assert(*imported.log.traces[1].attribute("note") == "case\r\nnote");
+  // The case attribute comes from the case's earliest row, as in the reference.
+  assert(*imported.log.traces[1].attribute("note") == "same");
+  assert(imported.table.rows[0][4]->value == "case\r\nnote");
   std::istringstream untrimmed("case_id,activity,payload\r\nz,A,\"  first\nlast  \"\r\n");
   minera::CsvImportOptions options;options.trim_fields = false;
   assert(minera::import_csv_event_data(untrimmed,options).table.rows[0][2]->value == "  first\nlast  ");
@@ -3531,22 +3534,43 @@ void filters_keep_empty_traces_like_the_reference() {
 }
 
 void filter_time_range_trace_modes_read_endpoints_by_position() {
-  // "back" runs backwards in time (10:00 then 09:00).
+  // pm4py 2.7.22's DataFrame time filter (read_xes of the same cases) spans
+  // each case by its earliest and latest timestamp, so a case that runs
+  // backwards in time (10:00 then 09:00) spans 09:00-10:00 like a forward
+  // one. Captured: [09:30,10:30] contains neither and intersects
+  // back/fwd/mid; [09:30,09:45] intersects all three; [08:00,10:30] contains
+  // back and fwd; [10:30,12:00] intersects only mid.
   const auto log = clock_log({{"back", {{"a", "2024-01-01T10:00:00Z"},
                                         {"b", "2024-01-01T09:00:00Z"}}},
                               {"fwd", {{"a", "2024-01-01T09:00:00Z"},
-                                       {"b", "2024-01-01T10:00:00Z"}}}});
-  minera::LogFilterOptions options;
-  options.time_from = "2024-01-01T09:30:00Z";
-  options.time_to = "2024-01-01T10:30:00Z";
-  options.time_mode = minera::TimeFilterMode::traces_contained;
-  assert((case_ids(minera::filter_event_log(log, options)) ==
-          std::vector<std::string>{"back"}));
-
-  options.time_to = "2024-01-01T09:45:00Z";
-  options.time_mode = minera::TimeFilterMode::traces_intersecting;
-  assert((case_ids(minera::filter_event_log(log, options)) ==
-          std::vector<std::string>{"fwd"}));
+                                       {"b", "2024-01-01T10:00:00Z"}}},
+                              {"mid", {{"a", "2024-01-01T09:00:00Z"},
+                                       {"b", "2024-01-01T11:00:00Z"},
+                                       {"c", "2024-01-01T10:00:00Z"}}}});
+  const auto run = [&](const char* from, const char* to,
+                       minera::TimeFilterMode mode) {
+    minera::LogFilterOptions options;
+    options.time_from = from;
+    options.time_to = to;
+    options.time_mode = mode;
+    return case_ids(minera::filter_event_log(log, options));
+  };
+  using Ids = std::vector<std::string>;
+  constexpr auto contained = minera::TimeFilterMode::traces_contained;
+  constexpr auto intersecting = minera::TimeFilterMode::traces_intersecting;
+  assert(run("2024-01-01T09:30:00Z", "2024-01-01T10:30:00Z", contained).empty());
+  assert((run("2024-01-01T09:30:00Z", "2024-01-01T10:30:00Z", intersecting) ==
+          Ids{"back", "fwd", "mid"}));
+  assert(run("2024-01-01T09:30:00Z", "2024-01-01T09:45:00Z", contained).empty());
+  assert((run("2024-01-01T09:30:00Z", "2024-01-01T09:45:00Z", intersecting) ==
+          Ids{"back", "fwd", "mid"}));
+  assert((run("2024-01-01T08:00:00Z", "2024-01-01T10:30:00Z", contained) ==
+          Ids{"back", "fwd"}));
+  assert((run("2024-01-01T08:00:00Z", "2024-01-01T10:30:00Z", intersecting) ==
+          Ids{"back", "fwd", "mid"}));
+  assert(run("2024-01-01T10:30:00Z", "2024-01-01T12:00:00Z", contained).empty());
+  assert((run("2024-01-01T10:30:00Z", "2024-01-01T12:00:00Z", intersecting) ==
+          Ids{"mid"}));
 }
 
 void performance_clamps_backwards_steps_and_keeps_precision() {
@@ -3789,28 +3813,29 @@ void filter_matches_exact_admitted_variants() {
 void filter_cuts_prefixes_and_suffixes() {
   const auto log = log_from_variants({{"a", "b", "c", "d"}, {"a", "d"}});
 
-  // Prefix: the head up to and including the first anchor; a case without
-  // the anchor is dropped.
+  // Prefix: the head before the first anchor (strict leaves it out); a case
+  // without the anchor is dropped.
   minera::LogFilterOptions prefix;
   prefix.prefix_activity = "b";
   assert(prefix.any());
   const auto heads = minera::filter_event_log(log, prefix);
   assert(heads.trace_count() == 1);
   assert((activity_names(heads.traces.front()) ==
-          std::vector<std::string>{"a", "b"}));
+          std::vector<std::string>{"a"}));
 
-  // Suffix: the tail from the first anchor on.
+  // Suffix: the tail after the first anchor.
   minera::LogFilterOptions suffix;
   suffix.suffix_activity = "c";
   const auto tails = minera::filter_event_log(log, suffix);
   assert(tails.trace_count() == 1);
   assert((activity_names(tails.traces.front()) ==
-          std::vector<std::string>{"c", "d"}));
+          std::vector<std::string>{"d"}));
 
-  // Both: the prefix cut applies first, the suffix is sought inside it.
+  // Both: the prefix cut applies first, the suffix is sought inside it; a
+  // case cut to nothing is dropped.
   minera::LogFilterOptions both;
-  both.prefix_activity = "c";
-  both.suffix_activity = "b";
+  both.prefix_activity = "d";
+  both.suffix_activity = "a";
   const auto middles = minera::filter_event_log(log, both);
   assert(middles.trace_count() == 1);
   assert((activity_names(middles.traces.front()) ==
@@ -3915,10 +3940,12 @@ void filter_rework_keeps_cases_with_a_repeated_activity() {
 }
 
 void filter_between_extracts_subtraces() {
-  // One case passes a->b twice, so it yields two subcases; a case that never
-  // closes a segment yields none and vanishes.
+  // pm4py 2.7.22's DataFrame filter_between, captured from read_xes of the
+  // same cases: a case passing a->b twice yields <case>##@@0 and
+  // <case>##@@1; a case that never closes a segment yields none.
   const auto log = log_from_variants(
       {{"x", "a", "m", "b", "y", "a", "n", "b"}, {"x", "a", "m"}});
+  const auto& id = log.traces.front().case_id;
 
   minera::LogFilterOptions between;
   between.between_start = "a";
@@ -3930,20 +3957,36 @@ void filter_between_extracts_subtraces() {
           std::vector<std::string>{"a", "m", "b"}));
   assert((activity_names(cut.traces[1]) ==
           std::vector<std::string>{"a", "n", "b"}));
-  // Several segments from one case become distinct cases.
-  assert(cut.traces[0].case_id != cut.traces[1].case_id);
+  assert(cut.traces[0].case_id == id + "##@@0");
+  assert(cut.traces[1].case_id == id + "##@@1");
 
-  // A single segment keeps its original case id.
+  // A single segment is still labelled, counted from 0.
   const auto single = log_from_variants({{"x", "a", "m", "b", "y"}});
   const auto one = minera::filter_event_log(single, between);
   assert(one.trace_count() == 1);
-  assert(one.traces.front().case_id == single.traces.front().case_id);
+  assert(one.traces.front().case_id == single.traces.front().case_id + "##@@0");
   assert((activity_names(one.traces.front()) ==
           std::vector<std::string>{"a", "m", "b"}));
+
+  // Captured: a,b,a,c,b gives [a,b] and [a,c,b]; with a->b on a,x,a,y,a,b
+  // the second a does not reopen, so one segment spans the whole case.
+  const auto reopened = minera::filter_event_log(
+      log_from_variants({{"a", "b", "a", "c", "b"}}), between);
+  assert(reopened.trace_count() == 2);
+  assert((activity_names(reopened.traces[1]) ==
+          std::vector<std::string>{"a", "c", "b"}));
+  const auto spanning = minera::filter_event_log(
+      log_from_variants({{"a", "x", "a", "y", "a", "b"}}), between);
+  assert(spanning.trace_count() == 1);
+  assert((activity_names(spanning.traces[0]) ==
+          std::vector<std::string>{"a", "x", "a", "y", "a", "b"}));
 }
 
 void filter_between_handles_equal_endpoints_and_rejects_one_sided() {
-  // start == end: each segment runs from one occurrence to the next.
+  // start == end: the closing a also opens the next segment, and as a
+  // DataFrame row carries one label it belongs to that later segment only.
+  // Captured from the reference: a,x,a,y,a gives ##@@0 [a,x] and
+  // ##@@1 [a,y,a]; an adjacent a,a gives one segment [a,a].
   const auto log = log_from_variants({{"a", "x", "a", "y", "a"}});
   minera::LogFilterOptions between;
   between.between_start = "a";
@@ -3951,9 +3994,16 @@ void filter_between_handles_equal_endpoints_and_rejects_one_sided() {
   const auto cut = minera::filter_event_log(log, between);
   assert(cut.trace_count() == 2);
   assert((activity_names(cut.traces[0]) ==
-          std::vector<std::string>{"a", "x", "a"}));
+          std::vector<std::string>{"a", "x"}));
   assert((activity_names(cut.traces[1]) ==
           std::vector<std::string>{"a", "y", "a"}));
+  assert(cut.traces[0].case_id == log.traces.front().case_id + "##@@0");
+  assert(cut.traces[1].case_id == log.traces.front().case_id + "##@@1");
+  const auto adjacent =
+      minera::filter_event_log(log_from_variants({{"a", "a"}}), between);
+  assert(adjacent.trace_count() == 1);
+  assert((activity_names(adjacent.traces[0]) ==
+          std::vector<std::string>{"a", "a"}));
 
   assert(throws([&] {
     minera::LogFilterOptions one_sided;
@@ -4281,36 +4331,42 @@ void filter_absolute_attribute_occurrence_thresholds() {
 void filter_prefix_suffix_support_strictness_and_occurrence() {
   const auto log = log_from_variants({{"a", "b", "a", "c"}, {"x", "y"}});
 
+  // pm4py's filter_prefixes/filter_suffixes: strict leaves the anchor out,
+  // non-strict keeps it; a case cut to nothing has no DataFrame rows.
   minera::PrefixSuffixFilterOptions prefix;
   prefix.activity = "a";
   auto first_strict = minera::filter_prefix(log, prefix);
-  assert(first_strict.trace_count() == 1);
-  assert((activity_names(first_strict.traces.front()) ==
+  assert(first_strict.trace_count() == 0);
+  prefix.strict = false;
+  const auto first_non_strict = minera::filter_prefix(log, prefix);
+  assert(first_non_strict.trace_count() == 1);
+  assert((activity_names(first_non_strict.traces.front()) ==
           std::vector<std::string>{"a"}));
+  prefix.strict = true;
 
   prefix.occurrence = minera::FilterAnchorOccurrence::last;
   const auto last_strict = minera::filter_prefix(log, prefix);
   assert((activity_names(last_strict.traces.front()) ==
-          std::vector<std::string>{"a", "b", "a"}));
+          std::vector<std::string>{"a", "b"}));
 
   prefix.strict = false;
   const auto last_non_strict = minera::filter_prefix(log, prefix);
   assert((activity_names(last_non_strict.traces.front()) ==
-          std::vector<std::string>{"a", "b"}));
+          std::vector<std::string>{"a", "b", "a"}));
 
   minera::PrefixSuffixFilterOptions suffix;
   suffix.activity = "a";
   const auto suffix_first = minera::filter_suffix(log, suffix);
   assert((activity_names(suffix_first.traces.front()) ==
-          std::vector<std::string>{"a", "b", "a", "c"}));
+          std::vector<std::string>{"b", "a", "c"}));
   suffix.occurrence = minera::FilterAnchorOccurrence::last;
   const auto suffix_last = minera::filter_suffix(log, suffix);
   assert((activity_names(suffix_last.traces.front()) ==
-          std::vector<std::string>{"a", "c"}));
+          std::vector<std::string>{"c"}));
   suffix.strict = false;
   const auto suffix_last_non_strict = minera::filter_suffix(log, suffix);
   assert((activity_names(suffix_last_non_strict.traces.front()) ==
-          std::vector<std::string>{"c"}));
+          std::vector<std::string>{"a", "c"}));
 
   minera::LogFilterOptions integrated;
   integrated.prefix_activity = "a";
@@ -4321,7 +4377,7 @@ void filter_prefix_suffix_support_strictness_and_occurrence() {
   const auto combined = minera::filter_event_log(log, integrated);
   assert(combined.trace_count() == 1);
   assert((activity_names(combined.traces.front()) ==
-          std::vector<std::string>{"b"}));
+          std::vector<std::string>{"a"}));
 
   assert(throws([&] {
     minera::PrefixSuffixFilterOptions invalid;
@@ -4332,6 +4388,72 @@ void filter_prefix_suffix_support_strictness_and_occurrence() {
     invalid.prefix_strict = false;
     (void)minera::filter_event_log(log, invalid);
   }));
+}
+
+// The mining filters over an imported CSV/XES log follow pm4py's DataFrame
+// filters, which is what read_csv + format_dataframe and read_xes hand out.
+void filter_event_log_follows_dataframe_cells() {
+  // traces_intersecting: a case that only touches a bound from outside is not
+  // an intersection; covering the whole range (endpoints inclusive) is.
+  const auto timed = clock_log(
+      {{"ends_at_from", {{"a", "2023-11-15T00:00:00Z"}, {"b", "2023-11-15T05:00:00Z"}}},
+       {"starts_at_to", {{"a", "2023-11-15T10:00:00Z"}, {"b", "2023-11-15T12:00:00Z"}}},
+       {"exact", {{"a", "2023-11-15T05:00:00Z"}, {"b", "2023-11-15T10:00:00Z"}}},
+       {"inside", {{"a", "2023-11-15T06:00:00Z"}, {"b", "2023-11-15T07:00:00Z"}}},
+       {"covers", {{"a", "2023-11-15T01:00:00Z"}, {"b", "2023-11-15T11:00:00Z"}}},
+       {"single_at_from", {{"a", "2023-11-15T05:00:00Z"}}},
+       {"single_at_to", {{"a", "2023-11-15T10:00:00Z"}}}});
+  minera::LogFilterOptions window;
+  window.time_from = "2023-11-15T05:00:00Z";
+  window.time_to = "2023-11-15T10:00:00Z";
+  window.time_mode = minera::TimeFilterMode::traces_intersecting;
+  assert((case_ids(minera::filter_event_log(timed, window)) ==
+          std::vector<std::string>{"exact", "inside", "covers"}));
+  window.time_mode = minera::TimeFilterMode::traces_contained;
+  assert((case_ids(minera::filter_event_log(timed, window)) ==
+          std::vector<std::string>{"exact", "inside", "single_at_from", "single_at_to"}));
+
+  // Attribute keys name DataFrame columns: first-class fields are selectable,
+  // trace attributes answer to their `case:` column, and a float NaN cell is
+  // missing (it neither matches nor is removed).
+  std::istringstream xes(R"(<?xml version="1.0" encoding="utf-8" ?>
+<log xes.version="1849-2016" xmlns="http://www.xes-standard.org/">
+<trace><string key="concept:name" value="1"/><string key="grp" value="x"/>
+<event><string key="concept:name" value="A"/><float key="org:resource" value="nan"/><date key="time:timestamp" value="2023-01-01T00:00:00+00:00"/></event>
+<event><string key="concept:name" value="B"/><string key="org:resource" value="r1"/><date key="time:timestamp" value="2023-01-01T01:00:00+00:00"/></event>
+</trace>
+<trace><string key="concept:name" value="2"/><string key="grp" value="y"/>
+<event><string key="concept:name" value="A"/><string key="org:resource" value="r2"/><date key="time:timestamp" value="2023-01-02T00:00:00+00:00"/></event>
+</trace>
+</log>
+)");
+  const auto log = minera::import_xes_event_log(xes);
+  minera::LogFilterOptions by_resource;
+  by_resource.attribute_key = "org:resource";
+  by_resource.keep_attribute_values = {"r1"};
+  auto kept = minera::filter_event_log(log, by_resource);
+  assert(kept.trace_count() == 1 && (activity_names(kept.traces[0]) == std::vector<std::string>{"B"}));
+  by_resource.keep_attribute_values.clear();
+  by_resource.remove_attribute_values = {"nan"};
+  kept = minera::filter_event_log(log, by_resource);
+  assert(kept.event_count() == 3);
+  minera::LogFilterOptions by_activity;
+  by_activity.attribute_key = "concept:name";
+  by_activity.keep_attribute_values = {"A"};
+  by_activity.attribute_mode = minera::AttributeFilterMode::traces;
+  assert(minera::filter_event_log(log, by_activity).trace_count() == 2);
+  minera::LogFilterOptions resources;
+  resources.remove_resources = {"nan"};
+  assert(minera::filter_event_log(log, resources).event_count() == 3);
+  resources.remove_resources.clear();
+  resources.keep_resources = {"nan", "r2"};
+  assert((case_ids(minera::filter_event_log(log, resources)) == std::vector<std::string>{"2"}));
+  minera::LogFilterOptions by_case;
+  by_case.case_attribute_key = "case:grp";
+  by_case.keep_case_attribute_values = {"x"};
+  assert((case_ids(minera::filter_event_log(log, by_case)) == std::vector<std::string>{"1"}));
+  by_case.case_attribute_key = "grp";
+  assert((case_ids(minera::filter_event_log(log, by_case)) == std::vector<std::string>{"1"}));
 }
 
 void importer_rejects_malformed_rows() {
@@ -5210,8 +5332,9 @@ void json_export_carries_the_decisions_contract() {
 
 void csv_importer_maps_case_columns_to_case_attributes() {
   // A `case:`-prefixed column is a case attribute: stored once on the trace
-  // under the unprefixed key (first value wins, blanks skipped), and never
-  // doubled as an event attribute.
+  // under the unprefixed key, taken from the case's earliest row as the
+  // reference does (a blank cell there leaves it missing), and never doubled
+  // as an event attribute.
   const auto path = write_temp_log(
       "case_id,activity,timestamp,case:region,amount\n"
       "1,A,2026-01-01T00:00:00,,100\n"
@@ -5221,13 +5344,15 @@ void csv_importer_maps_case_columns_to_case_attributes() {
 
   const auto log = minera::import_csv_event_log(path);
   const auto& first = log.traces[0];
-  // The blank first cell is skipped; the first non-empty value sticks and the
-  // later conflicting one is ignored.
-  assert(first.attributes.size() == 1);
-  assert(first.attributes[0].key == "region");
-  assert(*first.attribute("region") == "north");
-  assert(first.attributes[0].kind == minera::AttributeKind::kString);
-  assert(*log.traces[1].attribute("region") == "east");
+  // The earliest row's cell is blank, so the case has no region; later
+  // values are not consulted.
+  assert(first.attributes.empty());
+  assert(first.attribute("region") == nullptr);
+  const auto& second = log.traces[1];
+  assert(second.attributes.size() == 1);
+  assert(second.attributes[0].key == "region");
+  assert(*second.attribute("region") == "east");
+  assert(second.attributes[0].kind == minera::AttributeKind::kString);
   // The column feeds the trace, not the events; other columns still do.
   assert(first.events[0].attribute("region") == nullptr);
   assert(first.events[0].attribute("case:region") == nullptr);
@@ -7451,9 +7576,117 @@ void csv_case_ids_follow_reference_dtype_inference_and_order() {
   }
 }
 
+// The activity column is typed like the case ids (format_dataframe converts
+// it with astype("string")); case attributes come from the case's first row
+// by timestamp and row; lines of only spaces/tabs are skipped; relation keys
+// joining a CSV log are typed the same way. Expected values were captured
+// from pandas 3.0.5 + pm4py 2.7.22.
+void csv_import_types_activities_case_attributes_and_relations_like_reference() {
+  const auto activities = [](const std::string& text) {
+    std::istringstream input(text);
+    std::vector<std::pair<std::string, std::string>> out;
+    for (const auto& trace : minera::import_csv_event_log(input).traces)
+      for (const auto& event : trace.events) out.emplace_back(trace.case_id, event.activity);
+    return out;
+  };
+  using Pairs = std::vector<std::pair<std::string, std::string>>;
+  // "010" and "10" are one int64 activity "10".
+  assert((activities("case_id,activity,timestamp\nA,010,2024-01-01 10:00\n"
+                     "A,20,2024-01-01 11:00\nB,10,2024-01-01 09:00\n") ==
+          Pairs{{"A", "10"}, {"A", "20"}, {"B", "10"}}));
+  // An NA activity makes the column float and drops its row.
+  assert((activities("case_id,activity,timestamp\nA,01,2024-01-01 10:00\n"
+                     "A,2,2024-01-01 11:00\nB,,2024-01-01 09:00\n") ==
+          Pairs{{"A", "1.0"}, {"A", "2.0"}}));
+  // An NA case row still takes part in the activity column's typing.
+  assert((activities("case_id,activity,timestamp\nA,1,2024-01-01 10:00\n"
+                     "A,,2024-01-01 11:00\nNA,2,2024-01-01 12:00\nB,NA,2024-01-01 09:00\n") ==
+          Pairs{{"A", "1.0"}}));
+  assert((activities("case_id,activity\nA,true\nA,FALSE\n") ==
+          Pairs{{"A", "True"}, {"A", "False"}}));
+  assert((activities("case_id,activity\nA,01\nA,2.50\nB,TRUE\n") ==
+          Pairs{{"A", "01"}, {"A", "2.50"}, {"B", "TRUE"}}));
+  // A column read without NA filtering keeps blank and NA spellings.
+  assert((activities("case_id,activity,timestamp\nA,18446744073709551615,2024-01-01 10:00\n"
+                     "A,,2024-01-01 11:00\nA,NA,2024-01-01 12:00\nB,5,2024-01-01 09:00\n") ==
+          Pairs{{"A", "18446744073709551615"}, {"A", ""}, {"A", "NA"}, {"B", "5"}}));
+  {
+    // The flat table carries the converted activity text.
+    std::istringstream input("case_id,activity\nA,010\nB,10\n");
+    const auto data = minera::import_csv_event_data(input);
+    assert(data.table.rows[0][1]->value == "10" && data.table.rows[1][1]->value == "10");
+    // Stream readers keep literal activities.
+    minera::CsvImportOptions options;
+    options.keep_na_first_class_values = true;
+    std::istringstream stream("case_id,activity\nA,010\nB,NA\n");
+    const auto log = minera::import_csv_event_log(stream, options);
+    assert(log.traces[0].events[0].activity == "010");
+    assert(log.traces[1].events[0].activity == "NA");
+  }
+  const auto case_attribute = [](const std::string& text, std::size_t trace)
+      -> std::optional<std::string> {
+    std::istringstream input(text);
+    const auto log = minera::import_csv_event_log(input);
+    const auto* value = log.traces.at(trace).attribute("x");
+    return value ? std::optional<std::string>(*value) : std::nullopt;
+  };
+  // The earliest row by timestamp supplies the case attribute ...
+  assert(case_attribute("case_id,activity,timestamp,case:x\n"
+                        "A,a,2024-01-01 10:00,first\nA,b,2024-01-01 09:00,second\n", 0) == "second");
+  // ... and a blank or NA cell there leaves it missing.
+  assert(!case_attribute("case_id,activity,timestamp,case:x\n"
+                         "A,a,2024-01-01 10:00,\nA,b,2024-01-01 11:00,second\n", 0));
+  assert(!case_attribute("case_id,activity,timestamp,case:x\n"
+                         "B,c,2024-01-01 09:00,NA\nB,d,2024-01-01 10:00,v\n", 0));
+  // Ties keep file order; rows without a timestamp count only when no row is timed.
+  assert(case_attribute("case_id,activity,timestamp,case:x\n"
+                        "A,a,2024-01-01 10:00,first\nA,b,2024-01-01 10:00,second\n", 0) == "first");
+  assert(!case_attribute("case_id,activity,timestamp,case:x\n"
+                         "A,a,,first\nA,b,2024-01-01 10:00,second\nA,c,2024-01-01 09:00,\n", 0));
+  assert(case_attribute("case_id,activity,case:x\nA,a,first\nA,b,second\n", 0) == "first");
+  {
+    // Lines of only spaces or tabs are blank, before the header too; a line
+    // holding the delimiter or other whitespace is a row.
+    assert((activities("\n  \ncase_id,activity\n1,a\n   \n\t\n 2 ,b\n \t \n") ==
+            Pairs{{"1", "a"}, {"2", "b"}}));
+    minera::CsvImportOptions tabs;
+    tabs.delimiter = '\t';
+    std::istringstream tabbed("case_id\tactivity\n1\ta\n  \n2\tb\n");
+    assert(minera::import_csv_event_log(tabbed, tabs).event_count() == 2);
+    std::istringstream row("case_id\tactivity\n1\ta\n\t\n2\tb\n");
+    bool rejected = false;
+    try {
+      (void)minera::import_csv_event_log(row, tabs);
+    } catch (const std::exception&) {
+      rejected = true;  // a row of empty cells (case and activity NA) ...
+    }
+    // ... is dropped like any row with a missing case id.
+    assert(!rejected);
+  }
+  {
+    // Relation keys joining CSV logs are typed like their case ids; an XES
+    // side keeps its literal keys.
+    std::vector<minera::CaseRelation> relations{{"007", "+9"}, {"8", "x"}};
+    minera::type_case_relations_like_csv_logs(relations, true, false);
+    assert(relations[0].left_case_id == "7" && relations[0].right_case_id == "+9");
+    assert(relations[1].left_case_id == "8");
+    // An NA cell makes the column float; the NA cell itself keeps its text.
+    std::vector<minera::CaseRelation> floats{{"1", "2"}, {"NA", "3"}};
+    minera::type_case_relations_like_csv_logs(floats, true, true);
+    assert(floats[0].left_case_id == "1.0" && floats[0].right_case_id == "2");
+    assert(floats[1].left_case_id == "NA");
+    std::istringstream table_input("case_id_LEFT,case_id_RIGHT,note\n007,09,01\n");
+    auto table = minera::parse_case_relations_table_csv(table_input);
+    minera::type_case_relation_column_like_csv_log(table, "case_id_LEFT");
+    assert(table.rows[0][0]->value == "7" && table.rows[0][1]->value == "09" &&
+           table.rows[0][2]->value == "01");
+  }
+}
+
 int main() {
   csv_import_matches_reference_dataframe_flow();
   csv_case_ids_follow_reference_dtype_inference_and_order();
+  csv_import_types_activities_case_attributes_and_relations_like_reference();
   exact_mean_matches_python_statistics_goldens();
   exact_stdev_matches_python_statistics_goldens();
   csv_case_aliases_are_opt_in_and_exact_columns_win();
@@ -7612,6 +7845,7 @@ int main() {
   filter_frequency_attribute_variants_support_top_and_relative_occurrence();
   filter_absolute_attribute_occurrence_thresholds();
   filter_prefix_suffix_support_strictness_and_occurrence();
+  filter_event_log_follows_dataframe_cells();
   csv_importer_captures_extra_columns_as_attributes();
   xes_importer_captures_generic_event_attributes();
   xes_export_round_trips_generic_attributes();

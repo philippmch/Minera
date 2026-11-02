@@ -45,6 +45,19 @@ struct CaseRelationsOptions {
 // malformed or short rows are rejected so the returned table is rectangular.
 [[nodiscard]] EventTable parse_case_relations_table_csv(std::istream& input);
 
+// A relation file is read like the reference reads a relations frame
+// (read_csv types each column), and its keys are compared with a
+// batch-imported CSV log's case ids, which format_dataframe has converted to
+// strings. These rewrite the relation key column(s) joining a CSV log to that
+// typed text (reference_csv_column_text), so "007" or "+7" in a relation file
+// still meets the CSV case "7" and a column with an NA cell reads as floats.
+// A cell the typing marks missing keeps its text; other columns stay text.
+// An XES side keeps its literal keys.
+void type_case_relation_column_like_csv_log(EventTable& relations,
+                                            const std::string& column);
+void type_case_relations_like_csv_logs(std::vector<CaseRelation>& relations,
+                                       bool left_is_csv, bool right_is_csv);
+
 [[nodiscard]] EventLog merge_case_relations(
     const EventLog& base, const EventLog& incoming,
     const std::vector<CaseRelation>& relations,

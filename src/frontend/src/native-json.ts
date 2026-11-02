@@ -2,9 +2,20 @@
 // their original holders so inspection and CSV do not round native uint64 values.
 const literals=new WeakMap<object,Map<string,string>>();
 export function parseNativeJson(raw:string):unknown {
-  const value:unknown=JSON.parse(raw);const end=raw.trimEnd().length;const lexer=/\s*("(?:[^"\\]|\\.)*"|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null|[{}\[\],:])/y;
-  const next=()=>{const match=lexer.exec(raw);if(!match)throw new Error("Invalid native JSON token.");return match[1];};let token=next();
-  const advance=()=>{if(lexer.lastIndex<end)token=next();else token="";};
+  const value:unknown=JSON.parse(raw);const end=raw.trimEnd().length;
+  // A linear scanner: JSON.parse above already validated the text, so tokens only
+  // need to be delimited. Regular expressions over string tokens backtrack per
+  // character and overflow the engine's stack on multi-megabyte strings.
+  const number=/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;let position=0;
+  const next=():string=>{
+    while(position<end){const c=raw.charCodeAt(position);if(c===32||c===9||c===10||c===13)++position;else break;}
+    const start=position,c=raw[position];
+    if(c==='"'){let i=position+1;for(;;){const quote=raw.indexOf('"',i);if(quote<0)throw new Error("Invalid native JSON token.");let slashes=0;for(let j=quote-1;j>start&&raw.charCodeAt(j)===92;--j)++slashes;i=quote+1;if(slashes%2===0)break;}position=i;return raw.slice(start,position);}
+    if(c==="{"||c==="}"||c==="["||c==="]"||c===","||c===":"){++position;return c;}
+    for(const word of ["true","false","null"])if(raw.startsWith(word,position)){position+=word.length;return word;}
+    number.lastIndex=position;const match=number.exec(raw);if(!match)throw new Error("Invalid native JSON token.");position=number.lastIndex;return match[0];
+  };let token=next();
+  const advance=()=>{if(position<end)token=next();else token="";};
   const walk=(current:unknown,parent?:object,key?:string):void=>{
     const start=token;
     if(start==="{"){advance();while(token!=="}"){const name=JSON.parse(token) as string;advance();advance();const holder=current&&typeof current==="object"&&!Array.isArray(current)?current as Record<string,unknown>:undefined;walk(holder?.[name],holder,name);if(token!==",")break;advance();}advance();}

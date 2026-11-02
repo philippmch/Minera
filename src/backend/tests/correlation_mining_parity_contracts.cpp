@@ -448,7 +448,7 @@ void filtered_csv_projection_preserves_rows_and_segment_case_ids() {
   const auto activity_index = table.column_index("activity");
   const auto group_index = table.column_index("group");
   const std::vector<std::string> expected_cases{
-      "one::1", "one::1", "one::2", "one::2"};
+      "one::0", "one::0", "one::1", "one::1"};
   const std::vector<std::string> expected_activities{"A", "B", "A", "B"};
   for (std::size_t row = 0; row < table.rows.size(); ++row) {
     assert(table.rows[row][case_index]);
