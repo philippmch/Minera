@@ -2674,6 +2674,22 @@ EmdResult evaluate_emd(const StochasticLanguage& left_input,
     return encoded_normalized_levenshtein(left_encoded[i], right_encoded[j]);
   };
 
+  // The reference PYEMD cost divides the Levenshtein distance by the longer
+  // trace length, so an empty trace in either language (both histograms share
+  // the union of trace keys) makes it raise ZeroDivisionError.
+  const bool default_distance = !options.encoded_distance &&
+                                !options.string_distance &&
+                                !options.utf8_string_distance &&
+                                !options.distance;
+  if (options.variant == EmdVariant::PYEMD && default_distance &&
+      std::any_of(left_encoded.begin(), left_encoded.end(),
+                  [](const std::u32string& trace) { return trace.empty(); })) {
+    out.computed = false;
+    out.error =
+        "normalized Levenshtein distance is undefined for two empty traces";
+    return out;
+  }
+
   const std::size_t left_size = left_keys.size();
   const std::size_t right_size = right_keys.size();
   std::vector<std::vector<double>> costs(

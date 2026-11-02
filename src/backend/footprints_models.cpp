@@ -33,6 +33,7 @@ footprints_detail::DiscoveryParameters discovery_parameters(
   parameters.index_key = options.index_attribute;
   parameters.sort_required = options.sort_required;
   parameters.initial_marking = options.initial_marking;
+  parameters.transition_names = options.transition_names;
   return parameters;
 }
 

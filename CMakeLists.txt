@@ -2178,6 +2178,16 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_evaluation_tests PRIVATE cxx_std_20)
   target_compile_options(minera_evaluation_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_evaluation_tests COMMAND minera_evaluation_tests)
+  add_executable(minera_evaluation_quality_regression_tests
+    src/backend/tests/test_evaluation_quality_regressions.cpp
+  )
+  target_link_libraries(minera_evaluation_quality_regression_tests PRIVATE minera::core)
+  target_compile_features(minera_evaluation_quality_regression_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_evaluation_quality_regression_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_evaluation_quality_regression_tests
+           COMMAND minera_evaluation_quality_regression_tests
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/quality_reference"
+                   $<TARGET_FILE:minera_export>)
 
   add_executable(minera_evaluation_parity_contracts_tests
     src/backend/tests/test_evaluation_parity_contracts.cpp

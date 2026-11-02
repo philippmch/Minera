@@ -6,6 +6,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -627,18 +628,50 @@ Footprint PetriReachabilityFootprintsDiscovery::apply(
     return *activity < net.activities().size() ? net.activities()[*activity]
                                                : std::to_string(*activity);
   };
-  auto eventually_enabled = [&net, &graph](std::size_t start) {
+  // The reference scans eventually enabled transitions with a worklist in
+  // transition-name order: every silent firing appends the transitions
+  // enabled afterwards and moves each of them to that newest marking, and a
+  // transition is handled once per marking. A silent transition used on one
+  // branch can therefore be unavailable on another.
+  std::vector<std::size_t> order(net.transitions().size());
+  std::iota(order.begin(), order.end(), std::size_t{0});
+  if (parameters.transition_names.size() == order.size())
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+      return parameters.transition_names[a] < parameters.transition_names[b];
+    });
+  std::vector<std::size_t> rank(order.size());
+  for (std::size_t i = 0; i < order.size(); ++i) rank[order[i]] = i;
+  std::vector<std::vector<ReachEdge>> sorted_edges(state_count);
+  for (std::size_t state = 0; state < state_count; ++state) {
+    sorted_edges[state] = graph.states[state].edges;
+    std::stable_sort(sorted_edges[state].begin(), sorted_edges[state].end(),
+                     [&](const ReachEdge& a, const ReachEdge& b) {
+                       return rank[a.transition] < rank[b.transition];
+                     });
+  }
+  auto eventually_enabled = [&](std::size_t start) {
     std::set<std::size_t> visible;
-    std::set<std::size_t> seen{start};
-    std::deque<std::size_t> todo{start};
-    while (!todo.empty()) {
-      const auto state = todo.front();
-      todo.pop_front();
-      for (const auto& edge : graph.states[state].edges) {
-        if (net.transitions()[edge.transition].activity)
-          visible.insert(edge.transition);
-        else if (seen.insert(edge.target).second)
-          todo.push_back(edge.target);
+    std::vector<std::size_t> work;
+    std::vector<std::size_t> at(net.transitions().size(), 0);
+    for (const auto& edge : sorted_edges[start]) {
+      work.push_back(edge.transition);
+      at[edge.transition] = start;
+    }
+    std::set<std::pair<std::size_t, std::size_t>> handled;
+    for (std::size_t k = 0; k < work.size(); ++k) {
+      const auto transition = work[k];
+      const auto state = at[transition];
+      if (!handled.emplace(transition, state).second) continue;
+      if (net.transitions()[transition].activity) {
+        visible.insert(transition);
+        continue;
+      }
+      std::size_t target = state;
+      for (const auto& edge : graph.states[state].edges)
+        if (edge.transition == transition) { target = edge.target; break; }
+      for (const auto& edge : sorted_edges[target]) {
+        work.push_back(edge.transition);
+        at[edge.transition] = target;
       }
     }
     return visible;
@@ -655,6 +688,7 @@ Footprint PetriReachabilityFootprintsDiscovery::apply(
 
   std::set<std::pair<std::size_t, std::size_t>> output_pairs;
   std::set<std::pair<std::size_t, std::size_t>> predecessor_pairs;
+  std::set<std::pair<std::size_t, std::size_t>> sequence_pairs;
   for (std::size_t state = 0; state < state_count; ++state) {
     std::set<std::size_t> outputs;
     for (const auto& edge : graph.states[state].edges) {
@@ -670,17 +704,32 @@ Footprint PetriReachabilityFootprintsDiscovery::apply(
     const auto eventually = eventually_enabled(state);
     for (const auto predecessor : incoming[state]) {
       for (const auto successor : eventually)
-        result.sequence.insert({label(predecessor), label(successor)});
+        sequence_pairs.insert({predecessor, successor});
       for (const auto successor : outputs)
         predecessor_pairs.insert({predecessor, successor});
     }
   }
+  std::set<std::pair<std::size_t, std::size_t>> parallel_pairs;
   for (const auto& pair : predecessor_pairs) {
     if (predecessor_pairs.count({pair.second, pair.first}) &&
         output_pairs.count(pair))
-      result.parallel.insert({label(pair.first), label(pair.second)});
+      parallel_pairs.insert(pair);
   }
-  for (const auto& pair : result.parallel) result.sequence.erase(pair);
+  // Like the reference, parallel transition pairs leave the sequence before
+  // both relations are relabelled.
+  for (const auto& pair : sequence_pairs)
+    if (!parallel_pairs.count(pair))
+      result.sequence.insert({label(pair.first), label(pair.second)});
+  for (const auto& pair : parallel_pairs)
+    result.parallel.insert({label(pair.first), label(pair.second)});
+  // A label pair in sequence both ways (including a self pair) is parallel.
+  std::vector<FootprintPair> symmetric;
+  for (const auto& pair : result.sequence)
+    if (result.sequence.count({pair.second, pair.first})) symmetric.push_back(pair);
+  for (const auto& pair : symmetric) {
+    result.parallel.insert(pair);
+    result.sequence.erase(pair);
+  }
   return result;
 }
 

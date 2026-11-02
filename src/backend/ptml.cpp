@@ -1,4 +1,7 @@
 #include "minera/ptml.hpp"
+#include "minera/token_integer.hpp"
+#include <algorithm>
+#include <string_view>
 
 #include <fstream>
 #include <iterator>
@@ -10,6 +13,11 @@
 #include <vector>
 
 #include "xml_pull_parser.hpp"
+
+namespace minera::inductive_detail {
+// RFC 1321 MD5 digest integer of a label (defined with the inductive miner).
+TokenInteger activity_order_key(std::string_view label);
+}  // namespace minera::inductive_detail
 
 namespace minera {
 namespace {
@@ -174,6 +182,15 @@ class PtmlBuilder {
 
   ProcessTree tree(const std::string& root_id) {
     auto root = build(root_id);
+    // The reference importer finishes with tree_sort: parallel and choice
+    // children are stably ordered by the sum of their leaves' label MD5
+    // digest integers (silent leaves contribute zero). Other operators keep
+    // their document order.
+    std::vector<TokenInteger> keys;
+    keys.reserve(activities_.size());
+    for (const auto& label : activities_)
+      keys.push_back(inductive_detail::activity_order_key(label));
+    sort_children(root, keys);
     return ProcessTree(std::move(activities_), std::move(root));
   }
 
@@ -236,6 +253,32 @@ class PtmlBuilder {
     }
     visiting_.erase(id);
     return node;
+  }
+
+  static TokenInteger sort_children(ProcessTreeNode& node,
+                                    const std::vector<TokenInteger>& keys) {
+    if (node.op == ProcessTreeOperator::kActivity) return keys.at(node.activity);
+    TokenInteger sum;
+    std::vector<std::pair<TokenInteger, std::size_t>> child_keys;
+    child_keys.reserve(node.children.size());
+    for (std::size_t index = 0; index < node.children.size(); ++index) {
+      auto key = sort_children(node.children[index], keys);
+      sum += key;
+      child_keys.emplace_back(std::move(key), index);
+    }
+    if (node.op == ProcessTreeOperator::kParallel ||
+        node.op == ProcessTreeOperator::kExclusive) {
+      std::stable_sort(child_keys.begin(), child_keys.end(),
+                       [](const auto& left, const auto& right) {
+                         return left.first < right.first;
+                       });
+      std::vector<ProcessTreeNode> sorted;
+      sorted.reserve(node.children.size());
+      for (const auto& entry : child_keys)
+        sorted.push_back(std::move(node.children[entry.second]));
+      node.children = std::move(sorted);
+    }
+    return sum;
   }
 
   std::size_t activity_id(const std::string& label) {

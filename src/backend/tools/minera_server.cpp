@@ -7808,8 +7808,10 @@ void handle_evaluate(const httplib::Request& request,
             minera::PrecisionVariant::ETCONFORMANCE_TOKEN)
           cached_imported_markings(request, *session, miner, params.precision_options,
                                    "evaluation_initial_marking", "evaluation_final_marking");
-        result.precision = evaluation_document && params.precision_variant ==
-            minera::PrecisionVariant::ETCONFORMANCE_TOKEN
+        // Every variant takes the document entry point: alignment-based
+        // precision needs its PNML transition IDs for the reference's
+        // name-ordered eventually-enabled scan.
+        result.precision = evaluation_document
             ? minera::evaluate_precision(
                   input, *evaluation_document, params.precision_variant,
                   params.precision_options)
@@ -8029,8 +8031,9 @@ void handle_evaluate_emd(const httplib::Request& request,
             ? minera::import_xes_event_log(input)
             : minera::import_csv_event_log(input);
     const auto result = minera::evaluate_emd(
-        minera::derive_stochastic_language(require_prepared_log(*session)),
-        minera::derive_stochastic_language(reference), options);
+        // The reference compares trace-variant probabilities (get_language).
+        minera::derive_stochastic_language(require_prepared_log(*session), true),
+        minera::derive_stochastic_language(reference, true), options);
     response.set_content(minera::emd_json(result), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

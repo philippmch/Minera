@@ -7272,8 +7272,9 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
           ? minera::import_xes_event_log(emd_reference)
           : minera::import_csv_event_log(emd_reference, options);
       emd_result = minera::evaluate_emd(
-          minera::derive_stochastic_language(log),
-          minera::derive_stochastic_language(reference), emd_options);
+          // The reference compares trace-variant probabilities (get_language).
+          minera::derive_stochastic_language(log, true),
+          minera::derive_stochastic_language(reference, true), emd_options);
     }
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
     if (!dfg_statistical_variants.empty() || !dfg_causal_variants.empty()) {
@@ -7830,8 +7831,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
             if (evaluation_document && model_evaluation.precision_variant !=
                 minera::PrecisionVariant::ETCONFORMANCE_TOKEN)
               apply_imported_markings(model_evaluation.precision_options);
-            result.precision = evaluation_document && model_evaluation.precision_variant ==
-                minera::PrecisionVariant::ETCONFORMANCE_TOKEN
+            // Every variant takes the document entry point: alignment-based
+            // precision needs its PNML transition IDs for the reference's
+            // name-ordered eventually-enabled scan.
+            result.precision = evaluation_document
                 ? minera::evaluate_precision(
                       evaluation_log, *evaluation_document, model_evaluation.precision_variant,
                       model_evaluation.precision_options)

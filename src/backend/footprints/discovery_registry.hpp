@@ -27,6 +27,8 @@ struct DiscoveryParameters {
   // An omitted marking means one token at the net source.  When supplied, its
   // length must equal the number of places in the net.
   std::optional<std::vector<std::uint64_t>> initial_marking;
+  // Petri reachability: names in index order for the eventually-enabled scan.
+  std::vector<std::string> transition_names;
 };
 
 class DfgFootprintsDiscovery {

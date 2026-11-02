@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
+	<trace>
+		<string key="concept:name" value="c0" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:01:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:02:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="a" />
+			<date key="time:timestamp" value="2020-01-01T00:03:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c1" />
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:04:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:05:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c2" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:06:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:07:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c3" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:08:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:09:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c4" />
+		<event>
+			<string key="concept:name" value="zz_unknown" />
+			<date key="time:timestamp" value="2020-01-01T00:10:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:11:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:12:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c5" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:13:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:14:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="a" />
+			<date key="time:timestamp" value="2020-01-01T00:15:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c6" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:16:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:17:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:18:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="a" />
+			<date key="time:timestamp" value="2020-01-01T00:19:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c7" />
+		<event>
+			<string key="concept:name" value="zz_unknown" />
+			<date key="time:timestamp" value="2020-01-01T00:20:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:21:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:22:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c8" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:23:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="a" />
+			<date key="time:timestamp" value="2020-01-01T00:24:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:25:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c9" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:26:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:27:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="a" />
+			<date key="time:timestamp" value="2020-01-01T00:28:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c10" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:29:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:30:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c11" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:31:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="a" />
+			<date key="time:timestamp" value="2020-01-01T00:32:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c12" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:33:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="zz_unknown" />
+			<date key="time:timestamp" value="2020-01-01T00:34:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:35:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="a" />
+			<date key="time:timestamp" value="2020-01-01T00:36:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c13" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:37:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:38:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c14" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:39:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="d" />
+			<date key="time:timestamp" value="2020-01-01T00:40:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:41:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c15" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:42:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:43:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c16" />
+		<event>
+			<string key="concept:name" value="b" />
+			<date key="time:timestamp" value="2020-01-01T00:44:00" />
+		</event>
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:45:00" />
+		</event>
+	</trace>
+	<trace>
+		<string key="concept:name" value="c17" />
+		<event>
+			<string key="concept:name" value="c" />
+			<date key="time:timestamp" value="2020-01-01T00:46:00" />
+		</event>
+	</trace>
+</log>

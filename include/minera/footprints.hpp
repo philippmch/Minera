@@ -66,6 +66,10 @@ struct FootprintsDiscoveryOptions {
   // When engaged, this must contain one token count for every Petri place.
   // An omitted marking uses the workflow source place's initial token.
   std::optional<std::vector<std::uint64_t>> initial_marking;
+  // Petri reachability discovery: transition names (PNML IDs) in native
+  // index order. The reference scans eventually enabled transitions in name
+  // order; an empty or mismatched list uses index order.
+  std::vector<std::string> transition_names;
 };
 
 Footprint discover_footprints(const EventLog& log);
