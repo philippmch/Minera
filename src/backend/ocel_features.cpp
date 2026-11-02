@@ -375,6 +375,10 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
                        const std::vector<std::vector<std::size_t>>& object_events,
                        const std::vector<std::optional<double>>& times,
                        const std::vector<std::string>& object_types_by_index) {
+  // Compatibility style emits exactly the reference event columns, so the
+  // native-only E2E and attribute-count columns are left out there.
+  const bool compatibility_names =
+      options.feature_name_style == OcelFeatureNameStyle::kCompatibility;
   if (options.include_activity_features) {
     for (const auto& activity : activities) {
       std::vector<double> values(log.events.size(), 0.0);
@@ -424,7 +428,7 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
         builder.add("@@event_num_rel_objs_type_" + type, std::move(values));
       }
     }
-    if (options.include_relation_features) {
+    if (options.include_relation_features && !compatibility_names) {
       std::map<std::string, std::size_t> event_index;
       for (std::size_t row = 0; row < log.events.size(); ++row)
         event_index.emplace(log.events[row].id, row);
@@ -446,8 +450,6 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
       options.include_endpoint_features);
   const bool include_event_end_ot = options.include_event_end_ot_features.value_or(
       options.include_endpoint_features);
-  const bool compatibility_names =
-      options.feature_name_style == OcelFeatureNameStyle::kCompatibility;
   if ((include_event_start_ot || include_event_end_ot) && compatibility_names) {
     // Reference event_start_ot/event_end_ot quirk: the endpoint event id of
     // every object is iterated as a string, so the per-type set holds the
@@ -508,7 +510,7 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
       }
     }
   }
-  if (options.include_attribute_counts) {
+  if (options.include_attribute_counts && !compatibility_names) {
     std::vector<double> counts(log.events.size(), 0.0);
     for (std::size_t row = 0; row < log.events.size(); ++row)
       counts[row] = static_cast<double>(log.events[row].attributes.size());
@@ -648,7 +650,11 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
                         const std::vector<std::vector<std::size_t>>& event_objects,
                         const std::vector<std::optional<double>>& times,
                         const std::vector<Lifecycle>& lifecycles) {
-  if (options.include_activity_features) {
+  // Compatibility style emits exactly the reference object columns: the
+  // native-only type indicators and attribute count are left out there.
+  const bool compatibility_names =
+      options.feature_name_style == OcelFeatureNameStyle::kCompatibility;
+  if (options.include_activity_features && !compatibility_names) {
     for (const auto& type : object_types) {
       std::vector<double> values(log.objects.size(), 0.0);
       for (std::size_t row = 0; row < log.objects.size(); ++row)
@@ -656,7 +662,7 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       builder.add("@@object_type_" + type, std::move(values));
     }
   }
-  if (options.include_attribute_counts) {
+  if (options.include_attribute_counts && !compatibility_names) {
     std::vector<double> values(log.objects.size(), 0.0);
     for (std::size_t row = 0; row < log.objects.size(); ++row)
       values[row] = static_cast<double>(log.objects[row].attributes.size());

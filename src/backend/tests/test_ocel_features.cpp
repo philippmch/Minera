@@ -144,6 +144,16 @@ void compatibility_event_quirks_contract() {
   assert((column(1, "@@event_start_item") == std::vector<double>{0, 0, 1}));
   assert((column(1, "@@event_start_order") == std::vector<double>{0, 0, 1}));
   assert((column(0, "@@ev_new_interactions") == std::vector<double>{1, 1, 3}));
+  // Exactly the reference column list (no native-only E2E or attribute-count
+  // columns in compatibility style).
+  assert((table.feature_names == std::vector<std::string>{
+      "@@event_act_A", "@@event_act_B", "@@event_timestamp",
+      "@@event_timestamp_dayofweek", "@@event_timestamp_hour",
+      "@@event_timestamp_month", "@@event_timestamp_day",
+      "@@event_num_rel_objs", "@@event_num_rel_objs_type_order",
+      "@@event_num_rel_objs_type_item", "@@event_start_item",
+      "@@event_start_order", "@@event_start_item", "@@event_start_order",
+      "@@ev_new_interactions"}));
   // The positional JSON envelope keeps the repeated reference names.
   const auto json = minera::serialize_ocel_features_json(table);
   const auto first_start = json.find("\"@@event_start_item\"");
@@ -164,6 +174,25 @@ void compatibility_event_quirks_contract() {
   assert((native_column("@@event_start_order") == std::vector<double>{1, 1, 0}));
   assert((native_column("@@event_end_item") == std::vector<double>{0, 0, 1}));
   assert((native_column("@@event_new_interactions") == std::vector<double>{1, 1, 1}));
+  (void)native_column("@@event_num_attributes");
+  (void)native_column("@@event_num_e2e_out");
+
+  // Object rows: the type indicators and attribute count are native-only.
+  const auto has = [](const minera::OcelFeatureTable& table, const std::string& prefix) {
+    return std::any_of(table.feature_names.begin(), table.feature_names.end(),
+                       [&](const auto& name) { return name.rfind(prefix, 0) == 0; });
+  };
+  options.feature_name_style = minera::OcelFeatureNameStyle::kCompatibility;
+  const auto compatibility_objects = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kObjects, options);
+  assert(!has(compatibility_objects, "@@object_type_") &&
+         !has(compatibility_objects, "@@object_num_attributes"));
+  assert(has(compatibility_objects, "@@object_lifecycle_length"));
+  options.feature_name_style = minera::OcelFeatureNameStyle::kNative;
+  const auto native_objects = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kObjects, options);
+  assert(has(native_objects, "@@object_type_") &&
+         has(native_objects, "@@object_num_attributes"));
 }
 
 int main() {
