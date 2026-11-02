@@ -106,7 +106,68 @@ minera::Ocel non_monotonic_lifecycle_sample() {
 
 }  // namespace
 
+// Captured from pm4py 2.7.22 algo.transformation.ocel.features.events: the
+// compatibility style reproduces event_start_ot/event_end_ot (endpoint ids
+// iterated as characters; both blocks named @@event_start_<type>, sorted
+// types) and new_interactions (seen set never updated). Native style keeps
+// the corrected values.
+void compatibility_event_quirks_contract() {
+  minera::Ocel log;
+  log.objects = {{"o1", "order", {}}, {"o2", "order", {}}, {"i1", "item", {}}};
+  log.events = {{"12", "A", "2024-01-01T00:00:00Z", {}},
+                {"1", "B", "2024-01-01T01:00:00Z", {}},
+                {"2", "A", "2024-01-01T02:00:00Z", {}}};
+  log.relations = {{"12", "o1", ""}, {"12", "i1", ""},
+                   {"1", "o1", ""}, {"1", "o2", ""},
+                   {"2", "o2", ""}, {"2", "i1", ""}, {"2", "o1", ""}};
+  minera::OcelFeatureOptions options;
+  options.feature_name_style = minera::OcelFeatureNameStyle::kCompatibility;
+  const auto table = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kEvents, options);
+  const auto column = [&](std::size_t occurrence, const std::string& name) {
+    std::size_t seen = 0;
+    for (std::size_t index = 0; index < table.feature_names.size(); ++index) {
+      if (table.feature_names[index] != name || seen++ != occurrence) continue;
+      std::vector<double> values;
+      for (const auto& row : table.values) values.push_back(row[index]);
+      return values;
+    }
+    assert(false && "missing feature column");
+    return std::vector<double>{};
+  };
+  const auto first = std::find(table.feature_names.begin(), table.feature_names.end(),
+                               "@@event_start_item");
+  assert(first != table.feature_names.end() && *(first + 1) == "@@event_start_order" &&
+         *(first + 2) == "@@event_start_item" && *(first + 3) == "@@event_start_order");
+  assert((column(0, "@@event_start_item") == std::vector<double>{0, 1, 1}));
+  assert((column(0, "@@event_start_order") == std::vector<double>{0, 1, 1}));
+  assert((column(1, "@@event_start_item") == std::vector<double>{0, 0, 1}));
+  assert((column(1, "@@event_start_order") == std::vector<double>{0, 0, 1}));
+  assert((column(0, "@@ev_new_interactions") == std::vector<double>{1, 1, 3}));
+  // The positional JSON envelope keeps the repeated reference names.
+  const auto json = minera::serialize_ocel_features_json(table);
+  const auto first_start = json.find("\"@@event_start_item\"");
+  assert(first_start != std::string::npos &&
+         json.find("\"@@event_start_item\"", first_start + 1) != std::string::npos);
+
+  options.feature_name_style = minera::OcelFeatureNameStyle::kNative;
+  const auto native = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kEvents, options);
+  const auto native_column = [&](const std::string& name) {
+    const auto found = std::find(native.feature_names.begin(), native.feature_names.end(), name);
+    assert(found != native.feature_names.end());
+    std::vector<double> values;
+    for (const auto& row : native.values)
+      values.push_back(row[static_cast<std::size_t>(found - native.feature_names.begin())]);
+    return values;
+  };
+  assert((native_column("@@event_start_order") == std::vector<double>{1, 1, 0}));
+  assert((native_column("@@event_end_item") == std::vector<double>{0, 0, 1}));
+  assert((native_column("@@event_new_interactions") == std::vector<double>{1, 1, 1}));
+}
+
 int main() {
+  compatibility_event_quirks_contract();
   const auto log = sample();
   minera::OcelFeatureOptions options;
   options.numeric_event_attributes = {"amount"};
@@ -194,6 +255,9 @@ int main() {
   assert(rejects_table(malformed_table));
   malformed_table = events;
   malformed_table.feature_names[1] = malformed_table.feature_names[0];
+  // Repeated names are positional (reference compatibility); empty ones fail.
+  assert(!rejects_table(malformed_table));
+  malformed_table.feature_names[1].clear();
   assert(rejects_table(malformed_table));
   malformed_table = events;
   malformed_table.values[0][0] = std::numeric_limits<double>::infinity();

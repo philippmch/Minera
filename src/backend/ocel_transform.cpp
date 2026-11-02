@@ -259,11 +259,14 @@ std::vector<std::pair<std::string, ObjectIds>> ancestors_descendants(
     if (left_it == starts.end() || right_it == starts.end()) continue;
     const auto& a = left_it->second;
     const auto& b = right_it->second;
+    // The reference compares first timestamps only. Equal timestamps are a
+    // tie (even across different events or relation rows) and are oriented
+    // below: lexically smaller -> larger when the smaller endpoint has the
+    // selected type, otherwise larger -> smaller when that one has it.
     auto before = [&](const StartOrder& first, const StartOrder& second) {
-      if (first.known && second.known && first.timestamp != second.timestamp)
-        return first.timestamp < second.timestamp;
+      if (first.known && second.known) return first.timestamp < second.timestamp;
       if (first.known != second.known) return first.known;
-      return first.event_index < second.event_index;
+      return false;
     };
     if (before(a, b)) {
       directed[left].insert(right);
@@ -472,15 +475,6 @@ std::set<ObjectPair> enrichment_inheritance_graph(
   return asymmetric;
 }
 
-void append_enrichment_edge(Ocel& log, std::set<std::tuple<std::string,
-                                                           std::string,
-                                                           std::string>>& seen,
-                            const std::string& source, const std::string& target,
-                            const std::string& qualifier) {
-  if (source == target || !seen.emplace(source, target, qualifier).second) return;
-  log.o2o.push_back({source, target, qualifier});
-}
-
 void apply_lifecycle_qualifiers(Ocel& log, const EnrichmentIndex& index) {
   std::map<std::pair<std::size_t, std::string>, std::string> qualifiers;
   for (const auto& [object, events] : index.events_by_object) {
@@ -516,40 +510,66 @@ const char* enrichment_graph_name(OcelEnrichmentGraph graph) {
 
 }  // namespace
 
+namespace {
+// Reference OCEL 2.0 computation (ocel20_computation.apply): interaction is
+// emitted in both orientations, descendants/cobirth/codeath once in graph
+// orientation, and the inheritance label carries the descendants edges (a
+// reference quirk). Computed triples are deduplicated among themselves only
+// and appended after the untouched original O2O rows.
+template <typename Includes>
+void append_reference_o2o(Ocel& result, const EnrichmentIndex& index,
+                          const Includes& includes,
+                          bool require_event_relations) {
+  std::set<std::tuple<std::string, std::string, std::string>> computed;
+  const auto add = [&](const std::set<ObjectPair>& edges,
+                       OcelEnrichmentGraph graph, bool symmetric = false) {
+    for (const auto& [source, target] : edges) {
+      if (source == target) continue;
+      computed.emplace(source, target, enrichment_graph_name(graph));
+      if (symmetric)
+        computed.emplace(target, source, enrichment_graph_name(graph));
+    }
+  };
+  // Fixed dispatch order also preserves the captured first missing-event
+  // diagnostic when several selected graph computations would fail.
+  if (includes(OcelEnrichmentGraph::kInteraction))
+    add(enrichment_interaction_graph(index), OcelEnrichmentGraph::kInteraction,
+        true);
+  if (includes(OcelEnrichmentGraph::kDescendants))
+    add(enrichment_descendants_graph(index, require_event_relations),
+        OcelEnrichmentGraph::kDescendants);
+  // The captured OCEL20 composite labels descendants as inheritance.
+  // This is specific to the composite; the direct inheritance API retains
+  // its independent lifetime relation and reverse-order error contract.
+  if (includes(OcelEnrichmentGraph::kInheritance))
+    add(enrichment_descendants_graph(index, require_event_relations),
+        OcelEnrichmentGraph::kInheritance);
+  if (includes(OcelEnrichmentGraph::kCobirth))
+    add(enrichment_cobirth_graph(index, require_event_relations),
+        OcelEnrichmentGraph::kCobirth);
+  if (includes(OcelEnrichmentGraph::kCodeath))
+    add(enrichment_codeath_graph(index, require_event_relations),
+        OcelEnrichmentGraph::kCodeath);
+  for (const auto& [source, target, qualifier] : computed)
+    result.o2o.push_back({source, target, qualifier});
+}
+}  // namespace
+
 Ocel enrich_ocel(const Ocel& log, const OcelEnrichmentOptions& options) {
   const auto index = make_enrichment_index(log);
   Ocel result = log;
-  std::set<std::tuple<std::string, std::string, std::string>> seen;
-  for (const auto& relation : result.o2o)
-    seen.emplace(relation.source_id, relation.target_id, relation.qualifier);
-
-  const auto add_undirected = [&](const std::set<ObjectPair>& edges,
-                                  const char* qualifier) {
-    for (const auto& [source, target] : edges) {
-      append_enrichment_edge(result, seen, source, target, qualifier);
-      append_enrichment_edge(result, seen, target, source, qualifier);
+  // O2O rows follow pm4py.ocel_o2o_enrichment, including its quirks. Events
+  // without relations are skipped (the reference readers drop them).
+  append_reference_o2o(result, index, [&](OcelEnrichmentGraph graph) {
+    switch (graph) {
+      case OcelEnrichmentGraph::kInteraction: return options.include_interaction;
+      case OcelEnrichmentGraph::kDescendants: return options.include_descendants;
+      case OcelEnrichmentGraph::kInheritance: return options.include_inheritance;
+      case OcelEnrichmentGraph::kCobirth: return options.include_cobirth;
+      case OcelEnrichmentGraph::kCodeath: return options.include_codeath;
     }
-  };
-  const auto add_directed = [&](const std::set<ObjectPair>& edges,
-                                const char* qualifier) {
-    for (const auto& [source, target] : edges)
-      append_enrichment_edge(result, seen, source, target, qualifier);
-  };
-  if (options.include_interaction)
-    add_undirected(enrichment_interaction_graph(index),
-                   enrichment_graph_name(OcelEnrichmentGraph::kInteraction));
-  if (options.include_descendants)
-    add_directed(enrichment_descendants_graph(index),
-                 enrichment_graph_name(OcelEnrichmentGraph::kDescendants));
-  if (options.include_inheritance)
-    add_directed(enrichment_inheritance_graph(index),
-                 enrichment_graph_name(OcelEnrichmentGraph::kInheritance));
-  if (options.include_cobirth)
-    add_undirected(enrichment_cobirth_graph(index),
-                   enrichment_graph_name(OcelEnrichmentGraph::kCobirth));
-  if (options.include_codeath)
-    add_undirected(enrichment_codeath_graph(index),
-                   enrichment_graph_name(OcelEnrichmentGraph::kCodeath));
+    return false;
+  }, false);
   if (options.include_lifecycle_qualifiers)
     apply_lifecycle_qualifiers(result, index);
   return result;
@@ -571,37 +591,9 @@ Ocel compute_ocel20(
       !includes(OcelEnrichmentGraph::kCobirth) &&
       !includes(OcelEnrichmentGraph::kCodeath)) return result;
   const auto index = make_enrichment_index(log, true);
-  std::set<std::tuple<std::string, std::string, std::string>> computed;
-  const auto add = [&](const std::set<ObjectPair>& edges,
-                       OcelEnrichmentGraph graph, bool symmetric = false) {
-    for (const auto& [source, target] : edges) {
-      computed.emplace(source, target, enrichment_graph_name(graph));
-      if (symmetric)
-        computed.emplace(target, source, enrichment_graph_name(graph));
-    }
-  };
-  // Fixed dispatch order also preserves the captured first missing-event
-  // diagnostic when several selected graph computations would fail.
-  if (includes(OcelEnrichmentGraph::kInteraction))
-    add(enrichment_interaction_graph(index), OcelEnrichmentGraph::kInteraction,
-        true);
-  if (includes(OcelEnrichmentGraph::kDescendants))
-    add(enrichment_descendants_graph(index, true),
-        OcelEnrichmentGraph::kDescendants);
-  // The captured OCEL20 composite labels descendants as inheritance.
-  // This is specific to the composite; the direct inheritance API retains
-  // its independent lifetime relation and reverse-order error contract.
-  if (includes(OcelEnrichmentGraph::kInheritance))
-    add(enrichment_descendants_graph(index, true),
-        OcelEnrichmentGraph::kInheritance);
-  if (includes(OcelEnrichmentGraph::kCobirth))
-    add(enrichment_cobirth_graph(index, true), OcelEnrichmentGraph::kCobirth);
-  if (includes(OcelEnrichmentGraph::kCodeath))
-    add(enrichment_codeath_graph(index, true), OcelEnrichmentGraph::kCodeath);
   // Deduplicate only this computation, never the original O2O prefix. A
   // subsequent call intentionally appends another copy of computed triples.
-  for (const auto& [source, target, qualifier] : computed)
-    result.o2o.push_back({source, target, qualifier});
+  append_reference_o2o(result, index, includes, true);
   return result;
 }
 

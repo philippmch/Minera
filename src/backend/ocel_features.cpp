@@ -446,7 +446,43 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
       options.include_endpoint_features);
   const bool include_event_end_ot = options.include_event_end_ot_features.value_or(
       options.include_endpoint_features);
-  if (include_event_start_ot || include_event_end_ot) {
+  const bool compatibility_names =
+      options.feature_name_style == OcelFeatureNameStyle::kCompatibility;
+  if ((include_event_start_ot || include_event_end_ot) && compatibility_names) {
+    // Reference event_start_ot/event_end_ot quirk: the endpoint event id of
+    // every object is iterated as a string, so the per-type set holds the
+    // id's characters (code points); an event scores 1 only when its whole
+    // id is one of them. Both blocks are named "@@event_start_<type>", start
+    // block first, types in sorted (groupby) order. Objects without
+    // relations are skipped (the reference raises KeyError on them).
+    auto sorted_types = object_types;
+    std::sort(sorted_types.begin(), sorted_types.end());
+    const auto add_quirk_block = [&](bool start) {
+      for (const auto& type : sorted_types) {
+        std::set<std::string> characters;
+        for (std::size_t object = 0; object < object_events.size(); ++object) {
+          if (object_types_by_index[object] != type || object_events[object].empty())
+            continue;
+          const auto& id = log.events[start ? object_events[object].front()
+                                            : object_events[object].back()].id;
+          for (std::size_t at = 0; at < id.size();) {
+            const auto lead = static_cast<unsigned char>(id[at]);
+            std::size_t length = lead < 0x80 ? 1 : lead >= 0xF0 ? 4
+                                 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+            if (at + length > id.size()) length = 1;
+            characters.insert(id.substr(at, length));
+            at += length;
+          }
+        }
+        std::vector<double> values(log.events.size(), 0.0);
+        for (std::size_t row = 0; row < log.events.size(); ++row)
+          values[row] = characters.contains(log.events[row].id) ? 1.0 : 0.0;
+        builder.add("@@event_start_" + type, std::move(values));
+      }
+    };
+    if (include_event_start_ot) add_quirk_block(true);
+    if (include_event_end_ot) add_quirk_block(false);
+  } else if (include_event_start_ot || include_event_end_ot) {
     for (const auto& type : object_types) {
       if (include_event_start_ot) {
         std::vector<double> starts(log.events.size(), 0.0);
@@ -516,7 +552,15 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
   if (include_new_interactions) {
     std::set<std::pair<std::size_t, std::size_t>> seen_pairs;
     std::vector<double> new_interactions(log.events.size(), 0.0);
-    for (std::size_t row = 0; row < event_objects.size(); ++row) {
+    // Reference new_interactions quirk: its "seen" set is never updated, so
+    // every event counts all ordered relation pairs with a lexically smaller
+    // first object id (relation multiplicity included).
+    for (std::size_t row = 0; compatibility_names && row < event_objects.size(); ++row)
+      for (const auto left : event_objects[row])
+        for (const auto right : event_objects[row])
+          if (log.objects[left].id < log.objects[right].id)
+            new_interactions[row] += 1.0;
+    for (std::size_t row = 0; !compatibility_names && row < event_objects.size(); ++row) {
       std::vector<std::size_t> objects = event_objects[row];
       std::sort(objects.begin(), objects.end());
       objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
@@ -1371,11 +1415,12 @@ std::string serialize_ocel_features_json(const OcelFeatureTable& table) {
   for (const auto& row_id : table.row_ids)
     if (row_id.empty() || !row_ids.insert(row_id).second)
       throw std::invalid_argument("OCEL feature table row ids must be unique and non-empty");
-  std::set<std::string> feature_names;
+  // Names may repeat: the reference-compatible event table names both the
+  // start and the end endpoint blocks "@@event_start_<type>". Columns are
+  // positional in this envelope.
   for (const auto& feature_name : table.feature_names)
-    if (feature_name.empty() || !feature_names.insert(feature_name).second)
-      throw std::invalid_argument(
-          "OCEL feature table names must be unique and non-empty");
+    if (feature_name.empty())
+      throw std::invalid_argument("OCEL feature table names must be non-empty");
   for (const auto& row : table.values) {
     if (row.size() != table.feature_names.size())
       throw std::invalid_argument("OCEL feature table columns are inconsistent");

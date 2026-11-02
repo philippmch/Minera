@@ -194,7 +194,39 @@ void variant2_tuple_contract(const minera::Ocel& log) {
 
 }  // namespace
 
+// Captured from pm4py 2.7.22 read_ocel2_json: a value that does not match its
+// declared type is coerced like _parse_attr_value or kept raw, never rejected
+// (pm4py's own writer declares partially missing boolean columns "string").
+void standard_json_declared_type_fallback_contract() {
+  const std::string input = R"({"objectTypes":[{"name":"order","attributes":[{"name":"w","type":"float"},{"name":"n","type":"integer"},{"name":"ok","type":"boolean"}]}],
+"eventTypes":[{"name":"a","attributes":[{"name":"flag","type":"string"},{"name":"b0","type":"boolean"},{"name":"bs","type":"boolean"},{"name":"bt","type":"boolean"},{"name":"i","type":"int"},{"name":"is","type":"int"},{"name":"f","type":"float"},{"name":"d","type":"date"}]}],
+"objects":[{"id":"o1","type":"order","attributes":[{"name":"w","time":"1970-01-01T00:00:00Z","value":"n/a"},{"name":"n","time":"1970-01-01T00:00:00Z","value":"x1"},{"name":"ok","time":"1970-01-01T00:00:00Z","value":0}]}],
+"events":[{"id":"e1","type":"a","time":"2024-01-01T00:00:00Z","attributes":[{"name":"flag","value":true},{"name":"b0","value":"0"},{"name":"bs","value":"no"},{"name":"bt","value":" TRUE "},{"name":"i","value":3.7},{"name":"is","value":" +12 "},{"name":"f","value":true},{"name":"d","value":5}],"relationships":[{"objectId":"o1","qualifier":""}]}]})";
+  const auto log = minera::parse_ocel_json(input);
+  const auto value = [](const std::vector<minera::OcelAttribute>& attributes,
+                        const std::string& key) {
+    const auto found = std::find_if(attributes.begin(), attributes.end(),
+                                    [&](const auto& item) { return item.key == key; });
+    assert(found != attributes.end());
+    return found->value;
+  };
+  const auto& event = log.events.at(0).attributes;
+  assert(std::get<bool>(value(event, "flag")) == true);
+  assert(std::get<bool>(value(event, "b0")) == true);   // bool("0")
+  assert(std::get<bool>(value(event, "bs")) == true);   // bool("no")
+  assert(std::get<bool>(value(event, "bt")) == true);
+  assert(std::get<std::int64_t>(value(event, "i")) == 3);  // int(3.7)
+  assert(std::get<std::int64_t>(value(event, "is")) == 12);
+  assert(std::get<double>(value(event, "f")) == 1.0);       // float(True)
+  assert(std::get<std::int64_t>(value(event, "d")) == 5);   // raw value
+  const auto& object = log.objects.at(0).attributes;
+  assert(std::get<std::string>(value(object, "w")) == "n/a");
+  assert(std::get<std::string>(value(object, "n")) == "x1");
+  assert(std::get<bool>(value(object, "ok")) == false);
+}
+
 int main() {
+  standard_json_declared_type_fallback_contract();
   ocpn_miner_policy_contract();
   const std::string input =
       R"({"ocel:events":{"e2":{"ocel:activity":"Ship","ocel:timestamp":"2024-01-02T00:00:00Z","ocel:omap":["o1","o2"],"ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"source"},{"ocel:oid":"o2","ocel:qualifier":"target"}],"ocel:vmap":{"count":2}},"e1":{"ocel:activity":"Create","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]}},"ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{"amount":12.5}},"o2":{"ocel:type":"item","ocel:ovmap":{}}}})";

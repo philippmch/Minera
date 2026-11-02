@@ -2747,7 +2747,9 @@ activity-targeted sublogs that exclude competing target activities. It also
 provides automatic event/case feature selection with mandatory, numeric, and
 bounded-cardinality attribute handling. All projections copy log, trace, event,
 and typed attribute metadata. Timestamp targets accept ISO timestamps and
-finite numeric values, and invalid or reversed intervals are rejected.
+finite numeric values; unparseable timestamps are rejected, while a target
+recorded before its predecessor gives a negative duration, as the reference's
+plain subtraction does (until-activity and per-target sublogs alike).
 
 `minera_log_util` emits one stable `LOG_UTIL` JSON envelope for CSV/XES input;
 the cached-session `POST /api/log-util` route applies all six variants with
@@ -3036,10 +3038,24 @@ identity. The generated rejection checks require native rejection, not Python
 runtime exception classes. CSV and mixed XES adapters remain separate work.
 
 The native CSV event importer follows the reference `pandas.read_csv` +
-`pm4py.format_dataframe` flow for the first-class columns. Rows whose case id
-or activity is an empty cell or a pandas default NA spelling (`NA`, `null`,
+`pm4py.format_dataframe` flow for the first-class columns. Rows whose
+activity is an empty cell or a pandas default NA spelling (`NA`, `null`,
 `None`, `NaN`, `n/a`, ...) are dropped rather than rejected; whitespace is a
-value only with `trim_fields=false`. Textual timestamps are converted per cell
+value only with `trim_fields=false`. The case-id column is typed the way the
+pandas 3.0.5 C parser infers it from every data row (int64, then float64,
+then bool, then object; `parsers.pyx`/`tokenizer.c` rules) and then printed as
+`astype("string")` does: `007`, `+7` and `7` are one case `7`; an NA cell in
+an integer column makes every id a float (`1.0`); floats use the parser's
+17-digit `precise_xstrtod` value and Python's repr (`1e+31`, `-14.0`, `inf`);
+`true`/`FALSE` become `True`/`False`; `1_000`, hex and padded text stay
+strings. NA case cells are missing (their rows dropped) except where pandas
+reads the column without NA filtering (unsigned 64-bit ids mixed with NA or
+negative values, or out-of-range integers mixed with non-integers), which
+keeps those spellings as literal ids. Traces are then ordered by the case-id
+string, as `format_dataframe` sorts the frame by case id, timestamp and row
+index; flat table rows keep source order with the converted case text.
+Stream readers (`keep_na_first_class_values`) keep literal ids in file order,
+as `csv.DictReader` does. Textual timestamps are converted per cell
 as `to_datetime(format="mixed", utc=True)` does in 2.7.22: no format is
 inferred from the first value, ambiguous `A/B/YYYY`, `A.B.YYYY` and
 `A-B-YYYY` dates are month-first and day-first only when the first number
@@ -14512,7 +14528,7 @@ Evidence: docs/feature-first-workflow-input-validation.json. No browser screensh
 
 Independent DFG CLASSIC and decomposed RECOMPOS_MAXIMAL alignment accepts original CSV/TSV/XES/gzip-XES, typed EventTable JSON or literal trace-word JSON against independently supplied DFG JSON/text or PNML models, from landing and both classic/OCEL toolbars without accessing or replacing the cached mining session.
 
-Grouped-log, selected original trace and literal-word entry points invoke the matching native overload. Typed tables preserve cells, dtype/index/category/metadata and native case grouping; physical selected case columns take precedence over stale first-class roles. CSV/XES retain their grouped importer order.
+Grouped-log, selected original trace and literal-word entry points invoke the matching native overload. Typed tables preserve cells, dtype/index/category/metadata and native case grouping; physical selected case columns take precedence over stale first-class roles. CSV traces follow the reference's sorted case-id order and XES traces their file order.
 
 Every native DFG and decomposed option is configurable and inspectable through options_context. Exact-label JSON cost maps preserve empty labels, delimiters, Unicode, NUL, negative zero and the four independent DFG supplied-empty flags. Bounds, cache controls, literal selectors and actual invoked defaults remain observable.
 
@@ -15961,6 +15977,10 @@ values and passing controls.
 | T1 | Fresh calendar/time-zone comparison: business-hour durations match `soj_time_business_hours_diff` and `BusinessHours.get_seconds` on 6,000 random pairs (UTC offsets including mixed and +05:30/+14:00/-12:00, pre-1970 dates, microseconds, overlapping and touching slots); event distributions match on 700 random XES logs with mixed offsets. Fixed: YEARS on a log without timed events raises like the reference (`min()` of an empty sequence). | `minera_attribute_distribution_tests` |
 | OC1 | OCEL JSON (both formats), XML and SQLite imports order events by timestamp (ties keep file or table order) and relations by their event's position, as every reference importer does; native kept file order (SQLite: id order), so object graphs on unsorted files differed. The five object graphs then match on 600 random OCELs (300 time-sorted, 300 unsorted). Not claimed: the OCEL 2.0 JSON reader's relation order inside one event. | `minera_ocel_codeath_module_tests` |
 | OC2 | The OCEL 2.0 JSON reader keeps one relation per event and object with the last qualifier, as the reference reader does (XML and SQLite keep repeats; the classic JSON format stays lossless because native adapters use it as transport, a declared difference). Fresh comparisons then match on random OCELs with unsorted times and repeated relations: OCDFG activity/start/end/edge metrics and edge performance 0/500, object-type activities, per-event object-type counts, ETOT and OTG 0/285. | `minera_ocel_codeath_module_tests` |
+| OC3 | The ancestors/descendants split compares object first timestamps only, as the reference does: objects first seen at the same instant are a tie even across events or relation rows, and a tie is oriented lexically smaller to larger when the smaller id has the selected type, otherwise larger to smaller. Native used relation order as a tie-break. Matches on 40 random OCEL 2.0 logs (previously 30/40 differed). | `minera_ocel_transform_tests` |
+| OC4 | OCEL 2.0 JSON values that do not fit their declared type follow the reference reader (`_parse_attr_value`): types are tried as date/time, float/double, int, bool; float accepts booleans and padded text, int truncates floats (`int(3.7)` is 3) and accepts padded `+12`, bool gives `true`/`false` text its value and otherwise Python truthiness (`"0"` and `"no"` are true), and any other mismatch keeps the raw value instead of failing. pm4py's own writer declares a partly missing boolean column as `string`, which native used to reject. | `minera_ocel_tests` |
+| OC5 | `--enrich` (`enrich_ocel`, `/api/ocel/enrich`) writes O2O rows as `pm4py.ocel_o2o_enrichment` does, quirks included: the interaction graph in both orientations, descendants/cobirth/codeath once in graph orientation, and `object_inheritance_graph` carrying the descendants edges (reference code reuses the descendants graph). Computed triples are deduplicated among themselves and appended after the original O2O rows, which keep their multiplicity. Native emitted cobirth/codeath both ways and the true inheritance relation; that relation stays available as `discover_ocel_object_graph` / `--graph inheritance`. Declared difference: events without relations are skipped rather than raising (the reference readers drop them). Lifecycle E2O qualifiers are unchanged and match. | `minera_ocel_transform_tests` |
+| OC6 | Event features with `--features-name-style compatibility` reproduce two reference quirks. Endpoint columns: the reference iterates each object's first (last) event id as a string, so an event scores 1 only if its whole id is one character of some endpoint id of that type; both blocks are named `@@event_start_<type>` (start block first, types sorted). New interactions: the reference never records seen pairs, so each event counts every ordered relation pair whose first object id is lexically smaller. The native style keeps the corrected values (`@@event_end_<type>`, `@@event_new_interactions`). Declared difference: objects without relations are skipped where the reference raises KeyError. | `minera_ocel_features_tests` |
 | R1 | Token replay reads reset and inhibitor arcs as ordinary inputs of their weight, as the reference does. PNML parallel arcs stay distinct arcs: a place needs the weight of one arc to enable, firing consumes every arc, and repair walks the arcs in order, adding each arc's weight when the place is below it. Fresh comparisons of full forward per-trace results (fitness, activated and enabled transitions, reached marking, token counters) match 0/240 random nets with reset, inhibitor, weighted and parallel arcs and no silent transitions, and 225/232 with silent transitions; the 7 left are reference set-order ties (equal-length silent paths, or parallel arcs of different kinds and weights on one place), which follow memory addresses and are not claimed. The `/api/token-replay` route gives the same results on all 495 nets (the same 7 ties differ). Backwards replay uses the same arc reading (spot-checked only). | `minera_petri_extended_arcs_tests`, `minera_token_replay_diagnostics_tests` |
 | F1 | `format_dataframe` never converts a categorical column to dates: a categorical timestamp stays categorical (strings) in its source column, in `time:timestamp` and in the `start_timestamp` copy, and an all-null categorical column stays categorical. Fresh comparisons of the full formatted frame and the post-call input match 0/660 random frames mixing nullable Int64/Float64/boolean, string, object, categorical and ordered categorical, numpy int/float/bool, naive, UTC and categorical timestamps, missing values, duplicate and MultiIndex indexes, with and without a start timestamp. | `minera_dataframe_format_tests` |
 | P1 | The Polars DFG adapter (`df_statistics.get_dfg_graph`, `freq_triples`) follows the reference on nulls and aggregation keys: rows with a null case are dropped; frequency drops pairs with a null activity, while performance keeps a null source (exposed as `null_source_performance`) and drops a null target; null timestamps sort first and give their edge a null duration, which aggregations skip (an edge with only null durations is null, except `sum`, which is 0); a single observation has a null standard deviation; `stdev` and `raw_values` are rejected as the reference rejects them; triples keep a null first activity (`null_first`). Fresh comparisons of frequency, performance (every aggregation, windows 1-3, keep-once) and triples match 0/1,700 random Polars frames with null cases, activities and timestamps, categorical and integer cases, and shuffled rows. | `minera_dfg_dataframe_tests` |

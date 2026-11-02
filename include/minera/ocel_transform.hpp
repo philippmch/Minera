@@ -32,7 +32,12 @@ enum class OcelEnrichmentGraph {
 };
 
 struct OcelEnrichmentOptions {
-  // Each selected graph is materialized as deterministic O2O qualifiers.
+  // Each selected graph is materialized as O2O rows exactly as the reference
+  // pm4py.ocel_o2o_enrichment does: interaction in both orientations, the
+  // other graphs once, and "object_inheritance_graph" carrying the
+  // descendants edges (reference quirk). Computed rows are appended after the
+  // original O2O rows, which keep order and multiplicity. The corrected
+  // inheritance relation stays available via discover_ocel_object_graph.
   // Defaults enable the complete graph family.
   bool include_interaction = true;
   bool include_descendants = true;

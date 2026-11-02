@@ -6,6 +6,8 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <vector>
 
 namespace {
 
@@ -100,9 +102,33 @@ void validation_contract() {
 
 void enrichment_contract() {
   const auto result = minera::enrich_ocel(sample());
-  // Existing O2O records are preserved; each selected graph contributes its
-  // deterministic relation family without duplicate triples.
-  assert(result.o2o.size() == 22);
+  // Captured from pm4py 2.7.22 ocel_o2o_enrichment on the same log: the
+  // original row comes first; interaction has both orientations, the others
+  // one; the inheritance label repeats the descendants edges (reference quirk).
+  const std::vector<std::tuple<std::string, std::string, std::string>> expected_o2o = {
+      {"o1", "o2", "contains"},
+      {"i1", "o1", "object_cobirth_graph"},
+      {"i1", "o1", "object_interaction_graph"},
+      {"i1", "o2", "object_descendants_graph"},
+      {"i1", "o2", "object_inheritance_graph"},
+      {"i1", "o2", "object_interaction_graph"},
+      {"i2", "o2", "object_codeath_graph"},
+      {"i2", "o2", "object_interaction_graph"},
+      {"i3", "i4", "object_cobirth_graph"},
+      {"i3", "i4", "object_codeath_graph"},
+      {"i3", "i4", "object_interaction_graph"},
+      {"i4", "i3", "object_interaction_graph"},
+      {"o1", "i1", "object_interaction_graph"},
+      {"o2", "i1", "object_interaction_graph"},
+      {"o2", "i2", "object_descendants_graph"},
+      {"o2", "i2", "object_inheritance_graph"},
+      {"o2", "i2", "object_interaction_graph"}};
+  assert(result.o2o.size() == expected_o2o.size());
+  for (std::size_t row = 0; row < expected_o2o.size(); ++row) {
+    const auto& [source, target, qualifier] = expected_o2o[row];
+    assert(result.o2o[row].source_id == source && result.o2o[row].target_id == target &&
+           result.o2o[row].qualifier == qualifier);
+  }
   bool interaction = false, descendant = false, inheritance = false;
   bool cobirth = false, codeath = false;
   for (const auto& relation : result.o2o) {
@@ -432,7 +458,30 @@ void flatten_contract() {
 
 }  // namespace
 
+// Captured from pm4py 2.7.22 split_ocel ANCESTORS_DESCENDANTS: objects first
+// seen at the same instant are a tie (relation order is not a tie-break), and
+// ties are oriented lexically smaller -> larger for the selected type.
+void ancestors_descendants_tie_contract() {
+  minera::Ocel log;
+  log.objects = {{"o1", "order", {}}, {"o2", "order", {}}, {"o3", "order", {}}};
+  log.events = {{"e1", "a", "2024-01-01T00:00:00Z", {}},
+                {"e2", "a", "2024-01-01T00:00:00Z", {}}};
+  log.relations = {{"e1", "o2", ""}, {"e1", "o1", ""},
+                   {"e2", "o2", ""}, {"e2", "o3", ""}};
+  minera::OcelSplitOptions options;
+  options.variant = minera::OcelSplitVariant::kAncestorsDescendants;
+  options.object_type = "order";
+  const auto result = minera::split_ocel(log, options);
+  assert(result.logs.size() == 3);
+  assert((result.central_objects == std::vector<std::string>{"o1", "o2", "o3"}));
+  for (const auto& projection : result.logs) {
+    assert(projection.objects.size() == 3);
+    assert(projection.events.size() == 2);
+  }
+}
+
 int main() {
+  ancestors_descendants_tie_contract();
   connected_components_contract();
   ancestors_descendants_contract();
   validation_contract();

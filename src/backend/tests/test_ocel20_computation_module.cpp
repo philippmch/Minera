@@ -2586,7 +2586,13 @@ void selected_graph_diagnostics_and_legacy_separation() {
   const auto legacy = enrich_ocel(original);
   assert(exact.relations[0].qualifier == "original");
   assert(legacy.relations[0].qualifier == "creation");
-  assert(exact.o2o.size() != legacy.o2o.size());
+  // enrich_ocel now writes the same reference O2O rows; only its lifecycle
+  // E2O qualifiers differ from the composite.
+  assert(exact.o2o.size() == legacy.o2o.size());
+  for (std::size_t row = 0; row < exact.o2o.size(); ++row)
+    assert(exact.o2o[row].source_id == legacy.o2o[row].source_id &&
+           exact.o2o[row].target_id == legacy.o2o[row].target_id &&
+           exact.o2o[row].qualifier == legacy.o2o[row].qualifier);
   // The public composite labels descendants as inheritance. The independent
   // direct relation is different on this same-birth/different-death model.
   const auto direct = discover_ocel_object_graph(

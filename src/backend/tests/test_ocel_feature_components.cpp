@@ -208,9 +208,22 @@ void event_new_interactions_contract() {
   const auto table = minera::extract_ocel_features(
       component_log(), minera::OcelFeatureVariant::kEvents, options);
   const auto interactions = column(table, "@@ev_new_interactions");
-  assert(table.values[1][interactions] == 1.0 &&
-         table.values[2][interactions] == 0.0 &&
-         table.values[4][interactions] == 0.0);
+  // Captured from pm4py 2.7.22 new_interactions: its seen set is never
+  // updated, so every event counts its ordered relation pairs (multiplicity
+  // included: e1 relates a twice and b once).
+  assert(table.values[0][interactions] == 0.0 &&
+         table.values[1][interactions] == 2.0 &&
+         table.values[2][interactions] == 1.0 &&
+         table.values[3][interactions] == 0.0 &&
+         table.values[4][interactions] == 1.0);
+  // The native style keeps the corrected first-occurrence count.
+  options.feature_name_style = minera::OcelFeatureNameStyle::kNative;
+  const auto native = minera::extract_ocel_features(
+      component_log(), minera::OcelFeatureVariant::kEvents, options);
+  const auto corrected = column(native, "@@event_new_interactions");
+  assert(native.values[1][corrected] == 1.0 &&
+         native.values[2][corrected] == 0.0 &&
+         native.values[4][corrected] == 0.0);
 }
 
 void related_objects_features_contract() {

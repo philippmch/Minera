@@ -381,67 +381,80 @@ const std::string* standard_attribute_type(const StandardAttributeTypes& types,
   return attribute_it == owner_it->second.end() ? nullptr : &attribute_it->second;
 }
 
+// Mirrors the reference OCEL 2.0 JSON value coercion: the declared type is
+// tried in reference order (date/time, float/double, int, bool) and a value
+// that cannot be converted keeps its raw JSON scalar instead of failing.
 OcelValue standard_scalar(const Json& value, std::string_view field,
                           const std::string* declared_type) {
   if (declared_type == nullptr || declared_type->empty())
     return scalar(value, field);
   const auto type = lowercase(*declared_type);
   if (value.is_null()) return nullptr;
-  if (type.find("bool") != std::string::npos) {
-    if (value.is_bool()) return std::get<bool>(value.value);
-    if (value.is_string()) {
-      const auto text = lowercase(value.string());
-      if (text == "true" || text == "1") return true;
-      if (text == "false" || text == "0") return false;
-    }
-    throw std::invalid_argument("OCEL boolean attribute has invalid value: " +
-                                std::string(field));
-  }
-  if (type.find("int") != std::string::npos ||
-      type.find("long") != std::string::npos) {
-    if (value.is_int()) return std::get<std::int64_t>(value.value);
-    if (value.is_string()) {
-      std::int64_t result = 0;
-      const auto text = value.string();
-      const auto parsed = std::from_chars(text.data(), text.data() + text.size(),
-                                          result);
-      if (parsed.ec == std::errc() &&
-          parsed.ptr == text.data() + text.size())
-        return result;
-    }
-    if (std::holds_alternative<double>(value.value)) {
-      const double number = std::get<double>(value.value);
-      if (std::isfinite(number) && std::floor(number) == number &&
-          number >= static_cast<double>(std::numeric_limits<std::int64_t>::min()) &&
-          number <= static_cast<double>(std::numeric_limits<std::int64_t>::max()))
-        return static_cast<std::int64_t>(number);
-    }
-    throw std::invalid_argument("OCEL integer attribute has invalid value: " +
-                                std::string(field));
+  const auto trimmed = [](const std::string& text) {
+    const auto first = text.find_first_not_of(" \t\n\r\f\v");
+    if (first == std::string::npos) return std::string{};
+    const auto last = text.find_last_not_of(" \t\n\r\f\v");
+    return text.substr(first, last - first + 1);
+  };
+  if (type.find("date") != std::string::npos ||
+      type.find("time") != std::string::npos) {
+    if (value.is_string()) return value.string();
+    return scalar(value, field);
   }
   if (type.find("float") != std::string::npos ||
-      type.find("double") != std::string::npos ||
-      type == "number") {
+      type.find("double") != std::string::npos || type == "number") {
     if (std::holds_alternative<double>(value.value))
       return std::get<double>(value.value);
     if (value.is_int())
       return static_cast<double>(std::get<std::int64_t>(value.value));
+    if (value.is_bool()) return std::get<bool>(value.value) ? 1.0 : 0.0;
     if (value.is_string()) {
-      const auto text = value.string();
-      char* end = nullptr;
-      const double number = std::strtod(text.c_str(), &end);
-      if (end == text.c_str() + text.size() && std::isfinite(number))
-        return number;
+      const auto text = trimmed(value.string());
+      if (!text.empty() && text.find_first_of("xXpP") == std::string::npos) {
+        char* end = nullptr;
+        const double number = std::strtod(text.c_str(), &end);
+        if (end == text.c_str() + text.size() && std::isfinite(number))
+          return number;
+      }
     }
-    throw std::invalid_argument("OCEL floating attribute has invalid value: " +
-                                std::string(field));
+    return scalar(value, field);
   }
-  if (type.find("date") != std::string::npos ||
-      type.find("time") != std::string::npos || type == "string" ||
-      type == "str") {
-    if (value.is_string()) return value.string();
-    throw std::invalid_argument("OCEL textual attribute has invalid value: " +
-                                std::string(field));
+  if (type.find("int") != std::string::npos ||
+      type.find("long") != std::string::npos) {
+    if (value.is_int()) return std::get<std::int64_t>(value.value);
+    if (value.is_bool()) return static_cast<std::int64_t>(std::get<bool>(value.value));
+    if (value.is_string()) {
+      auto text = trimmed(value.string());
+      if (!text.empty() && text.front() == '+') text.erase(0, 1);
+      std::int64_t result = 0;
+      const auto parsed = std::from_chars(text.data(), text.data() + text.size(),
+                                          result);
+      if (!text.empty() && parsed.ec == std::errc() &&
+          parsed.ptr == text.data() + text.size())
+        return result;
+    }
+    if (std::holds_alternative<double>(value.value)) {
+      // int(float) truncates toward zero.
+      const double number = std::trunc(std::get<double>(value.value));
+      if (std::isfinite(number) &&
+          number >= static_cast<double>(std::numeric_limits<std::int64_t>::min()) &&
+          number < 0x1p63)
+        return static_cast<std::int64_t>(number);
+    }
+    return scalar(value, field);
+  }
+  if (type.find("bool") != std::string::npos) {
+    if (value.is_bool()) return std::get<bool>(value.value);
+    if (value.is_string()) {
+      const auto text = lowercase(trimmed(value.string()));
+      if (text == "true") return true;
+      if (text == "false") return false;
+      return !value.string().empty();  // bool(str): any non-empty text
+    }
+    if (value.is_int()) return std::get<std::int64_t>(value.value) != 0;
+    if (std::holds_alternative<double>(value.value))
+      return std::get<double>(value.value) != 0.0;
+    return scalar(value, field);
   }
   return scalar(value, field);
 }
