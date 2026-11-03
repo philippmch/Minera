@@ -392,7 +392,7 @@ void ocel_wall_clock_order(){
  bool blank=false,line=false;
  for(const auto& a:spaced_back.events.at(0).attributes){blank|=a.key=="blank"&&a.value==OcelValue(std::string("  "));line|=a.key=="line"&&a.value==OcelValue(std::string("\n"));}
  check(blank&&line,"OCEL 2.0 XML keeps whitespace-only values");
- const auto cdata=parse_ocel_xml(R"(<?xml version="1.0"?><log><object-types/><event-types><event-type name="A"><attributes><attribute name="s" type="string"/></attributes></event-type></event-types><objects/><events><event id="e1" type="A" time="2020-01-01T00:00:00Z"><attributes><attribute name="s"><![CDATA[a<b]]> c</attribute></attributes><objects/></event></events></log>)");
+ const auto cdata=parse_ocel_xml(R"(<?xml version="1.0"?><log><object-types/><event-types><event-type name="A"><attributes><attribute name="s" type="string"/></attributes></event-type></event-types><objects><object id="o1" type="item"><attributes/></object></objects><events><event id="e1" type="A" time="2020-01-01T00:00:00Z"><attributes><attribute name="s"><![CDATA[a<b]]> c</attribute></attributes><objects><relationship object-id="o1" qualifier=""/></objects></event></events></log>)");
  check(cdata.events.at(0).attributes.size()==1&&cdata.events[0].attributes[0].value==OcelValue(std::string("a<b c")),"OCEL 2.0 XML reads CDATA text");
  // Nulls are left out and booleans written as Python text, as PM4Py's writer
  // does: read_ocel2_xml of this export gives f [1.5, nan] and flag ['True',
@@ -400,6 +400,7 @@ void ocel_wall_clock_order(){
  // float(None) on the empty null element before).
  Ocel nulls=changed;
  nulls.events.push_back(nulls.events[0]);nulls.events[1].id="e2";
+ nulls.relations.push_back({"e2","o1","q"}); // readers drop events without an e2o relation
  nulls.events[0].attributes={{"f",1.5},{"flag",true}};
  nulls.events[1].attributes={{"f",nullptr},{"flag",false}};
  nulls.objects[0].attributes.push_back({"gone",nullptr});

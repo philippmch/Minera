@@ -37,6 +37,18 @@ struct ConceptDriftOptions {
   std::string activity_attribute = "concept:name";
   std::string timestamp_attribute = "time:timestamp";
   std::string case_id_attribute = "case:concept:name";
+  // False leaves sublogs, returned_sublogs and cumulative_sublogs empty; the
+  // matching *_ranges fields (always filled) then describe every partition by
+  // trace indices into the input log, without copying any trace.
+  bool materialize_sublogs = true;
+};
+
+// Traces [begin, end) of the input log, and the number of events they hold.
+struct ConceptDriftTraceRange {
+  std::size_t begin = 0;
+  std::size_t end = 0;
+  std::size_t event_count = 0;
+  [[nodiscard]] std::size_t trace_count() const noexcept { return end - begin; }
 };
 
 struct ConceptDriftChangePoint {
@@ -60,6 +72,10 @@ struct ConceptDriftResult {
   // Cumulative logs ending at each raw sub-log. Trace and event metadata are
   // copied verbatim from the input log.
   std::vector<EventLog> cumulative_sublogs;
+  // Index form of the three partitions above, one range per sub-log.
+  std::vector<ConceptDriftTraceRange> sublog_ranges;
+  std::vector<ConceptDriftTraceRange> returned_sublog_ranges;
+  std::vector<ConceptDriftTraceRange> cumulative_sublog_ranges;
   std::vector<double> sublog_start_timestamps;
   std::vector<ConceptDriftChangePoint> change_points;
   std::vector<double> change_timestamps;

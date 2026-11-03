@@ -549,6 +549,8 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   validate_references(log);
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
   sort_ocel_events_by_timestamp(log, standard ? OcelTimestampReader::kDateutil : OcelTimestampReader::kIsoFormat);
+  // Both reference XML readers drop events and objects without relations.
+  drop_unrelated_ocel_entries(log);
   return log;
 }
 

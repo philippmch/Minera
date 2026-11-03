@@ -4,6 +4,8 @@
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <random>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -48,6 +50,77 @@ void connected_components_contract() {
   const auto json = minera::serialize_ocel_split_json(result);
   assert(json.find("\"family\":\"OCEL_SPLIT\"") != std::string::npos);
   assert(json.find("CONNECTED_COMPONENTS") != std::string::npos);
+}
+
+// The single-pass component filter must equal filtering the whole log once
+// per component, including duplicate ids, cross-component o2o/e2e and
+// objects removed by the degree-centrality bound.
+minera::Ocel per_component_reference(const minera::Ocel& log,
+                                     const std::set<std::string>& selected) {
+  minera::Ocel result;
+  result.globals = log.globals;
+  result.event_type_attributes = log.event_type_attributes;
+  result.object_type_attributes = log.object_type_attributes;
+  std::set<std::string> event_ids;
+  for (const auto& object : log.objects)
+    if (selected.contains(object.id)) result.objects.push_back(object);
+  for (const auto& relation : log.relations) {
+    if (!selected.contains(relation.object_id)) continue;
+    result.relations.push_back(relation);
+    event_ids.insert(relation.event_id);
+  }
+  for (const auto& event : log.events)
+    if (event_ids.contains(event.id)) result.events.push_back(event);
+  for (const auto& relation : log.o2o)
+    if (selected.contains(relation.source_id) && selected.contains(relation.target_id))
+      result.o2o.push_back(relation);
+  for (const auto& relation : log.e2e)
+    if (event_ids.contains(relation.source_id) && event_ids.contains(relation.target_id))
+      result.e2e.push_back(relation);
+  for (const auto& change : log.object_changes)
+    if (selected.contains(change.object_id)) result.object_changes.push_back(change);
+  return result;
+}
+
+void connected_components_single_pass_contract() {
+  std::mt19937 random(20261103);
+  for (int round = 0; round < 400; ++round) {
+    const auto pick = [&](int bound) {
+      return static_cast<int>(random() % static_cast<unsigned>(bound));
+    };
+    const int objects = 1 + pick(12), events = 1 + pick(12);
+    const auto object_id = [&] { return "o" + std::to_string(pick(objects + 1)); };
+    const auto event_id = [&] { return "e" + std::to_string(pick(events + 1)); };
+    minera::Ocel log;
+    for (int index = 0; index < objects; ++index)
+      log.objects.push_back({"o" + std::to_string(pick(objects)),
+                             index % 2 ? "order" : "item", {}});
+    for (int index = 0; index < events; ++index)
+      log.events.push_back({"e" + std::to_string(pick(events)), "A",
+                            "2026-01-01T00:00:00Z", {}});
+    for (int index = pick(30); index > 0; --index)
+      log.relations.push_back({event_id(), object_id(), ""});
+    for (int index = pick(8); index > 0; --index)
+      log.o2o.push_back({object_id(), object_id(), std::to_string(index)});
+    for (int index = pick(8); index > 0; --index)
+      log.e2e.push_back({event_id(), event_id(), std::to_string(index)});
+    for (int index = pick(6); index > 0; --index)
+      log.object_changes.push_back({object_id(), "order", "2026-01-02T00:00:00Z",
+                                    "state", std::string("x")});
+    minera::OcelSplitOptions options;
+    options.variant = minera::OcelSplitVariant::kConnectedComponents;
+    if (round % 3 == 0) options.max_degree_centrality = 0.25 * pick(5);
+    const auto result = minera::split_ocel(log, options);
+    std::set<std::string> covered;
+    for (const auto& part : result.logs) {
+      std::set<std::string> selected;
+      for (const auto& relation : part.relations) selected.insert(relation.object_id);
+      assert(!selected.empty());
+      for (const auto& id : selected) assert(covered.insert(id).second);
+      assert(minera::serialize_ocel_json(part) ==
+             minera::serialize_ocel_json(per_component_reference(log, selected)));
+    }
+  }
 }
 
 void ancestors_descendants_contract() {
@@ -483,6 +556,7 @@ void ancestors_descendants_tie_contract() {
 int main() {
   ancestors_descendants_tie_contract();
   connected_components_contract();
+  connected_components_single_pass_contract();
   ancestors_descendants_contract();
   validation_contract();
   enrichment_contract();

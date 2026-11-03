@@ -1,4 +1,5 @@
 #include "minera/json_export.hpp"
+#include "minera/analysis_json_traces.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/pnml.hpp"
 #include "root_cause_trace_key.hpp"
@@ -4304,6 +4305,19 @@ std::string token_replay_traces_json(
   return out.str();
 }
 
+namespace {
+thread_local bool t_omit_analysis_traces = false;
+}  // namespace
+
+OmitAnalysisTraces::OmitAnalysisTraces(bool omit)
+    : previous_(t_omit_analysis_traces) {
+  t_omit_analysis_traces = previous_ || omit;
+}
+
+OmitAnalysisTraces::~OmitAnalysisTraces() {
+  t_omit_analysis_traces = previous_;
+}
+
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& log,
@@ -4446,6 +4460,7 @@ void write_analysis_json(std::ostream& out,
   write_projected_metadata(out, log.metadata);
   out << ",\n";
 
+  if (!t_omit_analysis_traces) {
   out << "  \"traces\": [\n";
   for (std::size_t i = 0; i < log.traces.size(); ++i) {
     const auto& trace = log.traces[i];
@@ -4544,6 +4559,7 @@ void write_analysis_json(std::ostream& out,
     out << "]}" << (i + 1 < log.traces.size() ? "," : "") << '\n';
   }
   out << "  ],\n";
+  }
 
   out << "  \"activities\": ";
   write_activity_stats(out, graph);
@@ -6345,23 +6361,23 @@ std::string concept_drift_json(const ConceptDriftResult& result) {
     out << ']';
   }
   out << "],\"sublogs\":[";
-  for (std::size_t i = 0; i < result.sublogs.size(); ++i) {
+  for (std::size_t i = 0; i < result.sublog_ranges.size(); ++i) {
     if (i) out << ',';
-    out << "{\"trace_count\":" << result.sublogs[i].trace_count()
-        << ",\"event_count\":" << result.sublogs[i].event_count() << '}';
+    out << "{\"trace_count\":" << result.sublog_ranges[i].trace_count()
+        << ",\"event_count\":" << result.sublog_ranges[i].event_count << '}';
   }
   out << "],\"returned_sublogs\":[";
-  for (std::size_t i = 0; i < result.returned_sublogs.size(); ++i) {
+  for (std::size_t i = 0; i < result.returned_sublog_ranges.size(); ++i) {
     if (i) out << ',';
-    out << "{\"trace_count\":" << result.returned_sublogs[i].trace_count()
-        << ",\"event_count\":" << result.returned_sublogs[i].event_count()
+    out << "{\"trace_count\":" << result.returned_sublog_ranges[i].trace_count()
+        << ",\"event_count\":" << result.returned_sublog_ranges[i].event_count
         << '}';
   }
   out << "],\"cumulative_sublogs\":[";
-  for (std::size_t i = 0; i < result.cumulative_sublogs.size(); ++i) {
+  for (std::size_t i = 0; i < result.cumulative_sublog_ranges.size(); ++i) {
     if (i) out << ',';
-    out << "{\"trace_count\":" << result.cumulative_sublogs[i].trace_count()
-        << ",\"event_count\":" << result.cumulative_sublogs[i].event_count() << '}';
+    out << "{\"trace_count\":" << result.cumulative_sublog_ranges[i].trace_count()
+        << ",\"event_count\":" << result.cumulative_sublog_ranges[i].event_count << '}';
   }
   out << "],\"sublog_start_timestamps\":[";
   for (std::size_t i = 0; i < result.sublog_start_timestamps.size(); ++i) {

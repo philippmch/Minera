@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "minera/directly_follows_graph.hpp"
@@ -26,5 +27,22 @@ struct EventuallyFollowsEdge {
 // registry order.
 [[nodiscard]] std::vector<EventuallyFollowsEdge> discover_eventually_follows(
     const EventLog& log, const DirectlyFollowsGraph& graph);
+
+struct EventuallyFollowsOptions {
+  // Empty keeps the position semantics above. Otherwise the reference's
+  // interval semantics (statistics.eventually_follows with a start timestamp
+  // key): each trace is stably sorted by this start attribute, and position
+  // pair i < j counts only when event j starts at or after event i completes.
+  // A missing or unreadable start or completion timestamp throws, where the
+  // reference raises KeyError.
+  std::string start_timestamp_attribute;
+  // Completion timestamp; empty, "timestamp" or "time:timestamp" read
+  // Event::timestamp.
+  std::string timestamp_attribute;
+};
+
+[[nodiscard]] std::vector<EventuallyFollowsEdge> discover_eventually_follows(
+    const EventLog& log, const DirectlyFollowsGraph& graph,
+    const EventuallyFollowsOptions& options);
 
 }  // namespace minera

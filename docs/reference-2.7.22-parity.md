@@ -998,7 +998,8 @@ by `src/backend/tests/test_request_params.cpp` and the focused overlap/native
 JSON tests.
 
 Passed-time evidence: `discover_passed_time` exposes `PRE`, `POST`, and
-`PREPOST` with deterministic neighbor rows, edge frequencies, weighted
+`PREPOST` with neighbor rows in the order each directly-follows pair first
+occurs in the log (the reference's row order), edge frequencies, weighted
 averages, custom activity/timestamp attributes, scalar performance
 aggregations, and optional business-hour durations. The standalone CLI,
 `POST /api/passed-time`, strict request parser, and typed frontend API share
@@ -1196,8 +1197,10 @@ focused tests cover round trips, sparse table cells, graph bounds and edge
 orientation, selector validation, variant multiplicity, and malformed payloads.
 
 Trie conversion evidence: prefix tries now convert to deterministic workflow
-nets with shared prefix places, silent terminal-prefix exits, multiple root
-branches, and explicit source/sink places. The export CLI's
+nets with shared prefix places, silent terminal-prefix exits, and explicit
+source/sink places. Every root branch is converted; the reference converter
+keeps only the root's first child (a declared difference, see "Trie, OCEL
+readers, passed time and eventually-follows (2026-11-03)"). The export CLI's
 `--trie-to-petri` mode, cached local `/api/trie-to-petri` route, and typed
 frontend request guard share the `TRIE_CONVERSION` envelope.
 
@@ -2775,8 +2778,10 @@ cardinality rules, option validation, and malformed response guards.
 ## Trie-transformation evidence
 
 The native trie transformation collapses duplicate activity variants into a
-rooted prefix tree with deterministic lexicographic children, depth, terminal
-markers, custom activity attributes, and an optional positive path-length cap.
+rooted prefix tree whose children keep the order in which their labels are
+first seen, walking the traces in log order (as the reference trie does), with
+depth, terminal markers, custom activity attributes, and an optional positive
+path-length cap.
 Truncation marks the retained endpoint terminal, matching the language of the
 bounded variants. Recursive JSON, strict request fields, standalone CLI JSON
 (`--trie`), cached-session `GET /api/trie`, and frontend recursive response
@@ -16225,8 +16230,9 @@ values and passing controls.
 | OC2 | The OCEL 2.0 JSON reader keeps one relation per event and object with the last qualifier, as the reference reader does (XML and SQLite keep repeats; the classic JSON format stays lossless because native adapters use it as transport, a declared difference). Fresh comparisons then match on random OCELs with unsorted times and repeated relations: OCDFG activity/start/end/edge metrics and edge performance 0/500, object-type activities, per-event object-type counts, ETOT and OTG 0/285. | `minera_ocel_codeath_module_tests` |
 | OC3 | The ancestors/descendants split compares object first timestamps only, as the reference does: objects first seen at the same instant are a tie even across events or relation rows, and a tie is oriented lexically smaller to larger when the smaller id has the selected type, otherwise larger to smaller. Native used relation order as a tie-break. Matches on 40 random OCEL 2.0 logs (previously 30/40 differed). | `minera_ocel_transform_tests` |
 | OC4 | OCEL 2.0 JSON values that do not fit their declared type follow the reference reader (`_parse_attr_value`): types are tried as date/time, float/double, int, bool; float accepts booleans and padded text, int truncates floats (`int(3.7)` is 3) and accepts padded `+12`, bool gives `true`/`false` text its value and otherwise Python truthiness (`"0"` and `"no"` are true), and any other mismatch keeps the raw value instead of failing. pm4py's own writer declares a partly missing boolean column as `string`, which native used to reject. | `minera_ocel_tests` |
-| OC5 | `--enrich` (`enrich_ocel`, `/api/ocel/enrich`) writes O2O rows as `pm4py.ocel_o2o_enrichment` does, quirks included: the interaction graph in both orientations, descendants/cobirth/codeath once in graph orientation, and `object_inheritance_graph` carrying the descendants edges (reference code reuses the descendants graph). Computed triples are deduplicated among themselves and appended after the original O2O rows, which keep their multiplicity. Native emitted cobirth/codeath both ways and the true inheritance relation; that relation stays available as `discover_ocel_object_graph` / `--graph inheritance`. Declared difference: events without relations are skipped rather than raising (the reference readers drop them). Lifecycle E2O qualifiers are unchanged and match. | `minera_ocel_transform_tests` |
-| OC6 | Event features with `--features-name-style compatibility` reproduce two reference quirks. Endpoint columns: the reference iterates each object's first (last) event id as a string, so an event scores 1 only if its whole id is one character of some endpoint id of that type; both blocks are named `@@event_start_<type>` (start block first, types sorted). New interactions: the reference never records seen pairs, so each event counts every ordered relation pair whose first object id is lexically smaller. The native style keeps the corrected values (`@@event_end_<type>`, `@@event_new_interactions`). Declared difference: objects without relations are skipped where the reference raises KeyError. | `minera_ocel_features_tests` |
+| OC5 | `--enrich` (`enrich_ocel`, `/api/ocel/enrich`) writes O2O rows as `pm4py.ocel_o2o_enrichment` does, quirks included: the interaction graph in both orientations, descendants/cobirth/codeath once in graph orientation, and `object_inheritance_graph` carrying the descendants edges (reference code reuses the descendants graph). Computed triples are deduplicated among themselves and appended after the original O2O rows, which keep their multiplicity. Native emitted cobirth/codeath both ways and the true inheritance relation; that relation stays available as `discover_ocel_object_graph` / `--graph inheritance`. Declared difference: events without relations are skipped rather than raising. Since OC7 the JSON, XML and SQLite readers drop such events as the reference readers do, so they only reach enrichment from an OCEL CSV import (whose reference reader keeps them) or a native caller. Lifecycle E2O qualifiers are unchanged and match. | `minera_ocel_transform_tests` |
+| OC6 | Event features with `--features-name-style compatibility` reproduce two reference quirks. Endpoint columns: the reference iterates each object's first (last) event id as a string, so an event scores 1 only if its whole id is one character of some endpoint id of that type; both blocks are named `@@event_start_<type>` (start block first, types sorted). New interactions: the reference never records seen pairs, so each event counts every ordered relation pair whose first object id is lexically smaller. The native style keeps the corrected values (`@@event_end_<type>`, `@@event_new_interactions`). Declared difference: objects without relations are skipped where the reference raises KeyError. Since OC7 they only arrive from an OCEL CSV import or a native caller; the other readers drop them as the reference readers do. | `minera_ocel_features_tests` |
+| OC7 | The OCEL 1.0 JSON, OCEL 2.0 JSON, both XML and the SQLite readers keep only events and objects that take part in an event-object relation, as every reference reader does: the dropped entries take their relations, O2O links, event-to-event links and object changes with them, and a log without relations reads as empty (`drop_unrelated_ocel_entries`). The OCEL CSV reader keeps them, as the reference CSV reader does. Every OCEL route reads its document through these readers, so filters, statistics and discovery no longer see objectless events (the timestamp, event-attribute and events filters returned them; object filters kept unlinked objects). Declared: the reference OCEL 2.0 XML reader raises `AttributeError: 'NoneType' object has no attribute 'index'` on a log with no relation at all; native reads it as empty, as the reference JSON readers do. Fresh comparisons: 120 random OCELs per format (1.0 JSON, 2.0 JSON, 2.0 XML) match events, objects, relations, O2O and changes, except the 9 relation-free 2.0 XML logs where the reference raises as declared; all 15 filters match on 150 random OCELs with orphans, except one declared `filter_ocel_objects` KeyError. | `minera_ocel_tests`, `minera_ocel_xml_tests`, `minera_ocel_sqlite_tests` |
 | R1 | Token replay reads reset and inhibitor arcs as ordinary inputs of their weight, as the reference does. PNML parallel arcs stay distinct arcs: a place needs the weight of one arc to enable, firing consumes every arc, and repair walks the arcs in order, adding each arc's weight when the place is below it. Fresh comparisons of full forward per-trace results (fitness, activated and enabled transitions, reached marking, token counters) match 0/240 random nets with reset, inhibitor, weighted and parallel arcs and no silent transitions, and 225/232 with silent transitions; the 7 left are reference set-order ties (equal-length silent paths, or parallel arcs of different kinds and weights on one place), which follow memory addresses and are not claimed. The `/api/token-replay` route gives the same results on all 495 nets (the same 7 ties differ). Backwards replay uses the same arc reading (spot-checked only). | `minera_petri_extended_arcs_tests`, `minera_token_replay_diagnostics_tests` |
 | F1 | `format_dataframe` never converts a categorical column to dates: a categorical timestamp stays categorical (strings) in its source column, in `time:timestamp` and in the `start_timestamp` copy, and an all-null categorical column stays categorical. Fresh comparisons of the full formatted frame and the post-call input match 0/660 random frames mixing nullable Int64/Float64/boolean, string, object, categorical and ordered categorical, numpy int/float/bool, naive, UTC and categorical timestamps, missing values, duplicate and MultiIndex indexes, with and without a start timestamp. | `minera_dataframe_format_tests` |
 | P1 | The Polars DFG adapter (`df_statistics.get_dfg_graph`, `freq_triples`) follows the reference on nulls and aggregation keys: rows with a null case are dropped; frequency drops pairs with a null activity, while performance keeps a null source (exposed as `null_source_performance`) and drops a null target; null timestamps sort first and give their edge a null duration, which aggregations skip (an edge with only null durations is null, except `sum`, which is 0); a single observation has a null standard deviation; `stdev` and `raw_values` are rejected as the reference rejects them; triples keep a null first activity (`null_first`). Fresh comparisons of frequency, performance (every aggregation, windows 1-3, keep-once) and triples match 0/1,700 random Polars frames with null cases, activities and timestamps, categorical and integer cases, and shuffled rows. | `minera_dfg_dataframe_tests` |
@@ -16735,3 +16741,77 @@ Declarations:
 - **Reachability graphs on unbounded nets.** Native stops with an error once
   the state space grows past its bound; the reference's construction does not
   terminate.
+
+## Trie, OCEL readers, passed time and eventually-follows (2026-11-03)
+
+Fixes:
+
+- **Trie child order.** `log_to_trie` children keep the order in which their
+  labels are first seen, walking the traces in log order (the reference
+  appends a child the first time its label occurs); native sorted them by
+  name. Variants CAB, B, CB, AC, CA give `[C[A*[B*],B*],B*,A[C*]]`. Fresh
+  comparison: 0/200 random logs differ (CLI `--trie`, `GET /api/trie`).
+  Test: `minera_trie_tests` (`reference_first_seen_order`).
+- **Passed-time row order.** PRE/POST rows follow the first occurrence of
+  each directly-follows pair in log order, as the reference's rows do; native
+  sorted them by activity. Values, frequencies and weighted averages were
+  already equal. Fresh comparison: 0/148 random logs differ. Test:
+  `minera_passed_time_tests` (`reference_first_seen_order`).
+- **OCEL readers drop unrelated events and objects** (OC7 above).
+- **Interval eventually-follows.** The eventually-follows statistic takes the
+  reference's start-timestamp key (`statistics.eventually_follows` with
+  `start_timestamp_key`): each trace is stably sorted by the start attribute
+  and position pair i < j counts only when event j starts at or after event i
+  completes. CLI `--eventually-follows-start-attribute <name>` (and
+  `--eventually-follows-timestamp-attribute`), `/api/mine` fields
+  `eventually_follows_start_attribute` and
+  `eventually_follows_timestamp_attribute`. A missing or unreadable start
+  raises (the reference raises KeyError). Without a start attribute the
+  statistic keeps every position pair i < j in trace order. Fresh comparison:
+  0/80 random interval logs differ. Test: `minera_overlap_tests`
+  (`eventually_follows_interval_reference`).
+- **SNA with no connections.** Every reference SNA variant raises
+  `ValueError: zero-size array to reduction operation maximum which has no
+  identity` when it finds no connection (a single event, one resource for
+  working together, joint activities or subcontracting, no handover). Native
+  returns the empty network with `diagnostics.computed=false` and that error
+  as the message, as for other reference exceptions with a computed flag
+  (EMD). All 8 variants match on 158 random logs, the empty cases included.
+
+Declarations:
+
+- **Trie to Petri net keeps every root branch.** The reference converter
+  (`objects.conversion.trie`) converts only the subtree of the root's first
+  child (first-seen order), so the net's language is exactly the variants
+  that start with that label (300/300 probes): `AB, CD, EF` gives a net that
+  accepts only `AB`. That loses behaviour, so native keeps the full
+  conversion (every root branch, shared prefix places, silent exits for
+  final nodes with children, which match the reference), as for BPMN
+  interleaving.
+- **Reference exceptions without a computed flag.** Native keeps a result
+  where the reference raises:
+  - `get_log_traces_to_activities` raises `TypeError: string indices must be
+    integers` whenever a sublog would be non-empty (it returns two empty lists
+    only when no trace qualifies, which native matches); native returns the
+    activity-targeted sublogs.
+  - `filter_ocel_objects` with `level >= 2` raises `KeyError(<id>)` for an id
+    that is not an object of the log (after the reader drop, an id of an
+    unlinked object too); native ignores the unknown id.
+  - `filter_ocel_event_attribute` and `filter_ocel_object_attribute` raise
+    `KeyError(<key>)` when no event (object) carries the attribute; native
+    filters with no match.
+  - `read_ocel2_xml` raises `AttributeError` on a log with no event-object
+    relation; native reads it as empty, like the reference JSON readers (OC7).
+- **Writers stay lossless.** The reference writers (JSON, XML, SQLite, CSV)
+  drop unrelated events and objects, also from the OCEL in memory, before
+  writing. Native writers keep what the OCEL holds, because native adapters
+  use classic JSON as transport; reading such a file back through a native
+  JSON, XML or SQLite reader drops them as the reference reader would, while
+  a native CSV round trip keeps them (the reference's CSV round trip loses
+  them at the writer). An OCEL CSV import keeps unrelated entries like the
+  reference CSV reader, but they are dropped once the OCEL travels as JSON to
+  another route.
+- **Eventually-follows without a start attribute** counts pairs in trace
+  order; the reference first sorts each trace by completion timestamp. This
+  only differs on XES traces whose events are not in time order.
+

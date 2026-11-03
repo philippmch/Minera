@@ -23,5 +23,8 @@ namespace minera {
 [[nodiscard]] OcpnPlayoutResult parse_oc_playout_workbench_result_json(std::string_view);
 [[nodiscard]] std::string serialize_oc_playout_workbench_result_json(const OcpnPlayoutResult&);
 [[nodiscard]] PetriNet parse_oc_playout_workbench_petri_net_json(std::string_view);
+// Writes the nine PetriNetLiteralStorage fields the workbench clients validate;
+// native place names are not part of the carrier (the parser still accepts
+// an optional place_names field).
 [[nodiscard]] std::string serialize_oc_playout_workbench_petri_net_json(const PetriNet&);
 }  // namespace minera

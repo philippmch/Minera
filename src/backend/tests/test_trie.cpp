@@ -7,6 +7,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -66,9 +67,10 @@ void duplicate_variants_and_ordering() {
                                          trace({event("z")} ),
                                          trace({event("m")} )}));
   assert(model.root.children.size() == 3);
-  assert(model.root.children[0].label == "a");
-  assert(model.root.children[1].label == "m");
-  assert(model.root.children[2].label == "z");
+  // First-seen order, as the reference trie keeps it.
+  assert(model.root.children[0].label == "z");
+  assert(model.root.children[1].label == "a");
+  assert(model.root.children[2].label == "m");
 }
 
 void truncation_and_custom_attribute() {
@@ -125,9 +127,36 @@ void json_shape() {
   assert(json.find("\"truncated\":false") != std::string::npos);
 }
 
+std::string shape(const TrieNode& node) {
+  std::string text = node.label + (node.final ? "*" : "");
+  if (node.children.empty()) return text;
+  text += '[';
+  for (std::size_t i = 0; i < node.children.size(); ++i) {
+    if (i) text += ',';
+    text += shape(node.children[i]);
+  }
+  return text + ']';
+}
+
+// Reference capture (pm4py 2.7.22 log_to_trie, stable across hash seeds):
+// variants CAB, B, CB, AC, CA give [C[A*[B*],B*],B*,A[C*]] -- children in
+// first-seen order, not sorted.
+void reference_first_seen_order() {
+  const auto variant = [](std::string_view letters) {
+    Trace result;
+    for (const char letter : letters) result.events.push_back(event(std::string(1, letter)));
+    return result;
+  };
+  EventLog input;
+  for (const auto* letters : {"CAB", "B", "CB", "AC", "CA"})
+    input.traces.push_back(variant(letters));
+  assert(shape(discover_trie(input).root) == "[C[A*[B*],B*],B*,A[C*]]");
+}
+
 }  // namespace
 
 int main() {
+  reference_first_seen_order();
   shared_prefixes_and_terminals();
   duplicate_variants_and_ordering();
   truncation_and_custom_attribute();

@@ -17,19 +17,14 @@ std::string event_label(const Event& event, std::string_view key) {
   return {};
 }
 
+// Children keep the order in which their labels are first seen, walking the
+// traces in log order, as the reference trie does.
 TrieNode* child_for(TrieNode& node, std::string label) {
-  const auto it = std::lower_bound(
-      node.children.begin(), node.children.end(), label,
-      [](const TrieNode& child, std::string_view value) {
-        return child.label < value;
-      });
-  if (it != node.children.end() && it->label == label) return &*it;
-  const auto position = static_cast<std::size_t>(
-      std::distance(node.children.begin(), it));
-  node.children.insert(node.children.begin() +
-                           static_cast<std::ptrdiff_t>(position),
-                       TrieNode{std::move(label), {}, node.depth + 1, false});
-  return &node.children[position];
+  for (auto& child : node.children) {
+    if (child.label == label) return &child;
+  }
+  node.children.push_back(TrieNode{std::move(label), {}, node.depth + 1, false});
+  return &node.children.back();
 }
 
 }  // namespace

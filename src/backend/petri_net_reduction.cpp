@@ -800,6 +800,15 @@ PetriNetReductionResult reduce_petri_net(
         reduced.add_inhibitor_arc(index, result.old_to_new_place[place]);
     }
   }
+  // Reductions remove or merge places in place, so a surviving place keeps
+  // its name, as the reference's reduced net does.
+  if (const auto& names = net.place_names(); names && names->size() == working.place_count) {
+    std::vector<std::string> kept;
+    kept.reserve(reduced_places);
+    for (std::size_t place = 0; place < working.place_count; ++place)
+      if (place_alive[place]) kept.push_back((*names)[place]);
+    reduced.set_place_names(std::move(kept));
+  }
   result.net = std::move(reduced);
 
   const auto remap_marking = [&](const Marking& original) {

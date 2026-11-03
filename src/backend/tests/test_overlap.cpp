@@ -1,7 +1,13 @@
 #include "minera/overlap.hpp"
+#include "minera/eventually_follows.hpp"
 
+#undef NDEBUG
 #include <cassert>
+#include <cstdio>
+#include <map>
 #include <stdexcept>
+#include <string>
+#include <utility>
 
 using namespace minera;
 
@@ -17,9 +23,55 @@ Event timed(const char* start, const char* complete, const char* activity) {
   e.activity = activity;
   return e;
 }
+// Reference capture (pm4py 2.7.22 statistics.eventually_follows.log with
+// start_timestamp_key): traces [A 0-10, B 5-15, C 10-20, D 30-40],
+// [X 20-25, Y 0-30, X 30-31], [A 0-5, B 0-0] (minutes) give
+// {(A,C):1, (A,D):1, (B,D):1, (C,D):1, (X,X):1, (Y,X):1}. Each trace is
+// stably sorted by start; a pair counts when the later event starts at or
+// after the earlier one completes.
+void eventually_follows_interval_reference() {
+  const auto at = [](int minute) {
+    char text[32];
+    std::snprintf(text, sizeof text, "2024-01-01T%02d:%02d:00", minute / 60, minute % 60);
+    return std::string(text);
+  };
+  const auto ev = [&](const char* activity, int start, int end) {
+    Event e;
+    e.activity = activity;
+    e.timestamp = at(end);
+    e.attributes.push_back({"start_timestamp", at(start)});
+    return e;
+  };
+  EventLog log;
+  log.traces.push_back(Trace{"c1", {ev("A", 0, 10), ev("B", 5, 15), ev("C", 10, 20), ev("D", 30, 40)}});
+  log.traces.push_back(Trace{"c2", {ev("X", 20, 25), ev("Y", 0, 30), ev("X", 30, 31)}});
+  log.traces.push_back(Trace{"c3", {ev("A", 0, 5), ev("B", 0, 0)}});
+  const auto graph = discover_directly_follows_graph(log);
+  EventuallyFollowsOptions options;
+  options.start_timestamp_attribute = "start_timestamp";
+  std::map<std::pair<std::string, std::string>, std::uint64_t> counts;
+  for (const auto& edge : discover_eventually_follows(log, graph, options))
+    counts[{graph.activities()[edge.source], graph.activities()[edge.target]}] = edge.count;
+  const std::map<std::pair<std::string, std::string>, std::uint64_t> expected = {
+      {{"A", "C"}, 1}, {{"A", "D"}, 1}, {{"B", "D"}, 1},
+      {{"C", "D"}, 1}, {{"X", "X"}, 1}, {{"Y", "X"}, 1}};
+  assert(counts == expected);
+
+  // A missing start attribute raises, as the reference's KeyError does.
+  log.traces[0].events[1].attributes.clear();
+  bool thrown = false;
+  try {
+    (void)discover_eventually_follows(log, graph, options);
+  } catch (const std::invalid_argument&) {
+    thrown = true;
+  }
+  assert(thrown);
+}
+
 }  // namespace
 
 int main() {
+  eventually_follows_interval_reference();
   Trace a{"a", {event("2024-01-01T00:00:00Z", "2024-01-01T00:00:10Z")}};
   Trace b{"b", {event("2024-01-01T00:00:10Z", "2024-01-01T00:00:20Z")}};
   EventLog log{{a, b}};

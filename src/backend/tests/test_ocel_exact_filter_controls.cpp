@@ -195,7 +195,8 @@ void actual_http_object_controls(){
   source.objects={{"","T",{{"",std::int64_t{9007199254740993LL}}}},
                   {"o2","U",{{"",std::int64_t{9007199254740992LL}}}},
                   {"unused","T",{{"",std::int64_t{9007199254740993LL}}}}};
-  source.relations={{"e1","","first"},{"e1","","duplicate"},{"e2","o2","q"}};
+  // Readers drop objects without an e2o relation, as the reference does, so "unused" keeps one.
+  source.relations={{"e1","","first"},{"e1","","duplicate"},{"e2","o2","q"},{"e1","unused","linked"}};
   source.o2o={{"","unused","retained"},{"","o2","removed"}};
   source.e2e={{"e1","e1","retained"},{"e1","e2","removed"}};
   source.globals={{"source","original"}};
@@ -232,7 +233,7 @@ void actual_http_object_controls(){
     if(!response||response->status!=200)throw std::runtime_error(response?response->body:"Object HTTP request failed");
     const auto reopened=parse_ocel_json(response->body);
     if(serialize_ocel_json(reopened)!=serialize_ocel_json(expected))throw std::runtime_error("Object HTTP actual: "+serialize_ocel_json(reopened)+"\nExpected: "+serialize_ocel_json(expected));
-    assert(reopened.objects.at(1).id=="unused"&&reopened.relations.size()==2);
+    assert(reopened.objects.at(1).id=="unused"&&reopened.relations.size()==3);
     const auto negative=post(controls.first,controls.second,false);
     assert(negative&&negative->status==200);
     const auto removed=parse_ocel_json(negative->body);

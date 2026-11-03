@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
             "a run bound to the current imported model runs: " + describe(result));
       result = client.Post("/api/align?miner=imported", {{"X-Minera-Imported-Model", first}},
                            "", "application/x-www-form-urlencoded");
-      check(result && result->status == 409 && contains(result, "imported model changed"),
+      check(result && result->status == 409 && contains(result, "check the model again"),
             "a run bound to a replaced imported model is refused: " + describe(result));
       result = client.Get("/api/playout?miner=imported&traces=5",
                           {{"X-Minera-Imported-Model", first}});

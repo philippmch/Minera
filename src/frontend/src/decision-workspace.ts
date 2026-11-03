@@ -17,16 +17,23 @@ export function decisionQuery(form:DecisionForm,schema:LogQuerySchema):URLSearch
  if(form.mode==='guarded'){options.max_depth=integer(form.depth,'Tree depth',0,64);options.min_split=integer(form.split,'Minimum split',2);options.min_leaf=integer(form.leaf,'Minimum leaf',1);options.max_categories=integer(form.categories,'Category candidates',1);options.max_thresholds=integer(form.thresholds,'Threshold candidates',1);if(form.gain){const value=Number(form.gain);if(!Number.isFinite(value)||value<0)throw new Error('Minimum gain must be finite and non-negative.');options.min_gain=value;}}
  const q=new URLSearchParams(decisionTablesQuery(options));q.set('miner',form.miner);q.set('source_id',schema.source_id);q.set('include_workspace','true');if(form.mode==='guarded'&&form.diagnostics!=='native')q.set('include_decision_diagnostics',form.diagnostics);return q;
 }
+// A table cell shows at most this many characters; CSV downloads and the
+// complete decision data keep every value whole.
+export const DECISION_CELL_PREVIEW_CHARACTERS=2000;
+export function decisionCellPreview(text:string):string {return text.length>DECISION_CELL_PREVIEW_CHARACTERS?text.slice(0,DECISION_CELL_PREVIEW_CHARACTERS)+`… (${text.length} characters; the CSV download has the complete value)`:text;}
 export function decisionTables(workspace:DecisionWorkspace):Record<string,OcelPreparedTable> {
  const result=workspace.result,encoded=result.family==='DECISION_TABLES'?result:result.decision_tables!;const tables:Record<string,OcelPreparedTable>={};const table=(columns:string[],rows:unknown[][]):OcelPreparedTable=>({columns,count:rows.length,rowAt:i=>rows[i]});
+ // Rows holding whole native JSON values are built when first read, so a
+ // large result serializes only the rows a page or a download asks for.
+ const lazy=<T,>(columns:string[],items:readonly T[],build:(item:T,i:number)=>unknown[]):OcelPreparedTable=>{const rows=new Map<number,unknown[]>();return {columns,count:items.length,rowAt:i=>{let row=rows.get(i);if(!row){row=build(items[i],i);rows.set(i,row);}return row;}};};
  const keys=['trace_count','observed_traces','replayed_traces','aligned_traces','alignment_failures','activity_attribute'];tables.diagnostics=table(keys,[[...keys.map(k=>nativeCell(encoded,k))]]);const source=['source_id','dataset','miner','mode'];tables.source=table([...source,'case_count','event_count'],[[...source.map(k=>nativeCell(workspace,k)),nativeCell(workspace.source,'case_count'),nativeCell(workspace.source,'event_count')]]);
- tables.decision_points=table(['table_position','place','classes','features','rows','native_table_json'],encoded.tables.map((t,i)=>[i,nativeCell(t,'place'),nativeJson(t.classes),nativeJson(t.feature_names),t.rows.length,nativeJson(t)]));
+ tables.decision_points=lazy(['table_position','place','classes','features','rows','native_table_json'],encoded.tables,(t,i)=>[i,nativeCell(t,'place'),nativeJson(t.classes),nativeJson(t.feature_names),t.rows.length,nativeJson(t)]);
  tables.classes=table(['table_position','place','target','class'],encoded.tables.flatMap((t,i)=>t.classes.map((label,j)=>[i,nativeCell(t,'place'),j,label])));
  for(const [i,t] of encoded.tables.entries())tables['training_'+i]=table(['row_position','target','class',...t.feature_names],t.rows.map((row,j)=>[j,nativeCell(row,'target'),t.classes[row.target],...row.features.map((_,k)=>nativeCell(row.features,k))]));
  if(result.family==='DATA_PETRI_NET'){
-  tables.transitions=table(['index','activity','silent','inputs','outputs','guard','read_variables','write_variables','native_transition_json'],result.transitions.map(t=>[nativeCell(t,'index'),t.activity,t.silent,nativeJson(t.inputs),nativeJson(t.outputs),t.guard,nativeJson(t.read_variables),nativeJson(t.write_variables),nativeJson(t)]));
+  tables.transitions=lazy(['index','activity','silent','inputs','outputs','guard','read_variables','write_variables','native_transition_json'],result.transitions,t=>[nativeCell(t,'index'),t.activity,t.silent,nativeJson(t.inputs),nativeJson(t.outputs),t.guard,nativeJson(t.read_variables),nativeJson(t.write_variables),nativeJson(t)]);
   tables.variables=table(['transition','role','position','name'],result.transitions.flatMap(t=>[...t.read_variables.map((v,i)=>[nativeCell(t,'index'),'read',i,v]),...t.write_variables.map((v,i)=>[nativeCell(t,'index'),'write',i,v])]));
-  tables.rules=table(['point_position','place','native_decision_point_json'],result.decisions.decision_points.map((p,i)=>[i,nativeCell(p,'place'),nativeJson(p)]));
+  tables.rules=lazy(['point_position','place','native_decision_point_json'],result.decisions.decision_points,(p,i)=>[i,nativeCell(p,'place'),nativeJson(p)]);
  }
  return tables;
 }

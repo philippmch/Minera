@@ -198,7 +198,7 @@ void handle_active_source_mining(const httplib::Request& request,
     performance = minera::compute_performance_metrics(log, graph);
     resources = minera::discover_resource_network(log);
     durations = minera::compute_variant_durations(log, graph);
-    eventually = minera::discover_eventually_follows(log, graph);
+    eventually = minera::discover_eventually_follows(log, graph, params.eventually_follows);
     // These remain established presentation metrics, not complete raw native
     // snapshots. The full source is independently available in active_source.
     native_returned = true;

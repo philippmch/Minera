@@ -514,6 +514,184 @@ class Replayer {
     }
   };
 
+  // Forward replay state of one trace between two events.
+  struct ForwardState {
+    Marking marking;
+    detail::ReplayMarkingKeys keys;
+    std::vector<std::size_t> order;
+    Counts counts;
+  };
+
+  // The prefix walk of token precision: the state before the first event and
+  // one event at a time, exactly as replay() advances (forward options only).
+  [[nodiscard]] ForwardState start_prefix_walk() const {
+    if (!forward_configuration_)
+      throw std::logic_error("prefix walk requires forward replay options");
+    return initial_forward_state(*forward_configuration_);
+  }
+  // False once the event needed a missing token and replay stopped (with
+  // stop_immediately_unfit); the state then holds the marking replay reached.
+  [[nodiscard]] bool advance_prefix_walk(ForwardState& state,
+                                         const std::optional<std::size_t>& step,
+                                         const TokenReplayOptions& options) const {
+    return forward_event(state, step, options, *forward_configuration_, nullptr, nullptr);
+  }
+
+  // The trace fitness replay() would report for a trace ending at `state`
+  // (forward options without final routing): the final marking is consumed
+  // from the reached marking exactly as replay() does after its last event.
+  [[nodiscard]] double prefix_walk_fitness(const ForwardState& state) const {
+    const auto& final_keys = forward_configuration_->final_keys;
+    Counts counts;
+    counts.forward_replay = true;
+    counts.produced = state.counts.produced;
+    counts.consumed = state.counts.consumed;
+    counts.missing = state.counts.missing;
+    counts.remaining = state.counts.remaining;
+    for (std::size_t place = 0; place < state.marking.size(); ++place) {
+      auto tokens = state.marking[place];
+      counts.consumed += TokenInteger(final_[place]);
+      if (final_keys[place] && (state.keys[place] || TokenInteger(final_[place]) > 0)) {
+        if (tokens >= final_[place]) {
+          tokens -= final_[place];
+        } else {
+          counts.missing += TokenInteger(final_[place] - tokens);
+          tokens = 0;
+        }
+      }
+      if (tokens != 0) counts.remaining += TokenInteger(tokens);
+    }
+    return counts.fitness();
+  }
+
+ private:
+  [[nodiscard]] ForwardState initial_forward_state(const ForwardConfiguration& configuration) const {
+    ForwardState state;
+    state.marking = initial_marking();
+    state.keys = configuration.initial_keys;
+    state.order = configuration.initial_order;
+    state.counts.forward_replay = true;
+    state.counts.places.resize(initial_.size());
+    for (std::size_t place = 0; place < initial_.size(); ++place) {
+      const auto tokens = TokenInteger(initial_[place]);
+      state.counts.produced += tokens;
+      state.counts.places[place].produced += tokens;
+    }
+    return state;
+  }
+
+  // One event of forward replay. Returns false when replay stops at this
+  // event (stop_immediately_unfit and a missing token).
+  [[nodiscard]] bool forward_event(ForwardState& state, const std::optional<std::size_t>& step,
+                                   const TokenReplayOptions& options,
+                                   const ForwardConfiguration& configuration,
+                                   std::vector<std::uint64_t>* executions,
+                                   TokenReplayTraceDiagnostics* diagnostics) const {
+    auto& marking = state.marking;
+    auto& keys = state.keys;
+    auto& order = state.order;
+    auto& counts = state.counts;
+    const auto& place_names = configuration.place_names;
+    const auto& transition_names = configuration.transition_names;
+    const auto& components = configuration.components;
+
+    const auto emit = [&](std::size_t transition, bool event) {
+      if (!forward_fire(marking, keys, transition, counts, &order)) return;
+      if (executions) ++(*executions)[transition];
+      if (diagnostics) {
+        diagnostics->activated_transitions.push_back(transition);
+        if (event) diagnostics->event_diagnostics.back().activated_transitions.push_back(transition);
+      }
+    };
+    if (diagnostics) {
+      diagnostics->event_diagnostics.push_back({diagnostics->replayed_events, {}, {}});
+      ++diagnostics->replayed_events;
+    }
+    if (!step || transitions_by_activity_[*step].empty()) {
+      counts.has_unknown_activity = true;
+      if (diagnostics)
+        diagnostics->unknown_event_indices.push_back(diagnostics->replayed_events - 1);
+      return true;
+    }
+    const auto& targets = transitions_by_activity_[*step];
+    auto chosen = *std::max_element(targets.begin(), targets.end(), [&](auto left, auto right) {
+      return std::tie(transition_names[left], left) < std::tie(transition_names[right], right);
+    });
+    if (options.transition_identity_hashes && !net_.has_extended_arcs()) {
+      // The public enabled set includes every activity and silent transition.
+      // Filtering matching activities before constructing that set changes
+      // its iteration order when collisions or table growth are involved.
+      std::vector<std::size_t> enabled_candidates;
+      for (std::size_t transition = 0; transition < net_.transitions().size(); ++transition)
+        if (enabled(marking, transition)) enabled_candidates.push_back(transition);
+      for (const auto transition : replay_identity_set_order(
+               enabled_candidates, *options.transition_identity_hashes)) {
+        if (std::find(targets.begin(), targets.end(), transition) != targets.end()) {
+          chosen = transition;
+          break;
+        }
+      }
+    } else {
+      for (const auto transition : targets) {
+        if (enabled(marking, transition)) { chosen = transition; break; }
+      }
+    }
+    if (!enabled(marking, chosen) && options.walk_through_hidden_transitions) {
+      if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {
+        const auto path = silent_path(marking, [&](const Marking& candidate) { return enabled(candidate, chosen); });
+        if (path) for (const auto transition : *path) emit(transition, true);
+      } else {
+        forward_route_hidden(marking, keys, chosen, place_names,
+                             options,
+                             [&](auto transition) { emit(transition, true); });
+      }
+    }
+    const bool forced = !enabled(marking, chosen);
+    if (forced && diagnostics) {
+      diagnostics->transitions_with_problems.push_back(chosen);
+      diagnostics->event_diagnostics.back().transitions_with_problems.push_back(chosen);
+    }
+    if (forced && options.stop_immediately_unfit) {
+      ++counts.missing;
+      if (diagnostics) diagnostics->replay_stopped = true;
+      return false;
+    }
+    // A null-selected silent event has no PLTR transition-map key. This
+    // rejection occurs during the event, before per-trace float conversion.
+    if (options.enable_pltr_fitness && *step == net_.activities().size())
+      throw std::invalid_argument("null transition PLTR key");
+    if (full_result_ && options.enable_pltr_fitness &&
+        net_.transitions()[chosen].activity &&
+        net_.activities()[*net_.transitions()[chosen].activity].empty())
+      throw TokenReplayTransitionKeyError(chosen);
+    const auto before_cleaning = forced && !components.empty()
+        ? keys : detail::ReplayMarkingKeys{};
+    emit(chosen, true);
+    if (!before_cleaning.empty()) {
+      const auto introduced_places = detail::cleaning_introduced_places(keys, before_cleaning, place_names);
+      const auto unique_names = detail::cleaning_unique_place_names(keys, place_names);
+      for (const auto& component : components) {
+        const bool introduced = std::any_of(component.begin(), component.end(),
+            [&](auto place) { return keys[place] && introduced_places[place]; });
+        if (!introduced) continue;
+        for (const auto place : component) {
+          if (keys[place] && before_cleaning[place] && unique_names[place]) {
+            marking[place] = 0;
+            keys[place] = false;
+            std::erase(order, place);
+            ++counts.remaining;
+            ++counts.places[place].remaining;
+            if (diagnostics && std::find(diagnostics->cleaned_place_indices.begin(),
+                diagnostics->cleaned_place_indices.end(), place) == diagnostics->cleaned_place_indices.end())
+              diagnostics->cleaned_place_indices.push_back(place);
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+ public:
   // Replays a trace (activity ids, std::nullopt = activity absent from the
   // model) and returns the token counts. Perfect replay yields missing == 0
   // and remaining == 0. When `executions` is given (sized to the net's
@@ -524,25 +702,17 @@ class Replayer {
       std::vector<std::uint64_t>* executions = nullptr,
       const TokenReplayOptions& options = {},
       TokenReplayTraceDiagnostics* diagnostics = nullptr) const {
-    Marking marking = initial_marking();
     std::optional<ForwardConfiguration> local_configuration;
     if (!forward_configuration_) local_configuration = prepare_forward(options);
     const auto& configuration = forward_configuration_ ? *forward_configuration_ : *local_configuration;
-    auto keys = configuration.initial_keys;
-    auto order = configuration.initial_order;
+    ForwardState state = initial_forward_state(configuration);
+    auto& marking = state.marking;
+    auto& keys = state.keys;
+    auto& order = state.order;
+    auto& counts = state.counts;
     const auto& final_keys = configuration.final_keys;
     const auto& place_names = configuration.place_names;
-    const auto& transition_names = configuration.transition_names;
-    const auto& components = configuration.components;
-    Counts counts;
-    counts.forward_replay = true;
-    counts.places.resize(initial_.size());
     if (diagnostics) diagnostics->marking_domain = markings_.domain;
-    for (std::size_t place = 0; place < initial_.size(); ++place) {
-      const auto tokens = TokenInteger(initial_[place]);
-      counts.produced += tokens;
-      counts.places[place].produced += tokens;
-    }
     const auto emit = [&](std::size_t transition, bool event) {
       if (!forward_fire(marking, keys, transition, counts, &order)) return;
       if (executions) ++(*executions)[transition];
@@ -551,93 +721,8 @@ class Replayer {
         if (event) diagnostics->event_diagnostics.back().activated_transitions.push_back(transition);
       }
     };
-    for (const auto& step : trace) {
-      if (diagnostics) {
-        diagnostics->event_diagnostics.push_back({diagnostics->replayed_events, {}, {}});
-        ++diagnostics->replayed_events;
-      }
-      if (!step || transitions_by_activity_[*step].empty()) {
-        counts.has_unknown_activity = true;
-        if (diagnostics)
-          diagnostics->unknown_event_indices.push_back(diagnostics->replayed_events - 1);
-        continue;
-      }
-      const auto& targets = transitions_by_activity_[*step];
-      auto chosen = *std::max_element(targets.begin(), targets.end(), [&](auto left, auto right) {
-        return std::tie(transition_names[left], left) < std::tie(transition_names[right], right);
-      });
-      if (options.transition_identity_hashes && !net_.has_extended_arcs()) {
-        // The public enabled set includes every activity and silent transition.
-        // Filtering matching activities before constructing that set changes
-        // its iteration order when collisions or table growth are involved.
-        std::vector<std::size_t> enabled_candidates;
-        for (std::size_t transition = 0; transition < net_.transitions().size(); ++transition)
-          if (enabled(marking, transition)) enabled_candidates.push_back(transition);
-        for (const auto transition : replay_identity_set_order(
-                 enabled_candidates, *options.transition_identity_hashes)) {
-          if (std::find(targets.begin(), targets.end(), transition) != targets.end()) {
-            chosen = transition;
-            break;
-          }
-        }
-      } else {
-        for (const auto transition : targets) {
-          if (enabled(marking, transition)) { chosen = transition; break; }
-        }
-      }
-      if (!enabled(marking, chosen) && options.walk_through_hidden_transitions) {
-        if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {
-          const auto path = silent_path(marking, [&](const Marking& candidate) { return enabled(candidate, chosen); });
-          if (path) for (const auto transition : *path) emit(transition, true);
-        } else {
-          forward_route_hidden(marking, keys, chosen, place_names,
-                               options,
-                               [&](auto transition) { emit(transition, true); });
-        }
-      }
-      const bool forced = !enabled(marking, chosen);
-      if (forced && diagnostics) {
-        diagnostics->transitions_with_problems.push_back(chosen);
-        diagnostics->event_diagnostics.back().transitions_with_problems.push_back(chosen);
-      }
-      if (forced && options.stop_immediately_unfit) {
-        ++counts.missing;
-        if (diagnostics) diagnostics->replay_stopped = true;
-        break;
-      }
-      // A null-selected silent event has no PLTR transition-map key. This
-      // rejection occurs during the event, before per-trace float conversion.
-      if (options.enable_pltr_fitness && *step == net_.activities().size())
-        throw std::invalid_argument("null transition PLTR key");
-      if (full_result_ && options.enable_pltr_fitness &&
-          net_.transitions()[chosen].activity &&
-          net_.activities()[*net_.transitions()[chosen].activity].empty())
-        throw TokenReplayTransitionKeyError(chosen);
-      const auto before_cleaning = forced && !components.empty()
-          ? keys : detail::ReplayMarkingKeys{};
-      emit(chosen, true);
-      if (!before_cleaning.empty()) {
-        const auto introduced_places = detail::cleaning_introduced_places(keys, before_cleaning, place_names);
-        const auto unique_names = detail::cleaning_unique_place_names(keys, place_names);
-        for (const auto& component : components) {
-          const bool introduced = std::any_of(component.begin(), component.end(),
-              [&](auto place) { return keys[place] && introduced_places[place]; });
-          if (!introduced) continue;
-          for (const auto place : component) {
-            if (keys[place] && before_cleaning[place] && unique_names[place]) {
-              marking[place] = 0;
-              keys[place] = false;
-              std::erase(order, place);
-              ++counts.remaining;
-              ++counts.places[place].remaining;
-              if (diagnostics && std::find(diagnostics->cleaned_place_indices.begin(),
-                  diagnostics->cleaned_place_indices.end(), place) == diagnostics->cleaned_place_indices.end())
-                diagnostics->cleaned_place_indices.push_back(place);
-            }
-          }
-        }
-      }
-    }
+    for (const auto& step : trace)
+      if (!forward_event(state, step, options, configuration, executions, diagnostics)) break;
     const auto final_present = [&]() {
       for (std::size_t place = 0; place < keys.size(); ++place)
         if (final_keys[place] && !keys[place]) return false;
@@ -4623,6 +4708,130 @@ replay_firing_sequences(const PetriNet& net,
     result.push_back(replayer.clean_firing_sequence(ids));
   }
   return result;
+}
+
+void detail::forward_token_prefix_walk_impl(
+    const PetriNet& net, const TokenReplayOptions& options, const TokenPrefixTrie& trie,
+    void (*visit)(void*, std::size_t, const std::vector<std::size_t>*), void* context) {
+  if (options.variant != TokenReplayVariant::kForward || !options.stop_immediately_unfit ||
+      options.try_to_reach_final_marking_through_hidden || options.consider_remaining_in_fitness ||
+      options.consider_activities_not_in_model_in_fitness)
+    throw std::logic_error("token prefix walk requires the precision replay options");
+  const auto nodes = trie.parent.size();
+  if (trie.label.size() != nodes)
+    throw std::logic_error("token prefix trie is malformed");
+  std::vector<std::size_t> depth(nodes, 0);
+  for (std::size_t node = 1; node < nodes; ++node) {
+    if (trie.parent[node] >= node || trie.label[node] >= trie.labels.size())
+      throw std::logic_error("token prefix trie is malformed");
+    depth[node] = depth[trie.parent[node]] + 1;
+  }
+  // The materialised prefix log holds one event per prefix step; its row
+  // bound is checked over that whole log first.
+  if (options.max_rows_to_materialize) {
+    std::size_t available = *options.max_rows_to_materialize;
+    for (const auto node : trie.scored) {
+      if (depth[node] > available)
+        throw std::length_error("token replay input exceeds max_rows_to_materialize");
+      available -= depth[node];
+    }
+  }
+  // The full-result checks that precede replay.
+  const auto transition_name_values = detail::replay_transition_names(
+      options.nullable_transition_names, options.transition_names, net);
+  detail::validate_forward_transition_name_order(transition_name_values);
+  if (options.place_fitness_order) {
+    std::vector<bool> listed(net.place_count(), false);
+    if (options.place_fitness_order->size() != listed.size())
+      throw std::invalid_argument("place_fitness_order must contain every root place exactly once");
+    for (const auto place : *options.place_fitness_order) {
+      if (place >= listed.size() || listed[place])
+        throw std::invalid_argument("place_fitness_order must contain every root place exactly once");
+      listed[place] = true;
+    }
+  }
+  // Each distinct label resolves to a model activity the way the grouped
+  // variant (or, ungrouped, the event itself) resolves in the full replay.
+  const auto& selector = options.activity_attribute;
+  const bool grouped = !options.disable_variants.value_or(options.enable_pltr_fitness);
+  std::vector<std::optional<std::string>> model_labels(trie.labels.size());
+  std::vector<bool> null_labels(trie.labels.size(), false);
+  for (const auto& event : trie.labels) (void)selected_replay_activity(event, selector);
+  for (std::size_t index = 0; index < trie.labels.size(); ++index) {
+    const auto& event = trie.labels[index];
+    if (grouped) {
+      const auto activity = selected_replay_activity(event, selector);
+      auto cell = native_event_attribute(event, selector);
+      if (!cell) cell = EventAttribute{selector, activity.display_name.value_or(""),
+                                      AttributeKind::kString, !activity.display_name};
+      cell->key = selector;
+      cell->first_class_role = FirstClassAttributeRole::kNone;
+      cell->first_class_source_key.clear();
+      if (!root_cause_key_is_hashable(*cell))
+        throw std::invalid_argument("unhashable activity variant key");
+      Event generated;
+      generated.attributes.push_back(*cell);
+      const auto resolved = selected_replay_activity(generated, selector);
+      model_labels[index] = resolved.model_label;
+      null_labels[index] = !resolved.display_name;
+    } else {
+      const auto resolved = selected_replay_activity(event, selector);
+      model_labels[index] = resolved.model_label;
+      null_labels[index] = !resolved.display_name;
+    }
+  }
+  const Replayer replayer(net, options.initial_marking, options.final_marking, &options, true);
+  std::vector<std::optional<std::size_t>> ids(trie.labels.size());
+  for (std::size_t index = 0; index < ids.size(); ++index)
+    ids[index] = model_labels[index] ? replayer.activity_id(*model_labels[index])
+               : null_labels[index] ? replayer.null_activity_id() : std::nullopt;
+
+  // Replay is deterministic in its state, so a prefix replayed from the state
+  // its ancestor reached matches the prefix replayed alone; a prefix whose
+  // replay stopped leaves every extension at the same stopped state.
+  std::unordered_map<TokenMarking, std::vector<std::size_t>, TokenMarkingHash> enabled_cache;
+  auto state = replayer.start_prefix_walk();
+  std::size_t current = 0;
+  bool stopped = false;
+  std::vector<std::size_t> path;
+  for (std::size_t index = 0; index < trie.scored.size(); ++index) {
+    const auto target = trie.scored[index];
+    path.clear();
+    auto node = target;
+    while (node != 0 && depth[node] > depth[current]) {
+      path.push_back(node);
+      node = trie.parent[node];
+    }
+    if (node != current) {
+      path.clear();
+      for (node = target; node != 0; node = trie.parent[node]) path.push_back(node);
+      state = replayer.start_prefix_walk();
+      current = 0;
+      stopped = false;
+    }
+    for (auto step = path.rbegin(); step != path.rend(); ++step) {
+      if (!stopped && !replayer.advance_prefix_walk(state, ids[trie.label[*step]], options))
+        stopped = true;
+      current = *step;
+    }
+    // The full replay computes every row's fitness, which can overflow for
+    // token counts beyond floating-point range.
+    try {
+      (void)replayer.prefix_walk_fitness(state);
+    } catch (const std::overflow_error& error) {
+      if (std::string_view(error.what()) == "token integer does not fit floating-point range")
+        throw std::overflow_error("int too large to convert to float");
+      throw;
+    }
+    // The full replay lists enabled transitions for every row, fit or not.
+    auto found = enabled_cache.find(state.marking);
+    if (found == enabled_cache.end())
+      found = enabled_cache.emplace(state.marking,
+                                    replayer.enabled_transition_ids(state.marking, options)).first;
+    visit(context, index, stopped ? nullptr : &found->second);
+  }
+  // The checks the full result performs after replay.
+  (void)replay_token_result(EventLog{}, net, options);
 }
 
 bool final_marking_reachable(const PetriNet& net) {

@@ -24,6 +24,7 @@
 #include "minera/knowledge_injection.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/dfg_dataframe.hpp"
+#include "minera/eventually_follows.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
@@ -218,6 +219,9 @@ struct MineParams {
   // Keep this extension at the end so existing positional aggregate
   // initialization of MineParams remains source-compatible.
   DeclareConformanceOptions declare_conformance_options;
+  // Eventually-follows statistic selectors (empty start keeps the position
+  // semantics; a start attribute selects the reference's interval semantics).
+  EventuallyFollowsOptions eventually_follows;
 };
 
 using ConceptDriftParams = ConceptDriftOptions;

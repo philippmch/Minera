@@ -1045,11 +1045,16 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
   if (!log.traces.empty()) {
     const std::size_t sublog_count =
         (log.traces.size() - 1) / options.sub_log_size + 1;
-    result.sublogs.reserve(sublog_count);
     result.feature_vectors.reserve(sublog_count);
-    result.cumulative_sublogs.reserve(sublog_count);
+    if (options.materialize_sublogs) {
+      result.sublogs.reserve(sublog_count);
+      result.cumulative_sublogs.reserve(sublog_count);
+    }
+    result.sublog_ranges.reserve(sublog_count);
+    result.cumulative_sublog_ranges.reserve(sublog_count);
     result.sublog_start_timestamps.reserve(sublog_count);
   }
+  std::size_t cumulative_events = 0;
 
   for (std::size_t start = 0; start < log.traces.size();
        start += options.sub_log_size) {
@@ -1062,16 +1067,22 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
     copy_event_log_context(log, raw);
     raw.traces.insert(raw.traces.end(), log.traces.begin() + start,
                       log.traces.begin() + end);
-    result.sublogs.push_back(raw);
+    const std::size_t raw_events = raw.event_count();
+    cumulative_events += raw_events;
+    result.sublog_ranges.push_back({start, end, raw_events});
+    result.cumulative_sublog_ranges.push_back({0, end, cumulative_events});
     result.feature_vectors.push_back(
         extract_concept_drift_features(raw.traces, activities,
                                        options.activity_attribute));
-    // Keep this field cumulative from the beginning, as requested by the API.
-    EventLog cumulative_copy;
-    copy_event_log_context(log, cumulative_copy);
-    cumulative_copy.traces.insert(cumulative_copy.traces.end(), log.traces.begin(),
-                                   log.traces.begin() + end);
-    result.cumulative_sublogs.push_back(std::move(cumulative_copy));
+    if (options.materialize_sublogs) {
+      result.sublogs.push_back(std::move(raw));
+      // Keep this field cumulative from the beginning, as requested by the API.
+      EventLog cumulative_copy;
+      copy_event_log_context(log, cumulative_copy);
+      cumulative_copy.traces.insert(cumulative_copy.traces.end(), log.traces.begin(),
+                                     log.traces.begin() + end);
+      result.cumulative_sublogs.push_back(std::move(cumulative_copy));
+    }
     if (options.include_timestamps)
       result.sublog_start_timestamps.push_back(case_start_times[start]);
   }
@@ -1115,8 +1126,8 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
     }
   }
 
-  if (!result.sublogs.empty()) {
-    std::vector<bool> drift_boundaries(result.sublogs.size() + 1, false);
+  if (!result.sublog_ranges.empty()) {
+    std::vector<bool> drift_boundaries(result.sublog_ranges.size() + 1, false);
     for (const auto& point : result.change_points) {
       if (point.sublog_index > 0 &&
           point.sublog_index < drift_boundaries.size()) {
@@ -1126,15 +1137,27 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
 
     EventLog segment;
     copy_event_log_context(log, segment);
-    result.returned_sublogs.reserve(result.change_points.size() + 1);
-    for (std::size_t i = 0; i < result.sublogs.size(); ++i) {
-      const auto& raw = result.sublogs[i];
-      segment.traces.insert(segment.traces.end(), raw.traces.begin(),
-                            raw.traces.end());
-      if (drift_boundaries[i + 1] || i + 1 == result.sublogs.size()) {
-        result.returned_sublogs.push_back(std::move(segment));
-        segment = EventLog{};
-        copy_event_log_context(log, segment);
+    if (options.materialize_sublogs)
+      result.returned_sublogs.reserve(result.change_points.size() + 1);
+    result.returned_sublog_ranges.reserve(result.change_points.size() + 1);
+    ConceptDriftTraceRange segment_range;
+    for (std::size_t i = 0; i < result.sublog_ranges.size(); ++i) {
+      const auto& range = result.sublog_ranges[i];
+      segment_range.end = range.end;
+      segment_range.event_count += range.event_count;
+      if (options.materialize_sublogs) {
+        const auto& raw = result.sublogs[i];
+        segment.traces.insert(segment.traces.end(), raw.traces.begin(),
+                              raw.traces.end());
+      }
+      if (drift_boundaries[i + 1] || i + 1 == result.sublog_ranges.size()) {
+        result.returned_sublog_ranges.push_back(segment_range);
+        segment_range = ConceptDriftTraceRange{range.end, range.end, 0};
+        if (options.materialize_sublogs) {
+          result.returned_sublogs.push_back(std::move(segment));
+          segment = EventLog{};
+          copy_event_log_context(log, segment);
+        }
       }
     }
   }

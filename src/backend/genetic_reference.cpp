@@ -1,8 +1,12 @@
 #include "minera/genetic_reference.hpp"
 
 #include <algorithm>
+#include <map>
+#include <optional>
 #include <set>
+#include <string_view>
 #include <tuple>
+#include <vector>
 
 #include "minera/evaluation.hpp"
 
@@ -420,15 +424,85 @@ ReferenceGeneticPetriNet reference_genetic_petri_net(const ReferenceGeneticNet& 
   return result;
 }
 
+namespace {
+
+// Whether token replay reads nothing of an event but its activity label: a
+// present first-class activity with no typed value, source key or other
+// attribute (the events the genetic miner builds for its fitness log).
+bool plain_replay_event(const Event& event) {
+  return event.activity_state == FirstClassAttributeState::kPresent &&
+         !event.activity_attribute && event.activity_source_key.empty() &&
+         event.attributes.empty();
+}
+
+// The log's distinct activity sequences, each once (its first trace), and the
+// variant of every trace; empty when some event is not plain.
+struct GeneticReplayVariants {
+  EventLog log;
+  std::vector<std::size_t> trace_variant;
+};
+
+std::optional<GeneticReplayVariants> genetic_replay_variants(const EventLog& log) {
+  GeneticReplayVariants result;
+  result.log.attributes = log.attributes;
+  result.log.metadata = log.metadata;
+  result.trace_variant.reserve(log.traces.size());
+  std::map<std::vector<std::string_view>, std::size_t> variants;
+  std::vector<std::string_view> key;
+  for (const auto& trace : log.traces) {
+    key.clear();
+    for (const auto& event : trace.events) {
+      if (!plain_replay_event(event)) return std::nullopt;
+      key.push_back(event.activity);
+    }
+    const auto [found, added] = variants.try_emplace(key, result.log.traces.size());
+    if (added) result.log.traces.push_back(trace);
+    result.trace_variant.push_back(found->second);
+  }
+  return result;
+}
+
+}  // namespace
+
 double reference_genetic_fitness(const ReferenceGeneticMatrix& matrix, const EventLog& log,
                                  const ReferenceGeneticReplayOrder* order) {
   const auto petri = reference_genetic_petri_net(reference_genetic_net(matrix), order);
   ReplayFitnessOptions options;
   options.place_outgoing_transition_order = petri.outgoing_order;
   options.place_names = petri.place_names;
-  const auto replay =
-      evaluate_replay_fitness(log, petri.net, ReplayFitnessVariant::TOKEN_BASED, options);
-  return 0.4 * replay.average_trace_fitness + 0.6 * replay.percentage_fit_traces / 100.0;
+  const auto variants = genetic_replay_variants(log);
+  if (!variants) {
+    const auto replay =
+        evaluate_replay_fitness(log, petri.net, ReplayFitnessVariant::TOKEN_BASED, options);
+    return 0.4 * replay.average_trace_fitness + 0.6 * replay.percentage_fit_traces / 100.0;
+  }
+  // Token replay of a trace depends only on its activity sequence, so each
+  // variant is replayed once; the totals are then accumulated over every
+  // trace in log order exactly as the whole-log replay accumulates them.
+  const auto replay = evaluate_replay_fitness(variants->log, petri.net,
+                                              ReplayFitnessVariant::TOKEN_BASED, options);
+  // Without per-trace rows the replay stopped before any trace (an invalid
+  // net or marking), and its result does not depend on the traces.
+  if (!replay.token_result.trace_diagnostics)
+    return 0.4 * replay.average_trace_fitness + 0.6 * replay.percentage_fit_traces / 100.0;
+  const auto& rows = *replay.token_result.trace_diagnostics;
+  double fitness_sum = 0.0;
+  std::size_t fitting = 0;
+  TokenInteger produced = 0, consumed = 0;
+  for (const auto variant : variants->trace_variant) {
+    const auto& row = rows.at(variant);
+    fitting += row.trace_is_fit ? 1 : 0;
+    fitness_sum += row.trace_fitness;
+    produced += row.produced;
+    consumed += row.consumed;
+  }
+  const std::size_t trace_count = variants->trace_variant.size();
+  double average_trace_fitness = 0.0, percentage_fit_traces = 0.0;
+  if (trace_count > 0 && consumed > 0 && produced > 0) {
+    average_trace_fitness = fitness_sum / double(trace_count);
+    percentage_fit_traces = 100.0 * double(fitting) / double(trace_count);
+  }
+  return 0.4 * average_trace_fitness + 0.6 * percentage_fit_traces / 100.0;
 }
 
 ReferenceGeneticTournament reference_genetic_tournament(

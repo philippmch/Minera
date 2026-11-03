@@ -935,6 +935,8 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     }
   }
   sort_ocel_events_by_timestamp(log, true);
+  // The reference SQLite reader drops events and objects without relations.
+  drop_unrelated_ocel_entries(log);
   return log;
 #endif
 }

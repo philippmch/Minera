@@ -313,6 +313,17 @@ OrganizationalSnaResult discover_organizational_sna(
     if (maximum > 0.0)
       for (auto& [pair, weight] : weights) { (void)pair; weight /= maximum; }
   }
+  // Every reference SNA variant takes np.max over the connection values and
+  // raises ValueError ("zero-size array to reduction operation maximum which
+  // has no identity") when there is no connection. The empty network stays
+  // available, reported as not computed, as other reference exceptions are.
+  if (weights.empty()) {
+    result.diagnostics.computed = false;
+    result.diagnostics.message =
+        "the reference raises ValueError: zero-size array to reduction operation "
+        "maximum which has no identity (no connections)";
+    return result;
+  }
   emit_edges(weights, result, options.max_edges);
   result.diagnostics.edge_count = result.edges.size();
   result.diagnostics.computed = true;

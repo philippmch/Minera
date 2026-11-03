@@ -19,6 +19,15 @@ describe("precision the backend could not compute", () => {
     expect(render(null)).toContain("unavailable");
   });
 
+  it("names the causes that apply to each precision source", () => {
+    const alignment = precisionGauge(null, true, "hint").hint;
+    const token = precisionGauge(null, true, "hint", "token_replay").hint;
+    expect(alignment).toContain("silent transitions");
+    expect(alignment).not.toContain("backwards");
+    expect(token).toContain("silent transitions");
+    expect(token).toContain("backwards token replay");
+  });
+
   it("keeps genuine numbers, including a real zero", () => {
     expect(render(0)).toContain("conf-gauge poor");
     expect(render(0)).toContain("0.0%");

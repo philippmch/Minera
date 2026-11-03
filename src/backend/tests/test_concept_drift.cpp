@@ -710,6 +710,25 @@ int main() {
   assert(boundary_result.returned_sublogs[0].traces[1].case_id == "c2");
   assert(boundary_result.returned_sublogs[1].traces[0].case_id == "c3");
   assert(boundary_result.returned_sublogs[1].traces[1].case_id == "c4");
+  // The index-only result serializes exactly like the materialized one.
+  for (auto ranged : {options, boundary_options}) {
+    const auto materialized = minera::detect_concept_drift(log, ranged);
+    ranged.materialize_sublogs = false;
+    const auto indexed = minera::detect_concept_drift(log, ranged);
+    assert(indexed.sublogs.empty() && indexed.returned_sublogs.empty() &&
+           indexed.cumulative_sublogs.empty());
+    assert(indexed.sublog_ranges.size() == materialized.sublogs.size());
+    assert(indexed.returned_sublog_ranges.size() == materialized.returned_sublogs.size());
+    for (std::size_t i = 0; i < indexed.returned_sublog_ranges.size(); ++i) {
+      const auto& range = indexed.returned_sublog_ranges[i];
+      assert(range.trace_count() == materialized.returned_sublogs[i].traces.size());
+      for (std::size_t t = range.begin; t < range.end; ++t)
+        assert(log.traces[t].case_id ==
+               materialized.returned_sublogs[i].traces[t - range.begin].case_id);
+    }
+    assert(minera::concept_drift_json(indexed) ==
+           minera::concept_drift_json(materialized));
+  }
   assert(*boundary_result.returned_sublogs[0].attribute("fixture") ==
          "concept-drift");
   assert(*boundary_result.returned_sublogs[0].traces[0].attribute("case:group") ==

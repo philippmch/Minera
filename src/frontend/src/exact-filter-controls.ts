@@ -109,9 +109,41 @@ const runs=new WeakMap<object,ExactFilterRun>();
 export const exactFilterRun=(value:object):ExactFilterRun|undefined=>runs.get(value);
 export function exactFilterMatchesWireFilename(value:object,field:string,name:string):boolean|undefined{const run=runs.get(value);if(!run?.audit)return undefined;return [...run.audit.original_inputs,...run.audit.query_inputs].some(part=>part.file&&same(bytes(part.name),nativeStringBytes(field))&&same(bytes(part.filename),nativeStringBytes(name)));}
 export class OwnedExactFilterResult extends Error{constructor(public readonly run:ExactFilterRun){super(run.http_status>=400?"Exact native operation returned diagnostics.":"Complete native result is retained; ordinary analysis projection is unavailable.");this.name="OwnedExactFilterResult";}}
+// The text of `raw` (one JSON object) without its last top-level `name`
+// member, or undefined when it has none: a linear scan of the text.
+export function withoutLastTopLevelMember(raw:string,name:string):string|undefined{
+ let depth=0,position=0,expectKey=false,lastSeparator=-1,found:{start:number;depth:number}|undefined,member:[number,number]|undefined;
+ const string=(start:number)=>{let i=start+1;for(;;){const quote=raw.indexOf('"',i);if(quote<0)throw new Error("Invalid native JSON text.");let slashes=0;for(let j=quote-1;j>start&&raw.charCodeAt(j)===92;--j)++slashes;i=quote+1;if(slashes%2===0)return i;}};
+ while(position<raw.length){const c=raw.charCodeAt(position);
+  if(c===34){const end=string(position);if(depth===1&&expectKey){if(JSON.parse(raw.slice(position,end))===name)found={start:lastSeparator,depth};expectKey=false;}position=end;continue;}
+  if(c===123||c===91){++depth;if(depth===1){expectKey=true;lastSeparator=position+1;}}
+  else if(c===125||c===93){if(depth===1&&found){member=[found.start,position];found=undefined;}--depth;}
+  else if(c===44&&depth===1){if(found){member=[found.start,position];found=undefined;}expectKey=true;lastSeparator=position;}
+  ++position;}
+ if(!member)return undefined;const [start,end]=member;
+ // A first member keeps the opening brace; a later one drops its comma.
+ return raw.slice(0,start)+raw.slice(end);
+}
+// Restores what the backend writes once: a JSON-object legacy body is the
+// envelope text without exact_controls ({"body":null,"json":null}), and a
+// source snapshot equal to an earlier one is {"same_as":"<member>"}.
+function restoreExactAudit(value:Record<string,unknown>,raw:string):void{
+ const audit=value.exact_controls;if(!object(audit))return;
+ const native=audit.selected_native;
+ if(object(native)){
+  const resolve=(v:unknown)=>object(v)&&keys(v,["same_as"])&&(v.same_as==="source_before"||v.same_as==="source_after")?native[v.same_as]:v;
+  native.source_after=resolve(native.source_after);
+  const call=native.heuristic_call;if(object(call)){call.source_before=resolve(call.source_before);call.source_after=resolve(call.source_after);}
+ }
+ const legacy=audit.legacy_response;
+ if(value.family!=="EXACT_FILTER_DISCOVERY"&&object(legacy)&&legacy.body===null&&legacy.json===null&&legacy.json_error===null){
+  const body=withoutLastTopLevelMember(raw,"exact_controls");if(body===undefined)return;
+  legacy.body=body;legacy.json=parseNativeJson(body);
+ }
+}
 const hash=async(b:Uint8Array<ArrayBuffer>)=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",b)),n=>n.toString(16).padStart(2,"0")).join("");
 export async function readExactFilterResponse(response:Response,path:string,body:FormData,fields:Array<[string,string]>,signal?:AbortSignal):Promise<ExactFilterRun>{
- const value=await readNativeResponse(response,{path,fields});signal?.throwIfAborted();if(!object(value))throw new Error("Invalid exact native response (HTTP "+response.status+").");
+ const value=await readNativeResponse(response,{path,fields});signal?.throwIfAborted();if(!object(value))throw new Error("Invalid exact native response (HTTP "+response.status+").");restoreExactAudit(value,nativeResponseJson(value));
  const ltl=isOriginalLtlEnvelope(value)?value:null,audit=isExactFilterAudit(value.exact_controls)?value.exact_controls:null;if(!ltl&&!audit)throw new Error("The response did not retain complete exact native diagnostics.");
  if((path==="/api/embedding-workbench")!==Boolean(ltl))throw new Error("The exact native response belongs to a different operation.");
  if(value.family==="EXACT_FILTER_DISCOVERY"&&(value.operation!==({"/api/mine":"mine","/api/discover-workflow":"discover_workflow","/api/discover-workflow-input":"discover_workflow_input"}as Record<string,string>)[path]||nativeJson(value.legacy_response)!==nativeJson(audit?.legacy_response)))throw new Error("Exact fallback operation or legacy snapshot changed.");

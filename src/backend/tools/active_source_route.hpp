@@ -2,6 +2,13 @@
 
 // Included in the server implementation namespace. The source owns every
 // native view; publication is guarded independently of client cancellation.
+// Returns the allocator's free pages to the system (glibc keeps them otherwise).
+void minera_release_free_memory() {
+#if defined(__GLIBC__)
+  malloc_trim(0);
+#endif
+}
+
 std::string active_source_safe_json(std::string_view input) {
   constexpr char hex[] = "0123456789abcdef";
   std::string output;
@@ -302,6 +309,14 @@ std::string active_source_snapshot_json(const MinedSession& session, bool comple
   const auto& s = source.selectors();
   const auto table = [complete](const minera::EventTable* value) {return complete && value ? minera::serialize_event_table_input_json(*value) : "null";};
   const auto log = [complete](const minera::EventLog* value) {return complete && value ? minera::serialize_active_source_log_json(*value) : "null";};
+  // A view equal to an earlier member is written once: later members are
+  // {"same_as":"<member>"} references, which the inspector resolves.
+  const auto same_as = [](const std::string& value, const std::string& earlier, const char* name) {
+    return value != "null" && value == earlier ? "{\"same_as\":\"" + std::string(name) + "\"}" : value;
+  };
+  const auto input = table(source.original_table_if_available());
+  const auto checked = table(source.checked_table_if_available());
+  const auto original_log = log(source.original_log_if_available());
   std::string body = "{\"format\":" + active_source_quote(source.file().format == "table" ? "table" : "auto") +
       ",\"detected_format\":" + active_source_quote(source.file().format) +
       ",\"shape\":" + active_source_quote(active_source_shape(source.selected_kind())) +
@@ -311,13 +326,13 @@ std::string active_source_snapshot_json(const MinedSession& session, bool comple
       ",\"source_unchanged\":true,\"source_selectors\":{\"case_id_key\":" + active_source_quote(s.case_id_key) +
       ",\"activity_key\":" + active_source_quote(s.activity_key) + ",\"timestamp_key\":" + active_source_quote(s.timestamp_key) +
       ",\"resource_key\":" + active_source_quote(s.resource_key) + ",\"lifecycle_key\":" + active_source_quote(s.lifecycle_key) +
-      "},\"input_before\":" + table(source.original_table_if_available()) +
-      ",\"input_after\":" + table(source.original_table_if_available()) +
-      ",\"checked_table\":" + table(source.checked_table_if_available()) +
-      ",\"original_log\":" + log(source.original_log_if_available()) +
-      ",\"checked_log\":" + log(source.checked_log_if_available()) +
+      "},\"input_before\":" + input +
+      ",\"input_after\":" + same_as(input, input, "input_before") +
+      ",\"checked_table\":" + same_as(checked, input, "input_before") +
+      ",\"original_log\":" + original_log +
+      ",\"checked_log\":" + same_as(log(source.checked_log_if_available()), original_log, "original_log") +
       ",\"prepared_stream\":" + (complete && source.checked_stream_if_available() ? minera::serialize_active_source_stream_json(*source.checked_stream_if_available()) : "null") +
-      ",\"prepared_lazy_table\":" + (source.checked_lazy_if_available() ? table(source.checked_table_if_available()) : "null") +
+      ",\"prepared_lazy_table\":" + (source.checked_lazy_if_available() ? same_as(checked, checked, "checked_table") : "null") +
       (complete ? "" : ",\"detail\":\"summary\"") +
       ",\"original_table_origin\":" + active_source_quote(source.original_table_origin()) +
       ",\"paired_csv_import_error\":" + (session.paired_csv_import_error.empty() ? "null" : active_source_quote(session.paired_csv_import_error)) +
@@ -359,6 +374,33 @@ minera::LogQueryTable cached_source_query_table(const MinedSession& session) {
     result.table.rows[i].push_back(std::move(index));
   }
   result.table.validate();
+  return result;
+}
+
+// The query table's columns and row count, read from the checked source
+// without building the table (log-query/schema needs nothing else).
+struct SourceQuerySchema {
+  std::vector<std::string> columns;
+  std::string event_index_column;
+  std::size_t row_count = 0;
+};
+
+SourceQuerySchema source_query_schema(const MinedSession& session) {
+  SourceQuerySchema result;
+  if (!session.active_source) {
+    auto table = cached_source_query_table(session);
+    result.columns = std::move(table.table.columns);
+    result.event_index_column = std::move(table.event_index_column);
+    result.row_count = table.table.rows.size();
+    return result;
+  }
+  const auto& table = session.active_source->checked_table();
+  result.columns = table.columns;
+  result.event_index_column = "__minera_event_index";
+  const auto lower = [](std::string text) {for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); return text;};
+  while (std::any_of(result.columns.begin(), result.columns.end(), [&](const auto& column) {return lower(column) == lower(result.event_index_column);})) result.event_index_column += '_';
+  result.columns.push_back(result.event_index_column);
+  result.row_count = table.rows.size();
   return result;
 }
 
@@ -470,7 +512,12 @@ struct ActiveMiningTicket {
   std::shared_ptr<const MinedSession> previous;
   std::shared_ptr<const ClusteringAnalysis> previous_clustering;
   std::shared_ptr<const MinedSession> published;
+  // Set once the published response reached the client in full: the rollback
+  // session is then released, so a later cancel keeps the delivered session.
+  bool delivered = false;
 };
+// The ticket this request thread published, handed to the route wrapper.
+thread_local std::shared_ptr<ActiveMiningTicket> t_published_mining_ticket;
 std::uint64_t g_active_mining_generation = 0;
 std::map<std::string, std::shared_ptr<ActiveMiningTicket>> g_active_mining_requests;
 
@@ -515,6 +562,47 @@ void publish_active_mining(const std::shared_ptr<ActiveMiningTicket>& ticket,
   session->mining_request_id = ticket->id;
   session->active_source_native_dispatch = ticket->native_source_dispatch;
   g_session = session; g_clustering_analysis.reset(); ticket->published = session;
+  t_published_mining_ticket = ticket;
+}
+
+void release_mining_rollback(const std::shared_ptr<ActiveMiningTicket>& ticket) {
+  std::shared_ptr<const MinedSession> previous;
+  std::shared_ptr<const ClusteringAnalysis> previous_clustering;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    if (ticket->canceled || ticket->delivered) return;
+    ticket->delivered = true;
+    previous = std::move(ticket->previous); previous_clustering = std::move(ticket->previous_clustering);
+  }
+  // Destroy the replaced session outside the lock.
+  previous.reset(); previous_clustering.reset();
+  minera_release_free_memory();
+}
+
+// A mining response is streamed from a shared body so its completion is
+// observable: only a response written in full to a still-connected client
+// releases the rollback session (a client that aborted keeps cancel-mine
+// able to restore the previous source). The body bytes are unchanged.
+void deliver_published_mining(httplib::Response& response) {
+  auto ticket = std::move(t_published_mining_ticket);
+  t_published_mining_ticket.reset();
+  if (!ticket || response.body.empty()) return;
+  const auto type = response.get_header_value("Content-Type");
+  auto body = std::make_shared<std::string>(std::move(response.body));
+  if (type.starts_with("application/json") && body->find('\xed') != std::string::npos)
+    *body = active_source_safe_json(*body);
+  response.body.clear();
+  // set_content_provider adds the Content-Type header again.
+  response.headers.erase("Content-Type");
+  const auto size = body->size();
+  response.set_content_provider(size, type,
+      [body](std::size_t offset, std::size_t length, httplib::DataSink& sink) {
+        return sink.write(body->data() + offset, std::min(length, body->size() - offset));
+      },
+      [ticket, body](bool success) mutable {
+        body.reset();
+        if (success) release_mining_rollback(ticket);
+      });
 }
 
 void handle_cancel_mine(const httplib::Request& request, httplib::Response& response) {
@@ -522,18 +610,27 @@ void handle_cancel_mine(const httplib::Request& request, httplib::Response& resp
     const auto id = request.get_param_value("request_id");
     if (id.size() != 36 || request.params.size() != 1 || !request.body.empty())
       throw std::invalid_argument("cancel-mine requires a request UUID and an empty body");
+    // A rolled-back session is destroyed after the lock is released.
+    std::shared_ptr<const MinedSession> replaced;
+    std::string held;
+    {
     std::lock_guard<std::mutex> lock(g_session_mutex);
     if (!g_active_mining_requests.contains(id) && g_active_mining_requests.size() >= 2048)
       throw std::invalid_argument("too many unknown mining request identities");
     auto& ticket = g_active_mining_requests[id];
     if (!ticket) {ticket = std::make_shared<ActiveMiningTicket>(); ticket->id = id;}
     ticket->canceled = true;
-    if (ticket->published && g_session == ticket->published && ticket->generation == g_active_mining_generation) {
+    if (ticket->published && !ticket->delivered && g_session == ticket->published && ticket->generation == g_active_mining_generation) {
+      replaced = std::move(g_session);
       g_session = ticket->previous; g_clustering_analysis = ticket->previous_clustering;
+      // The canceled ticket can never restore again, so it holds nothing.
+      ticket->published.reset(); ticket->previous.reset(); ticket->previous_clustering.reset();
     }
     // The source the backend holds once the cancel is applied, so the UI hands
     // back only the source that is really live, whatever the request order.
-    const auto held = g_session ? active_source_quote(std::to_string(g_session->query_source_id)) : std::string("null");
+    held = g_session ? active_source_quote(std::to_string(g_session->query_source_id)) : std::string("null");
+    }
+    if (replaced) {replaced.reset(); minera_release_free_memory();}
     response.set_content("{\"family\":\"ACTIVE_SOURCE_CANCEL\",\"request_id\":" + active_source_quote(id) + ",\"canceled\":true,\"active_source_id\":" + held + "}", "application/json");
   } catch (const std::exception& error) {response.status = 400; response.set_content(error_json(error.what()), "application/json");}
 }

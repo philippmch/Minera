@@ -137,6 +137,15 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader);
 // `nanoseconds` selects kInstantNanoseconds, otherwise kIsoFormat.
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
 
+// Keeps only the events and objects that take part in at least one
+// event-object relation, as every reference OCEL JSON, XML and SQLite reader
+// does after reading (the OCEL CSV reader keeps them). Relations to a dropped
+// side, object-to-object links touching a dropped object, event-to-event links
+// touching a dropped event and the changes of dropped objects go with them;
+// a log without relations ends up with no events and no objects. Order,
+// multiplicity and the type catalogs are kept.
+void drop_unrelated_ocel_entries(Ocel& log);
+
 Ocel parse_ocel_json(std::string_view json,
                      const OcelJsonLimits& limits = {});
 // Exact native filter inputs may use literal empty IDs, type names and

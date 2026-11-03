@@ -78,15 +78,24 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`;
 const grade = (value: number) =>
   value >= 0.95 ? "good" : value >= 0.8 ? "fair" : "poor";
 
-// A metric the backend could not compute (precision whose silent-transition
-// search ran out of budget) carries no value and is never graded.
+// A metric the backend could not compute carries no value and is never graded.
 export interface Gauge { label: string; value: number | null; hint: string }
-const INCOMPLETE_PRECISION_HINT =
-  "Not computed: the model's silent transitions allow more states than the precision search explores, so any number would understate the escaping behavior.";
+// Why precision can be missing. Alignment precision stops only when its
+// silent-transition search runs out of budget. Token-replay precision also
+// stops there, and additionally, with backwards replay, at a prefix that
+// cannot be replayed (no consumed or produced tokens), where the reference
+// evaluator raises instead of returning a value.
+export type PrecisionSource = "alignments" | "token_replay";
+const INCOMPLETE_PRECISION_HINTS: Record<PrecisionSource, string> = {
+  alignments:
+    "Not computed: the model's silent transitions allow more states than the precision search explores, so any number would understate the escaping behavior.",
+  token_replay:
+    "Not computed: either the model's silent transitions allow more states than the precision search explores, or backwards token replay reached a log prefix it cannot replay, where the reference evaluator raises instead of returning a value.",
+};
 /** The precision gauge: unavailable when the backend could not compute it. */
-export function precisionGauge(precision: number | null, incomplete: boolean | undefined, hint: string): Gauge {
+export function precisionGauge(precision: number | null, incomplete: boolean | undefined, hint: string, source: PrecisionSource = "alignments"): Gauge {
   return precision === null || incomplete
-    ? { label: "Precision", value: null, hint: INCOMPLETE_PRECISION_HINT }
+    ? { label: "Precision", value: null, hint: INCOMPLETE_PRECISION_HINTS[source] }
     : { label: "Precision", value: precision, hint };
 }
 export function GaugeTile({ metric }: { metric: Gauge }) {
@@ -1513,7 +1522,7 @@ function TokenReplay({
       hint: "Token-replay: how much of the log the model reproduces.",
     },
     precisionGauge(conformance.precision, conformance.precision_incomplete,
-      "Escaping edges: how tightly the model matches the log (lower = the model allows more unseen behavior)."),
+      "Escaping edges: how tightly the model matches the log (lower = the model allows more unseen behavior).", "token_replay"),
     ...(conformance.generalization !== undefined
       ? [
           {

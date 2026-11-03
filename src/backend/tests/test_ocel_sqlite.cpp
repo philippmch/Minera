@@ -212,6 +212,47 @@ int main() {
   assert(external.event_type_attributes.at("Create").at("active") == "boolean");
   assert(external.object_type_attributes.at("order").at("status") == "string");
 
+  // Reference capture (pm4py 2.7.22 read_ocel2_sqlite): an event and an object
+  // without event-object relations are dropped with the object's changes and
+  // the O2O link touching it -> 1 event, 1 object, 1 relation, 0 O2O, 1 change.
+  const auto orphan_path = external_path.string() + ".orphans.sqlite";
+  std::filesystem::remove(orphan_path, ignored);
+  sqlite3* orphan_db = nullptr;
+  assert(sqlite3_open_v2(orphan_path.c_str(), &orphan_db,
+                         SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) ==
+         SQLITE_OK);
+  exec_sql(orphan_db,
+           "CREATE TABLE event (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"
+           "CREATE TABLE object (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"
+           "CREATE TABLE event_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
+           "CREATE TABLE object_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
+           "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+           "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
+           "CREATE TABLE event_Create (ocel_id TEXT PRIMARY KEY, ocel_time TEXT, priority INTEGER, active BOOLEAN);"
+           "CREATE TABLE object_order (ocel_id TEXT, ocel_time TEXT, status TEXT, ocel_changed_field TEXT, \"@@cumcount\" INTEGER);"
+           "INSERT INTO event VALUES ('e1', 'Create');"
+           "INSERT INTO event VALUES ('e2', 'Create');"
+           "INSERT INTO object VALUES ('o1', 'order');"
+           "INSERT INTO object VALUES ('o2', 'order');"
+           "INSERT INTO event_map_type VALUES ('Create', 'Create');"
+           "INSERT INTO object_map_type VALUES ('order', 'order');"
+           "INSERT INTO event_Create VALUES ('e1', '2024-02-01T00:00:00Z', 7, 1);"
+           "INSERT INTO event_Create VALUES ('e2', '2024-02-03T00:00:00Z', 8, 0);"
+           "INSERT INTO object_order VALUES ('o1', NULL, 'open', 'status', 0);"
+           "INSERT INTO object_order VALUES ('o1', '2024-02-02T00:00:00Z', 'paid', 'status', 1);"
+           "INSERT INTO object_order VALUES ('o2', NULL, 'open', 'status', 0);"
+           "INSERT INTO object_order VALUES ('o2', '2024-02-04T00:00:00Z', 'paid', 'status', 1);"
+           "INSERT INTO event_object VALUES ('e1', 'o1', 'uses');"
+           "INSERT INTO object_object VALUES ('o1', 'o2', 'next');");
+  assert(sqlite3_close(orphan_db) == SQLITE_OK);
+  const auto orphans = minera::import_ocel_sqlite(orphan_path);
+  assert(orphans.events.size() == 1 && orphans.events[0].id == "e1");
+  assert(orphans.objects.size() == 1 && orphans.objects[0].id == "o1");
+  assert(orphans.relations.size() == 1 && orphans.o2o.empty());
+  assert(orphans.object_changes.size() == 1 &&
+         orphans.object_changes[0].object_id == "o1");
+  std::filesystem::remove(orphan_path, ignored);
+
   std::filesystem::remove(path, ignored);
   std::filesystem::remove(external_path, ignored);
   return 0;

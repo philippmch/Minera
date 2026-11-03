@@ -96,6 +96,29 @@ void literal_petri_storage() {
   const auto empty=parse_oc_playout_workbench_petri_net_json(R"({"transition_names":[],"discovery_markings":{}})");assert(empty.transition_names()&&empty.transition_names()->empty()&&empty.discovery_markings());
   assert(!parse_oc_playout_workbench_petri_net_json("{}").transition_names());
 }
+// Workbench clients validate the nine-field PetriNet carrier exactly, so a net
+// that carries native place names (tree-converted nets do) must not add a
+// tenth field; a carrier that supplies place_names is still read.
+void carrier_omits_native_place_names() {
+  PetriNetLiteralStorage state;state.place_count=2;state.activities={"a"};
+  PetriTransition transition;transition.activity=0;transition.inputs={0};transition.outputs={1};state.transitions={transition};
+  state.place_names=std::vector<std::string>{"source","sink"};
+  const auto net=PetriNet::from_literal_storage(state);assert(net.place_names());
+  const auto json=serialize_oc_playout_workbench_petri_net_json(net);
+  assert(json.find("place_names")==std::string::npos);
+  std::size_t top_level_keys=0,depth=0;bool quoted=false,escaped=false,key=true;
+  for(const char c:json){
+    if(quoted){if(escaped)escaped=false;else if(c=='\\')escaped=true;else if(c=='"')quoted=false;continue;}
+    if(c=='"'){quoted=true;if(depth==1&&key){++top_level_keys;key=false;}}
+    else if(c=='{'||c=='['){++depth;}else if(c=='}'||c==']'){--depth;}
+    else if(c==','&&depth==1){key=true;}
+  }
+  assert(top_level_keys==9);
+  const auto copy=parse_oc_playout_workbench_petri_net_json(json);assert(serialize_oc_playout_workbench_petri_net_json(copy)==json);
+  auto named=json;named.insert(named.size()-1,R"(,"place_names":["x","y"])");
+  const auto read=parse_oc_playout_workbench_petri_net_json(named);
+  assert(read.place_names()&&(*read.place_names())[1]=="y"&&serialize_oc_playout_workbench_petri_net_json(read)==json);
+}
 void complete_graph_annotations_and_causal_storage() {
   auto model=graph();model.activities={odd_bytes(),"",odd_bytes()};model.object_types={"dup","dup",""};model.annotated=false;
   model.activity_object_types[odd_bytes()]={"dup","dup",""};model.activity_variable_object_types[""]={odd_bytes(),odd_bytes()};model.double_arcs_on_activity[odd_bytes()][""]=false;
@@ -245,6 +268,7 @@ int main() {
   try {
     std::cerr<<"defaults/options/exact integers\n";defaults_options_and_exact_numbers();
     std::cerr<<"literal Petri storage without normalization\n";literal_petri_storage();
+    std::cerr<<"nine-field carrier without native place names\n";carrier_omits_native_place_names();
     std::cerr<<"complete graph/annotation/causal state\n";complete_graph_annotations_and_causal_storage();
     std::cerr<<"complete raw OCEL and inactive result\n";full_raw_ocel_and_inactive_result();
     std::cerr<<"strict JSON and byte identity\n";strict_parser_and_byte_identity();

@@ -1,5 +1,5 @@
 import type { ModelEvaluation, PetriAnalysisResult, PublicEvaluationValue } from "./types";
-import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
+import { nativeCell, nativeFieldRecord, nativeJson } from "./native-json";
 import { hasNativeResponse, nativeResponseRequest } from "./native-response";
 
 export interface DiagnosticEntry {
@@ -56,16 +56,16 @@ export function publicEvaluationTable(value: PublicEvaluationValue): DiagnosticT
 /** Every property is retained; nested array cells include their complete JSON. */
 export function nativeObjectTables(result: object): DiagnosticTable[] {
   const tables: DiagnosticTable[] = [];
+  // Field records share canonical subtrees, so building every table stays
+  // linear in the result size (a text round trip per field was quadratic in
+  // nesting depth). Each record still equals its text round trip.
+  const canonical = new WeakMap<object, boolean>();
   const visit = (value: unknown, path: string) => {
     if (record(value)) {
       const keys = Object.keys(value);
       tables.push({ id: path || "summary", title: path || "Native summary", columns: ["field", "type", "value"],
         rows: keys.map(key => [key, value[key] === null ? "null" : Array.isArray(value[key]) ? "array" : typeof value[key], nativeCell(value,key)]),
-        records: keys.map(key => {
-          const cell = nativeCell(value,key);
-          const encoded = typeof value[key] === "number" && typeof cell === "string" ? cell : nativeJson(value[key]);
-          return parseNativeJson(`{"field":${JSON.stringify(key)},"value":${encoded}}`);
-        }) });
+        records: keys.map(key => nativeFieldRecord(key, value, key, canonical)) });
       for (const key of keys) if (value[key] !== null && typeof value[key] === "object") visit(value[key], `${path}/${pointer(key)}`);
     } else if (Array.isArray(value)) {
       const columns = [...new Set(value.flatMap(row => record(row) ? Object.keys(row) : ["value"]))];

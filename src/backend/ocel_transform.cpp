@@ -7,9 +7,13 @@
 #include <iomanip>
 #include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -156,6 +160,75 @@ Ocel filter_objects(const Ocel& log, const ObjectIds& selected) {
   }
   for (const auto& change : log.object_changes) {
     if (selected.contains(change.object_id)) result.object_changes.push_back(change);
+  }
+  return result;
+}
+
+// filter_objects for every member of a family of disjoint object sets in one
+// pass over the log. Each returned Ocel equals filter_objects(log, set).
+std::vector<Ocel> filter_disjoint_objects(const Ocel& log,
+                                          const std::vector<ObjectIds>& sets) {
+  std::vector<Ocel> result(sets.size());
+  std::unordered_map<std::string_view, std::size_t> owner;
+  for (std::size_t index = 0; index < sets.size(); ++index) {
+    auto& part = result[index];
+    part.globals = log.globals;
+    part.event_type_attributes = log.event_type_attributes;
+    part.object_type_attributes = log.object_type_attributes;
+    for (const auto& id : sets[index]) owner.emplace(id, index);
+  }
+  const auto owner_of = [&](const std::string& id) -> std::optional<std::size_t> {
+    const auto found = owner.find(id);
+    if (found == owner.end()) return std::nullopt;
+    return found->second;
+  };
+  for (const auto& object : log.objects) {
+    if (const auto index = owner_of(object.id)) result[*index].objects.push_back(object);
+  }
+  // Sorted, unique set indices whose event_ids contain each event id.
+  std::unordered_map<std::string_view, std::vector<std::size_t>> event_sets;
+  for (const auto& relation : log.relations) {
+    const auto index = owner_of(relation.object_id);
+    if (!index) continue;
+    result[*index].relations.push_back(relation);
+    auto& indices = event_sets[relation.event_id];
+    const auto at = std::lower_bound(indices.begin(), indices.end(), *index);
+    if (at == indices.end() || *at != *index) indices.insert(at, *index);
+  }
+  const auto sets_of = [&](const std::string& id) -> const std::vector<std::size_t>* {
+    const auto found = event_sets.find(id);
+    return found == event_sets.end() ? nullptr : &found->second;
+  };
+  for (const auto& event : log.events) {
+    if (const auto* indices = sets_of(event.id))
+      for (const auto index : *indices) result[index].events.push_back(event);
+  }
+  for (const auto& relation : log.o2o) {
+    const auto source = owner_of(relation.source_id);
+    if (source && source == owner_of(relation.target_id))
+      result[*source].o2o.push_back(relation);
+  }
+  for (const auto& relation : log.e2e) {
+    const auto* source = sets_of(relation.source_id);
+    const auto* target = sets_of(relation.target_id);
+    if (!source || !target) continue;
+    auto left = source->begin();
+    auto right = target->begin();
+    while (left != source->end() && right != target->end()) {
+      if (*left < *right) {
+        ++left;
+      } else if (*right < *left) {
+        ++right;
+      } else {
+        result[*left].e2e.push_back(relation);
+        ++left;
+        ++right;
+      }
+    }
+  }
+  for (const auto& change : log.object_changes) {
+    if (const auto index = owner_of(change.object_id))
+      result[*index].object_changes.push_back(change);
   }
   return result;
 }
@@ -535,15 +608,20 @@ void append_reference_o2o(Ocel& result, const EnrichmentIndex& index,
   if (includes(OcelEnrichmentGraph::kInteraction))
     add(enrichment_interaction_graph(index), OcelEnrichmentGraph::kInteraction,
         true);
+  // Both labels use one descendants computation, made where the first of
+  // them needs it (the computation is deterministic and has no side effects).
+  std::optional<std::set<ObjectPair>> descendants;
+  const auto descendants_graph = [&]() -> const std::set<ObjectPair>& {
+    if (!descendants) descendants = enrichment_descendants_graph(index, require_event_relations);
+    return *descendants;
+  };
   if (includes(OcelEnrichmentGraph::kDescendants))
-    add(enrichment_descendants_graph(index, require_event_relations),
-        OcelEnrichmentGraph::kDescendants);
+    add(descendants_graph(), OcelEnrichmentGraph::kDescendants);
   // The captured OCEL20 composite labels descendants as inheritance.
   // This is specific to the composite; the direct inheritance API retains
   // its independent lifetime relation and reverse-order error contract.
   if (includes(OcelEnrichmentGraph::kInheritance))
-    add(enrichment_descendants_graph(index, require_event_relations),
-        OcelEnrichmentGraph::kInheritance);
+    add(descendants_graph(), OcelEnrichmentGraph::kInheritance);
   if (includes(OcelEnrichmentGraph::kCobirth))
     add(enrichment_cobirth_graph(index, require_event_relations),
         OcelEnrichmentGraph::kCobirth);
@@ -1074,10 +1152,11 @@ OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
   result.variant = options.variant;
   if (options.variant == OcelSplitVariant::kConnectedComponents) {
     const auto types = object_types(log);
-    for (const auto& component : connected_components(
-             interaction_edges(log, types), options.max_degree_centrality)) {
-      result.logs.push_back(filter_objects(log, component));
-    }
+    // Connected components are disjoint, so all of them are filtered in a
+    // single pass instead of one full log scan per component.
+    result.logs = filter_disjoint_objects(
+        log, connected_components(interaction_edges(log, types),
+                                  options.max_degree_centrality));
     result.candidate_count = result.logs.size();
   } else {
     if (options.object_type.empty())

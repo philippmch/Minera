@@ -819,11 +819,8 @@ void write_standard_type_table(std::ostringstream& out,
   out << ']';
 }
 
-void write_o2o(std::ostringstream& out, const Ocel& log, std::string_view source) {
-  std::vector<const OcelO2oRelation*> relations;
-  for (const auto& relation : log.o2o) {
-    if (relation.source_id == source) relations.push_back(&relation);
-  }
+// `relations` are one source object's o2o relations in log order.
+void write_o2o(std::ostringstream& out, std::vector<const OcelO2oRelation*> relations) {
   std::sort(relations.begin(), relations.end(), [](const auto* left,
                                                    const auto* right) {
     return std::tie(left->target_id, left->qualifier) <
@@ -1056,6 +1053,9 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   }
   sort_ocel_events_by_timestamp(result, standard ? OcelTimestampReader::kIsoFormat
                                                  : OcelTimestampReader::kIsoFormatOrFileOrder);
+  // Every reference reader (OCEL 1.0 and 2.0 JSON alike) drops events and
+  // objects that take part in no event-object relation.
+  drop_unrelated_ocel_entries(result);
   if (const auto* raw = optional(r, "minera:tableColumns")) {
     const auto& columns = obj(*raw, "minera:tableColumns");
     const auto read = [&](const char* name,
@@ -1470,6 +1470,53 @@ bool natively_utc(std::string_view text, std::int64_t microseconds) {
 
 }  // namespace
 
+void drop_unrelated_ocel_entries(Ocel& log) {
+  std::unordered_set<std::string> events;
+  std::unordered_set<std::string> objects;
+  for (const auto& event : log.events) events.insert(event.id);
+  for (const auto& object : log.objects) objects.insert(object.id);
+  std::unordered_set<std::string> related_events;
+  std::unordered_set<std::string> related_objects;
+  for (const auto& relation : log.relations) {
+    if (!events.count(relation.event_id) || !objects.count(relation.object_id))
+      continue;
+    related_events.insert(relation.event_id);
+    related_objects.insert(relation.object_id);
+  }
+  if (related_events.size() == events.size() &&
+      related_objects.size() == objects.size() &&
+      std::all_of(log.relations.begin(), log.relations.end(),
+                  [&](const OcelRelation& relation) {
+                    return events.count(relation.event_id) &&
+                           objects.count(relation.object_id);
+                  }))
+    return;
+  const auto erase_if = [](auto& rows, auto predicate) {
+    rows.erase(std::remove_if(rows.begin(), rows.end(), predicate), rows.end());
+  };
+  erase_if(log.events, [&](const OcelEvent& event) {
+    return !related_events.count(event.id);
+  });
+  erase_if(log.objects, [&](const OcelObject& object) {
+    return !related_objects.count(object.id);
+  });
+  erase_if(log.relations, [&](const OcelRelation& relation) {
+    return !related_events.count(relation.event_id) ||
+           !related_objects.count(relation.object_id);
+  });
+  erase_if(log.o2o, [&](const OcelO2oRelation& relation) {
+    return !related_objects.count(relation.source_id) ||
+           !related_objects.count(relation.target_id);
+  });
+  erase_if(log.e2e, [&](const OcelE2eRelation& relation) {
+    return !related_events.count(relation.source_id) ||
+           !related_events.count(relation.target_id);
+  });
+  erase_if(log.object_changes, [&](const OcelObjectChange& change) {
+    return !related_objects.count(change.object_id);
+  });
+}
+
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds) {
   sort_ocel_events_by_timestamp(log, nanoseconds ? OcelTimestampReader::kInstantNanoseconds
                                                  : OcelTimestampReader::kIsoFormat);
@@ -1633,6 +1680,13 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     relations_by_event[relation.event_id].push_back(&relation);
   std::unordered_map<std::string_view, std::vector<const OcelO2oRelation*>> o2o_by_source;
   for (const auto& relation : log.o2o) o2o_by_source[relation.source_id].push_back(&relation);
+  // Each object's changes in log order, so no object rescans every change.
+  std::unordered_map<std::string_view, std::vector<const OcelObjectChange*>> changes_by_object;
+  for (const auto& change : log.object_changes) changes_by_object[change.object_id].push_back(&change);
+  const auto source_o2o = [&](std::string_view source) {
+    const auto found = o2o_by_source.find(source);
+    return found == o2o_by_source.end() ? std::vector<const OcelO2oRelation*>{} : found->second;
+  };
   auto event_relations = [&](const OcelEvent& event) {
     std::vector<const OcelRelation*> relations;
     if (const auto found = relations_by_event.find(event.id); found != relations_by_event.end())
@@ -1752,9 +1806,8 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
         out << '}';
       }
       std::vector<const OcelObjectChange*> changes;
-      for (const auto& change : log.object_changes) {
-        if (change.object_id == object->id) changes.push_back(&change);
-      }
+      if (const auto found = changes_by_object.find(object->id); found != changes_by_object.end())
+        changes = found->second;
       std::sort(changes.begin(), changes.end(), [](const auto* left, const auto* right) {
         return std::tie(left->timestamp, left->field, left->object_type) <
                std::tie(right->timestamp, right->field, right->object_type);
@@ -1861,7 +1914,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     out << ",\"ocel:ovmap\":";
     write_attrs(out, object->attributes);
     out << ",\"ocel:o2o\":";
-    write_o2o(out, log, object->id);
+    write_o2o(out, source_o2o(object->id));
     out << '}';
   }
   out << "},\"ocel:objectChanges\":";

@@ -12,6 +12,9 @@ int main() {
   log.events.push_back({"e1", "create", "2024-01-01T00:00:00Z", {{"ok", true}}});
   log.events.push_back({"e2", "ship", "2024-01-02T00:00:00Z", {}});
   log.relations.push_back({"e1", "o1", "owner"});
+  // Every event and object takes part in a relation: the readers drop the
+  // others, as the reference readers do (checked separately below).
+  log.relations.push_back({"e2", "o2", "item"});
   log.o2o.push_back({"o1", "o2", "contains"});
   log.e2e.push_back({"e1", "e2", "precedes"});
   log.object_changes.push_back({"o1", "Order", "2024-01-02T00:00:00Z", "status", std::string("paid")});
@@ -35,7 +38,7 @@ int main() {
   const auto parsed2 = minera::parse_ocel_xml(xml2);
   // o1 has no base "status": like PM4Py 2.7.22 write_ocel2_xml no null base
   // entry is written, so the single change reads back as o1's base value.
-  assert(parsed2.events.size() == 2 && parsed2.relations.size() == 1 &&
+  assert(parsed2.events.size() == 2 && parsed2.relations.size() == 2 &&
          parsed2.object_changes.empty());
   for (const auto& object : parsed2.objects)
     if (object.id == "o1")
@@ -92,7 +95,7 @@ int main() {
   <events>
     <event id="e1" type="ship" time="2024-01-01T00:00:00Z">
       <attributes><attribute name="count" type="int">2</attribute></attributes>
-      <objects><relationship object-id="o1" qualifier="ships"/></objects>
+      <objects><relationship object-id="o1" qualifier="ships"/><relationship object-id="o2" qualifier="ships"/></objects>
     </event>
   </events>
   <e2e><relationship source-event-id="e1" target-event-id="e1" qualifier="self"/></e2e>
@@ -103,7 +106,8 @@ int main() {
   assert(standard_fixture.o2o.front().qualifier == "contains");
   assert(standard_fixture.e2e.size() == 1 &&
          standard_fixture.e2e.front().qualifier == "self");
-  assert(standard_fixture.relations.size() == 1);
+  // o2 is kept because e1 relates it (the reader drops unrelated objects).
+  assert(standard_fixture.relations.size() == 2);
   assert(std::get<std::int64_t>(standard_fixture.events.front().attributes.front().value) == 2);
 
   const std::string typed_standard = R"xml(
@@ -163,9 +167,13 @@ int main() {
     <attribute name="state" time="1970-01-01T00:00:00Z" value="reopened"/>
     <attribute name="state" time="0" value="queued"/>
   </attributes></object></objects>
-  <events/>
+  <events><event id="e1" type="Create" time="2024-01-01T00:00:00Z">
+    <objects><relationship object-id="o1" qualifier=""/></objects>
+  </event></events>
 </log>
 )xml");
+  // e1 keeps o1: the reader drops objects without relations.
+  assert(repeated_epoch.objects.size() == 1);
   assert(repeated_epoch.objects.front().attributes.size() == 1);
   assert(repeated_epoch.object_changes.size() == 2);
   assert(repeated_epoch.object_changes[0].timestamp ==
@@ -219,6 +227,97 @@ int main() {
     if (attribute.key == "due")
       assert(std::get<std::string>(attribute.value) == "2024-01-02T00:00:00Z");
     if (attribute.key == "s") assert(std::get<std::string>(attribute.value) == " x ");
+  }
+  // Reference capture (pm4py 2.7.22 read_ocel2_xml / read_ocel_xml): an event
+  // without objects (e2) and an object without events (o2) are dropped; both
+  // readers return one event and one object.
+  for (const char* orphan_xml : {R"xml(<?xml version='1.0' encoding='UTF-8'?>
+<log>
+  <object-types>
+    <object-type name="order">
+      <attributes/>
+    </object-type>
+  </object-types>
+  <event-types>
+    <event-type name="A">
+      <attributes/>
+    </event-type>
+    <event-type name="B">
+      <attributes/>
+    </event-type>
+  </event-types>
+  <objects>
+    <object id="o1" type="order">
+      <attributes/>
+    </object>
+    <object id="o2" type="order">
+      <attributes/>
+    </object>
+  </objects>
+  <events>
+    <event id="e1" type="A" time="2024-01-01T00:00:00">
+      <attributes/>
+      <objects>
+        <relationship object-id="o1" qualifier=""/>
+      </objects>
+    </event>
+    <event id="e2" type="B" time="2024-01-01T01:00:00">
+      <attributes/>
+    </event>
+  </events>
+</log>
+)xml", R"xml(<?xml version='1.0' encoding='UTF-8'?>
+<log>
+  <global scope="event">
+    <string key="ocel:activity" value="__INVALID__"/>
+  </global>
+  <global scope="object">
+    <string key="ocel:type" value="__INVALID__"/>
+  </global>
+  <global scope="log">
+    <list key="attribute-names"/>
+    <list key="object-types">
+      <string key="object-type" value="order"/>
+    </list>
+    <string key="version" value="1.0"/>
+    <string key="ordering" value="timestamp"/>
+  </global>
+  <events>
+    <event>
+      <string key="id" value="e1"/>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2024-01-01T00:00:00Z"/>
+      <list key="omap">
+        <string key="object-id" value="o1"/>
+      </list>
+      <list key="vmap"/>
+    </event>
+    <event>
+      <string key="id" value="e2"/>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2024-01-02T00:00:00Z"/>
+      <list key="omap"/>
+      <list key="vmap"/>
+    </event>
+  </events>
+  <objects>
+    <object>
+      <string key="id" value="o1"/>
+      <string key="type" value="order"/>
+      <list key="ovmap"/>
+    </object>
+    <object>
+      <string key="id" value="o2"/>
+      <string key="type" value="order"/>
+      <list key="ovmap"/>
+    </object>
+  </objects>
+</log>
+)xml"}) {
+    const auto orphans = minera::parse_ocel_xml(orphan_xml);
+    assert(orphans.events.size() == 1 && orphans.events[0].id == "e1");
+    assert(orphans.objects.size() == 1 && orphans.objects[0].id == "o1");
+    assert(orphans.relations.size() == 1);
   }
   return 0;
 }

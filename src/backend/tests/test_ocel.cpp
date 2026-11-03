@@ -225,7 +225,45 @@ void standard_json_declared_type_fallback_contract() {
   assert(std::get<bool>(value(object, "ok")) == false);
 }
 
+// Reference capture (pm4py 2.7.22 read_ocel2_json / read_ocel): events and
+// objects without event-object relations are dropped, with the O2O links and
+// object changes that touch a dropped object; a log without relations reads as
+// empty.
+void readers_drop_unrelated_entries_contract() {
+  const auto standard = minera::parse_ocel_json(R"json({"objectTypes":[{"name":"order","attributes":[{"name":"st","type":"string"}]}],"eventTypes":[{"name":"A","attributes":[]},{"name":"B","attributes":[]}],
+"objects":[{"id":"o1","type":"order","attributes":[{"name":"st","time":"2024-01-01T00:00:00Z","value":"x"}],"relationships":[{"objectId":"o2","qualifier":"has"}]},
+{"id":"o2","type":"order","attributes":[{"name":"st","time":"2024-01-01T00:00:00Z","value":"y"},{"name":"st","time":"2024-01-02T00:00:00Z","value":"z"}],"relationships":[{"objectId":"o1","qualifier":"rev"}]}],
+"events":[{"id":"e1","type":"A","time":"2024-01-01T00:00:00Z","attributes":[],"relationships":[{"objectId":"o1","qualifier":""}]},
+{"id":"e2","type":"B","time":"2024-01-01T01:00:00Z","attributes":[],"relationships":[]}]}
+)json");
+  assert(standard.events.size() == 1 && standard.events[0].id == "e1");
+  assert(standard.objects.size() == 1 && standard.objects[0].id == "o1");
+  assert(standard.relations.size() == 1);
+  assert(standard.o2o.empty() && standard.object_changes.empty());
+
+  const auto classic = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}},)"
+      R"("e2":{"ocel:activity":"B","ocel:timestamp":"2024-01-01T01:00:00","ocel:omap":[],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}},"o2":{"ocel:type":"order","ocel:ovmap":{}}}})");
+  assert(classic.events.size() == 1 && classic.events[0].id == "e1");
+  assert(classic.objects.size() == 1 && classic.objects[0].id == "o1");
+
+  const auto unrelated = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":[],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+  assert(unrelated.events.empty() && unrelated.objects.empty());
+
+  // Native callers that build an OCEL in memory keep their entries until a
+  // reader sees them.
+  minera::Ocel in_memory;
+  in_memory.events.push_back({"e1", "A", "2024-01-01T00:00:00Z", {}});
+  in_memory.objects.push_back({"o1", "order", {}});
+  minera::drop_unrelated_ocel_entries(in_memory);
+  assert(in_memory.events.empty() && in_memory.objects.empty());
+}
+
 int main() {
+  readers_drop_unrelated_entries_contract();
   standard_json_declared_type_fallback_contract();
   ocpn_miner_policy_contract();
   const std::string input =
@@ -401,8 +439,12 @@ int main() {
       {"name":"state","time":"1970-01-01T00:00:00Z","value":"new"},
       {"name":"state","time":"1970-01-01T00:00:00Z","value":"reopened"},
       {"name":"state","time":"0","value":"queued"}]}],
-    "events":[]
+    "eventTypes":[{"name":"Create","attributes":[]}],
+    "events":[{"id":"e1","type":"Create","time":"2024-01-01T00:00:00Z","attributes":[],
+      "relationships":[{"objectId":"o1","qualifier":""}]}]
   })json");
+  // The event keeps o1: the reader drops objects without relations.
+  assert(repeated_epoch.objects.size() == 1);
   assert(repeated_epoch.objects.front().attributes.size() == 1);
   assert(repeated_epoch.object_changes.size() == 2);
   assert(repeated_epoch.object_changes[0].timestamp ==

@@ -2,6 +2,8 @@
 
 #include <cmath>
 #include <map>
+#include <set>
+#include <vector>
 #include <stdexcept>
 #include <string_view>
 
@@ -119,7 +121,24 @@ PassedTimeResult discover_passed_time(const EventLog& log,
   std::uint64_t pre_count = 0;
   std::uint64_t post_count = 0;
 
-  for (const auto& [pair, statistics] : performance) {
+  // Rows follow the order in which each directly-follows pair first occurs,
+  // walking the traces in log order, as the reference's rows do.
+  std::vector<DfgActivityPair> order;
+  {
+    std::set<DfgActivityPair> seen;
+    for (const auto& trace : projected.traces) {
+      for (std::size_t i = 1; i < trace.events.size(); ++i) {
+        DfgActivityPair pair{trace.events[i - 1].activity, trace.events[i].activity};
+        if (performance.count(pair) && seen.insert(pair).second)
+          order.push_back(std::move(pair));
+      }
+    }
+    for (const auto& entry : performance)
+      if (seen.insert(entry.first).second) order.push_back(entry.first);
+  }
+
+  for (const auto& pair : order) {
+    const auto& statistics = performance.at(pair);
     const auto frequency_it = frequency.find(pair);
     if (frequency_it == frequency.end()) {
       throw std::invalid_argument("passed time: frequency/performance mismatch");

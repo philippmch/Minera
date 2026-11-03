@@ -1167,9 +1167,15 @@ std::map<std::vector<std::string>, PrefixInfo> collect_prefixes(
   return prefixes;
 }
 
+struct TokenPrefixScore {
+  std::uint64_t frequency = 0;
+  std::set<std::string> observed;
+};
+
 struct TokenPrefixes {
-  PrefixInfo initial;
-  std::vector<PrefixInfo> proper;
+  TokenPrefixScore initial;
+  std::vector<TokenPrefixScore> proper;  // aligned with trie.scored
+  detail::TokenPrefixTrie trie;
 };
 
 // Groups proper prefixes the way the public prefix utility does: string labels
@@ -1177,34 +1183,61 @@ struct TokenPrefixes {
 // containing a comma replays as several events and prefixes whose joined keys
 // coincide are one prefix. Steps without a string label (null or typed
 // activities) keep their own identity and replay as labels absent from the
-// model.
+// model. The prefixes form a trie over the split tokens, so storage is linear
+// in the distinct prefix steps rather than in their total length.
 TokenPrefixes collect_token_prefixes(const std::vector<detail::TokenPrecisionSequence>& sequences,
                                     const PetriNet& net,
                                     const std::string& activity_attribute) {
   TokenPrefixes result;
-  std::map<std::vector<std::string>, std::size_t> indices;
+  auto& trie = result.trie;
   std::set<std::string> model_labels(net.activities().begin(), net.activities().end());
-  std::map<std::string, std::string> absent_labels;
-  const auto absent_label = [&](const std::string& identity) {
-    const auto [it, inserted] = absent_labels.try_emplace(identity);
+  std::size_t absent_count = 0;
+  // Token text ("s" + label or "x" + identity) -> index into trie.labels.
+  std::unordered_map<std::string, std::size_t> tokens;
+  const auto token_label = [&](const std::string& token) {
+    const auto [it, inserted] = tokens.try_emplace(token, trie.labels.size());
     if (inserted) {
-      std::string label = "\x1f" + std::to_string(absent_labels.size());
-      while (model_labels.contains(label)) label += '\x1f';
-      it->second = std::move(label);
+      std::string label;
+      if (token.front() == 's') {
+        label = token.substr(1);
+      } else {
+        label = "\x1f" + std::to_string(++absent_count);
+        while (model_labels.contains(label)) label += '\x1f';
+      }
+      Event event;
+      event.activity = label;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key = activity_attribute;
+      if (activity_attribute != "concept:name")
+        event.attributes.push_back({activity_attribute, label, AttributeKind::kString});
+      trie.labels.push_back(std::move(event));
     }
     return it->second;
   };
-  const auto append_tokens = [](const detail::TokenPrecisionStep& step,
-                                std::vector<std::string>& tokens) {
-    if (!step.text) {
-      tokens.push_back("x" + step.identity);
-      return;
+  struct EdgeHash {
+    std::size_t operator()(const std::pair<std::size_t, std::size_t>& edge) const noexcept {
+      return std::hash<std::size_t>{}(edge.first * 0x9e3779b97f4a7c15ULL ^ edge.second);
     }
+  };
+  std::unordered_map<std::pair<std::size_t, std::size_t>, std::size_t, EdgeHash> children;
+  std::vector<std::size_t> scored_index{std::numeric_limits<std::size_t>::max()};
+  const auto child = [&](std::size_t node, std::size_t label) {
+    const auto [it, inserted] = children.try_emplace({node, label}, trie.parent.size());
+    if (inserted) {
+      trie.parent.push_back(node);
+      trie.label.push_back(label);
+      scored_index.push_back(std::numeric_limits<std::size_t>::max());
+    }
+    return it->second;
+  };
+  const auto advance = [&](const detail::TokenPrecisionStep& step, std::size_t node) {
+    if (!step.text) return child(node, token_label("x" + step.identity));
     std::size_t begin = 0;
     while (true) {
       const auto end = step.text->find(',', begin);
-      tokens.push_back("s" + step.text->substr(begin, end == std::string::npos ? end : end - begin));
-      if (end == std::string::npos) break;
+      node = child(node, token_label(
+          "s" + step.text->substr(begin, end == std::string::npos ? end : end - begin)));
+      if (end == std::string::npos) return node;
       begin = end + 1;
     }
   };
@@ -1212,32 +1245,34 @@ TokenPrefixes collect_token_prefixes(const std::vector<detail::TokenPrecisionSeq
     const auto& steps = sequence.steps;
     result.initial.frequency += sequence.count;
     if (!steps.empty() && steps.front().text) result.initial.observed.insert(*steps.front().text);
-    std::vector<std::string> key;
+    std::size_t node = 0;
     for (std::size_t i = 0; i + 1 < steps.size(); ++i) {
-      append_tokens(steps[i], key);
-      const auto [position, inserted] = indices.emplace(key, result.proper.size());
-      if (inserted) {
-        auto& prefix = result.proper.emplace_back();
-        prefix.sample.case_id = "prefix-" + std::to_string(position->second);
-        for (const auto& token : key) {
-          const auto label = token.front() == 's' ? token.substr(1) : absent_label(token.substr(1));
-          Event event;
-          event.case_id = prefix.sample.case_id;
-          event.activity = label;
-          event.activity_state = FirstClassAttributeState::kPresent;
-          event.activity_source_key = activity_attribute;
-          event.input_order = prefix.sample.events.size();
-          if (activity_attribute != "concept:name")
-            event.attributes.push_back({activity_attribute, label, AttributeKind::kString});
-          prefix.sample.events.push_back(std::move(event));
-        }
+      node = advance(steps[i], node);
+      if (scored_index[node] == std::numeric_limits<std::size_t>::max()) {
+        scored_index[node] = result.proper.size();
+        result.proper.emplace_back();
+        trie.scored.push_back(node);
       }
-      auto& prefix = result.proper[position->second];
+      auto& prefix = result.proper[scored_index[node]];
       prefix.frequency += sequence.count;
       if (steps[i + 1].text) prefix.observed.insert(*steps[i + 1].text);
     }
   }
   return result;
+}
+
+// The materialised trace of a scored prefix (backwards replay needs whole
+// prefixes): the label events along its trie path.
+Trace token_prefix_trace(const detail::TokenPrefixTrie& trie, std::size_t node, std::size_t index) {
+  Trace trace;
+  trace.case_id = "prefix-" + std::to_string(index);
+  for (; node != 0; node = trie.parent[node]) trace.events.push_back(trie.labels[trie.label[node]]);
+  std::reverse(trace.events.begin(), trace.events.end());
+  for (std::size_t position = 0; position < trace.events.size(); ++position) {
+    trace.events[position].case_id = trace.case_id;
+    trace.events[position].input_order = position;
+  }
+  return trace;
 }
 
 struct StopAlignmentResult {
@@ -1556,35 +1591,67 @@ double token_etconformance_precision(const std::vector<TokenPrecisionSequence>& 
       ? "concept:name" : replay_options.activity_attribute;
   replay_options.activity_attribute = activity_attribute;
   const auto prefixes = collect_token_prefixes(sequences, net, activity_attribute);
-  EventLog prefix_log;
-  std::vector<const PrefixInfo*> scored;
-  for (const auto& info : prefixes.proper) {
-    prefix_log.traces.push_back(info.sample);
-    scored.push_back(&info);
-  }
-  const auto rows = replay_options.variant == TokenReplayVariant::kForward
-      ? replay_token_result(prefix_log, net, replay_options).traces
-      : replay_token_traces(prefix_log, net, replay_options);
   TokenInteger enabled_total = 0, escaping_total = 0;
-  const auto score = [&](const PrefixInfo& prefix, const std::set<std::string>& labels) {
+  const auto score = [&](const TokenPrefixScore& prefix, const std::set<std::string>& labels) {
     enabled_total += TokenInteger(prefix.frequency) * labels.size();
     for (const auto& label : labels)
       if (!prefix.observed.contains(label)) escaping_total += prefix.frequency;
   };
+  const auto score_enabled = [&](const TokenPrefixScore& prefix,
+                                 const std::vector<std::size_t>& enabled) {
+    std::set<std::string> labels;
+    for (const auto transition : enabled) {
+      const auto& node = net.transitions().at(transition);
+      if (node.activity) labels.insert(net.activities().at(*node.activity));
+    }
+    score(prefix, labels);
+  };
+  if (replay_options.variant == TokenReplayVariant::kForward) {
+    // Forward replay is incremental: each prefix continues from the state its
+    // trie parent reached, so the walk costs about one replay step per trie
+    // edge instead of one per event of every materialised prefix.
+    detail::forward_token_prefix_walk(
+        net, replay_options, prefixes.trie,
+        [&](std::size_t index, const std::vector<std::size_t>* enabled) {
+          if (enabled) score_enabled(prefixes.proper[index], *enabled);
+        });
+  } else {
+    // Backwards replay needs whole prefixes; materialise them a bounded chunk
+    // at a time so peak memory stays independent of the total prefix length.
+    // The row limit applies to the whole prefix log, as one replay would.
+    if (replay_options.max_rows_to_materialize) {
+      std::vector<std::size_t> depth(prefixes.trie.parent.size(), 0);
+      for (std::size_t node = 1; node < depth.size(); ++node)
+        depth[node] = depth[prefixes.trie.parent[node]] + 1;
+      std::size_t available = *replay_options.max_rows_to_materialize;
+      for (const auto node : prefixes.trie.scored) {
+        if (depth[node] > available)
+          throw std::length_error("token replay input exceeds max_rows_to_materialize");
+        available -= depth[node];
+      }
+      replay_options.max_rows_to_materialize.reset();
+    }
+    constexpr std::size_t kChunkEvents = 1 << 16;
+    std::size_t next = 0;
+    do {
+      EventLog chunk;
+      const std::size_t first = next;
+      std::size_t events = 0;
+      while (next < prefixes.trie.scored.size() && (events == 0 || events < kChunkEvents)) {
+        chunk.traces.push_back(token_prefix_trace(prefixes.trie, prefixes.trie.scored[next], next));
+        events += chunk.traces.back().events.size();
+        ++next;
+      }
+      const auto rows = replay_token_traces(chunk, net, replay_options);
+      for (std::size_t i = 0; i < rows.size(); ++i)
+        if (rows[i].trace_is_fit) score_enabled(prefixes.proper[first + i], rows[i].enabled_transitions);
+    } while (next < prefixes.trie.scored.size());
+  }
   if (prefixes.initial.frequency != 0) {
     std::set<std::string> labels;
     for (const auto activity : detail::initial_enabled_token_activities(net, replay_options))
       labels.insert(net.activities().at(activity));
     score(prefixes.initial, labels);
-  }
-  for (std::size_t i = 0; i < rows.size(); ++i) {
-    if (!rows[i].trace_is_fit) continue;
-    std::set<std::string> labels;
-    for (const auto transition : rows[i].enabled_transitions) {
-      const auto& node = net.transitions().at(transition);
-      if (node.activity) labels.insert(net.activities().at(*node.activity));
-    }
-    score(*scored[i], labels);
   }
   return enabled_total == 0 ? 1.0 : 1.0 - token_integer_ratio(escaping_total, enabled_total);
 }

@@ -5,6 +5,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <type_traits>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,44 @@ struct TokenPrecisionSequence {
 double token_etconformance_precision(const std::vector<TokenPrecisionSequence>& sequences,
                                      const PetriNet& net,
                                      TokenReplayOptions replay_options);
+
+// The distinct proper prefixes of token precision as a trie. Node 0 is the
+// empty prefix; node n > 0 extends parent[n] by one replayed event whose
+// sample is labels[label[n]] (the event a materialised prefix trace would
+// carry). `scored` lists the nodes of the proper prefixes in the order the
+// reference creates them (first occurrence in the log).
+struct TokenPrefixTrie {
+  std::vector<std::size_t> parent{0};
+  std::vector<std::size_t> label{0};
+  std::vector<Event> labels;
+  std::vector<std::size_t> scored;
+};
+
+// Forward replay of every scored prefix, as replay_token_result would replay
+// the materialised prefix log, without materialising it: the prefixes are
+// walked along the trie in `scored` order, a prefix's replay continues from
+// the state its ancestor reached, and enabled transitions are cached by
+// marking. `visit(i, enabled)` receives the enabled transitions at the
+// marking scored prefix i reached, or nullptr when that prefix is unfit.
+// Validation, exceptions and their order match the materialised replay.
+// Requires forward replay options with stop_immediately_unfit and without
+// final routing.
+template <class Visit>
+void forward_token_prefix_walk(const PetriNet& net, const TokenReplayOptions& options,
+                               const TokenPrefixTrie& trie, Visit&& visit);
+void forward_token_prefix_walk_impl(
+    const PetriNet& net, const TokenReplayOptions& options, const TokenPrefixTrie& trie,
+    void (*visit)(void*, std::size_t, const std::vector<std::size_t>*), void* context);
+template <class Visit>
+void forward_token_prefix_walk(const PetriNet& net, const TokenReplayOptions& options,
+                               const TokenPrefixTrie& trie, Visit&& visit) {
+  forward_token_prefix_walk_impl(
+      net, options, trie,
+      [](void* context, std::size_t index, const std::vector<std::size_t>* enabled) {
+        (*static_cast<std::remove_reference_t<Visit>*>(context))(index, enabled);
+      },
+      &visit);
+}
 
 // Labels the evaluator observes as eventually enabled at a marking, searching
 // silent transitions in transition-name order (index order without names).

@@ -58,6 +58,27 @@ void envelope_and_parser(){
  ExactFilterDiscoveryContext c;ExactFilterDiscoveryScope scope(c);MineParams p;p.heuristic.activity_attribute="before";record_exact_parsed_options(p);p.heuristic.activity_attribute="after";record_exact_effective_options(p);has(c.parsed_heuristic,"before");has(c.configured_heuristic,"after");
  record_exact_heuristic_begin("null",p.heuristic);HeuristicsNet n;record_exact_heuristic_end("null",p.heuristic,&n);const auto safe=exact_filter_discovery_response(c,"mine",200,"{}");has(safe,"\"source_type\":null");assert(safe.starts_with("{\"exact_controls\":"));
  const auto fallback=exact_filter_discovery_response(c,"mine",400,std::string("{\"bad\":\"\xff\"}"));has(fallback,"EXACT_FILTER_DISCOVERY");has(fallback,"\"json\":null");
+ has(fallback,"\"body\":{\"native_bytes\":\"hex-v1\"");
+ // A JSON-object body is the envelope itself: its legacy snapshot keeps only
+ // the status, and removing the final exact_controls member restores the
+ // body's exact bytes (including trailing whitespace after its last brace).
+ const std::string body="{\"family\":\"MINE\",\"traces\":[{\"a\":\"\xc3\xa9\"}]}\n";
+ const auto inline_envelope=exact_filter_discovery_response(c,"mine",200,body);
+ has(inline_envelope,"\"legacy_response\":{\"status\":200,\"body\":null,\"json\":null,\"json_error\":null}");
+ const auto member=inline_envelope.rfind(",\"exact_controls\":");assert(member!=std::string::npos);
+ const auto last=inline_envelope.find_last_not_of(" \t\r\n");
+ assert(inline_envelope.substr(0,member)+inline_envelope.substr(last)==body);
+ assert(inline_envelope.find("\\\"family\\\"")==std::string::npos);  // no quoted second copy
+ // Equal snapshots are written once; later members refer to the first.
+ ExactFilterDiscoveryContext same;{ExactFilterDiscoveryScope inner(same);
+  const std::string snapshot="{\"type\":\"HeuristicClassicDfgInput\",\"value\":{\"dfg\":[]}}";
+  record_exact_heuristic_begin(snapshot,p.heuristic);record_exact_heuristic_end(snapshot,p.heuristic,&n);}
+ const auto deduped=exact_filter_discovery_response(same,"mine",200,"{}");
+ has(deduped,"\"selected_native\":{\"source_before\":{\"type\":\"HeuristicClassicDfgInput\"");
+ has(deduped,"\"source_after\":{\"same_as\":\"source_before\"},\"heuristics_net\"");
+ has(deduped,"\"source_type\":\"HeuristicClassicDfgInput\",\"source_before\":{\"same_as\":\"source_before\"},\"source_after\":{\"same_as\":\"source_after\"}");
+ has(deduped,"\"source_unchanged\":true");
+ std::size_t copies=0;for(auto at=deduped.find("\"dfg\":[]");at!=std::string::npos;at=deduped.find("\"dfg\":[]",at+1))++copies;assert(copies==1);
  std::map<std::string,std::string> fields{{"ltl_attribute_values_json",R"(["A,B"," B ","A,B"])"}};const auto get=[&](std::string_view k){const auto i=fields.find(std::string(k));return i==fields.end()?std::string{}:i->second;};const auto present=[&](std::string_view k){return fields.contains(std::string(k));};const auto opts=parse_mine_params(get,present);assert(opts.ltl->attribute_values.size()==3&&opts.ltl->attribute_values[1]==" B ");fields["ltl_attribute_values"]="";rejects([&]{parse_mine_params(get,present);},"conflicts by presence");fields.erase("ltl_attribute_values");fields["ltl_attribute_values_file"]="[]";rejects([&]{parse_mine_params(get,present);},"JSON and File conflict");
  fields={{"heuristic_options_json",serialize_exact_heuristic_options_json(HeuristicMinerOptions{})},{"dependency_threshold",""}};rejects([&]{parse_mine_params(get,present);},"conflicts by presence");
 }

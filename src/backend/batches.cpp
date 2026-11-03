@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <initializer_list>
 #include <limits>
@@ -13,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 
@@ -334,12 +336,13 @@ void validate_options(const BatchDiscoveryOptions& options) {
 // The reference's (start, end, events) interval tuples: events is a set of
 // (start, complete, case[, id]) tuples, so a repeated event is one member and
 // a union keeps the left set's member of two equal ones. `identities` holds
-// the members' tuple identities (see event_identity).
+// the members' interned tuple identities (equal tuples share one id; see
+// event_identity), so set equality and inclusion are those of the tuples.
 struct Interval {
   double start = 0.0;
   double end = 0.0;
   std::vector<std::size_t> members;
-  std::set<std::string> identities;
+  std::set<std::uint32_t> identities;
 };
 
 // Python's tuple comparison: start, then end, then the sets, where a set is
@@ -353,53 +356,84 @@ bool interval_less(const Interval& left, const Interval& right) {
                        left.identities.begin(), left.identities.end());
 }
 
-Interval merged_interval(const Interval& left, const Interval& right,
-                         const std::vector<std::string>& identities) {
+// The union of a pair the merge removes: `left` is consumed rather than
+// copied, so growing one batch costs only the members it gains.
+Interval merged_interval(Interval&& left, const Interval& right,
+                         const std::vector<std::uint32_t>& identities) {
   Interval merged{std::min(left.start, right.start),
-                  std::max(left.end, right.end), left.members, left.identities};
+                  std::max(left.end, right.end), std::move(left.members),
+                  std::move(left.identities)};
   for (const auto member : right.members)
     if (merged.identities.insert(identities[member]).second) merged.members.push_back(member);
   return merged;
 }
 
-void sift_down(std::vector<Interval>& heap, std::size_t start,
-               std::size_t position) {
-  auto item = std::move(heap[position]);
+// The interval list the reference rewrites in place. Intervals stay where
+// they were created and the list orders handles to them, so removing a pair,
+// appending a union and re-sorting move small handles, never the sets.
+struct IntervalList {
+  std::vector<Interval> pool;
+  std::vector<std::uint32_t> order;
+  const Interval& operator[](std::size_t position) const { return pool[order[position]]; }
+  bool less(std::uint32_t left, std::uint32_t right) const {
+    return interval_less(pool[left], pool[right]);
+  }
+  // Removes the pair at `index` and appends its union, as the reference does.
+  void merge_pair(std::size_t index, const std::vector<std::uint32_t>& identities) {
+    const auto left = order[index], right = order[index + 1];
+    auto merged = merged_interval(std::move(pool[left]), pool[right], identities);
+    pool[right] = Interval{};
+    order.erase(order.begin() + static_cast<std::ptrdiff_t>(index),
+                order.begin() + static_cast<std::ptrdiff_t>(index + 2));
+    order.push_back(static_cast<std::uint32_t>(pool.size()));
+    pool.push_back(std::move(merged));
+  }
+};
+
+void sift_down(IntervalList& heap, std::size_t start, std::size_t position) {
+  auto& order = heap.order;
+  const auto item = order[position];
   while (position > start) {
     const auto parent = (position - 1) / 2;
-    if (!interval_less(item, heap[parent])) break;
-    heap[position] = std::move(heap[parent]);
+    if (!heap.less(item, order[parent])) break;
+    order[position] = order[parent];
     position = parent;
   }
-  heap[position] = std::move(item);
+  order[position] = item;
 }
 
-void sift_up(std::vector<Interval>& heap, std::size_t position) {
-  const auto end = heap.size();
+void sift_up(IntervalList& heap, std::size_t position) {
+  auto& order = heap.order;
+  const auto end = order.size();
   const auto start = position;
-  auto item = std::move(heap[position]);
+  const auto item = order[position];
   auto child = 2 * position + 1;
   while (child < end) {
     const auto right = child + 1;
-    if (right < end && !interval_less(heap[child], heap[right])) child = right;
-    heap[position] = std::move(heap[child]);
+    if (right < end && !heap.less(order[child], order[right])) child = right;
+    order[position] = order[child];
     position = child;
     child = 2 * position + 1;
   }
-  heap[position] = std::move(item);
+  order[position] = item;
   sift_down(heap, start, position);
 }
 
 // The reference builds one interval per event in input order and heapifies
 // the list (Python heapq order) before merging.
-std::vector<Interval> heapified_intervals(const std::vector<IndexedEvent>& values,
-                                          const std::vector<std::size_t>& rows,
-                                          const std::vector<std::string>& identities) {
-  std::vector<Interval> intervals;
-  intervals.reserve(rows.size());
-  for (const auto row : rows)
-    intervals.push_back({values[row].event.start, values[row].event.complete, {row}, {identities[row]}});
-  for (auto index = intervals.size() / 2; index > 0; --index)
+IntervalList heapified_intervals(const std::vector<IndexedEvent>& values,
+                                 const std::vector<std::size_t>& rows,
+                                 const std::vector<std::uint32_t>& identities) {
+  if (rows.size() > std::numeric_limits<std::uint32_t>::max() / 2)
+    throw std::invalid_argument("batches: too many events in one activity and resource group");
+  IntervalList intervals;
+  intervals.pool.reserve(rows.size());
+  intervals.order.reserve(rows.size());
+  for (const auto row : rows) {
+    intervals.order.push_back(static_cast<std::uint32_t>(intervals.pool.size()));
+    intervals.pool.push_back({values[row].event.start, values[row].event.complete, {row}, {identities[row]}});
+  }
+  for (auto index = intervals.order.size() / 2; index > 0; --index)
     sift_up(intervals, index - 1);
   return intervals;
 }
@@ -410,22 +444,21 @@ std::vector<Interval> heapified_intervals(const std::vector<IndexedEvent>& value
 // over, until nothing merges. Appending (rather than replacing the pair in
 // place) and restarting decide which of two equal events, such as case ids
 // 0 and 0.0, a batch keeps: a union keeps its left set's.
-void merge_overlapping(std::vector<Interval>& intervals,
-                       const std::vector<std::string>& identities) {
+void merge_overlapping(IntervalList& intervals,
+                       const std::vector<std::uint32_t>& identities) {
   bool changed = true;
   while (changed) {
     changed = false;
     std::size_t index = 0;
-    while (index + 1 < intervals.size()) {
+    while (index + 1 < intervals.order.size()) {
       if (!(intervals[index + 1].start < intervals[index].end)) {
         ++index;
         continue;
       }
-      auto merged = merged_interval(intervals[index], intervals[index + 1], identities);
-      intervals.erase(intervals.begin() + static_cast<std::ptrdiff_t>(index),
-                      intervals.begin() + static_cast<std::ptrdiff_t>(index + 2));
-      intervals.push_back(std::move(merged));
-      python::sort(intervals, interval_less);
+      intervals.merge_pair(index, identities);
+      python::sort(intervals.order, [&](std::uint32_t left, std::uint32_t right) {
+        return intervals.less(left, right);
+      });
       changed = true;
       index = 0;
     }
@@ -436,22 +469,19 @@ void merge_overlapping(std::vector<Interval>& intervals,
 // merged pair and heap-pushing the union back into the list, and repeating
 // the scan until nothing merges. The list is not re-sorted, so later scans
 // see heap order and can join intervals farther apart than the distance.
-void merge_near(std::vector<Interval>& intervals, double distance,
-                const std::vector<std::string>& identities) {
+void merge_near(IntervalList& intervals, double distance,
+                const std::vector<std::uint32_t>& identities) {
   bool changed = true;
   while (changed) {
     changed = false;
     std::size_t index = 0;
-    while (index + 1 < intervals.size()) {
+    while (index + 1 < intervals.order.size()) {
       if (intervals[index + 1].start - intervals[index].end > distance) {
         ++index;
         continue;
       }
-      auto merged = merged_interval(intervals[index], intervals[index + 1], identities);
-      intervals.erase(intervals.begin() + static_cast<std::ptrdiff_t>(index),
-                      intervals.begin() + static_cast<std::ptrdiff_t>(index + 2));
-      intervals.push_back(std::move(merged));
-      sift_down(intervals, 0, intervals.size() - 1);
+      intervals.merge_pair(index, identities);
+      sift_down(intervals, 0, intervals.order.size() - 1);
       changed = true;
     }
   }
@@ -555,10 +585,17 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
     throw std::invalid_argument(std::string("batches: ") + error.what());
   }
 
-  std::vector<std::string> identities;
+  // Each event tuple's identity, interned: equal tuples share one id.
+  std::vector<std::uint32_t> identities;
   identities.reserve(values.size());
-  for (std::size_t row = 0; row < values.size(); ++row)
-    identities.push_back(event_identity(values[row], row, include_event_id));
+  {
+    std::unordered_map<std::string, std::uint32_t> interned;
+    interned.reserve(values.size());
+    for (std::size_t row = 0; row < values.size(); ++row) {
+      const auto next = static_cast<std::uint32_t>(interned.size());
+      identities.push_back(interned.try_emplace(event_identity(values[row], row, include_event_id), next).first->second);
+    }
+  }
 
   struct KeyedGroup {
     BatchGroup group;
@@ -572,7 +609,8 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
     merge_near(intervals, options.merge_distance_seconds, identities);
 
     std::vector<Batch> batches;
-    for (auto& interval : intervals) {
+    for (const auto handle : intervals.order) {
+      const auto& interval = intervals.pool[handle];
       // An interval's events are a set, so repeated events count once and
       // the minimum size applies to the distinct events.
       if (interval.members.size() < options.min_batch_size) continue;

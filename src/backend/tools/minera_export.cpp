@@ -1029,6 +1029,10 @@ int usage(const char* program) {
                "  --overlap-completion-attribute <name> Optional completion timestamp attribute\n"
                "  --overlap-epsilon <f>     Non-negative overlap boundary epsilon\n"
                "  --overlap-strict          Exclude endpoint-only overlap\n"
+               "  --eventually-follows-start-attribute <name> Interval eventually-follows:\n"
+               "                            pairs where the later event starts at or after\n"
+               "                            the earlier one completes (sorted by start)\n"
+               "  --eventually-follows-timestamp-attribute <name> Completion attribute\n"
                "  --chaotic-activities      Emit entropy-based activity-chaos JSON\n"
                "  --chaotic-activity-key <name> Activity attribute\n"
                "  --chaotic-alpha <f>       Non-negative smoothing parameter\n"
@@ -2068,6 +2072,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   bool repetition_option_used = false;
   bool case_grouping_option_used = false;
   std::map<std::string, std::string> overlap_fields;
+  minera::EventuallyFollowsOptions eventually_follows_options;
   std::map<std::string, std::string> chaotic_activities_fields;
   std::map<std::string, std::string> passed_time_fields;
   std::map<std::string, std::string> service_time_fields;
@@ -3243,6 +3248,18 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       std::replace(key.begin(), key.end(), '-', '_');
       variant_statistics_fields[key] = value;
       variant_statistics_requested = true;
+      continue;
+    }
+    if (arg == "--eventually-follows-start-attribute" ||
+        arg == "--eventually-follows-timestamp-attribute") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (arg == "--eventually-follows-start-attribute") {
+        if (*value == '\0') return usage(argv[0]);
+        eventually_follows_options.start_timestamp_attribute = value;
+      } else {
+        eventually_follows_options.timestamp_attribute = value;
+      }
       continue;
     }
     if (arg == "--overlap-strict") {
@@ -7478,7 +7495,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
-    const auto eventually = minera::discover_eventually_follows(log, graph);
+    const auto eventually =
+        minera::discover_eventually_follows(log, graph, eventually_follows_options);
     const auto log_skeleton =
         minera::discover_log_skeleton(log, log_skeleton_options);
     const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(

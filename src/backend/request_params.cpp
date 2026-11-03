@@ -2179,6 +2179,17 @@ MineParams parse_mine_params(const FieldLookup& field,
     if (!supplied("overlap")) params.overlap = true;
   }
 
+  if (supplied("eventually_follows_start_attribute")) {
+    params.eventually_follows.start_timestamp_attribute =
+        field("eventually_follows_start_attribute");
+    if (params.eventually_follows.start_timestamp_attribute.empty())
+      throw std::invalid_argument(
+          "eventually_follows_start_attribute: expected an attribute name");
+  }
+  if (supplied("eventually_follows_timestamp_attribute"))
+    params.eventually_follows.timestamp_attribute =
+        field("eventually_follows_timestamp_attribute");
+
   if (const auto value = field("case_column"); !value.empty()) {
     params.csv.case_id_column = value;
   }
