@@ -44,9 +44,11 @@ struct StateKey {
   }
 };
 
+// Transitions are identified by the values of their endpoint states and their
+// label, so a window whose activities arrive in another order reuses the edge.
 struct EdgeKey {
-  StateKey source;
-  StateKey target;
+  Payload source;
+  Payload target;
   TransitionActivity label;
 
   friend bool operator<(const EdgeKey& left, const EdgeKey& right) {
@@ -458,13 +460,19 @@ TransitionSystem build_transition_system(
       options.view != TransitionView::kMultiset) {
     throw std::invalid_argument("transition-system view is invalid");
   }
+  // Root membership follows the state's own representation (two equal
+  // multisets written in a different order are both kept when they are
+  // created in the same step), while a lookup matches any root state by
+  // value and returns the first one registered with that value.
   std::map<StateKey, std::size_t> roots;
+  std::map<Payload, std::size_t> roots_by_value;
   std::map<EdgeKey, std::size_t> edges;
   std::vector<TransitionSystemState> result_states;
   std::vector<StateKey> state_keys;
   std::vector<TransitionSystemTransition> result_transitions;
   const auto lookup_state = [&](const StateKey& key, TransitionSystemState state) {
-    if (const auto found = roots.find(key); found != roots.end()) return found->second;
+    if (const auto found = roots_by_value.find(key.payload); found != roots_by_value.end())
+      return found->second;
     const auto identity = result_states.size();
     state.in_root = false;
     state.id = identity;
@@ -481,11 +489,16 @@ TransitionSystem build_transition_system(
       // a distinct endpoint object when the source takes the root-set slot.
       const auto source = lookup_state(source_key, std::move(source_state));
       const auto target = lookup_state(target_key, std::move(target_state));
-      if (roots.emplace(source_key, source).second) result_states[source].in_root = true;
-      if (roots.emplace(target_key, target).second) result_states[target].in_root = true;
+      const auto register_root = [&](std::size_t identity) {
+        if (!roots.emplace(state_keys[identity], identity).second) return;
+        result_states[identity].in_root = true;
+        roots_by_value.emplace(state_keys[identity].payload, identity);
+      };
+      register_root(source);
+      register_root(target);
       if (index == 0) ++result_states[source].start_count;
       if (index + 1 == activities.size()) ++result_states[target].end_count;
-      EdgeKey key{source_key, target_key, activities[index]};
+      EdgeKey key{source_key.payload, target_key.payload, activities[index]};
       const auto [found, inserted] = edges.emplace(key, result_transitions.size());
       if (inserted) {
         TransitionSystemTransition edge;

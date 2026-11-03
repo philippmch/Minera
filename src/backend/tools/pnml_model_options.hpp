@@ -139,6 +139,10 @@ inline PnmlImportOptions pnml_model_import_options(bool public_markings = false)
   base.final_marking_keys = document.final_marking_keys;
   base.place_names = document.place_ids;
   base.transition_names = document.transition_ids;
+  // Equally short hidden paths tie on the document's arc order, as in the
+  // evaluator entry points; a caller-supplied order still wins.
+  if (!base.place_outgoing_transition_order)
+    base.place_outgoing_transition_order = pnml_place_outgoing_transition_order(document);
   return base;
 }
 

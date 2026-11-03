@@ -1,10 +1,12 @@
 #include "minera/network_analysis.hpp"
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/json_export.hpp"
 #include "minera/request_params.hpp"
 
 #include <cassert>
 #include <cmath>
 #include <map>
+#include <sstream>
 #include <optional>
 #include <tuple>
 #include <utility>
@@ -89,8 +91,35 @@ static void reference_audit_contracts() {
   assert((empty_sort == Edges{{{"r", "s", "A"}, 1}}));
 }
 
+// A mined CSV's case column is case:concept:name as well as its header name,
+// as format_dataframe copies it there. PM4Py 2.7.22 on this CSV formatted
+// with case_id/activity/timestamp, resource nodes, either relation column:
+// {('r1','r2'): {'A': 1}, ('r1','r3'): {'A': 1}}.
+static void flat_csv_case_column() {
+  std::istringstream csv("case_id,activity,timestamp,resource\n"
+                         "c1,A,2024-01-01T00:00:00,r1\nc1,B,2024-01-01T00:01:00,r2\n"
+                         "c2,A,2024-01-01T00:00:00,r1\nc2,C,2024-01-01T00:02:00,r3\n");
+  const auto log = import_csv_event_log(csv);
+  for (const char* column : {"case:concept:name", "case_id"}) {
+    NetworkAnalysisOptions o;
+    o.out_relation_attribute = o.in_relation_attribute = column;
+    const auto edges = discover_network_analysis(log, o).edges;
+    assert(edges.size() == 2);
+    assert(edges[0].source == "r1" && edges[0].target == "r2" && edges[0].activity == "A" && edges[0].count == 1);
+    assert(edges[1].source == "r1" && edges[1].target == "r3" && edges[1].activity == "A" && edges[1].count == 1);
+  }
+  // A name the CSV does not carry is still the pandas KeyError.
+  NetworkAnalysisOptions absent;
+  absent.out_relation_attribute = absent.in_relation_attribute = "case:region";
+  try { (void)discover_network_analysis(log, absent); assert(false); }
+  catch (const std::invalid_argument& error) {
+    assert(std::string(error.what()) == "network analysis: KeyError: \"['case:region'] not in index\"");
+  }
+}
+
 int main() {
   reference_audit_contracts();
+  flat_csv_case_column();
   auto result = discover_network_analysis(sample());
   assert(result.variant == NetworkAnalysisVariant::kDataframe);
   assert(result.edges.size() == 2);

@@ -2294,6 +2294,50 @@ MineParams parse_mine_params(const FieldLookup& field,
         field(max_cases_field), max_cases_field);
   }
 
+  // Seeded sampling (pm4py.sample_cases / sample_events), the first filter
+  // step. With sampling requested, `seed` is accepted as an alias of
+  // `sample_seed`; without either a fresh seed is drawn and the response
+  // reports it.
+  const bool sample_cases_supplied = supplied("sample_cases");
+  const bool sample_events_supplied = supplied("sample_events");
+  const bool sample_input_supplied = supplied("sample_input");
+  if (sample_cases_supplied || sample_events_supplied) {
+    const bool sample_seed_supplied =
+        supplied("sample_seed") || supplied("seed");
+    LogSamplingOptions sampling;
+    if (sample_cases_supplied)
+      sampling.cases =
+          parse_nonnegative_size(field("sample_cases"), "sample_cases");
+    if (sample_events_supplied)
+      sampling.events =
+          parse_nonnegative_size(field("sample_events"), "sample_events");
+    if (sample_seed_supplied) {
+      if (supplied("sample_seed") && supplied("seed"))
+        throw std::invalid_argument("sample_seed: conflicts with seed");
+      const auto name = supplied("sample_seed") ? std::string_view("sample_seed")
+                                                : std::string_view("seed");
+      const auto seed = parse_nonnegative_u64(field(name), name);
+      if (seed > 0xffffffffULL)
+        throw std::invalid_argument(std::string(name) +
+                                    ": must be at most 4294967295");
+      sampling.seed = static_cast<std::uint32_t>(seed);
+    } else {
+      sampling.seed = random_sample_seed();
+    }
+    if (sample_input_supplied) {
+      const auto input = parse_sample_input(field("sample_input"));
+      if (!input)
+        throw std::invalid_argument(
+            "sample_input: expected dataframe, event_log, or event_stream");
+      sampling.input = *input;
+    }
+    params.filter.sampling = sampling;
+  } else if (supplied("sample_seed") || sample_input_supplied) {
+    throw std::invalid_argument(
+        std::string(sample_input_supplied ? "sample_input" : "sample_seed") +
+        ": requires sample_cases or sample_events");
+  }
+
   // Frequency-based activity/attribute projections.  The maximum-activity
   // field accepts the common aliases so old clients can opt into the same
   // deterministic top-value filter.  Relative occurrence defaults to the

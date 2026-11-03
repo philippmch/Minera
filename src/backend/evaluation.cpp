@@ -1172,30 +1172,55 @@ struct TokenPrefixes {
   std::vector<PrefixInfo> proper;
 };
 
-TokenPrefixes collect_token_prefixes(const EventLog& log,
+// Groups proper prefixes the way the public prefix utility does: string labels
+// are joined with commas and the key is split again for replay, so a label
+// containing a comma replays as several events and prefixes whose joined keys
+// coincide are one prefix. Steps without a string label (null or typed
+// activities) keep their own identity and replay as labels absent from the
+// model.
+TokenPrefixes collect_token_prefixes(const std::vector<detail::TokenPrecisionSequence>& sequences,
+                                    const PetriNet& net,
                                     const std::string& activity_attribute) {
   TokenPrefixes result;
-  std::map<std::string, std::size_t> indices;
-  for (const auto& trace : log.traces) {
-    std::vector<std::string> activities;
-    for (const auto& event : trace.events)
-      activities.push_back(selected_evaluation_activity(event, activity_attribute));
-    ++result.initial.frequency;
-    if (!activities.empty()) result.initial.observed.insert(activities.front());
-    std::string key;
-    for (std::size_t i = 0; i + 1 < activities.size(); ++i) {
-      if (i) key += ',';
-      key += activities[i];
+  std::map<std::vector<std::string>, std::size_t> indices;
+  std::set<std::string> model_labels(net.activities().begin(), net.activities().end());
+  std::map<std::string, std::string> absent_labels;
+  const auto absent_label = [&](const std::string& identity) {
+    const auto [it, inserted] = absent_labels.try_emplace(identity);
+    if (inserted) {
+      std::string label = "\x1f" + std::to_string(absent_labels.size());
+      while (model_labels.contains(label)) label += '\x1f';
+      it->second = std::move(label);
+    }
+    return it->second;
+  };
+  const auto append_tokens = [](const detail::TokenPrecisionStep& step,
+                                std::vector<std::string>& tokens) {
+    if (!step.text) {
+      tokens.push_back("x" + step.identity);
+      return;
+    }
+    std::size_t begin = 0;
+    while (true) {
+      const auto end = step.text->find(',', begin);
+      tokens.push_back("s" + step.text->substr(begin, end == std::string::npos ? end : end - begin));
+      if (end == std::string::npos) break;
+      begin = end + 1;
+    }
+  };
+  for (const auto& sequence : sequences) {
+    const auto& steps = sequence.steps;
+    result.initial.frequency += sequence.count;
+    if (!steps.empty() && steps.front().text) result.initial.observed.insert(*steps.front().text);
+    std::vector<std::string> key;
+    for (std::size_t i = 0; i + 1 < steps.size(); ++i) {
+      append_tokens(steps[i], key);
       const auto [position, inserted] = indices.emplace(key, result.proper.size());
       if (inserted) {
         auto& prefix = result.proper.emplace_back();
         prefix.sample.case_id = "prefix-" + std::to_string(position->second);
-        // The public prefix utility joins labels with commas and splits that
-        // key again for replay. Empty fields and colliding keys survive.
-        std::size_t begin = 0;
-        while (true) {
-          const auto end = key.find(',', begin);
-          const auto label = key.substr(begin, end == std::string::npos ? end : end - begin);
+        for (const auto& token : key) {
+          const auto label = token.front() == 's' ? token.substr(1) : absent_label(token.substr(1));
           Event event;
           event.case_id = prefix.sample.case_id;
           event.activity = label;
@@ -1205,13 +1230,11 @@ TokenPrefixes collect_token_prefixes(const EventLog& log,
           if (activity_attribute != "concept:name")
             event.attributes.push_back({activity_attribute, label, AttributeKind::kString});
           prefix.sample.events.push_back(std::move(event));
-          if (end == std::string::npos) break;
-          begin = end + 1;
         }
       }
       auto& prefix = result.proper[position->second];
-      ++prefix.frequency;
-      prefix.observed.insert(activities[i + 1]);
+      prefix.frequency += sequence.count;
+      if (steps[i + 1].text) prefix.observed.insert(*steps[i + 1].text);
     }
   }
   return result;
@@ -1409,38 +1432,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     replay_options.consider_activities_not_in_model_in_fitness = false;
     replay_options.activity_attribute = activity_attribute;
     copy_token_markings(options, replay_options);
-    const auto prefixes = collect_token_prefixes(log, activity_attribute);
-    EventLog prefix_log;
-    std::vector<const PrefixInfo*> scored;
-    for (const auto& info : prefixes.proper) {
-      prefix_log.traces.push_back(info.sample);
-      scored.push_back(&info);
-    }
-    const auto rows = options.token_replay_variant == TokenReplayVariant::kForward
-        ? replay_token_result(prefix_log, net, replay_options).traces
-        : replay_token_traces(prefix_log, net, replay_options);
-    TokenInteger enabled_total = 0, escaping_total = 0;
-    const auto score = [&](const PrefixInfo& prefix, const std::set<std::string>& labels) {
-      enabled_total += TokenInteger(prefix.frequency) * labels.size();
-      for (const auto& label : labels)
-        if (!prefix.observed.contains(label)) escaping_total += prefix.frequency;
-    };
-    if (prefixes.initial.frequency != 0) {
-      std::set<std::string> labels;
-      for (const auto activity : detail::initial_enabled_token_activities(net, replay_options))
-        labels.insert(net.activities().at(activity));
-      score(prefixes.initial, labels);
-    }
-    for (std::size_t i = 0; i < rows.size(); ++i) {
-      if (!rows[i].trace_is_fit) continue;
-      std::set<std::string> labels;
-      for (const auto transition : rows[i].enabled_transitions) {
-        const auto& node = net.transitions().at(transition);
-        if (node.activity) labels.insert(net.activities().at(*node.activity));
-      }
-      score(*scored[i], labels);
-    }
-    out.precision = enabled_total == 0 ? 1.0 : 1.0 - token_integer_ratio(escaping_total, enabled_total);
+    out.precision = detail::token_etconformance_precision(log, net, replay_options);
     out.token_result.precision = out.precision;
     out.token_result.activity_attribute = activity_attribute;
     out.token_result_is_precision_only = true;
@@ -1535,6 +1527,67 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
 }  // namespace
 
 namespace detail {
+
+double token_etconformance_precision(const EventLog& log, const PetriNet& net,
+                                     TokenReplayOptions replay_options) {
+  const std::string activity_attribute = replay_options.activity_attribute.empty()
+      ? "concept:name" : replay_options.activity_attribute;
+  std::vector<TokenPrecisionSequence> sequences;
+  sequences.reserve(log.traces.size());
+  for (const auto& trace : log.traces) {
+    auto& sequence = sequences.emplace_back();
+    for (const auto& event : trace.events)
+      sequence.steps.push_back({selected_evaluation_activity(event, activity_attribute), {}});
+  }
+  return token_etconformance_precision(sequences, net, std::move(replay_options));
+}
+
+double token_etconformance_precision(const std::vector<TokenPrecisionSequence>& sequences,
+                                     const PetriNet& net,
+                                     TokenReplayOptions replay_options) {
+  // The reference evaluator replays every distinct proper prefix as its own
+  // trace, stopping at the first missing token and never routing to the final
+  // marking, then scores the labels eventually enabled at the reached marking.
+  replay_options.stop_immediately_unfit = true;
+  replay_options.consider_remaining_in_fitness = false;
+  replay_options.try_to_reach_final_marking_through_hidden = false;
+  replay_options.consider_activities_not_in_model_in_fitness = false;
+  const std::string activity_attribute = replay_options.activity_attribute.empty()
+      ? "concept:name" : replay_options.activity_attribute;
+  replay_options.activity_attribute = activity_attribute;
+  const auto prefixes = collect_token_prefixes(sequences, net, activity_attribute);
+  EventLog prefix_log;
+  std::vector<const PrefixInfo*> scored;
+  for (const auto& info : prefixes.proper) {
+    prefix_log.traces.push_back(info.sample);
+    scored.push_back(&info);
+  }
+  const auto rows = replay_options.variant == TokenReplayVariant::kForward
+      ? replay_token_result(prefix_log, net, replay_options).traces
+      : replay_token_traces(prefix_log, net, replay_options);
+  TokenInteger enabled_total = 0, escaping_total = 0;
+  const auto score = [&](const PrefixInfo& prefix, const std::set<std::string>& labels) {
+    enabled_total += TokenInteger(prefix.frequency) * labels.size();
+    for (const auto& label : labels)
+      if (!prefix.observed.contains(label)) escaping_total += prefix.frequency;
+  };
+  if (prefixes.initial.frequency != 0) {
+    std::set<std::string> labels;
+    for (const auto activity : detail::initial_enabled_token_activities(net, replay_options))
+      labels.insert(net.activities().at(activity));
+    score(prefixes.initial, labels);
+  }
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    if (!rows[i].trace_is_fit) continue;
+    std::set<std::string> labels;
+    for (const auto transition : rows[i].enabled_transitions) {
+      const auto& node = net.transitions().at(transition);
+      if (node.activity) labels.insert(net.activities().at(*node.activity));
+    }
+    score(*scored[i], labels);
+  }
+  return enabled_total == 0 ? 1.0 : 1.0 - token_integer_ratio(escaping_total, enabled_total);
+}
 
 bool eventually_enabled_labels(const PetriNet& net, const std::vector<int>& marking,
                                const std::vector<std::string>& transition_names,

@@ -12,6 +12,7 @@
 #include "minera/attribute_value_repetition.hpp"
 #include "minera/case_grouping.hpp"
 #include "minera/event_log.hpp"
+#include "minera/sampling.hpp"
 
 namespace minera {
 
@@ -343,6 +344,12 @@ struct LogFilterOptions {
       consecutive_activity_grouping;
   std::optional<TimestampCaseGroupingOptions> timestamp_case_grouping;
 
+  // Optional seeded sampling (pm4py.sample_cases / sample_events, see
+  // minera/sampling.hpp). It runs before every other filter, on the log as
+  // imported, so a seeded request reproduces the reference call on the
+  // imported data.
+  std::optional<LogSamplingOptions> sampling;
+
   [[nodiscard]] bool any() const {
     return !time_from.empty() || !time_to.empty() ||
            !keep_activities.empty() || !remove_activities.empty() ||
@@ -380,7 +387,7 @@ struct LogFilterOptions {
            !activity_split_activities.empty() ||
            attribute_value_repetition.has_value() ||
            consecutive_activity_grouping.has_value() ||
-           timestamp_case_grouping.has_value();
+           timestamp_case_grouping.has_value() || sampling.has_value();
   }
 };
 

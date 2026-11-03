@@ -722,10 +722,16 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
   const bool event_id_str = event_id_selected && str_column(event_id_selector);
 
   // Polars requires a string (or categorical) case column, even when empty.
+  // A table typed by the pandas CSV adapter (a mined CSV source) reaches the
+  // Polars variant as the frame pl.from_pandas makes of it: its "str",
+  // "string" and "object" text columns are String and "category" is
+  // Categorical. Numeric cells of an object column are refused per row below.
   if (polars && case_selector.column && *case_selector.column < table.dtypes.size()) {
     const std::string_view dtype = table.dtypes[*case_selector.column];
     const bool text = dtype.starts_with("String") || dtype.starts_with("Utf8") ||
-                      dtype.starts_with("Categorical") || dtype.starts_with("Enum");
+                      dtype.starts_with("Categorical") || dtype.starts_with("Enum") ||
+                      dtype == "str" || dtype == "string" || dtype == "object" ||
+                      dtype == "category";
     if (!text)
       throw std::invalid_argument(
           "batches: the case ID column should be of type string.");

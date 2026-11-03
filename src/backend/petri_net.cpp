@@ -309,6 +309,9 @@ class ReferenceTreeNetBuilder {
       remap[p] = result.net.add_place();
       result.place_names.push_back(place_names_[p]);
     }
+    // The net carries the reference's place names so replay tie-breaks on
+    // them even when no PNML document accompanies the converted net.
+    result.net.set_place_names(result.place_names);
     result.net.set_activities(tree_.activities());
     result.net.set_source(remap[source]);
     result.net.set_sink(remap[sink]);

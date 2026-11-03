@@ -69,15 +69,25 @@ export class MiningSourceRequestGate {private generation = 0; issue(): MiningReq
 export function assertMiningSourceBinding(expected: string | null, current: string | null, generation: number, currentGeneration: number): void {if (!expected) throw new Error("No live backend log is loaded for this analysis. Open the original CSV or XES log (or wait for the current load to finish) to compute this."); if (expected !== current || generation !== currentGeneration) throw new Error("The active source changed while this request was pending.");}
 /** What a cancel-mine settled with: `confirmed` once the backend handled the cancel (and restored its previous session), with the source id it then holds (null for none) when it reported one. A cancel that failed on the network or was refused is not confirmed: the backend may still hold the newer session. */
 export interface MiningCancelOutcome {confirmed: boolean; activeSourceId?: string | null;}
-/** Never rejects. */
-export function cancelMiningRequest(requestId: string): Promise<MiningCancelOutcome> {
-  return fetch(`/api/cancel-mine?request_id=${encodeURIComponent(requestId)}`, {method: "POST"}).then(async response => {
+/** How long a cancel-mine may take before it settles as unconfirmed. */
+export const CANCEL_MINING_TIMEOUT_MS = 10_000;
+/**
+ * Never rejects, and settles within `timeoutMs`: a cancel whose request or
+ * body stalls is aborted and reported unconfirmed, so the cancel barrier that
+ * later loads wait on cannot hang behind it.
+ */
+export function cancelMiningRequest(requestId: string, timeoutMs = CANCEL_MINING_TIMEOUT_MS): Promise<MiningCancelOutcome> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<MiningCancelOutcome>(resolve => {timer = setTimeout(() => {controller.abort(); resolve({confirmed: false});}, timeoutMs);});
+  const answered = fetch(`/api/cancel-mine?request_id=${encodeURIComponent(requestId)}`, {method: "POST", signal: controller.signal}).then(async (response): Promise<MiningCancelOutcome> => {
     if (!response.ok) return {confirmed: false};
     const value: unknown = await response.json().catch(() => undefined);
     if (!object(value) || value.family !== "ACTIVE_SOURCE_CANCEL" || value.canceled !== true) return {confirmed: false};
     const held = value.active_source_id;
     return {confirmed: true, ...(held === null || typeof held === "string" ? {activeSourceId: held} : {})};
   }, () => ({confirmed: false}));
+  return Promise.race([answered, expired]).finally(() => clearTimeout(timer));
 }
 /** The download label for a mining response: one whose active source is only the summary (a large original) does not carry the complete source views. */
 export function miningResultsLabel(capture: unknown): string {const source = object(capture) ? capture.active_source : undefined; return object(source) && source.detail === "summary" ? "Download native mining results (source summary only)" : "Download complete native mining results";}

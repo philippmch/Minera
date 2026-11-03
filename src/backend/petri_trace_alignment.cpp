@@ -351,6 +351,7 @@ PetriNet unit_weight_net(const PetriNet& net) {
   if (net.has_source()) copy.set_source(net.source());
   if (net.has_sink()) copy.set_sink(net.sink());
   if (net.transition_names()) copy.set_transition_names(*net.transition_names());
+  if (net.place_names()) copy.set_place_names(*net.place_names());
   if (net.discovery_markings()) copy.set_discovery_markings(*net.discovery_markings());
   return copy;
 }

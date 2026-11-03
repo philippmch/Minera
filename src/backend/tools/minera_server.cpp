@@ -396,8 +396,13 @@ minera::BatchDiscovery discover_selected_batches(
 // caching just the latest analysis is enough; a shared_ptr lets a slow
 // alignment run on a snapshot without holding the lock.
 std::atomic<std::uint64_t> g_query_source_sequence{0};
+// Each model import gets a fresh id (0 = none). A client that sends the id it
+// was given in the X-Minera-Imported-Model header has its request refused
+// when the server's imported model is not that one for the whole request.
+std::atomic<std::uint64_t> g_imported_model_sequence{0};
 struct MinedSession {
   std::uint64_t query_source_id=++g_query_source_sequence;
+  std::uint64_t imported_model_id = 0;
   std::shared_ptr<const minera::ActiveEventSource> active_source;
   // Literal/typed/native-flat mining binds defaults to the retained source;
   // legacy grouped-log mining keeps its existing native selector defaults.
@@ -1331,6 +1336,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto bound_body = body.substr(0, body_end) + ",\"source_id\":" +
         minera::embedding_runtime::detail::escape_json(std::to_string(session->query_source_id)) +
         ",\"active_source\":" + active_source_snapshot_json(*session, false) +
+        (params.filter.sampling
+             ? ",\"sampling\":" +
+                   minera::sampling_options_json(*params.filter.sampling)
+             : std::string{}) +
         '}' + body.substr(body_end + 1);
     publish_active_mining(ticket, session);
 
@@ -6293,20 +6302,30 @@ void handle_check_model(const httplib::Request& request,
                                              replay_options.initial_marking)
                  : minera::check_footprints(footprint_log, imported),
         std::nullopt};
-    const auto body =
+    auto body =
         minera::imported_model_json(conformance, next_session->graph);
+    const auto imported_model_id = ++g_imported_model_sequence;
+    next_session->imported_model_id = imported_model_id;
 
     {
       std::lock_guard<std::mutex> lock(g_session_mutex);
-      // Only publish if no re-mine replaced the session in the meantime.
+      // Only publish if no re-mine replaced the session in the meantime. An
+      // unpublished import is refused either way: its id never reaches the
+      // server's session, so reporting success would mislead the caller.
       if (g_session == session) g_session = std::move(next_session);
-      else if (request.has_param("source_id")) {
+      else {
         response.status = 409;
-        response.set_content(error_json("the active session changed during model checking; retry the handoff"),
+        response.set_content(error_json(request.has_param("source_id")
+            ? "the active session changed during model checking; retry the handoff"
+            : "the active session changed during model checking; check the model again"),
                              "application/json");
         return;
       }
     }
+    // Runs on the imported model echo this id (X-Minera-Imported-Model) so a
+    // model replaced while they are pending is detected by the server.
+    if (body.size() > 2 && body.front() == '{')
+      body.insert(1, "\"imported_model_id\":" + std::to_string(imported_model_id) + ",");
     response.set_content(body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -9071,6 +9090,19 @@ void handle_stochastic_map(const httplib::Request& request,
   }
 }
 
+// pm4py plays out 1000 traces whatever the per-trace length cap. The server
+// keeps the worst case (traces x per-trace cap) under its 1,000,000-event
+// safety budget, so when the caller omits the trace count it shrinks to
+// min(default, budget / cap) instead of failing (declared in
+// docs/reference-2.7.22-parity.md). An explicit count is checked as given.
+constexpr std::size_t kPlayoutEventBudget = 1'000'000;
+std::size_t default_playout_traces(std::size_t per_trace_cap,
+                                   std::size_t reference_default) {
+  if (per_trace_cap == 0) return reference_default;
+  return std::max<std::size_t>(
+      1, std::min(reference_default, kPlayoutEventBudget / per_trace_cap));
+}
+
 void handle_playout(const httplib::Request& request,
                     httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -9210,6 +9242,8 @@ void handle_playout(const httplib::Request& request,
       auto options = minera::parse_stochastic_playout_params(lookup, present);
       cached_imported_markings(request, *session, selected_miner, options,
                                "stochastic_initial_marking", "stochastic_final_marking");
+      if (!present("stochastic_traces"))
+        options.traces = default_playout_traces(options.max_steps, options.traces);
       if (options.traces > 10000 || options.max_steps > 10000) {
         reject("stochastic Petri playout bounds exceed the server safety limits");
         return;
@@ -9353,6 +9387,10 @@ void handle_playout(const httplib::Request& request,
         reject("DFG playout bounds exceed the server safety limits");
         return;
       }
+      if (options.variant == minera::DfgPlayoutVariant::kPerformance &&
+          !present("dfg_playout_traces"))
+        options.traces = default_playout_traces(options.max_events_per_trace,
+                                                options.traces);
       constexpr std::size_t kMaxGeneratedEvents = 1'000'000;
       if (options.variant == minera::DfgPlayoutVariant::kPerformance &&
           options.traces != 0 && options.max_events_per_trace != 0 &&
@@ -9471,6 +9509,8 @@ void handle_playout(const httplib::Request& request,
     if (!parsed) return;
     options.max_steps = static_cast<std::size_t>(*parsed);
   }
+  if (!request.has_param("traces"))
+    options.traces = default_playout_traces(options.max_steps, options.traces);
   if (request.has_param("seed")) {
     const auto parsed = parse_bounded(
         "seed", 0, std::numeric_limits<std::uint64_t>::max());
@@ -10661,6 +10701,25 @@ std::optional<std::string> repeated_request_control(const httplib::Request& requ
   return std::nullopt;
 }
 
+std::uint64_t current_imported_model_id() {
+  std::lock_guard<std::mutex> lock(g_session_mutex);
+  return g_session ? g_session->imported_model_id : 0;
+}
+
+void reject_stale_imported_model(httplib::Response& response) {
+  // Drop what the handler produced (body, downloads, providers) but keep the
+  // CORS headers the pre-routing handler set.
+  httplib::Response fresh;
+  for (const char* name : {"Access-Control-Allow-Origin", "Vary"})
+    if (response.has_header(name))
+      fresh.set_header(name, response.get_header_value(name));
+  response = std::move(fresh);
+  response.status = 409;
+  response.set_content(
+      error_json("The imported model changed while this request was pending; run it again."),
+      "application/json");
+}
+
 httplib::Server::Handler api_route_handler(std::string path,
                                            httplib::Server::Handler handler) {
   return [path = std::move(path), handler = std::move(handler)](
@@ -10674,6 +10733,20 @@ httplib::Server::Handler api_route_handler(std::string path,
             "application/json");
         return;
       }
+    }
+    // A request bound to an imported model runs only when that model is the
+    // server's imported model both before and after the handler: ids are
+    // never reused, so the handler's own session snapshot held it too.
+    if (path != "/api/check-model" && request.has_header("X-Minera-Imported-Model")) {
+      const auto expected = request.get_header_value("X-Minera-Imported-Model");
+      if (expected != std::to_string(current_imported_model_id())) {
+        reject_stale_imported_model(response);
+        return;
+      }
+      handler(request, response);
+      if (expected != std::to_string(current_imported_model_id()))
+        reject_stale_imported_model(response);
+      return;
     }
     handler(request, response);
   };
@@ -10869,7 +10942,7 @@ int main(int argc, char** argv) {
   });
   const auto preflight = [](const httplib::Request&, httplib::Response& response) {
     response.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
-    response.set_header("Access-Control-Allow-Headers", "Content-Type");
+    response.set_header("Access-Control-Allow-Headers", "Content-Type, X-Minera-Imported-Model");
     response.status = 204;
   };
   server.Options("/api/mine", preflight);

@@ -1,5 +1,6 @@
 #include "minera/conformance.hpp"
 #include "minera/token_replay_error.hpp"
+#include "evaluation_internal.hpp"
 #include "petri_replay_internal.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
@@ -357,6 +358,7 @@ std::optional<PetriNet> ordinary_token_replay_net(const PetriNet& net) {
   storage.activities = net.activities();
   storage.discovery_markings = net.discovery_markings();
   storage.transition_names = net.transition_names();
+  storage.place_names = net.place_names();
   for (auto& transition : storage.transitions) {
     if (!transition.has_extended_arcs()) continue;
     std::vector<PetriArcWeight> weights;
@@ -970,9 +972,12 @@ class Replayer {
     return acts;
   }
 
+  // `budget`, when given, bounds the forward worklist's silent expansions and
+  // reports exhaustion as SilentSearchBudgetExhausted (the precision root).
   [[nodiscard]] std::vector<std::size_t> enabled_transition_ids(
       const Marking& marking,
-      const TokenReplayOptions& options) const {
+      const TokenReplayOptions& options,
+      std::optional<std::size_t> budget = std::nullopt) const {
     if (net_.has_extended_arcs()) {
       std::vector<std::size_t> result;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
@@ -1032,7 +1037,8 @@ class Replayer {
         const auto& reached = *latest[t];
         if (!visited[pair_ids[t]].insert(reached).second) continue;
         if (!net_.transitions()[t].silent()) { selected.push_back(t); continue; }
-        if (expanded++ >= kSilentSearchCap)
+        if (budget && expanded >= *budget) throw detail::SilentSearchBudgetExhausted();
+        if (expanded++ >= kSilentSearchCap && !budget)
           throw std::runtime_error("enabled transition diagnostic search exceeded limit");
         Marking next = reached;
         Counts scratch;
@@ -1149,7 +1155,7 @@ class Replayer {
     for (std::size_t p = 0; p < result.initial_keys.size(); ++p)
       if (result.initial_keys[p] && std::find(result.initial_order.begin(), result.initial_order.end(), p) == result.initial_order.end())
         result.initial_order.push_back(p);
-    result.place_names = detail::replay_element_names(options.place_names, net_.place_count(), "p", "place_names");
+    result.place_names = detail::replay_place_names(options.place_names, net_);
     if (markings_.domain) for (const auto& place : markings_.domain->detached_places) {
       const auto* name = std::get_if<std::string>(&place.name.value);
       result.place_names.push_back(name ? *name : "detached:" + std::to_string(place.id));
@@ -1806,6 +1812,10 @@ class Replayer {
 struct Variant {
   std::vector<std::optional<std::size_t>> ids;  // std::nullopt = absent activity
   std::vector<std::string> names;
+  // Per step: the plain string label (std::nullopt for null or typed
+  // activities) and the step's identity key, as token precision groups them.
+  std::vector<std::optional<std::string>> labels;
+  std::vector<std::string> identities;
   std::uint64_t count = 0;
   std::vector<std::size_t> null_activity_indices;
 };
@@ -1974,6 +1984,8 @@ std::vector<Variant> collect_replay_variants(
                                 ? resolver.activity_id(*activity.model_label)
                                 : std::nullopt);
       variant.names.push_back(activity.display_name.value_or(""));
+      variant.labels.push_back(activity.model_label);
+      variant.identities.push_back(activity.variant_key);
       key.push_back(std::move(activity.variant_key));
     }
     const auto [it, inserted] = index.emplace(std::move(key), variants.size());
@@ -2017,130 +2029,9 @@ std::vector<Variant> collect_variants(const EventLog& log,
   return variants;
 }
 
-double compute_precision(const std::vector<Variant>& variants,
-                         const Replayer& replayer,
-                         TokenReplayVariant replay_variant,
-                         bool stop_immediately_unfit,
-                         bool walk_through_hidden_transitions) {
-  using Marking = TokenMarking;
-  using MarkingHash = TokenMarkingHash;
-  // Prefix automaton as a trie: each node is a distinct prefix and records how
-  // many traces pass through it and which activities they go on to take.
-  // Activities absent from the model get one edge key per distinct label, so
-  // prefixes X and Y stay apart as in the reference's prefix strings; replay
-  // still treats every absent label alike (the marking does not move).
-  constexpr std::size_t kAbsent = std::numeric_limits<std::size_t>::max();
-  std::map<std::pair<bool, std::string>, std::size_t> absent_edges;
-  const auto absent_edge = [&](const Variant& variant, std::size_t depth) {
-    const bool null_label =
-        std::find(variant.null_activity_indices.begin(),
-                  variant.null_activity_indices.end(),
-                  depth) != variant.null_activity_indices.end();
-    const auto [it, inserted] = absent_edges.try_emplace(
-        {null_label, variant.names[depth]}, kAbsent - absent_edges.size());
-    return it->second;
-  };
-  struct Node {
-    std::unordered_map<std::size_t, std::size_t> children;  // edge -> node
-    std::uint64_t freq = 0;
-    std::unordered_set<std::size_t> observed;  // next activities the log takes
-    std::vector<std::optional<std::size_t>> prefix;
-  };
-  std::vector<Node> nodes(1);
-  for (const auto& variant : variants) {
-    std::size_t current = 0;
-    nodes[current].freq += variant.count;
-    for (std::size_t depth = 0; depth < variant.ids.size(); ++depth) {
-      const auto& id = variant.ids[depth];
-      if (id) nodes[current].observed.insert(*id);
-      const auto edge = id ? *id : absent_edge(variant, depth);
-      const auto existing = nodes[current].children.find(edge);
-      std::size_t child = 0;
-      if (existing == nodes[current].children.end()) {
-        child = nodes.size();
-        auto child_prefix = nodes[current].prefix;
-        child_prefix.push_back(id);
-        nodes[current].children.emplace(edge, child);
-        nodes.emplace_back();
-        nodes.back().prefix = std::move(child_prefix);
-      } else {
-        child = existing->second;
-      }
-      current = child;
-      // The evaluator scores proper prefixes only. A node reached by the final
-      // event is terminal and contributes no weight; a shorter variant that
-      // shares a prefix contributes only when another event follows it.
-      if (depth + 1 < variant.ids.size()) nodes[current].freq += variant.count;
-    }
-  }
-
-  // Distinct prefixes routinely reach the same marking, and computing a
-  // marking's enabled activities is the costly step (a silent-transition search
-  // per activity). Cache it by marking so that work happens once per marking
-  // rather than once per prefix.
-  std::unordered_map<Marking, std::unordered_set<std::size_t>, MarkingHash>
-      enabled_cache;
-
-  std::uint64_t enabled_total = 0;
-  std::uint64_t escaping_total = 0;
-
-  const auto score = [&](const Node& node, Marking marking) {
-    const auto [it, inserted] = enabled_cache.try_emplace(std::move(marking));
-    if (inserted) {
-      it->second = replayer.enabled_activities(it->first);
-    }
-    const auto& enabled = it->second;
-    std::uint64_t escaping = 0;
-    for (const std::size_t a : enabled) {
-      if (node.observed.find(a) == node.observed.end()) ++escaping;
-    }
-    enabled_total += node.freq * enabled.size();
-    escaping_total += node.freq * escaping;
-  };
-
-  if (replay_variant == TokenReplayVariant::kBackwards) {
-    score(nodes.front(), replayer.initial_marking());
-    for (std::size_t index = 1; index < nodes.size(); ++index) {
-      const auto outcome = replayer.replay_backwards(
-          nodes[index].prefix, nullptr, stop_immediately_unfit,
-          walk_through_hidden_transitions);
-      if (outcome.fitting) score(nodes[index], outcome.marking);
-    }
-  } else {
-    // Depth-first walk carrying the marking: a child's marking is its parent's
-    // advanced by one replay step, so each trie node costs one step rather than
-    // a from-scratch replay of its whole prefix. Evaluator precision discards
-    // a prefix as soon as replay needs a missing token.
-    struct Frame {
-      std::size_t index = 0;
-      Marking marking;
-      bool fitting = true;
-    };
-    std::vector<Frame> stack;
-    stack.push_back({0, replayer.initial_marking(), true});
-    while (!stack.empty()) {
-      auto frame = std::move(stack.back());
-      stack.pop_back();
-      const Node& node = nodes[frame.index];
-      if (!stop_immediately_unfit || frame.fitting) {
-        score(node, frame.marking);
-      }
-      if (stop_immediately_unfit && !frame.fitting) continue;
-      for (const auto& [edge, child] : node.children) {
-        Marking next = frame.marking;
-        const bool fitting = replayer.advance(
-            next, nodes[child].prefix.back(), walk_through_hidden_transitions);
-        stack.push_back({child, std::move(next), fitting});
-      }
-    }
-  }
-  return enabled_total == 0 ? 1.0
-                            : 1.0 - double(escaping_total) / double(enabled_total);
-}
-
 // Alignment-based escaping-edges precision (Adriansyah, Munoz-Gama, Carmona,
-// van Dongen & van der Aalst): the same prefix-automaton walk as
-// compute_precision, but each prefix's model state comes from the optimal
+// van Dongen & van der Aalst): a prefix-automaton walk like token
+// ETConformance precision, but each prefix's model state comes from the optimal
 // alignments rather than from forced token replay — on a deviating log the
 // replay marking can be an artifact of healed tokens, while the aligned
 // marking is one the model genuinely reaches in the cheapest explanation.
@@ -3815,8 +3706,17 @@ detail::ScopedEnabledSearchBudget::~ScopedEnabledSearchBudget() {
 
 std::vector<std::size_t> detail::initial_enabled_token_activities(
     const PetriNet& net, const TokenReplayOptions& options) {
-  const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
-  const auto activities = replayer.enabled_activities(replayer.initial_marking());
+  // The reference scores the empty prefix with the same eventually-enabled
+  // worklist as every other prefix (transition-name order, newest marking per
+  // queued transition, one visit per transition and marking), whichever replay
+  // variant scores the remaining prefixes.
+  auto forward = options;
+  forward.variant = TokenReplayVariant::kForward;
+  const Replayer replayer(net, forward.initial_marking, forward.final_marking, &forward);
+  std::set<std::size_t> activities;
+  for (const auto transition : replayer.enabled_transition_ids(
+           replayer.initial_marking(), forward, detail::enabled_search_budget()))
+    if (const auto& activity = net.transitions()[transition].activity) activities.insert(*activity);
   return {activities.begin(), activities.end()};
 }
 
@@ -3879,13 +3779,28 @@ ConformanceResult check_conformance(const EventLog& event_log,
     result.fitness = 0.5 * (1.0 - consume_term) + 0.5 * (1.0 - produce_term);
   }
 
-  // ETConformance precision always discards a prefix at its first missing
-  // token, whatever the fitness replay was asked to do with unfit traces.
+  // ETConformance precision is the evaluator's computation: it replays each
+  // distinct proper prefix with stop-immediately-unfit and no final routing,
+  // whatever the fitness replay was asked to do, and scores the labels the
+  // reference's eventually-enabled worklist reports at the reached marking.
   try {
-    result.precision = compute_precision(
-        variants, replayer, options.variant, /*stop_immediately_unfit=*/true,
-        options.walk_through_hidden_transitions);
-  } catch (const detail::SilentSearchBudgetExhausted&) {
+    std::vector<detail::TokenPrecisionSequence> sequences;
+    sequences.reserve(variants.size());
+    for (const auto& variant : variants) {
+      auto& sequence = sequences.emplace_back();
+      sequence.count = variant.count;
+      for (std::size_t step = 0; step < variant.labels.size(); ++step)
+        sequence.steps.push_back({variant.labels[step], variant.identities[step]});
+    }
+    result.precision = detail::token_etconformance_precision(sequences, net, options);
+  } catch (const std::runtime_error&) {
+    // Silent-search budgets (the enabled-label worklist and the routing
+    // searches) refuse to produce a partial value.
+    result.precision = std::numeric_limits<double>::quiet_NaN();
+    result.precision_computed = false;
+  } catch (const std::domain_error&) {
+    // A backwards prefix with no consumed or produced tokens has no fitness;
+    // the reference evaluator raises there, so no precision value exists.
     result.precision = std::numeric_limits<double>::quiet_NaN();
     result.precision_computed = false;
   }
@@ -4248,8 +4163,7 @@ TokenReplayResult replay_token_result(
   TokenReplayResult result;
   result.marking_domain = markings.domain;
   result.return_names = options.return_names;
-  result.place_names = detail::replay_element_names(
-      options.place_names, net.place_count(), "p", "place_names");
+  result.place_names = detail::replay_place_names(options.place_names, net);
   result.transition_names = detail::replay_element_names(
       options.nullable_transition_names ? std::vector<std::string>{} : options.transition_names,
       net.transitions().size(), "t", "transition_names");

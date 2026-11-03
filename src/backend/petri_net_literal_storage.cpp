@@ -1,5 +1,6 @@
 #include "minera/petri_net.hpp"
 
+#include <stdexcept>
 #include <utility>
 
 namespace minera {
@@ -14,6 +15,9 @@ PetriNet PetriNet::from_literal_storage(PetriNetLiteralStorage storage) {
   net.activities_ = std::move(storage.activities);
   net.discovery_markings_ = std::move(storage.discovery_markings);
   net.transition_names_ = std::move(storage.transition_names);
+  if (storage.place_names && storage.place_names->size() != storage.place_count)
+    throw std::invalid_argument("Petri place names must contain one entry per place");
+  net.place_names_ = std::move(storage.place_names);
   return net;
 }
 }  // namespace minera

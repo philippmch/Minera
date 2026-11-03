@@ -2187,8 +2187,9 @@ void parse_bpmn_rejects_unsupported_models() {
       <sequenceFlow id="f1" sourceRef="s" targetRef="ghost"/>
     </process></definitions>)");
   }));
-  // A process without a start or end event cannot be replayed source-to-sink.
-  assert(throws([] {
+  // A process without a start event converts like the reference: the source
+  // place stays unconnected (test_bpmn_reference_parity.cpp checks the net).
+  assert(!throws([] {
     (void)minera::parse_bpmn(R"(<definitions><process id="p">
       <task id="a" name="a"/><endEvent id="e"/>
       <sequenceFlow id="f1" sourceRef="a" targetRef="e"/>

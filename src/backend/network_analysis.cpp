@@ -72,14 +72,18 @@ const EventAttribute* literal_cell(const Event& e, const Trace* trace, std::stri
 }
 
 // Whether a selector names the case column. A flat adapter's case column
-// keeps its header name; an XES trace attribute (a trace with a selected
-// case cell) is a dataframe column only under its "case:" prefix, so its
-// bare key is not a column (the bare "concept:name" is the activity).
+// keeps its header name and, as format_dataframe copies the chosen column to
+// case:concept:name, is also that canonical column (as its activity, time and
+// resource columns are concept:name, time:timestamp and org:resource). An
+// XES trace attribute (a trace with a selected case cell) is a dataframe
+// column only under its "case:" prefix, so its bare key is not a column (the
+// bare "concept:name" is the activity).
 bool case_selector(const Event& e, const Trace* trace, std::string_view selector) {
   if (e.case_id_source_key.empty())
     return selector == "case:concept:name" || selector == "case:id" || selector == "case_id";
   if (selector == "case:" + e.case_id_source_key) return true;
-  return selector == e.case_id_source_key && !(trace && trace->case_id_attribute);
+  const bool flat = !(trace && trace->case_id_attribute);
+  return flat && (selector == e.case_id_source_key || selector == "case:concept:name");
 }
 
 // The first-class projection a selector names on this event, with its

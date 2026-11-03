@@ -1,4 +1,5 @@
 import { monteCarloQuery } from "./api";
+import { importedModelFetch } from "./imported-model-binding";
 import { isLogConversionResult, isMonteCarloResult, type MonteCarloOptions, type MonteCarloResult,
   type LogConversionLog, type PetriNetModel } from "./types";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
@@ -84,7 +85,7 @@ export function simulationTables(value: SimulationWorkspace): Record<string, Oce
 export interface SimulationRun { value: SimulationWorkspace; raw: string; report: string; tables: Record<string, OcelPreparedTable>; }
 export async function runSimulationWorkspace(miner: string, inputs: SimulationInputs, schema: LogQuerySchema, signal?: AbortSignal): Promise<SimulationRun> {
   const q = new URLSearchParams(monteCarloQuery(simulationOptions(inputs))); q.set("miner", miner); q.set("source_id", schema.source_id); q.set("include_workspace", "true");
-  const response = await fetch("/api/monte-carlo?" + q, { method: "POST", ...(signal ? { signal } : {}) });
+  const response = await importedModelFetch("/api/monte-carlo?" + q, { method: "POST", ...(signal ? { signal } : {}) });
   const raw = await response.text(); let value: unknown;
   try { value = parseNativeJson(raw); } catch { throw new Error("The backend returned invalid simulation JSON."); }
   if (record(value) && "error" in value) throw new Error(String(value.error));

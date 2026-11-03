@@ -175,6 +175,89 @@ EventLog nullable_log(std::initializer_list<TransitionActivity> activities) {
   return log;
 }
 
+// Python's repr of a Counter state name: keys by descending count, ties in
+// first-seen order.
+std::string counter_name(const TransitionSystemState& state) {
+  std::vector<std::pair<std::string, std::size_t>> counts;
+  for (const auto& key : state.name_order) {
+    std::size_t count = 0;
+    for (const auto& item : state.payload) count += item == key ? 1 : 0;
+    counts.emplace_back(key.value_or("None"), count);
+  }
+  std::stable_sort(counts.begin(), counts.end(),
+                   [](const auto& a, const auto& b) { return a.second > b.second; });
+  if (counts.empty()) return "Counter()";
+  std::string name = "Counter({";
+  for (std::size_t i = 0; i < counts.size(); ++i) {
+    if (i) name += ", ";
+    name += "'" + counts[i].first + "': " + std::to_string(counts[i].second);
+  }
+  return name + "})";
+}
+
+std::vector<std::string> sorted_names(std::vector<std::string> names) {
+  std::sort(names.begin(), names.end());
+  return names;
+}
+
+std::vector<std::string> root_state_names(const TransitionSystem& system) {
+  std::vector<std::string> names;
+  for (const auto& state : system.states())
+    if (state.in_root) names.push_back(counter_name(state));
+  std::sort(names.begin(), names.end());
+  return names;
+}
+
+std::vector<std::string> transition_names(const TransitionSystem& system) {
+  std::vector<std::string> names;
+  for (const auto& transition : system.transitions())
+    names.push_back(counter_name(system.states()[transition.source]) + " -" +
+                    transition.label.value_or("None") + "-> " +
+                    counter_name(system.states()[transition.target]));
+  std::sort(names.begin(), names.end());
+  return names;
+}
+
+// pm4py 2.7.22 captures of discover_transition_system(window=2,
+// view="multiset"): the reference looks a state up by its Counter value
+// among the registered states, so equal-valued windows reached from either
+// side share one state (backward), named after the first registration.
+void transition_system_multiset_value_lookup_contract() {
+  auto options = TransitionSystemOptions{};
+  options.window = 2;
+  options.view = TransitionView::kMultiset;
+  options.direction = TransitionDirection::kBackward;
+  const auto aba = discover_transition_system(nullable_log({"A", "B", "A"}), options);
+  assert(aba.root_state_count() == 3);
+  assert((root_state_names(aba) == sorted_names({
+      "Counter()", "Counter({'A': 1, 'B': 1})", "Counter({'A': 1})"})));
+  assert((transition_names(aba) == sorted_names({
+      "Counter() -A-> Counter({'A': 1})",
+      "Counter({'A': 1, 'B': 1}) -A-> Counter({'A': 1, 'B': 1})",
+      "Counter({'A': 1}) -B-> Counter({'A': 1, 'B': 1})"})));
+  const auto dadc = discover_transition_system(nullable_log({"d", "a", "d", "c"}), options);
+  assert(dadc.root_state_count() == 4);
+  assert((root_state_names(dadc) == sorted_names({
+      "Counter()", "Counter({'d': 1, 'a': 1})", "Counter({'d': 1, 'c': 1})",
+      "Counter({'d': 1})"})));
+  assert((transition_names(dadc) == sorted_names({
+      "Counter() -d-> Counter({'d': 1})",
+      "Counter({'d': 1, 'a': 1}) -c-> Counter({'d': 1, 'c': 1})",
+      "Counter({'d': 1, 'a': 1}) -d-> Counter({'d': 1, 'a': 1})",
+      "Counter({'d': 1}) -a-> Counter({'d': 1, 'a': 1})"})));
+  options.direction = TransitionDirection::kForward;
+  const auto forward = discover_transition_system(nullable_log({"d", "a", "d", "c"}), options);
+  assert(forward.root_state_count() == 5);
+  assert((root_state_names(forward) == sorted_names({
+      "Counter()", "Counter({'a': 1, 'd': 1})", "Counter({'c': 1})",
+      "Counter({'d': 1, 'a': 1})", "Counter({'d': 1, 'c': 1})"})));
+  assert((transition_names(forward) == sorted_names({
+      "Counter({'c': 1}) -c-> Counter()",
+      "Counter({'d': 1, 'a': 1}) -a-> Counter({'d': 1, 'c': 1})",
+      "Counter({'d': 1, 'a': 1}) -d-> Counter({'a': 1, 'd': 1})",
+      "Counter({'d': 1, 'c': 1}) -d-> Counter({'c': 1})"})));
+}
+
 void transition_system_nullable_and_missing_contract() {
   auto options = TransitionSystemOptions{};
   options.include_data = true;
@@ -247,5 +330,6 @@ int main() {
   transition_system_nullable_and_missing_contract();
   transition_system_endpoint_data_and_counter_contract();
   transition_system_signed_window_contract();
+  transition_system_multiset_value_lookup_contract();
   return 0;
 }

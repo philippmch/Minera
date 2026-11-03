@@ -554,6 +554,18 @@ function PtmlButton({
   );
 }
 
+/** Cases the "Simulate log" button asks a Petri miner for: pm4py's play_out default. */
+export const SIMULATED_LOG_TRACES = 1000;
+
+// Petri miners get an explicit trace count, so the download keeps pm4py's 1000
+// cases rather than a server default that may shrink to fit its event budget.
+// The other playout families keep their own model-specific defaults.
+export function simulatedLogOptions(minerId: string): { traces?: number } {
+  return ["declare", "dfg", "process_tree", "stochastic", "monte_carlo"].includes(minerId)
+    ? {}
+    : { traces: SIMULATED_LOG_TRACES };
+}
+
 // Simulates the shown model into an XES log using the backend's model-specific
 // defaults. Declare traces are prefix-safe and may retain pending obligations.
 function PlayoutButton({
@@ -571,7 +583,7 @@ function PlayoutButton({
   const download = () => {
     setBusy(true);
     setError(null);
-    fetchPlayout(minerId, {}, sourceId)
+    fetchPlayout(minerId, simulatedLogOptions(minerId), sourceId)
       .then((xml) => {
         const blob = new Blob([xml], { type: "application/xml" });
         const url = URL.createObjectURL(blob);

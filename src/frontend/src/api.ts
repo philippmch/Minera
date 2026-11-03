@@ -261,6 +261,7 @@ import {
 import { nativeJson } from "./native-json";
 import { readAlignmentResponse } from "./alignment-inspection";
 import { nativeResponseFailure, readNativeResponse } from "./native-response";
+import { importedModelFetch, importedModelIdOf, setImportedModelId } from "./imported-model-binding";
 import {isActiveSourceMining, miningSourceFields, type ActiveDatasetResult, type MiningInputOptions} from "./active-mining-source";
 
 export interface CsvOptions {
@@ -1749,7 +1750,7 @@ export async function mineActiveDataset(
 
   let response: Response;
   try {
-    response = await fetch("/api/mine", { method: "POST", body: form, signal });
+    response = await importedModelFetch("/api/mine", { method: "POST", body: form, signal });
   } catch (cause) {
     if (signal?.aborted) throw cause;
     throw new Error(
@@ -1819,7 +1820,7 @@ export async function alignModel(miner: string, options: AlignmentOptions = {}):
   const params = [`miner=${encodeURIComponent(miner)}`, query].filter(Boolean).join("&");
   let response: Response;
   try {
-    response = await fetch(`/api/align?${params}`, {
+    response = await importedModelFetch(`/api/align?${params}`, {
       method: "POST",
     });
   } catch {
@@ -1829,6 +1830,10 @@ export async function alignModel(miner: string, options: AlignmentOptions = {}):
   }
 
   const parsed: unknown = await response.json().catch(() => null);
+  // An uncomputed result (search exhausted, or no reachable final marking) is a
+  // valid answer: it carries its reason in `error`, and the caller renders the
+  // notice and caches it like any other alignment.
+  if (response.ok && isUncomputedAlignmentPayload(parsed)) return parsed as unknown as Alignments;
   if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
     throw new Error(String((parsed as { error: unknown }).error));
   }
@@ -1839,6 +1844,20 @@ export async function alignModel(miner: string, options: AlignmentOptions = {}):
     throw new Error("the Minera backend returned an invalid alignment");
   }
   return parsed as Alignments;
+}
+
+/**
+ * True for the uncomputed alignment shape the server answers with status 200:
+ * `computed: false` with a boolean `exhausted` and/or a string `error`.
+ */
+export function isUncomputedAlignmentPayload(value: unknown): value is { computed: false; exhausted?: boolean; error?: string } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (record.computed !== false) return false;
+  const exhausted = record.exhausted, error = record.error;
+  if (exhausted !== undefined && typeof exhausted !== "boolean") return false;
+  if (error !== undefined && typeof error !== "string") return false;
+  return typeof exhausted === "boolean" || typeof error === "string";
 }
 
 function escapeCostActivity(name: string): string {
@@ -1948,9 +1967,10 @@ export async function alignDfg(options: DfgAlignmentOptions = {}): Promise<DfgAl
   const query = dfgAlignmentQuery(options);
   const path = `/api/align-dfg${query ? `?${query}` : ""}`;
   let response: Response;
-  try { response = await fetch(path, { method: "POST" }); }
+  try { response = await importedModelFetch(path, { method: "POST" }); }
   catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
   const parsed = await readAlignmentResponse(response, { path });
+  if (response.ok && isUncomputedAlignmentPayload(parsed) && isDfgAlignmentResult(parsed)) return parsed;
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isDfgAlignmentResult(parsed)) throw new Error("the Minera backend returned an invalid DFG alignment");
@@ -1982,10 +2002,11 @@ export async function alignEditDistance(reference: File, options: EditDistanceOp
   const fields = editDistanceFormEntries(options);
   for (const [name, value] of fields) form.append(name, value);
   let response: Response;
-  try { response = await fetch("/api/align-edit-distance", { method: "POST", body: form }); }
+  try { response = await importedModelFetch("/api/align-edit-distance", { method: "POST", body: form }); }
   catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
   const parsed = await readAlignmentResponse(response, { path: "/api/align-edit-distance", fields,
     reference: { name: reference.name, size: reference.size, last_modified: reference.lastModified } });
+  if (response.ok && isUncomputedAlignmentPayload(parsed) && isEditDistanceResult(parsed)) return parsed;
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isEditDistanceResult(parsed)) throw new Error("the Minera backend returned an invalid edit-distance alignment");
@@ -2301,7 +2322,7 @@ export async function evaluateEmd(reference: File, options: EmdOptions = {}): Pr
   const path = `/api/evaluate-emd${query ? `?${query}` : ""}`;
   let response: Response;
   try {
-    response = await fetch(path, { method: "POST", body: form });
+    response = await importedModelFetch(path, { method: "POST", body: form });
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
@@ -2391,12 +2412,13 @@ export async function alignProcessTree(options: ProcessTreeAlignmentOptions = {}
   const path = `/api/align-process-tree${query ? `?${query}` : ""}`;
   let response: Response;
   try {
-    response = await fetch(path, { method: "POST" });
+    response = await importedModelFetch(path, { method: "POST" });
   } catch (cause) {
     if (cause instanceof Error && cause.message.startsWith("pt_alignment_")) throw cause;
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
   const parsed = await readAlignmentResponse(response, { path });
+  if (response.ok && isUncomputedAlignmentPayload(parsed) && isProcessTreeAlignmentResult(parsed)) return parsed;
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isProcessTreeAlignmentResult(parsed)) throw new Error("the Minera backend returned an invalid process-tree alignment");
@@ -3118,7 +3140,7 @@ export async function throwIfBackendError(response: Response): Promise<void> {
 }
 async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string, body?: BodyInit, signal?: AbortSignal): Promise<T> {
   let response: Response;
-  try { response = await fetch(path, { method: "POST", ...(body === undefined ? {} : { body }), ...(signal ? {signal} : {}) }); }
+  try { response = await importedModelFetch(path, { method: "POST", ...(body === undefined ? {} : { body }), ...(signal ? {signal} : {}) }); }
   catch(cause) { if(signal?.aborted)throw cause;throw new Error("could not reach the Minera backend — is minera_server running?"); }
   const parsed: unknown = await response.json().catch(() => null);
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
@@ -3128,7 +3150,7 @@ async function postChecked<T>(path: string, guard: (value: unknown) => value is 
 }
 async function postNativeChecked<T>(path:string,guard:(value:unknown)=>value is T,label:string):Promise<T> {
   let response:Response;
-  try{response=await fetch(path,{method:"POST"});}catch{throw new Error("could not reach the Minera backend — is minera_server running?");}
+  try{response=await importedModelFetch(path,{method:"POST"});}catch{throw new Error("could not reach the Minera backend — is minera_server running?");}
   const parsed=await readNativeResponse(response,{path});
   // Diagnostic results carry their own error field, including an empty string.
   // Preserve valid uncomputed/exhausted results for inspection and export.
@@ -3158,9 +3180,11 @@ export function reduceProcessTree(traceIndex: number, options: ProcessTreeReduct
 
 async function postAlignmentChecked<T>(path: string, guard: (value: unknown) => value is T, label: string): Promise<T> {
   let response: Response;
-  try { response = await fetch(path, { method: "POST" }); }
+  try { response = await importedModelFetch(path, { method: "POST" }); }
   catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
   const parsed = await readAlignmentResponse(response, { path });
+  // A valid uncomputed/exhausted result carries its reason in `error`; keep it.
+  if (response.ok && isUncomputedAlignmentPayload(parsed) && guard(parsed)) return parsed;
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!guard(parsed)) throw new Error(`the Minera backend returned an invalid ${label}`);
@@ -3253,7 +3277,7 @@ export async function decideModel(
   params.set("miner", miner);
   let response: Response;
   try {
-    response = await fetch(`/api/decide?${params.toString()}`, {
+    response = await importedModelFetch(`/api/decide?${params.toString()}`, {
       method: "POST",
     });
   } catch {
@@ -3287,6 +3311,8 @@ export interface ImportedModelCheck {
    */
   activities: ActivityStat[];
   model: ModelConformance;
+  /** Server id of this import; later runs on "imported" are bound to it. */
+  imported_model_id?: number;
 }
 
 /**
@@ -3306,7 +3332,7 @@ export async function checkModel(file: File, options: { pnmlPublicMarkings?: boo
     if (options.sourceId !== undefined) parameters.set("source_id", options.sourceId);
     if (options.activityKey !== undefined) parameters.set("activity_attribute", options.activityKey);
     const query = parameters.size ? `?${parameters}` : "";
-    response = await fetch(`/api/check-model${query}`, { method: "POST", body: form });
+    response = await importedModelFetch(`/api/check-model${query}`, { method: "POST", body: form });
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -3328,6 +3354,9 @@ export async function checkModel(file: File, options: { pnmlPublicMarkings?: boo
   ) {
     throw new Error("the Minera backend returned an invalid model check");
   }
+  // Later runs on "imported" are bound to this model; an answer without an id
+  // (an older server) leaves them unbound rather than bound to the old model.
+  setImportedModelId(importedModelIdOf(parsed));
   return parsed as ImportedModelCheck;
 }
 
@@ -3361,7 +3390,7 @@ export async function fetchProcessTreePetriNet(
   const query = processTreePetriNetQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/process-tree-petri${query ? `?${query}` : ""}`);
+    response = await importedModelFetch(`/api/process-tree-petri${query ? `?${query}` : ""}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -3387,7 +3416,7 @@ export async function fetchPnml(
   const query = processTreePetriNetQuery(options);
   let response: Response;
   try {
-    response = await fetch(
+    response = await importedModelFetch(
       `/api/pnml?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`,
     );
   } catch {
@@ -3414,7 +3443,7 @@ export async function fetchPtml(miner?: string): Promise<string> {
   let response: Response;
   try {
     const query = miner ? `?miner=${encodeURIComponent(miner)}` : "";
-    response = await fetch(`/api/ptml${query}`);
+    response = await importedModelFetch(`/api/ptml${query}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -3479,7 +3508,7 @@ export async function reducePetriNet(
   form.append("model", model, "model.pnml");
   let response: Response;
   try {
-    response = await fetch(
+    response = await importedModelFetch(
       `/api/reduce-petri-net${query ? `?${query}` : ""}`,
       { method: "POST", body: form },
     );
@@ -3520,7 +3549,7 @@ export async function fetchXes(options: XesExportOptions = {}): Promise<Blob> {
   const query = xesExportQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/xes${query ? `?${query}` : ""}`);
+    response = await importedModelFetch(`/api/xes${query ? `?${query}` : ""}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -3666,7 +3695,7 @@ export async function fetchDfg(options: DfgExportOptions = {}): Promise<string> 
   const query = dfgExportQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/dfg${query ? `?${query}` : ""}`);
+    response = await importedModelFetch(`/api/dfg${query ? `?${query}` : ""}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -3882,7 +3911,7 @@ export async function requestDfgDataframe(
   const query = dfgDataframeQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/dfg-dataframe${query ? `?${query}` : ""}`, {
+    response = await importedModelFetch(`/api/dfg-dataframe${query ? `?${query}` : ""}`, {
       method: "GET",
     });
   } catch {
@@ -3904,7 +3933,7 @@ export const requestDataframeDfg = requestDfgDataframe;
 export async function importDfg(document: Blob): Promise<string> {
   let response: Response;
   try {
-    response = await fetch("/api/dfg", {
+    response = await importedModelFetch("/api/dfg", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: document,
@@ -3941,7 +3970,7 @@ export async function requestDfgPrecision(
   const query = dfgPrecisionQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/dfg-precision${query ? `?${query}` : ""}`, {
+    response = await importedModelFetch(`/api/dfg-precision${query ? `?${query}` : ""}`, {
       method: "POST", headers: { "Content-Type": "text/plain" }, body: document,
     });
   } catch {
@@ -3980,7 +4009,7 @@ export async function convertDfgToPetriNet(
   const query = dfgPetriConversionQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/dfg-to-petri${query ? `?${query}` : ""}`, {
+    response = await importedModelFetch(`/api/dfg-to-petri${query ? `?${query}` : ""}`, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: document,
@@ -4070,7 +4099,7 @@ export async function requestProcessCube(
   const query = processCubeQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/process-cube${query ? `?${query}` : ""}`, {
+    response = await importedModelFetch(`/api/process-cube${query ? `?${query}` : ""}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(table),
@@ -4114,7 +4143,7 @@ export async function requestStreamingDfg(
   const query = streamingDfgQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/streaming-dfg${query ? `?${query}` : ""}`, {
+    response = await importedModelFetch(`/api/streaming-dfg${query ? `?${query}` : ""}`, {
       method: "POST", body: form,
     });
   } catch {
@@ -4206,7 +4235,7 @@ export async function requestStreamingFootprints(
   const query = streamingFootprintsQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/streaming-footprints?${query}`, {
+    response = await importedModelFetch(`/api/streaming-footprints?${query}`, {
       method: "POST", body: form,
     });
   } catch {
@@ -4290,7 +4319,7 @@ export async function requestStreamingTemporal(
   const query = streamingTemporalQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/streaming-temporal?${query}`, {
+    response = await importedModelFetch(`/api/streaming-temporal?${query}`, {
       method: "POST", body: form,
     });
   } catch {
@@ -4413,7 +4442,7 @@ export async function requestStreamingTbr(
   const query = streamingTbrQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/streaming-tbr${query ? `?${query}` : ""}`, {
+    response = await importedModelFetch(`/api/streaming-tbr${query ? `?${query}` : ""}`, {
       method: "POST", body: form,
     });
   } catch {
@@ -4492,7 +4521,7 @@ export async function comparePetriUsage(
   }
   let response: Response;
   try {
-    response = await fetch("/api/compare-petri", { method: "POST", body: form });
+    response = await importedModelFetch("/api/compare-petri", { method: "POST", body: form });
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
@@ -4696,7 +4725,7 @@ export async function fetchStochasticPlayoutVisited(
     ...options,
     return_visited_elements: true,
   });
-  const response = await fetch(playoutUrl(`/api/playout?miner=stochastic${query ? `&${query}` : ""}`, sourceId));
+  const response = await importedModelFetch(playoutUrl(`/api/playout?miner=stochastic${query ? `&${query}` : ""}`, sourceId));
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     if (payload && typeof payload === "object" && "error" in payload)
@@ -4998,7 +5027,7 @@ export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
 async function fetchPlayoutText(path: string, init?: RequestInit): Promise<string> {
   let response: Response;
   try {
-    response = init === undefined ? await fetch(path) : await fetch(path, init);
+    response = init === undefined ? await importedModelFetch(path) : await importedModelFetch(path, init);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -5093,7 +5122,7 @@ export async function fetchBasicPlayoutVisited(
   const query = basicPlayoutQuery({ ...options, return_visited_elements: true });
   let response: Response;
   try {
-    response = await fetch(playoutUrl(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`, sourceId));
+    response = await importedModelFetch(playoutUrl(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`, sourceId));
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -5125,7 +5154,7 @@ export async function fetchExtensivePlayoutVisited(
   });
   let response: Response;
   try {
-    response = await fetch(playoutUrl(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`, sourceId));
+    response = await importedModelFetch(playoutUrl(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`, sourceId));
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
@@ -5212,7 +5241,7 @@ export async function fetchStochasticPetri(
   const query = stochasticPetriQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/stochastic-petri?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+    response = await importedModelFetch(`/api/stochastic-petri?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
@@ -5234,7 +5263,7 @@ export async function fetchStochasticPetriDistribution(
   if (options.analysis !== "transient" && options.analysis !== "steady_state")
     throw new Error("analysis must be transient or steady_state for distribution analysis");
   const query = stochasticPetriQuery(options);
-  const response = await fetch(`/api/stochastic-petri?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+  const response = await importedModelFetch(`/api/stochastic-petri?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     if (payload !== null && typeof payload === "object" && "error" in payload)
@@ -5315,7 +5344,7 @@ export async function fetchStochasticMap(
   const query = stochasticMapQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/stochastic-map?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+    response = await importedModelFetch(`/api/stochastic-map?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
@@ -5341,7 +5370,7 @@ export async function fetchProcessTreePlayoutSet(
   });
   let response: Response;
   try {
-    response = await fetch(playoutUrl(`/api/playout?miner=process_tree${query ? `&${query}` : ""}`, sourceId));
+    response = await importedModelFetch(playoutUrl(`/api/playout?miner=process_tree${query ? `&${query}` : ""}`, sourceId));
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
@@ -5363,7 +5392,7 @@ export async function fetchDfgPlayout(
   const query = dfgPlayoutQuery(options);
   let response: Response;
   try {
-    response = await fetch(playoutUrl(`/api/playout?miner=dfg${query ? `&${query}` : ""}`, sourceId));
+    response = await importedModelFetch(playoutUrl(`/api/playout?miner=dfg${query ? `&${query}` : ""}`, sourceId));
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -5393,7 +5422,7 @@ export async function fetchMonteCarloResult(
   params.set("miner", miner);
   let response: Response;
   try {
-    response = await fetch("/api/monte-carlo", {
+    response = await importedModelFetch("/api/monte-carlo", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString(),
@@ -5425,7 +5454,7 @@ export async function fetchBpmn(
   const query = processTreePetriNetQuery(options);
   let response: Response;
   try {
-    response = await fetch(
+    response = await importedModelFetch(
       `/api/bpmn?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`,
     );
   } catch {
@@ -5470,7 +5499,7 @@ export function conceptDriftQuery(options: ConceptDriftOptions = {}): string {
 
 export async function requestConceptDrift(options: ConceptDriftOptions = {}): Promise<ConceptDriftResult> {
   const query = conceptDriftQuery(options);
-  const response = await fetch(`/api/concept-drift${query ? `?${query}` : ""}`, { method: "POST" });
+  const response = await importedModelFetch(`/api/concept-drift${query ? `?${query}` : ""}`, { method: "POST" });
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isConceptDriftResult(payload)) {
@@ -5505,7 +5534,7 @@ export function logToTargetQuery(options: LogToTargetOptions = {}): string {
 
 export async function requestLogToTarget(options: LogToTargetOptions = {}): Promise<LogToTargetResult> {
   const query = logToTargetQuery(options);
-  const response = await fetch(`/api/transform-target${query ? `?${query}` : ""}`, { method: "POST" });
+  const response = await importedModelFetch(`/api/transform-target${query ? `?${query}` : ""}`, { method: "POST" });
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isLogToTargetResult(payload)) {
@@ -5561,7 +5590,7 @@ export function logUtilityQuery(options: LogUtilityOptions = {}): string {
 
 export async function requestLogUtility(options: LogUtilityOptions = {}): Promise<LogUtilityResult> {
   const query = logUtilityQuery(options);
-  const response = await fetch(`/api/log-util${query ? `?${query}` : ""}`, { method: "POST" });
+  const response = await importedModelFetch(`/api/log-util${query ? `?${query}` : ""}`, { method: "POST" });
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isLogUtilityResult(payload)) throw new Error("the Minera backend returned an invalid log utility result");
@@ -5639,7 +5668,7 @@ export function logToFeaturesQuery(options: LogToFeaturesOptions = {}): string {
 }
 export async function requestLogToFeatures(options: LogToFeaturesOptions = {}): Promise<LogToFeaturesResult> {
   const query = logToFeaturesQuery(options);
-  const response = await fetch(`/api/log-to-features${query ? `?${query}` : ""}`, { method: "POST" });
+  const response = await importedModelFetch(`/api/log-to-features${query ? `?${query}` : ""}`, { method: "POST" });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
@@ -5719,7 +5748,7 @@ export function logConversionQuery(options: LogConversionOptions = {}): string {
 }
 export async function requestLogConversion(options: LogConversionOptions = {}): Promise<LogConversionResult> {
   const query = logConversionQuery(options);
-  const response = await fetch(`/api/log-convert${query ? `?${query}` : ""}`, { method: "POST" });
+  const response = await importedModelFetch(`/api/log-convert${query ? `?${query}` : ""}`, { method: "POST" });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
@@ -5767,7 +5796,7 @@ export function browserHistoryQuery(options: BrowserHistoryOptions): string {
 export async function requestBrowserHistory(
   options: BrowserHistoryOptions,
 ): Promise<BrowserHistoryResult> {
-  const response = await fetch(`/api/browser-history?${browserHistoryQuery(options)}`,
+  const response = await importedModelFetch(`/api/browser-history?${browserHistoryQuery(options)}`,
                                { method: "POST" });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
@@ -5801,7 +5830,7 @@ export function windowsEventsQuery(options: WindowsEventsOptions): string {
 export async function requestWindowsEvents(
   options: WindowsEventsOptions,
 ): Promise<WindowsEventsResult> {
-  const response = await fetch(`/api/windows-events?${windowsEventsQuery(options)}`,
+  const response = await importedModelFetch(`/api/windows-events?${windowsEventsQuery(options)}`,
                                { method: "POST" });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
@@ -5844,7 +5873,7 @@ export async function requestRepositoryHistory(
 ): Promise<RepositoryHistoryResult> {
   const headers: Record<string, string> = {};
   if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
-  const response = await fetch(`/api/repository-history?${repositoryHistoryQuery(options)}`,
+  const response = await importedModelFetch(`/api/repository-history?${repositoryHistoryQuery(options)}`,
                                { method: "POST", headers });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
@@ -5863,7 +5892,7 @@ export async function requestWorkflowHistory(
   if (maxEvents !== undefined && (!Number.isSafeInteger(maxEvents) || maxEvents <= 0 || maxEvents > 10_000_000))
     throw new Error("workflow_max_events must be in [1,10000000]");
   const query = maxEvents === undefined ? "" : `?workflow_max_events=${maxEvents}`;
-  const response = await fetch(`/api/workflow-history${query}`, {
+  const response = await importedModelFetch(`/api/workflow-history${query}`, {
     method: "POST", headers: { "Content-Type": "text/csv" }, body: csv,
   });
   if (!response.ok) {
@@ -5884,7 +5913,7 @@ export async function requestEnterpriseHistory(
     throw new Error("enterprise_max_events must be in [1,10000000]");
   const query = new URLSearchParams({ enterprise_variant: variant });
   if (maxEvents !== undefined) query.set("enterprise_max_events", String(maxEvents));
-  const response = await fetch(`/api/enterprise-history?${query}`, {
+  const response = await importedModelFetch(`/api/enterprise-history?${query}`, {
     method: "POST", headers: { "Content-Type": "text/csv" }, body: csv,
   });
   if (!response.ok) {
@@ -5900,7 +5929,7 @@ export interface CommunicationHistoryOptions { communication_variant: "mailbox" 
 export async function requestCommunicationHistory(csv: string, options: CommunicationHistoryOptions): Promise<CommunicationHistoryResult> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) if (value !== undefined) query.set(key, String(value));
-  const response = await fetch(`/api/communication-history?${query}`, { method: "POST", headers: { "Content-Type": "text/csv" }, body: csv });
+  const response = await importedModelFetch(`/api/communication-history?${query}`, { method: "POST", headers: { "Content-Type": "text/csv" }, body: csv });
   if (!response.ok) { const payload: unknown = await response.json().catch(() => null); if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error)); throw new Error(`the Minera backend answered with status ${response.status}`); }
   const payload: unknown = await response.json(); if (!isCommunicationHistoryResult(payload)) throw new Error("the Minera backend returned invalid communication history"); return payload;
 }
@@ -5924,7 +5953,7 @@ export function embeddingsQuery(options: EmbeddingOptions = {}): string {
 }
 export async function requestEmbeddings(options: EmbeddingOptions = {}, signal?: AbortSignal): Promise<EmbeddingApiResult> {
   const query = embeddingsQuery(options);
-  const response = await fetch(`/api/embeddings${query ? `?${query}` : ""}`, { method: "POST", signal });
+  const response = await importedModelFetch(`/api/embeddings${query ? `?${query}` : ""}`, { method: "POST", signal });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
@@ -5956,7 +5985,7 @@ export function labelSplittingQuery(options: LabelSplittingOptions = {}): string
 }
 export async function requestLabelSplitting(options: LabelSplittingOptions = {}): Promise<LabelSplittingResult> {
   const query = labelSplittingQuery(options);
-  const response = await fetch(`/api/label-splitting${query ? `?${query}` : ""}`, { method: "POST" });
+  const response = await importedModelFetch(`/api/label-splitting${query ? `?${query}` : ""}`, { method: "POST" });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
@@ -5981,7 +6010,7 @@ export function trieQuery(options: TrieOptions = {}): string {
 
 export async function requestTrie(options: TrieOptions = {}): Promise<TrieResult> {
   const query = trieQuery(options);
-  const response = await fetch(`/api/trie${query ? `?${query}` : ""}`);
+  const response = await importedModelFetch(`/api/trie${query ? `?${query}` : ""}`);
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isTrieResult(payload)) throw new Error("the Minera backend returned an invalid trie");
@@ -5990,7 +6019,7 @@ export async function requestTrie(options: TrieOptions = {}): Promise<TrieResult
 
 export async function requestTriePetriNet(options: TrieOptions = {}): Promise<TriePetriConversionResult> {
   const query = trieQuery(options);
-  const response = await fetch(`/api/trie-to-petri${query ? `?${query}` : ""}`);
+  const response = await importedModelFetch(`/api/trie-to-petri${query ? `?${query}` : ""}`);
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isTriePetriConversionResult(payload))
@@ -6041,7 +6070,7 @@ export function intervalTreeQuery(options: IntervalTreeOptions = {}): string {
 
 export async function requestIntervalTree(options: IntervalTreeOptions = {}): Promise<IntervalTreeResult> {
   const query = intervalTreeQuery(options);
-  const response = await fetch(`/api/interval-tree${query ? `?${query}` : ""}`);
+  const response = await importedModelFetch(`/api/interval-tree${query ? `?${query}` : ""}`);
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isIntervalTreeResult(payload)) throw new Error("the Minera backend returned an invalid interval tree");
@@ -6090,7 +6119,7 @@ export async function requestCaseRelations(
   form.append("incoming_log", incoming, incoming.name);
   form.append("case_relations", relations, relations.name);
   const query = caseRelationsQuery(options);
-  const response = await fetch(`/api/merge-case-relations${query ? `?${query}` : ""}`, { method: "POST", body: form });
+  const response = await importedModelFetch(`/api/merge-case-relations${query ? `?${query}` : ""}`, { method: "POST", body: form });
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isCaseRelationsResult(payload)) throw new Error("the Minera backend returned an invalid case-relations merge");
@@ -6128,7 +6157,7 @@ export async function requestLinkAnalysis(
   options: LinkAnalysisOptions = {},
 ): Promise<LinkAnalysisResult> {
   const query = linkAnalysisQuery(options);
-  const response = await fetch(`/api/link-analysis${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/link-analysis${query ? `?${query}` : ""}`, {
     method: "POST",
   });
   await throwIfBackendError(response);
@@ -6167,7 +6196,7 @@ export async function requestTimestampInterleavings(
   form.append("right", right, right.name);
   form.append("relations", relations, relations.name);
   const query = timestampInterleavingsQuery(options);
-  const response = await fetch(`/api/timestamp-interleavings${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/timestamp-interleavings${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -6226,7 +6255,7 @@ export function randomTreeQuery(options: RandomTreeOptions = {}): string {
 
 export async function requestRandomTree(options: RandomTreeOptions = {}): Promise<RandomTreeResult> {
   const query = randomTreeQuery(options);
-  const response = await fetch(`/api/random-tree${query ? `?${query}` : ""}`);
+  const response = await importedModelFetch(`/api/random-tree${query ? `?${query}` : ""}`);
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isRandomTreeResult(payload)) throw new Error("the Minera backend returned an invalid random tree");
@@ -6316,7 +6345,7 @@ export async function requestOcelDiscovery(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelDiscoveryQuery(options);
-  const response = await fetch(`/api/ocel/discover${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/discover${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
     signal,
@@ -6337,7 +6366,7 @@ export async function requestOcelSqlite(log: Blob): Promise<OcelSqliteResult> {
   const form = new FormData();
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.sqlite";
   form.append("log", log, logName);
-  const response = await fetch("/api/ocel/sqlite", { method: "POST", body: form });
+  const response = await importedModelFetch("/api/ocel/sqlite", { method: "POST", body: form });
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   if (!isOcelSqliteResult(payload)) throw new Error("the Minera backend returned an invalid OCEL SQLite import");
@@ -6348,7 +6377,7 @@ export async function requestOcelSqlite(log: Blob): Promise<OcelSqliteResult> {
 export async function requestOcelSqliteExport(
   log: Record<string, unknown> | Blob,
 ): Promise<Blob> {
-  const response = await fetch("/api/ocel/sqlite?mode=export", {
+  const response = await importedModelFetch("/api/ocel/sqlite?mode=export", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: log instanceof Blob ? log : nativeJson(log),
@@ -6454,7 +6483,7 @@ export async function requestOcelExchangeImport(
       : "ocel_objects.csv";
     form.append("objects", objects, objectName);
   }
-  const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "import", options)}`, {
+  const response = await importedModelFetch(`/api/ocel/io?${ocelExchangeQuery(format, "import", options)}`, {
     method: "POST",
     body: form,
   });
@@ -6471,7 +6500,7 @@ export async function requestOcelExchangeExport(
   format: OcelExchangeFormat = "json",
   options: OcelCsvOptions = {},
 ): Promise<Blob> {
-  const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "export", options)}`, {
+  const response = await importedModelFetch(`/api/ocel/io?${ocelExchangeQuery(format, "export", options)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: log instanceof Blob ? log : nativeJson(log),
@@ -6536,7 +6565,7 @@ export async function requestOcelFlatten(
   const form = new FormData();
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
-  const response = await fetch(`/api/ocel/flatten?${ocelFlattenQuery(options)}`, {
+  const response = await importedModelFetch(`/api/ocel/flatten?${ocelFlattenQuery(options)}`, {
     method: "POST",
     body: form,
   });
@@ -6656,7 +6685,7 @@ export async function requestOcelFilter(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelFilterQuery(options);
-  const response = await fetch(`/api/ocel/filter${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/filter${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -6693,7 +6722,7 @@ export async function requestOcelSplit(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelSplitQuery(options);
-  const response = await fetch(`/api/ocel/split${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/split${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -6732,7 +6761,7 @@ export async function requestOcelEnrichment(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelEnrichmentQuery(options);
-  const response = await fetch(`/api/ocel/enrich${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/enrich${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -6768,7 +6797,7 @@ export async function requestOcelObjectGraph(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelObjectGraphQuery(options);
-  const response = await fetch(`/api/ocel/graph${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/graph${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -6810,7 +6839,7 @@ export async function requestOcelEventObjectGraph(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelEventObjectGraphQuery(options);
-  const response = await fetch(`/api/ocel/event-object-graph?${query}`, {
+  const response = await importedModelFetch(`/api/ocel/event-object-graph?${query}`, {
     method: "POST",
     body: form,
   });
@@ -6957,7 +6986,7 @@ export async function requestOcelPlayout(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelPlayoutQuery(options);
-  const response = await fetch(`/api/ocel/playout${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/playout${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -7167,7 +7196,7 @@ export async function requestOcelFeatures(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelFeaturesQuery(options);
-  const response = await fetch(`/api/ocel/features${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/features${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -7219,7 +7248,7 @@ export async function requestOcelStatistics(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelStatisticsQuery(options);
-  const response = await fetch(`/api/ocel/statistics${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/statistics${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -7250,7 +7279,7 @@ export async function requestOcelDescription(
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   form.append("log", log, logName);
   const query = ocelDescriptionQuery(options);
-  const response = await fetch(`/api/ocel/description${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/description${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -7355,7 +7384,7 @@ export async function requestOcelConformance(
   const exactThresholds = validateOtgThresholdOptions(options);
   if (exactThresholds !== undefined) {parameters.delete(OTG_THRESHOLD_FIELD);appendOtgThresholds(form, exactThresholds);}
   const query = parameters.toString();
-  const response = await fetch(`/api/ocel/conformance${query ? `?${query}` : ""}`, {
+  const response = await importedModelFetch(`/api/ocel/conformance${query ? `?${query}` : ""}`, {
     method: "POST",
     body: form,
   });
@@ -7394,7 +7423,7 @@ export async function requestKnowledgeInjection(
 ): Promise<import("./types").KnowledgeInjectionResult | ExactKnowledgeEnvelope> {
   if (hasExactKnowledge(options)) return requestExactKnowledge(options);
   const query = knowledgeInjectionQuery(options);
-  const response = await fetch(`/api/knowledge-injection${query ? `?${query}` : ""}`, { method: "POST" });
+  const response = await importedModelFetch(`/api/knowledge-injection${query ? `?${query}` : ""}`, { method: "POST" });
   await throwIfBackendError(response);
   const payload: unknown = await response.json();
   const { isKnowledgeInjectionResult } = await import("./types");

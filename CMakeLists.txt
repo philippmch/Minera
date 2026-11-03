@@ -330,6 +330,7 @@ add_library(minera_core
   src/backend/resource_analysis.cpp
   src/backend/resource_profiles.cpp
   src/backend/role_discovery.cpp
+  src/backend/sampling.cpp
   src/backend/secure_random.cpp
   src/backend/timestamp.cpp
   src/backend/zone_database.cpp
@@ -2095,6 +2096,32 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_performance_spectrum_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_performance_spectrum_parity_contracts_tests
            COMMAND minera_performance_spectrum_parity_contracts_tests)
+  add_test(NAME minera_performance_spectrum_cli_missing_activity
+           COMMAND minera_export "${MINERA_FIXTURES}/ab_two_cases.csv"
+                   --spectrum A,Zeta)
+  set_tests_properties(minera_performance_spectrum_cli_missing_activity PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"activities\": \\[\"A\", \"Zeta\"\\],[^}]*\"observations\": \\[\\]")
+
+  add_executable(minera_sampling_tests
+    src/backend/tests/test_sampling.cpp
+  )
+  target_link_libraries(minera_sampling_tests PRIVATE minera::core)
+  target_compile_features(minera_sampling_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_sampling_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_sampling_tests COMMAND minera_sampling_tests)
+  add_test(NAME minera_sampling_filters_cli_seeded_cases
+           COMMAND minera_export "${MINERA_FIXTURES}/sampling_twelve_cases.csv"
+                   --sample-cases 3 --sample-seed 0)
+  set_tests_properties(minera_sampling_filters_cli_seeded_cases PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"trace_count\": 5,")
+
+  add_executable(minera_bpmn_reference_parity_tests
+    src/backend/tests/test_bpmn_reference_parity.cpp
+  )
+  target_link_libraries(minera_bpmn_reference_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_bpmn_reference_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_bpmn_reference_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_bpmn_reference_parity_tests COMMAND minera_bpmn_reference_parity_tests)
 
   add_executable(minera_batches_parity_contracts_tests
     src/backend/tests/test_batches_parity_contracts.cpp
@@ -2234,6 +2261,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_precision_prefix_semantics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_precision_prefix_semantics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_precision_prefix_semantics_tests COMMAND minera_precision_prefix_semantics_tests)
+  add_executable(minera_tbr_precision_reference_repro_tests src/backend/tests/test_tbr_precision_reference_repros.cpp)
+  target_link_libraries(minera_tbr_precision_reference_repro_tests PRIVATE minera::core)
+  target_compile_features(minera_tbr_precision_reference_repro_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_tbr_precision_reference_repro_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_tbr_precision_reference_repro_tests COMMAND minera_tbr_precision_reference_repro_tests)
 
   add_executable(minera_zone_database_tests src/backend/tests/test_zone_database.cpp)
   target_link_libraries(minera_zone_database_tests PRIVATE minera::core)

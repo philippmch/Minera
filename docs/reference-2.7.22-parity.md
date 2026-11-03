@@ -586,6 +586,16 @@ can retain only cases that reach the final marking and optionally accept
 markings that contain it. The native API, `--petri-playout-*` export options,
 generic `/api/playout` parameters, and typed frontend query serialize these
 controls with matching validation.
+Declared: the local server's playout event budget. pm4py's basic (and
+stochastic) Petri playout returns 1000 traces whatever the per-trace length
+cap, so `max_trace_length=5000` yields 1000 traces of up to 5000 events. The
+local `/api/playout` endpoint bounds the worst case (traces x per-trace cap)
+at 1,000,000 events. When the caller omits the trace count (`traces`,
+`stochastic_traces`, or `dfg_playout_traces` for DFG performance playout)
+the default becomes min(1000, 1,000,000 / cap): 1000 up to a cap of 1000,
+200 at `max_steps=5000`, 100 at the 10,000 maximum. An explicit count above
+the budget is still rejected. The CLIs keep pm4py's unscaled 1000, and the
+frontend's "Simulate log (XES)" sends an explicit 1000 traces.
 The stochastic Petri analysis endpoint adds a first-class tangible-state
 reachability view at `/api/stochastic-petri` and the corresponding
 `--stochastic-petri` export mode. Ordinary arcs are enumerated in deterministic
@@ -1947,8 +1957,11 @@ fill a weighted deficit. The native trial search reports its 4,096-state bound
 and 64 MiB retained-node payload budget explicitly; temporary firing scratch
 is outside that accounting. If no trial succeeds, dependency
 exploration runs without the preliminary
-prefix pass. Both modes allow two invocation levels. The default dependency
-phase continues across candidate paths, checking target enablement within each path.
+prefix pass. Both modes allow two invocation levels. The dependency phase never
+stops early: in both modes it walks every step of every recomputed candidate
+path, firing each unvisited enabled step and recursing into each unvisited
+blocked one, even after the selected target has become enabled (see *Token
+replay hidden-routing second pass and precision path*).
 This option defaults to false and is available in the native API,
 `--compare-petri-exhaustive-invisible-exploration`, strict server parsing, and
 the frontend comparison controls.
@@ -4131,6 +4144,80 @@ order alone explain far fewer tie choices than arc order (in a 60-net pilot,
 Still open for `algo.conformance.tokenreplay`: nets built in memory rather
 than imported have no recorded arc order (the reference follows arc creation
 order there), and the identity-dependent rows have no document-level rule.
+
+### Token replay hidden-routing second pass and precision path
+
+Observed rules (pinned 2.7.22, fresh processes, PYTHONHASHSEED 0-5 and
+allocation paddings; none of the rules below is hash-seed or identity
+dependent):
+
+- **Second routing pass.** When the first pass over the candidate paths (paths
+  from the marked places to the deficient input places, sorted by source and
+  target place name and then stably by length) leaves the visible transition
+  disabled, the reference recomputes the paths and visits every step of every
+  path: an unvisited disabled step is first routed recursively (two levels in
+  all), and an unvisited enabled step fires. Nothing in this pass checks whether
+  the visible transition is already enabled, and the exhaustive mode runs the
+  same pass after a failed transactional trial. Minera stopped a path as soon
+  as the target was enabled, and the exhaustive mode stopped the whole pass. On
+  `*(->('h','g'), +(X(tau,'f'), X(tau, ->(X(tau,*('e',tau)), X(tau,*('c',tau))))))`
+  with trace `g g f h` the reference fires `tau_1, tauSplit_5, skip_7` after
+  `skip_8, tauJoin_6` have enabled `h` (13 produced / 12 consumed; Minera had
+  12/11), and the extra firings also change token precision (a net where the
+  late step consumes the only token of a visible alternative scores 0.75 in
+  the reference and 0.6 before the fix).
+- **Place names of converted nets.** Hidden-path ties are sorted by place name.
+  A net converted from a process tree (discovered, PTML import or API) now
+  carries the reference's place names (`source`, `sink`, `p_<n>`) on the
+  `PetriNet` itself (`PetriNet::place_names`), so replay without a PNML
+  document no longer falls back to positional `p<index>` names (`"p10" <
+  "p2"`). The example above replayed through `--check-ptml` gave 9/8/2/3 with
+  positional names. PNML import records the place IDs as the names, and
+  legacy PNML export without document IDs writes them back when they are
+  unique, so the names survive copies and round trips. Explicit
+  `TokenReplayOptions::place_names` still take precedence.
+- **Arc order on the CLI and server.** The PNML replay options of the CLI and
+  local server (`--check-pnml`, `--token-replay-model` and the routes built on
+  the same options) now also pass the document's arc order as
+  `place_outgoing_transition_order`, as the evaluator entry points already
+  did, so equally short hidden paths tie as they do in the reference on the
+  same document.
+- **One token-precision computation.** `check_conformance` (the conformance
+  section's `token_replay.precision`) used a separate prefix-trie walk: it
+  advanced prefixes with a breadth-first shortest silent path and scored an
+  exact silent reachability closure. The reference instead replays every
+  distinct proper prefix (labels joined with commas and split again, so a label
+  containing a comma becomes several events) with stop-immediately-unfit and no
+  final routing, and scores the eventually-enabled worklist: transitions
+  enabled at the start marking sorted by name, each queued transition read at
+  the newest marking assigned to it, one visit per transition and marking, so a
+  silent transition re-enabled at a later marking is fired only from that
+  marking and labels reachable only through its earlier firing are not
+  reported. The empty prefix uses the same worklist on the initial marking.
+  `check_conformance` now calls the evaluator's computation, and the empty
+  prefix uses the worklist (it used the exact closure). Before the change, 21 of
+  124 clean inductive logs and 17 of 122 noisy logs differed from the reference
+  (36 explained by the exact closure, 2 by the shortest-path routing); the
+  evaluator matched all 246. A silent-search budget still makes the conformance
+  precision NaN with `precision_computed=false`.
+- **Declared: duplicate-label set iteration.** When several transitions with
+  the event's label are enabled, the reference takes the first in the iteration
+  order of the net's transition set, which follows object addresses (the
+  choice flips with allocation padding even under a fixed hash seed). Minera
+  forward replay takes them in transition index order, or in the order implied
+  by supplied `transition_identity_hashes`. When none is enabled, both take the greatest
+  transition name; on nets the reference builds in memory its visible
+  transition names are random UUIDs, so that choice is random per process
+  there.
+
+Evidence: `minera_tbr_precision_reference_repro_tests` binds the minimal
+repros (worklist name order, empty prefix, comma-split labels, second pass in
+both modes, its precision effect, the tree net by PNML document and by
+in-memory conversion with names, copies and PNML round trip) to captured
+reference values. A sweep of 3,500 unique-label random-tree traces, all 124
+clean and 122 noisy inductive logs (token precision against the reference on
+the in-memory and the PNML net) and the noisy logs' token replay counters by
+PNML and by PTML shows no remaining difference.
 
 ## PNML document export evidence
 
@@ -16536,3 +16623,115 @@ Declared (not equivalent, kept on purpose):
   acquisition) holds at most 32 sessions (429 beyond), with 256 MiB of
   uploads and 1,000,000 events per live session (413 beyond). Tests:
   `minera_streaming_session_tests`.
+
+## BPMN, transition systems, performance spectrum and sampling (2026-11-03)
+
+Fixes:
+
+- **Multiset transition systems.** The reference looks a state up by its
+  Counter value among the states registered so far (both endpoints are looked
+  up before either is registered), keeps one root state per name and dedups
+  edges by endpoint values and label. Native now does the same, and when two
+  equal-valued states exist (reached under different key orders) a later
+  lookup takes the first-registered one, where the reference's choice depends
+  on set iteration. `A,B,A` backward (window 2) has 3 states with an
+  `{A,B} -A-> {A,B}` self-loop and `d,a,d,c` backward has 4 states, as in
+  the reference. Tests: `minera_transition_system_parity_contracts_tests`
+  (`transition_system_multiset_value_lookup_contract`).
+- **Performance spectrum.** A pattern activity that never occurs yields no
+  observations (the reference's empty points list) instead of a "not
+  registered" error. Test: `minera_performance_spectrum_cli_missing_activity`.
+- **BPMN import.** Processes that use only start and end events, task kinds
+  (not call activities), exclusive and parallel gateways are converted with
+  the reference construction: `source`/`sink`, `ent_<id>`/`exi_<id>` per
+  node, one place per sequence flow named by its id, `sfl_`/`tfl_` silent
+  connectors, a forking/joining silent transition for parallel gateways with
+  several outgoing/incoming flows, start/end connectors, then the reference's
+  two-pass simple reduction of silent connectors. Place names and transition
+  names are carried on the net (PNML export uses the place names). Dangling
+  gateways, isolated tasks, a task with several outgoing flows (an exclusive
+  choice there) and processes without start or end events are accepted as in
+  the reference. Comparison against `convert_to_petri_net(read_bpmn(...))` on
+  618 inputs (18 hand-written, 600 random): 514 equal in places, labels, arcs
+  and markings, 1 rejected by both, and 103 declared below (97 silent cycles,
+  6 constructs outside the reference converter). Tests: `minera_bpmn_reference_parity_tests` (21 captured nets).
+- **Petri-net BPMN export.** Uses the reference mapping: an exclusive gateway
+  per place, start event into the source gateway and the sink gateway into the
+  end event, one task per visible label (shared by equally labelled
+  transitions) with a converging parallel gateway for several input places
+  and a diverging one for several output places (an exclusive gateway on a
+  side with no place), a silent transition as one parallel gateway when it
+  has several input or output places (Converging when several inputs) and an
+  exclusive gateway otherwise, then the removal of exclusive gateways with one
+  incoming and one outgoing flow, so dangling places keep their gateways.
+  135 alpha/heuristic/inductive nets (3 x 15 random trees) are isomorphic to
+  the reference's export including gateway directions; the inductive-tree
+  export is isomorphic on 26 of 26 logs it could be checked on (two larger
+  logs ran out of memory in the full CLI bundle, unrelated to BPMN).
+- **Exported BPMN documents.** Gateways carry `gatewayDirection`, every node
+  lists `<incoming>`/`<outgoing>`, events are named `start`/`end`, and a
+  `BPMNDiagram` with a deterministic layered layout (longest-path columns,
+  back edges ignored) is included. bpmn-moddle 9.0.1 reads every checked
+  export without warnings with a shape per node and an edge per flow; the
+  reference importer and the native importer both read the exports, and on
+  163 round trips the language equals the reference export's round trip.
+  Token replay and alignment fitness on reference-converted BPMN models
+  matched in 21 of 21 checked logs.
+- **Sampling.** `sample_cases` and `sample_events` are a filter step that runs
+  first (`LogFilterOptions::sampling`): `/api/mine` fields `sample_cases`,
+  `sample_events`, `sample_seed` (alias `seed`), `sample_input`; CLI
+  `--sample-cases`, `--sample-events`, `--sample-seed`, `--sample-input`.
+  Native has its own MT19937 with CPython's `random.seed` (init_by_array over
+  the seed's 32-bit words), `getrandbits`, `_randbelow`, `shuffle` and
+  `sample` (pool or selection-set method by CPython's set-size rule) and
+  numpy's legacy `RandomState` seeding, masked `interval` and `permutation`.
+  `sample_input=dataframe` (the default, as `pm4py.read_xes` and a pandas CSV
+  read give a DataFrame) follows `sample_cases(df, n)`: shuffle of the
+  distinct case ids in row order, then the points-subset picker (indices 0 and
+  len-1 plus `(j*n)//m + n//(2m)`), rows kept in original order; and
+  `sample_events(df, n)` = `df.sample(n)` = the first n of a numpy
+  permutation. `event_log` follows `random.sample` over the traces for both
+  calls (the reference's `sample_events` on an EventLog samples traces), and
+  `event_stream` follows `random.sample` over the flattened events. Seeded
+  runs reproduce the reference after `random.seed(s); numpy.random.seed(s)`
+  exactly. Tests: `minera_sampling_tests` (captures of CPython 3.11, numpy
+  and pm4py on four seeds, the picker on 45 sizes),
+  `minera_sampling_filters_cli_seeded_cases`.
+
+Declarations:
+
+- **Unseeded sampling.** Without a seed native draws one from the OS
+  cryptographic source and reports it (`"sampling":{...,"seed":s}` in the
+  mining response, a `note:` line on the CLI), so the run can be replayed;
+  the reference's unseeded generators are not reproducible either. Seeds are
+  limited to 0..4294967295 (numpy's legacy seeding range, used for both
+  generators).
+- **Sampling edge cases.** Negative counts are rejected (the reference's
+  `random.sample` raises; its DataFrame `sample_cases` treats them like 0).
+  An empty table samples to an empty log where the reference raises
+  IndexError. A DataFrame `sample_events` above the row count is rejected as
+  in pandas; the other inputs clamp to the population as the reference does.
+  `sample_cases` on an event stream is rejected (not defined there).
+- **Regrouping sampled events.** A log needs traces, so sampled events are
+  regrouped: traces in the order their first event was sampled, events of a
+  trace in their original order (the order the reference's table algorithms
+  restore by sorting on case and timestamp). The reference returns rows or
+  stream events in sample order. A DataFrame sample never keeps traces
+  without events (they have no rows), as in the reference.
+- **Multi-pool BPMN.** Native reads the first non-empty `<process>`; the
+  reference merges the nodes and flows of every process into one graph.
+- **BPMN silent cycles.** When the raw construction has a cycle of silent
+  connectors, the reference's reduction merges a transition into itself and
+  leaves arcs pointing at removed nodes; native skips that merge, so the net
+  stays well-formed and differs there (97 of the 600 random inputs; all 97
+  reference nets have dangling arcs).
+- **BPMN constructs outside the reference converter.** Intermediate events,
+  event-based, inclusive and complex gateways, subprocesses, boundary events
+  and call activities keep native's token-semantics mapping: the reference
+  treats them as plain nodes (wrong semantics) or fails (call activities,
+  complex gateways, transactions crash its reader).
+- **BPMN connector names.** Reference connector transitions get random
+  UUIDs; native names them `00000000-0000-4000-8000-<counter>`.
+- **Reachability graphs on unbounded nets.** Native stops with an error once
+  the state space grows past its bound; the reference's construction does not
+  terminate.

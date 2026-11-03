@@ -117,8 +117,10 @@ void silent_search_is_complete_or_refuses() {
     assert(near(evaluator_precision(log, net), 1.0 / double(branches + 1)));
   }
 
-  // A forced small budget cannot produce an ordinary number.
-  const minera::detail::ScopedEnabledSearchBudget small(16);
+  // A forced small budget cannot produce an ordinary number. The reference
+  // worklist reaches Z after 14 silent firings (each re-enabled skip fires only
+  // from the newest marking), so the budget must be below that.
+  const minera::detail::ScopedEnabledSearchBudget small(4);
   const auto net = wide_optional_split(13);
   const auto result =
       minera::check_conformance(log_from_variants({{"Z"}}), net, minera::TokenReplayOptions{});

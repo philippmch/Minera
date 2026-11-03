@@ -4,6 +4,7 @@
 #include "token_replay_dataframe_grouping_reference_cases.hpp"
 #include "../root_cause_trace_key.hpp"
 
+#include <cmath>
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -76,7 +77,10 @@ void same_traces(const std::vector<TokenReplayTraceDiagnostics>& a,
   }
 }
 void same_conformance(const ConformanceResult& a, const ConformanceResult& b) {
-  require(a.fitness == b.fitness && a.precision == b.precision &&
+  // An undefined precision (NaN, not computed) is the same outcome on both sides.
+  require(a.fitness == b.fitness &&
+          (a.precision == b.precision || (std::isnan(a.precision) && std::isnan(b.precision))) &&
+          a.precision_computed == b.precision_computed &&
           a.generalization == b.generalization && a.simplicity == b.simplicity &&
           a.fitting_traces == b.fitting_traces && a.trace_count == b.trace_count &&
           a.produced == b.produced && a.consumed == b.consumed &&

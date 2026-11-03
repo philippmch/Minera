@@ -94,6 +94,33 @@ void error_json_escapes_quotes_and_backslashes() {
   assert(minera::error_json("\x7f") == "{\"error\": \"\x7f\"}");
 }
 
+void parse_mine_params_reads_sampling_controls() {
+  const auto seeded = minera::parse_mine_params(fields({
+      {"sample_cases", "3"}, {"sample_events", "4"}, {"seed", "4294967295"},
+      {"sample_input", "event_log"}}));
+  assert(seeded.filter.sampling && seeded.filter.any());
+  assert(seeded.filter.sampling->cases == 3u && seeded.filter.sampling->events == 4u);
+  assert(seeded.filter.sampling->seed == 4294967295u);
+  assert(seeded.filter.sampling->input == minera::SampleInput::kEventLog);
+  const auto defaulted = minera::parse_mine_params(fields({{"sample_cases", "0"}}));
+  assert(defaulted.filter.sampling && defaulted.filter.sampling->cases == 0u);
+  assert(defaulted.filter.sampling->input == minera::SampleInput::kDataFrame);
+  // `seed` alone belongs to other controls and does not request sampling.
+  assert(!minera::parse_mine_params(fields({{"seed", "1"}})).filter.sampling);
+  const auto rejects = [](std::map<std::string, std::string> values) {
+    try { (void)minera::parse_mine_params(fields(std::move(values))); }
+    catch (const std::invalid_argument&) { return true; }
+    return false;
+  };
+  assert(rejects({{"sample_cases", "-1"}}));
+  assert(rejects({{"sample_events", "x"}}));
+  assert(rejects({{"sample_cases", "1"}, {"sample_seed", "4294967296"}}));
+  assert(rejects({{"sample_cases", "1"}, {"sample_seed", "1"}, {"seed", "1"}}));
+  assert(rejects({{"sample_cases", "1"}, {"sample_input", "table"}}));
+  assert(rejects({{"sample_seed", "1"}}));
+  assert(rejects({{"sample_input", "dataframe"}}));
+}
+
 void parse_mine_params_defaults_when_empty() {
   const auto params = minera::parse_mine_params(fields({}));
   // Stock importer defaults survive an empty form.
@@ -6271,6 +6298,7 @@ void knowledge_injection_params_contract() {
 }
 
 int main() {
+  parse_mine_params_reads_sampling_controls();
   ends_with_ci_is_case_insensitive();
   looks_like_xes_uses_extension_then_content_sniff();
   split_csv_trims_and_drops_empty_parts();

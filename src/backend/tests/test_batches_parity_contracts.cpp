@@ -548,9 +548,47 @@ void reference_interval_merging_contract() {
   assert(scaled_batch.events[1].case_id == "nan");
 }
 
+// A mined CSV reaches the Polars variant as a pandas-typed table ("str"
+// columns), which pl.from_pandas reads as String. PM4Py 2.7.22's Polars
+// batches on this CSV (string ids): Pack/crew, one "Concurrent batching" of
+// X1, X2 (00:00) and X3 (00:05). A numeric Polars case column keeps "the
+// case ID column should be of type string.".
+void polars_batches_accept_a_mined_csv_text_case_column() {
+  std::istringstream text("case_id,activity,timestamp,resource\n"
+                          "X1,Pack,2026-01-01T00:00:00,crew\nX2,Pack,2026-01-01T00:00:00,crew\n"
+                          "X3,Pack,2026-01-01T00:05:00,crew\nX1,Ship,2026-01-01T01:00:00,van\n");
+  const auto csv = import_csv_event_data(text);
+  const auto polars = BatchPolarsDiscovery::apply(LazyEventTable::from_table(csv.table), {});
+  assert(polars.groups.size() == 1);
+  const auto& group = polars.groups.front();
+  assert(group.activity == "Pack" && group.resource == "crew" && group.batches.size() == 1);
+  const auto& batch = group.batches.front();
+  assert(batch.type == BatchType::kConcurrent && batch.events.size() == 3);
+  assert(batch.complete - batch.start == 300.0);
+  // format_dataframe casts the case ids to str, so integer-looking ids of a
+  // mined CSV are text too (only a numeric Polars column is refused).
+  std::istringstream integers("case_id,activity,timestamp,resource\n"
+                              "1,Pack,2026-01-01T00:00:00,crew\n2,Pack,2026-01-01T00:00:00,crew\n");
+  const auto numeric = import_csv_event_data(integers);
+  assert(numeric.table.dtypes.at(0) == "str");
+  const auto integer_ids = BatchPolarsDiscovery::apply(LazyEventTable::from_table(numeric.table), {});
+  // Reference: Pack/crew, one "Simultaneous" batch of cases '1' and '2'.
+  assert(integer_ids.groups.size() == 1 && integer_ids.groups.front().batches.front().events.size() == 2 &&
+         integer_ids.groups.front().batches.front().type == BatchType::kSimultaneous);
+  auto typed = numeric.table;
+  typed.dtypes.at(0) = "Int64";
+  try {
+    (void)BatchPolarsDiscovery::apply(LazyEventTable::from_table(typed), {});
+    assert(false);
+  } catch (const std::invalid_argument& error) {
+    assert(std::string(error.what()) == "batches: the case ID column should be of type string.");
+  }
+}
+
 }  // namespace
 
 int main() {
+  polars_batches_accept_a_mined_csv_text_case_column();
   selector_components_cover_all_input_adapters();
   all_five_classifications_are_stable();
   merging_and_event_identity_match_contract();

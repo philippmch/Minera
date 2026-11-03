@@ -207,8 +207,27 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
     return result;
   };
   const std::vector<std::string> no_ids;
-  const auto place_ids = resolve_ids(document ? document->place_ids : no_ids,
-                                     net.place_count(), "p");
+  // Without document IDs, a net that carries reference place names (process
+  // tree, BPMN or PNML origin) exports them, unless they are not unique or
+  // would collide with the generated transition IDs.
+  const auto net_place_ids = [&]() -> const std::vector<std::string>& {
+    if (document && !document->place_ids.empty()) return document->place_ids;
+    if (!net.place_names() || net.place_names()->size() != net.place_count()) return no_ids;
+    const auto& names = *net.place_names();
+    std::unordered_set<std::string> seen;
+    const bool generated_transition_ids = !document || document->transition_ids.empty();
+    for (const auto& name : names) {
+      if (!seen.insert(name).second) return no_ids;
+      if (generated_transition_ids && name.size() > 1 && name[0] == 't' &&
+          std::all_of(name.begin() + 1, name.end(), [](unsigned char c) { return c >= '0' && c <= '9'; }))
+        return no_ids;
+    }
+    if (!generated_transition_ids)
+      for (const auto& id : document->transition_ids)
+        if (seen.contains(id)) return no_ids;
+    return names;
+  };
+  const auto place_ids = resolve_ids(net_place_ids(), net.place_count(), "p");
   const auto transition_ids = resolve_ids(document ? document->transition_ids : no_ids,
                                           net.transitions().size(), "t");
   const auto validate_keys = [&](const std::vector<bool>& keys,
@@ -1255,6 +1274,10 @@ PnmlDocument parse_pnml_document(std::string_view xml,
         std::move(input_weights[t]), std::move(output_weights[t])});
   }
   storage.activities = std::move(activities);
+  // The reference names each imported place by its PNML ID; carrying them on
+  // the net keeps replay tie-breaks after copies and legacy re-export.
+  storage.place_names.emplace();
+  for (const auto& place : places) storage.place_names->push_back(place.id);
   PetriNet net = PetriNet::from_literal_storage(std::move(storage));
 
   PnmlDocument document;

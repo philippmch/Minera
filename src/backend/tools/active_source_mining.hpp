@@ -289,6 +289,7 @@ void handle_active_source_mining(const httplib::Request& request,
       ",\"active_source\":" + active_source_snapshot_json(*session, false) + ",\"analysis\":" + analysis +
       ",\"family_results\":" + records_json + ",\"submitted_controls\":" + fields +
       ",\"inductive_options\":" + minera::serialize_inductive_options_json(params.inductive) +
+      (params.filter.sampling ? ",\"sampling\":" + minera::sampling_options_json(*params.filter.sampling) : std::string{}) +
       ",\"error\":" + presentation_error + '}');
   publish_active_mining(ticket, session);
   response.set_content(body, "application/json");

@@ -1522,6 +1522,19 @@ int usage(const char* program) {
                 "  --case-duration-min <s>  Inclusive lower complete-case duration\n"
                 "  --case-duration-max <s>  Inclusive upper complete-case duration\n"
                "  --max-cases <n>           Keep the first n surviving cases\n"
+               "  --sample-cases <n>        pm4py.sample_cases(n) before every\n"
+               "                            other filter (dataframe input: the\n"
+               "                            two extreme picks plus n spread\n"
+               "                            cases of a random.shuffle)\n"
+               "  --sample-events <n>       pm4py.sample_events(n), after any\n"
+               "                            --sample-cases (dataframe input:\n"
+               "                            numpy df.sample(n))\n"
+               "  --sample-seed <s>         random.seed(s) and numpy.random.seed(s)\n"
+               "                            before sampling, 0..4294967295\n"
+               "                            (default: a fresh seed, printed)\n"
+               "  --sample-input <kind>     dataframe (default), event_log, or\n"
+               "                            event_stream: the object the reference\n"
+               "                            samples\n"
                "  --max-activities <n>     Keep events from the n most frequent\n"
                "                            activities (0 drops all events)\n"
                "  --top-activities <n>     Alias for --max-activities\n"
@@ -2072,6 +2085,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   bool xes_import_result_requested = false;
   minera::XesExportOptions xes_export_options;
   minera::LogFilterOptions filter;
+  std::optional<std::size_t> sample_cases_option;
+  std::optional<std::size_t> sample_events_option;
+  std::optional<std::uint32_t> sample_seed_option;
+  std::optional<minera::SampleInput> sample_input_option;
   std::map<std::string, std::string> ltl_fields;
   std::map<std::string, std::string> segment_fields;
   std::map<std::string, std::string> path_fields;
@@ -2916,6 +2933,32 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         throw std::invalid_argument(
             std::string(arg) + " expects first or last");
       }
+      continue;
+    }
+    if (arg == "--sample-cases" || arg == "--sample-events") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto parsed = parse_nonnegative_size(value, arg);
+      (arg == "--sample-cases" ? sample_cases_option : sample_events_option) =
+          parsed;
+      continue;
+    }
+    if (arg == "--sample-seed") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto parsed = parse_nonnegative_size(value, arg);
+      if (parsed > 0xffffffffULL)
+        throw std::invalid_argument("--sample-seed must be at most 4294967295");
+      sample_seed_option = static_cast<std::uint32_t>(parsed);
+      continue;
+    }
+    if (arg == "--sample-input") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      sample_input_option = minera::parse_sample_input(value);
+      if (!sample_input_option)
+        throw std::invalid_argument(
+            "--sample-input expects dataframe, event_log, or event_stream");
       continue;
     }
     if (arg == "--max-cases" || arg == "--max-no-cases" ||
@@ -5500,6 +5543,25 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     } else {
       return usage(argv[0]);
     }
+  }
+
+  if (sample_cases_option || sample_events_option) {
+    minera::LogSamplingOptions sampling;
+    sampling.cases = sample_cases_option;
+    sampling.events = sample_events_option;
+    if (sample_input_option) sampling.input = *sample_input_option;
+    if (sample_seed_option) {
+      sampling.seed = *sample_seed_option;
+    } else {
+      sampling.seed = minera::random_sample_seed();
+      std::cerr << "note: sampling with --sample-seed " << sampling.seed
+                << '\n';
+    }
+    filter.sampling = sampling;
+  } else if (sample_seed_option || sample_input_option) {
+    std::cerr << "error: --sample-seed/--sample-input require --sample-cases "
+                 "or --sample-events\n";
+    return 1;
   }
 
   if(exact.scope){

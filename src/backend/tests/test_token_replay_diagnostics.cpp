@@ -150,7 +150,13 @@ void consistent(const EventLog& log, const PetriNet& net, TokenReplayOptions opt
   options.include_trace_diagnostics = true;
   const auto attached = check_conformance(log, net, options);
   assert(attached.trace_diagnostics && attached.trace_diagnostics->size() == rows.size());
-  assert(attached.fitness == aggregate.fitness && attached.precision == aggregate.precision);
+  // Precision is NaN (precision_computed false) when a prefix replay has no
+  // defined fitness, e.g. backwards replay of an unknown-only prefix; the
+  // reference raises ZeroDivisionError there. NaN never compares equal.
+  assert(attached.fitness == aggregate.fitness);
+  assert(attached.precision_computed == aggregate.precision_computed);
+  assert(attached.precision == aggregate.precision ||
+         (std::isnan(attached.precision) && std::isnan(aggregate.precision)));
   for (std::size_t i = 0; i < rows.size(); ++i) {
     assert((*attached.trace_diagnostics)[i].case_id == rows[i].case_id);
     assert((*attached.trace_diagnostics)[i].activated_transitions == rows[i].activated_transitions);
@@ -612,6 +618,10 @@ void unknown_policy_is_classification_only_even_when_stopping() {
           assert(rows[2].unknown_activities.size() == 1);
           assert(rows[2].replay_stopped == stop);
           if (stop) assert(rows[2].replayed_events == 2);
+          // Backwards ETConformance replays the prefix <unknown>, whose fitness
+          // has a zero denominator; reference precision raises ZeroDivisionError.
+          const auto conformance = check_conformance(valid_log, net, options);
+          assert(!conformance.precision_computed && std::isnan(conformance.precision));
           consistent(valid_log, net, options);
         } else {
           const auto rows = replay_token_traces(log, net, options);
@@ -1310,18 +1320,21 @@ void forward_bpmn_greedy_routing_public_contract() {
        {{ProcessTreeOperator::kSequence, 0, {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}},
         {ProcessTreeOperator::kSequence, 0, {ProcessTreeNode::leaf(2), ProcessTreeNode::leaf(3)}}}});
   // BPMN export of an interleaving tree goes through the reference tree-to-net
-  // construction (split, join and a mutex place each child takes and returns).
-  // Reference token replay on this exact PNML fits both block orders without
-  // routing problems (11 tokens consumed and produced, nothing missing).
+  // construction (split, join and a mutex place each child takes and returns),
+  // the reference net-to-BPMN mapping, and back through the reference
+  // BPMN-to-net construction. Reference token replay on this exact PNML fits
+  // both block orders without routing problems (14 tokens consumed and
+  // produced, nothing missing).
   const auto interleaving_net = parse_pnml(to_pnml(parse_bpmn(to_bpmn(interleaving))));
   const auto log = log_of({{"a", "b", "c", "d"}, {"c", "d", "a", "b"}});
   const auto interleaving_rows = replay_token_traces(log, interleaving_net);
   assert(interleaving_rows.size() == 2);
-  const std::vector<std::vector<std::size_t>> activated = {{0, 2, 3, 4, 5, 1}, {0, 4, 5, 2, 3, 1}};
+  const std::vector<std::vector<std::size_t>> activated = {{0, 1, 2, 3, 1, 4, 5, 1, 6},
+                                                            {0, 1, 4, 5, 1, 2, 3, 1, 6}};
   for (std::size_t i = 0; i < interleaving_rows.size(); ++i) {
     const auto& row = interleaving_rows[i];
     assert(row.trace_is_fit && row.trace_fitness == 1.0);
-    assert(row.consumed == 11 && row.produced == 11);
+    assert(row.consumed == 14 && row.produced == 14);
     assert(row.missing == 0 && row.remaining == 0);
     assert(row.activated_transitions == activated[i]);
     assert(row.transitions_with_problems.empty());

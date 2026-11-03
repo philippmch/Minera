@@ -89,6 +89,19 @@ inline std::vector<std::string> replay_element_names(
   return result;
 }
 
+// Explicit names win; otherwise a net that carries reference place names
+// (process-tree and BPMN conversions) uses them, and any other net the
+// positional `p<index>` placeholders.
+inline std::vector<std::string> replay_place_names(
+    const std::vector<std::string>& configured, const PetriNet& net) {
+  if (configured.empty() && net.place_names()) {
+    if (net.place_names()->size() != net.place_count())
+      throw std::invalid_argument("Petri place name metadata has the wrong size");
+    return *net.place_names();
+  }
+  return replay_element_names(configured, net.place_count(), "p", "place_names");
+}
+
 inline PetriTransitionNameList replay_transition_names(
     const std::optional<PetriTransitionNameList>& nullable_names,
     const std::vector<std::string>& string_names, const PetriNet& net) {
@@ -475,13 +488,11 @@ void route_hidden_dependencies(std::size_t transition_count, std::size_t target,
           emit(transition);
           visited[transition] = true;
         }
-        // A still-blocked dependency does not discard later path steps.
-        if (enabled(selected)) break;
+        // A still-blocked dependency does not discard later path steps, and
+        // enabling the selected transition does not end the pass either: the
+        // reference keeps firing (or recursing into) every remaining unvisited
+        // step of every recomputed path, in both exploration modes.
       }
-      // Non-exhaustive routing keeps examining later paths even after one
-      // path enables the selected transition.  Exhaustive mode retains the
-      // original outer break after its transactional trial fallback.
-      if (exhaustive && enabled(selected)) break;
     }
   };
   explore(explore, target, 0);

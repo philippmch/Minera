@@ -10,15 +10,17 @@
 
 namespace minera {
 
-// Serializes an inductive-miner process tree as BPMN 2.0 XML — the notation read
-// by Camunda, bpmn.io, Signavio, and most BPM suites. The block-structured tree
-// maps cleanly onto BPMN: an activity leaf becomes a task, an exclusive choice
-// an exclusive, inclusive, or parallel block becomes a matching split/join
-// gateway pair, and a loop becomes a gateway cycle. A silent (tau) step emits
-// no task — it collapses into a direct sequence flow. Only the semantic process
-// interchange); importers lay the graph out on their own.
-// Trees containing atomic interleaving are first converted to their exact
-// workflow net so BPMN export does not weaken them into event-level parallelism.
+// Serializes an inductive-miner process tree as BPMN 2.0 XML. An activity
+// leaf becomes a task; an exclusive, inclusive, or parallel block becomes a
+// split gateway (gatewayDirection="Diverging") and a join gateway
+// ("Converging"); a loop becomes an exclusive cycle with a converging head and
+// a diverging tail. A silent (tau) step emits no task. Start and end events
+// are named "start" and "end". Every node lists its <incoming>/<outgoing>
+// flows, and a BPMNDiagram with a deterministic layered layout (columns by
+// longest-path depth, back edges ignored) is included so BPMN editors open the
+// file directly. Trees containing atomic interleaving are first converted to
+// their exact workflow net so BPMN export does not weaken them into
+// event-level parallelism.
 void write_bpmn(std::ostream& out,
                 const ProcessTree& tree,
                 std::string_view name = "process");
@@ -26,15 +28,19 @@ void write_bpmn(std::ostream& out,
 [[nodiscard]] std::string to_bpmn(const ProcessTree& tree,
                                   std::string_view name = "process");
 
-// Serializes any workflow net as BPMN 2.0 XML, so the Alpha and Heuristic
-// miners' models (and imported nets) export like the inductive one. The
-// mapping follows the nets' token semantics: a visible transition becomes a
-// task, a transition consuming from (producing to) several places gets a
-// parallel join (split) gateway, and a place with several producers or
-// consumers becomes an exclusive gateway — a token rests in one place and
-// leaves through one arc. The source place becomes the start event, the sink
-// the end event; trivial places and silent one-in-one-out transitions
-// collapse into plain sequence flows.
+// Serializes any accepting Petri net as BPMN 2.0 XML with the reference
+// (pm4py 2.7.22) Petri-net-to-BPMN structure: every place becomes an
+// exclusive gateway; the source place is reached from the start event and the
+// sink place leads to the end event; transitions sharing a visible label share
+// one task, preceded by a converging parallel gateway when the transition has
+// several input places and followed by a diverging one when it has several
+// output places (and by an exclusive gateway when it has no input or no output
+// place); a silent transition becomes one parallel gateway when it has several
+// input or output places (Converging when several inputs, else Diverging) and
+// an exclusive gateway otherwise. Exclusive gateways with exactly one incoming
+// and one outgoing flow are then collapsed into a direct flow, so dangling
+// places keep their gateways. The document carries gatewayDirection,
+// <incoming>/<outgoing> children and a layered BPMNDiagram.
 void write_bpmn(std::ostream& out,
                 const PetriNet& net,
                 std::string_view name = "process");
@@ -42,37 +48,39 @@ void write_bpmn(std::ostream& out,
 [[nodiscard]] std::string to_bpmn(const PetriNet& net,
                                   std::string_view name = "process");
 
-// Parses a BPMN 2.0 model into a workflow net, so a process drawn or exported
-// in a BPM suite can be checked against a log like a discovered model. The
-// first non-empty <process> is read (namespace prefixes are ignored); its
-// token semantics map onto the net: every sequence flow becomes a place, a
-// task (any task kind, or a call activity) a transition — visible under its
-// name, silent when unnamed — an exclusive or event-based gateway routes one
-// token from any incoming flow to one outgoing flow, and a parallel gateway
-// consumes a token from every incoming flow and produces one on every
-// outgoing flow. A block-structured inclusive split/join pair uses selector
-// and completion places to represent every non-empty subset of branches; a
-// one-in/one-out inclusive gateway is a silent pass-through. Per the
-// standard's token rules, a non-gateway node with
-// several outgoing flows starts all of them, and one with several incoming
-// flows fires on each token separately; intermediate events pass tokens
-// through silently. An expanded subprocess converts recursively between its
-// own start and end events; a collapsed (empty) one behaves as an atomic
-// task. Start events feed from a fresh source place and end events into a
-// fresh sink place, giving the single-source single-sink shape conformance
-// replays. A task no sequence flow reaches — how an activity that is
-// disconnected in the source model comes out of a BPMN export — stays a
-// disconnected (dead) transition rather than an error, so conformance can
-// report it honestly. Complex, mixed-arity inclusive, and ambiguous inclusive
-// gateways are rejected. Interrupting boundary events on tasks and collapsed
-// subprocesses compete
-// with normal completion for the activity token; named boundary events remain
-// observable, while unnamed events route silently. A non-interrupting event
-// forks a one-shot boundary path while leaving the activity enabled. Expanded
-// subprocess interruption resets the private child-scope marking before
-// routing the boundary path. Malformed models
-// (dangling flow references, missing start or end events, gateways without
-// incoming or outgoing flows) fail via std::runtime_error.
+// Parses a BPMN 2.0 model into a workflow net. The first non-empty <process>
+// is read (namespace prefixes are ignored; the reference merges every pool
+// instead).
+//
+// When the process only uses start and end events, tasks of any task kind
+// (not call activities), exclusive and parallel gateways — the constructs the
+// reference converter supports — the net is built with the reference
+// construction and names: places "source" and "sink", "ent_<node id>" and
+// "exi_<node id>" per node, one place per sequence flow named by the flow id,
+// silent connector transitions between them, a forking (joining) silent
+// transition for a parallel gateway with several outgoing (incoming) flows,
+// silent start/end connectors from source and into sink, and one transition
+// per task (visible under a non-empty name, silent otherwise). Silent
+// connectors with a single private input or output place are then merged
+// into their neighbour exactly as the reference's simple reduction does.
+// Dangling gateways, isolated tasks and processes without start or end events
+// are accepted like the reference. Connector transitions get deterministic
+// UUID-shaped names (00000000-0000-4000-8000-<counter>) where the reference
+// draws random UUIDs. Place names are carried in PetriNet::place_names().
+//
+// Other processes (intermediate events, event-based, inclusive or complex
+// gateways, subprocesses, boundary events, call activities) keep Minera's
+// token-semantics mapping: every sequence flow becomes a place, a task or
+// call activity a transition, an exclusive or event-based gateway routes one
+// token, a parallel gateway synchronizes, a block-structured inclusive
+// split/join pair enumerates non-empty branch subsets, a non-gateway node with
+// several outgoing flows starts all of them, intermediate events pass tokens
+// silently, expanded subprocesses convert recursively, and boundary events
+// compete with normal completion (interrupting) or fork a one-shot path
+// (non-interrupting). Complex, mixed-arity inclusive and ambiguous inclusive
+// gateways are rejected, and malformed models (dangling flow references,
+// missing start or end events, gateways without incoming or outgoing flows)
+// fail via std::runtime_error on this path.
 [[nodiscard]] PetriNet parse_bpmn(std::string_view xml);
 
 // Reads and parses a BPMN file.

@@ -974,7 +974,10 @@ EventLog filter_ncases(const EventLog& event_log, std::size_t max_cases) {
   return result;
 }
 
-EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) {
+EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options) {
+  std::optional<EventLog> sampled;
+  if (options.sampling) sampled = sample_event_log(input, *options.sampling);
+  const EventLog& log = sampled ? *sampled : input;
   const auto keep = to_set(options.keep_activities);
   const auto remove = to_set(options.remove_activities);
   const auto keep_res = to_set(options.keep_resources);

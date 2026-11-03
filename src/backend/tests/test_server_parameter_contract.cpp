@@ -200,11 +200,82 @@ int main(int argc, char** argv) {
     check(result && result->status == 400,
           "an explicit empty miner is still rejected: " + describe(result));
 
+    // Imported-model binding: each check-model answer carries a fresh id, and
+    // a run that echoes a superseded id is refused instead of answering for
+    // the newer model.
+    {
+      const auto pnml = client.Get("/api/pnml?miner=inductive");
+      check(pnml && pnml->status == 200, "inductive PNML for import: " + describe(pnml));
+      const auto import_model = [&]() -> std::string {
+        httplib::MultipartFormDataItems items = {
+            {"model", pnml ? pnml->body : std::string{}, "model.pnml", "application/xml"}};
+        const auto checked = client.Post("/api/check-model", items);
+        const std::string key = "\"imported_model_id\":";
+        const auto at = checked ? checked->body.find(key) : std::string::npos;
+        check(checked && checked->status == 200 && at == 1,
+              "check-model reports its imported model id: " + describe(checked));
+        if (at == std::string::npos) return {};
+        const auto begin = at + key.size();
+        return checked->body.substr(begin, checked->body.find(',', begin) - begin);
+      };
+      const auto first = import_model(), second = import_model();
+      check(!first.empty() && !second.empty() && first != second,
+            "each import gets a fresh id: " + first + " vs " + second);
+      result = client.Post("/api/align?miner=imported", {{"X-Minera-Imported-Model", second}},
+                           "", "application/x-www-form-urlencoded");
+      check(result && result->status == 200,
+            "a run bound to the current imported model runs: " + describe(result));
+      result = client.Post("/api/align?miner=imported", {{"X-Minera-Imported-Model", first}},
+                           "", "application/x-www-form-urlencoded");
+      check(result && result->status == 409 && contains(result, "imported model changed"),
+            "a run bound to a replaced imported model is refused: " + describe(result));
+      result = client.Get("/api/playout?miner=imported&traces=5",
+                          {{"X-Minera-Imported-Model", first}});
+      check(result && result->status == 409,
+            "a stale bound playout is refused: " + describe(result));
+      result = client.Post("/api/align?miner=imported", "", "application/x-www-form-urlencoded");
+      check(result && result->status == 200,
+            "an unbound run keeps working: " + describe(result));
+    }
+
     // Item 4: basic Petri playout generates pm4py's 1000 traces by default.
     result = client.Get("/api/playout?miner=inductive");
     check(result && result->status == 200 && count(result->body, "<trace>") == 1000,
           "default playout has 1000 traces: " +
               (result ? std::to_string(count(result->body, "<trace>")) : describe(result)));
+    // An omitted trace count never fails the 1,000,000-event budget: with a
+    // long per-trace cap it shrinks to budget / cap (declared), while an
+    // explicit count is still checked as given.
+    result = client.Get("/api/playout?miner=inductive&max_steps=5000");
+    check(result && result->status == 200 && count(result->body, "<trace>") == 200,
+          "long max_steps scales the default trace count: " +
+              (result && result->status == 200 ? std::to_string(count(result->body, "<trace>"))
+                                               : describe(result)));
+    result = client.Get("/api/playout?miner=inductive&max_steps=10000");
+    check(result && result->status == 200 && count(result->body, "<trace>") == 100,
+          "the longest max_steps still plays out: " +
+              (result && result->status == 200 ? std::to_string(count(result->body, "<trace>"))
+                                               : describe(result)));
+    result = client.Get("/api/playout?miner=inductive&max_steps=1000");
+    check(result && result->status == 200 && count(result->body, "<trace>") == 1000,
+          "max_steps 1000 keeps 1000 default traces: " + describe(result));
+    result = client.Get("/api/playout?miner=inductive&max_steps=5000&traces=1000");
+    check(result && result->status == 400 && contains(result, "event budget"),
+          "an explicit over-budget trace count is rejected: " + describe(result));
+    result = client.Get("/api/playout?miner=stochastic&stochastic_max_steps=5000");
+    check(result && result->status == 200 && count(result->body, "<trace>") == 200,
+          "stochastic playout scales its default trace count: " +
+              (result && result->status == 200 ? std::to_string(count(result->body, "<trace>"))
+                                               : describe(result)));
+    result = client.Get("/api/playout?miner=stochastic&stochastic_max_steps=5000&stochastic_traces=1000");
+    check(result && result->status == 400 && contains(result, "event budget"),
+          "an explicit over-budget stochastic count is rejected: " + describe(result));
+    result = client.Get("/api/playout?miner=dfg&dfg_playout_variant=performance&dfg_playout_max_steps=5000");
+    check(result && result->status == 200,
+          "DFG performance playout scales its default trace count: " + describe(result));
+    result = client.Get("/api/playout?miner=dfg&dfg_playout_variant=performance&dfg_playout_max_steps=5000&dfg_playout_traces=1000");
+    check(result && result->status == 400 && contains(result, "event budget"),
+          "an explicit over-budget DFG count is rejected: " + describe(result));
     // Item 9: an empty number is not zero.
     result = client.Get("/api/playout?miner=inductive&start=");
     check(result && result->status == 400, "empty start is rejected: " + describe(result));

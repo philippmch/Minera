@@ -2718,8 +2718,12 @@ void validate_performance_spectrum(const PerformanceSpectrum& spectrum,
   }
   const bool built_in_activity = spectrum.activity_attribute == "activity" ||
                                  spectrum.activity_attribute == "concept:name";
+  // A pattern activity that never occurs in the log yields no observations
+  // (the reference returns an empty points list), so only observed activities
+  // must be registered.
   if (built_in_activity) {
-    for (const auto& activity : spectrum.activities) {
+    for (const auto& observation : spectrum.observations)
+    for (const auto& activity : observation.activities) {
       if (!graph.activity_id(activity)) {
         throw std::invalid_argument("performance spectrum activity is not registered: " + activity);
       }

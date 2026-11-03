@@ -555,8 +555,7 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
   const auto final_keys = resolve_marking_keys(options.final_marking_keys, final_marking, "final_marking_keys");
   auto place_names = options.place_names;
   if (place_names.empty()) {
-    for (std::size_t place = 0; place < net.place_count(); ++place)
-      place_names.push_back("p" + std::to_string(place));
+    place_names = detail::replay_place_names({}, net);
   } else if (place_names.size() != net.place_count()) {
     throw std::invalid_argument("place_names must contain one entry per place");
   }

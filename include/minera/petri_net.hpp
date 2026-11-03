@@ -172,6 +172,7 @@ struct PetriNetLiteralStorage {
   std::vector<std::string> activities;
   std::optional<PetriDiscoveryMarkings> discovery_markings;
   std::optional<PetriTransitionNameList> transition_names;
+  std::optional<std::vector<std::string>> place_names;
 };
 
 // A labeled net with optional workflow boundaries and explicit discovery
@@ -181,7 +182,10 @@ class PetriNet {
  public:
   [[nodiscard]] static PetriNet from_literal_storage(PetriNetLiteralStorage storage);
 
-  std::size_t add_place() { return place_count_++; }
+  std::size_t add_place() {
+    if (place_names_) place_names_->push_back("p" + std::to_string(place_count_));
+    return place_count_++;
+  }
 
   std::size_t add_transition(std::optional<std::size_t> activity,
                              std::vector<std::size_t> inputs,
@@ -323,6 +327,20 @@ class PetriNet {
     return transition_names_;
   }
 
+  // Place names a reference net built in memory would carry (for example the
+  // process-tree conversion's `source`, `sink` and `p_<n>`). Replay sorts
+  // hidden-routing candidates by these names when no explicit names are given.
+  void set_place_names(std::vector<std::string> names) {
+    if (names.size() != place_count_)
+      throw std::invalid_argument("Petri place names must contain one entry per place");
+    place_names_ = std::move(names);
+  }
+
+  [[nodiscard]] const std::optional<std::vector<std::string>>&
+  place_names() const noexcept {
+    return place_names_;
+  }
+
   // Sparse entries preserve signed, arbitrary-width counts and explicit zero
   // keys. Both roles can refer to the same detached identity. Setting these
   // markings does not create root places or change workflow boundary flags.
@@ -381,6 +399,7 @@ class PetriNet {
   std::vector<std::string> activities_;
   std::optional<PetriDiscoveryMarkings> discovery_markings_;
   std::optional<PetriTransitionNameList> transition_names_;
+  std::optional<std::vector<std::string>> place_names_;
 };
 
 // Process-tree Petri-net conversion variants.  The standard variant keeps
