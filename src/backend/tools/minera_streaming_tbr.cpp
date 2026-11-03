@@ -8,6 +8,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/pnml.hpp"
 #include "minera/python_csv_stream.hpp"
+#include "minera/request_params.hpp"
 #include "minera/streaming_tbr.hpp"
 
 int usage(const char* program) {
@@ -47,14 +48,9 @@ int main(int argc, char** argv) {
         import_options.activity_column =
             std::string(value_for("--activity-column"));
       } else if (argument == "--max-invisible") {
-        const auto value = value_for("--max-invisible");
-        std::size_t used = 0;
-        const std::string text(value);
-        const auto parsed = std::stoull(text, &used);
-        if (used != text.size())
-          throw std::invalid_argument("max-invisible must be an integer");
-        options.maximum_iterations_invisibles =
-            static_cast<std::size_t>(parsed);
+        options.maximum_iterations_invisibles = static_cast<std::size_t>(
+            minera::parse_strict_u64(value_for("--max-invisible"),
+                                     "--max-invisible"));
       } else if (argument == "--stop-immediately") {
         options.stop_immediately_unfit = true;
       } else if (output_path.empty() && !argument.empty() &&

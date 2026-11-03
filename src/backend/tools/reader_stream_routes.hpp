@@ -5,7 +5,8 @@ struct ReaderSessionRecord {
   std::string id;
   httplib::Params configuration;
   LiveUpload source;
-  std::unique_ptr<minera::ReaderStreamSession> reader;
+  // Shared so a snapshot can wait for the queue without the record lock.
+  std::shared_ptr<minera::ReaderStreamSession> reader;
   bool released=false;
 };
 std::mutex g_reader_mutex;
@@ -51,7 +52,7 @@ void handle_reader_create(const httplib::Request& request,httplib::Response& res
     options.traces.acceptance=[case_id,activity,minimum,maximum](const minera::Trace& trace){return (!case_id||trace.case_id==*case_id)&&trace.events.size()>=minimum&&trace.events.size()<=maximum&&(!activity||std::any_of(trace.events.begin(),trace.events.end(),[&](const auto& event){return event.activity==*activity;}));};
     auto record=std::make_shared<ReaderSessionRecord>();record->id=id;record->configuration=request.params;
     record->source={"source",request.has_param("source_name")?request.get_param_value("source_name"):"reader-upload",kind=="csv_events"?"csv":"xes",request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",options.source};
-    record->reader=std::make_unique<minera::ReaderStreamSession>(std::move(options));
+    record->reader=std::make_shared<minera::ReaderStreamSession>(std::move(options));
     {std::lock_guard lock(g_reader_mutex);const auto found=g_reader_sessions.find(id);
       if(found!=g_reader_sessions.end())record=found->second;
       else if(g_reader_sessions.size()>=kLiveMaxSessions)throw LiveCapacityError(429,"too many reader sessions ("+std::to_string(kLiveMaxSessions)+"); release one before creating another");
@@ -62,7 +63,11 @@ void handle_reader_create(const httplib::Request& request,httplib::Response& res
   });
 }
 void handle_reader_snapshot(const httplib::Request& request,httplib::Response& response) {
-  live_response(response,[&]{live_params(request,{"session_id","wait_until_drained"});auto s=reader_find(request);std::lock_guard lock(s->mutex);response.set_content(reader_payload(*s,ocel_query_bool(request,"wait_until_drained",true)),"application/json");});
+  live_response(response,[&]{live_params(request,{"session_id","wait_until_drained"});const bool wait=ocel_query_bool(request,"wait_until_drained",true);auto s=reader_find(request);
+    // Drain without the record lock, as the live snapshot does, so listing
+    // and releasing other readers are not blocked by a long queue.
+    if(wait){std::shared_ptr<minera::ReaderStreamSession> reader;{std::lock_guard lock(s->mutex);reader_open(*s);reader=s->reader;}reader->wait_until_drained();}
+    std::lock_guard lock(s->mutex);response.set_content(reader_payload(*s,wait),"application/json");});
 }
 void handle_reader_read(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{live_params(request,{"session_id","expected_revision","batch_id","maximum_items","wait_until_drained"});auto s=reader_find(request);std::lock_guard lock(s->mutex);reader_open(*s);

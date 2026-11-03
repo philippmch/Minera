@@ -50,6 +50,37 @@ const std::string* resource_value(const Event& event, std::string_view key) {
   return dataframe_cell::resource_missing(event) ? nullptr : &event.resource;
 }
 
+// Whether the resource cell is a float NaN. A DataFrame treats it as missing
+// (resource_value), but an EventLog object keeps it as a present float that
+// equals nothing, not even another NaN (each event holds its own NaN object).
+bool resource_nan(const Event& event, std::string_view key) {
+  const auto nan_metadata = [](const std::optional<EventAttribute>& metadata,
+                               FirstClassAttributeState state) {
+    return state != FirstClassAttributeState::kNull && metadata &&
+           !metadata->is_null && dataframe_cell::float_nan(*metadata);
+  };
+  if (key.empty())
+    return event.has_resource() &&
+           nan_metadata(event.resource_attribute, event.resource_state);
+  for (const auto& entry : event.attributes)
+    if (entry.key == key) return !entry.is_null && dataframe_cell::float_nan(entry);
+  const auto first_class = [&](std::string_view canonical, const std::string& source,
+                               bool present, FirstClassAttributeState state,
+                               const std::optional<EventAttribute>& metadata) {
+    return (source.empty() ? canonical : std::string_view(source)) == key && present &&
+           nan_metadata(metadata, state);
+  };
+  return first_class("concept:name", event.activity_source_key, event.has_activity(),
+                     event.activity_state, event.activity_attribute) ||
+         first_class("org:resource", event.resource_source_key, event.has_resource(),
+                     event.resource_state, event.resource_attribute) ||
+         first_class("time:timestamp", event.timestamp_source_key, event.has_timestamp(),
+                     event.timestamp_state, event.timestamp_attribute) ||
+         first_class("lifecycle:transition", event.lifecycle_source_key,
+                     event.has_lifecycle(), event.lifecycle_state,
+                     event.lifecycle_attribute);
+}
+
 void validate_options(const LtlFilterOptions& options) {
   for (const auto& value : options.attribute_values) {
     if (value.empty()) {
@@ -165,19 +196,31 @@ bool next_matches_event_log(const Trace& trace,
 }
 
 // The EventLog-object reference: a case violates the principle when any
-// resource of an A event also performs some B event.
+// resource of an A event also performs some B event. A NaN resource makes
+// its side non-empty but never meets another resource.
 std::optional<bool> four_eyes_relation_event_log(
     const Trace& trace, const LtlFilterOptions& options) {
   std::unordered_set<std::string> first_resources;
   std::unordered_set<std::string> second_resources;
+  bool first_nan = false;
+  bool second_nan = false;
   for (const auto& event : trace.events) {
     const auto* value = event_value(event, options.attribute_key);
+    if (!value) continue;
     const auto* resource = resource_value(event, options.resource_key);
-    if (!value || !resource || resource->empty()) continue;
+    if (!resource) {
+      if (!resource_nan(event, options.resource_key)) continue;
+      if (*value == options.attribute_values[0]) first_nan = true;
+      if (*value == options.attribute_values[1]) second_nan = true;
+      continue;
+    }
+    if (resource->empty()) continue;
     if (*value == options.attribute_values[0]) first_resources.insert(*resource);
     if (*value == options.attribute_values[1]) second_resources.insert(*resource);
   }
-  if (first_resources.empty() || second_resources.empty()) return std::nullopt;
+  if ((first_resources.empty() && !first_nan) ||
+      (second_resources.empty() && !second_nan))
+    return std::nullopt;
   for (const auto& resource : first_resources) {
     if (second_resources.count(resource) != 0) return false;
   }
@@ -214,9 +257,17 @@ bool eventually_matches_dataframe(const Trace& trace,
     }
     rows.push_back({value, instant});
   }
+  // Past the first value the search continues right after the previous
+  // match, so its outcome depends on (depth, previous) only. Remembering the
+  // states that failed keeps the search at O(values * rows^2) without
+  // changing its result.
+  std::vector<bool> failed;
+  if (values.size() > 1) failed.assign(values.size() * rows.size(), false);
   const auto search = [&](auto&& self, std::size_t depth, std::size_t begin,
                           std::size_t previous) -> bool {
     if (depth == values.size()) return true;
+    const bool remembered = depth != 0;
+    if (remembered && failed[depth * rows.size() + previous]) return false;
     for (std::size_t i = begin; i < rows.size(); ++i) {
       if (*rows[i].value != values[depth]) continue;
       if (depth != 0 && bounded) {
@@ -229,6 +280,7 @@ bool eventually_matches_dataframe(const Trace& trace,
       }
       if (self(self, depth + 1, i + 1, i)) return true;
     }
+    if (remembered) failed[depth * rows.size() + previous] = true;
     return false;
   };
   return search(search, 0, 0, 0);
@@ -294,17 +346,24 @@ bool different_persons_matches_dataframe(const Trace& trace,
   return false;
 }
 
+// The EventLog-object reference: the A events' resources form more than one
+// distinct value. Each NaN resource is a value of its own there.
 bool different_persons_matches(const Trace& trace,
                                const LtlFilterOptions& options) {
   std::unordered_set<std::string> resources;
+  std::size_t nans = 0;
   for (const auto& event : trace.events) {
     const auto* value = event_value(event, options.attribute_key);
+    if (!value || *value != options.attribute_values.front()) continue;
     const auto* resource = resource_value(event, options.resource_key);
-    if (value && *value == options.attribute_values.front() && resource &&
-        !resource->empty()) {
+    if (resource && !resource->empty()) {
       resources.insert(*resource);
-      if (resources.size() > 1) return true;
+    } else if (!resource && resource_nan(event, options.resource_key)) {
+      ++nans;
+    } else {
+      continue;
     }
+    if (resources.size() + nans > 1) return true;
   }
   return false;
 }

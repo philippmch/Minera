@@ -29,7 +29,7 @@ inline std::string relation_role_column(const EventTable& table,
 
 // True when `key` names the case-id column of a batch-imported CSV table.
 // Those ids carry the reference's typed text, so relation keys joined with
-// them are typed the same way (type_case_relation_column_like_csv_log).
+// them follow the same typed column (type_csv_case_relation_keys).
 inline bool csv_case_id_key(const EventTable& table, const std::string& key) {
   for (std::size_t column = 0; column < table.columns.size(); ++column)
     for (const auto& row : table.rows)

@@ -128,6 +128,9 @@ EventLog ReaderStreamSession::selected_log(bool delivered,bool wait) {
   }
   return log;
 }
+void ReaderStreamSession::wait_until_drained() {
+  auto& s=*impl_;std::lock_guard api(s.api_mutex);if(s.state()==StreamingStreamState::kActive)s.drain();
+}
 std::string ReaderStreamSession::snapshot_json(bool wait) {
   auto& s=*impl_;std::lock_guard api(s.api_mutex);if(wait&&s.state()==StreamingStreamState::kActive)s.drain();
   std::lock_guard data(s.data_mutex);const auto state=s.state();std::ostringstream out;

@@ -143,6 +143,7 @@ import {
 } from "./api";
 import {
   LiveSourceHandback,
+  type LiveSourceRollback,
   delimiterForFile,
   hasActiveFilters,
   hasActiveMinerOptions,
@@ -225,14 +226,20 @@ export default function App() {
   const resultCacheScope = () => `${liveSource.current ?? 'offline'}#${importedModelGeneration.current}`;
   const sourceAvailable = source !== null && liveSourceId === source.source_id;
   const clearSourceCaches = () => {cacheGeneration.current += 1; alignCache.current = {}; decideCache.current = {}; dfgCache.current = {}; editCache.current = {}; processTreeCache.current = {}; decomposedCache.current = {}; petriAntiCache.current = {}; petriMultiCache.current = {}; reductionCache.current = {}; evaluationCache.current = {}; petriAnalysisCache.current = {}; emdCache.current = {}; conceptDriftCache.current = {};};
-  const abortSourceLoad = () => {sourceGate.current.invalidate(); const previous = sourceRequest.current; sourceRequest.current = null; previous?.controller.abort(); const rollback = previous?.posted ? cancelMiningRequest(previous.request_id) : Promise.resolve(); ocelRequest.current?.abort(); ocelRequest.current = null; setMining(false); return {previous, rollback};};
-  const handBackLiveSource = (previousSource: string | null | undefined, rollback: Promise<unknown>) => void liveSourceHandback.current.handback(previousSource, rollback, sourceId => {if (sourceRequest.current) return; liveSource.current = sourceId; setLiveSourceId(sourceId);});
+  // Settles once every cancel-mine sent so far has been handled. A new mining POST waits for it, so the backend
+  // applies an older load's rollback before the newer load begins (begin_active_mining drops the older rollback).
+  const cancelBarrier = useRef<Promise<void>>(Promise.resolve());
+  const sendCancel = (requestId: string) => {const rollback = cancelMiningRequest(requestId); cancelBarrier.current = Promise.all([cancelBarrier.current, rollback]).then(() => undefined); return rollback;};
+  const abortSourceLoad = () => {sourceGate.current.invalidate(); const previous = sourceRequest.current; sourceRequest.current = null; previous?.controller.abort(); const rollback: Promise<LiveSourceRollback> = previous?.posted ? sendCancel(previous.request_id) : Promise.resolve(undefined); ocelRequest.current?.abort(); ocelRequest.current = null; setMining(false); return {previous, rollback};};
+  const handBackLiveSource = (previousSource: string | null | undefined, rollback: Promise<LiveSourceRollback>) => void liveSourceHandback.current.handback(previousSource, rollback, sourceId => {if (sourceRequest.current) return; liveSource.current = sourceId; setLiveSourceId(sourceId);});
   // A cancelled load leaves the previous analysis on screen; the backend restores its session, so it is live again.
   const cancelSourceLoad = () => {const {previous, rollback} = abortSourceLoad(); handBackLiveSource(previous?.previousSource, rollback);};
   // A failed load: roll the backend back in case it published the session before the response failed to arrive.
-  const failSourceLoad = (pending: {request_id: string; posted: boolean; previousSource: string | null} | null) => {if (pending) handBackLiveSource(pending.previousSource, pending.posted ? cancelMiningRequest(pending.request_id) : Promise.resolve());};
-  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMining(true); setError(null); return {ticket, controller};};
-  useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
+  const failSourceLoad = (pending: {request_id: string; posted: boolean; previousSource: string | null} | null) => {if (pending) handBackLiveSource(pending.previousSource, pending.posted ? sendCancel(pending.request_id) : Promise.resolve(undefined));};
+  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMining(true); setError(null); return {ticket, controller, cancelsSettled: cancelBarrier.current};};
+  useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) void cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
+  // A run on the imported model is stale once another model has been imported, even though its source is unchanged.
+  const importedModelGuard = (miner: string | undefined) => {const generation = importedModelGeneration.current; return () => {if (miner === "imported" && generation !== importedModelGeneration.current) throw new Error("The imported model changed while this request was pending; run it again.");};};
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
@@ -254,7 +261,8 @@ export default function App() {
       if (cached) return cached;
       const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
-      const result = await alignModel(minerId, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+      const sameModel = importedModelGuard(minerId);
+      const result = await alignModel(minerId, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel();
       alignCache.current = { ...alignCache.current, [cacheKey]: result };
       return result;
     },
@@ -268,7 +276,7 @@ export default function App() {
     if (cached) return cached;
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
-    const result = await decideModel(minerId, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const sameModel = importedModelGuard(minerId); const result = await decideModel(minerId, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel();
     decideCache.current = { ...decideCache.current, [cacheKey]: result };
     return result;
   }, []);
@@ -297,7 +305,7 @@ export default function App() {
     if (cached) return cached;
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
-    const result = await evaluateModel(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const sameModel = importedModelGuard(miner); const result = await evaluateModel(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel();
     evaluationCache.current = { ...evaluationCache.current, [key]: result };
     return result;
   }, []);
@@ -307,7 +315,7 @@ export default function App() {
     if (cached) return cached;
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
-    const result = await analyzePetriModel(options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
+    const sameModel = importedModelGuard(options.miner); const result = await analyzePetriModel(options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel();
     petriAnalysisCache.current = { ...petriAnalysisCache.current, [key]: result };
     return result;
   }, []);
@@ -346,21 +354,21 @@ export default function App() {
     if (decomposedCache.current[key]) return decomposedCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
-    const result = await alignDecomposed(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); decomposedCache.current = { ...decomposedCache.current, [key]: result }; return result;
+    const sameModel = importedModelGuard(miner); const result = await alignDecomposed(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel(); decomposedCache.current = { ...decomposedCache.current, [key]: result }; return result;
   }, []);
   const requestPetriAnti = useCallback(async (miner: string, options: PetriAntiAlignmentOptions = {}) => {
     const key = `${resultCacheScope()}|${miner}|${petriAntiAlignmentQuery(options)}`;
     if (petriAntiCache.current[key]) return petriAntiCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
-    const result = await alignPetriAnti(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); petriAntiCache.current = { ...petriAntiCache.current, [key]: result }; return result;
+    const sameModel = importedModelGuard(miner); const result = await alignPetriAnti(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel(); petriAntiCache.current = { ...petriAntiCache.current, [key]: result }; return result;
   }, []);
   const requestPetriMulti = useCallback(async (miner: string, options: PetriMultiAlignmentOptions = {}) => {
     const key = `${resultCacheScope()}|${miner}|${petriMultiAlignmentQuery(options)}`;
     if (petriMultiCache.current[key]) return petriMultiCache.current[key];
     const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
-    const result = await alignPetriMulti(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); petriMultiCache.current = { ...petriMultiCache.current, [key]: result }; return result;
+    const sameModel = importedModelGuard(miner); const result = await alignPetriMulti(miner, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel(); petriMultiCache.current = { ...petriMultiCache.current, [key]: result }; return result;
   }, []);
   const requestReduction = useCallback(async (traceIndex: number, options: ProcessTreeReductionOptions = {}) => {
     const key = `${resultCacheScope()}|${traceIndex}|${processTreeReductionQuery(options)}`;
@@ -443,7 +451,7 @@ export default function App() {
   const loadFile = (file: File, xesActivityAttribute?: string, xesOptions?: CsvOptions, miningOptions?: MineOptions) => {
     setTool(null);
     setPendingSourceFile(file);
-    const {ticket, controller} = beginSourceLoad();
+    const {ticket, controller, cancelsSettled} = beginSourceLoad();
     const accepts = () => sourceRequest.current?.controller === controller && sourceGate.current.accepts(ticket, controller.signal);
     (async () => {
       // Minera JSON exports open directly; object-centric JSON is discovered
@@ -481,6 +489,7 @@ export default function App() {
       }
         options.miningRequestId = ticket.request_id;
         const sha256 = await miningSourceHash(file);
+        await cancelsSettled;
         if (!accepts()) return;
         sourceRequest.current!.posted = true;
         const result = await mineActiveDataset(file, options, controller.signal);
@@ -532,11 +541,16 @@ export default function App() {
     if (!source) return;
     // Only the import settings carry over; filters and miner settings come
     // entirely from this request, so Reset ({}) really clears them.
-    const original = source, {ticket, controller} = beginSourceLoad(), options: MineOptions = {...sourceImportOptions(original.options), ...filters, miningRequestId: ticket.request_id};
-    sourceRequest.current!.posted = true;
-    mineActiveDataset(original.file, options, controller.signal)
+    const original = source, {ticket, controller, cancelsSettled} = beginSourceLoad(), options: MineOptions = {...sourceImportOptions(original.options), ...filters, miningRequestId: ticket.request_id};
+    const accepts = () => sourceGate.current.accepts(ticket, controller.signal) && sourceRequest.current?.controller === controller;
+    cancelsSettled
+      .then(() => {
+        if (!accepts()) return null;
+        sourceRequest.current!.posted = true;
+        return mineActiveDataset(original.file, options, controller.signal);
+      })
       .then((result) => {
-        if (!sourceGate.current.accepts(ticket, controller.signal) || sourceRequest.current?.controller !== controller) return;
+        if (result === null || !accepts()) return;
         setExactInspection(exactFilterRun(result) ?? null); setOwnedExactInspection(false); if(exactFilterRun(result))setPreviousExactSuccess(exactFilterRun(result)!);
         const descriptor = miningSourceDescriptor(original.file, original.sha256, options, result), analysis = activeDatasetAnalysis(result);
         liveSource.current = descriptor.source_id; setLiveSourceId(descriptor.source_id);

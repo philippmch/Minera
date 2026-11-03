@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LiveSourceHandback, caseRowEntries, identityKey, optionalNumber, runSurvivesModelImport } from "../src/app-logic";
-import { assertMiningSourceBinding } from "../src/active-mining-source";
+import { IMPORTED_MODEL_CHANGED, LiveSourceHandback, caseRowEntries, identityKey, importedRunStale, optionalNumber, runSurvivesModelImport } from "../src/app-logic";
+import { assertMiningSourceBinding, cancelMiningRequest, miningResultsLabel } from "../src/active-mining-source";
 import { fetchDfg, fetchXes, mineActiveDataset, petriAntiAlignmentQuery, petriMultiAlignmentQuery } from "../src/api";
 import { nativeResponseFailure, readNativeResponse } from "../src/native-response";
 import { structuralReplayKey, type StructuralRun } from "../src/structural-workspace";
@@ -21,10 +21,38 @@ describe("failed or cancelled loads hand the previous live source back", () => {
     expect(restored).toEqual(["18446744073709551615"]);
   });
 
-  it("restores even when the rollback request itself failed", async () => {
+  it("does not restore when the rollback request failed: the backend may still hold the newer session", async () => {
     const restored: string[] = [];
-    await expect(new LiveSourceHandback().handback("7", Promise.reject(new Error("offline")), id => restored.push(id))).resolves.toBe(true);
-    expect(restored).toEqual(["7"]);
+    await expect(new LiveSourceHandback().handback("7", Promise.reject(new Error("offline")), id => restored.push(id))).resolves.toBe(false);
+    await expect(new LiveSourceHandback().handback("7", Promise.resolve({confirmed: false}), id => restored.push(id))).resolves.toBe(false);
+    expect(restored).toEqual([]);
+  });
+
+  it("restores only the source the backend reports holding after the cancel", async () => {
+    const restored: string[] = [];
+    await expect(new LiveSourceHandback().handback("7", Promise.resolve({confirmed: true, activeSourceId: "7"}), id => restored.push(id))).resolves.toBe(true);
+    // A newer load began before this cancel and dropped its rollback: the backend holds another source.
+    await expect(new LiveSourceHandback().handback("7", Promise.resolve({confirmed: true, activeSourceId: "8"}), id => restored.push(id))).resolves.toBe(false);
+    await expect(new LiveSourceHandback().handback("7", Promise.resolve({confirmed: true, activeSourceId: null}), id => restored.push(id))).resolves.toBe(false);
+    // An older backend that does not report its source: a confirmed cancel restores.
+    await expect(new LiveSourceHandback().handback("9", Promise.resolve({confirmed: true}), id => restored.push(id))).resolves.toBe(true);
+    expect(restored).toEqual(["7", "9"]);
+  });
+
+  it("reads the cancel-mine response: confirmed only on an ok cancel, with the held source", async () => {
+    const respond = (body: string, status = 200) => vi.stubGlobal("fetch", vi.fn(async () => new Response(body, {status})));
+    respond('{"family":"ACTIVE_SOURCE_CANCEL","request_id":"x","canceled":true,"active_source_id":"18446744073709551615"}');
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true, activeSourceId: "18446744073709551615"});
+    respond('{"family":"ACTIVE_SOURCE_CANCEL","request_id":"x","canceled":true,"active_source_id":null}');
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true, activeSourceId: null});
+    respond('{"family":"ACTIVE_SOURCE_CANCEL","request_id":"x","canceled":true}');
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true});
+    respond('{"error":"cancel-mine requires a request UUID"}', 400);
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: false});
+    respond("not json");
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: false});
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("offline"); }));
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: false});
   });
 
   it("never restores after a newer load or going home superseded it", async () => {
@@ -75,6 +103,22 @@ describe("workspace runs across model imports", () => {
     expect(runSurvivesModelImport("inductive")).toBe(true);
     expect(runSurvivesModelImport("alpha")).toBe(true);
     expect(runSurvivesModelImport("imported")).toBe(false);
+  });
+
+  it("marks only an in-flight run on the imported net stale once another model was imported", () => {
+    expect(importedRunStale("imported", 1, 2)).toBe(true);
+    expect(importedRunStale("imported", 2, 2)).toBe(false);
+    expect(importedRunStale("inductive", 1, 2)).toBe(false);
+    expect(importedRunStale(null, 1, 2)).toBe(false);
+    expect(IMPORTED_MODEL_CHANGED).toMatch(/imported model changed/);
+  });
+});
+
+describe("summary source downloads", () => {
+  it("labels mining results whose active source is only the summary", () => {
+    expect(miningResultsLabel({active_source: {detail: "summary"}})).toMatch(/source summary only/);
+    expect(miningResultsLabel({active_source: {detail: "complete"}})).toBe("Download complete native mining results");
+    expect(miningResultsLabel({})).toBe("Download complete native mining results");
   });
 });
 

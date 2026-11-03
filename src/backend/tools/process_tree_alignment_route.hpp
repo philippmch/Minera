@@ -186,7 +186,7 @@ void handle_process_tree_alignment_workbench(const httplib::Request& request,
         catch (const std::exception& error) {bpmn_error = error.what();}
       }
       if (net) {
-        try {pnml = minera::to_pnml(*net, "Independent process-tree alignment model");}
+        try {pnml = minera::to_pnml(minera::process_tree_pnml_document(tree, conversion), "Independent process-tree alignment model");}
         catch (const std::exception& error) {pnml_error = error.what();}
       }
     }

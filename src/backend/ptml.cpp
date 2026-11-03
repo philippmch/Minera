@@ -409,6 +409,52 @@ ProcessTree parse_ptml(std::string_view xml) {
                              "'");
   }
 
+  // Observed reference reading of a three-child xorLoop (body, redo, exit),
+  // visited in document order: a silent exit is dropped and the loop stays
+  // in place. Otherwise the loop keeps its body and redo and is replaced by
+  // sequence(loop, exit), appended at the end of its current parent's
+  // children; a root loop simply loses its exit.
+  std::unordered_map<std::string, std::string> parent_of;
+  for (const auto& [id, node] : nodes)
+    for (const auto& child : node.children) parent_of[child] = id;
+  std::size_t synthetic = 0;
+  const auto document_order = order;
+  for (const auto& id : document_order) {
+    auto& loop = nodes.at(id);
+    if (loop.kind != "xorLoop" || loop.children.size() != 3) continue;
+    const auto exit = loop.children.back();
+    const auto exit_node = nodes.find(exit);
+    if (exit_node == nodes.end()) continue;  // reported by the builder
+    const bool silent_exit =
+        exit_node->second.children.empty() &&
+        (exit_node->second.kind == "automaticTask" ||
+         (exit_node->second.kind == "manualTask" && exit_node->second.name.empty()));
+    loop.children.pop_back();
+    const auto parent = parent_of.find(id);
+    if (silent_exit || parent == parent_of.end()) {
+      parent_of.erase(exit);  // a dropped exit is detached from the tree
+      continue;
+    }
+    std::string sequence_id;
+    do {
+      sequence_id = "\x01loop-exit-sequence-" + std::to_string(synthetic++);
+    } while (nodes.contains(sequence_id));
+    auto& siblings = nodes.at(parent->second).children;
+    const auto position = std::find(siblings.begin(), siblings.end(), id);
+    if (position == siblings.end()) continue;  // inside a detached exit
+    siblings.erase(position);
+    siblings.push_back(sequence_id);
+    ParsedPtmlNode sequence;
+    sequence.kind = "sequence";
+    sequence.children = {id, exit};
+    sequence.has_parent = true;
+    const auto grandparent = parent->second;
+    nodes.emplace(sequence_id, std::move(sequence));
+    parent_of[sequence_id] = grandparent;
+    parent_of[id] = sequence_id;
+    parent_of[exit] = sequence_id;
+  }
+
   return PtmlBuilder(nodes).tree(root_id);
 }
 

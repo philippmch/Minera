@@ -67,8 +67,20 @@ export function activeMiningSourceText(input: ArrayBuffer | Uint8Array): string 
 export interface MiningRequestTicket {generation: number; request_id: string;}
 export class MiningSourceRequestGate {private generation = 0; issue(): MiningRequestTicket {return {generation: ++this.generation, request_id: crypto.randomUUID()};} invalidate(): void {++this.generation;} accepts(ticket: MiningRequestTicket, signal?: AbortSignal): boolean {return ticket.generation === this.generation && !signal?.aborted;}}
 export function assertMiningSourceBinding(expected: string | null, current: string | null, generation: number, currentGeneration: number): void {if (!expected) throw new Error("No live backend log is loaded for this analysis. Open the original CSV or XES log (or wait for the current load to finish) to compute this."); if (expected !== current || generation !== currentGeneration) throw new Error("The active source changed while this request was pending.");}
-/** Settles once the backend has handled the cancel (and restored its previous session), or the request failed. */
-export function cancelMiningRequest(requestId: string): Promise<void> {return fetch(`/api/cancel-mine?request_id=${encodeURIComponent(requestId)}`, {method: "POST"}).then(() => undefined, () => undefined);}
+/** What a cancel-mine settled with: `confirmed` once the backend handled the cancel (and restored its previous session), with the source id it then holds (null for none) when it reported one. A cancel that failed on the network or was refused is not confirmed: the backend may still hold the newer session. */
+export interface MiningCancelOutcome {confirmed: boolean; activeSourceId?: string | null;}
+/** Never rejects. */
+export function cancelMiningRequest(requestId: string): Promise<MiningCancelOutcome> {
+  return fetch(`/api/cancel-mine?request_id=${encodeURIComponent(requestId)}`, {method: "POST"}).then(async response => {
+    if (!response.ok) return {confirmed: false};
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!object(value) || value.family !== "ACTIVE_SOURCE_CANCEL" || value.canceled !== true) return {confirmed: false};
+    const held = value.active_source_id;
+    return {confirmed: true, ...(held === null || typeof held === "string" ? {activeSourceId: held} : {})};
+  }, () => ({confirmed: false}));
+}
+/** The download label for a mining response: one whose active source is only the summary (a large original) does not carry the complete source views. */
+export function miningResultsLabel(capture: unknown): string {const source = object(capture) ? capture.active_source : undefined; return object(source) && source.detail === "summary" ? "Download native mining results (source summary only)" : "Download complete native mining results";}
 export function miningSourceDescriptor(file: File, sha256: string, options: MineOptions, data: ActiveDatasetResult): ActiveMiningSourceDescriptor {
   const snapshot = data.active_source ?? null, source_id = data.source_id; if (!source_id) throw new Error("The mined analysis did not identify its active native source.");
   if (snapshot && (!isActiveMiningSourceSnapshot(snapshot) || snapshot.source_id !== source_id || !(exactFilterMatchesWireFilename(data,"log",snapshot.original_dataset) ?? snapshot.original_dataset === file.name) || BigInt(String(nativeCell(snapshot, "original_input_bytes"))) !== BigInt(file.size))) throw new Error("The active native source does not match the uploaded file and analysis.");

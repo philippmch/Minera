@@ -1,6 +1,7 @@
 #include <atomic>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 #include "minera/live_stream.hpp"
@@ -10,9 +11,11 @@ namespace {
 
 int usage(const char* program) {
   std::cerr << "Usage: " << program
-            << " INPUT.csv|INPUT.xes[.gz] [--trace] [--thread-pool N]\n";
+            << " INPUT.csv|INPUT.xes[.gz] [--trace] [--thread-pool N (1-256, default 6)]\n";
   return 2;
 }
+
+constexpr std::size_t kMaxThreadPool = 256;
 
 std::size_t parse_size(std::string_view text) {
   if (text.empty()) throw std::invalid_argument("empty thread pool size");
@@ -24,7 +27,14 @@ std::size_t parse_size(std::string_view text) {
     if (value > (static_cast<std::size_t>(-1) - digit) / 10)
       throw std::invalid_argument("thread pool size is too large");
     value = value * 10 + digit;
+    // pm4py hands the size to a ThreadPoolExecutor without a cap; one OS
+    // thread per worker here, so the command line bounds it.
+    if (value > kMaxThreadPool)
+      throw std::invalid_argument("thread pool size must be at most " +
+                                  std::to_string(kMaxThreadPool));
   }
+  if (value == 0)
+    throw std::invalid_argument("thread pool size must be positive");
   return value;
 }
 

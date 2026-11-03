@@ -199,6 +199,7 @@
 #include "minera/petri_analysis_json.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
+#include "minera/process_tree_petri.hpp"
 #include "minera/powl_conversion.hpp"
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
@@ -725,8 +726,39 @@ void reject_unknown_stochastic_map_params(const httplib::Request& request) {
   }
 }
 
+// Records which multipart fields a handler consulted, so a handler that
+// reads its fields lazily can still reject the ones it never looked at
+// (misspelled or inapplicable controls) instead of silently ignoring them.
+struct FormFieldAudit {
+  std::set<std::string> consulted;
+};
+thread_local FormFieldAudit* g_form_field_audit = nullptr;
+void audit_form_field(std::string_view name) {
+  if (g_form_field_audit) g_form_field_audit->consulted.emplace(name);
+}
+class FormFieldAuditScope {
+ public:
+  FormFieldAuditScope() : previous_(g_form_field_audit) { g_form_field_audit = &audit_; }
+  ~FormFieldAuditScope() { g_form_field_audit = previous_; }
+  FormFieldAuditScope(const FormFieldAuditScope&) = delete;
+  FormFieldAuditScope& operator=(const FormFieldAuditScope&) = delete;
+  // The first supplied multipart field that was never consulted, if any.
+  std::optional<std::string> unconsulted(const httplib::Request& request) const {
+    for (const auto& [name, field] : request.files) {
+      (void)field;
+      if (!audit_.consulted.contains(name)) return name;
+    }
+    return std::nullopt;
+  }
+
+ private:
+  FormFieldAudit audit_;
+  FormFieldAudit* previous_;
+};
+
 std::string form_field(const httplib::Request& request,
                        const std::string& name) {
+  audit_form_field(name);
   return request.has_file(name) ? request.get_file_value(name).content
                                 : std::string{};
 }
@@ -953,6 +985,20 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
 #include "active_source_mining.hpp"
 
 void handle_mine(const httplib::Request& request, httplib::Response& response) {
+  // A multipart mine reads its controls from form fields only, so a query
+  // string next to the upload would be silently ignored; reject it. (The
+  // exact-control route moves its query controls into fields itself.)
+  const bool audit_fields = request.is_multipart_form_data() &&
+                            !minera::exact_filter_discovery_recording();
+  if (audit_fields && !request.params.empty()) {
+    response.status = 400;
+    response.set_content(
+        error_json("query-string parameter " + request.params.begin()->first +
+                   " is not accepted with a multipart /api/mine upload; send it as a form field"),
+        "application/json");
+    return;
+  }
+  FormFieldAuditScope field_audit;
   try {
     const auto ticket = begin_active_mining(request);
     std::string csv;
@@ -966,6 +1012,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                              "application/json");
         return;
       }
+      audit_form_field("log");
       const auto& file = request.get_file_value("log");
       csv = file.content;
       if (!file.filename.empty()) dataset = file.filename;
@@ -975,6 +1022,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
             return form_field(request, std::string(name));
           },
           [&](std::string_view name) {
+            audit_form_field(name);
             return request.has_file(std::string(name));
           });
     } else {
@@ -999,6 +1047,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto literal_source_selectors = active_source_supplied(request, "mining_selectors_json")
         ? minera::parse_workflow_selector_strings_json(active_source_field(request, "mining_selectors_json"))
         : std::map<std::string, std::string>{};
+    // Every control has been read by now; a field nothing consulted is
+    // unknown (or inapplicable) and would otherwise be dropped silently.
+    if (audit_fields) {
+      if (const auto unknown = field_audit.unconsulted(request))
+        throw std::invalid_argument("unknown or inapplicable /api/mine form field: " + *unknown);
+    }
     if (active_source->file().format == "table" ||
         active_source->selected_kind() != minera::EventDataKind::kEventLog || !literal_source_selectors.empty() || minera::exact_filter_discovery_recording()) {
       ticket->native_source_dispatch = true;
@@ -1287,14 +1341,25 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
   }
 }
 
+// Model-export and alignment routes default to the inductive model, as
+// /api/bpmn and the CLI do; an explicit empty or unknown miner is still
+// rejected by the caller's lookup.
+std::string requested_miner(const httplib::Request& request) {
+  return request.has_param("miner") ? request.get_param_value("miner")
+                                    : std::string("inductive");
+}
+
 double ocel_query_number(const httplib::Request& request,
                          std::string_view name, double fallback) {
   const auto key = std::string(name);
   if (!request.has_param(key)) return fallback;
   const auto value = request.get_param_value(key);
   char* end = nullptr;
+  // strtod accepts an empty or space-led text as 0 / the trailing number;
+  // a supplied control must be the complete number.
   const auto parsed = std::strtod(value.c_str(), &end);
-  if (end != value.c_str() + value.size() || !std::isfinite(parsed)) {
+  if (value.empty() || std::isspace(static_cast<unsigned char>(value.front())) ||
+      end != value.c_str() + value.size() || !std::isfinite(parsed)) {
     throw std::invalid_argument(key + ": expected a finite number");
   }
   return parsed;
@@ -1307,7 +1372,8 @@ double ocel_conformance_query_number(const httplib::Request& request,
   const auto value = request.get_param_value(key);
   char* end = nullptr;
   const auto parsed = std::strtod(value.c_str(), &end);
-  if (end == value.c_str() || end != value.c_str() + value.size())
+  if (end == value.c_str() || end != value.c_str() + value.size() ||
+      std::isspace(static_cast<unsigned char>(value.front())))
     throw std::invalid_argument(key + ": expected a number");
   return parsed;
 }
@@ -1316,17 +1382,15 @@ std::size_t ocel_query_size(const httplib::Request& request,
                             std::string_view name, std::size_t fallback) {
   if (!request.has_param(std::string(name))) return fallback;
   const auto value = request.get_param_value(std::string(name));
-  if (value.empty() || value.front() == '-')
-    throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
-  errno = 0;
-  char* end = nullptr;
-  const auto parsed = std::strtoull(value.c_str(), &end, 10);
-  if (end != value.c_str() + value.size() ||
-      errno == ERANGE ||
-      parsed > std::numeric_limits<std::size_t>::max()) {
+  // The complete text must be decimal digits: no sign, space or suffix.
+  std::size_t parsed = 0;
+  const auto result =
+      std::from_chars(value.data(), value.data() + value.size(), parsed);
+  if (value.empty() || result.ec != std::errc{} ||
+      result.ptr != value.data() + value.size()) {
     throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
   }
-  return static_cast<std::size_t>(parsed);
+  return parsed;
 }
 
 std::vector<std::uint32_t> parse_playout_marking(
@@ -1520,7 +1584,8 @@ std::vector<double> process_cube_query_bins(const httplib::Request& request,
   for (const auto& value : values) {
     char* end = nullptr;
     const double parsed = std::strtod(value.c_str(), &end);
-    if (end != value.c_str() + value.size() || !std::isfinite(parsed))
+    if (value.empty() || std::isspace(static_cast<unsigned char>(value.front())) ||
+        end != value.c_str() + value.size() || !std::isfinite(parsed))
       throw std::invalid_argument(std::string(name) + ": expected finite numeric edges");
     result.push_back(parsed);
   }
@@ -1634,7 +1699,8 @@ std::vector<minera::OcelValue> parse_ocel_filter_values(
     } else if (type == "d") {
       char* end = nullptr;
       const auto parsed = std::strtod(value.c_str(), &end);
-      if (end != value.c_str() + value.size() || !std::isfinite(parsed))
+      if (value.empty() || std::isspace(static_cast<unsigned char>(value.front())) ||
+          end != value.c_str() + value.size() || !std::isfinite(parsed))
         throw std::invalid_argument("attribute_values has an invalid number");
       result.emplace_back(parsed);
     } else if (type == "b") {
@@ -6263,7 +6329,7 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     return;
   }
 
-  const std::string miner = request.get_param_value("miner");
+  const std::string miner = requested_miner(request);
   try {
     std::optional<minera::PetriNet> converted;
     const auto& selected = select_cached_or_process_tree_net(
@@ -6792,7 +6858,8 @@ void handle_log_util(const httplib::Request& request,
         const auto text = value("train_percentage");
         char* end = nullptr;
         const double parsed = std::strtod(text.c_str(), &end);
-        if (end != text.c_str() + text.size() || !std::isfinite(parsed) ||
+        if (text.empty() || std::isspace(static_cast<unsigned char>(text.front())) ||
+            end != text.c_str() + text.size() || !std::isfinite(parsed) ||
             parsed < 0.0 || parsed > 1.0)
           throw std::invalid_argument(
               "train_percentage expects a finite number in [0,1]");
@@ -7233,11 +7300,14 @@ void handle_case_relations(const httplib::Request& request,
       options.relation_right_column = right_column;
       auto base_data = minera::import_csv_event_data(base_input);
       auto incoming_data = minera::import_csv_event_data(incoming_input);
-      // Keys joining a CSV case-id column carry its typed text.
-      if (minera::tools::csv_case_id_key(base_data.table, options.case_id_key))
-        minera::type_case_relation_column_like_csv_log(relation_table, left_column);
-      if (minera::tools::csv_case_id_key(incoming_data.table, options.case_id_key))
-        minera::type_case_relation_column_like_csv_log(relation_table, right_column);
+      // Keys joining a CSV case-id column follow its typed column.
+      minera::type_csv_case_relation_keys(
+          relation_table, left_column, right_column,
+          minera::tools::csv_case_id_key(base_data.table, options.case_id_key)
+              ? &base_data.table : nullptr,
+          minera::tools::csv_case_id_key(incoming_data.table, options.case_id_key)
+              ? &incoming_data.table : nullptr,
+          options.case_id_key);
       normalize_csv_timestamp_missingness(base_data.table);
       normalize_csv_timestamp_missingness(incoming_data.table);
       if (!request.has_param("merge_timestamp_key")) {
@@ -7274,12 +7344,15 @@ void handle_case_relations(const httplib::Request& request,
       options.relation_left_column = left_column;
       options.relation_right_column = right_column;
       auto relation_table = minera::parse_case_relations_table_csv(relation_input);
-      // Keys joining a CSV case-id column carry its typed text; XES keys
+      // Keys joining a CSV case-id column follow its typed column; XES keys
       // stay literal.
-      if (!base_is_xes && minera::tools::csv_case_id_key(base_table, options.case_id_key))
-        minera::type_case_relation_column_like_csv_log(relation_table, left_column);
-      if (!incoming_is_xes && minera::tools::csv_case_id_key(incoming_table, options.case_id_key))
-        minera::type_case_relation_column_like_csv_log(relation_table, right_column);
+      minera::type_csv_case_relation_keys(
+          relation_table, left_column, right_column,
+          !base_is_xes && minera::tools::csv_case_id_key(base_table, options.case_id_key)
+              ? &base_table : nullptr,
+          !incoming_is_xes && minera::tools::csv_case_id_key(incoming_table, options.case_id_key)
+              ? &incoming_table : nullptr,
+          options.case_id_key);
       publish_merge(minera::merge_case_relations(
           base_table, incoming_table, relation_table, options));
     }
@@ -7346,10 +7419,11 @@ void handle_timestamp_interleavings(const httplib::Request& request,
         value("interleavings_right_column", "case_id_RIGHT");
     auto relations = minera::parse_case_relations_csv(
         relation_input, left_column, right_column);
-    // Keys joining a CSV log carry its typed case-id text.
+    // Keys joining a CSV log follow its typed case-id column.
     minera::type_case_relations_like_csv_logs(
-        relations, !looks_like_xes(left_file.filename, left_file.content),
-        !looks_like_xes(right_file.filename, right_file.content));
+        relations,
+        looks_like_xes(left_file.filename, left_file.content) ? nullptr : &left,
+        looks_like_xes(right_file.filename, right_file.content) ? nullptr : &right);
     const auto lookup = [&](std::string_view key) {
       return request.has_param(std::string(key))
                  ? request.get_param_value(std::string(key))
@@ -8111,7 +8185,7 @@ void handle_align_process_tree(const httplib::Request& request,
 void handle_align_decomposed(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
-  const auto miner = request.get_param_value("miner"); const auto it=session->nets.find(miner);
+  const auto miner = requested_miner(request); const auto it=session->nets.find(miner);
   if (it==session->nets.end()) { response.status=400; response.set_content(error_json("unknown miner: "+miner),"application/json"); return; }
   try {
     static const std::set<std::string> allowed = {
@@ -8135,14 +8209,14 @@ void handle_align_decomposed(const httplib::Request& request, httplib::Response&
 void handle_align_petri_anti(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
-  const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
+  const auto miner=requested_miner(request); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
   try { static const std::set<std::string> allowed = {"miner", "variant", "exponent", "epsilon", "marking_limit", "max_states", "initial_marking", "final_marking", "activity_attribute"}; for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown Petri anti-alignment parameter: " + key); } const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_petri_anti_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::anti_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_anti_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_align_petri_multi(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
-  const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
+  const auto miner=requested_miner(request); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
   try { static const std::set<std::string> allowed = {"miner", "variant", "exponent", "marking_limit", "max_states", "initial_marking", "final_marking", "activity_attribute"}; for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown Petri multi-alignment parameter: " + key); } const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_petri_multi_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::multi_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_multi_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
@@ -8395,15 +8469,26 @@ void handle_pnml(const httplib::Request& request, httplib::Response& response) {
     return;
   }
 
-  const std::string miner = request.get_param_value("miner");
+  const std::string miner = requested_miner(request);
   try {
     std::optional<minera::PetriNet> converted;
     const auto& selected = select_cached_or_process_tree_net(
         request, *session, miner, converted);
-    response.set_content(miner == "imported" && session->imported_document
-                             ? minera::to_pnml(*session->imported_document)
-                             : minera::to_pnml(selected, miner + " net"),
-                         "application/xml");
+    // The standard inductive net exports the reference node names.
+    const bool standard_tree_net =
+        miner == "inductive" && session->tree_ready &&
+        (!request.has_param("process_tree_variant") ||
+         minera::parse_process_tree_petri_net_variant(
+             request.get_param_value("process_tree_variant")) ==
+             minera::ProcessTreePetriNetVariant::kStandard);
+    response.set_content(
+        miner == "imported" && session->imported_document
+            ? minera::to_pnml(*session->imported_document)
+        : standard_tree_net
+            ? minera::to_pnml(minera::process_tree_pnml_document(session->tree),
+                              miner + " net")
+            : minera::to_pnml(selected, miner + " net"),
+        "application/xml");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -9372,6 +9457,10 @@ void handle_playout(const httplib::Request& request,
     return;
   }
   minera::PlayoutOptions options;
+  // pm4py's basic Petri playout generates 1000 traces by default
+  // (play_out(net, im, fm) returns 1000 cases); the native struct keeps its
+  // historical 100 for the hashed workbench captures.
+  options.traces = 1000;
   if (request.has_param("traces")) {
     const auto parsed = parse_bounded("traces", 1, 10000);
     if (!parsed) return;
@@ -9443,7 +9532,9 @@ void handle_playout(const httplib::Request& request,
       reject(error.what());
       return;
     }
-    extensive.max_traces = options.traces;
+    // pm4py's extensive playout has no trace cap; keep the native distinct
+    // trace budget unless the caller asks for fewer.
+    if (request.has_param("traces")) extensive.max_traces = options.traces;
     extensive.initial_marking = options.initial_marking;
     extensive.final_marking = options.final_marking;
   }
@@ -9779,7 +9870,7 @@ void handle_model_exchange(const httplib::Request& request,
       tree = minera::parse_ptml(body);
       primary = tree_data = minera::process_tree_json(*tree);
       canonical = minera::to_ptml(*tree);
-      pnml = minera::to_pnml(minera::to_petri_net(*tree, tree_variant));
+      pnml = minera::to_pnml(minera::process_tree_pnml_document(*tree, tree_variant));
     } else if (format == "bpmn") {
       const auto net = minera::parse_bpmn(body);
       pnml = minera::to_pnml(net);
@@ -10527,6 +10618,115 @@ void handle_process_cube(const httplib::Request& request,
   }
 }
 
+// ---- /api route registry -------------------------------------------------
+// Every /api route is registered through api_get/api_post so the server
+// knows which methods a path serves (for 405 responses) and so a repeated
+// scalar control is rejected instead of silently keeping its first value.
+std::map<std::string, std::set<std::string>> g_api_route_methods;
+
+// Routes whose own contract owns repeated controls: the exact/original
+// workbenches and reference adapters record every submitted part and report
+// duplicates inside their structured envelopes, and the live/reader/source
+// session routes validate repeats themselves.
+bool api_route_owns_repeated_controls(const std::string& path,
+                                      const httplib::Request& request) {
+  if (path.find("workbench") != std::string::npos) return true;
+  for (const std::string_view prefix :
+       {"/api/original-", "/api/reference-", "/api/structural-inputs",
+        "/api/source-acquisition/", "/api/live-stream/", "/api/stream-reader/",
+        "/api/discover-inductive-input", "/api/ocel/conformance",
+        "/api/knowledge-injection", "/api/log-query", "/api/llm-context",
+        "/api/log-cluster"})
+    if (std::string_view(path).starts_with(prefix)) return true;
+  // The exact-control adapter of these routes reports duplicates itself.
+  if ((path == "/api/mine" || path == "/api/discover-workflow" ||
+       path == "/api/discover-workflow-input") &&
+      exact_filter_discovery_route::requested(request))
+    return true;
+  return false;
+}
+
+// The first control supplied more than once, counting query parameters and
+// multipart fields together (a key in both places is also a repeat).
+std::optional<std::string> repeated_request_control(const httplib::Request& request) {
+  std::map<std::string, std::size_t> counts;
+  for (const auto& [key, value] : request.params) {
+    (void)value;
+    if (++counts[key] > 1) return key;
+  }
+  for (const auto& [key, value] : request.files) {
+    (void)value;
+    if (++counts[key] > 1) return key;
+  }
+  return std::nullopt;
+}
+
+httplib::Server::Handler api_route_handler(std::string path,
+                                           httplib::Server::Handler handler) {
+  return [path = std::move(path), handler = std::move(handler)](
+             const httplib::Request& request, httplib::Response& response) {
+    if (!api_route_owns_repeated_controls(path, request)) {
+      if (const auto repeated = repeated_request_control(request)) {
+        response.status = 400;
+        response.set_content(
+            error_json("parameter " + *repeated +
+                       " is supplied more than once; send each control once"),
+            "application/json");
+        return;
+      }
+    }
+    handler(request, response);
+  };
+}
+
+void api_get(httplib::Server& server, const std::string& path,
+             httplib::Server::Handler handler) {
+  g_api_route_methods[path].insert("GET");
+  server.Get(path, api_route_handler(path, std::move(handler)));
+}
+
+void api_post(httplib::Server& server, const std::string& path,
+              httplib::Server::Handler handler) {
+  g_api_route_methods[path].insert("POST");
+  server.Post(path, api_route_handler(path, std::move(handler)));
+}
+
+// Streaming-body routes read their own upload; they are workbench routes
+// whose envelopes own repeated controls, so only the method is recorded.
+void api_post(httplib::Server& server, const std::string& path,
+              httplib::Server::HandlerWithContentReader handler) {
+  g_api_route_methods[path].insert("POST");
+  server.Post(path, std::move(handler));
+}
+
+// Gives /api error statuses without a body (unknown routes, wrong methods,
+// oversized payloads) the same JSON error shape as the handlers' errors.
+httplib::Server::HandlerResponse api_error_body(const httplib::Request& request,
+                                                httplib::Response& response) {
+  if (!request.path.starts_with("/api/") || !response.body.empty())
+    return httplib::Server::HandlerResponse::Unhandled;
+  std::string message;
+  const auto route = g_api_route_methods.find(request.path);
+  if (response.status == 404 && route != g_api_route_methods.end() &&
+      !route->second.contains(request.method == "HEAD" ? "GET" : request.method)) {
+    std::string allow;
+    for (const auto& method : route->second) allow += (allow.empty() ? "" : ", ") + method;
+    response.status = 405;
+    response.set_header("Allow", allow);
+    message = "method " + request.method + " is not allowed for " + request.path +
+              "; use " + allow;
+  } else if (response.status == 404 && route == g_api_route_methods.end()) {
+    message = "unknown API route: " + request.path;
+  } else if (response.status == 413) {
+    message = "request payload exceeds the server limit";
+  } else {
+    message = std::string(httplib::status_message(response.status));
+    if (message.empty()) message = "HTTP " + std::to_string(response.status);
+  }
+  response.set_content(error_json(message), "application/json");
+  return httplib::Server::HandlerResponse::Handled;
+}
+
 int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " [options]\n"
@@ -10558,8 +10758,15 @@ int main(int argc, char** argv) {
     if (arg == "--port") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      port = std::atoi(value);
-      if (port <= 0 || port > 65535) return usage(argv[0]);
+      // The whole value must be the port number; "8484abc" is not 8484.
+      const std::string_view text = value;
+      const auto parsed = std::from_chars(text.data(), text.data() + text.size(), port);
+      if (text.empty() || parsed.ec != std::errc{} ||
+          parsed.ptr != text.data() + text.size() || port <= 0 || port > 65535) {
+        std::cerr << "error: --port expects an integer from 1 through 65535, got '"
+                  << text << "'\n";
+        return usage(argv[0]);
+      }
     } else if (arg == "--frontend") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -10618,6 +10825,9 @@ int main(int argc, char** argv) {
     if (request.path.starts_with("/api/") &&
         response.get_header_value("Content-Type").starts_with("application/json"))
       response.body = active_source_safe_json(response.body);
+  });
+  server.set_error_handler([](const httplib::Request& request, httplib::Response& response) {
+    return api_error_body(request, response);
   });
 
   // The app is local-first. Browsers attach Origin to cross-origin and
@@ -10794,242 +11004,242 @@ int main(int argc, char** argv) {
   for(const auto* route:{"acquire","snapshot","original","capture","table","export","list","release"})server.Options(std::string("/api/source-acquisition/")+route,source_preflight);
   server.Options("/api/knowledge-injection", preflight);
 
-  server.Post("/api/mine", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"mine",handle_mine);});
-  server.Post("/api/cancel-mine", handle_cancel_mine);
-  server.Get("/api/active-source", handle_active_source);
-  server.Get("/api/active-source-file", handle_active_source_file);
-  server.Post("/api/ocel/discover", handle_ocel_discovery);
-  server.Post("/api/ocel/split", handle_ocel_split);
-  server.Post("/api/ocel/enrich", handle_ocel_enrichment);
-  server.Post("/api/ocel/graph", handle_ocel_graph);
-  server.Post("/api/ocel/event-object-graph", handle_ocel_event_object_graph);
-  server.Post("/api/ocel/flatten", handle_ocel_flatten);
-  server.Post("/api/ocel/playout", handle_ocel_playout);
-  server.Post("/api/ocel/features", handle_ocel_features);
-  server.Post("/api/ocel/statistics", handle_ocel_statistics);
-  server.Post("/api/ocel/description", handle_ocel_description);
-  server.Post("/api/ocel/filter", handle_ocel_filter);
-  server.Post("/api/ocel/sqlite", handle_ocel_sqlite);
-  server.Post("/api/ocel/io", handle_ocel_exchange);
-  server.Post("/api/ocel/conformance", [](const httplib::Request& request, httplib::Response& response) {
+  api_post(server, "/api/mine", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"mine",handle_mine);});
+  api_post(server, "/api/cancel-mine", handle_cancel_mine);
+  api_get(server, "/api/active-source", handle_active_source);
+  api_get(server, "/api/active-source-file", handle_active_source_file);
+  api_post(server, "/api/ocel/discover", handle_ocel_discovery);
+  api_post(server, "/api/ocel/split", handle_ocel_split);
+  api_post(server, "/api/ocel/enrich", handle_ocel_enrichment);
+  api_post(server, "/api/ocel/graph", handle_ocel_graph);
+  api_post(server, "/api/ocel/event-object-graph", handle_ocel_event_object_graph);
+  api_post(server, "/api/ocel/flatten", handle_ocel_flatten);
+  api_post(server, "/api/ocel/playout", handle_ocel_playout);
+  api_post(server, "/api/ocel/features", handle_ocel_features);
+  api_post(server, "/api/ocel/statistics", handle_ocel_statistics);
+  api_post(server, "/api/ocel/description", handle_ocel_description);
+  api_post(server, "/api/ocel/filter", handle_ocel_filter);
+  api_post(server, "/api/ocel/sqlite", handle_ocel_sqlite);
+  api_post(server, "/api/ocel/io", handle_ocel_exchange);
+  api_post(server, "/api/ocel/conformance", [](const httplib::Request& request, httplib::Response& response) {
     if(request.has_param("otg_theta_by_relation_json")||request.has_file("otg_theta_by_relation_json"))handle_exact_otg_conformance(request,response);
     else handle_ocel_conformance(request,response);
   });
-  server.Post("/api/ilp-mine", handle_ilp_mine);
-  server.Post("/api/mine-ilp", handle_ilp_mine);
-  server.Post("/api/genetic-mine", handle_genetic_mine);
-  server.Post("/api/mine-genetic", handle_genetic_mine);
-  server.Post("/api/genetic-matrix-convert", handle_genetic_matrix_conversion);
-  server.Post("/api/log-convert", handle_log_conversion);
-  server.Post("/api/organizational-sna", handle_organizational_sna);
-  server.Post("/api/sna", handle_organizational_sna);
-  server.Post("/api/network-analysis", handle_network_analysis);
-  server.Post("/api/link-analysis", handle_link_analysis);
-  server.Post("/api/roles", handle_roles);
-  server.Post("/api/resource-profiles", handle_resource_profiles);
-  server.Post("/api/knowledge-injection", [](const httplib::Request& request,httplib::Response& response){
+  api_post(server, "/api/ilp-mine", handle_ilp_mine);
+  api_post(server, "/api/mine-ilp", handle_ilp_mine);
+  api_post(server, "/api/genetic-mine", handle_genetic_mine);
+  api_post(server, "/api/mine-genetic", handle_genetic_mine);
+  api_post(server, "/api/genetic-matrix-convert", handle_genetic_matrix_conversion);
+  api_post(server, "/api/log-convert", handle_log_conversion);
+  api_post(server, "/api/organizational-sna", handle_organizational_sna);
+  api_post(server, "/api/sna", handle_organizational_sna);
+  api_post(server, "/api/network-analysis", handle_network_analysis);
+  api_post(server, "/api/link-analysis", handle_link_analysis);
+  api_post(server, "/api/roles", handle_roles);
+  api_post(server, "/api/resource-profiles", handle_resource_profiles);
+  api_post(server, "/api/knowledge-injection", [](const httplib::Request& request,httplib::Response& response){
     for(const auto& [name,value]:request.params){(void)value;if(minera::knowledge_exact_control(name)){handle_knowledge_exact(request,response);return;}}
     for(const auto& [name,value]:request.files){(void)value;if(minera::knowledge_exact_control(name)){handle_knowledge_exact(request,response);return;}}
     handle_knowledge_injection(request,response);
   });
-  server.Get("/api/llm/status", handle_llm_status);
-  server.Post("/api/llm/complete", handle_llm_complete);
-  server.Get("/api/log-query/schema",handle_log_query_schema);
-  server.Post("/api/log-query",handle_log_query);
-  server.Post("/api/log-query/export",handle_log_query_export);
-  server.Post("/api/log-cluster",handle_log_cluster);
-  server.Post("/api/llm-context",[](const httplib::Request& request,httplib::Response& response){
+  api_get(server, "/api/llm/status", handle_llm_status);
+  api_post(server, "/api/llm/complete", handle_llm_complete);
+  api_get(server, "/api/log-query/schema",handle_log_query_schema);
+  api_post(server, "/api/log-query",handle_log_query);
+  api_post(server, "/api/log-query/export",handle_log_query_export);
+  api_post(server, "/api/log-cluster",handle_log_cluster);
+  api_post(server, "/api/llm-context",[](const httplib::Request& request,httplib::Response& response){
     if(request_uses_supplied_case_context(request))handle_supplied_case_context(request,response);
     else if(request_uses_original_model_context(request))handle_original_model_context(request,response);
     else handle_llm_context(request,response);
   });
-  server.Post("/api/local-diagnostics", handle_local_diagnostics);
-  server.Post("/api/clustering", handle_clustering);
-  server.Post("/api/profile-clustering", handle_profile_clustering);
-  server.Post("/api/clustering/export", handle_clustering_export);
-  server.Post("/api/chaotic-activities", handle_chaotic_activities);
-  server.Post("/api/passed-time", handle_passed_time);
-  server.Post("/api/service-time", handle_service_time);
-  server.Post("/api/rework", handle_rework);
-  server.Post("/api/cycle-time", handle_cycle_time);
-  server.Post("/api/case-arrival", handle_case_arrival);
-  server.Post("/api/case-statistics", handle_case_statistics);
-  server.Post("/api/attribute-statistics", handle_attribute_statistics);
-  server.Post("/api/attribute-distribution", handle_attribute_distribution);
-  server.Post("/api/attribute-kde", handle_attribute_kde);
-  server.Post("/api/boundary-activities", handle_boundary_activities);
-  server.Post("/api/variant-statistics", handle_variant_statistics);
-  server.Post("/api/trace-variant-query", handle_trace_variant_query);
-  server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
-  server.Post("/api/pripel", handle_pripel);
-  server.Post("/api/anonymize-pripel", handle_pripel);
-  server.Post("/api/concept-drift", handle_concept_drift);
-  server.Post("/api/browser-history", handle_browser_history);
-  server.Post("/api/windows-events", handle_windows_events);
-  server.Post("/api/repository-history", handle_repository_history);
-  server.Post("/api/workflow-history", handle_workflow_history);
-  server.Post("/api/enterprise-history", handle_enterprise_history);
-  server.Post("/api/communication-history", handle_communication_history);
-  server.Post("/api/transform-target", handle_log_to_target);
-  server.Post("/api/log-to-features", handle_log_to_features);
-  server.Post("/api/features", handle_log_to_features);
-  server.Post("/api/transform-features", handle_log_to_features);
-  server.Post("/api/log-util", handle_log_util);
-  server.Post("/api/embeddings", handle_embeddings);
-  server.Post("/api/to-embeddings", handle_embeddings);
-  server.Post("/api/label-splitting", handle_label_splitting);
-  server.Post("/api/transform-label-splitting", handle_label_splitting);
-  server.Get("/api/trie", handle_trie);
-  server.Get("/api/trie-to-petri", handle_trie_to_petri);
-  server.Get("/api/interval-tree", handle_interval_tree);
-  server.Post("/api/merge-case-relations", handle_case_relations);
-  server.Post("/api/format-dataframe", handle_format_dataframe);
-  server.Post("/api/timestamp-interleavings", handle_timestamp_interleavings);
-  server.Get("/api/random-tree", handle_random_tree);
-  server.Post("/api/generate-trees", handle_tree_generation);
-  server.Post("/api/compare-petri", handle_compare_petri);
-  server.Post("/api/align", handle_align);
-  server.Post("/api/evaluate", handle_evaluate);
-  server.Post("/api/petri-analysis", handle_petri_analysis);
-  server.Post("/api/evaluate-emd", handle_evaluate_emd);
-  server.Post("/api/align-process-tree", handle_align_process_tree);
-  server.Post("/api/align-decomposed", handle_align_decomposed);
-  server.Post("/api/align-petri-anti", handle_align_petri_anti);
-  server.Post("/api/align-petri-multi", handle_align_petri_multi);
-  server.Post("/api/reduce-process-tree", handle_reduce_process_tree);
-  server.Post("/api/reduce-petri-net", handle_reduce_petri_net);
-  server.Post("/api/align-dfg", handle_align_dfg);
-  server.Post("/api/discover-alpha-plus", handle_alpha_plus_result);
-  server.Post("/api/discover-workflow", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"discover_workflow",handle_workflow_discovery);});
-  server.Post("/api/discover-workflow-input", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"discover_workflow_input",handle_workflow_input_discovery);});
-  server.Post("/api/discover-inductive-input", handle_inductive_input_discovery);
-  server.Post("/api/align-process-tree-workbench", handle_process_tree_alignment_workbench);
-  server.Post("/api/align-petri-anti-multi-workbench", handle_petri_anti_multi_workbench);
-  server.Post("/api/model-conversion-workbench", [](const httplib::Request& request, httplib::Response& response) {
+  api_post(server, "/api/local-diagnostics", handle_local_diagnostics);
+  api_post(server, "/api/clustering", handle_clustering);
+  api_post(server, "/api/profile-clustering", handle_profile_clustering);
+  api_post(server, "/api/clustering/export", handle_clustering_export);
+  api_post(server, "/api/chaotic-activities", handle_chaotic_activities);
+  api_post(server, "/api/passed-time", handle_passed_time);
+  api_post(server, "/api/service-time", handle_service_time);
+  api_post(server, "/api/rework", handle_rework);
+  api_post(server, "/api/cycle-time", handle_cycle_time);
+  api_post(server, "/api/case-arrival", handle_case_arrival);
+  api_post(server, "/api/case-statistics", handle_case_statistics);
+  api_post(server, "/api/attribute-statistics", handle_attribute_statistics);
+  api_post(server, "/api/attribute-distribution", handle_attribute_distribution);
+  api_post(server, "/api/attribute-kde", handle_attribute_kde);
+  api_post(server, "/api/boundary-activities", handle_boundary_activities);
+  api_post(server, "/api/variant-statistics", handle_variant_statistics);
+  api_post(server, "/api/trace-variant-query", handle_trace_variant_query);
+  api_post(server, "/api/anonymize-trace-variants", handle_trace_variant_query);
+  api_post(server, "/api/pripel", handle_pripel);
+  api_post(server, "/api/anonymize-pripel", handle_pripel);
+  api_post(server, "/api/concept-drift", handle_concept_drift);
+  api_post(server, "/api/browser-history", handle_browser_history);
+  api_post(server, "/api/windows-events", handle_windows_events);
+  api_post(server, "/api/repository-history", handle_repository_history);
+  api_post(server, "/api/workflow-history", handle_workflow_history);
+  api_post(server, "/api/enterprise-history", handle_enterprise_history);
+  api_post(server, "/api/communication-history", handle_communication_history);
+  api_post(server, "/api/transform-target", handle_log_to_target);
+  api_post(server, "/api/log-to-features", handle_log_to_features);
+  api_post(server, "/api/features", handle_log_to_features);
+  api_post(server, "/api/transform-features", handle_log_to_features);
+  api_post(server, "/api/log-util", handle_log_util);
+  api_post(server, "/api/embeddings", handle_embeddings);
+  api_post(server, "/api/to-embeddings", handle_embeddings);
+  api_post(server, "/api/label-splitting", handle_label_splitting);
+  api_post(server, "/api/transform-label-splitting", handle_label_splitting);
+  api_get(server, "/api/trie", handle_trie);
+  api_get(server, "/api/trie-to-petri", handle_trie_to_petri);
+  api_get(server, "/api/interval-tree", handle_interval_tree);
+  api_post(server, "/api/merge-case-relations", handle_case_relations);
+  api_post(server, "/api/format-dataframe", handle_format_dataframe);
+  api_post(server, "/api/timestamp-interleavings", handle_timestamp_interleavings);
+  api_get(server, "/api/random-tree", handle_random_tree);
+  api_post(server, "/api/generate-trees", handle_tree_generation);
+  api_post(server, "/api/compare-petri", handle_compare_petri);
+  api_post(server, "/api/align", handle_align);
+  api_post(server, "/api/evaluate", handle_evaluate);
+  api_post(server, "/api/petri-analysis", handle_petri_analysis);
+  api_post(server, "/api/evaluate-emd", handle_evaluate_emd);
+  api_post(server, "/api/align-process-tree", handle_align_process_tree);
+  api_post(server, "/api/align-decomposed", handle_align_decomposed);
+  api_post(server, "/api/align-petri-anti", handle_align_petri_anti);
+  api_post(server, "/api/align-petri-multi", handle_align_petri_multi);
+  api_post(server, "/api/reduce-process-tree", handle_reduce_process_tree);
+  api_post(server, "/api/reduce-petri-net", handle_reduce_petri_net);
+  api_post(server, "/api/align-dfg", handle_align_dfg);
+  api_post(server, "/api/discover-alpha-plus", handle_alpha_plus_result);
+  api_post(server, "/api/discover-workflow", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"discover_workflow",handle_workflow_discovery);});
+  api_post(server, "/api/discover-workflow-input", [](const httplib::Request& request,httplib::Response& response){exact_filter_discovery_route::integrated(request,response,"discover_workflow_input",handle_workflow_input_discovery);});
+  api_post(server, "/api/discover-inductive-input", handle_inductive_input_discovery);
+  api_post(server, "/api/align-process-tree-workbench", handle_process_tree_alignment_workbench);
+  api_post(server, "/api/align-petri-anti-multi-workbench", handle_petri_anti_multi_workbench);
+  api_post(server, "/api/model-conversion-workbench", [](const httplib::Request& request, httplib::Response& response) {
     if (request_uses_tree_reduction(request)) handle_tree_reduction_workbench(request, response);
     else handle_model_conversion_workbench(request, response);
   });
-  server.Post("/api/monte-carlo-workbench", handle_monte_carlo_workbench);
-  server.Post("/api/playout-workbench", handle_playout_workbench);
-  server.Post("/api/decision-workbench", handle_original_decision_workbench);
-  server.Post("/api/declare-workbench", handle_original_declare_workbench);
-  server.Post("/api/log-skeleton-workbench", handle_original_log_skeleton_workbench);
-  server.Post("/api/footprints-workbench", handle_original_footprints_workbench);
-  server.Post("/api/genetic-matrix-workbench", handle_original_genetic_matrix_workbench);
-  server.Post("/api/embedding-workbench", exact_filter_discovery_route::embedding);
-  server.Post("/api/original-log-to-features", handle_original_features_workbench);
-  server.Post("/api/original-label-splitting-workbench", handle_original_label_splitting_workbench);
-  server.Post("/api/original-log-query-workbench", handle_original_log_query_workbench);
-  server.Post("/api/reference-log-filter", handle_reference_log_filter);
-  server.Post("/api/reference-table-repetition", handle_table_attribute_repetition);
-  server.Post("/api/reference-table-between", handle_table_between_filter);
-  server.Post("/api/reference-table-cases", handle_table_case_filter);
-  server.Post("/api/reference-table-paths", handle_table_paths_filter);
-  server.Post("/api/reference-table-timestamp", handle_table_timestamp_filter);
-  server.Post("/api/reference-table-variants", handle_table_variants_filter);
-  server.Post("/api/reference-table-attributes", handle_table_attributes_filter);
-  server.Post("/api/reference-log-attributes", handle_log_attributes_filter);
-  server.Post("/api/reference-log-variants", handle_log_variants_filter);
-  server.Post("/api/reference-log-timestamp", handle_log_timestamp_filter);
-  server.Post("/api/reference-ltl-filter", handle_reference_ltl_filter);
+  api_post(server, "/api/monte-carlo-workbench", handle_monte_carlo_workbench);
+  api_post(server, "/api/playout-workbench", handle_playout_workbench);
+  api_post(server, "/api/decision-workbench", handle_original_decision_workbench);
+  api_post(server, "/api/declare-workbench", handle_original_declare_workbench);
+  api_post(server, "/api/log-skeleton-workbench", handle_original_log_skeleton_workbench);
+  api_post(server, "/api/footprints-workbench", handle_original_footprints_workbench);
+  api_post(server, "/api/genetic-matrix-workbench", handle_original_genetic_matrix_workbench);
+  api_post(server, "/api/embedding-workbench", exact_filter_discovery_route::embedding);
+  api_post(server, "/api/original-log-to-features", handle_original_features_workbench);
+  api_post(server, "/api/original-label-splitting-workbench", handle_original_label_splitting_workbench);
+  api_post(server, "/api/original-log-query-workbench", handle_original_log_query_workbench);
+  api_post(server, "/api/reference-log-filter", handle_reference_log_filter);
+  api_post(server, "/api/reference-table-repetition", handle_table_attribute_repetition);
+  api_post(server, "/api/reference-table-between", handle_table_between_filter);
+  api_post(server, "/api/reference-table-cases", handle_table_case_filter);
+  api_post(server, "/api/reference-table-paths", handle_table_paths_filter);
+  api_post(server, "/api/reference-table-timestamp", handle_table_timestamp_filter);
+  api_post(server, "/api/reference-table-variants", handle_table_variants_filter);
+  api_post(server, "/api/reference-table-attributes", handle_table_attributes_filter);
+  api_post(server, "/api/reference-log-attributes", handle_log_attributes_filter);
+  api_post(server, "/api/reference-log-variants", handle_log_variants_filter);
+  api_post(server, "/api/reference-log-timestamp", handle_log_timestamp_filter);
+  api_post(server, "/api/reference-ltl-filter", handle_reference_ltl_filter);
   server.Options("/api/emd-workbench", preflight);
-  server.Post("/api/emd-workbench", handle_original_emd_workbench);
+  api_post(server, "/api/emd-workbench", handle_original_emd_workbench);
   server.Options("/api/object-centric-playout-workbench", preflight);
-  server.Post("/api/object-centric-playout-workbench", handle_original_object_centric_playout_workbench);
-  server.Post("/api/discover-constraints", handle_constraint_discovery);
-  server.Post("/api/discover-graph", handle_graph_discovery);
-  server.Post("/api/discover-timing", handle_timing_discovery);
-  server.Post("/api/analyze-behavior", handle_behavior_analysis);
-  server.Post("/api/discover-dfg", handle_dfg_discovery);
-  server.Post("/api/evaluate-replay-results", handle_precomputed_replay_fitness);
+  api_post(server, "/api/object-centric-playout-workbench", handle_original_object_centric_playout_workbench);
+  api_post(server, "/api/discover-constraints", handle_constraint_discovery);
+  api_post(server, "/api/discover-graph", handle_graph_discovery);
+  api_post(server, "/api/discover-timing", handle_timing_discovery);
+  api_post(server, "/api/analyze-behavior", handle_behavior_analysis);
+  api_post(server, "/api/discover-dfg", handle_dfg_discovery);
+  api_post(server, "/api/evaluate-replay-results", handle_precomputed_replay_fitness);
   server.Options("/api/edit-distance-workbench", preflight);
-  server.Post("/api/edit-distance-workbench", handle_original_edit_distance_workbench);
-  server.Post("/api/bose-workbench", handle_original_bose_workbench);
+  api_post(server, "/api/edit-distance-workbench", handle_original_edit_distance_workbench);
+  api_post(server, "/api/bose-workbench", handle_original_bose_workbench);
   server.Options("/api/discovery-workbench", preflight);
-  server.Post("/api/discovery-workbench", handle_original_discovery_workbench);
+  api_post(server, "/api/discovery-workbench", handle_original_discovery_workbench);
   server.Options("/api/petri-analysis-workbench", preflight);
-  server.Post("/api/petri-analysis-workbench", handle_original_petri_analysis_workbench);
+  api_post(server, "/api/petri-analysis-workbench", handle_original_petri_analysis_workbench);
   server.Options("/api/root-cause-workbench", preflight);
-  server.Post("/api/root-cause-workbench", handle_original_root_cause_workbench);
+  api_post(server, "/api/root-cause-workbench", handle_original_root_cause_workbench);
   server.Options("/api/anonymization-workbench", preflight);
-  server.Post("/api/anonymization-workbench", handle_original_anonymization_workbench);
+  api_post(server, "/api/anonymization-workbench", handle_original_anonymization_workbench);
   server.Options("/api/quality-workbench", preflight);
-  server.Post("/api/quality-workbench", handle_original_quality_workbench);
+  api_post(server, "/api/quality-workbench", handle_original_quality_workbench);
   server.Options("/api/clustering-workbench", preflight);
-  server.Post("/api/clustering-workbench", handle_original_clustering_workbench);
+  api_post(server, "/api/clustering-workbench", handle_original_clustering_workbench);
   server.Options("/api/organizational-workbench", preflight);
-  server.Post("/api/organizational-workbench", handle_original_organizational_workbench);
+  api_post(server, "/api/organizational-workbench", handle_original_organizational_workbench);
   server.Options("/api/temporal-workbench", preflight);
-  server.Post("/api/temporal-workbench", handle_original_temporal_workbench);
-  server.Post("/api/timing-workbench", handle_original_timing_workbench);
-  server.Post("/api/time-analysis-workbench", handle_original_time_analysis_workbench);
-  server.Post("/api/structural-inputs", handle_original_structural_inputs);
-  server.Post("/api/align-edit-distance", handle_align_edit_distance);
-  server.Post("/api/decide", handle_decide);
-  server.Post("/api/decision-tables", handle_decision_tables);
-  server.Post("/api/data-petri-net", handle_data_petri_net);
-  server.Post("/api/check-model", handle_check_model);
-  server.Post("/api/token-replay", handle_token_replay);
-  server.Post("/api/replay-token-workbench", handle_token_replay_workbench);
-  server.Post("/api/analyze-replay-duration-workbench", handle_replay_duration_workbench);
-  server.Post("/api/align-petri-workbench", handle_petri_alignment_workbench);
-  server.Post("/api/align-graph-workbench", [](const httplib::Request& request,httplib::Response& response) {
+  api_post(server, "/api/temporal-workbench", handle_original_temporal_workbench);
+  api_post(server, "/api/timing-workbench", handle_original_timing_workbench);
+  api_post(server, "/api/time-analysis-workbench", handle_original_time_analysis_workbench);
+  api_post(server, "/api/structural-inputs", handle_original_structural_inputs);
+  api_post(server, "/api/align-edit-distance", handle_align_edit_distance);
+  api_post(server, "/api/decide", handle_decide);
+  api_post(server, "/api/decision-tables", handle_decision_tables);
+  api_post(server, "/api/data-petri-net", handle_data_petri_net);
+  api_post(server, "/api/check-model", handle_check_model);
+  api_post(server, "/api/token-replay", handle_token_replay);
+  api_post(server, "/api/replay-token-workbench", handle_token_replay_workbench);
+  api_post(server, "/api/analyze-replay-duration-workbench", handle_replay_duration_workbench);
+  api_post(server, "/api/align-petri-workbench", handle_petri_alignment_workbench);
+  api_post(server, "/api/align-graph-workbench", [](const httplib::Request& request,httplib::Response& response) {
     const auto operation=request.has_file("operation")?form_field(request,"operation"):request.has_param("operation")?request.get_param_value("operation"):std::string{};
     if(operation=="project_saved_dfg")handle_saved_dfg_projection_workbench(request,response);
     else handle_graph_alignment_workbench(request,response);
   });
-  server.Post("/api/replay-fitness", handle_replay_fitness);
-  server.Get("/api/pnml", handle_pnml);
-  server.Get("/api/process-tree-petri", handle_process_tree_petri);
-  server.Get("/api/bpmn", handle_bpmn);
-  server.Get("/api/ptml", handle_ptml);
-  server.Get("/api/xes", handle_xes);
-  server.Get("/api/dfg", handle_dfg);
-  server.Get("/api/dfg-dataframe", handle_dfg_dataframe);
-  server.Post("/api/dfg-dataframe", handle_dfg_dataframe);
-  server.Post("/api/dfg", handle_dfg_import);
-  server.Post("/api/model-exchange", handle_model_exchange);
-  server.Post("/api/dfg-precision", handle_dfg_precision);
-  server.Post("/api/dfg-to-petri", handle_dfg_conversion);
-  server.Post("/api/process-cube", handle_process_cube);
-  server.Post("/api/streaming-dfg", handle_streaming_dfg);
-  server.Post("/api/streaming-footprints", handle_streaming_footprints);
-  server.Post("/api/streaming-temporal", handle_streaming_temporal);
-  server.Post("/api/temporal-conformance", handle_temporal_conformance);
-  server.Post("/api/streaming-tbr", handle_streaming_tbr);
-  server.Post("/api/streaming-declare", handle_streaming_declare);
-  server.Post("/api/live-stream/create",handle_live_create);
-  server.Post("/api/stream-reader/create",handle_reader_create);
-  server.Post("/api/source-acquisition/acquire",handle_acquire_source);
-  server.Get("/api/source-acquisition/snapshot",handle_acquired_snapshot);
-  server.Get("/api/source-acquisition/original",handle_acquired_original);
-  server.Get("/api/source-acquisition/capture",handle_acquired_capture);
-  server.Get("/api/source-acquisition/table",handle_acquired_database_table);
-  server.Get("/api/source-acquisition/export",handle_acquired_export);
-  server.Post("/api/source-acquisition/export",handle_acquired_export);
-  server.Get("/api/source-acquisition/list",handle_acquired_list);
-  server.Post("/api/source-acquisition/release",handle_acquired_release);
-  server.Get("/api/stream-reader/snapshot",handle_reader_snapshot);
-  server.Post("/api/stream-reader/read",handle_reader_read);
-  server.Post("/api/stream-reader/action",handle_reader_action);
-  server.Get("/api/stream-reader/list",handle_reader_list);
-  server.Get("/api/stream-reader/source",handle_reader_source);
-  server.Get("/api/stream-reader/export",handle_reader_export);
-  server.Post("/api/stream-reader/release",handle_reader_release);
-  server.Get("/api/live-stream/snapshot",handle_live_snapshot);
-  server.Post("/api/live-stream/append",handle_live_append);
-  server.Post("/api/live-stream/action",handle_live_action);
-  server.Get("/api/live-stream/list",handle_live_list);
-  server.Get("/api/live-stream/source",handle_live_source);
-  server.Post("/api/live-stream/release",handle_live_release);
-  server.Get("/api/playout", handle_playout);
-  server.Post("/api/playout", handle_playout);
-  server.Get("/api/stochastic-petri", handle_stochastic_petri);
-  server.Get("/api/stochastic-map", handle_stochastic_map);
-  server.Get("/api/monte-carlo", handle_monte_carlo_json);
-  server.Post("/api/monte-carlo", handle_monte_carlo_json);
+  api_post(server, "/api/replay-fitness", handle_replay_fitness);
+  api_get(server, "/api/pnml", handle_pnml);
+  api_get(server, "/api/process-tree-petri", handle_process_tree_petri);
+  api_get(server, "/api/bpmn", handle_bpmn);
+  api_get(server, "/api/ptml", handle_ptml);
+  api_get(server, "/api/xes", handle_xes);
+  api_get(server, "/api/dfg", handle_dfg);
+  api_get(server, "/api/dfg-dataframe", handle_dfg_dataframe);
+  api_post(server, "/api/dfg-dataframe", handle_dfg_dataframe);
+  api_post(server, "/api/dfg", handle_dfg_import);
+  api_post(server, "/api/model-exchange", handle_model_exchange);
+  api_post(server, "/api/dfg-precision", handle_dfg_precision);
+  api_post(server, "/api/dfg-to-petri", handle_dfg_conversion);
+  api_post(server, "/api/process-cube", handle_process_cube);
+  api_post(server, "/api/streaming-dfg", handle_streaming_dfg);
+  api_post(server, "/api/streaming-footprints", handle_streaming_footprints);
+  api_post(server, "/api/streaming-temporal", handle_streaming_temporal);
+  api_post(server, "/api/temporal-conformance", handle_temporal_conformance);
+  api_post(server, "/api/streaming-tbr", handle_streaming_tbr);
+  api_post(server, "/api/streaming-declare", handle_streaming_declare);
+  api_post(server, "/api/live-stream/create",handle_live_create);
+  api_post(server, "/api/stream-reader/create",handle_reader_create);
+  api_post(server, "/api/source-acquisition/acquire",handle_acquire_source);
+  api_get(server, "/api/source-acquisition/snapshot",handle_acquired_snapshot);
+  api_get(server, "/api/source-acquisition/original",handle_acquired_original);
+  api_get(server, "/api/source-acquisition/capture",handle_acquired_capture);
+  api_get(server, "/api/source-acquisition/table",handle_acquired_database_table);
+  api_get(server, "/api/source-acquisition/export",handle_acquired_export);
+  api_post(server, "/api/source-acquisition/export",handle_acquired_export);
+  api_get(server, "/api/source-acquisition/list",handle_acquired_list);
+  api_post(server, "/api/source-acquisition/release",handle_acquired_release);
+  api_get(server, "/api/stream-reader/snapshot",handle_reader_snapshot);
+  api_post(server, "/api/stream-reader/read",handle_reader_read);
+  api_post(server, "/api/stream-reader/action",handle_reader_action);
+  api_get(server, "/api/stream-reader/list",handle_reader_list);
+  api_get(server, "/api/stream-reader/source",handle_reader_source);
+  api_get(server, "/api/stream-reader/export",handle_reader_export);
+  api_post(server, "/api/stream-reader/release",handle_reader_release);
+  api_get(server, "/api/live-stream/snapshot",handle_live_snapshot);
+  api_post(server, "/api/live-stream/append",handle_live_append);
+  api_post(server, "/api/live-stream/action",handle_live_action);
+  api_get(server, "/api/live-stream/list",handle_live_list);
+  api_get(server, "/api/live-stream/source",handle_live_source);
+  api_post(server, "/api/live-stream/release",handle_live_release);
+  api_get(server, "/api/playout", handle_playout);
+  api_post(server, "/api/playout", handle_playout);
+  api_get(server, "/api/stochastic-petri", handle_stochastic_petri);
+  api_get(server, "/api/stochastic-map", handle_stochastic_map);
+  api_get(server, "/api/monte-carlo", handle_monte_carlo_json);
+  api_post(server, "/api/monte-carlo", handle_monte_carlo_json);
 
-  server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
+  api_get(server, "/api/version", [](const httplib::Request&, httplib::Response& response) {
     std::ostringstream out;
     out << "{\"generator\": \"minera " << minera::version_major << '.'
         << minera::version_minor << '.' << minera::version_patch << "\"}";

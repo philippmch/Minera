@@ -5,7 +5,7 @@ import { requestLogQuerySchema, downloadQueryBlob, type LogQuerySchema } from ".
 import { ocelPreparedCsv } from "../ocel-preparation";
 import { nativeJson } from "../native-json";
 import { cellText } from "../transformation-workspace";
-import { runSurvivesModelImport } from "../app-logic";
+import { IMPORTED_MODEL_CHANGED, importedRunStale, runSurvivesModelImport } from "../app-logic";
 import { computePetriLayout } from "../petri-layout";
 import { PetriNet } from "./PetriNet";
 
@@ -28,12 +28,19 @@ export function SimulationWorkspace({ models, live, dataset, onOpenLog, onOpenUn
   };
   useEffect(() => { void refresh(); return () => { request.current?.abort(); source.current?.abort(); }; }, [live]);
   // "Check simulation workflow" imports this run's model; only a run on the replaced imported net becomes stale.
-  const seenImport = useRef(importedGeneration);
-  useEffect(() => { if (seenImport.current === importedGeneration) return; seenImport.current = importedGeneration; setRun(old => old && !runSurvivesModelImport(old.value.miner) ? null : old); }, [importedGeneration]);
+  // A run on the imported net still in flight is dropped too: it would show the replaced model's result.
+  const seenImport = useRef(importedGeneration), currentImport = useRef(importedGeneration), requestMiner = useRef<string | null>(null);
+  currentImport.current = importedGeneration;
+  useEffect(() => {
+    if (seenImport.current === importedGeneration) return;
+    seenImport.current = importedGeneration;
+    setRun(old => old && !runSurvivesModelImport(old.value.miner) ? null : old);
+    if (request.current && !runSurvivesModelImport(requestMiner.current)) { request.current.abort(); request.current = null; setPending(false); setError(IMPORTED_MODEL_CHANGED); }
+  }, [importedGeneration]);
   const start = async () => {
     if (!schema || !miner || pending) return;
-    const controller = new AbortController(); request.current = controller; setPending(true); setError(null);
-    try { const next = await runSimulationWorkspace(miner, inputs, schema, controller.signal); if (request.current === controller && !controller.signal.aborted) { resultSequence.current += 1; setRun(next); } }
+    const controller = new AbortController(), started = currentImport.current; request.current = controller; requestMiner.current = miner; setPending(true); setError(null);
+    try { const next = await runSimulationWorkspace(miner, inputs, schema, controller.signal); if (request.current === controller && !controller.signal.aborted && importedRunStale(miner, started, currentImport.current)) throw new Error(IMPORTED_MODEL_CHANGED); if (request.current === controller && !controller.signal.aborted) { resultSequence.current += 1; setRun(next); } }
     catch (cause) { if (request.current === controller && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { if (request.current === controller) { request.current = null; setPending(false); } }
   };

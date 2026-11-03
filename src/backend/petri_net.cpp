@@ -1,5 +1,6 @@
 #include "minera/petri_net.hpp"
 #include "minera/petri_net_reduction.hpp"
+#include "minera/process_tree_petri.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -8,6 +9,7 @@
 #include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -20,157 +22,323 @@ struct BorderedFragment {
   std::size_t sink_transition = 0;
 };
 
-// Wires the fragment for `node` between the given entry and exit places,
-// appending the transitions (and any intermediate places) to `net`.
-void build(const ProcessTreeNode& node,
-           std::size_t in,
-           std::size_t out,
-           PetriNet& net);
+// Reference-compatible standard conversion. The construction, the root
+// wrapper taus, the element names and the two-pass simple reduction follow
+// observed reference behaviour (docs/reference-2.7.22-parity.md, "Process-tree
+// Petri conversion"); the shared reduce_petri_net rule family is not used.
+class ReferenceTreeNetBuilder {
+ public:
+  struct Node {
+    std::optional<std::size_t> activity;
+    std::vector<std::size_t> inputs;
+    std::vector<std::size_t> outputs;
+    std::string name;
+    bool alive = true;
+  };
 
-BorderedFragment build_transition_bordered(const ProcessTreeNode& node,
-                                           const ProcessTree& tree,
-                                           PetriNet& net);
+  explicit ReferenceTreeNetBuilder(const ProcessTree& tree) : tree_(tree) {}
 
-void build_inclusive_or(const ProcessTreeNode& node,
-                        std::size_t in,
-                        std::size_t out,
-                        PetriNet& net) {
-  // Split one control token into one selector token per child. Each selector
-  // can skip its child or start it. The first selected child moves the state
-  // token from `not_started` to `started`; later selected children preserve
-  // that token. Requiring `started` at the join excludes the empty subset
-  // without enumerating all 2^n choices.
-  if (node.children.empty()) {
-    throw std::invalid_argument(
-        "process-tree inclusive OR requires at least one child");
-  }
-  const std::size_t not_started = net.add_place();
-  const std::size_t started = net.add_place();
-  std::vector<std::size_t> selectors;
-  std::vector<std::size_t> completions;
-  selectors.reserve(node.children.size());
-  completions.reserve(node.children.size());
-
-  for (const auto& child : node.children) {
-    const std::size_t selector = net.add_place();
-    const std::size_t child_in = net.add_place();
-    const std::size_t child_out = net.add_place();
-    const std::size_t completion = net.add_place();
-    selectors.push_back(selector);
-    completions.push_back(completion);
-
-    build(child, child_in, child_out, net);
-    net.add_transition(std::nullopt, {child_out}, {completion});
-    net.add_transition(std::nullopt, {selector}, {completion});
-    net.add_transition(std::nullopt, {selector, not_started},
-                       {child_in, started});
-    net.add_transition(std::nullopt, {selector, started},
-                       {child_in, started});
-  }
-
-  std::vector<std::size_t> split_outputs = selectors;
-  split_outputs.push_back(not_started);
-  net.add_transition(std::nullopt, {in}, std::move(split_outputs));
-
-  std::vector<std::size_t> join_inputs = completions;
-  join_inputs.push_back(started);
-  net.add_transition(std::nullopt, std::move(join_inputs), {out});
-}
-
-void build(const ProcessTreeNode& node,
-           std::size_t in,
-           std::size_t out,
-           PetriNet& net) {
-  switch (node.op) {
-    case ProcessTreeOperator::kActivity:
-      net.add_transition(node.activity, {in}, {out});
-      return;
-    case ProcessTreeOperator::kTau:
-      net.add_transition(std::nullopt, {in}, {out});
-      return;
-    case ProcessTreeOperator::kSequence: {
-      std::size_t prev = in;
-      for (std::size_t i = 0; i < node.children.size(); ++i) {
-        const std::size_t next =
-            i + 1 < node.children.size() ? net.add_place() : out;
-        build(node.children[i], prev, next, net);
-        prev = next;
-      }
-      return;
-    }
-    case ProcessTreeOperator::kExclusive:
-      // Every branch shares the entry and exit places, so the single entry
-      // token enables exactly one branch's first transition.
-      for (const auto& child : node.children) {
-        build(child, in, out, net);
-      }
-      return;
-    case ProcessTreeOperator::kInclusiveChoice:
-      build_inclusive_or(node, in, out, net);
-      return;
-    case ProcessTreeOperator::kParallel: {
-      // Silent AND-split forks a token into every branch; the AND-join waits
-      // for all branches before producing the exit token.
-      std::vector<std::size_t> branch_in;
-      std::vector<std::size_t> branch_out;
-      branch_in.reserve(node.children.size());
-      branch_out.reserve(node.children.size());
-      for (const auto& child : node.children) {
-        const std::size_t ci = net.add_place();
-        const std::size_t co = net.add_place();
-        build(child, ci, co, net);
-        branch_in.push_back(ci);
-        branch_out.push_back(co);
-      }
-      net.add_transition(std::nullopt, {in}, branch_in);
-      net.add_transition(std::nullopt, branch_out, {out});
-      return;
-    }
-    case ProcessTreeOperator::kInterleaving: {
-      if (node.children.empty()) {
-        net.add_transition(std::nullopt, {in}, {out});
-        return;
-      }
-      if (node.children.size() >= std::numeric_limits<std::size_t>::digits)
-        throw std::invalid_argument("process-tree interleaving has too many children");
-      const std::size_t states = std::size_t{1} << node.children.size();
-      std::vector<std::size_t> state(states);
-      state.front() = in;
-      state.back() = out;
-      for (std::size_t mask = 1; mask + 1 < states; ++mask)
-        state[mask] = net.add_place();
-      for (std::size_t mask = 0; mask < states; ++mask) {
-        for (std::size_t child = 0; child < node.children.size(); ++child) {
-          const auto bit = std::size_t{1} << child;
-          if ((mask & bit) == 0)
-            build(node.children[child], state[mask], state[mask | bit], net);
+  ProcessTreePetriNetConversion run() {
+    const auto source = named_place("source");
+    const auto sink = named_place("sink");
+    const auto& root = tree_.root();
+    bool initial_wrapper = false;
+    bool final_wrapper = false;
+    switch (root.op) {
+      case ProcessTreeOperator::kExclusive:
+      case ProcessTreeOperator::kParallel:
+      case ProcessTreeOperator::kLoop:
+        initial_wrapper = final_wrapper = true;
+        break;
+      case ProcessTreeOperator::kSequence:
+      case ProcessTreeOperator::kInclusiveChoice:
+      case ProcessTreeOperator::kInterleaving:
+        if (!root.children.empty()) {
+          initial_wrapper = loop_on_first_spine(root.children.front()) ||
+                            loop_on_last_spine(root.children.front());
+          final_wrapper = loop_on_last_spine(root.children.back());
         }
-      }
-      return;
+        break;
+      case ProcessTreeOperator::kActivity:
+      case ProcessTreeOperator::kTau:
+        break;
     }
-    case ProcessTreeOperator::kLoop: {
-      // child[0] is the body (executed at least once between in and out);
-      // child[1..] are redo paths that lead from the exit back to the entry.
-      if (node.children.empty()) {
-        net.add_transition(std::nullopt, {in}, {out});
+    std::optional<std::size_t> initial_tau;
+    std::optional<std::size_t> final_tau;
+    if (initial_wrapper) initial_tau = hidden("tau", {source}, {});
+    if (final_wrapper) final_tau = hidden("tau", {}, {sink});
+    std::size_t entry = source;
+    std::size_t exit = sink;
+    if (initial_tau) {
+      entry = place();
+      nodes_[*initial_tau].outputs.push_back(entry);
+    }
+    if (final_tau) {
+      exit = place();
+      nodes_[*final_tau].inputs.push_back(exit);
+    }
+    build(root, entry, exit, 0);
+    reduce();
+    return assemble(source, sink);
+  }
+
+ private:
+  static bool loop_on_first_spine(const ProcessTreeNode& node) {
+    const ProcessTreeNode* current = &node;
+    while (!current->children.empty()) {
+      if (current->op == ProcessTreeOperator::kLoop) return true;
+      current = &current->children.front();
+    }
+    return current->op == ProcessTreeOperator::kLoop;
+  }
+  static bool loop_on_last_spine(const ProcessTreeNode& node) {
+    const ProcessTreeNode* current = &node;
+    while (!current->children.empty()) {
+      if (current->op == ProcessTreeOperator::kLoop) return true;
+      current = &current->children.back();
+    }
+    return current->op == ProcessTreeOperator::kLoop;
+  }
+
+  std::size_t named_place(std::string name) {
+    place_names_.push_back(std::move(name));
+    place_alive_.push_back(true);
+    producers_.emplace_back();
+    consumers_.emplace_back();
+    return place_names_.size() - 1;
+  }
+  std::size_t place() { return named_place("p_" + std::to_string(++place_counter_)); }
+
+  std::size_t add_node(Node node) {
+    nodes_.push_back(std::move(node));
+    return nodes_.size() - 1;
+  }
+  std::size_t hidden(const char* kind, std::vector<std::size_t> inputs,
+                     std::vector<std::size_t> outputs) {
+    return add_node({std::nullopt, std::move(inputs), std::move(outputs),
+                     std::string(kind) + "_" + std::to_string(++hidden_counter_)});
+  }
+  std::size_t visible(std::size_t activity, std::size_t in, std::size_t out) {
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string suffix(12, '0');
+    auto value = visible_counter_++;
+    for (std::size_t i = 12; i-- > 0 && value != 0; value >>= 4) suffix[i] = hex[value & 15U];
+    return add_node({activity, {in}, {out}, "00000000-0000-4000-8000-" + suffix});
+  }
+
+  void build(const ProcessTreeNode& node, std::size_t in, std::size_t out,
+             std::size_t depth) {
+    if (depth > 100000)
+      throw std::invalid_argument("process tree is too deep for Petri conversion");
+    const auto& children = node.children;
+    switch (node.op) {
+      case ProcessTreeOperator::kActivity:
+        visible(node.activity, in, out);
+        return;
+      case ProcessTreeOperator::kTau:
+        hidden("skip", {in}, {out});
+        return;
+      case ProcessTreeOperator::kSequence: {
+        std::size_t current = in;
+        for (std::size_t i = 0; i < children.size(); ++i) {
+          const auto next = i + 1 == children.size() ? out : place();
+          build(children[i], current, next, depth + 1);
+          current = next;
+        }
         return;
       }
-      // Both loop borders are private places behind silent transitions. A
-      // shared exit would let a sibling or a preceding fragment that also
-      // produces `out` start a redo path, so XOR(LOOP(A, B), C) would admit
-      // C, B, A.
-      const std::size_t loop_entry = net.add_place();
-      const std::size_t loop_exit = net.add_place();
-      net.add_transition(std::nullopt, {in}, {loop_entry});
-      build(node.children[0], loop_entry, loop_exit, net);
-      for (std::size_t i = 1; i < node.children.size(); ++i) {
-        build(node.children[i], loop_exit, loop_entry, net);
+      case ProcessTreeOperator::kExclusive:
+        for (const auto& child : children) build(child, in, out, depth + 1);
+        return;
+      case ProcessTreeOperator::kParallel: {
+        const auto split = hidden("tauSplit", {in}, {});
+        const auto join = hidden("tauJoin", {}, {out});
+        for (const auto& child : children) {
+          const auto child_in = place();
+          const auto child_out = place();
+          nodes_[split].outputs.push_back(child_in);
+          nodes_[join].inputs.push_back(child_out);
+          build(child, child_in, child_out, depth + 1);
+        }
+        return;
       }
-      net.add_transition(std::nullopt, {loop_exit}, {out});
-      return;
+      case ProcessTreeOperator::kLoop: {
+        if (children.empty()) {
+          hidden("skip", {in}, {out});
+          return;
+        }
+        // Body start B, body end E and redo end R; every redo child runs
+        // from E to R and one silent "loop" transition returns R to B.
+        const auto body_start = place();
+        hidden("init_loop", {in}, {body_start});
+        const auto back = hidden("loop", {}, {body_start});
+        const auto body_end = place();
+        build(children.front(), body_start, body_end, depth + 1);
+        if (children.size() > 1) {
+          const auto redo_end = place();
+          nodes_[back].inputs.push_back(redo_end);
+          for (std::size_t i = 1; i < children.size(); ++i)
+            build(children[i], body_end, redo_end, depth + 1);
+        } else {
+          nodes_[back].alive = false;  // no redo path: nothing returns to B
+        }
+        hidden("skip", {body_end}, {out});
+        return;
+      }
+      case ProcessTreeOperator::kInclusiveChoice: {
+        if (children.empty())
+          throw std::invalid_argument(
+              "process-tree inclusive OR requires at least one child");
+        const auto split = hidden("tauSplit", {in}, {});
+        const auto join = hidden("tauJoin", {}, {out});
+        const auto started = place();
+        const auto not_started = place();
+        nodes_[split].outputs.push_back(not_started);
+        for (const auto& child : children) {
+          const auto selector = place();
+          const auto child_in = place();
+          const auto child_out = place();
+          nodes_[split].outputs.push_back(selector);
+          nodes_[join].inputs.push_back(child_out);
+          hidden("inclusiveStart", {not_started, selector}, {started, child_in});
+          hidden("inclusiveLater", {started, selector}, {started, child_in});
+          hidden("inclusiveSkip", {started, selector}, {started, child_out});
+          build(child, child_in, child_out, depth + 1);
+        }
+        nodes_[join].inputs.push_back(started);
+        return;
+      }
+      case ProcessTreeOperator::kInterleaving: {
+        const auto split = hidden("tauSplit", {in}, {});
+        const auto join = hidden("tauJoin", {}, {out});
+        const auto mutex = place();
+        nodes_[split].outputs.push_back(mutex);
+        nodes_[join].inputs.push_back(mutex);
+        for (const auto& child : children) {
+          const auto selector = place();
+          const auto done = place();
+          const auto child_in = place();
+          const auto child_out = place();
+          nodes_[split].outputs.push_back(selector);
+          nodes_[join].inputs.push_back(done);
+          hidden("iTrans", {mutex, selector}, {child_in});
+          hidden("fTrans", {child_out}, {mutex, done});
+          build(child, child_in, child_out, depth + 1);
+        }
+        return;
+      }
+    }
+    throw std::invalid_argument("unknown process-tree operator");
+  }
+
+  void index_arcs() {
+    for (auto& list : producers_) list.clear();
+    for (auto& list : consumers_) list.clear();
+    for (std::size_t t = 0; t < nodes_.size(); ++t) {
+      if (!nodes_[t].alive) continue;
+      for (const auto p : nodes_[t].inputs) consumers_[p].push_back(t);
+      for (const auto p : nodes_[t].outputs) producers_[p].push_back(t);
     }
   }
-}
+  static void replace_all(std::vector<std::size_t>& values, std::size_t from,
+                          std::size_t to) {
+    std::replace(values.begin(), values.end(), from, to);
+  }
+  static void erase_one(std::vector<std::size_t>& values, std::size_t value) {
+    const auto found = std::find(values.begin(), values.end(), value);
+    if (found != values.end()) values.erase(found);
+  }
+
+  // Single-entry pass to a fixed point, then single-exit pass to a fixed
+  // point. A silent transition t whose only input place p has exactly one
+  // incoming arc (from u != t) and exactly one outgoing arc (to t) is removed
+  // with p, u taking t's output arcs. Symmetrically, a silent t whose only
+  // output place q has one incoming arc (from t) and one outgoing arc (to
+  // v != t) is removed with q, v taking t's input arcs.
+  void reduce() {
+    index_arcs();
+    for (bool changed = true; changed;) {
+      changed = false;
+      for (std::size_t t = 0; t < nodes_.size(); ++t) {
+        auto& node = nodes_[t];
+        if (!node.alive || node.activity || node.inputs.size() != 1) continue;
+        const auto p = node.inputs.front();
+        if (producers_[p].size() != 1 || consumers_[p].size() != 1) continue;
+        const auto u = producers_[p].front();
+        if (u == t) continue;
+        erase_one(nodes_[u].outputs, p);
+        for (const auto q : node.outputs) {
+          nodes_[u].outputs.push_back(q);
+          replace_all(producers_[q], t, u);
+        }
+        producers_[p].clear();
+        consumers_[p].clear();
+        place_alive_[p] = false;
+        node.alive = false;
+        changed = true;
+      }
+    }
+    for (bool changed = true; changed;) {
+      changed = false;
+      for (std::size_t t = 0; t < nodes_.size(); ++t) {
+        auto& node = nodes_[t];
+        if (!node.alive || node.activity || node.outputs.size() != 1) continue;
+        const auto q = node.outputs.front();
+        if (producers_[q].size() != 1 || consumers_[q].size() != 1) continue;
+        const auto v = consumers_[q].front();
+        if (v == t) continue;
+        erase_one(nodes_[v].inputs, q);
+        for (const auto p : node.inputs) {
+          nodes_[v].inputs.push_back(p);
+          replace_all(consumers_[p], t, v);
+        }
+        producers_[q].clear();
+        consumers_[q].clear();
+        place_alive_[q] = false;
+        node.alive = false;
+        changed = true;
+      }
+    }
+  }
+
+  ProcessTreePetriNetConversion assemble(std::size_t source, std::size_t sink) {
+    ProcessTreePetriNetConversion result;
+    std::vector<std::size_t> remap(place_names_.size(), 0);
+    for (std::size_t p = 0; p < place_names_.size(); ++p) {
+      if (!place_alive_[p]) continue;
+      remap[p] = result.net.add_place();
+      result.place_names.push_back(place_names_[p]);
+    }
+    result.net.set_activities(tree_.activities());
+    result.net.set_source(remap[source]);
+    result.net.set_sink(remap[sink]);
+    PetriTransitionNameList names;
+    for (const auto& node : nodes_) {
+      if (!node.alive) continue;
+      std::vector<std::size_t> inputs;
+      std::vector<std::size_t> outputs;
+      inputs.reserve(node.inputs.size());
+      outputs.reserve(node.outputs.size());
+      for (const auto p : node.inputs) inputs.push_back(remap[p]);
+      for (const auto p : node.outputs) outputs.push_back(remap[p]);
+      result.net.add_transition(node.activity, std::move(inputs), std::move(outputs));
+      result.transition_names.push_back(node.name);
+      names.emplace_back(node.name);
+    }
+    result.net.set_transition_names(std::move(names));
+    return result;
+  }
+
+  const ProcessTree& tree_;
+  std::vector<std::string> place_names_;
+  std::vector<bool> place_alive_;
+  std::vector<std::vector<std::size_t>> producers_;
+  std::vector<std::vector<std::size_t>> consumers_;
+  std::vector<Node> nodes_;
+  std::size_t place_counter_ = 2;
+  std::size_t hidden_counter_ = 0;
+  std::size_t visible_counter_ = 0;
+};
 
 BorderedFragment build_transition_bordered(const ProcessTreeNode& node,
                                            const ProcessTree& tree,
@@ -291,15 +459,13 @@ BorderedFragment build_transition_bordered(const ProcessTreeNode& node,
 
 }  // namespace
 
+ProcessTreePetriNetConversion convert_process_tree_to_petri_net(
+    const ProcessTree& tree) {
+  return ReferenceTreeNetBuilder(tree).run();
+}
+
 PetriNet to_petri_net(const ProcessTree& tree) {
-  PetriNet net;
-  net.set_activities(tree.activities());
-  const std::size_t source = net.add_place();
-  const std::size_t sink = net.add_place();
-  net.set_source(source);
-  net.set_sink(sink);
-  build(tree.root(), source, sink, net);
-  return reduce_petri_net(net).net;
+  return convert_process_tree_to_petri_net(tree).net;
 }
 
 PetriNet to_petri_net(const HeuristicsNet& heuristics) {

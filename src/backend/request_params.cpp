@@ -943,15 +943,96 @@ std::vector<BusinessHourSlot> parse_business_hour_slots(
   return slots;
 }
 
+std::uint64_t parse_strict_u64(std::string_view value, std::string_view name) {
+  std::uint64_t parsed = 0;
+  const auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
+  if (value.empty() || result.ec != std::errc{} ||
+      result.ptr != value.data() + value.size())
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a non-negative integer, got '" +
+                                std::string(value) + "'");
+  return parsed;
+}
+
+double parse_strict_finite_double(std::string_view value, std::string_view name) {
+  // strtod would also skip leading whitespace; the complete text must be a
+  // number, so a leading space is rejected like any other stray character.
+  if (value.empty() ||
+      std::isspace(static_cast<unsigned char>(value.front())))
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a finite number, got '" +
+                                std::string(value) + "'");
+  return parse_finite_double(value, name);
+}
+
+char parse_csv_delimiter(std::string_view value, std::string_view name) {
+  if (value.size() != 1 || value[0] == '\0' || value[0] == '\r' || value[0] == '\n')
+    throw std::invalid_argument(std::string(name) +
+                                ": expected exactly one delimiter character other than NUL, CR or LF");
+  return value[0];
+}
+
 std::string error_json(std::string_view message) {
-  std::ostringstream out;
-  out << "{\"error\": \"";
-  for (const char c : message) {
-    if (c == '"' || c == '\\') out << '\\';
-    out << c;
+  // Messages often echo request bytes, so the body must stay valid UTF-8
+  // JSON whatever they contain: control characters are escaped, WTF-8
+  // surrogate code units keep their identity as \uXXXX escapes, and any
+  // other malformed byte becomes U+FFFD.
+  static constexpr char hex[] = "0123456789abcdef";
+  std::string out = "{\"error\": \"";
+  out.reserve(message.size() + 14);
+  const auto escape_unit = [&](unsigned unit) {
+    out += "\\u";
+    for (int shift = 12; shift >= 0; shift -= 4) out += hex[(unit >> shift) & 15];
+  };
+  const auto continuation = [&](std::size_t at) {
+    return at < message.size() &&
+           (static_cast<unsigned char>(message[at]) & 0xc0) == 0x80;
+  };
+  for (std::size_t i = 0; i < message.size();) {
+    const auto c = static_cast<unsigned char>(message[i]);
+    if (c < 0x80) {
+      switch (c) {
+        case '"': out += "\\\""; break;
+        case '\\': out += "\\\\"; break;
+        case '\b': out += "\\b"; break;
+        case '\f': out += "\\f"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default:
+          if (c < 0x20) escape_unit(c);
+          else out += static_cast<char>(c);
+      }
+      ++i;
+      continue;
+    }
+    const std::size_t length = c >= 0xc2 && c <= 0xdf ? 2 :
+                               c >= 0xe0 && c <= 0xef ? 3 :
+                               c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+    bool valid = length != 0 && i + length <= message.size();
+    for (std::size_t k = 1; valid && k < length; ++k) valid = continuation(i + k);
+    if (valid) {
+      const auto second = static_cast<unsigned char>(message[i + 1]);
+      if ((c == 0xe0 && second < 0xa0) || (c == 0xf0 && second < 0x90) ||
+          (c == 0xf4 && second > 0x8f)) {
+        valid = false;
+      } else if (c == 0xed && second >= 0xa0) {
+        const auto third = static_cast<unsigned char>(message[i + 2]);
+        escape_unit(((c & 15u) << 12) | ((second & 63u) << 6) | (third & 63u));
+        i += 3;
+        continue;
+      }
+    }
+    if (!valid) {
+      out += "\\ufffd";
+      ++i;
+      continue;
+    }
+    out.append(message.substr(i, length));
+    i += length;
   }
-  out << "\"}";
-  return out.str();
+  out += "\"}";
+  return out;
 }
 
 DfgAlignmentOptions parse_dfg_alignment_params(const FieldLookup& field) {
@@ -2113,8 +2194,8 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("lifecycle_column"); !value.empty()) {
     params.csv.lifecycle_column = value;
   }
-  if (const auto value = field("delimiter"); !value.empty()) {
-    params.csv.delimiter = value.front();
+  if (supplied("delimiter")) {
+    params.csv.delimiter = parse_csv_delimiter(field("delimiter"), "delimiter");
   }
   if (supplied("xes_variant")) {
     params.xes.variant = parse_xes_import_variant(field("xes_variant"));
@@ -2476,9 +2557,9 @@ MineParams parse_mine_params(const FieldLookup& field,
       params.filter.suffix_occurrence =
           parse_filter_anchor_occurrence("suffix_occurrence");
   }
-  if (const auto value = field("rework_min_occurrences"); !value.empty()) {
-    params.filter.rework_min_occurrences =
-        static_cast<std::uint64_t>(std::atoll(value.c_str()));
+  if (supplied("rework_min_occurrences")) {
+    params.filter.rework_min_occurrences = parse_nonnegative_u64(
+        field("rework_min_occurrences"), "rework_min_occurrences");
   }
   if (const auto value = field("between_start"); !value.empty()) {
     params.filter.between_start = value;
@@ -2663,12 +2744,13 @@ MineParams parse_mine_params(const FieldLookup& field,
       params.filter.min_length > params.filter.max_length) {
     throw std::invalid_argument("min_length: must not exceed max_length");
   }
-  if (const auto value = field("min_variant_frequency"); !value.empty()) {
-    params.filter.min_variant_frequency =
-        static_cast<std::uint64_t>(std::atoll(value.c_str()));
+  if (supplied("min_variant_frequency")) {
+    params.filter.min_variant_frequency = parse_nonnegative_u64(
+        field("min_variant_frequency"), "min_variant_frequency");
   }
-  if (const auto value = field("top_variants"); !value.empty()) {
-    params.filter.top_variants = static_cast<std::size_t>(std::atoll(value.c_str()));
+  if (supplied("top_variants")) {
+    params.filter.top_variants =
+        parse_nonnegative_size(field("top_variants"), "top_variants");
   }
   if (supplied("variant_coverage")) {
     params.filter.variant_coverage =

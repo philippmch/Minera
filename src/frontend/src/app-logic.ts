@@ -343,22 +343,29 @@ export function evaluationModelIds(data: MineraExport, importedAvailable = false
   return [...ids].sort();
 }
 
+/** How a rollback (cancel-mine) settled; undefined when nothing was posted, so the backend never left the previous source. */
+export type LiveSourceRollback = {confirmed: boolean; activeSourceId?: string | null} | undefined | void;
+
 /**
  * Hands the previous live backend source back after a load that failed or was
  * cancelled. The backend keeps (or, after cancel-mine, restores) its previous
  * session in that case, so the still-displayed analysis is live again once the
- * rollback request has finished. A newer load, or going home, supersedes a
- * pending handback.
+ * rollback request has finished, but only when the backend confirmed the
+ * cancel and, if it reported the source it now holds, that source is the
+ * previous one: a cancel that failed, or one overtaken by another load, leaves
+ * the analysis offline instead of claiming a source the backend no longer
+ * holds. A newer load, or going home, supersedes a pending handback.
  */
 export class LiveSourceHandback {
   private epoch = 0;
   /** A new load or going home: any pending handback must not apply. */
   supersede(): void { this.epoch += 1; }
-  async handback(previous: string | null | undefined, rollback: Promise<unknown>, restore: (sourceId: string) => void): Promise<boolean> {
+  async handback(previous: string | null | undefined, rollback: Promise<LiveSourceRollback>, restore: (sourceId: string) => void): Promise<boolean> {
     if (!previous) return false;
     const epoch = ++this.epoch;
-    await rollback.catch(() => undefined);
+    const outcome: LiveSourceRollback = await rollback.catch(() => ({confirmed: false}));
     if (epoch !== this.epoch) return false;
+    if (outcome && (!outcome.confirmed || (outcome.activeSourceId !== undefined && outcome.activeSourceId !== previous))) return false;
     restore(previous);
     return true;
   }
@@ -368,6 +375,13 @@ export class LiveSourceHandback {
 export function runSurvivesModelImport(runMiner: string | null | undefined): boolean {
   return runMiner !== "imported";
 }
+
+/** Whether a run started on `miner` at imported-model generation `started` is stale now (generation `current`): another model was imported while a run on the imported net was in flight. */
+export function importedRunStale(miner: string | null | undefined, started: number, current: number): boolean {
+  return started !== current && !runSurvivesModelImport(miner);
+}
+
+export const IMPORTED_MODEL_CHANGED = "The imported model changed while this run was pending; run it again.";
 
 /** Case rows with stable React keys: logs may repeat a case id, so rows are keyed by trace position. */
 export function caseRowEntries<T extends { case_id: string }>(traces: readonly T[], query: string): Array<{ key: number; trace: T }> {

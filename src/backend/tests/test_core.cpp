@@ -4454,6 +4454,59 @@ void filter_event_log_follows_dataframe_cells() {
   assert((case_ids(minera::filter_event_log(log, by_case)) == std::vector<std::string>{"1"}));
   by_case.case_attribute_key = "grp";
   assert((case_ids(minera::filter_event_log(log, by_case)) == std::vector<std::string>{"1"}));
+
+  // An empty range (from == to) keeps only a case running strictly across
+  // that instant: the DataFrame rule is start < to and end > from.
+  minera::LogFilterOptions instant;
+  instant.time_from = "2023-11-15T05:00:00Z";
+  instant.time_to = "2023-11-15T05:00:00Z";
+  instant.time_mode = minera::TimeFilterMode::traces_intersecting;
+  assert((case_ids(minera::filter_event_log(timed, instant)) ==
+          std::vector<std::string>{"covers"}));
+
+  // A CSV DataFrame keeps its case columns per row: case filters and the
+  // event-level filter test each row's cell, even when the case's first row
+  // is blank. The collapsed trace attribute still names the case for display.
+  const auto csv = [](const char* text) {
+    std::istringstream input(text);
+    return minera::import_csv_event_log(input);
+  };
+  const auto rows = csv(
+      "case_id,activity,timestamp,case:x\n"
+      "c1,A,2024-01-01 00:00:00,\n"
+      "c1,B,2024-01-01 00:01:00,u\n"
+      "c2,A,2024-01-01 00:00:00,u\n"
+      "c2,B,2024-01-01 00:01:00,v\n");
+  minera::LogFilterOptions per_row;
+  per_row.case_attribute_key = "case:x";
+  per_row.keep_case_attribute_values = {"u"};
+  assert((case_ids(minera::filter_event_log(rows, per_row)) ==
+          std::vector<std::string>{"c1", "c2"}));
+  per_row.keep_case_attribute_values.clear();
+  per_row.remove_case_attribute_values = {"v"};
+  assert((case_ids(minera::filter_event_log(rows, per_row)) ==
+          std::vector<std::string>{"c1"}));
+  per_row.case_attribute_key = "x";
+  assert((case_ids(minera::filter_event_log(rows, per_row)) ==
+          std::vector<std::string>{"c1"}));
+  minera::LogFilterOptions row_cells;
+  row_cells.attribute_key = "case:x";
+  row_cells.keep_attribute_values = {"u"};
+  const auto kept_rows = minera::filter_event_log(rows, row_cells);
+  assert(kept_rows.event_count() == 2 &&
+         (activity_names(kept_rows.traces[0]) == std::vector<std::string>{"B"}));
+  // The case-id column is a column of every row as well.
+  for (const auto* key : {"case_id", "case:concept:name"}) {
+    minera::LogFilterOptions by_id;
+    by_id.attribute_key = key;
+    by_id.keep_attribute_values = {"c1"};
+    assert((case_ids(minera::filter_event_log(rows, by_id)) ==
+            std::vector<std::string>{"c1"}));
+  }
+  minera::LogFilterOptions xes_id;
+  xes_id.attribute_key = "case:concept:name";
+  xes_id.keep_attribute_values = {"2"};
+  assert((case_ids(minera::filter_event_log(log, xes_id)) == std::vector<std::string>{"2"}));
 }
 
 void importer_rejects_malformed_rows() {
@@ -7664,22 +7717,121 @@ void csv_import_types_activities_case_attributes_and_relations_like_reference() 
     assert(!rejected);
   }
   {
-    // Relation keys joining CSV logs are typed like their case ids; an XES
-    // side keeps its literal keys.
+    // Relation keys joining CSV logs follow their typed case-id columns
+    // (pandas' merge rules); an XES side (null) keeps its literal keys.
+    const auto log_of = [](const char* text) {
+      std::istringstream input(text);
+      return minera::import_csv_event_log(input);
+    };
+    const auto ints = log_of("case_id,activity\n7,a\n8,b\n");
     std::vector<minera::CaseRelation> relations{{"007", "+9"}, {"8", "x"}};
-    minera::type_case_relations_like_csv_logs(relations, true, false);
+    minera::type_case_relations_like_csv_logs(relations, &ints, nullptr);
+    assert(relations.size() == 2);
     assert(relations[0].left_case_id == "7" && relations[0].right_case_id == "+9");
     assert(relations[1].left_case_id == "8");
-    // An NA cell makes the column float; the NA cell itself keeps its text.
-    std::vector<minera::CaseRelation> floats{{"1", "2"}, {"NA", "3"}};
-    minera::type_case_relations_like_csv_logs(floats, true, true);
-    assert(floats[0].left_case_id == "1.0" && floats[0].right_case_id == "2");
-    assert(floats[1].left_case_id == "NA");
-    std::istringstream table_input("case_id_LEFT,case_id_RIGHT,note\n007,09,01\n");
+    // An NA cell makes the relation column float64: 7.0 still meets the
+    // int64 case 7 by value, and the NA row meets nothing.
+    std::vector<minera::CaseRelation> floats{{"7", "2"}, {"NA", "3"}};
+    minera::type_case_relations_like_csv_logs(floats, &ints, nullptr);
+    assert(floats.size() == 1 && floats[0].left_case_id == "7");
+    std::vector<minera::CaseRelation> halves{{"7.0", "2"}, {"7.5", "3"}};
+    minera::type_case_relations_like_csv_logs(halves, &ints, nullptr);
+    assert(halves.size() == 1 && halves[0].left_case_id == "7");
+    // A float64 log meets an int64 key by value, in its own spelling.
+    const auto float_log = log_of("case_id,activity\n7.5,a\n7,b\n");
+    std::vector<minera::CaseRelation> to_float{{"7", "2"}};
+    minera::type_case_relations_like_csv_logs(to_float, &float_log, nullptr);
+    assert(to_float.size() == 1 && to_float[0].left_case_id == "7.0");
+    // Bool keys meet numbers by value (True == 1); a str never meets a bool.
+    const auto bools = log_of("case_id,activity\nTrue,a\nFalse,b\n");
+    std::vector<minera::CaseRelation> to_bool{{"1", "2"}, {"0.0", "3"}, {"2", "4"}};
+    minera::type_case_relations_like_csv_logs(to_bool, &bools, nullptr);
+    assert(to_bool.size() == 2 && to_bool[0].left_case_id == "True" &&
+           to_bool[1].left_case_id == "False");
+    std::vector<minera::CaseRelation> bool_keys{{"true", "2"}};
+    minera::type_case_relations_like_csv_logs(bool_keys, &bools, nullptr);
+    assert(bool_keys.size() == 1 && bool_keys[0].left_case_id == "True");
+    std::vector<minera::CaseRelation> bool_to_int{{"True", "2"}};
+    minera::type_case_relations_like_csv_logs(bool_to_int, &ints, nullptr);
+    assert(bool_to_int.empty());  // True == 1 meets no case of 7, 8
+    const auto with_one = log_of("case_id,activity\n1,a\n2,b\n");
+    std::vector<minera::CaseRelation> bool_to_one{{"True", "2"}};
+    minera::type_case_relations_like_csv_logs(bool_to_one, &with_one, nullptr);
+    assert(bool_to_one.size() == 1 && bool_to_one[0].left_case_id == "1");
+    const auto text = log_of("case_id,activity\nc1,a\n7,b\n");
+    std::vector<minera::CaseRelation> bool_text{{"True", "2"}};
+    minera::type_case_relations_like_csv_logs(bool_text, &text, nullptr);
+    assert(bool_text.empty());
+    // A str column cannot be joined with a numeric one.
+    std::vector<minera::CaseRelation> numeric_keys{{"7", "2"}};
+    bool str_number_rejected = false;
+    try {
+      minera::type_case_relations_like_csv_logs(numeric_keys, &text, nullptr);
+    } catch (const std::invalid_argument&) {
+      str_number_rejected = true;
+    }
+    assert(str_number_rejected);
+    // The left side joins first: when no relation meets a left case, the
+    // right side (here str against int) is never joined.
+    std::vector<minera::CaseRelation> unmatched_left{{"9", "x"}};
+    minera::type_case_relations_like_csv_logs(unmatched_left, &ints, &ints);
+    assert(unmatched_left.empty());
+    std::vector<minera::CaseRelation> matched_left{{"7", "x"}};
+    bool right_rejected = false;
+    try {
+      minera::type_case_relations_like_csv_logs(matched_left, &ints, &ints);
+    } catch (const std::invalid_argument&) {
+      right_rejected = true;
+    }
+    assert(right_rejected);
+
+    // A merge: the incoming side joins like the interleavings; the base
+    // case ids and the LEFT keys form one column, here float64 (the LEFT
+    // column has an NA cell), so both read 7.0 and stay one case.
+    std::istringstream table_input(
+        "case_id_LEFT,case_id_RIGHT,note\n007,09,01\nNA,5,02\n");
     auto table = minera::parse_case_relations_table_csv(table_input);
-    minera::type_case_relation_column_like_csv_log(table, "case_id_LEFT");
-    assert(table.rows[0][0]->value == "7" && table.rows[0][1]->value == "09" &&
+    std::istringstream base_input("case_id,activity\n7,a\n");
+    std::istringstream incoming_input("case_id,activity\n9,x\n");
+    auto base = minera::import_csv_event_data(base_input);
+    auto incoming = minera::import_csv_event_data(incoming_input);
+    minera::type_csv_case_relation_keys(table, "case_id_LEFT", "case_id_RIGHT",
+                                        &base.table, &incoming.table, "case_id");
+    assert(base.table.rows[0][0]->value == "7.0");
+    assert(table.rows[0][0]->value == "7.0" && table.rows[0][1]->value == "9" &&
            table.rows[0][2]->value == "01");
+    assert(table.rows[1][0]->value == "NA" && table.rows[1][1]->value == "5");
+    // Bool LEFT keys read 1/0 in an int64 case column.
+    std::istringstream bool_table_input("case_id_LEFT,case_id_RIGHT\nTrue,9\n");
+    auto bool_table = minera::parse_case_relations_table_csv(bool_table_input);
+    std::istringstream base_again("case_id,activity\n7,a\n");
+    auto int_base = minera::import_csv_event_data(base_again);
+    minera::type_csv_case_relation_keys(bool_table, "case_id_LEFT", "case_id_RIGHT",
+                                        &int_base.table, nullptr, "case_id");
+    assert(int_base.table.rows[0][0]->value == "7" &&
+           bool_table.rows[0][0]->value == "1" && bool_table.rows[0][1]->value == "9");
+    // A merge joins the incoming side as pandas' typed merge does: a str
+    // case-id column cannot meet a numeric key column.
+    std::istringstream text_incoming_input("case_id,activity\nq,x\n");
+    auto text_incoming = minera::import_csv_event_data(text_incoming_input);
+    std::istringstream numeric_relation_input("case_id_LEFT,case_id_RIGHT\n7,9\n");
+    auto numeric_relation = minera::parse_case_relations_table_csv(numeric_relation_input);
+    bool rejected = false;
+    try {
+      minera::type_csv_case_relation_keys(numeric_relation, "case_id_LEFT", "case_id_RIGHT",
+                                          nullptr, &text_incoming.table, "case_id");
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+    // An NA incoming key meets no case: it becomes a null cell.
+    std::istringstream unmatched_input("case_id_LEFT,case_id_RIGHT\n7,NA\n");
+    auto unmatched = minera::parse_case_relations_table_csv(unmatched_input);
+    std::istringstream incoming_again("case_id,activity\n9,x\n");
+    auto int_incoming = minera::import_csv_event_data(incoming_again);
+    minera::type_csv_case_relation_keys(unmatched, "case_id_LEFT", "case_id_RIGHT",
+                                        nullptr, &int_incoming.table, "case_id");
+    assert(unmatched.rows[0][1]->is_null);
   }
 }
 

@@ -1309,13 +1309,22 @@ void forward_bpmn_greedy_routing_public_contract() {
       {ProcessTreeOperator::kInterleaving, 0,
        {{ProcessTreeOperator::kSequence, 0, {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}},
         {ProcessTreeOperator::kSequence, 0, {ProcessTreeNode::leaf(2), ProcessTreeNode::leaf(3)}}}});
+  // BPMN export of an interleaving tree goes through the reference tree-to-net
+  // construction (split, join and a mutex place each child takes and returns).
+  // Reference token replay on this exact PNML fits both block orders without
+  // routing problems (11 tokens consumed and produced, nothing missing).
   const auto interleaving_net = parse_pnml(to_pnml(parse_bpmn(to_bpmn(interleaving))));
   const auto log = log_of({{"a", "b", "c", "d"}, {"c", "d", "a", "b"}});
-  for (const auto& row : replay_token_traces(log, interleaving_net)) {
-    assert(!row.trace_is_fit && row.trace_fitness == 0.6);
-    assert(row.consumed == 5 && row.produced == 5);
-    assert(row.missing == 2 && row.remaining == 2);
-    assert(row.activated_transitions.size() == 4 && row.transitions_with_problems.size() == 2);
+  const auto interleaving_rows = replay_token_traces(log, interleaving_net);
+  assert(interleaving_rows.size() == 2);
+  const std::vector<std::vector<std::size_t>> activated = {{0, 2, 3, 4, 5, 1}, {0, 4, 5, 2, 3, 1}};
+  for (std::size_t i = 0; i < interleaving_rows.size(); ++i) {
+    const auto& row = interleaving_rows[i];
+    assert(row.trace_is_fit && row.trace_fitness == 1.0);
+    assert(row.consumed == 11 && row.produced == 11);
+    assert(row.missing == 0 && row.remaining == 0);
+    assert(row.activated_transitions == activated[i]);
+    assert(row.transitions_with_problems.empty());
   }
   consistent(log, interleaving_net, {});
 }

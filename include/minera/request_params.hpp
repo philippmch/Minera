@@ -1,6 +1,7 @@
 #pragma once
 
 #include <any>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <optional>
@@ -111,9 +112,24 @@ namespace minera {
 // (e.g. from "a,,b" or a trailing comma) are skipped entirely.
 [[nodiscard]] std::vector<std::string> split_csv(std::string_view value);
 
-// Serializes a message as a one-key JSON error object, escaping quotes and
-// backslashes so the message can never break the JSON.
+// Serializes a message as a one-key JSON error object. Quotes, backslashes
+// and control characters are escaped, WTF-8 surrogate code units become
+// \uXXXX escapes and any other malformed UTF-8 byte becomes U+FFFD, so
+// echoed request bytes can never break the JSON or its UTF-8 encoding.
 [[nodiscard]] std::string error_json(std::string_view message);
+
+// Strict scalar parsers shared by the request adapters and the CLIs. Each
+// accepts the complete text only: no surrounding whitespace, sign on
+// unsigned values, trailing characters or empty text; integers must fit the
+// target type and doubles must be finite. Failures throw
+// std::invalid_argument naming `name`.
+[[nodiscard]] std::uint64_t parse_strict_u64(std::string_view value,
+                                             std::string_view name);
+[[nodiscard]] double parse_strict_finite_double(std::string_view value,
+                                                std::string_view name);
+// A CSV field delimiter: exactly one byte other than NUL, CR or LF.
+[[nodiscard]] char parse_csv_delimiter(std::string_view value,
+                                       std::string_view name);
 
 // The discovery options parsed from a mine request's form fields.
 // Operation selected by the dataframe-backed DFG transport. The native table

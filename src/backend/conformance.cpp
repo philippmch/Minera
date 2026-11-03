@@ -3111,6 +3111,19 @@ class Aligner {
     State goal = final_;
     goal.push_back(static_cast<int>(len));
 
+    // Search paths are stored once, as parent-linked records; a queued node
+    // refers to the record of its last step. Copying whole paths into every
+    // queued node made memory grow with queue size times path length, so long
+    // traces hit the stored-path guard after a few tens of thousands of states.
+    constexpr std::size_t kNoRecord = static_cast<std::size_t>(-1);
+    struct PathRecord {
+      std::size_t parent = kNoRecord;
+      State state;
+      AlignmentMove move{};
+      bool has_move = false;  // the step is listed among the alignment moves
+      bool consumed = false;  // the step consumed a log event
+    };
+    std::vector<PathRecord> records;
     struct Node {
       double cost = 0.0;
       double priority = 0.0;
@@ -3118,9 +3131,7 @@ class Aligner {
       std::size_t depth = 0;
       bool discounted_order = false;
       State state;
-      std::vector<AlignmentMove> moves;
-      std::vector<Marking> prefixes;
-      std::vector<State> path_states;
+      std::size_t record = 0;
       bool operator>(const Node& o) const {
         if (priority != o.priority) return priority > o.priority;
         if (cost != o.cost) return cost > o.cost;
@@ -3215,7 +3226,38 @@ class Aligner {
       if (!lp.feasible) return std::numeric_limits<double>::infinity();
       return std::max(0.0, lp.objective);
     };
-    frontier.push(Node{0.0, lp_heuristic(start), 0, 0, discounted, start, {}, {}, {start}});
+    records.push_back(PathRecord{kNoRecord, start, {}, false, false});
+    frontier.push(Node{0.0, lp_heuristic(start), 0, 0, discounted, start, 0});
+    struct GoalPath {
+      double cost = 0.0;
+      std::vector<AlignmentMove> moves;
+      std::vector<Marking> prefixes;
+      std::vector<State> path_states;
+    };
+    const auto reconstruct = [&](const Node& last) {
+      std::vector<std::size_t> chain;
+      for (std::size_t r = last.record; r != kNoRecord; r = records[r].parent)
+        chain.push_back(r);
+      std::reverse(chain.begin(), chain.end());
+      GoalPath path;
+      path.cost = last.cost;
+      for (const std::size_t r : chain) {
+        const PathRecord& record = records[r];
+        path.path_states.push_back(record.state);
+        if (record.parent == kNoRecord) continue;
+        if (record.consumed) {
+          const State& before = records[record.parent].state;
+          path.prefixes.push_back(Marking(before.begin(), before.end() - 1));
+        }
+        if (record.has_move) path.moves.push_back(record.move);
+      }
+      return path;
+    };
+    const auto path_contains = [&](std::size_t record, const State& state) {
+      for (std::size_t r = record; r != kNoRecord; r = records[r].parent)
+        if (records[r].state == state) return true;
+      return false;
+    };
     std::unordered_set<State, MarkingHash> discounted_closed;
     std::unordered_map<State, std::unordered_set<std::string>, MarkingHash>
         generator_seen;
@@ -3225,14 +3267,13 @@ class Aligner {
     std::size_t arcs = 0;
     bool invalid_cost = false;
     std::size_t queued_total = 0;
-    // Queued nodes carry their whole path. Unbounded nets whose discounted
+    // Every queued node adds one path record. Unbounded nets whose discounted
     // edge costs vanish with depth would otherwise exhaust memory long before
-    // the expansion budget; past this many stored path states the search
+    // the expansion budget; past this many stored path records the search
     // gives up as capped.
     constexpr std::size_t kStoredPathEntryCap = 5'000'000;
-    std::size_t stored_path_entries = 0;
     double goal_cost = std::numeric_limits<double>::infinity();
-    std::vector<Node> goals;
+    std::vector<GoalPath> goals;
     const auto move_key = [](const std::vector<AlignmentMove>& moves) {
       std::string key;
       for (const auto& m : moves) {
@@ -3250,28 +3291,30 @@ class Aligner {
                  options.max_time_seconds;
     };
     while (!frontier.empty() && expanded < budget && !timed_out() &&
-           stored_path_entries < kStoredPathEntryCap) {
+           records.size() < kStoredPathEntryCap) {
       Node node = frontier.top();
       frontier.pop();
       const auto it_best = best.find(node.state);
       if (it_best == best.end() || node.cost > it_best->second + 1e-9) continue;
       if (discounted && !discounted_closed.insert(node.state).second) continue;
       if (!generator && node.state == goal) {
-        if (node.prefixes.size() == len)
-          node.prefixes.push_back(Marking(final_.begin(), final_.end()));
-        goals.push_back(std::move(node));
+        GoalPath path = reconstruct(node);
+        if (path.prefixes.size() == len)
+          path.prefixes.push_back(Marking(final_.begin(), final_.end()));
+        goals.push_back(std::move(path));
         goal_cost = goals.front().cost;
         break;
       }
       if (generator && node.state == goal) {
         if (node.cost > goal_cost + 1e-9) break;
         if (!std::isfinite(goal_cost)) goal_cost = node.cost;
-        if (node.prefixes.size() == len)
-          node.prefixes.push_back(Marking(final_.begin(), final_.end()));
-        const auto key = move_key(node.moves);
+        GoalPath path = reconstruct(node);
+        if (path.prefixes.size() == len)
+          path.prefixes.push_back(Marking(final_.begin(), final_.end()));
+        const auto key = move_key(path.moves);
         auto& seen = generator_seen[node.state];
         if (seen.insert(key).second && goals.size() < alignment_limit) {
-          goals.push_back(std::move(node));
+          goals.push_back(std::move(path));
         }
         if (goals.size() >= alignment_limit) break;
         continue;
@@ -3288,24 +3331,27 @@ class Aligner {
           invalid_cost = true;
           return;
         }
-        Node child = node;
+        Node child;
+        child.discounted_order = node.discounted_order;
         child.state = std::move(next);
         if (discounted && discounted_closed.find(child.state) != discounted_closed.end()) return;
-        if (generator && std::find(child.path_states.begin(), child.path_states.end(), child.state) !=
-                             child.path_states.end()) return;
-        child.path_states.push_back(child.state);
+        if (generator && path_contains(node.record, child.state)) return;
         child.depth = node.depth + 1;
         child.seq = seq++;
         child.cost = node.cost + edge_cost * factor;
         child.priority = child.cost + lp_heuristic(child.state);
         if (!std::isfinite(child.priority)) return;
-        if (consume) {
-          child.prefixes.push_back(Marking(node.state.begin(), node.state.end() - 1));
-        }
         // Configured variants retain tau/model routing moves explicitly;
         // an empty activity denotes a silent transition.
-        if (!move.activity.empty() || move.type == AlignmentMoveType::kModel)
-          child.moves.push_back(std::move(move));
+        const bool keep_move =
+            !move.activity.empty() || move.type == AlignmentMoveType::kModel;
+        const auto enqueue = [&]() {
+          records.push_back(PathRecord{node.record, child.state, std::move(move),
+                                       keep_move, consume});
+          child.record = records.size() - 1;
+          frontier.push(std::move(child));
+          ++queued_total;
+        };
         if (less_memory) {
           Marking marking(child.state.begin(), child.state.end() - 1);
           const std::size_t child_pos = static_cast<std::size_t>(child.state.back());
@@ -3330,9 +3376,7 @@ class Aligner {
             if (child.cost >= old->second - 1e-9) {
               // Discounted equal-cost arrivals remain queued so depth tie
               // ordering can select the deeper pinned path.
-              stored_path_entries += child.path_states.size();
-              frontier.push(std::move(child));
-              ++queued_total;
+              enqueue();
               return;
             }
           }
@@ -3342,9 +3386,7 @@ class Aligner {
         } else if (child.cost > old->second + 1e-9) {
           return;
         }
-        stored_path_entries += child.path_states.size();
-        frontier.push(std::move(child));
-        ++queued_total;
+        enqueue();
       };
       // Explicit mode enumerates the raw log successor first, matching the
       // pinned non-synchronous product ordering; compact mode emits it after

@@ -155,8 +155,10 @@ export function isPetriAlignmentWorkflow(value: unknown): value is PetriAlignmen
     (item.type === "log" ? item.transition === null : item.transition !== null);
   const marking = (items: unknown): boolean => Array.isArray(items) && items.length === places.length && items.every((_, i) => integer(items, i));
   const diagnostics = (item: unknown): boolean => item === undefined || (object(item) && Object.keys(item).every(key => integer(item, key)));
-  if (typeof result.computed !== "boolean" || typeof result.exhausted !== "boolean" || !numeric(result, "fitness") ||
-    (result.precision !== undefined && !(result.precision === null ? result.precision_incomplete === true : numeric(result, "precision"))) || !index(result.fitting_traces) || !index(result.trace_count) ||
+  if (typeof result.computed !== "boolean" || typeof result.exhausted !== "boolean" ||
+    // An uncomputed result carries null fitness and precision with its reason.
+    (result.computed ? !numeric(result, "fitness") : result.fitness !== null || result.precision !== null || typeof result.error !== "string") ||
+    (result.computed && result.precision !== undefined && !(result.precision === null ? result.precision_incomplete === true : numeric(result, "precision"))) || !index(result.fitting_traces) || !index(result.trace_count) ||
     result.fitting_traces > result.trace_count || !numeric(result, "total_cost") || !supportedVariant(result.variant) ||
     (result.alignment_variant !== undefined && result.alignment_variant !== result.variant) || typeof result.activity_attribute !== "string" ||
     result.activity_attribute !== input.activity_attribute || !diagnostics(result.diagnostics) || !Array.isArray(result.variants)) return false;

@@ -400,6 +400,14 @@ struct Event {
   std::optional<EventAttribute> resource_attribute;
   std::optional<EventAttribute> lifecycle_attribute;
 
+  // The `case:` cells of the flat row this event was read from (keys without
+  // the prefix), set only by the batch CSV import. A DataFrame keeps a case
+  // column per row, so its case filters and statistics test every row; the
+  // Trace keeps one collapsed value for display and conversion. A blank or NA
+  // cell is stored as an explicit null. XES and native logs leave this empty:
+  // their case attributes live on the Trace only.
+  std::vector<EventAttribute> case_row_attributes;
+
   [[nodiscard]] bool has_case_id() const noexcept {
     return case_id_state != FirstClassAttributeState::kMissing ||
            !case_id.empty();

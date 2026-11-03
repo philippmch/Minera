@@ -39,8 +39,11 @@ int usage(const char* program) {
             << " <model.pnml|model.bpmn|model.ptml> [options]\n"
                "  Simulates the workflow net and writes the traces as XES.\n"
                "  -o <path>          Write XES to <path> instead of stdout\n"
-               "  --traces <n>       Cases to generate (default: 100); with\n"
-               "                     --extensive, the cap on distinct traces\n"
+               "  --traces <n>       Cases to generate (default: 1000, as pm4py);\n"
+               "                     with --extensive, the cap on distinct\n"
+               "                     traces (default: uncapped up to 1000);\n"
+               "                     with --monte-carlo, the simulation count\n"
+               "                     (default: 100)\n"
                "  --max-steps <n>    Firing cap per case (default: 1000)\n"
                "  --seed <n>         RNG seed; same seed, same log (default: 1)\n"
                "  --extensive        Enumerate every distinct trace the model\n"
@@ -91,7 +94,8 @@ int usage(const char* program) {
                "  --stochastic-petri-analysis <name> reachability, transient, or steady_state\n"
                "  --stochastic-petri-time <f> Transient time in seconds\n"
                "  --stochastic-petri-initial-state <n> Transient source state\n"
-               "  --stochastic-petri-initial-probabilities <p,...> Transient vector\n";
+               "  --stochastic-petri-initial-probabilities <p,...> Transient vector\n"
+               "  A repeated option keeps its last value.\n";
   return 2;
 }
 
@@ -101,6 +105,9 @@ int main(int argc, char** argv) {
   std::filesystem::path input;
   std::filesystem::path output;
   minera::PlayoutOptions options;
+  // pm4py's basic Petri playout generates 1000 traces by default.
+  options.traces = 1000;
+  bool traces_supplied = false;
   minera::ExtensivePlayoutOptions extensive_options;
   bool extensive = false;
   bool extensive_control_used = false;
@@ -153,6 +160,16 @@ int main(int argc, char** argv) {
     return result;
   };
 
+  // Repeated flags follow the usual command-line rule: the last one wins.
+  const auto strict_u64 = [](const char* value, std::string_view option)
+      -> std::optional<std::uint64_t> {
+    try {
+      return minera::parse_strict_u64(value, option);
+    } catch (const std::exception& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return std::nullopt;
+    }
+  };
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
     const auto next = [&]() -> const char* {
@@ -166,15 +183,22 @@ int main(int argc, char** argv) {
     } else if (arg == "--traces" && !dfg) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      options.traces = static_cast<std::size_t>(std::atoll(value));
+      const auto parsed = strict_u64(value, arg);
+      if (!parsed) return 2;
+      options.traces = static_cast<std::size_t>(*parsed);
+      traces_supplied = true;
     } else if (arg == "--max-steps") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      options.max_steps = static_cast<std::size_t>(std::atoll(value));
+      const auto parsed = strict_u64(value, arg);
+      if (!parsed) return 2;
+      options.max_steps = static_cast<std::size_t>(*parsed);
     } else if (arg == "--seed" && !dfg) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      options.seed = static_cast<std::uint64_t>(std::atoll(value));
+      const auto parsed = strict_u64(value, arg);
+      if (!parsed) return 2;
+      options.seed = *parsed;
     } else if (arg == "--extensive") {
       extensive = true;
     } else if (arg == "--dfg") {
@@ -240,7 +264,9 @@ int main(int argc, char** argv) {
     } else if (arg == "--max-length") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      extensive_options.max_length = static_cast<std::size_t>(std::atoll(value));
+      const auto parsed = strict_u64(value, arg);
+      if (!parsed) return 2;
+      extensive_options.max_length = static_cast<std::size_t>(*parsed);
     } else if (arg == "--return-elements") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -257,18 +283,10 @@ int main(int argc, char** argv) {
     } else if (arg == "--max-marking-occ") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      try {
-        std::size_t parsed = 0;
-        const auto text = std::string(value);
-        std::size_t consumed = 0;
-        parsed = std::stoull(text, &consumed);
-        if (consumed != text.size()) throw std::invalid_argument("suffix");
-        extensive_options.max_marking_occ = parsed;
-        extensive_control_used = true;
-      } catch (const std::exception&) {
-        std::cerr << "error: --max-marking-occ expects a non-negative integer\n";
-        return 2;
-      }
+      const auto parsed = strict_u64(value, arg);
+      if (!parsed) return 2;
+      extensive_options.max_marking_occ = static_cast<std::size_t>(*parsed);
+      extensive_control_used = true;
     } else if (arg == "--initial-marking" || arg == "--final-marking") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -319,7 +337,9 @@ int main(int argc, char** argv) {
     std::cerr << "error: extensive controls require --extensive\n";
     return 2;
   }
-  extensive_options.max_traces = options.traces;
+  // pm4py's extensive playout has no trace cap; keep the native distinct
+  // trace budget unless --traces asks for fewer.
+  if (traces_supplied) extensive_options.max_traces = options.traces;
 
   try {
     if (dfg) {
@@ -428,8 +448,10 @@ int main(int argc, char** argv) {
     minera::EventLog log;
     if (monte_carlo) {
       if (!monte_carlo_fields.contains("monte_carlo_simulations"))
+        // pm4py's Monte Carlo default is 100 simulations; --traces still
+        // overrides it.
         monte_carlo_fields["monte_carlo_simulations"] =
-            std::to_string(options.traces);
+            std::to_string(traces_supplied ? options.traces : 100);
       if (!monte_carlo_fields.contains("monte_carlo_max_steps"))
         monte_carlo_fields["monte_carlo_max_steps"] =
             std::to_string(options.max_steps);

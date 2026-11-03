@@ -18,8 +18,8 @@ struct LogSegmentFilterOptions {
 // Slice at the first/last exact string-valued selected activity. Empty labels
 // are valid; missing and non-string values do not match. Traces without an
 // anchor are omitted. Strict excludes the anchor for BOTH operations.
-// These public-reference semantics are separate from segment_filter.hpp's
-// existing native extension (notably its suffix strictness and empty labels).
+// segment_filter.hpp's native extension uses the same strictness but rejects
+// empty labels.
 EventLog filter_log_prefix(const EventLog& source, std::string_view activity,
                           const LogSegmentFilterOptions& options = {});
 EventLog filter_log_suffix(const EventLog& source, std::string_view activity,

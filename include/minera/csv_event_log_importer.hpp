@@ -51,6 +51,23 @@ struct CsvEventData {
 [[nodiscard]] std::vector<std::optional<std::string>> reference_csv_column_text(
     const std::vector<std::string>& cells);
 
+// The dtype read_csv gives such a column: int64, float64 (also an integer
+// column with an NA cell, and an all-NA column), bool, str, or object (Python
+// ints beyond 64 bits, or a column kept as literal text). Joins on typed keys
+// follow this kind: int64 and float64 keys meet by value, bool keys meet only
+// bool keys, and a str key cannot be joined with a numeric one.
+enum class ReferenceCsvColumnKind { kInteger, kFloat, kBoolean, kText, kObject };
+struct ReferenceCsvColumn {
+  ReferenceCsvColumnKind kind = ReferenceCsvColumnKind::kText;
+  std::vector<std::optional<std::string>> text;  // as reference_csv_column_text
+};
+[[nodiscard]] ReferenceCsvColumn reference_csv_column(
+    const std::vector<std::string>& cells);
+
+// Python's repr of a float ("7.0", "0.1", "inf"), the text a float64 key
+// converted to str has.
+[[nodiscard]] std::string reference_csv_float_text(double value);
+
 [[nodiscard]] CsvEventData import_csv_event_data(
     std::istream& input,
     const CsvImportOptions& options = {});

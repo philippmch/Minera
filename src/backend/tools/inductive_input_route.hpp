@@ -160,7 +160,7 @@ void handle_inductive_input_discovery(const httplib::Request& request,
       try {bpmn = minera::to_bpmn(*tree, "Independent Inductive discovery");}
       catch (const std::exception& error) {bpmn_error = error.what();}
       if (net) {
-        try {pnml = minera::to_pnml(*net, "Independent Inductive discovery");}
+        try {pnml = minera::to_pnml(minera::process_tree_pnml_document(*tree, conversion), "Independent Inductive discovery");}
         catch (const std::exception& error) {pnml_error = error.what();}
       }
       if (prepared && graph) {

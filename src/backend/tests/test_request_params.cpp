@@ -73,6 +73,25 @@ void error_json_escapes_quotes_and_backslashes() {
   assert(minera::error_json("plain") == "{\"error\": \"plain\"}");
   assert(minera::error_json("a\"b") == "{\"error\": \"a\\\"b\"}");
   assert(minera::error_json("a\\b") == "{\"error\": \"a\\\\b\"}");
+  // Echoed request bytes must not break the JSON or its UTF-8 encoding.
+  assert(minera::error_json("1\nx\t\r\b\f") ==
+         "{\"error\": \"1\\nx\\t\\r\\b\\f\"}");
+  assert(minera::error_json(std::string("a\0b\x01\x1f", 5)) ==
+         "{\"error\": \"a\\u0000b\\u0001\\u001f\"}");
+  assert(minera::error_json("got '1\xff'") ==
+         "{\"error\": \"got '1\\ufffd'\"}");
+  assert(minera::error_json("\xc3") == "{\"error\": \"\\ufffd\"}");
+  assert(minera::error_json("\xc0\xaf") == "{\"error\": \"\\ufffd\\ufffd\"}");
+  assert(minera::error_json("\xe0\x80\x80") ==
+         "{\"error\": \"\\ufffd\\ufffd\\ufffd\"}");
+  assert(minera::error_json("\xf4\x90\x80\x80") ==
+         "{\"error\": \"\\ufffd\\ufffd\\ufffd\\ufffd\"}");
+  // Well-formed UTF-8 passes through; lone WTF-8 surrogates are escaped.
+  assert(minera::error_json("caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80") ==
+         "{\"error\": \"caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80\"}");
+  assert(minera::error_json("\xed\xa0\x80!") == "{\"error\": \"\\ud800!\"}");
+  assert(minera::error_json("\xed\x9f\xbf") == "{\"error\": \"\xed\x9f\xbf\"}");
+  assert(minera::error_json("\x7f") == "{\"error\": \"\x7f\"}");
 }
 
 void parse_mine_params_defaults_when_empty() {

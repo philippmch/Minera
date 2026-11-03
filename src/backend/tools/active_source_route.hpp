@@ -48,12 +48,14 @@ minera::EventDataKind active_source_kind(std::string_view name) {
 }
 
 std::string active_source_field(const httplib::Request& request, std::string_view name) {
+  audit_form_field(name);
   const std::string key(name);
   return request.has_file(key) ? form_field(request, key)
       : request.has_param(key) ? request.get_param_value(key) : std::string{};
 }
 
 bool active_source_supplied(const httplib::Request& request, std::string_view name) {
+  audit_form_field(name);
   return request.has_file(std::string(name)) || request.has_param(std::string(name));
 }
 
@@ -529,7 +531,10 @@ void handle_cancel_mine(const httplib::Request& request, httplib::Response& resp
     if (ticket->published && g_session == ticket->published && ticket->generation == g_active_mining_generation) {
       g_session = ticket->previous; g_clustering_analysis = ticket->previous_clustering;
     }
-    response.set_content("{\"family\":\"ACTIVE_SOURCE_CANCEL\",\"request_id\":" + active_source_quote(id) + ",\"canceled\":true}", "application/json");
+    // The source the backend holds once the cancel is applied, so the UI hands
+    // back only the source that is really live, whatever the request order.
+    const auto held = g_session ? active_source_quote(std::to_string(g_session->query_source_id)) : std::string("null");
+    response.set_content("{\"family\":\"ACTIVE_SOURCE_CANCEL\",\"request_id\":" + active_source_quote(id) + ",\"canceled\":true,\"active_source_id\":" + held + "}", "application/json");
   } catch (const std::exception& error) {response.status = 400; response.set_content(error_json(error.what()), "application/json");}
 }
 

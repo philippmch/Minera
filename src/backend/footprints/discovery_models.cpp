@@ -635,9 +635,21 @@ Footprint PetriReachabilityFootprintsDiscovery::apply(
   // branch can therefore be unavailable on another.
   std::vector<std::size_t> order(net.transitions().size());
   std::iota(order.begin(), order.end(), std::size_t{0});
-  if (parameters.transition_names.size() == order.size())
+  // Explicit names win; otherwise a net that carries a complete name list
+  // (for example a converted process tree) orders by those names.
+  std::vector<std::string> net_names;
+  if (parameters.transition_names.size() != order.size() && net.transition_names() &&
+      net.transition_names()->size() == order.size() &&
+      std::all_of(net.transition_names()->begin(), net.transition_names()->end(),
+                  [](const auto& name) { return name.has_value(); })) {
+    for (const auto& name : *net.transition_names()) net_names.push_back(*name);
+  }
+  const auto& names = parameters.transition_names.size() == order.size()
+                          ? parameters.transition_names
+                          : net_names;
+  if (names.size() == order.size())
     std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-      return parameters.transition_names[a] < parameters.transition_names[b];
+      return names[a] < names[b];
     });
   std::vector<std::size_t> rank(order.size());
   for (std::size_t i = 0; i < order.size(); ++i) rank[order[i]] = i;

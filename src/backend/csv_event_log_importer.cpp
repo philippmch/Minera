@@ -704,10 +704,11 @@ std::string python_float_text(double value) {
 // The text each cell of one column has after read_csv's typing and
 // format_dataframe's string conversion (used for the case-id and activity
 // columns); nullopt is a missing cell, whose row the reference drops.
-std::vector<std::optional<std::string>> infer_reference_case_ids(
+ReferenceCsvColumn infer_reference_column(
     const std::vector<std::string>& cells) {
   const auto count = cells.size();
   using Column = std::vector<std::optional<std::string>>;
+  using Kind = ReferenceCsvColumnKind;
   const auto na = [&](std::size_t i) { return is_reference_na_token(cells[i]); };
   // Every cell's text as written, NA spellings included.
   const auto literal = [&] { return Column(cells.begin(), cells.end()); };
@@ -748,7 +749,7 @@ std::vector<std::optional<std::string>> infer_reference_case_ids(
           column[i] = python_float_text(static_cast<double>(values[i]));
         }
       }
-      return column;
+      return {missing == 0 ? Kind::kInteger : Kind::kFloat, std::move(column)};
     }
     integer_overflow = *first_failure == IntegerCell::kOverflow;
   }
@@ -766,20 +767,21 @@ std::vector<std::optional<std::string>> infer_reference_case_ids(
       const auto cell = unsigned_cell(cells[i], scan, values[i]);
       if (cell != IntegerCell::kFits) first_failure = cell;
     }
+    // Python ints and literal text both make an object column.
     const auto ints_or_literal = [&] {
-      if (auto column = python_ints()) return *column;
-      return literal();
+      if (auto column = python_ints()) return ReferenceCsvColumn{Kind::kObject, *column};
+      return ReferenceCsvColumn{Kind::kObject, literal()};
     };
     if (first_failure == IntegerCell::kOverflow) return ints_or_literal();
     if (!first_failure) {
       // Values above the signed range cannot share a column with NA or
       // negative cells: the column then keeps its text unfiltered.
       if (scan.saw_above_int64 && (scan.saw_na || scan.saw_minus))
-        return literal();
+        return {Kind::kObject, literal()};
       if (scan.saw_minus) return ints_or_literal();
       Column column(count);
       for (std::size_t i = 0; i < count; ++i) column[i] = std::to_string(values[i]);
-      return column;
+      return {Kind::kInteger, std::move(column)};
     }
     // Otherwise a non-integer cell: continue with floats.
   }
@@ -795,7 +797,7 @@ std::vector<std::optional<std::string>> infer_reference_case_ids(
       else
         all = false;
     }
-    if (all) return column;
+    if (all) return {Kind::kFloat, std::move(column)};
   }
 
   // Booleans (any letter case).
@@ -808,14 +810,14 @@ std::vector<std::optional<std::string>> infer_reference_case_ids(
       else if (equals_ascii_ignoring_case(cells[i], "false")) column[i] = "False";
       else all = false;
     }
-    if (all) return column;
+    if (all) return {Kind::kBoolean, std::move(column)};
   }
 
   // Text, NA cells missing.
   Column column(count);
   for (std::size_t i = 0; i < count; ++i)
     if (!na(i)) column[i] = cells[i];
-  return column;
+  return {Kind::kText, std::move(column)};
 }
 
 }  // namespace
@@ -1047,8 +1049,8 @@ CsvEventData import_csv_event_data_impl(
   std::vector<std::optional<std::string>> case_ids;
   std::vector<std::optional<std::string>> activities;
   if (reference_batch) {
-    case_ids = infer_reference_case_ids(case_tokens);
-    activities = infer_reference_case_ids(activity_tokens);
+    case_ids = infer_reference_column(case_tokens).text;
+    activities = infer_reference_column(activity_tokens).text;
   } else {
     case_ids.assign(case_tokens.begin(), case_tokens.end());
     activities.assign(activity_tokens.begin(), activity_tokens.end());
@@ -1097,6 +1099,15 @@ CsvEventData import_csv_event_data_impl(
 
     auto& trace = log.traces[it->second];
     if (reference_batch) {
+      // The DataFrame keeps every row's case cells: case filters and
+      // statistics test them per row (a blank or NA cell is null there).
+      row.event.case_row_attributes = row.case_attributes;
+      for (auto& cell : row.event.case_row_attributes) {
+        if (cell.value.empty() || is_reference_na_token(cell.value)) {
+          cell.value.clear();
+          cell.is_null = true;
+        }
+      }
       row_case_attributes.push_back(std::move(row.case_attributes));
     } else {
       for (auto& attribute : row.case_attributes) {
@@ -1205,7 +1216,15 @@ CsvEventData import_csv_event_data_impl(
 
 std::vector<std::optional<std::string>> reference_csv_column_text(
     const std::vector<std::string>& cells) {
-  return infer_reference_case_ids(cells);
+  return infer_reference_column(cells).text;
+}
+
+ReferenceCsvColumn reference_csv_column(const std::vector<std::string>& cells) {
+  return infer_reference_column(cells);
+}
+
+std::string reference_csv_float_text(double value) {
+  return python_float_text(value);
 }
 
 CsvEventData import_csv_event_data(

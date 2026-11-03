@@ -21,7 +21,10 @@ int run_query_legacy(int argc,char** argv){
  try{
   if(argc<2){std::cerr<<"Usage: minera_query LOG.csv|LOG.xes --sql SQL [--engine sqlite|duckdb --runtime-url URL] [--limit N] [--filter-output LOG.xes --mode cases|events]\n";return 2;}
   const auto path=std::filesystem::u8path(argv[1]);std::string sql,engine="sqlite",runtime,output,mode="cases";minera::LogQueryOptions options;
+  // A repeated option is an error here too, as in the exact-report mode.
+  std::set<std::string> seen;
   for(int i=2;i<argc;++i){const std::string key=argv[i];if(i+1>=argc)throw std::invalid_argument("missing query option value");const std::string value=argv[++i];
+   if(!seen.insert(key).second)throw std::invalid_argument("duplicate query option: "+key);
    if(key=="--sql")sql=value;else if(key=="--sql-file"){std::ifstream file(std::filesystem::u8path(value),std::ios::binary);if(!file)throw std::invalid_argument("could not open SQL file");sql.assign(std::istreambuf_iterator<char>(file),{});}
    else if(key=="--engine")engine=value;else if(key=="--runtime-url")runtime=value;else if(key=="--filter-output")output=value;else if(key=="--mode")mode=value;
    else if(key=="--limit"){auto parsed=std::from_chars(value.data(),value.data()+value.size(),options.max_rows);if(parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size())throw std::invalid_argument("invalid query limit");}
@@ -143,7 +146,7 @@ int run_query(int argc,char** argv){
   // Scan option positions, not literal SQL/options values.
   for(int i=2;i<argc;i+=2){const std::string key=argv[i];if(key=="--query-options-json"||key=="--query-options-file"||key=="--exact-query-report")exact=true;}
   if(argc==2&&std::string(argv[1])=="--help"){
-    std::cout<<"Usage: minera_query LOG.csv|LOG.xes --sql SQL|--sql-file PATH [--engine sqlite|duckdb] [--query-options-json RAW|--query-options-file PATH] [--exact-query-report PATH] [--filter-output PATH --mode cases|events]\nFull SQLite options: table_name,max_rows,max_vm_steps,parameters. DuckDB: table_name,max_rows,parameters; max_vm_steps is SQLite-only. Full options conflict with --limit. Exact report preserves typed outcomes independently from legacy stdout.\n";return 0;
+    std::cout<<"Usage: minera_query LOG.csv|LOG.xes --sql SQL|--sql-file PATH [--engine sqlite|duckdb] [--runtime-url URL] [--limit N] [--query-options-json RAW|--query-options-file PATH] [--exact-query-report PATH] [--filter-output PATH --mode cases|events]\n--runtime-url URL: DuckDB runtime endpoint (required with --engine duckdb). --limit N: maximum result rows. Each option may be given once.\nFull SQLite options: table_name,max_rows,max_vm_steps,parameters. DuckDB: table_name,max_rows,parameters; max_vm_steps is SQLite-only. Full options conflict with --limit. Exact report preserves typed outcomes independently from legacy stdout.\n";return 0;
   }
   return exact?run_exact_query(argc,argv):run_query_legacy(argc,argv);
 }

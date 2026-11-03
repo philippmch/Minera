@@ -77,6 +77,20 @@ int main() {
     assert(rejected);
   }
 
+  // An uncomputed result reports no fitness or precision, only the reason.
+  for (const bool exhausted : {true, false}) {
+    minera::AlignmentResult uncomputed;
+    uncomputed.computed = false;
+    uncomputed.exhausted = exhausted;
+    const auto json = minera::alignment_json(uncomputed, numeric_graph);
+    assert(json.find("\"fitness\": null, \"precision\": null") != std::string::npos);
+    assert(json.find("\"fitness\": 1") == std::string::npos);
+    assert(json.find(exhausted ? "\"error\": \"alignment search exhausted\""
+                               : "\"error\": \"alignment not computed") !=
+           std::string::npos);
+  }
+  assert(legacy_json.find("\"error\"") == std::string::npos);
+
   const auto attributed = log_with_activity_attribute();
   minera::AlignmentOptions attributed_options;
   attributed_options.variant = minera::AlignmentVariant::kDijkstraNoHeuristics;

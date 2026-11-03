@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <bit>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <iomanip>
 #include <limits>
 #include <map>
@@ -13,6 +15,7 @@
 #include <string_view>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -1453,36 +1456,281 @@ EventTable parse_case_relations_table_csv(std::istream& input) {
   return table;
 }
 
-void type_case_relation_column_like_csv_log(EventTable& relations,
-                                            const std::string& column) {
-  const auto found = std::find(relations.columns.begin(),
-                               relations.columns.end(), column);
-  if (found == relations.columns.end()) return;
-  const auto index = static_cast<std::size_t>(found - relations.columns.begin());
+namespace {
+
+// One key column as read_csv types it (reference_csv_column), the way the
+// reference's merge compares and concatenates it.
+using KeyKind = ReferenceCsvColumnKind;
+
+struct KeyColumn {
+  KeyKind kind = KeyKind::kObject;
+  std::vector<std::optional<std::string>> text;  // nullopt: NA
+  bool has_na = false;
+};
+
+KeyColumn key_column(const std::vector<std::string>& cells) {
+  auto typed = reference_csv_column(cells);
+  KeyColumn column{typed.kind, std::move(typed.text), false};
+  for (const auto& cell : column.text)
+    if (!cell) column.has_na = true;
+  // A bool column with an NA cell is an object column of bools; a column
+  // with no cells at all is an empty object column.
+  if (column.kind == KeyKind::kBoolean && column.has_na) column.kind = KeyKind::kObject;
+  if (cells.empty()) column.kind = KeyKind::kObject;
+  return column;
+}
+
+// The kind of a log's case-id column, re-read from its typed case-id text
+// (an int64 column with NA was already rendered as floats there).
+KeyKind log_key_kind(const std::vector<std::string>& case_ids) {
+  return key_column(case_ids).kind;
+}
+
+bool numeric_kind(KeyKind kind) {
+  return kind == KeyKind::kInteger || kind == KeyKind::kFloat;
+}
+
+// The value of a typed int64/float64/bool key text.
+struct KeyNumber {
+  bool exact = false;  // an int64 value
+  std::int64_t integer = 0;
+  double number = 0.0;
+};
+
+std::optional<KeyNumber> key_number(KeyKind kind, const std::string& text) {
+  if (kind == KeyKind::kBoolean) {
+    const bool value = text == "True";
+    return KeyNumber{true, value ? 1 : 0, value ? 1.0 : 0.0};
+  }
+  if (kind == KeyKind::kInteger) {
+    std::int64_t integer = 0;
+    const auto* end = text.data() + text.size();
+    const auto [ptr, error] = std::from_chars(text.data(), end, integer);
+    if (error == std::errc{} && ptr == end)
+      return KeyNumber{true, integer, static_cast<double>(integer)};
+  }
+  if (kind == KeyKind::kInteger || kind == KeyKind::kFloat) {
+    char* end = nullptr;
+    const double number = std::strtod(text.c_str(), &end);
+    if (end != text.c_str()) return KeyNumber{false, 0, number};
+  }
+  return std::nullopt;
+}
+
+bool numbers_equal(const KeyNumber& left, const KeyNumber& right) {
+  if (left.exact && right.exact) return left.integer == right.integer;
+  return left.number == right.number;
+}
+
+std::string integer_text(const KeyNumber& number) {
+  return std::to_string(number.integer);
+}
+
+std::string float_text(const KeyNumber& number) {
+  return reference_csv_float_text(number.number);
+}
+
+// The text a joined key cell must have to meet the log's case id, as pandas'
+// typed merge compares keys: numbers and bools meet by value (True == 1 ==
+// 1.0), a str never meets a bool, and a str column cannot be merged with a
+// numeric one (pandas raises). An NA key meets nothing. nullopt: the row
+// meets no case. Object columns keep their typed text.
+std::vector<std::optional<std::string>> joined_key_text(
+    KeyKind log_kind, const KeyColumn& relation, const char* side) {
+  const auto count = relation.text.size();
+  if (log_kind == KeyKind::kObject || relation.kind == KeyKind::kObject ||
+      (log_kind == KeyKind::kText && relation.kind == KeyKind::kText))
+    return relation.text;
+  std::vector<std::optional<std::string>> result(count);
+  const bool log_bool = log_kind == KeyKind::kBoolean;
+  if (log_kind == KeyKind::kText || relation.kind == KeyKind::kText) {
+    if (log_bool || relation.kind == KeyKind::kBoolean) return result;
+    throw std::invalid_argument(
+        std::string("case relations: the ") + side +
+        " case id column and its relation column cannot be joined (str and number)");
+  }
+  for (std::size_t row = 0; row < count; ++row) {
+    if (!relation.text[row]) continue;
+    const auto number = key_number(relation.kind, *relation.text[row]);
+    if (!number) continue;
+    if (log_bool) {
+      if (number->number == 1.0) result[row] = "True";
+      else if (number->number == 0.0) result[row] = "False";
+    } else if (log_kind == KeyKind::kFloat) {
+      result[row] = float_text(*number);
+    } else if (number->exact) {
+      result[row] = integer_text(*number);
+    } else if (std::isfinite(number->number) &&
+               std::trunc(number->number) == number->number &&
+               number->number >= -9223372036854775808.0 &&
+               number->number < 9223372036854775808.0) {
+      result[row] = std::to_string(static_cast<std::int64_t>(number->number));
+    }
+  }
+  return result;
+}
+
+enum class ConcatKind { kInteger, kFloat, kBoolean, kObject };
+
+// The dtype of the case column once the base rows (`log`) and the relation
+// rows (`relation`, its LEFT column) are concatenated.
+ConcatKind concat_kind(KeyKind log, KeyKind relation) {
+  if (log == KeyKind::kText || log == KeyKind::kObject ||
+      relation == KeyKind::kText || relation == KeyKind::kObject)
+    return ConcatKind::kObject;
+  switch (log) {
+    case KeyKind::kInteger:
+      return relation == KeyKind::kFloat ? ConcatKind::kFloat : ConcatKind::kInteger;
+    case KeyKind::kFloat:
+      return ConcatKind::kFloat;
+    case KeyKind::kBoolean:
+      return relation == KeyKind::kInteger  ? ConcatKind::kInteger
+             : relation == KeyKind::kFloat ? ConcatKind::kObject
+                                           : ConcatKind::kBoolean;
+    default:
+      return ConcatKind::kObject;
+  }
+}
+
+// A key text rendered in the concatenated column. In an object column every
+// cell keeps its own rendering, but numbers (and bools) that are equal group
+// as one case, under the spelling seen first (base rows, then relations).
+struct ConcatRenderer {
+  ConcatKind kind;
+  std::vector<std::pair<KeyNumber, std::string>> seen;
+
+  std::string render(KeyKind source, const std::string& text) {
+    if (source == KeyKind::kText || source == KeyKind::kObject) return text;
+    const auto number = key_number(source, text);
+    if (!number) return text;
+    switch (kind) {
+      case ConcatKind::kInteger:
+        return source == KeyKind::kBoolean ? integer_text(*number) : text;
+      case ConcatKind::kFloat:
+        return source == KeyKind::kFloat ? text : float_text(*number);
+      case ConcatKind::kBoolean:
+        return text;
+      case ConcatKind::kObject:
+        for (const auto& [value, spelling] : seen)
+          if (numbers_equal(value, *number)) return spelling;
+        seen.emplace_back(*number, text);
+        return text;
+    }
+    return text;
+  }
+};
+
+std::optional<std::size_t> table_column(const EventTable& table,
+                                        const std::string& name) {
+  const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+  if (found == table.columns.end()) return std::nullopt;
+  return static_cast<std::size_t>(found - table.columns.begin());
+}
+
+std::vector<std::string> column_texts(const EventTable& table, std::size_t index) {
   std::vector<std::string> cells;
-  cells.reserve(relations.rows.size());
-  for (const auto& row : relations.rows)
+  cells.reserve(table.rows.size());
+  for (const auto& row : table.rows)
     cells.push_back(index < row.size() && row[index] ? row[index]->value
                                                      : std::string{});
-  const auto typed = reference_csv_column_text(cells);
-  for (std::size_t row = 0; row < relations.rows.size(); ++row) {
-    auto& cell = relations.rows[row][index];
-    if (cell && typed[row]) cell->value = *typed[row];
+  return cells;
+}
+
+std::vector<std::string> present_texts(const EventTable& table, std::size_t index) {
+  std::vector<std::string> cells;
+  cells.reserve(table.rows.size());
+  for (const auto& row : table.rows)
+    if (index < row.size() && row[index] && !row[index]->is_null)
+      cells.push_back(row[index]->value);
+  return cells;
+}
+
+}  // namespace
+
+void type_csv_case_relation_keys(EventTable& relations,
+                                 const std::string& left_column,
+                                 const std::string& right_column,
+                                 EventTable* base_csv, EventTable* incoming_csv,
+                                 const std::string& case_key) {
+  const auto left_index = table_column(relations, left_column);
+  const auto right_index = table_column(relations, right_column);
+  if (incoming_csv && right_index) {
+    if (const auto case_index = table_column(*incoming_csv, case_key)) {
+      const auto relation = key_column(column_texts(relations, *right_index));
+      const auto joined = joined_key_text(
+          log_key_kind(present_texts(*incoming_csv, *case_index)), relation,
+          "incoming");
+      for (std::size_t row = 0; row < relations.rows.size(); ++row) {
+        auto& cell = relations.rows[row][*right_index];
+        if (!cell) continue;
+        if (joined[row]) {
+          cell->value = *joined[row];
+        } else {
+          cell->value.clear();
+          cell->is_null = true;
+        }
+      }
+    }
+  }
+  if (base_csv && left_index) {
+    if (const auto case_index = table_column(*base_csv, case_key)) {
+      const auto relation = key_column(column_texts(relations, *left_index));
+      const auto base_kind = log_key_kind(present_texts(*base_csv, *case_index));
+      ConcatRenderer renderer{concat_kind(base_kind, relation.kind), {}};
+      for (auto& row : base_csv->rows) {
+        auto& cell = row[*case_index];
+        if (cell && !cell->is_null) cell->value = renderer.render(base_kind, cell->value);
+      }
+      // An NA LEFT cell keeps its text, as before.
+      for (std::size_t row = 0; row < relations.rows.size(); ++row) {
+        auto& cell = relations.rows[row][*left_index];
+        if (cell && relation.text[row])
+          cell->value = renderer.render(relation.kind, *relation.text[row]);
+      }
+    }
   }
 }
 
 void type_case_relations_like_csv_logs(std::vector<CaseRelation>& relations,
-                                       bool left_is_csv, bool right_is_csv) {
-  const auto apply = [&](std::string CaseRelation::*member) {
+                                       const EventLog* left_csv,
+                                       const EventLog* right_csv) {
+  std::vector<bool> keep(relations.size(), true);
+  const auto apply = [&](const EventLog& log, std::string CaseRelation::*member,
+                         const char* side) {
     std::vector<std::string> cells;
     cells.reserve(relations.size());
     for (const auto& relation : relations) cells.push_back(relation.*member);
-    const auto typed = reference_csv_column_text(cells);
-    for (std::size_t row = 0; row < relations.size(); ++row)
-      if (typed[row]) relations[row].*member = *typed[row];
+    std::vector<std::string> case_ids;
+    case_ids.reserve(log.traces.size());
+    for (const auto& trace : log.traces) case_ids.push_back(trace.case_id);
+    const auto joined = joined_key_text(log_key_kind(case_ids), key_column(cells), side);
+    for (std::size_t row = 0; row < relations.size(); ++row) {
+      if (joined[row]) relations[row].*member = *joined[row];
+      else keep[row] = false;
+    }
   };
-  if (left_is_csv) apply(&CaseRelation::left_case_id);
-  if (right_is_csv) apply(&CaseRelation::right_case_id);
+  if (left_csv) {
+    apply(*left_csv, &CaseRelation::left_case_id, "left");
+    // The reference joins the left log first and stops when no relation met
+    // one of its cases, so the right join is not attempted (and cannot fail).
+    std::unordered_set<std::string> cases;
+    for (const auto& trace : left_csv->traces) cases.insert(trace.case_id);
+    bool met = false;
+    for (std::size_t row = 0; row < relations.size() && !met; ++row)
+      met = keep[row] && cases.contains(relations[row].left_case_id);
+    if (!met) {
+      relations.clear();
+      return;
+    }
+  }
+  if (right_csv) apply(*right_csv, &CaseRelation::right_case_id, "right");
+  std::size_t kept = 0;
+  for (std::size_t row = 0; row < relations.size(); ++row)
+    if (keep[row]) {
+      if (kept != row) relations[kept] = std::move(relations[row]);
+      ++kept;
+    }
+  relations.resize(kept);
 }
 
 EventLog merge_case_relations(const EventLog& base, const EventLog& incoming,

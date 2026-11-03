@@ -188,6 +188,7 @@ describe("complete independent alignment inspection", () => {
   });
   it("retains uncomputed and empty workflows without presenting placeholder fitness as measured", () => {
     const value = workflow(); value.result.computed = false; value.result.exhausted = true; value.result.trace_count = 0;
+    value.result.fitness = null; value.result.precision = null; value.result.error = "alignment search exhausted";
     value.result.variants = []; value.variant_details = []; value.trace_groups.forEach(group => {group.variant_index = null;});
     expect(isPetriAlignmentWorkflow(value)).toBe(true);
     expect(petriAlignmentResultSummary(value.result)).toContain("not computed"); expect(petriAlignmentResultSummary(value.result)).toContain("search bound");
@@ -196,6 +197,7 @@ describe("complete independent alignment inspection", () => {
     for (const id of ["/result/variants", "/variant_details", "complete_moves", "optimal_alignments", "projected_model_moves"]) expect(tables.find(table => table.id === id)?.rows).toEqual([]);
     expect(tables.find(table => table.id === "/trace_groups")?.rows).toHaveLength(2);
     value.result.computed = true; value.result.exhausted = false; value.trace_groups = [];
+    value.result.fitness = 0.5; value.result.precision = 0.75; delete value.result.error;
     value.input_context.evaluated_case_count = value.input_context.evaluated_event_count = 0;
     expect(isPetriAlignmentWorkflow(value)).toBe(true); expect(petriAlignmentWorkbenchTables(value).find(table => table.id === "/trace_groups")?.rows).toEqual([]);
   });

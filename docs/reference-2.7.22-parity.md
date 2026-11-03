@@ -2963,8 +2963,9 @@ timestamp headers; XES values are projected onto those aliases. Selected CSV
 date cells are parsed to native dates in mixed merges so sorting remains
 chronological. XES tables carry basic scalar dtype declarations, allowing
 missing numeric values to promote during table merging. CSV relation keys
-remain strings (typed like the CSV side's case ids where they join it), and
-incompatible numeric XES case keys are rejected.
+remain strings, rewritten to follow the typed join with the CSV side's case
+ids where they join it (see the CSV import notes), and incompatible numeric
+XES case keys are rejected.
 
 Explicit case selectors use the corresponding XES trace attribute. An alias
 collision preserves the original event field under an `event:` prefix (repeated
@@ -3059,9 +3060,16 @@ filtering (unsigned 64-bit values mixed with NA or negative values, or
 out-of-range integers mixed with non-integers), which keeps those spellings
 as literal values. Traces are then ordered by the case-id string, as
 `format_dataframe` sorts the frame by case id, timestamp and row index. Each
-`case:` attribute comes from the case's first row in that order (rows
-without a timestamp count only when no row of the case is timed, since the
-reference drops them); a blank or NA cell there leaves the attribute missing.
+`case:` attribute shown on the trace (display, XES and JSON conversion) comes
+from the case's first row in that order (rows without a timestamp count only
+when no row of the case is timed, since the reference drops them); a blank or
+NA cell there leaves the attribute missing. Each row also keeps its own `case:`
+cells, since the DataFrame keeps the column per row: the case-attribute
+filter keeps a case when some row holds a kept value and drops it when any row
+holds a removed one, trace-scope attribute statistics count the filled rows,
+and the event-level attribute filter reads the row's cell (blank and NA cells
+match nothing). The case-id column (`case_id`/`case:concept:name`) is a column
+of every row for the event-level filter and the events-scope statistics too.
 Other columns, including resource and lifecycle, keep their text where
 `read_csv` would type them (declared: CSV adapters do not infer pandas column
 dtypes beyond the case-id and activity columns). Declared: the flat table
@@ -3069,10 +3077,24 @@ keeps source row order (with the converted case-id and activity text) where
 the formatted reference frame is sorted by case id, timestamp and row index.
 Case-relation files joined with a CSV log (case-relations merge and timestamp
 interleavings, CLI and server) are read like the reference reads a relations
-frame: the key column joining a CSV case-id column is typed the same way, so
-`007` in both files still joins the CSV case `7` (a relation key column with
-an NA cell reads as floats, as the reference's does); keys joining an XES log
-and other relation columns stay text. Stream readers
+frame, and its key columns meet the CSV case-id column the way pandas' typed
+merge does: int64 and float64 keys meet by value (`007`, `7` and `7.0` join the
+CSV case `7`, also when an NA cell makes the relation column float64), bool
+keys meet numbers by value (`True` meets the case `1`), a str key never meets
+a bool, an NA key meets nothing, and a str case-id column joined with a
+numeric key column (or the reverse) is an error, as pandas raises. The
+interleavings join the left log first and return no rows, without trying the
+right join, when no relation meets a left case. In a merge the base case ids and the relation's LEFT keys become one
+case column whose dtype follows the concatenation: an int64 log with a
+float64 LEFT column reads `7.0` for every case (base rows included), bool LEFT
+keys read `1`/`0` in an int64 column, a float64 and a bool column concatenate
+to object, and in an object column numbers of equal value (`True`, `1`, `1.0`)
+form one case under the first spelling. Declared: object key columns (Python
+ints beyond 64 bits, columns kept as literal text) keep their typed text; a
+str key sharing a number's spelling in an object column joins that number's
+case (the reference keeps them apart); keys joining an XES log and other
+relation columns stay text; the merged case column keeps text order where the
+reference sorts an int64 column numerically. Stream readers
 (`keep_na_first_class_values`), including `minera_live_stream`, keep literal
 ids and activities in file order, as `csv.DictReader` does. Textual timestamps are converted per cell
 as `to_datetime(format="mixed", utc=True)` does in 2.7.22: no format is
@@ -3391,6 +3413,74 @@ POWL/alignment expansion, PTML, BPMN, JSON, and frontend rendering.
 
 ## BPMN inclusive-gateway evidence
 
+## Process-tree to Petri-net conversion evidence
+
+`to_petri_net(tree)` and `convert_process_tree_to_petri_net(tree)` (which also
+returns the place and transition names) build the reference's net for the
+standard variant. Every tree-to-net call site uses it: the inductive variants,
+the `--pnml`/`--check-ptml` CLI paths, the server PNML, tree-net, inductive-input
+and process-tree-alignment routes, active-source mining, and the evaluation and
+conformance overloads that take a tree. The shared `reduce_petri_net` used for
+heuristics, BPMN and POWL nets is unchanged; the tree conversion runs its own
+reduction once.
+
+| Area | Reference behaviour now matched |
+| --- | --- |
+| Construction | Activity: one visible transition. Tau: silent `skip`. Sequence: children chained through fresh places. Choice: children share entry and exit places. Parallel: `tauSplit` into one entry place per child, `tauJoin` from one exit place per child. Loop `*(body, redo1..redoK)`: `init_loop` into a do place, body from it to a decision place, each redo child from the decision place to a redo place, `loop` from the redo place back to the do place, `skip` from the decision place to the exit. |
+| Inclusive choice (O) | `tauSplit` and `tauJoin` with a started place and a not-started place; per child a selector place plus entry and exit places, with `inclusiveStart` (not-started + selector to started + entry), `inclusiveLater` (started + selector to started + entry) and `inclusiveSkip` (started + selector to started + exit). The join consumes every child exit and the started place. |
+| Interleaving (<>) | `tauSplit`, `tauJoin` and a mutex place; per child a selector, done, entry and exit place, `iTrans` (mutex + selector to entry) and `fTrans` (exit to mutex + done). |
+| Root wrappers | A silent `tau` from the source and into the sink: both for a choice, parallel or loop root; for a sequence, inclusive or interleaving root, the entry wrapper when its first child starts or ends with a loop along its first/last-child spine, the exit wrapper when its last child ends with one. A leaf root has none. |
+| Reduction | Two passes, each to a fixpoint, applied once: a silent transition whose only input place has exactly one producer (another transition) and is consumed only by it is merged into that producer; then a silent transition whose only output place has exactly one producer (itself) and one consumer (another transition) is merged into that consumer. No other rule runs. |
+| Place names | `source`, `sink`, then `p_<k>` in creation order, numbered from `p_3` (the reference's counter), with gaps where reduction removed places. PNML export of a standard tree net uses these IDs. |
+| Silent names | `<kind>_<k>`, numbered in creation order across all kinds from 1 (`tau_1`, `skip_5`, `tauSplit_1`, `loop_2`, ...), carried in `PetriNet::transition_names()` and as PNML IDs. Footprints from the reachability graph, token replay and every other consumer that orders transitions by name therefore follow the reference order. |
+| Visible names | The reference uses random UUID4 strings. Minera writes deterministic UUID-shaped names `00000000-0000-4000-8000-<12 hex digits>` numbered in creation order. They sort before every silent name; a reference UUID sorts before every silent kind except possibly `fTrans` (when its first hex digit is `f`), so name-ordered results agree except on interleaving nets in that case. |
+| PTML 3-child `xorLoop` | As the reference reader: elements are processed in document order; a silent third child is dropped; a root loop drops its third child; otherwise the loop keeps (body, redo) and `->(loop, exit)` is appended at the end of the loop's parent's children. Child ordering then follows the reader's tree sort. |
+
+Not reference-deterministic and left as is: the transition-bordered variant keeps
+its derived `pN`/`tN` PNML IDs.
+
+BPMN export of a tree that contains an interleaving node goes through this net
+(other trees still convert block by block). The reference's tree-to-BPMN
+converter has no interleaving case: for `<>(->('a','b'), ->('c','d'))` it returns
+only a start and an end event with no flow, and for a tree with other nodes it
+drops the interleaving subtree. Minera keeps its exact-language export instead (declared).
+On the PNML of the exported BPMN, the reference token replay fits both `abcd`
+and `cdab` (11 tokens consumed and produced, nothing missing or remaining), and
+`minera_token_replay_diagnostics_tests` pins that capture. The same net now
+also feeds BPMN for an explicitly requested standard `process_tree_variant`
+and the LLM-context `petri_net` text of a tree.
+
+Evidence: a black-box harness writes random trees as PTML, reads them with the
+reference reader (or its tree notation plus tree sort, for interleaving), converts
+them with the reference converter, and compares the nets by place, silent
+transition and arc names, then up to isomorphism. 3,850 trees (depth 4 to 6;
+sequence, choice, parallel, loops with up to three children, inclusive choice and
+interleaving) give 0 structural and 0 naming mismatches.
+`minera_petri_net_conversion_tests` pins ten reference captures, including both
+3-child PTML loop rewrites.
+
+Downstream, on 120 seeded logs (inductive net from a clean log, replayed on a
+noise-injected copy): nets isomorphic 120/120; reachability-graph footprints
+equal 120/120; token-replay produced/consumed/missing/remaining, fitness and
+generalization equal on 119/120; simplicity equal 120/120; standard-profile
+alignment total cost and fitness equal on all 116 logs both sides computed. Still
+different, and unrelated to the conversion:
+
+- Token-based precision is lower than the reference on 17 of the 120 logs (also
+  on 21 of 124 clean-log models, identically before this conversion change).
+- Token replay fires one silent transition fewer than the reference for some
+  deviating traces, e.g. tree `*( ->('h','g'), +( X(tau,'f'), X(tau, ->( X(tau, *('e',tau)), X(tau, *('c',tau)) )) ) )`
+  and trace `g g f h` (reference produced/consumed 13/12, Minera 12/11), which
+  moves fitness and generalization on 1 of the 120 logs.
+- Alignments with the default 200,000 expanded states per trace stop on traces
+  the reference aligns without a state bound (3 of 120 logs; they complete with
+  `--alignment-max-states 2000000`). Uncomputed alignments now report `fitness`
+  and `precision` as `null` with an `error` ("alignment search exhausted" or
+  "alignment not computed: ..."), never the 1.0 placeholder. The alignment search
+  also stores each path once as parent-linked records; it used to copy the
+  whole path into every queued state, so long traces hit the 5,000,000
+  stored-path guard after 28,000 to 350,000 states and reported exhaustion.
+
 ## PTML atomic-interleaving evidence
 
 The process-tree model includes a first-class atomic-interleaving operator.
@@ -3398,9 +3488,10 @@ Every child executes exactly once and each child subtree remains contiguous,
 while the children themselves may occur in any order. PTML reads and writes the
 `interleaving` element without approximating it as event-level parallelism.
 
-The standard Petri conversion uses a compact subset-state construction, so the
-model has one state per completed-child subset instead of enumerating factorial
-permutations. Extensive playout enumerates permutations of complete child words;
+The standard Petri conversion uses the reference construction (see "Process-tree
+to Petri-net conversion evidence"): a shared mutex place that each child takes
+when it starts and returns when it completes, so the net stays linear in the
+number of children instead of enumerating factorial permutations. Extensive playout enumerates permutations of complete child words;
 seeded playout shuffles whole children. Alignment and POWL conversion use exact
 permutation expansion with an explicit eight-child safety bound. BPMN export
 automatically uses the exact converted workflow net. JSON and frontend tree
@@ -4847,6 +4938,12 @@ queueing, drain-on-stop, observer failures, invalid pool sizes, and lifecycle
 transitions; the headless `minera_live_stream` command exercises CSV event
 delivery end to end.
 
+The `--thread-pool N` option of `minera_live_stream` and
+`minera_stream_import` accepts 1 to 256 workers (default 6, as pm4py's
+`THREAD_POOL_SIZE`). pm4py passes the value to a `ThreadPoolExecutor` without a
+cap; Minera starts one OS thread per worker, so the command line rejects larger
+values instead of exhausting the process's thread limit.
+
 `CsvEventStreamReader`, `XesEventStreamReader`, and `XesTraceStreamReader` are
 restartable readers with transformation and acceptance callbacks. They expose
 single-item reads and direct delivery into the live event or trace stream;
@@ -5118,7 +5215,7 @@ Where pm4py's own two paths disagree:
 
 | Behaviour | pm4py DataFrame | pm4py EventLog | Minera follows |
 |---|---|---|---|
-| `filter_time_range(mode="traces_intersecting")` at the bounds | start or end strictly inside, or the case covers the range; touching a bound from outside is excluded | inclusive at both bounds | DataFrame |
+| `filter_time_range(mode="traces_intersecting")` at the bounds | strict overlap: the case starts before `dt2` and ends after `dt1`; touching a bound from outside is excluded, and an empty range (`dt1 == dt2`) keeps only a case running across that instant | inclusive at both bounds | DataFrame |
 | `filter_time_range` trace modes on out-of-order traces | case minimum/maximum timestamp | first/last event by position | DataFrame: a case spans its earliest to its latest parseable timestamp (`filter_time_range_trace_modes_read_endpoints_by_position`); identical for CSV imports, whose cases are sorted by time |
 | `filter_prefixes`/`filter_suffixes` that leave no events | case dropped | empty trace kept | DataFrame, for both `prefix_*`/`suffix_*` and the `segment_*` variants |
 | `get_event_attribute_values` on missing/NaN cells | not counted | counted as `nan` | DataFrame: blank CSV cells, explicit nulls and XES float NaN are not counted |

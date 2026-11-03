@@ -1942,11 +1942,22 @@ void write_alignments(std::ostream& out,
     out << ']';
   };
   out << "{\"computed\": " << (alignments.computed ? "true" : "false")
-      << ", \"exhausted\": " << (alignments.exhausted ? "true" : "false")
-      << ", \"fitness\": " << alignments.fitness
-      << ", \"precision\": ";
-  if (alignments.precision_computed) out << alignments.precision;
-  else out << "null, \"precision_incomplete\": true";
+      << ", \"exhausted\": " << (alignments.exhausted ? "true" : "false");
+  if (!alignments.computed) {
+    // An uncomputed result has no fitness or precision: report them as null
+    // with the reason, as the evaluation results do, never as the 1.0 the
+    // struct defaults hold.
+    out << ", \"error\": ";
+    write_json_string(out, alignments.exhausted
+                               ? "alignment search exhausted"
+                               : "alignment not computed: final marking "
+                                 "unreachable or invalid alignment options");
+    out << ", \"fitness\": null, \"precision\": null";
+  } else {
+    out << ", \"fitness\": " << alignments.fitness << ", \"precision\": ";
+    if (alignments.precision_computed) out << alignments.precision;
+    else out << "null, \"precision_incomplete\": true";
+  }
   out << ", \"fitting_traces\": " << alignments.fitting_traces
       << ", \"trace_count\": " << alignments.trace_count
       << ", \"total_cost\": " << alignments.total_cost

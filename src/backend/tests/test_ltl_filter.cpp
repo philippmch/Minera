@@ -2,9 +2,11 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 using minera::AttributeKind;
 using minera::Event;
@@ -232,6 +234,65 @@ int main() {
     assert(minera::filter_ltl_event_log(nan_log, persons).traces.empty());
     persons.resource_key = "org:resource";
     assert(minera::filter_ltl_event_log(nan_log, persons).traces.empty());
+
+    // An EventLog object (native log JSON) instead keeps the NaN as a
+    // present float that equals nothing, not even another NaN.
+    constexpr auto object = minera::LtlInputShape::kEventLogObject;
+    persons.resource_key.clear();
+    EventLog pair;
+    pair.traces = {{"p", {event("p", "A", "", "r1"), unknown}, {}}};
+    assert(minera::filter_ltl_event_log(pair, persons, object).traces.size() == 1);
+    assert(minera::filter_ltl_event_log(pair, persons).traces.empty());
+    EventLog nans;
+    nans.traces = {{"q", {unknown, unknown}, {}}};
+    assert(minera::filter_ltl_event_log(nans, persons, object).traces.size() == 1);
+    persons.resource_key = "org:resource";
+    assert(minera::filter_ltl_event_log(nans, persons, object).traces.size() == 1);
+    // Four eyes: a NaN performer makes its side non-empty but meets no one.
+    assert(minera::filter_ltl_event_log(nan_log, eyes, object).traces.size() == 1);
+    auto unknown_b = unknown;
+    unknown_b.activity = "B";
+    EventLog both;
+    both.traces = {{"b", {unknown, unknown_b}, {}}};
+    assert(minera::filter_ltl_event_log(both, eyes, object).traces.size() == 1);
+    assert(minera::filter_ltl_event_log(both, eyes).traces.empty());
+  }
+
+  // The bounded eventually-follows search remembers the states that failed:
+  // a long case still finishes, with the same answer.
+  {
+    std::vector<std::string> stamps;
+    EventLog wide;
+    Trace long_case{"w", {}, {}};
+    const auto at = [](int second) {
+      char text[32];
+      std::snprintf(text, sizeof text, "2024-01-01T%02d:%02d:%02dZ", second / 3600,
+                    second / 60 % 60, second % 60);
+      return std::string(text);
+    };
+    for (int i = 0; i < 2500; ++i) stamps.push_back(at(i));
+    stamps.push_back(at(2600));
+    for (int i = 0; i < 2500; ++i)
+      long_case.events.push_back({"w", "A", stamps[i], "", 0, {}, {}});
+    long_case.events.push_back({"w", "B", stamps[2500], "", 0, {}, {}});
+    wide.traces = {long_case};
+    LtlFilterOptions bounded{LtlFilterVariant::kEventuallyFollows, "", {"A", "A", "B"}};
+    bounded.enable_timestamp = true;
+    // A -> A within 0..10 s, then A -> B within 0..1e6 s: satisfiable.
+    bounded.timestamp_diff_boundaries = {{0.0, 10.0}, {0.0, 1e6}};
+    assert(minera::filter_ltl_event_log(wide, bounded).traces.size() == 1);
+    // A -> B within 0..10 s: B comes 101 s after the last A, so no match,
+    // and the search must still end quickly.
+    bounded.timestamp_diff_boundaries = {{0.0, 1e6}, {0.0, 10.0}};
+    assert(minera::filter_ltl_event_log(wide, bounded).traces.empty());
+    // Only the last A before B (2499 s) and an A 2 s earlier fit; the first
+    // A must be chosen late, after earlier choices failed.
+    bounded.timestamp_diff_boundaries = {{2.0, 2.0}, {101.0, 101.0}};
+    assert(minera::filter_ltl_event_log(wide, bounded).traces.size() == 1);
+    bounded.timestamp_diff_boundaries = {{3.0, 3.0}, {101.0, 101.0}};
+    assert(minera::filter_ltl_event_log(wide, bounded).traces.size() == 1);
+    bounded.timestamp_diff_boundaries = {{2600.0, 2600.0}, {0.0, 1e6}};
+    assert(minera::filter_ltl_event_log(wide, bounded).traces.empty());
   }
   return 0;
 }

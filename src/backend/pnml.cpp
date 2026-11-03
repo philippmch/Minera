@@ -1,4 +1,5 @@
 #include "minera/pnml.hpp"
+#include "minera/process_tree_petri.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1437,6 +1438,27 @@ PetriNet import_pnml(const std::filesystem::path& path) {
         "PNML markings do not describe a single-token workflow net");
   }
   return std::move(document.net);
+}
+
+PnmlDocument process_tree_pnml_document(const ProcessTree& tree,
+                                        ProcessTreePetriNetVariant variant) {
+  PnmlDocument document;
+  if (variant == ProcessTreePetriNetVariant::kStandard) {
+    auto conversion = convert_process_tree_to_petri_net(tree);
+    document.net = std::move(conversion.net);
+    document.place_ids = std::move(conversion.place_names);
+    document.transition_ids = std::move(conversion.transition_names);
+  } else {
+    document.net = to_petri_net(tree, variant);
+  }
+  const auto places = document.net.place_count();
+  document.initial_marking.assign(places, TokenInteger(0));
+  document.final_marking.assign(places, TokenInteger(0));
+  if (places != 0) {
+    document.initial_marking[document.net.source()] = TokenInteger(1);
+    document.final_marking[document.net.sink()] = TokenInteger(1);
+  }
+  return document;
 }
 
 }  // namespace minera

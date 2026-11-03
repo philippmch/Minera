@@ -683,6 +683,21 @@ if(MINERA_BUILD_TESTS)
                    --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations.csv")
   set_tests_properties(minera_csv_relations_interleavings_typed_cli PROPERTIES
     PASS_REGULAR_EXPRESSION "\"source_activity\":\"x\",\"target_activity\":\"b\"")
+  # An NA cell makes the LEFT column float64: its 7.0 still meets the int64
+  # case 7, and the concatenated case column reads 7.0 for every row.
+  add_test(NAME minera_csv_relations_merge_float_key_cli
+           COMMAND minera_export "${MINERA_CSV_TYPING_FIXTURES}/base.csv"
+                   --merge-case-relations "${MINERA_CSV_TYPING_FIXTURES}/incoming.csv"
+                   --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations_na.csv")
+  set_tests_properties(minera_csv_relations_merge_float_key_cli PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"traces\":\\[\\{\"case_id\":\"7\\.0\""
+    FAIL_REGULAR_EXPRESSION "\"case_id\":\"7\"")
+  add_test(NAME minera_csv_relations_interleavings_float_key_cli
+           COMMAND minera_export "${MINERA_CSV_TYPING_FIXTURES}/base.csv"
+                   --timestamp-interleavings "${MINERA_CSV_TYPING_FIXTURES}/incoming.csv"
+                   --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations_na.csv")
+  set_tests_properties(minera_csv_relations_interleavings_float_key_cli PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"source_activity\":\"x\",\"target_activity\":\"b\"")
   add_test(NAME minera_csv_activity_typing_cli
            COMMAND minera_query "${MINERA_CSV_TYPING_FIXTURES}/activities.csv"
                    --sql "SELECT activity FROM dataframe")
@@ -1684,6 +1699,96 @@ if(MINERA_BUILD_TESTS)
                    --compare-petri-model "${MINERA_FIXTURES}/parallel_arc_sequence.pnml")
   set_tests_properties(minera_petri_usage_cli_parallel_arcs PROPERTIES
     PASS_REGULAR_EXPRESSION "\"arcs\":\\[{\"id\":0,[^]]*{\"id\":5,[^]{}]*}\\]")
+  # Parameter review C3: rejected values exit cleanly with status 1 or 2
+  # (never an abort), empty values are not defaults, unsigned flags reject
+  # negatives, and the help lists the handled flags.
+  set(MINERA_CLI_EXIT "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/check_cli_exit.cmake")
+  set(MINERA_AB_CSV "${MINERA_FIXTURES}/ab_two_cases.csv")
+  set(MINERA_SEQUENCE_PNML "${MINERA_FIXTURES}/literal_activity_selector.pnml")
+  function(minera_cli_exit_test name expected_exit stderr_regex)
+    list(JOIN ARGN "|" command)
+    add_test(NAME ${name}
+             COMMAND ${CMAKE_COMMAND} "-DCOMMAND=${command}"
+                     -DEXPECT_EXIT=${expected_exit}
+                     "-DEXPECT_STDERR=${stderr_regex}"
+                     -P "${MINERA_CLI_EXIT}")
+  endfunction()
+  foreach(case
+      "dependency_junk|--dependency-threshold|abc"
+      "dependency_suffix|--dependency-threshold|0.5junk"
+      "dependency_nan|--dependency-threshold|nan"
+      "dependency_empty|--dependency-threshold|@EMPTY@"
+      "and_threshold_empty|--and-threshold|@EMPTY@"
+      "min_edge_negative|--min-edge-frequency|-1"
+      "heuristic_activity_negative|--heuristic-min-activity-count|-1"
+      "top_variants_suffix|--top-variants|1junk"
+      "min_variant_negative|--min-variant-frequency|-2"
+      "rework_negative|--rework-min|-5"
+      "max_cases_junk|--max-cases|x"
+      "case_duration_junk|--case-duration-min|x"
+      "decision_depth_junk|--decision-max-depth|x"
+      "batch_merge_empty|--batch-merge-distance-seconds|@EMPTY@"
+      "batch_merge_space|--batch-merge-distance-seconds| 5"
+      "delimiter_two_chars|--delimiter|ab")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 label)
+    list(GET parts 1 flag)
+    list(GET parts 2 value)
+    minera_cli_exit_test(minera_export_rejects_${label} 2 "error: "
+                         $<TARGET_FILE:minera_export> "${MINERA_AB_CSV}" ${flag} "${value}")
+  endforeach()
+  minera_cli_exit_test(minera_export_rejects_pt_alignment_empty 2
+                       "--pt-alignment-batch-size expects a non-empty value"
+                       $<TARGET_FILE:minera_export> "${MINERA_AB_CSV}"
+                       --align-process-tree --pt-alignment-batch-size @EMPTY@)
+  minera_cli_exit_test(minera_export_help_lists_handled_flags 2
+                       "repeated option keeps its last value.*--evaluation-alignment-theta.*--stochastic-start.*--stochastic-map-fit-timing.*--dfg-playout-max-steps.*--dfg-playout-return-only-if-complete.*--attribute-threshold-key"
+                       $<TARGET_FILE:minera_export> --help)
+  minera_cli_exit_test(minera_playout_rejects_negative_marking_occ 2
+                       "--max-marking-occ: expected a non-negative integer"
+                       $<TARGET_FILE:minera_playout> "${MINERA_SEQUENCE_PNML}"
+                       --extensive --max-marking-occ -1)
+  minera_cli_exit_test(minera_playout_rejects_junk_traces 2
+                       "--traces: expected a non-negative integer"
+                       $<TARGET_FILE:minera_playout> "${MINERA_SEQUENCE_PNML}" --traces 10x)
+  minera_cli_exit_test(minera_streaming_tbr_rejects_negative_invisible 1
+                       "--max-invisible: expected a non-negative integer"
+                       $<TARGET_FILE:minera_streaming_tbr> "${MINERA_SEQUENCE_PNML}"
+                       "${MINERA_AB_CSV}" --max-invisible -1)
+  minera_cli_exit_test(minera_query_legacy_rejects_duplicate_option 1
+                       "duplicate query option: --sql"
+                       $<TARGET_FILE:minera_query> "${MINERA_AB_CSV}"
+                       --sql "SELECT 1" --sql "SELECT 2")
+  minera_cli_exit_test(minera_server_rejects_port_suffix 2
+                       "--port expects an integer"
+                       $<TARGET_FILE:minera_server> --port 18732junk)
+  minera_cli_exit_test(minera_live_stream_bounds_thread_pool 1
+                       "thread pool size must be at most 256"
+                       $<TARGET_FILE:minera_live_stream> "${MINERA_AB_CSV}" --thread-pool 100000)
+  minera_cli_exit_test(minera_stream_import_rejects_zero_thread_pool 1
+                       "thread pool size must be positive"
+                       $<TARGET_FILE:minera_stream_import> "${MINERA_AB_CSV}" --thread-pool 0)
+  add_test(NAME minera_query_help_lists_runtime_url
+           COMMAND minera_query --help)
+  set_tests_properties(minera_query_help_lists_runtime_url PROPERTIES
+    PASS_REGULAR_EXPRESSION "--runtime-url URL.*--limit N")
+  # pm4py.play_out on a Petri net returns 1000 traces by default.
+  add_test(NAME minera_playout_default_traces
+           COMMAND ${CMAKE_COMMAND}
+                   "-DCOMMAND=$<TARGET_FILE:minera_playout>|${MINERA_SEQUENCE_PNML}"
+                   -DEXPECT_EXIT=0 "-DEXPECT_STDOUT_COUNT=<trace>:1000"
+                   -P "${MINERA_CLI_EXIT}")
+  if(UNIX)
+    add_executable(minera_server_parameter_contract_tests
+      src/backend/tests/test_server_parameter_contract.cpp)
+    target_include_directories(minera_server_parameter_contract_tests PRIVATE third_party)
+    target_link_libraries(minera_server_parameter_contract_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_parameter_contract_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_parameter_contract_tests minera_server)
+    add_test(NAME minera_server_parameter_contract_tests
+             COMMAND minera_server_parameter_contract_tests
+                     $<TARGET_FILE:minera_server> "${MINERA_AB_CSV}")
+  endif()
   # Recheck 61ebeee0 J2/J3: present empty resources are network nodes and
   # explicit empty profile selectors pick them (reference: edge ""->"" with
   # Review Ω and [7]; distinct_activities 2; interaction_two_resources 1).

@@ -72,14 +72,20 @@ void handle_live_create(const httplib::Request& request,httplib::Response& respo
   live_response(response,[&]{
     const auto method=live_required(request,"method"),id=live_required(request,"session_id");live_id(id);
     const std::string prefix=method=="dfg"?"streaming_":"streaming_"+method+"_";
-    std::set<std::string> allowed={"session_id","method","streaming_event_order","streaming_include_diagnostics","source_name","source_sha256","csv_delimiter","csv_trim_fields","csv_has_header","csv_case_aliases","csv_resource_column","csv_lifecycle_column","xes_variant","xes_case_attribute","xes_activity_attribute","xes_timestamp_attribute","xes_resource_attribute","xes_lifecycle_attribute"};
+    std::set<std::string> allowed={"session_id","method","streaming_event_order","streaming_include_diagnostics","csv_delimiter","csv_trim_fields","csv_has_header","csv_case_aliases","csv_resource_column","csv_lifecycle_column","xes_variant","xes_case_attribute","xes_activity_attribute","xes_timestamp_attribute","xes_resource_attribute","xes_lifecycle_attribute"};
     allowed.insert(prefix+"case_id_column");allowed.insert(prefix+"activity_column");
     if(method=="footprints")for(const auto* suffix:{"activities","start_activities","end_activities","sequence","parallel","terminate_all"})allowed.insert(prefix+suffix);
     else if(method=="temporal")for(const auto* suffix:{"profile","zeta","timestamp_column","start_timestamp_column"})allowed.insert(prefix+suffix);
     else if(method=="tbr")for(const auto* suffix:{"variant","stop_immediately","max_invisible","terminate_all"})allowed.insert(prefix+suffix);
     else if(method=="declare")allowed.insert(prefix+"timestamp_column");
     else if(method!="dfg")throw std::invalid_argument("unknown live monitor method");
+    // Only the model-backed monitors store an uploaded source to name.
+    if(method=="tbr"||method=="declare"){allowed.insert("source_name");allowed.insert("source_sha256");}
     live_params(request,allowed);
+    // Live snapshots always carry their delivery diagnostics; the streaming
+    // flag is accepted for query compatibility with /api/streaming-* only
+    // when it asks for that behavior.
+    if(!ocel_query_bool(request,"streaming_include_diagnostics",true))throw std::invalid_argument("live snapshots always include diagnostics; streaming_include_diagnostics must be true");
     if(ocel_query_bool(request,prefix+"terminate_all",false))throw std::invalid_argument("finalize live cases using a session action");
     auto record=std::make_shared<LiveSessionRecord>();record->id=id;record->method=method;record->configuration=request.params;
     if(request.has_param(prefix+"case_id_column"))record->csv.case_id_column=request.get_param_value(prefix+"case_id_column");
@@ -181,7 +187,9 @@ void handle_live_release(const httplib::Request& request,httplib::Response& resp
   live_response(response,[&]{live_params(request,{"session_id","expected_revision"});auto s=live_find(request);const auto revision=live_revision(request);
     {const auto monitor=live_monitor(*s);if(monitor->revision()!=revision)throw minera::StreamingSessionConflict("live session revision changed; refresh before releasing");monitor->wait_until_drained();}
     std::lock_guard lock(s->mutex);live_open(*s);if(s->monitor->revision()!=revision)throw minera::StreamingSessionConflict("live session revision changed; refresh before releasing");
-    const auto before=s->monitor->snapshot_json(false,0);if(before.find("\"state\":\"INACTIVE\"")!=std::string::npos&&before.find("\"pending\":0,")==std::string::npos)throw minera::StreamingSessionConflict("start and finish the queued stream before releasing");
+    // An unstarted session may still hold queued events; releasing it
+    // discards that queue (the stream's stop clears an inactive queue).
+    const auto before=s->monitor->snapshot_json(false,0);
     if(before.find("\"state\":\"ACTIVE\"")!=std::string::npos)s->monitor->action(minera::StreamingSessionAction::kFinish,revision);
     auto payload=live_payload(*s);payload.pop_back();payload+=",\"released\":true}";s->released=true;s->monitor.reset();{std::lock_guard registry_lock(g_live_mutex);g_live_sessions.erase(s->id);}response.set_content(payload,"application/json");});
 }

@@ -1,10 +1,12 @@
 #include "minera/attribute_statistics.hpp"
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/json_export.hpp"
 
 #include <cassert>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <sstream>
 #include <stdexcept>
 
 namespace {
@@ -97,6 +99,42 @@ int main() {
     options.attribute_key = "score";
     assert((minera::discover_attribute_statistics(sparse, options).values ==
             std::map<std::string, std::uint64_t>{{"1.0", 2}}));
+  }
+
+  // A CSV DataFrame keeps each row's own case cell: only the filled rows
+  // count, and a case whose rows differ counts each value.
+  {
+    using Counts = std::map<std::string, std::uint64_t>;
+    const auto csv = [](const char* text) {
+      std::istringstream input(text);
+      return minera::import_csv_event_log(input);
+    };
+    minera::AttributeStatisticsOptions options;
+    options.scope = minera::AttributeStatisticsScope::kTraces;
+    options.attribute_key = "case:x";
+    const auto blanks = csv(
+        "case_id,activity,timestamp,case:x\n"
+        "c1,A,2024-01-01 00:00:00,u\nc1,B,2024-01-01 00:01:00,\n"
+        "c1,C,2024-01-01 00:02:00,\nc2,A,2024-01-01 00:00:00,u\n"
+        "c2,B,2024-01-01 00:01:00,\n");
+    assert((minera::discover_attribute_statistics(blanks, options).values == Counts{{"u", 2}}));
+    const auto mixed = csv(
+        "case_id,activity,timestamp,case:x\n"
+        "c1,A,2024-01-01 00:00:00,\nc1,B,2024-01-01 00:01:00,u\n"
+        "c2,A,2024-01-01 00:00:00,u\nc2,B,2024-01-01 00:01:00,v\n");
+    assert((minera::discover_attribute_statistics(mixed, options).values ==
+            Counts{{"u", 2}, {"v", 1}}));
+    options.attribute_key = "x";
+    assert((minera::discover_attribute_statistics(mixed, options).values ==
+            Counts{{"u", 2}, {"v", 1}}));
+    // The events scope reads the same per-row cells, and the case-id column.
+    options.scope = minera::AttributeStatisticsScope::kEvents;
+    options.attribute_key = "case:x";
+    assert((minera::discover_attribute_statistics(mixed, options).values ==
+            Counts{{"u", 2}, {"v", 1}}));
+    options.attribute_key = "case_id";
+    assert((minera::discover_attribute_statistics(mixed, options).values ==
+            Counts{{"c1", 2}, {"c2", 2}}));
   }
 
   bool rejected = false;

@@ -107,6 +107,7 @@
 #include "minera/rework.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
+#include "minera/process_tree_petri.hpp"
 #include "minera/powl_conversion.hpp"
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
@@ -593,6 +594,7 @@ int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " <event_log.csv|.xes> [options]\n"
                "  A .xes file is imported as XES; any other file as CSV.\n"
+               "  A repeated option keeps its last value.\n"
                "  -o <path>                 Write JSON to <path> instead of stdout\n"
                "  --ltl-attribute-values-json <JSON> Exact ordered NativeString values\n"
                "  --ltl-attribute-values-file <path> Exact values JSON File\n"
@@ -1133,6 +1135,7 @@ int usage(const char* program) {
                "  --evaluation-alignment-max-time-trace <f> Per-trace seconds\n"
                "  --evaluation-alignment-max-alignments <n> Generator result limit\n"
                "  --evaluation-alignment-exponent <f> Discounted A* exponent\n"
+               "  --evaluation-alignment-theta <f> Discounted A* theta\n"
                "  --evaluation-alignment-synchronous-dijkstra <bool> Discounted scheduling\n"
                "  --evaluation-alignment-cost-profile <id> standard or legacy\n"
                "  --evaluation-alignment-trace-cost <f> Default log-move cost\n"
@@ -1402,7 +1405,9 @@ int usage(const char* program) {
                "  --playout-max-traces <n> Extensive trace cap\n"
                "  --playout-max-trace-cap <n> Alias for max-traces\n"
                "  --playout-return-set-strings <bool> Extensive activity-word JSON\n"
-               "  --petri-playout-traces <n> Petri sampled cases\n"
+               "  --petri-playout-traces <n> Petri sampled cases (default: 1000,\n"
+               "                            as pm4py; with extensive mode, the\n"
+               "                            distinct-trace cap)\n"
                "  --petri-playout-max-steps <n> Petri firing cap per case\n"
                "  --petri-playout-seed <u64> Petri random seed\n"
                "  --petri-playout-initial-marking <n,...> Initial marker vector\n"
@@ -1426,6 +1431,9 @@ int usage(const char* program) {
                "  --stochastic-return-visited-elements <bool> Emit visited markings/transitions as JSON\n"
                "  --stochastic-initial-marking <n,...> Initial marker vector\n"
                "  --stochastic-final-marking <n,...> Final marker vector\n"
+               "  --stochastic-start <f>   First case epoch seconds\n"
+               "  --stochastic-case-interval <f> Seconds between cases\n"
+               "  --stochastic-event-interval <f> Seconds between events\n"
                "  --stochastic-petri <bool> Emit tangible CTMC JSON with --playout\n"
                "  --stochastic-petri-rates <r,...> Exponential transition rates\n"
                "  --stochastic-petri-initial-marking <n,...> Initial marking\n"
@@ -1442,6 +1450,17 @@ int usage(const char* program) {
                "  --stochastic-map-default-parameter <f> Default duration/rate\n"
                "  --stochastic-map-conversion-variant <name> DFG Petri conversion\n"
                "  --stochastic-map-max-states <n> CTMC state cap\n"
+               "  --stochastic-map-silent-transitions-immediate <bool> Silent\n"
+               "                            transitions fire immediately\n"
+               "  --stochastic-map-zero-duration-immediate <bool> Zero-duration\n"
+               "                            activities fire immediately\n"
+               "  --stochastic-map-fit-activation-weights <bool> Fit weights\n"
+               "  --stochastic-map-fit-timing <bool> Fit duration distributions\n"
+               "  --stochastic-map-default-activation-weight <f> Non-negative\n"
+               "                            weight for performance_dfg maps\n"
+               "  --stochastic-map-frequency-activation-weights <bool> Use arc\n"
+               "                            frequencies as weights\n"
+               "  --stochastic-map-initial-marking <n,...> CTMC initial marking\n"
                "  --monte-carlo-simulations <n> Virtual-time cases\n"
                "  --monte-carlo-activity-key <name> Generated activity attribute\n"
                "  --monte-carlo-timestamp-key <name> Generated timestamp attribute\n"
@@ -1481,6 +1500,15 @@ int usage(const char* program) {
                "  --dfg-playout-case-id-key <key> Generated case-id attribute\n"
                "  --dfg-playout-artificial-start-activity <label> Boundary label\n"
                "  --dfg-playout-artificial-end-activity <label> Boundary label\n"
+               "  --dfg-playout-max-steps <n> Alias of --dfg-playout-max-events-per-trace\n"
+               "  --dfg-playout-min-variant-occurrences <n> Minimum variant count\n"
+               "  --dfg-playout-interrupt-when-dfg-complete <bool> Stop once\n"
+               "                            every DFG edge is covered\n"
+               "  --dfg-playout-add-trace-if-takes-new-edges <bool> Keep only\n"
+               "                            traces that cover new edges\n"
+               "  --dfg-playout-return-variants <bool> Emit variant counts JSON\n"
+               "  --dfg-playout-return-only-if-complete <bool> Suppress\n"
+               "                            incomplete results\n"
                "  --declare-playout-traces <n> Declare cases (default: 1000)\n"
                "  --declare-playout-min-length <n> Minimum events (default: 3)\n"
                "  --declare-playout-max-length <n> Maximum events (default: 15)\n"
@@ -1509,6 +1537,8 @@ int usage(const char* program) {
                "  --attribute-occurrence-key <k>\n"
                "                            Absolute-frequency attribute (blank = activity)\n"
                "  --attribute-occurrence-min <n> Keep values seen at least n times\n"
+               "  --attribute-threshold-key <k>, --attribute-threshold <n>\n"
+               "                            Aliases of the two options above\n"
                "  --start-activities <a,b>  Keep traces starting with one of these\n"
                "  --start-activities-positive <bool> Keep (or exclude) listed starts\n"
                "  --end-activities <a,b>    Keep traces ending with one of these\n"
@@ -2065,6 +2095,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   std::map<std::string, std::string> basic_playout_fields;
   bool basic_playout_options_used = false;
   minera::PlayoutOptions basic_playout_options;
+  // pm4py's basic Petri playout generates 1000 traces by default.
+  basic_playout_options.traces = 1000;
   std::map<std::string, std::string> extensive_playout_fields;
   bool extensive_playout_options_used = false;
   std::string petri_playout_mode = "basic";
@@ -4622,6 +4654,12 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         }
         pt_alignment_fields[key] = selector;
       } else {
+        // The option lookup reads an empty value as "absent", so an empty
+        // value is rejected here instead of silently using the default.
+        if (*value == '\0') {
+          std::cerr << "error: " << arg << " expects a non-empty value\n";
+          return 2;
+        }
         pt_alignment_fields[key] = value;
       }
       align_process_tree = true;
@@ -5064,13 +5102,13 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       batch_option_used = true;
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      char* end = nullptr;
-      const double parsed = std::strtod(value, &end);
-      if (end != value + std::strlen(value) || !std::isfinite(parsed)) {
+      try {
+        batch_options.merge_distance_seconds =
+            minera::parse_strict_finite_double(value, arg);
+      } catch (const std::invalid_argument&) {
         std::cerr << "error: --batch-merge-distance-seconds expects a finite number\n";
         return 2;
       }
-      batch_options.merge_distance_seconds = parsed;
     } else if (arg == "--batch-min-size") {
       batch_option_used = true;
       const auto* value = next();
@@ -5214,21 +5252,22 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     } else if (arg == "--dependency-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      heuristic_options.dependency_threshold = std::atof(value);
+      heuristic_options.dependency_threshold =
+          minera::parse_strict_finite_double(value, arg);
     } else if (arg == "--and-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      heuristic_options.and_threshold = std::atof(value);
+      heuristic_options.and_threshold =
+          minera::parse_strict_finite_double(value, arg);
     } else if (arg == "--min-edge-frequency") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      heuristic_options.min_frequency =
-          static_cast<std::uint64_t>(std::atoll(value));
+      heuristic_options.min_frequency = minera::parse_strict_u64(value, arg);
     } else if (arg == "--heuristic-min-activity-count") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       heuristic_options.min_activity_count =
-          static_cast<std::uint64_t>(std::atoll(value));
+          minera::parse_strict_u64(value, arg);
     } else if (arg == "--heuristic-decoration") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -5273,11 +5312,13 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                "--heuristic-dfg-pre-cleaning-noise-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      heuristic_options.dfg_pre_cleaning_noise_threshold = std::atof(value);
+      heuristic_options.dfg_pre_cleaning_noise_threshold =
+          minera::parse_strict_finite_double(value, arg);
     } else if (arg == "--heuristic-loop-length-two-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      heuristic_options.loop_length_two_threshold = std::atof(value);
+      heuristic_options.loop_length_two_threshold =
+          minera::parse_strict_finite_double(value, arg);
     } else if (arg == "--heuristic-keep-once-per-case") {
       heuristic_options.keep_once_per_case = true;
     } else if (arg == "--heuristic-most-common-paths") {
@@ -5297,8 +5338,13 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       heuristic_options.lifecycle_instance_attribute = value;
     } else if (arg == "--delimiter") {
       const auto* value = next();
-      if (!value || value[0] == '\0') return usage(argv[0]);
-      options.delimiter = value[0];
+      if (!value) return usage(argv[0]);
+      try {
+        options.delimiter = minera::parse_csv_delimiter(value, arg);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
     } else if (arg == "--time-from") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -5383,8 +5429,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     } else if (arg == "--rework-min") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      filter.rework_min_occurrences =
-          static_cast<std::uint64_t>(std::atoll(value));
+      filter.rework_min_occurrences = minera::parse_strict_u64(value, arg);
     } else if (arg == "--keep-directly-follows") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -5428,20 +5473,19 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     } else if (arg == "--min-length") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      filter.min_length = static_cast<std::size_t>(std::atoll(value));
+      filter.min_length = static_cast<std::size_t>(minera::parse_strict_u64(value, arg));
     } else if (arg == "--max-length") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      filter.max_length = static_cast<std::size_t>(std::atoll(value));
+      filter.max_length = static_cast<std::size_t>(minera::parse_strict_u64(value, arg));
     } else if (arg == "--min-variant-frequency") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      filter.min_variant_frequency =
-          static_cast<std::uint64_t>(std::atoll(value));
+      filter.min_variant_frequency = minera::parse_strict_u64(value, arg);
     } else if (arg == "--top-variants") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      filter.top_variants = static_cast<std::size_t>(std::atoll(value));
+      filter.top_variants = static_cast<std::size_t>(minera::parse_strict_u64(value, arg));
     } else if (arg == "--variant-coverage") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -6254,9 +6298,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                                     : std::string("case_id_RIGHT");
       auto relations = minera::parse_case_relations_csv(
           relation_input, left_column, right_column);
-      // Keys joining a CSV log carry its typed case-id text.
+      // Keys joining a CSV log follow its typed case-id column.
       minera::type_case_relations_like_csv_logs(
-          relations, !input_is_xes, !is_xes_path(timestamp_interleavings_right_path));
+          relations, input_is_xes ? nullptr : &log,
+          is_xes_path(timestamp_interleavings_right_path) ? nullptr : &right);
       const auto lookup = [&](std::string_view name) {
         const auto it = timestamp_interleavings_fields.find(std::string(name));
         return it == timestamp_interleavings_fields.end() ? std::string{} : it->second;
@@ -6319,11 +6364,14 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         normalize_csv_timestamp_missingness(incoming_table);
         if (!merge_case_key_supplied)
           params.case_id_key = csv_case_column(base_table, options);
-        // Keys joining a CSV case-id column carry its typed text.
-        if (minera::tools::csv_case_id_key(base_table, params.case_id_key))
-          minera::type_case_relation_column_like_csv_log(relation_table, left);
-        if (minera::tools::csv_case_id_key(incoming_table, params.case_id_key))
-          minera::type_case_relation_column_like_csv_log(relation_table, right);
+        // Keys joining a CSV case-id column follow its typed column.
+        minera::type_csv_case_relation_keys(
+            relation_table, left, right,
+            minera::tools::csv_case_id_key(base_table, params.case_id_key)
+                ? &base_table : nullptr,
+            minera::tools::csv_case_id_key(incoming_table, params.case_id_key)
+                ? &incoming_table : nullptr,
+            params.case_id_key);
         if (!merge_fields.contains("merge_timestamp_key")) {
           adapt_case_relations_table_timestamp(params, base_table,
                                                 incoming_table, options);
@@ -6357,12 +6405,15 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         params.relation_left_column = left;
         params.relation_right_column = right;
         auto relation_table = minera::parse_case_relations_table_csv(relation_input);
-        // Keys joining a CSV case-id column carry its typed text; XES keys
-        // stay literal.
-        if (!input_is_xes && minera::tools::csv_case_id_key(base_table, params.case_id_key))
-          minera::type_case_relation_column_like_csv_log(relation_table, left);
-        if (!incoming_is_xes && minera::tools::csv_case_id_key(incoming_table, params.case_id_key))
-          minera::type_case_relation_column_like_csv_log(relation_table, right);
+        // Keys joining a CSV case-id column follow its typed column; XES
+        // keys stay literal.
+        minera::type_csv_case_relation_keys(
+            relation_table, left, right,
+            !input_is_xes && minera::tools::csv_case_id_key(base_table, params.case_id_key)
+                ? &base_table : nullptr,
+            !incoming_is_xes && minera::tools::csv_case_id_key(incoming_table, params.case_id_key)
+                ? &incoming_table : nullptr,
+            params.case_id_key);
         body = minera::case_relations_json(
             minera::merge_case_relations(base_table, incoming_table, relation_table, params), params);
       }
@@ -7497,6 +7548,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                             (check_ptml.empty() ? 0 : 1);
     std::optional<minera::PetriNet> imported_net;
     std::optional<minera::PnmlDocument> imported_document;
+    // A checked PTML tree keeps its reference node names for PNML export.
+    std::optional<minera::PnmlDocument> imported_tree_document;
     // Explicit nonempty caller vectors, including all-zero markings, win.
     const auto apply_imported_markings = [&](auto& options) {
       if (!imported_document) return;
@@ -7529,8 +7582,13 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         imported_document = minera::tools::import_pnml_model(check_pnml, pnml_public_markings);
         imported_net = imported_document->net;
       } else {
-        imported_net = !check_bpmn.empty() ? minera::import_bpmn(check_bpmn)
-            : minera::to_petri_net(minera::import_ptml(check_ptml));
+        if (!check_bpmn.empty()) {
+          imported_net = minera::import_bpmn(check_bpmn);
+        } else {
+          imported_tree_document =
+              minera::process_tree_pnml_document(minera::import_ptml(check_ptml));
+          imported_net = imported_tree_document->net;
+        }
       }
       for (const auto& activity : imported_net->activities()) {
         graph.ensure_activity(activity);
@@ -8200,6 +8258,12 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
               : pnml_miner + " net (transition_bordered)";
       if (pnml_miner == "imported" && imported_document)
         minera::write_pnml(pnml_file, *imported_document, pnml_name);
+      else if (pnml_miner == "imported" && imported_tree_document)
+        minera::write_pnml(pnml_file, *imported_tree_document, pnml_name);
+      else if (pnml_miner == "inductive" &&
+               process_tree_variant == minera::ProcessTreePetriNetVariant::kStandard)
+        minera::write_pnml(pnml_file, minera::process_tree_pnml_document(tree),
+                           pnml_name);
       else
         minera::write_pnml(pnml_file, *selected, pnml_name);
     }
@@ -8478,7 +8542,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   return 0;
 }
 
-int run_export(int argc,char** argv){ExactExportState exact(argc,argv);int status=1;try{status=run_export_impl(argc,argv,exact);}catch(const std::exception& e){if(!exact.scope)throw;std::cerr<<"error: "<<e.what()<<'\n';status=1;}try{exact.finish(status);}catch(const std::exception& e){std::cerr<<"error: "<<e.what()<<'\n';return 1;}return status;}
+// Option values that fail strict parsing throw from the argument loop; they
+// are reported like every other invalid option (status 2) instead of
+// escaping main and aborting the process. Exact-report mode keeps status 1.
+int run_export(int argc,char** argv){ExactExportState exact(argc,argv);int status=1;try{status=run_export_impl(argc,argv,exact);}catch(const std::exception& e){std::cerr<<"error: "<<e.what()<<'\n';status=exact.scope?1:2;}try{exact.finish(status);}catch(const std::exception& e){std::cerr<<"error: "<<e.what()<<'\n';return 1;}return status;}
 
 #ifdef _WIN32
 int wmain(int argc, wchar_t** argv) {

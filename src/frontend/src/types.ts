@@ -3298,8 +3298,13 @@ export interface Alignments {
   computed: boolean;
   /** When !computed: true = search bound hit (reachable but too large), false = unsound. */
   exhausted: boolean;
-  /** Cost-based fitness in [0, 1]: how cheaply the log aligns to the model. */
-  fitness: number;
+  /**
+   * Cost-based fitness in [0, 1]: how cheaply the log aligns to the model.
+   * Null when !computed (exports from older versions wrote 1 there).
+   */
+  fitness: number | null;
+  /** Why the alignments were not computed; present only when !computed. */
+  error?: string;
   /**
    * Alignment-based escaping-edges precision in [0, 1]: how much extra
    * behavior the model allows at the states the optimal alignments visit.

@@ -38,19 +38,39 @@ struct AttributeMatcher {
   // rule — never kept by a keep-set, never dropped by a remove-set — except
   // that a bare key (no value sets) keeps only the events carrying it. The key
   // names a DataFrame column, so `concept:name`/`org:resource` select the
-  // first-class fields and a NaN cell counts as missing.
-  [[nodiscard]] bool keeps_event(const Event& event) const {
-    const auto* value = dataframe_cell::event_value(event, key);
+  // first-class fields, the case-id column and `case:` columns read the row's
+  // case cells, and a NaN cell counts as missing.
+  [[nodiscard]] bool keeps_event(const Trace& trace, const Event& event) const {
+    const auto* value = dataframe_cell::row_value(trace, event, key);
     if (value == nullptr) return keep.empty() && !remove.empty();
     if (!keep.empty() && keep.find(*value) == keep.end()) return false;
     if (!remove.empty() && remove.find(*value) != remove.end()) return false;
     return true;
   }
 
-  // Case-attribute survival, judged on the trace's own attributes: same rule
-  // as keeps_event, so a case without the key is never kept by a keep-set,
-  // never dropped by a remove-set, and dropped by a bare key.
+  // Case-attribute survival. A DataFrame tests the case column row by row: a
+  // keep-set needs some row with a kept value, a remove-set drops the case
+  // when any row has a removed value, and a bare key needs some row carrying
+  // the key; missing cells match nothing. CSV rows keep their own case cells
+  // (Event::case_row_attributes); otherwise the trace's value stands for
+  // every row, so a case without the key is never kept by a keep-set, never
+  // dropped by a remove-set, and dropped by a bare key.
   [[nodiscard]] bool keeps_case(const Trace& trace) const {
+    if (dataframe_cell::has_case_rows(trace, key)) {
+      bool kept_value_seen = false;
+      bool key_seen = false;
+      for (const auto& event : trace.events) {
+        const auto cell = dataframe_cell::case_row_value(event, key);
+        if (!cell || *cell == nullptr) continue;
+        const auto& value = **cell;
+        key_seen = true;
+        if (!remove.empty() && remove.find(value) != remove.end()) return false;
+        if (!keep.empty() && keep.find(value) != keep.end()) kept_value_seen = true;
+      }
+      if (!keep.empty()) return kept_value_seen;
+      if (!remove.empty()) return true;
+      return key_seen;
+    }
     const auto* value = dataframe_cell::trace_value(trace, key);
     if (value == nullptr) return keep.empty() && !remove.empty();
     if (!keep.empty() && keep.find(*value) == keep.end()) return false;
@@ -65,7 +85,7 @@ struct AttributeMatcher {
     bool kept_value_seen = false;
     bool key_seen = false;
     for (const auto& event : trace.events) {
-      const auto* value = dataframe_cell::event_value(event, key);
+      const auto* value = dataframe_cell::row_value(trace, event, key);
       if (value == nullptr) continue;
       key_seen = true;
       if (!remove.empty() && remove.find(*value) != remove.end()) return false;
@@ -125,7 +145,7 @@ Trace project_events(const Trace& trace,
         remove_lifecycles.find(event.lifecycle) != remove_lifecycles.end()) {
       continue;
     }
-    if (attribute != nullptr && !attribute->keeps_event(event)) {
+    if (attribute != nullptr && !attribute->keeps_event(trace, event)) {
       continue;
     }
     result.events.push_back(event);
@@ -1117,16 +1137,13 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
         }
         case TimeFilterMode::traces_intersecting: {
           // pm4py's DataFrame filter (the reference for imported CSV/XES
-          // logs) keeps a case whose start or end lies strictly inside the
-          // range, or which covers the whole range; touching a bound from
-          // outside is not an intersection there, unlike its EventLog filter.
+          // logs) keeps a case whose span overlaps the range strictly: it
+          // starts before the range ends and ends after the range starts.
+          // Touching a bound from outside is not an intersection there,
+          // unlike its EventLog filter, and an empty range (from == to)
+          // keeps only a case running across that instant.
           const auto span = trace_endpoint_times(trace);
-          const auto inside = [&](double instant) {
-            return time_from < instant && instant < time_to;
-          };
-          if (!span ||
-              !(inside(span->first) || inside(span->second) ||
-                (span->first <= time_from && time_to <= span->second))) {
+          if (!span || !(span->first < time_to && span->second > time_from)) {
             continue;
           }
           break;

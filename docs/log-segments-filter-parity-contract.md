@@ -13,9 +13,10 @@ The public native counterparts are `filter_log_prefix` and `filter_log_suffix`
 in `include/minera/log_segments_filter.hpp`. Their semantic input is an
 original EventLog. Existing stream/table conversion adapters retain their own
 contracts, and this proof does not promote pandas or polars filtering modules.
-The old `filter_prefix`/`filter_suffix` API remains a separate native extension:
-it rejects empty targets and its suffix strictness includes the anchor. Its
-implementation, callers and defaults are unchanged.
+The old `filter_prefix`/`filter_suffix` API (`segment_filter.hpp`) remains a
+separate native extension that rejects empty targets. Its strictness now
+matches these functions: strict excludes the anchor from both the prefix and
+the suffix.
 
 ## Selection and slicing
 

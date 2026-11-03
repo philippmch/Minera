@@ -46,17 +46,42 @@ struct CaseRelationsOptions {
 [[nodiscard]] EventTable parse_case_relations_table_csv(std::istream& input);
 
 // A relation file is read like the reference reads a relations frame
-// (read_csv types each column), and its keys are compared with a
-// batch-imported CSV log's case ids, which format_dataframe has converted to
-// strings. These rewrite the relation key column(s) joining a CSV log to that
-// typed text (reference_csv_column_text), so "007" or "+7" in a relation file
-// still meets the CSV case "7" and a column with an NA cell reads as floats.
-// A cell the typing marks missing keeps its text; other columns stay text.
-// An XES side keeps its literal keys.
-void type_case_relation_column_like_csv_log(EventTable& relations,
-                                            const std::string& column);
+// (read_csv types each column), and its keys meet a batch-imported CSV log's
+// case-id column, which read_csv typed the same way. These rewrite the
+// relation key texts so that the text comparison of the merge follows the
+// reference's typed comparison:
+//   - A key joining a CSV log's case ids (the incoming side of a merge, both
+//     sides of the interleavings) meets a case id of equal value: int64,
+//     float64 and bool keys meet by value ("007" or "7.0" meet the case "7",
+//     True meets 1), a str key never meets a bool, and an NA key meets
+//     nothing. A str column joined with a numeric one is an error, as in
+//     pandas.
+//   - The base side's case ids and the LEFT keys become one concatenated
+//     case column, so both are rendered in its dtype: an int64 log with a
+//     float64 LEFT column (for example one with an NA cell) reads "7.0"
+//     throughout, bool keys read 1/0 in an int64 column, and in an object
+//     column numbers of equal value group as one case under the spelling
+//     seen first.
+// Columns of Python ints or literal text (read_csv's object columns) keep
+// their typed text. An XES side keeps its literal keys; so does a str key
+// sharing its spelling with a number in an object column, which the
+// reference keeps apart.
+//
+// For a merge: `base_csv`/`incoming_csv` are the CSV sides whose case-id
+// column is `case_key` (null otherwise); the base table's case cells may be
+// re-rendered, and an incoming key that meets no case becomes a null cell.
+void type_csv_case_relation_keys(EventTable& relations,
+                                 const std::string& left_column,
+                                 const std::string& right_column,
+                                 EventTable* base_csv, EventTable* incoming_csv,
+                                 const std::string& case_key);
+// For the interleavings, joined on both sides: a relation whose key meets no
+// case of a CSV side (null for an XES side) is dropped. The left side joins
+// first; when no relation meets a left case, the result is empty and the
+// right side is not joined (so it cannot fail), as in the reference.
 void type_case_relations_like_csv_logs(std::vector<CaseRelation>& relations,
-                                       bool left_is_csv, bool right_is_csv);
+                                       const EventLog* left_csv,
+                                       const EventLog* right_csv);
 
 [[nodiscard]] EventLog merge_case_relations(
     const EventLog& base, const EventLog& incoming,

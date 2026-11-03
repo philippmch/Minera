@@ -2,6 +2,8 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/json_export.hpp"
+#include "minera/process_tree_petri.hpp"
+#include "minera/ptml.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -12,6 +14,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -1441,9 +1444,161 @@ void automatic_presentation_bundle_collisions() {
   assert_generic_conversion_unchanged(generic_before,to_petri_net(hn));
 }
 
+// Reference process-tree conversion captures (pm4py 2.7.22: the reference
+// converter on its parsed tree notation, and on its PTML reader's tree for
+// the PTML cases). Each capture lists the sorted place names, the sorted
+// transition names (visible transitions as "v:<label>", since the reference
+// names those with random UUIDs) and the sorted arcs.
+std::string reference_tree_net_signature(
+    const minera::ProcessTreePetriNetConversion& conversion) {
+  const auto& net = conversion.net;
+  const auto transition_name = [&](std::size_t t) {
+    const auto& transition = net.transitions()[t];
+    return transition.activity ? "v:" + net.activities()[*transition.activity]
+                               : conversion.transition_names[t];
+  };
+  std::vector<std::string> places = conversion.place_names;
+  std::vector<std::string> transitions;
+  std::vector<std::string> arcs;
+  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+    transitions.push_back(transition_name(t));
+    for (const auto p : net.transitions()[t].inputs)
+      arcs.push_back(conversion.place_names[p] + ">" + transition_name(t));
+    for (const auto p : net.transitions()[t].outputs)
+      arcs.push_back(transition_name(t) + ">" + conversion.place_names[p]);
+  }
+  std::sort(places.begin(), places.end());
+  std::sort(transitions.begin(), transitions.end());
+  std::sort(arcs.begin(), arcs.end());
+  const auto join = [](const std::vector<std::string>& items) {
+    std::string out;
+    for (std::size_t i = 0; i < items.size(); ++i) {
+      if (i != 0) out += ' ';
+      out += items[i];
+    }
+    return out;
+  };
+  return join(places) + " | " + join(transitions) + " | " + join(arcs);
+}
+
+// Parses the reference's tree notation: ->, X, +, *, O and <> operators,
+// quoted activities and tau.
+class TreeNotation {
+ public:
+  explicit TreeNotation(std::string_view text) : text_(text) {}
+  minera::ProcessTree parse() {
+    auto root = node();
+    return minera::ProcessTree(std::move(activities_), std::move(root));
+  }
+
+ private:
+  minera::ProcessTreeNode node() {
+    using Op = minera::ProcessTreeOperator;
+    if (text_.substr(pos_, 3) == "tau") {
+      pos_ += 3;
+      return minera::ProcessTreeNode::tau();
+    }
+    if (text_[pos_] == '\'') {
+      const auto end = text_.find('\'', pos_ + 1);
+      std::string name(text_.substr(pos_ + 1, end - pos_ - 1));
+      pos_ = end + 1;
+      const auto it = std::find(activities_.begin(), activities_.end(), name);
+      const auto index = static_cast<std::size_t>(it - activities_.begin());
+      if (it == activities_.end()) activities_.push_back(name);
+      return minera::ProcessTreeNode::leaf(index);
+    }
+    Op op = Op::kSequence;
+    if (text_.substr(pos_, 2) == "->") {
+      pos_ += 2;
+    } else if (text_.substr(pos_, 2) == "<>") {
+      op = Op::kInterleaving;
+      pos_ += 2;
+    } else {
+      const char c = text_[pos_++];
+      op = c == 'X' ? Op::kExclusive
+           : c == '+' ? Op::kParallel
+           : c == '*' ? Op::kLoop
+                      : Op::kInclusiveChoice;
+    }
+    minera::ProcessTreeNode result{op, 0, {}};
+    ++pos_;  // '('
+    while (text_[pos_] != ')') {
+      result.children.push_back(node());
+      if (text_[pos_] == ',') ++pos_;
+    }
+    ++pos_;
+    return result;
+  }
+  std::string_view text_;
+  std::size_t pos_ = 0;
+  std::vector<std::string> activities_;
+};
+
+void tree_conversion_matches_reference_captures() {
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {"->('x',*('c',X('a','b')),'y')",
+       "p_5 p_6 p_7 sink source | loop_2 v:a v:b v:c v:x v:y | loop_2>p_5 p_5>v:c p_6>v:a p_6>v:b p_6>v:y p_7>loop_2 source>v:x v:a>p_7 v:b>p_7 v:c>p_6 v:x>p_5 v:y>sink"},
+      {"*('a','b')",
+       "p_5 p_6 sink source | skip_5 tau_1 v:a v:b | p_5>v:a p_6>skip_5 p_6>v:b skip_5>sink source>tau_1 tau_1>p_5 v:a>p_6 v:b>p_5"},
+      {"+('a',X('b',tau))",
+       "p_5 p_6 p_7 p_8 sink source | skip_5 tauJoin_4 tau_1 v:a v:b | p_5>v:a p_6>tauJoin_4 p_7>skip_5 p_7>v:b p_8>tauJoin_4 skip_5>p_8 source>tau_1 tauJoin_4>sink tau_1>p_5 tau_1>p_7 v:a>p_6 v:b>p_8"},
+      {"O(+('a','b'),'c')",
+       "p_10 p_11 p_12 p_13 p_14 p_3 p_4 p_5 p_6 p_7 p_8 p_9 sink source | inclusiveLater_4 inclusiveLater_9 inclusiveSkip_10 inclusiveSkip_5 inclusiveStart_3 inclusiveStart_8 tauJoin_2 tauJoin_7 tauSplit_1 tauSplit_6 v:a v:b v:c | inclusiveLater_4>p_3 inclusiveLater_4>p_6 inclusiveLater_9>p_13 inclusiveLater_9>p_3 inclusiveSkip_10>p_14 inclusiveSkip_10>p_3 inclusiveSkip_5>p_3 inclusiveSkip_5>p_7 inclusiveStart_3>p_3 inclusiveStart_3>p_6 inclusiveStart_8>p_13 inclusiveStart_8>p_3 p_10>v:b p_11>tauJoin_7 p_12>inclusiveLater_9 p_12>inclusiveSkip_10 p_12>inclusiveStart_8 p_13>v:c p_14>tauJoin_2 p_3>inclusiveLater_4 p_3>inclusiveLater_9 p_3>inclusiveSkip_10 p_3>inclusiveSkip_5 p_3>tauJoin_2 p_4>inclusiveStart_3 p_4>inclusiveStart_8 p_5>inclusiveLater_4 p_5>inclusiveSkip_5 p_5>inclusiveStart_3 p_6>tauSplit_6 p_7>tauJoin_2 p_8>v:a p_9>tauJoin_7 source>tauSplit_1 tauJoin_2>sink tauJoin_7>p_7 tauSplit_1>p_12 tauSplit_1>p_4 tauSplit_1>p_5 tauSplit_6>p_10 tauSplit_6>p_8 v:a>p_9 v:b>p_11 v:c>p_14"},
+      {"<>('a',->('b','c'))",
+       "p_12 p_3 p_4 p_5 p_8 p_9 sink source | tauJoin_2 tauSplit_1 v:a v:b v:c | p_12>v:c p_3>tauJoin_2 p_3>v:a p_3>v:b p_4>v:a p_5>tauJoin_2 p_8>v:b p_9>tauJoin_2 source>tauSplit_1 tauJoin_2>sink tauSplit_1>p_3 tauSplit_1>p_4 tauSplit_1>p_8 v:a>p_3 v:a>p_5 v:b>p_12 v:c>p_3 v:c>p_9"},
+      {"->('a',O('b','c'),'d')",
+       "p_10 p_11 p_12 p_5 p_6 p_7 p_8 p_9 sink source | inclusiveLater_4 inclusiveLater_7 inclusiveSkip_5 inclusiveSkip_8 inclusiveStart_3 inclusiveStart_6 v:a v:b v:c v:d | inclusiveLater_4>p_5 inclusiveLater_4>p_8 inclusiveLater_7>p_11 inclusiveLater_7>p_5 inclusiveSkip_5>p_5 inclusiveSkip_5>p_9 inclusiveSkip_8>p_12 inclusiveSkip_8>p_5 inclusiveStart_3>p_5 inclusiveStart_3>p_8 inclusiveStart_6>p_11 inclusiveStart_6>p_5 p_10>inclusiveLater_7 p_10>inclusiveSkip_8 p_10>inclusiveStart_6 p_11>v:c p_12>v:d p_5>inclusiveLater_4 p_5>inclusiveLater_7 p_5>inclusiveSkip_5 p_5>inclusiveSkip_8 p_5>v:d p_6>inclusiveStart_3 p_6>inclusiveStart_6 p_7>inclusiveLater_4 p_7>inclusiveSkip_5 p_7>inclusiveStart_3 p_8>v:b p_9>v:d source>v:a v:a>p_10 v:a>p_6 v:a>p_7 v:b>p_9 v:c>p_12 v:d>sink"},
+      {"X(tau,*(tau,'a'))",
+       "p_3 p_4 p_5 p_6 sink source | init_loop_4 skip_3 skip_6 skip_7 tau_1 tau_2 v:a | init_loop_4>p_5 p_3>init_loop_4 p_3>skip_3 p_4>tau_2 p_5>skip_6 p_6>skip_7 p_6>v:a skip_3>p_4 skip_6>p_6 skip_7>p_4 source>tau_1 tau_1>p_3 tau_2>sink v:a>p_5"},
+      {"->(*('a','b'),'c',*('d','e'))",
+       "p_10 p_11 p_6 p_7 sink source | skip_8 tau_1 v:a v:b v:c v:d v:e | p_10>v:d p_11>skip_8 p_11>v:e p_6>v:a p_7>v:b p_7>v:c skip_8>sink source>tau_1 tau_1>p_6 v:a>p_7 v:b>p_6 v:c>p_10 v:d>p_11 v:e>p_10"},
+  };
+  for (const auto& [tree_text, expected] : cases) {
+    const auto tree = TreeNotation(tree_text).parse();
+    const auto conversion = minera::convert_process_tree_to_petri_net(tree);
+    assert(reference_tree_net_signature(conversion) == expected);
+    // The net carries the same names, so name-ordered consumers follow them.
+    assert(conversion.net.transition_names());
+    const auto& names = *conversion.net.transition_names();
+    assert(names.size() == conversion.transition_names.size());
+    for (std::size_t t = 0; t < names.size(); ++t) {
+      assert(names[t] && *names[t] == conversion.transition_names[t]);
+      // Visible names are UUID-shaped and sort before every silent name.
+      if (!conversion.net.transitions()[t].activity) continue;
+      assert(names[t]->rfind("00000000-0000-4000-8000-", 0) == 0);
+      for (std::size_t u = 0; u < names.size(); ++u)
+        if (!conversion.net.transitions()[u].activity) assert(*names[t] < *names[u]);
+    }
+    const auto net = minera::to_petri_net(tree);
+    assert(net.transitions().size() == conversion.net.transitions().size());
+    assert(net.place_count() == conversion.net.place_count());
+  }
+}
+
+void ptml_three_child_loop_matches_reference_reader() {
+  // The reference reader drops a root loop's third child, and moves a nested
+  // loop's third child behind the loop, appended at the end of its parent.
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ptml><processTree name=\"t\" root=\"r\" id=\"pt\"><xorLoop name=\"\" id=\"r\"/><manualTask name=\"a\" id=\"ia\"/><manualTask name=\"b\" id=\"ib\"/><manualTask name=\"c\" id=\"ic\"/>\n<parentsNode id=\"e1\" sourceId=\"r\" targetId=\"ia\"/><parentsNode id=\"e2\" sourceId=\"r\" targetId=\"ib\"/><parentsNode id=\"e3\" sourceId=\"r\" targetId=\"ic\"/></processTree></ptml>",
+       "p_5 p_6 sink source | skip_5 tau_1 v:a v:b | p_5>v:a p_6>skip_5 p_6>v:b skip_5>sink source>tau_1 tau_1>p_5 v:a>p_6 v:b>p_5"},
+      {"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ptml><processTree name=\"t\" root=\"r\" id=\"pt\"><sequence name=\"\" id=\"r\"/><manualTask name=\"x\" id=\"ix\"/><xorLoop name=\"\" id=\"l\"/><manualTask name=\"y\" id=\"iy\"/><manualTask name=\"a\" id=\"ia\"/><manualTask name=\"b\" id=\"ib\"/><manualTask name=\"c\" id=\"ic\"/>\n<parentsNode id=\"e0\" sourceId=\"r\" targetId=\"ix\"/><parentsNode id=\"e4\" sourceId=\"r\" targetId=\"l\"/><parentsNode id=\"e5\" sourceId=\"r\" targetId=\"iy\"/><parentsNode id=\"e1\" sourceId=\"l\" targetId=\"ia\"/><parentsNode id=\"e2\" sourceId=\"l\" targetId=\"ib\"/><parentsNode id=\"e3\" sourceId=\"l\" targetId=\"ic\"/></processTree></ptml>",
+       "p_3 p_6 p_7 sink source | v:a v:b v:c v:x v:y | p_3>v:y p_6>v:a p_7>v:b p_7>v:c source>v:x v:a>p_7 v:b>p_6 v:c>sink v:x>p_3 v:y>p_6"},
+  };
+  for (const auto& [ptml, expected] : cases) {
+    const auto tree = minera::parse_ptml(ptml);
+    const auto conversion = minera::convert_process_tree_to_petri_net(tree);
+    assert(reference_tree_net_signature(conversion) == expected);
+    const auto document = minera::process_tree_pnml_document(tree);
+    assert(document.place_ids == conversion.place_names);
+    assert(document.transition_ids == conversion.transition_names);
+  }
+}
+
 }  // namespace
 
 int main() {
+  tree_conversion_matches_reference_captures();
+  ptml_three_child_loop_matches_reference_reader();
   discovery_markings_preserve_sparse_counts_and_detached_identity();
   leaf_and_tau_keep_labels_and_language();
   composite_fragments_have_silent_borders();

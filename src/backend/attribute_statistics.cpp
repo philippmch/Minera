@@ -12,12 +12,15 @@ namespace {
 // get_event_attribute_values/get_trace_attribute_values: a missing, null or
 // NaN cell is not counted. The short aliases `activity`, `timestamp`,
 // `resource` and `lifecycle` name the first-class fields as well.
-const std::string* event_value(const Event& event, std::string_view key) {
+// The case-id column and `case:` columns are DataFrame columns too: every
+// row carries them.
+const std::string* event_value(const Trace& trace, const Event& event,
+                               std::string_view key) {
   if (key == "activity") key = "concept:name";
   else if (key == "timestamp") key = "time:timestamp";
   else if (key == "resource") key = "org:resource";
   else if (key == "lifecycle") key = "lifecycle:transition";
-  return dataframe_cell::event_value(event, key);
+  return dataframe_cell::row_value(trace, event, key);
 }
 
 const std::string* trace_value(const Trace& trace, std::string_view key) {
@@ -76,7 +79,7 @@ AttributeStatisticsResult discover_attribute_statistics(
     for (const auto& trace : log.traces) {
       std::set<std::string> seen;
       for (const auto& event : trace.events) {
-        const auto* value = event_value(event, options.attribute_key);
+        const auto* value = event_value(trace, event, options.attribute_key);
         if (!value) continue;
         if (options.keep_once_per_case && !seen.insert(*value).second) continue;
         ++result.values[*value];
@@ -85,9 +88,19 @@ AttributeStatisticsResult discover_attribute_statistics(
     return result;
   }
   if (options.scope == AttributeStatisticsScope::kTraces) {
-    // A DataFrame repeats the case attribute on every event row, and the
-    // reference counts rows: a case contributes one count per event.
+    // The reference counts the case column's rows. A CSV keeps each row's own
+    // cell (blank rows are not counted); otherwise a DataFrame repeats the
+    // case attribute on every event row, so a case contributes one count per
+    // event.
     for (const auto& trace : log.traces) {
+      if (dataframe_cell::has_case_rows(trace, options.attribute_key)) {
+        for (const auto& event : trace.events) {
+          const auto cell =
+              dataframe_cell::case_row_value(event, options.attribute_key);
+          if (cell && *cell) ++result.values[**cell];
+        }
+        continue;
+      }
       const auto* value = trace_value(trace, options.attribute_key);
       if (value && !trace.events.empty())
         result.values[*value] += trace.events.size();
